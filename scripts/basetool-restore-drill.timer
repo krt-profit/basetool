@@ -8,7 +8,7 @@ OnCalendar=Sun *-*-* 05:30:00
 Persistent=true
 RandomizedDelaySec=5min
 
-Unit=iri-restore-drill.service
+Unit=basetool-restore-drill.service
 
 [Install]
 WantedBy=timers.target

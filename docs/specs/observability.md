@@ -5,7 +5,7 @@
 > Linux 10. The monitoring plane is nine Quadlet container units (generated from
 > `docker-compose.monitoring.yml` by `scripts/generate-quadlet.py`) plus host services installed by
 > the Ansible role (`node_exporter`, `alloy`, `prometheus-podman-exporter`, and the
-> `iri-container-metrics` / `iri-cert-expiry` collector timers). cAdvisor and the docker-socket-proxy
+> `basetool-container-metrics` / `basetool-cert-expiry` collector timers). cAdvisor and the docker-socket-proxy
 > no longer exist; container logs reach Loki through the journal. Where a requirement below still
 > names a Docker-era mechanism it says so and dates it.
 
@@ -639,7 +639,7 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
 > - The backend's `/actuator/loggers/**` stays with the main chain (authenticated `GET`,
 >   `ROLE_ADMIN` `POST`, REQ-OBS-016).
 > - The three `basetool-*` Prometheus jobs send `basic_auth` (username `monitoring`,
->   `password_file: /etc/prometheus/secrets/scrape_password`), so the prod `.env` value of
+>   `password_file: /etc/prometheus/secrets/scrape_password`), so the prod `basetool.env` value of
 >   `MONITORING_SCRAPE_PASSWORD` must equal that file and `MONITORING_SCRAPE_USER` must be
 >   `monitoring`.
 >
@@ -714,7 +714,7 @@ it is invisible until something waits on the container's health.
   edge's own configuration in git rather than an NPM setting. It still returns HTTP **404** (not
   403) so it does not reveal that the Actuator endpoints exist behind the edge, and every probe
   asserting it expects 404. The `scrape_password` secret is what the three `basetool-*` scrape jobs
-  send as their password, and it must equal `MONITORING_SCRAPE_PASSWORD` in the `.env`
+  send as their password, and it must equal `MONITORING_SCRAPE_PASSWORD` in the `basetool.env`
   (`monitoring/README.md` → *Rebuilding the monitoring plane on a new host*).
 - Every meter carries the common tag `application=basetool-{backend,frontend,ingest}` so
   dashboards can select the module.
@@ -860,9 +860,9 @@ not silent — so the only detector was a human reading a log export.
   amendment) records it.
 - **Ops-automation host logs** (`app="ops-deploy"` / `"ops-backup"` / `"ops-cleanup"` /
   `"ops-restore-drill"`) — the four systemd units' own log files under the existing
-  `/var/log:/hostlog:ro` mount (`iri-deploy.log`, `iri-backup.log`, `iri-container-cleanup.log`,
-  `iri-restore-drill.log`). Motive: the units write with `StandardOutput=append:`, which **replaces**
-  journald rather than teeing to it, so `journalctl -u iri-deploy.service` carries only systemd's own
+  `/var/log:/hostlog:ro` mount (`/var/log/basetool/deploy.log`, `backup.log`, `container-cleanup.log`,
+  `restore-drill.log`, read by Alloy as `/hostlog/basetool/<x>.log`). Motive: the units write with `StandardOutput=append:`, which **replaces**
+  journald rather than teeing to it, so `journalctl -u basetool-deploy.service` carries only systemd's own
   unit records — the script output that explains *why* a deploy rolled back was reachable over SSH
   and nowhere else, which is exactly the wrong triage path for a 03:40 alert mail. All four route
   through `loki.process.ops_automation_mask`: the three `<svc>-stdout` replaces (JWT / e-mail /
@@ -873,7 +873,7 @@ not silent — so the only detector was a human reading a log export.
   description is what reaches the operator's mailbox. **Precondition:** the shipper has no
   `CAP_DAC_OVERRIDE` in either shape — the container ran `cap_drop: [ALL]`, the host service runs as
   the unprivileged `alloy` user — so each log file must be readable through the `adm` group. The
-  four `scripts/iri-*.logrotate` snippets rotate with `copytruncate`, under which logrotate ignores
+  four `scripts/basetool-*.logrotate` snippets rotate with `copytruncate`, under which logrotate ignores
   their `create 0640 deploy adm` line: the live file is truncated in place and keeps whatever owner
   and mode it had when the unit's `append:` first created it — nothing in the repository sets it
   (corrected 2026-09-22; this sentence used to claim a `0640 deploy adm` re-create on every
@@ -1017,7 +1017,7 @@ not silent — so the only detector was a human reading a log export.
 
   **What is not served** — added 2026-09-20, and this paragraph **corrects** the sentence above it,
   which read as full coverage and was not. The internal CA itself,
-  `/var/iri/monitoring/certs/basetool-ca.crt`, is the trust anchor for every verified upstream at
+  `/etc/basetool/monitoring/certs/basetool-ca.crt`, is the trust anchor for every verified upstream at
   the edge **and** for the `https_internal` probe module. Nothing listens on it, so nothing probed
   it, so nothing watched it — measured on the testing host 2026-09-20, it was the only certificate
   in the monitoring plane with no coverage of any kind. The day it expires, every verified upstream
@@ -1026,7 +1026,7 @@ not silent — so the only detector was a human reading a log export.
   present for a service that is currently down has the same shape.
 
   The gap is closed from the host, not by another probe. `scripts/cert-expiry-metrics.py` runs under
-  `iri-cert-expiry.timer` (daily, `OnBootSec=5min`, `Persistent=true`) and writes
+  `basetool-cert-expiry.timer` (daily, `OnBootSec=5min`, `Persistent=true`) and writes
   `basetool_certificate_expiry_timestamp_seconds{path,subject,issuer,self_signed}`,
   `basetool_certificate_not_before_timestamp_seconds`, `basetool_certificate_files` and
   `basetool_certificate_metrics_timestamp_seconds` into node_exporter's textfile directory. It reads
@@ -1069,7 +1069,7 @@ Tracing on the OTel SDK) behind a hard master gate:
   them to Tempo — apps never reach the trace store directly. On the Podman host Alloy is a host
   service, so the name `alloy` resolves through `AddHost=alloy:host-gateway` on the backend,
   frontend, ingest and keycloak units (`PODMAN_HOST_ALIASES` in `generate-quadlet.py`), and Alloy
-  forwards to Tempo's loopback publish (`IRI_ALLOY_TEMPO_ENDPOINT=127.0.0.1:4327`, REQ-OBS-019). Sampling probability comes
+  forwards to Tempo's loopback publish (`BASETOOL_ALLOY_TEMPO_ENDPOINT=127.0.0.1:4327`, REQ-OBS-019). Sampling probability comes
   from `MONITORING_TRACING_SAMPLING_PROBABILITY`, which **stays at `1.0`** — the Phase-3 review
   it was flagged for happened on 2026-08-29 (#1705) and found nothing to buy. The deciding
   number is CPU, not memory: tempo's **entire** container CPU over seven days is 0.0181 cores,
@@ -1264,8 +1264,8 @@ transaction per pass) rather than per-scrape.
 
 `basetool_container_*` and `basetool_container_metrics_*` are written by
 [`scripts/cgroup-container-metrics.py`](../../scripts/cgroup-container-metrics.py) into
-node_exporter's textfile directory (`/var/iri/monitoring/textfile/containers.prom`), every 30 s
-under `iri-container-metrics.timer`. They are registered here because the naming rule is
+node_exporter's textfile directory (`/var/lib/basetool/textfile/containers.prom`), every 30 s
+under `basetool-container-metrics.timer`. They are registered here because the naming rule is
 repository-wide, not module-wide: anything called `basetool_*` obeys REQ-OBS-006, whoever produces
 it. Added 2026-09-18; the collector shipped without them being written down, which made the
 vocabulary look complete while its series sat outside it.
@@ -1320,7 +1320,7 @@ rule reads its Podman source alone. See REQ-OBS-014.
 ##### `basetool_certificate_*` — expiry for certificates no listener serves
 
 Written by [`scripts/cert-expiry-metrics.py`](../../scripts/cert-expiry-metrics.py) into the same
-textfile directory, under `iri-cert-expiry.timer`. Added 2026-09-20. The reason it exists is in
+textfile directory, under `basetool-cert-expiry.timer`. Added 2026-09-20. The reason it exists is in
 REQ-OBS-008: blackbox probes cover every certificate this deployment **serves**, and the internal CA
 is served by nothing, so it was the one certificate with no coverage at all — while being the one
 whose expiry breaks every verified upstream *and* the probes that would have warned about the
@@ -1334,7 +1334,7 @@ leaves, simultaneously.
 | `basetool_certificate_metrics_timestamp_seconds` | gauge | the collector itself | the collector's own liveness, read by `CertificateMetricsStale` |
 
 **Labels:** `path`, `subject`, `issuer`, `self_signed`. Bounded by the contents of one
-operator-provisioned directory — `/var/iri/monitoring/certs`, two files on the testing host today
+operator-provisioned directory — `/etc/basetool/monitoring/certs`, two files on the testing host today
 (the internal CA and Grafana's leaf) — which is what
 REQ-OBS-006 asks of a label set — `path` is not a request path or a user value, it is a fixed
 deployment artefact. `self_signed` is `issuer == subject`, and it is what splits the 14-day rule
@@ -1351,7 +1351,7 @@ and a collector must not add a dependency to a box whose point is a fixed, audit
 
 Written by [`scripts/host-updates-metrics.sh`](../../scripts/host-updates-metrics.sh) into the same
 textfile directory (`host-updates.prom`): from `dnf-automatic.service`'s `ExecStopPost=` after every
-run, and from `iri-host-updates-metrics.service` at boot. Added 2026-09-22 with REQ-OPS-032.
+run, and from `basetool-host-updates-metrics.service` at boot. Added 2026-09-22 with REQ-OPS-032.
 
 | series | type | source | why |
 |---|---|---|---|
@@ -2899,7 +2899,7 @@ a full edge outage pages once (liveness), not once per posture assertion.
 **The identity probe targets are gated in CI, because `prometheus.yml` cannot be derived.** Four
 targets name the identity base — the OIDC discovery document (`blackbox-http` and its IPv6 twin) and
 Keycloak's `/auth/health` and `/auth/metrics` management-surface denies. Since ADR-0167 the app stack
-and Grafana both compose that base from `IRI_KEYCLOAK_HOSTNAME`, but this file is static: nothing
+and Grafana both compose that base from `BASETOOL_KEYCLOAK_HOSTNAME`, but this file is static: nothing
 interpolates it, so a domain move never reaches it on its own. `scripts/check-keycloak-issuer.py`
 therefore compares instead, in **both** directions — no target under the identity path may sit on
 another base, **and** all three required probes must still be present. The second half is not
@@ -3095,12 +3095,12 @@ therefore alerts on:
   fires when that stamp stays newer than Prometheus's own
   `prometheus_config_last_reload_success_timestamp_seconds` for 15 minutes — long enough for the
   self-healing reconcile to converge, so a persistent alert means it is *not* converging (the
-  recreate is failing, or the `iri-deploy` timer stopped). The acute case (a wrong/absent scrape
+  recreate is failing, or the `basetool-deploy` timer stopped). The acute case (a wrong/absent scrape
   target) still pages `TargetDown`; this is the complementary early signal that the running Prometheus
   config is out of date at all.
 - **A reconcile disabled while the stack runs.** `PrometheusConfigStale` has a blind spot of its own:
   its `basetool_monitoring_config_applied_timestamp` stamp is written **only** from inside `deploy.sh`'s
-  monitoring reconcile, which returns early when `IRI_MONITORING_ENABLED != true`. On a host that runs
+  monitoring reconcile, which returns early when `BASETOOL_MONITORING_ENABLED != true`. On a host that runs
   the monitoring stack but leaves that flag unset, the config-bundle rsync keeps rewriting
   `monitoring/**` on disk every tick while the running containers are never recreated — on-disk
   rule/scrape changes silently never reach the running Prometheus — yet no applied stamp is ever
@@ -3109,13 +3109,13 @@ therefore alerts on:
   promoted v1.3.6 rule fixes lived on disk but the running Prometheus kept the old rules). `deploy.sh`
   closes this by emitting `basetool_monitoring_reconcile_disabled{component="deploy"}` (a node_exporter
   textfile gauge) on its **own** path — `1` when the monitoring plane is running (any of the nine
-  monitoring units on Podman, the `iri-monitoring` compose project on Docker) but the reconcile is
+  monitoring units on Podman, the `basetool-monitoring` compose project on Docker) but the reconcile is
   gated off, `0` when the reconcile is enabled and runs — plus a loud per-tick WARN;
   `MonitoringReconcileDisabled` (warning) fires on the `== 1` gauge after 30m. Because that gauge is
   written precisely in the failure state and never depends on the applied-stamp path, it cannot be
-  self-disabled the way `PrometheusConfigStale` was. The fix is `IRI_MONITORING_ENABLED=true` in the
-  host `.env`, which `deploy.sh` reads for this one key since 2026-08 (the unit declares no
-  `EnvironmentFile=`); an `Environment=` drop-in on `iri-deploy.service` still works and wins.
+  self-disabled the way `PrometheusConfigStale` was. The fix is `BASETOOL_MONITORING_ENABLED=true` in the
+  host `basetool.env`, which `deploy.sh` reads for this one key since 2026-08 (the unit declares no
+  `EnvironmentFile=`); an `Environment=` drop-in on `basetool-deploy.service` still works and wins.
 - **The deployer's own heartbeat** (since 2026-09-22). Every other deploy alert reads an outcome a
   tick wrote; none could see ticks that stopped happening. `DeployHeartbeatStale` (warning) fires
   when `basetool_deploy_last_stack_healthy_timestamp` — stamped by every tick that finds the stack at
@@ -3340,7 +3340,7 @@ therefore alerts on:
   `BackendCallFailureSustained`, the label-less sync-zero warnings) and the independent criticals still
   fire — inhibition suppresses the *notification*, never the firing, and criticals must keep paging.
   The template is rendered on the host with `envsubst` into
-  `/var/iri/monitoring/secrets/alertmanager.yml` and validated with `amtool check-config`
+  `/etc/basetool/monitoring/secrets/alertmanager.yml` and validated with `amtool check-config`
   (`monitoring/README.md`). Nothing renders it automatically, and Alertmanager is **not** in
   `deploy.sh`'s reconcile: a merged template change reaches the running process only when an operator
   re-renders the file and restarts `alertmanager.service` (verify `AlertmanagerConfigReloadFailed == 0`
@@ -3385,7 +3385,7 @@ files:
 
 Two follow-ups, both from the Podman cutover. **`SystemdUnitFailed` is alive again**: node_exporter
 became a host service (`27-observability.yml`) and its systemd collector now reads the system
-manager — which covers `iri-deploy`, `iri-backup`, `iri-restore-drill` and the other system units,
+manager — which covers `basetool-deploy`, `basetool-backup`, `basetool-restore-drill` and the other system units,
 but **not** the application containers, which are `systemctl --user` units of the service user;
 their state comes from `prometheus-podman-exporter` (`podman_container_state` /
 `podman_container_health`). And **three more joined the table on 2026-09-22**:
@@ -3425,7 +3425,7 @@ file parses and every LogQL expression is valid — a group the ruler skips aler
 Alertmanager, Alloy and Loki configuration files, each validated by its own tool in the pinned image) ·
 `monitoring/prometheus/alerts/containers-runtime.yml` (the `basetool:container:*` normalisation and
 the two collector-liveness alerts) · `scripts/cgroup-container-metrics.py` +
-`iri-container-metrics.timer` and `ansible/roles/basetool_host/tasks/27-observability.yml` (the
+`basetool-container-metrics.timer` and `ansible/roles/basetool_host/tasks/27-observability.yml` (the
 host-side collectors, node_exporter, the podman exporter, the persistent journal and `psi=1`) ·
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
 `scripts/deploy.sh` + `scripts/lib/container-runtime.sh` (`reconcile_monitoring_reload(s)`
@@ -3653,7 +3653,7 @@ Three mechanisms, in order of preference:
    `/hostlog/secure` (RHEL) under one `app="host-auth"` stream, and its `LogStreamSilent` rule matches
    either path.
 2. **A port cannot be bind-mounted → an environment variable with the container-shape default.**
-   `IRI_ALLOY_LOKI_ENDPOINT` and `IRI_ALLOY_TEMPO_ENDPOINT` default to `loki:3100` and `tempo:4317`,
+   `BASETOOL_ALLOY_LOKI_ENDPOINT` and `BASETOOL_ALLOY_TEMPO_ENDPOINT` default to `loki:3100` and `tempo:4317`,
    so the Docker deployment reads the identical file and is untouched; the Podman host sets them to
    the loopback ports `PODMAN_LOOPBACK_PUBLISH` publishes. Tempo's is **4327**, not 4317, because the
    host-native Alloy binds `0.0.0.0:4317` for its own OTLP receiver and that includes loopback.

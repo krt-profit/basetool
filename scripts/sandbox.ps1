@@ -6,7 +6,7 @@ Starts, resets or stops the local exchange sandbox of the Profit Basetool.
 Runs the sandbox compose profile with the committed throwaway values in docker/sandbox/sandbox.env.
 "up" starts and seeds it, "reset" removes it with all its data and starts it again, "down" stops it
 and removes all its data. It checks that host.docker.internal resolves to the loopback, which the
-issuer http://host.docker.internal:18080/auth/realms/iri needs on this machine.
+issuer http://host.docker.internal:18080/auth/realms/basetool needs on this machine.
 
 .PARAMETER Action
 up, reset or down.
@@ -95,7 +95,7 @@ function Start-Sandbox {
     }
     Invoke-Compose (@('up', '-d', '--wait', '--wait-timeout', '600') + $services)
     Invoke-Compose @('run', '--rm', 'sandbox-seed')
-    Write-Host 'sandbox: up. Issuer http://host.docker.internal:18080/auth/realms/iri,'
+    Write-Host 'sandbox: up. Issuer http://host.docker.internal:18080/auth/realms/basetool,'
     Write-Host 'sandbox: gateway https://localhost:11262/exchange/v1, web https://localhost:18081'
     Write-Host 'sandbox: the gateway answers 503 EXCHANGE_DISABLED for up to about 15 s until it sees the switch'
 }

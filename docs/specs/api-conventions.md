@@ -1147,7 +1147,7 @@ and the old backend then walls old apps while new apps find their paths gone. Co
 > ADR-0234; REQ-API-020)
 > This used to read: configuration, not a table, because raising the floor has to work without a
 > migration, an admin screen or a deploy. Until 2026-10-03 the floor was bound at backend start from
-> `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`) in the host `.env` and raised by runbook step S8
+> `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`) in the host `basetool.env` and raised by runbook step S8
 > of [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../archive/EXCHANGE_GO_LIVE_RUNBOOK.md), after the re-cut release was
 > verified healthy and reverted first on a rollback. Now the floor and the newest build are reviewed
 > literals in the backend's `application.yml` (`app.android.version-policy.release.*`), so they
@@ -1533,7 +1533,7 @@ changed or removed (ADR-0234).
 > An operation a wave retired now answers `404` like any other path the server does not serve.
 > The three `APP_ANDROID_*_OVERRIDE` variables are passed by neither `docker-compose.yml` nor
 > `quadlet/env.d/backend.env.tmpl` and are gone from `.env.example`, so a line left in a host
-> `.env` reaches no container.
+> `basetool.env` reaches no container.
 >
 > **The deploy-seam finding outlives the mechanism.** "A value that gates an API must deploy and
 > roll back with that API, not sit in a host file" is why the floor was a reviewed literal in
@@ -1576,7 +1576,7 @@ release, so it is folded into the next release's literal and emptied again.
 `APP_ANDROID_MINIMUM_VERSION_CODE`, `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_RELEASES_URL` —
 are passed by no compose file and no `env.d` template, which are closed allow-lists, and the
 properties moved under a prefix that relaxed binding cannot reach from those names, so a value left
-in a host `.env` binds to nothing even if it were passed. On production that line stays the floor of
+in a host `basetool.env` binds to nothing even if it were passed. On production that line stays the floor of
 a rollback to a release older than this requirement (1.13.x and before still read it), so it is left
 in place until no such release is a rollback target, and never edited again.
 

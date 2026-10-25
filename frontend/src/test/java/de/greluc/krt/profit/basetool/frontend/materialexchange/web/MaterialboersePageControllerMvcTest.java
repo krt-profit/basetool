@@ -94,7 +94,7 @@ class MaterialboersePageControllerMvcTest {
             null,
             null,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON")),
             false,
             796,
             120.0,
@@ -129,7 +129,7 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(containsString("data-mb-mode")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
-        .andExpect(content().string(containsString(">IRI<")));
+        .andExpect(content().string(containsString(">ALP<")));
   }
 
   /** The default offers page renders only the offers board, never the Gesuche board. */
@@ -160,7 +160,7 @@ class MaterialboersePageControllerMvcTest {
             null,
             null,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON")),
             false,
             500,
             12.0,
@@ -201,7 +201,7 @@ class MaterialboersePageControllerMvcTest {
             null,
             7,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON")),
             false,
             null,
             null,
@@ -248,7 +248,7 @@ class MaterialboersePageControllerMvcTest {
             null,
             5,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON")),
             true,
             null,
             null,

@@ -1,8 +1,8 @@
 {{ ansible_managed | comment }}
 [Service]
-BindReadOnlyPaths={{ basetool_host_root_dir }}/backend/log:/logs/backend
-BindReadOnlyPaths={{ basetool_host_root_dir }}/frontend/log:/logs/frontend
-BindReadOnlyPaths={{ basetool_host_root_dir }}/ingest/log:/logs/ingest
-BindReadOnlyPaths={{ basetool_host_root_dir }}/keycloak/log:/logs/keycloak
+BindReadOnlyPaths={{ basetool_host_log_dir }}/backend:/logs/backend
+BindReadOnlyPaths={{ basetool_host_log_dir }}/frontend:/logs/frontend
+BindReadOnlyPaths={{ basetool_host_log_dir }}/ingest:/logs/ingest
+BindReadOnlyPaths={{ basetool_host_log_dir }}/keycloak:/logs/keycloak
 
 BindReadOnlyPaths=/var/log:/hostlog

@@ -43,7 +43,7 @@ class FirstPartyClientIdsTest {
               "0 0 5 * * *",
               "Europe/Berlin",
               "https://keycloak.example",
-              "iri",
+              "basetool",
               "admin-client",
               "throwaway",
               100));

@@ -119,7 +119,7 @@ class JobOrderTenancyE2eTest {
               ADMIN_USER, ADMIN_PASSWORD, profitSkId, "E2E Tenancy SK Order", materialId, 650, 50);
       iridiumOrderId =
           seeder.createJobOrder(
-              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Tenancy IRI Order", materialId, 650, 50);
+              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Tenancy ALP Order", materialId, 650, 50);
 
       cRequestedOrderId =
           seeder.createJobOrder(

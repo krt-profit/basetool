@@ -59,7 +59,7 @@ final class ExchangeTestClient {
 
   /** The OpenID Connect endpoints of the E2E realm, as this JVM reaches them. */
   private static final String OIDC =
-      "http://localhost:18080/auth/realms/iri/protocol/openid-connect";
+      "http://localhost:18080/auth/realms/basetool/protocol/openid-connect";
 
   /** The ingest gateway, as this JVM reaches it. */
   static final String GATEWAY = "https://localhost:11262";

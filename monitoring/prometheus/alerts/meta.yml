@@ -58,7 +58,7 @@ groups:
           severity: warning
         annotations:
           summary: "Prometheus running a stale config (an apply was missed)"
-          description: "deploy.sh applied an on-disk Prometheus config more recently than Prometheus's last SUCCESSFUL reload — the running Prometheus is serving a stale config (scrape targets / alert rules out of date), which PrometheusConfigReloadFailed cannot see. Check the deploy.sh monitoring-reload logs, recreate Prometheus (`sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user restart prometheus.service` -- a restart IS a recreate under Quadlet), and verify the iri-deploy timer is running."
+          description: "deploy.sh applied an on-disk Prometheus config more recently than Prometheus's last SUCCESSFUL reload — the running Prometheus is serving a stale config (scrape targets / alert rules out of date), which PrometheusConfigReloadFailed cannot see. Check the deploy.sh monitoring-reload logs, recreate Prometheus (`sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user restart prometheus.service` -- a restart IS a recreate under Quadlet), and verify the basetool-deploy timer is running."
 
       - alert: MonitoringReconcileDisabled
         expr: basetool_monitoring_reconcile_disabled{component="deploy"} == 1
@@ -67,7 +67,7 @@ groups:
           severity: warning
         annotations:
           summary: "Monitoring reconcile is disabled while the stack is running"
-          description: "deploy.sh sees the iri-monitoring stack running but IRI_MONITORING_ENABLED != 'true', so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox — silent config drift, and PrometheusConfigStale cannot catch it (its applied-stamp metric is written only from inside the gated reconcile). Fix: add /etc/systemd/system/iri-deploy.service.d/monitoring.conf with `Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`."
+          description: "deploy.sh sees the basetool-monitoring stack running but BASETOOL_MONITORING_ENABLED != 'true', so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox — silent config drift, and PrometheusConfigStale cannot catch it (its applied-stamp metric is written only from inside the gated reconcile). Fix: add /etc/systemd/system/basetool-deploy.service.d/monitoring.conf with `Environment=BASETOOL_MONITORING_ENABLED=true`, then `systemctl daemon-reload`."
 
       - alert: PrometheusRuleEvaluationFailures
         expr: rate(prometheus_rule_evaluation_failures_total[5m]) > 0
@@ -96,7 +96,7 @@ groups:
           severity: critical
         annotations:
           summary: "Prometheus TSDB problems (WAL corruption / failed compaction)"
-          description: "Prometheus recorded a WAL corruption or a failed compaction in the last hour — metric history integrity is at risk. Check disk health/space on /var/iri and the Prometheus log."
+          description: "Prometheus recorded a WAL corruption or a failed compaction in the last hour — metric history integrity is at risk. Check disk health/space on /var/lib/basetool and the Prometheus log."
 
       - alert: AlertmanagerConfigReloadFailed
         expr: alertmanager_config_last_reload_successful == 0
@@ -214,7 +214,7 @@ groups:
           severity: warning
         annotations:
           summary: "Tempo metrics-generator remote_write failing"
-          description: "The Tempo metrics-generator has been failing to remote_write service-graph samples to Prometheus for 10 minutes — the service map/node graph will go stale. Triage in order: (1) the shared `grafana` web-auth credential matches — PROMETHEUS_WEB_PASSWORD in /var/iri/code/env.d/tempo.env vs the bcrypt hash in /var/iri/monitoring/secrets/prometheus-web.yml; (2) Prometheus AND Tempo were restarted after prometheus-web.yml last changed — a stale loaded hash or a wedged remote-write client both give 401 despite a correct password, fixed by restarting both units as the service user (`systemctl --user restart prometheus.service tempo.service`); (3) Prometheus's remote-write receiver is enabled. Quick check from net-monitoring-core: an authenticated empty POST (HTTP basic auth as user grafana) to http://prometheus:9090/api/v1/write returns 400 = auth+receiver OK, 401 = auth, 404 = receiver off."
+          description: "The Tempo metrics-generator has been failing to remote_write service-graph samples to Prometheus for 10 minutes — the service map/node graph will go stale. Triage in order: (1) the shared `grafana` web-auth credential matches — PROMETHEUS_WEB_PASSWORD in /etc/basetool/env.d/tempo.env vs the bcrypt hash in /etc/basetool/monitoring/secrets/prometheus-web.yml; (2) Prometheus AND Tempo were restarted after prometheus-web.yml last changed — a stale loaded hash or a wedged remote-write client both give 401 despite a correct password, fixed by restarting both units as the service user (`systemctl --user restart prometheus.service tempo.service`); (3) Prometheus's remote-write receiver is enabled. Quick check from net-monitoring-core: an authenticated empty POST (HTTP basic auth as user grafana) to http://prometheus:9090/api/v1/write returns 400 = auth+receiver OK, 401 = auth, 404 = receiver off."
 
       - alert: TempoGeneratorSeriesLimited
         expr: sum(increase(tempo_metrics_generator_registry_series_limited_total[1h])) > 0
@@ -266,7 +266,7 @@ groups:
           stream: keycloak
         annotations:
           summary: "Log stream not being tailed: Keycloak"
-          description: "Alloy is not tailing /logs/keycloak/keycloak.log — KeycloakErrorRateHigh is blind, and with it the fail-open Discord SPI precheck, whose failure mode is a security gate degrading open while logins keep succeeding (no other signal exists). Check the /var/iri/keycloak/log mount on the alloy container and that Keycloak still runs with `--log=console,file --log-file=/var/log/keycloak/keycloak.log`."
+          description: "Alloy is not tailing /logs/keycloak/keycloak.log — KeycloakErrorRateHigh is blind, and with it the fail-open Discord SPI precheck, whose failure mode is a security gate degrading open while logins keep succeeding (no other signal exists). Check the /var/log/basetool/keycloak mount on the alloy container and that Keycloak still runs with `--log=console,file --log-file=/var/log/keycloak/keycloak.log`."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/logs/backend/backend.json"})
@@ -276,7 +276,7 @@ groups:
           stream: backend
         annotations:
           summary: "Log stream not being tailed: backend JSON"
-          description: "Alloy is not tailing /logs/backend/backend.json — the backend half of HealthContributorHanging is blind (the alert keeps evaluating on the frontend half, so it still looks healthy) and the backend's masked application log is missing from Grafana for incident review. Check the /var/iri/backend/log mount and that the app's JSON file appender is still writing."
+          description: "Alloy is not tailing /logs/backend/backend.json — the backend half of HealthContributorHanging is blind (the alert keeps evaluating on the frontend half, so it still looks healthy) and the backend's masked application log is missing from Grafana for incident review. Check the /var/log/basetool/backend mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/logs/frontend/frontend.json"})
@@ -286,7 +286,7 @@ groups:
           stream: frontend
         annotations:
           summary: "Log stream not being tailed: frontend JSON"
-          description: "Alloy is not tailing /logs/frontend/frontend.json — FrontendKeycloakBackchannelFailing (the 2026-07-22 lost-token-grant detector) is blind, and so is the frontend half of HealthContributorHanging. Check the /var/iri/frontend/log mount and that the app's JSON file appender is still writing."
+          description: "Alloy is not tailing /logs/frontend/frontend.json — FrontendKeycloakBackchannelFailing (the 2026-07-22 lost-token-grant detector) is blind, and so is the frontend half of HealthContributorHanging. Check the /var/log/basetool/frontend mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/logs/ingest/ingest.json"})
@@ -296,7 +296,7 @@ groups:
           stream: ingest
         annotations:
           summary: "Log stream not being tailed: ingest JSON"
-          description: "Alloy is not tailing /logs/ingest/ingest.json — no Loki ruler alert reads this stream today, so nothing else will notice; the loss is forensic, and it lands exactly when an IngestHandoffErrors or ExchangeRelayFailing page needs the gateway's own log. Check the /var/iri/ingest/log mount and that the app's JSON file appender is still writing."
+          description: "Alloy is not tailing /logs/ingest/ingest.json — no Loki ruler alert reads this stream today, so nothing else will notice; the loss is forensic, and it lands exactly when an IngestHandoffErrors or ExchangeRelayFailing page needs the gateway's own log. Check the /var/log/basetool/ingest mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/fail2ban.log"})
@@ -309,14 +309,14 @@ groups:
           description: "Alloy is not tailing /hostlog/fail2ban.log — the record of SSH-jail bans/unbans is gone, so an SshFailedAuthSpike can no longer be read against whether fail2ban actually banned the source. Check the /var/log mount and that fail2ban.log is 0640 root:adm (Alloy reads it via its supplementary adm group)."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/hostlog/iri-deploy.log"})
+        expr: absent(loki_source_file_read_lines_total{path="/hostlog/basetool/deploy.log"})
         for: 1h
         labels:
           severity: warning
           stream: ops-deploy
         annotations:
           summary: "Log stream not being tailed: deploy automation"
-          description: "Alloy is not tailing /hostlog/iri-deploy.log — the deploy narrative behind DeployRolledBack / DeployFailed / DeployHealthRestartFailing is unavailable in Grafana, and recovering it means an SSH session to the production host (a read, so no approval needed, but the wrong triage path) at the worst possible moment. Check the /var/log mount, that /var/log/iri-deploy.log exists and is readable by the adm group (logrotate's copytruncate keeps whatever owner and mode it has), and that the iri-deploy timer is armed."
+          description: "Alloy is not tailing /hostlog/basetool/deploy.log — the deploy narrative behind DeployRolledBack / DeployFailed / DeployHealthRestartFailing is unavailable in Grafana, and recovering it means an SSH session to the production host (a read, so no approval needed, but the wrong triage path) at the worst possible moment. Check the /var/log mount, that /var/log/basetool/deploy.log exists and is readable by the adm group (logrotate's copytruncate keeps whatever owner and mode it has), and that the basetool-deploy timer is armed."
 
       - alert: LokiWriteFailing
         expr: sum by (reason) (rate(loki_write_dropped_entries_total[15m])) > 0

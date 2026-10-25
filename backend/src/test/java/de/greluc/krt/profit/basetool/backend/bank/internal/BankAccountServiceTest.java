@@ -80,7 +80,7 @@ class BankAccountServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     createAsManagement(
-        new CreateBankAccountRequest("Staffel IRIDIUM", BankAccountType.ORG_UNIT, orgUnitId, null));
+        new CreateBankAccountRequest("Staffel ALPHA", BankAccountType.ORG_UNIT, orgUnitId, null));
 
     ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
     verify(accountRepository).save(saved.capture());

@@ -11,7 +11,7 @@
 <main>
     <div class="greeting home-head" data-testid="home-head">
         <span class="page-eyebrow" data-testid="home-eyebrow"
-              th:text="${activeOrgUnit != null} ? ${activeOrgUnit.orgUnitName()} + ' · ' + ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')} : ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')}">IRIDIUM · Samstag, 03.10.</span>
+              th:text="${activeOrgUnit != null} ? ${activeOrgUnit.orgUnitName()} + ' · ' + ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')} : ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')}">ALPHA · Samstag, 03.10.</span>
         <h1 th:if="${username}" th:text="#{home.welcome(${currentUser != null ? currentUser.effectiveName : username})}">Willkommen, Pilot</h1>
         <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Willkommen beim Profit Basetool!</h1>
     </div>

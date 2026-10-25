@@ -9,12 +9,12 @@ Type=oneshot
 
 User=deploy
 
-ExecStart=/var/iri/code/scripts/backup.sh
+ExecStart=/opt/basetool/scripts/backup.sh
 
-StandardOutput=append:/var/log/iri-backup.log
-StandardError=append:/var/log/iri-backup.log
+StandardOutput=append:/var/log/basetool/backup.log
+StandardError=append:/var/log/basetool/backup.log
 
-ReadWritePaths=/var/lib/iri /var/iri /var/log /var/lock
+ReadWritePaths=/var/lib/basetool/deploy /var/lib/basetool/backup /var/lib/basetool/textfile /var/cache/basetool /var/log/basetool /run/lock
 
 MemoryMax=1G
 CPUQuota=200%

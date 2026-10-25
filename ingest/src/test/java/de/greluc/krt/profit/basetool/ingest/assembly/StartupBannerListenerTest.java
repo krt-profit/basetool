@@ -69,7 +69,7 @@ class StartupBannerListenerTest {
             new IngestGatePostureMetric(new SimpleMeterRegistry(), audiences));
     ReflectionTestUtils.setField(listener, "applicationName", "ingest");
     ReflectionTestUtils.setField(
-        listener, "keycloakIssuerUri", "https://keycloak.profit-base.online/realms/iri");
+        listener, "keycloakIssuerUri", "https://keycloak.profit-base.online/realms/basetool");
     ReflectionTestUtils.setField(listener, "redisHost", redisHost);
     ReflectionTestUtils.setField(listener, "redisPort", "6379");
     return LogCapture.capture(StartupBannerListener.class, Level.INFO, listener::onReady);
@@ -89,7 +89,7 @@ class StartupBannerListenerTest {
         .contains("PT30M")
         .contains("2097152")
         .contains("redis:6379")
-        .contains("https://keycloak.profit-base.online/realms/iri")
+        .contains("https://keycloak.profit-base.online/realms/basetool")
         .contains("X-Correlation-Id")
         .contains("2000")
         .contains("ip 120/PT1M");

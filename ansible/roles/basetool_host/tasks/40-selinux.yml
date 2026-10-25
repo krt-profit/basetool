@@ -1,15 +1,50 @@
 ---
-- name: Label the data tree for container access
+- name: Label the release tree for container access
   community.general.sefcontext:
-    target: "{{ basetool_host_root_dir }}(/.*)?"
+    target: "{{ basetool_host_release_dir }}(/.*)?"
     setype: container_file_t
     state: present
   notify: Apply the SELinux labels
 
 - name: Let systemd execute the operational scripts
   community.general.sefcontext:
-    target: "{{ basetool_host_root_dir }}/code/scripts(/.*)?"
+    target: "{{ basetool_host_release_dir }}/scripts(/.*)?"
     setype: bin_t
+    state: present
+  notify: Apply the SELinux labels
+
+- name: Label the host configuration for container access
+  community.general.sefcontext:
+    target: "{{ basetool_host_config_dir }}(/.*)?"
+    setype: container_file_t
+    state: present
+  notify: Apply the SELinux labels
+
+- name: Keep the deploy account's credentials out of container labels
+  community.general.sefcontext:
+    target: "{{ basetool_host_token_dir }}(/.*)?"
+    setype: etc_t
+    state: present
+  notify: Apply the SELinux labels
+
+- name: Label the data tree for container access
+  community.general.sefcontext:
+    target: "{{ basetool_host_data_dir }}(/.*)?"
+    setype: container_file_t
+    state: present
+  notify: Apply the SELinux labels
+
+- name: Keep the deploy account's state out of container labels
+  community.general.sefcontext:
+    target: "{{ basetool_host_state_dir }}(/.*)?"
+    setype: var_lib_t
+    state: present
+  notify: Apply the SELinux labels
+
+- name: Label the per-service log directories for container access
+  community.general.sefcontext:
+    target: "{{ basetool_host_log_dir }}/(backend|frontend|ingest|keycloak)(/.*)?"
+    setype: container_file_t
     state: present
   notify: Apply the SELinux labels
 

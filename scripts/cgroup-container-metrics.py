@@ -9,7 +9,7 @@ Usage
 -----
 ::
 
-    python3 scripts/cgroup-container-metrics.py --output /var/iri/monitoring/textfile/containers.prom
+    python3 scripts/cgroup-container-metrics.py --output /var/lib/basetool/textfile/containers.prom
 
     python3 scripts/cgroup-container-metrics.py --dry-run
 

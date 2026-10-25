@@ -71,16 +71,16 @@ class InventoryPoolChangeIntegrationTest {
 
   private UUID logistician;
   private UUID holder;
-  private UUID iridium;
+  private UUID alpha;
   private UUID bravo;
 
   @BeforeEach
   void setUp() {
     logistician = user("Logistician");
     holder = user("Holder");
-    iridium = orgUnit("Iridium");
+    alpha = orgUnit("Alpha");
     bravo = orgUnit("Bravo");
-    joins(holder, iridium);
+    joins(holder, alpha);
     joins(holder, bravo);
   }
 
@@ -101,8 +101,8 @@ class InventoryPoolChangeIntegrationTest {
 
   @Test
   void aLogisticianOfBothUnitsMovesTheWholeRowAndTheHolderIsTold() {
-    actsAsLogisticianOf(iridium, bravo);
-    UUID row = stock(material(), location(), 10, iridium);
+    actsAsLogisticianOf(alpha, bravo);
+    UUID row = stock(material(), location(), 10, alpha);
 
     UUID result = move(row, bravo, null);
 
@@ -120,14 +120,14 @@ class InventoryPoolChangeIntegrationTest {
     assertThat(told.getFirst().get("type")).isEqualTo("INVENTORY_POOL_CHANGED_BY_OTHER");
     assertThat((String) told.getFirst().get("params"))
         .contains("\"actor\":\"Logistician\"")
-        .contains("\"fromUnit\":\"Iridium ")
+        .contains("\"fromUnit\":\"Alpha ")
         .contains("\"toUnit\":\"Bravo ");
   }
 
   @Test
   void aPartIsSplitOffTheFreeStockAndTheRowKeepsItsEarmark() {
-    actsAsLogisticianOf(iridium, bravo);
-    UUID row = stock(material(), location(), 10, iridium);
+    actsAsLogisticianOf(alpha, bravo);
+    UUID row = stock(material(), location(), 10, alpha);
     earmarkToJobOrder(row, 6);
 
     UUID part = move(row, bravo, 4.0);
@@ -137,7 +137,7 @@ class InventoryPoolChangeIntegrationTest {
     assertThat(column(part, "personal")).isEqualTo(false);
     assertThat(((Number) column(part, "amount")).doubleValue()).isEqualTo(4);
     assertThat(((Number) column(row, "amount")).doubleValue()).isEqualTo(6);
-    assertThat(column(row, "owning_org_unit_id")).isEqualTo(iridium);
+    assertThat(column(row, "owning_org_unit_id")).isEqualTo(alpha);
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM inventory_item_job_order_allocation"
@@ -149,8 +149,8 @@ class InventoryPoolChangeIntegrationTest {
 
   @Test
   void aPartTheRestCannotCarryTheEarmarksForIsRefused() {
-    actsAsLogisticianOf(iridium, bravo);
-    UUID row = stock(material(), location(), 10, iridium);
+    actsAsLogisticianOf(alpha, bravo);
+    UUID row = stock(material(), location(), 10, alpha);
     earmarkToJobOrder(row, 8);
 
     assertThatThrownBy(() -> move(row, bravo, 3.0)).isInstanceOf(OverAllocationException.class);
@@ -159,27 +159,27 @@ class InventoryPoolChangeIntegrationTest {
 
   @Test
   void aCallerWhoIsNoLogisticianOfTheTargetUnitIsRefused() {
-    actsAsLogisticianOf(iridium);
-    UUID row = stock(material(), location(), 10, iridium);
+    actsAsLogisticianOf(alpha);
+    UUID row = stock(material(), location(), 10, alpha);
 
     assertThatThrownBy(() -> move(row, bravo, null)).isInstanceOf(AccessDeniedException.class);
-    assertThat(column(row, "owning_org_unit_id")).isEqualTo(iridium);
+    assertThat(column(row, "owning_org_unit_id")).isEqualTo(alpha);
   }
 
   @Test
   void aTargetTheHolderDoesNotBelongToIsRefused() {
     UUID charlie = orgUnit("Charlie");
-    actsAsLogisticianOf(iridium, charlie);
-    UUID row = stock(material(), location(), 10, iridium);
+    actsAsLogisticianOf(alpha, charlie);
+    UUID row = stock(material(), location(), 10, alpha);
 
     assertThatThrownBy(() -> move(row, charlie, null)).isInstanceOf(BadRequestException.class);
-    assertThat(column(row, "owning_org_unit_id")).isEqualTo(iridium);
+    assertThat(column(row, "owning_org_unit_id")).isEqualTo(alpha);
   }
 
   @Test
   void theHolderMovingTheirOwnRowIsNotTold() throws InterruptedException {
-    actsAs(holder, iridium, bravo);
-    UUID row = stock(material(), location(), 5, iridium);
+    actsAs(holder, alpha, bravo);
+    UUID row = stock(material(), location(), 5, alpha);
 
     move(row, bravo, null);
 
@@ -192,8 +192,8 @@ class InventoryPoolChangeIntegrationTest {
   void theTargetsAreTheHoldersOtherUnitsInWhichTheCallerIsALogistician() {
     UUID charlie = orgUnit("Charlie");
     joins(holder, charlie);
-    actsAsLogisticianOf(iridium, bravo);
-    UUID row = stock(material(), location(), 5, iridium);
+    actsAsLogisticianOf(alpha, bravo);
+    UUID row = stock(material(), location(), 5, alpha);
 
     List<OrgUnitReferenceDto> targets = poolChangeService.poolTargets(row);
 
@@ -316,7 +316,7 @@ class InventoryPoolChangeIntegrationTest {
   }
 
   /**
-   * Earmarks part of a row to a new job order of Iridium.
+   * Earmarks part of a row to a new job order of Alpha.
    *
    * @param row the row
    * @param amount the earmarked amount
@@ -328,8 +328,8 @@ class InventoryPoolChangeIntegrationTest {
             + " requesting_org_unit_id, responsible_org_unit_id, type)"
             + " VALUES (?, 2, now(), now(), 0, 'OPEN', ?, ?, 'MATERIAL')",
         order,
-        iridium,
-        iridium);
+        alpha,
+        alpha);
     jobOrders.add(order);
     jdbc.update(
         """

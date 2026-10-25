@@ -122,7 +122,7 @@ class BankStaffPagesPatternRenderTest {
     return new BankAccountDto(
         UUID.randomUUID(),
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         type,
         status,
         null,
@@ -252,7 +252,7 @@ class BankStaffPagesPatternRenderTest {
                     new BankDashboardAccountDto(
                         UUID.randomUUID(),
                         "KB-0001",
-                        "Staffel IRIDIUM",
+                        "Staffel ALPHA",
                         "ORG_UNIT",
                         "ACTIVE",
                         new BigDecimal("1000"),

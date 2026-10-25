@@ -1183,7 +1183,7 @@ def main() -> int:
         command.add_argument("--keycloak-url", required=True,
                              help="Keycloak base URL including the context path, e.g. "
                                   "https://testing.example/auth")
-        command.add_argument("--realm", default="iri", help="realm (default: iri)")
+        command.add_argument("--realm", default="basetool", help="realm (default: basetool)")
         command.add_argument("--client-id", default="basetool-seed",
                              help="seed client id (default: basetool-seed); its secret comes "
                                   f"from ${SECRET_ENV}")

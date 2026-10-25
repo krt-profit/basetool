@@ -1,18 +1,15 @@
 [Unit]
-Description=Profit Basetool — expiry metrics for certificates nothing serves
-Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cert-expiry-metrics.py
+Description=Profit Basetool — host patch-state metrics after boot
+Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/host-updates-metrics.sh
+After=local-fs.target
 
 [Service]
 Type=oneshot
-
 User=root
-
-ExecStart=/var/iri/code/scripts/cert-expiry-metrics.py --output /var/iri/monitoring/textfile/certificates.prom
-
-SuccessExitStatus=0 1
+ExecStart=/opt/basetool/scripts/host-updates-metrics.sh
 
 NoNewPrivileges=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
 PrivateTmp=true
 PrivateDevices=true
@@ -27,10 +24,8 @@ RestrictAddressFamilies=AF_UNIX
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 
-ReadWritePaths=/var/iri/monitoring/textfile
-
-TimeoutStartSec=60
-MemoryMax=128M
+TimeoutStartSec=120
+MemoryMax=256M
 CPUQuota=50%
 
 [Install]

@@ -120,8 +120,8 @@ class LeitungPagePatternRenderTest {
     LeitungUnitDto squadron =
         new LeitungUnitDto(
             SQUADRON,
-            "IRIDIUM",
-            "IRI",
+            "ALPHA",
+            "ALP",
             OrgUnitKind.SQUADRON,
             true,
             true,
@@ -158,7 +158,7 @@ class LeitungPagePatternRenderTest {
                         null,
                         List.of(
                             new SquadronChartDto(
-                                SQUADRON, "IRIDIUM", "IRI", null, List.of(), List.of(), false,
+                                SQUADRON, "ALPHA", "ALP", null, List.of(), List.of(), false,
                                 false)),
                         List.of(
                             new SpecialCommandChartDto(SK, "Bergung", "BRG", List.of(), false)))),

@@ -100,12 +100,12 @@ class OrgUnitBankPageControllerMvcTest {
         new OrgUnitBankBalanceDto(
             accountId,
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ACTIVE",
             "ORG_UNIT",
             orgUnitId,
-            "IRIDIUM",
-            "IRI",
+            "ALPHA",
+            "ALP",
             "SQUADRON",
             new BigDecimal("1850000"),
             true,
@@ -120,10 +120,10 @@ class OrgUnitBankPageControllerMvcTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             orgUnitId,
-            "IRIDIUM",
-            "IRI",
+            "ALPHA",
+            "ALP",
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
@@ -156,7 +156,7 @@ class OrgUnitBankPageControllerMvcTest {
             0L,
             null);
     BankAccountRefDto target =
-        new BankAccountRefDto(accountId, "KB-0001", "Staffel IRIDIUM", "ORG_UNIT");
+        new BankAccountRefDto(accountId, "KB-0001", "Staffel ALPHA", "ORG_UNIT");
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef())).thenReturn(List.of(balance));
     when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef())).thenReturn(List.of(request));
@@ -173,7 +173,7 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank/org-unit-bank"))
-        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
+        .andExpect(content().string(Matchers.containsString("Staffel ALPHA")))
         .andExpect(content().string(Matchers.containsString("kpi-delta")))
         .andExpect(content().string(Matchers.containsString("kpi-sparkline")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
@@ -200,8 +200,7 @@ class OrgUnitBankPageControllerMvcTest {
             content().string(Matchers.containsString("data-filter-scope=\"#ou-acc-results\"")))
         .andExpect(
             content().string(Matchers.containsString("data-filter-empty=\"#ou-acc-filter-empty\"")))
-        .andExpect(
-            content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
+        .andExpect(content().string(Matchers.containsString("data-filter-name=\"Staffel ALPHA\"")))
         .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter-empty\"")));
   }
 
@@ -277,7 +276,7 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank").param("fragment", "orgUnitBankAccounts"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank/org-unit-bank :: orgUnitBankAccounts"))
-        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")));
+        .andExpect(content().string(Matchers.containsString("Staffel ALPHA")));
   }
 
   @Test
@@ -300,10 +299,10 @@ class OrgUnitBankPageControllerMvcTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             UUID.randomUUID(),
-            "IRIDIUM",
-            "IRI",
+            "ALPHA",
+            "ALP",
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
@@ -417,7 +416,7 @@ class OrgUnitBankPageControllerMvcTest {
         new BankAccountDto(
             accountId,
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "ACTIVE",
             null,
@@ -450,7 +449,7 @@ class OrgUnitBankPageControllerMvcTest {
         new OrgUnitBankAccountSettingsDto(
             accountId,
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "SQUADRON",
             new BigDecimal("2000000"),
@@ -520,7 +519,7 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
         .andExpect(view().name("bank/org-unit-bank-account-detail"))
-        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
+        .andExpect(content().string(Matchers.containsString("Staffel ALPHA")))
         .andExpect(content().string(Matchers.containsString("bank-kpis")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
@@ -607,7 +606,7 @@ class OrgUnitBankPageControllerMvcTest {
         new BankAccountDto(
             accountId,
             "KB-0003",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "ACTIVE",
             null,
@@ -685,8 +684,7 @@ class OrgUnitBankPageControllerMvcTest {
     when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), anyTypeRef()))
         .thenReturn(
             List.of(
-                new BankAccountRefDto(
-                    UUID.randomUUID(), "KB-0001", "Staffel IRIDIUM", "ORG_UNIT")));
+                new BankAccountRefDto(UUID.randomUUID(), "KB-0001", "Staffel ALPHA", "ORG_UNIT")));
 
     String html =
         mockMvc
@@ -795,10 +793,10 @@ class OrgUnitBankPageControllerMvcTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         UUID.randomUUID(),
-        "IRIDIUM",
-        "IRI",
+        "ALPHA",
+        "ALP",
         "WITHDRAWAL",
         new BigDecimal("5000"),
         null,
@@ -846,10 +844,10 @@ class OrgUnitBankPageControllerMvcTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         UUID.randomUUID(),
-        "IRIDIUM",
-        "IRI",
+        "ALPHA",
+        "ALP",
         "WITHDRAWAL",
         new BigDecimal("5000"),
         note,

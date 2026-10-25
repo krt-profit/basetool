@@ -3,7 +3,7 @@
 ## 1.1 What the system is
 
 The **Profit Basetool** is a squadron-management web application for the *Star Citizen*
-organisation **DAS KARTELL / IRIDIUM**. It is the organisation's operational tool: missions are
+organisation **DAS KARTELL**. It is the organisation's operational tool: missions are
 planned in it, materials and ships are tracked in it, job orders are queued and worked in it, the
 organisation's bank is kept in it, and members administer each other's roles through it.
 

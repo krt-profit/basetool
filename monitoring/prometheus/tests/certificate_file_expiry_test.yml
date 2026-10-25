@@ -7,7 +7,7 @@ tests:
   - name: fires - the internal CA is 60 days from expiry
     interval: 1m
     input_series:
-      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/basetool-ca.crt", subject="CN=DAS KARTELL basetool CA", issuer="CN=DAS KARTELL basetool CA", self_signed="true"}'
+      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/etc/basetool/monitoring/certs/basetool-ca.crt", subject="CN=DAS KARTELL basetool CA", issuer="CN=DAS KARTELL basetool CA", self_signed="true"}'
         values: "5184000+0x180"
     alert_rule_test:
       - eval_time: 2h
@@ -15,13 +15,13 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              path: /var/iri/monitoring/certs/basetool-ca.crt
+              path: /etc/basetool/monitoring/certs/basetool-ca.crt
               subject: CN=DAS KARTELL basetool CA
               issuer: CN=DAS KARTELL basetool CA
               self_signed: "true"
             exp_annotations:
-              summary: "Self-signed certificate /var/iri/monitoring/certs/basetool-ca.crt expires in <90 days"
-              description: "CN=DAS KARTELL basetool CA at /var/iri/monitoring/certs/basetool-ca.crt is self-signed and expires in under 90 days. If it is the internal CA, replacing it means re-issuing every certificate it signed and rolling the trust anchor through the edge's proxy_ssl_trusted_certificate and the blackbox https_internal module together -- start now, not at 14 days."
+              summary: "Self-signed certificate /etc/basetool/monitoring/certs/basetool-ca.crt expires in <90 days"
+              description: "CN=DAS KARTELL basetool CA at /etc/basetool/monitoring/certs/basetool-ca.crt is self-signed and expires in under 90 days. If it is the internal CA, replacing it means re-issuing every certificate it signed and rolling the trust anchor through the edge's proxy_ssl_trusted_certificate and the blackbox https_internal module together -- start now, not at 14 days."
       - eval_time: 2h
         alertname: CertificateFileExpiringSoon
         exp_alerts: []
@@ -29,7 +29,7 @@ tests:
   - name: silent - a CA valid for another twenty years
     interval: 1m
     input_series:
-      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/basetool-ca.crt", subject="CN=CA", issuer="CN=CA", self_signed="true"}'
+      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/etc/basetool/monitoring/certs/basetool-ca.crt", subject="CN=CA", issuer="CN=CA", self_signed="true"}'
         values: "2400000000+0x180"
     alert_rule_test:
       - eval_time: 2h
@@ -39,7 +39,7 @@ tests:
   - name: fires - a CA-issued certificate file is 10 days from expiry
     interval: 1m
     input_series:
-      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/service.crt", subject="CN=service", issuer="CN=DAS KARTELL basetool CA", self_signed="false"}'
+      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/etc/basetool/monitoring/certs/service.crt", subject="CN=service", issuer="CN=DAS KARTELL basetool CA", self_signed="false"}'
         values: "864000+0x180"
     alert_rule_test:
       - eval_time: 2h
@@ -47,13 +47,13 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              path: /var/iri/monitoring/certs/service.crt
+              path: /etc/basetool/monitoring/certs/service.crt
               subject: CN=service
               issuer: CN=DAS KARTELL basetool CA
               self_signed: "false"
             exp_annotations:
-              summary: "Certificate file /var/iri/monitoring/certs/service.crt expires in <14 days"
-              description: "The certificate at /var/iri/monitoring/certs/service.crt (CN=service) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by CN=DAS KARTELL basetool CA -- re-issue it from that CA, put the new file in place and restart whatever reads it."
+              summary: "Certificate file /etc/basetool/monitoring/certs/service.crt expires in <14 days"
+              description: "The certificate at /etc/basetool/monitoring/certs/service.crt (CN=service) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by CN=DAS KARTELL basetool CA -- re-issue it from that CA, put the new file in place and restart whatever reads it."
       - eval_time: 2h
         alertname: SelfSignedCertificateExpiring
         exp_alerts: []
@@ -61,7 +61,7 @@ tests:
   - name: silent - a CA-issued certificate 30 days out
     interval: 1m
     input_series:
-      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/service.crt", subject="CN=service", issuer="CN=CA", self_signed="false"}'
+      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/etc/basetool/monitoring/certs/service.crt", subject="CN=service", issuer="CN=CA", self_signed="false"}'
         values: "2592000+0x180"
     alert_rule_test:
       - eval_time: 2h
@@ -71,7 +71,7 @@ tests:
   - name: fires - an already-expired CA-issued file
     interval: 1m
     input_series:
-      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/service.crt", subject="CN=service", issuer="CN=CA", self_signed="false"}'
+      - series: 'basetool_certificate_expiry_timestamp_seconds{path="/etc/basetool/monitoring/certs/service.crt", subject="CN=service", issuer="CN=CA", self_signed="false"}'
         values: "-86400+0x180"
     alert_rule_test:
       - eval_time: 2h
@@ -79,13 +79,13 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              path: /var/iri/monitoring/certs/service.crt
+              path: /etc/basetool/monitoring/certs/service.crt
               subject: CN=service
               issuer: CN=CA
               self_signed: "false"
             exp_annotations:
-              summary: "Certificate file /var/iri/monitoring/certs/service.crt expires in <14 days"
-              description: "The certificate at /var/iri/monitoring/certs/service.crt (CN=service) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by CN=CA -- re-issue it from that CA, put the new file in place and restart whatever reads it."
+              summary: "Certificate file /etc/basetool/monitoring/certs/service.crt expires in <14 days"
+              description: "The certificate at /etc/basetool/monitoring/certs/service.crt (CN=service) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by CN=CA -- re-issue it from that CA, put the new file in place and restart whatever reads it."
 
   - name: fires - the collector stopped writing
     interval: 1m
@@ -100,7 +100,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Certificate expiry metrics are stale"
-              description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
+              description: "basetool-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status basetool-cert-expiry.timer basetool-cert-expiry.service` and /var/lib/basetool/textfile/certificates.prom on the host."
 
   - name: silent - the collector wrote an hour ago
     interval: 1m
@@ -125,7 +125,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Certificate expiry metrics are stale"
-              description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
+              description: "basetool-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status basetool-cert-expiry.timer basetool-cert-expiry.service` and /var/lib/basetool/textfile/certificates.prom on the host."
 
   - name: silent - the collector has written once, recently
     interval: 1m

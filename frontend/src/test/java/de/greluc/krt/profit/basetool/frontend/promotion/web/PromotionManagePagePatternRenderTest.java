@@ -98,7 +98,7 @@ class PromotionManagePagePatternRenderTest {
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     MockHttpServletRequestBuilder request = get("/promotion/manage").locale(Locale.GERMAN);
     if (activeOrgUnitId != null) {
-      request = request.sessionAttr("iridium.activeOrgUnitId", activeOrgUnitId);
+      request = request.sessionAttr("basetool.activeOrgUnitId", activeOrgUnitId);
     }
     return mockMvc
         .perform(request)

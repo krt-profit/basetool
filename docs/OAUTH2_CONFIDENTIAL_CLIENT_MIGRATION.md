@@ -70,7 +70,7 @@ frontend's environment holds. PKCE stays on: the pattern is **PKCE + client secr
 - **E2E proves it.** The E2E realm's `basetool-frontend` is confidential with a throwaway secret, the
   E2E frontend receives it, and every Playwright login goes through the confidential client.
 - `compose` passes `KEYCLOAK_FRONTEND_CLIENT_SECRET` with an **empty default** (`:-`, not `:?`), so a
-  release carrying this renders and starts on a host whose `.env` lacks it.
+  release carrying this renders and starts on a host whose `basetool.env` lacks it.
 
 ## Rollout (production — every step is a write that needs the owner's yes)
 
@@ -81,12 +81,12 @@ As root, from `/`, with the [shell conventions](deployment.md#shell-conventions-
 
 ```bash
 cd /
-cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
-grep -q '^KEYCLOAK_FRONTEND_CLIENT_SECRET=' /var/iri/code/.env || \
-  printf 'KEYCLOAK_FRONTEND_CLIENT_SECRET=%s\n' "$(openssl rand -base64 48 | tr -d '/+=\n')" >> /var/iri/code/.env
-sudo -u deploy /var/iri/code/scripts/render-env-d.py \
-  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
-grep -c '^KEYCLOAK_FRONTEND_CLIENT_SECRET=.' /var/iri/code/env.d/frontend.env    # 1 (counts, never prints)
+cp -p /etc/basetool/basetool.env /etc/basetool/basetool.env.backup-$(date +%Y%m%d-%H%M%S)
+grep -q '^KEYCLOAK_FRONTEND_CLIENT_SECRET=' /etc/basetool/basetool.env || \
+  printf 'KEYCLOAK_FRONTEND_CLIENT_SECRET=%s\n' "$(openssl rand -base64 48 | tr -d '/+=\n')" >> /etc/basetool/basetool.env
+sudo -u deploy /opt/basetool/scripts/render-env-d.py \
+  --env /etc/basetool/basetool.env --templates /opt/basetool/quadlet/env.d --out /etc/basetool/env.d
+grep -c '^KEYCLOAK_FRONTEND_CLIENT_SECRET=.' /etc/basetool/env.d/frontend.env    # 1 (counts, never prints)
 ${UCTL} restart frontend.service
 ${UPOD} logs --since 5m frontend 2>&1 | grep "OAuth2 client 'keycloak' is"       # ... is CONFIDENTIAL
 ```
@@ -99,14 +99,14 @@ window — it must work exactly as before. Nobody is signed out.
 steps 1–3, for `kc`/`KCADM` and the rollback basis):
 
 ```bash
-S="$(sed -n 's/^KEYCLOAK_FRONTEND_CLIENT_SECRET=//p' /var/iri/code/.env | tail -1)"
-KEYCLOAK_FRONTEND_CLIENT_SECRET="$S" python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
+S="$(sed -n 's/^KEYCLOAK_FRONTEND_CLIENT_SECRET=//p' /etc/basetool/basetool.env | tail -1)"
+KEYCLOAK_FRONTEND_CLIENT_SECRET="$S" python3 /root/kc-realm/provision-keycloak-realm.py --realm basetool \
   --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential
 #   dry run: expect "~ publicClient: true -> false" and
 #   "~ secret: set from $KEYCLOAK_FRONTEND_CLIENT_SECRET (the value is not printed)", plus
 #   "~ clientAuthenticatorType: …" ONLY if the client's authenticator type is not client-secret
 #   already -- production's was, so its dry run (2026-09-25) planned just the two lines above
-KEYCLOAK_FRONTEND_CLIENT_SECRET="$S" python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
+KEYCLOAK_FRONTEND_CLIENT_SECRET="$S" python3 /root/kc-realm/provision-keycloak-realm.py --realm basetool \
   --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential --apply
 unset S
 ```
@@ -147,7 +147,7 @@ and read it before applying. Keycloak now demands the secret, and the frontend a
 **Rotation** cannot simply repeat step 1: a confidential client refuses the old secret the moment
 Keycloak holds the new one, and the frontend cannot switch at that same instant. So rotate through
 the public state, which accepts both: `--frontend-client public --apply`, then a new value into
-`.env` (replace the line) with the rest of step 1, then step 2 again. Existing sessions survive every
+`basetool.env` (replace the line) with the rest of step 1, then step 2 again. Existing sessions survive every
 step, because they refresh with the registration the frontend runs with now.
 
 **After the rollout**:
@@ -155,15 +155,15 @@ step, because they refresh with the registration the frontend runs with now.
 - ~~Make `--frontend-client confidential` part of every documented provisioner run~~ — **done
   2026-09-25**: the procedure in
   [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
-  passes it with `KEYCLOAK_FRONTEND_CLIENT_SECRET` from `.env`, and says what a host whose frontend
+  passes it with `KEYCLOAK_FRONTEND_CLIENT_SECRET` from `basetool.env`, and says what a host whose frontend
   has no secret yet must do first.
-- **Open:** update the host's `/var/iri/code/realm-export.json` seed (`"publicClient": false`,
+- **Open:** update the host's `/etc/basetool/realm-export.json` seed (`"publicClient": false`,
   `"clientAuthenticatorType": "client-secret"`, no secret) so a realm rebuilt from it is not public.
   A host write, not done.
 
 ## Risks & caveats
 
-- **Another secret to guard.** It lives in `/var/iri/code/.env` and the rendered
+- **Another secret to guard.** It lives in `/etc/basetool/basetool.env` and the rendered
   `env.d/frontend.env` (`0640`), rides in every backup's `config/dotenv`, and joins the rotation list
   in [`docs/backup.md`](backup.md#rotate-secrets-after-a-compromise-driven-restore). It does **not**
   reach Redis: the stored authorized client carries an empty secret.

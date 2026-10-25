@@ -1,7 +1,7 @@
 # Contributing to Profit Basetool
 
 Thanks for taking the time to help improve Profit Basetool — the
-squadron-management web app for the *DAS KARTELL* / IRIDIUM organization.
+squadron-management web app for the *DAS KARTELL* organization.
 This document is the entry point for everything around *how* to contribute:
 asking questions, reporting bugs, proposing features, sending pull
 requests, and the style / quality rules every change is held to.

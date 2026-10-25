@@ -105,7 +105,7 @@ class BankManagePageControllerTest {
     BankManagePageController controller =
         new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
-    BankAccountDto acc = account("KB-0001", "Staffel IRIDIUM", "ORG_UNIT", "ACTIVE");
+    BankAccountDto acc = account("KB-0001", "Staffel ALPHA", "ORG_UNIT", "ACTIVE");
     BankHolderDto holder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);

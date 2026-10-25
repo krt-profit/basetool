@@ -95,7 +95,7 @@ class ProfileControllerTest {
             new NotificationBackendClient(backendApiClient),
             new ExchangeBackendClient(backendApiClient),
             messageSource);
-    ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/iri");
+    ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/basetool");
   }
 
   private static UserDto user(
@@ -137,7 +137,7 @@ class ProfileControllerTest {
     List<SquadronReferenceDto> squadrons =
         List.of(
             new SquadronReferenceDto(
-                UUID.fromString("5a1d2c3b-4e5f-4a6b-8c7d-9e0f1a2b3c4d"), "IRIDIUM", "IRI"));
+                UUID.fromString("5a1d2c3b-4e5f-4a6b-8c7d-9e0f1a2b3c4d"), "ALPHA", "ALP"));
     when(backendApiClient.get(ME, UserDto.class))
         .thenReturn(
             user(7, "From-Backend", "Backend-DN", 4L, LocalDate.of(2024, 1, 15), squadrons));
@@ -170,7 +170,7 @@ class ProfileControllerTest {
     assertNotNull(months);
     assertTrue(months >= 12, "expected at least one year, was " + months);
     assertEquals(
-        "https://kc.example.com/realms/iri/account", model.getAttribute("keycloakAccountUrl"));
+        "https://kc.example.com/realms/basetool/account", model.getAttribute("keycloakAccountUrl"));
     ProfileDescriptionForm form =
         (ProfileDescriptionForm) model.getAttribute("profileDescriptionForm");
     assertNotNull(form);

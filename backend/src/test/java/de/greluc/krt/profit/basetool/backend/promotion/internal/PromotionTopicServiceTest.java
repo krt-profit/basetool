@@ -110,7 +110,7 @@ class PromotionTopicServiceTest {
         new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
-    squadron.setShorthand("IRI");
+    squadron.setShorthand("ALP");
     when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
     when(mapper.toEntity(request)).thenReturn(entity);
     when(repository.save(entity)).thenReturn(entity);

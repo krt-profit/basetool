@@ -110,14 +110,7 @@ class OrgChartPageRenderTest {
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
-                        UUID.randomUUID(),
-                        "IRIDIUM",
-                        "IRI",
-                        null,
-                        List.of(),
-                        List.of(),
-                        true,
-                        true)),
+                        UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true)),
                 List.of()));
     when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
         .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
@@ -130,7 +123,7 @@ class OrgChartPageRenderTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).as("Staffel column rendered").contains("IRIDIUM");
+    assertThat(html).as("Staffel column rendered").contains("ALPHA");
     assertThat(html).as("vacant Staffelleiter placeholder, not an NPE").contains("oc-node--vacant");
     assertThat(html)
         .as("admin assign-Staffelleiter affordance")
@@ -209,8 +202,8 @@ class OrgChartPageRenderTest {
                 List.of(
                     new SquadronChartDto(
                         UUID.randomUUID(),
-                        "IRIDIUM",
-                        "IRI",
+                        "ALPHA",
+                        "ALP",
                         null,
                         List.of(command),
                         List.of(),
@@ -263,8 +256,8 @@ class OrgChartPageRenderTest {
                 List.of(
                     new SquadronChartDto(
                         UUID.randomUUID(),
-                        "IRIDIUM",
-                        "IRI",
+                        "ALPHA",
+                        "ALP",
                         null,
                         List.of(command),
                         List.of(),
@@ -313,14 +306,7 @@ class OrgChartPageRenderTest {
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
-                        UUID.randomUUID(),
-                        "IRIDIUM",
-                        "IRI",
-                        null,
-                        List.of(),
-                        List.of(),
-                        true,
-                        true)),
+                        UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true)),
                 List.of()));
 
     String html =
@@ -332,7 +318,7 @@ class OrgChartPageRenderTest {
             .getContentAsString();
 
     assertThat(html).as("fragment renders the tree").contains("role=\"tree\"");
-    assertThat(html).as("fragment renders the Staffel column").contains("IRIDIUM");
+    assertThat(html).as("fragment renders the Staffel column").contains("ALPHA");
     assertThat(html)
         .as("fragment renders the in-tree add affordance")
         .contains("data-position-type=\"SQUADRON_LEAD\"");
@@ -502,8 +488,8 @@ class OrgChartPageRenderTest {
                 List.of(
                     new SquadronChartDto(
                         UUID.randomUUID(),
-                        "IRIDIUM",
-                        "IRI",
+                        "ALPHA",
+                        "ALP",
                         null,
                         List.of(command),
                         List.of(),
@@ -541,7 +527,7 @@ class OrgChartPageRenderTest {
             UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", null, 0, 0L);
     SquadronChartDto sq =
         new SquadronChartDto(
-            UUID.randomUUID(), "IRIDIUM", "IRI", null, List.of(), List.of(), true, true);
+            UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true);
     BereichChartDto bereich =
         new BereichChartDto(
             UUID.randomUUID(),
@@ -576,7 +562,7 @@ class OrgChartPageRenderTest {
     assertThat(html).as("Bereich caption shows its name").contains("Profit-Bereich");
     assertThat(html).as("Bereichsleiter renders as a hero node").contains("oc-node--hero");
     assertThat(html).as("Bereichsleiter holder rendered").contains("Area Boss");
-    assertThat(html).as("Bereich's Staffel rendered via ocUnitFan").contains("IRIDIUM");
+    assertThat(html).as("Bereich's Staffel rendered via ocUnitFan").contains("ALPHA");
     assertThat(html)
         .as("Bereich carries a collapse toggle")
         .contains("data-trigger=\"oc-collapse\"");

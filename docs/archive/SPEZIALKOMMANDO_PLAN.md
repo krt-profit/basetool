@@ -6,7 +6,7 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: **Code-complete on `claude/spezialkommando-r9-destructive-cleanup`.** All R1 → R9 releases are implemented as commits on a single linear branch and tracked by 25 stacked PRs ([#193](https://github.com/krt-iri/basetool/pull/193) → [#225](https://github.com/krt-iri/basetool/pull/225)). Coverage:
+**Status**: **Code-complete on `claude/spezialkommando-r9-destructive-cleanup`.** All R1 → R9 releases are implemented as commits on a single linear branch and tracked by 25 stacked PRs ([#193](https://github.com/krt-profit/basetool/pull/193) → [#225](https://github.com/krt-profit/basetool/pull/225)). Coverage:
 
 - **R1 → R4** — DB foundation (V94–V96), `OrgUnit` hierarchy + `OrgUnitMembership`, `Squadron` joins the hierarchy with sync trigger, `OwnerScopeService` extracted, `SquadronScopeService` shim dropped, `owningOrgUnit` mirror field with lifecycle dual-write on six aggregates.
 - **R5 → R5.c.b** — REST CRUD for `SpecialCommand` (`/api/v1/special-commands`), membership-management endpoints with `canManageMembers` gate, admin SK list page (`/admin/special-commands`), per-SK detail page with member roster.
@@ -17,7 +17,7 @@ Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 
 - **R8** — three deferred items closed (§6.1 contextual-role wiring polish, §7.4 member-edit UX, V100 cleanup draft).
 - **R9 Steps 1–6 (destructive cleanup)** — 8 callers migrated to `resolveOrgUnitForPickerOutput`; JPA `nullable` flipped; legacy `owningSquadron` / `creatingSquadron` / `requestingSquadron` lifecycle hooks + Java fields removed; `User.squadron` + flag columns removed; `UserMapper` reads membership row; V100 lifts NOT NULL on legacy, V101 drops 7 aggregate columns + V91/V93 indexes, V102 drops `app_user` legacy columns, V103 retargets three FKs (`promotion_topic`, `mission_participant`, `job_order_handover`) and drops the `squadron` table itself.
 
-**Open follow-ups (post-merge):** consolidate the 25 stacked PRs into a small number of deployable releases — current plan is **three** deploys (Foundation+UI / Identity-migration / Destructive cleanup) with a soak window between each. PRs [#193](https://github.com/krt-iri/basetool/pull/193)–[#203](https://github.com/krt-iri/basetool/pull/203) currently CONFLICT with `main` because V94 (manual-material) landed after R1; the consolidation rebase resolves the V-numbering collision.
+**Open follow-ups (post-merge):** consolidate the 25 stacked PRs into a small number of deployable releases — current plan is **three** deploys (Foundation+UI / Identity-migration / Destructive cleanup) with a soak window between each. PRs [#193](https://github.com/krt-profit/basetool/pull/193)–[#203](https://github.com/krt-profit/basetool/pull/203) currently CONFLICT with `main` because V94 (manual-material) landed after R1; the consolidation rebase resolves the V-numbering collision.
 
 ---
 

@@ -105,7 +105,7 @@ class OrdersListPatternRenderTest {
         new JobOrderDto(
             UUID.fromString(ORDER_ID),
             42,
-            new SquadronReferenceDto(UUID.randomUUID(), "Iridium Squadron", "IRI"),
+            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"),
             new SquadronReferenceDto(UUID.randomUUID(), "Nova Squadron", "NOV"),
             "Tester",
             null,

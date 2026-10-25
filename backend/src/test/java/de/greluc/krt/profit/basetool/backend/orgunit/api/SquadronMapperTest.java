@@ -62,15 +62,15 @@ class SquadronMapperTest {
   void orgUnitToReferenceDto_shouldProjectSquadronOwner() {
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
-    squadron.setName("IRIDIUM");
-    squadron.setShorthand("IRI");
+    squadron.setName("ALPHA");
+    squadron.setShorthand("ALP");
 
     SquadronReferenceDto ref = mapper.orgUnitToReferenceDto(squadron);
 
     assertNotNull(ref);
     assertEquals(squadron.getId(), ref.id());
-    assertEquals("IRIDIUM", ref.name());
-    assertEquals("IRI", ref.shorthand());
+    assertEquals("ALPHA", ref.name());
+    assertEquals("ALP", ref.shorthand());
   }
 
   @Test

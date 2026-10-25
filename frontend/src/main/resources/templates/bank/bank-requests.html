@@ -58,9 +58,9 @@
                               th:classappend="${r.type() == 'DEPOSIT'} ? ' chip--success' : (${r.type() == 'WITHDRAWAL'} ? ' chip--danger' : ' chip--info')"
                               th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</span>
                         <span class="cell-title" th:switch="${r.type()}">
-                            <th:block th:case="'DEPOSIT'"><th:block th:if="${r.counterpartyHandle() != null}" th:text="${@handles.display(r.counterpartyHandle())} + ' &#8594; '">greluc &#8594; </th:block><th:block th:text="${r.accountName()}">Staffel IRIDIUM</th:block></th:block>
-                            <th:block th:case="'WITHDRAWAL'"><th:block th:text="${r.accountName()}">Staffel IRIDIUM</th:block><th:block th:if="${r.counterpartyHandle() != null}" th:text="' &#8594; ' + ${@handles.display(r.counterpartyHandle())}"> &#8594; greluc</th:block></th:block>
-                            <th:block th:case="*"><th:block th:text="${r.accountName()}">Staffel IRIDIUM</th:block><th:block th:if="${r.targetAccountNo() != null}" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</th:block></th:block>
+                            <th:block th:case="'DEPOSIT'"><th:block th:if="${r.counterpartyHandle() != null}" th:text="${@handles.display(r.counterpartyHandle())} + ' &#8594; '">greluc &#8594; </th:block><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block></th:block>
+                            <th:block th:case="'WITHDRAWAL'"><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block><th:block th:if="${r.counterpartyHandle() != null}" th:text="' &#8594; ' + ${@handles.display(r.counterpartyHandle())}"> &#8594; greluc</th:block></th:block>
+                            <th:block th:case="*"><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block><th:block th:if="${r.targetAccountNo() != null}" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</th:block></th:block>
                         </span>
                     </div>
                     <span class="cell-sub">
@@ -76,7 +76,7 @@
                 </td>
                 <td>
                     <span class="bank-req-requester"
-                          th:text="${@handles.display(r.requesterHandle())} + (${r.orgUnitShorthand() != null} ? ' (' + ${r.orgUnitShorthand()} + ')' : '')">greluc (IRI)</span>
+                          th:text="${@handles.display(r.requesterHandle())} + (${r.orgUnitShorthand() != null} ? ' (' + ${r.orgUnitShorthand()} + ')' : '')">greluc (ALP)</span>
                     <span class="cell-sub utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span>
                 </td>
                 <td class="num">

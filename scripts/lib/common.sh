@@ -1,8 +1,12 @@
 # shellcheck shell=bash
 
-: "${COMPOSE_DIR:=${IRI_COMPOSE_DIR:-/var/iri/code}}"
+: "${COMPOSE_DIR:=${BASETOOL_COMPOSE_DIR:-/opt/basetool}}"
+: "${CONFIG_DIR:=${BASETOOL_CONFIG_DIR:-/etc/basetool}}"
+: "${ENV_FILE:=${BASETOOL_ENV_FILE:-${CONFIG_DIR}/basetool.env}}"
+: "${ENV_D_DIR:=${BASETOOL_ENV_D_DIR:-${CONFIG_DIR}/env.d}}"
+: "${CACHE_DIR:=${BASETOOL_CACHE_DIR:-/var/cache/basetool}}"
 
-: "${TEXTFILE_DIR:=${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}}"
+: "${TEXTFILE_DIR:=${BASETOOL_MONITORING_TEXTFILE_DIR:-/var/lib/basetool/textfile}}"
 
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -16,7 +20,7 @@ fail() {
 read_env() {
   local key="$1"
   [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 1
-  sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*//p" "${COMPOSE_DIR}/.env" 2>/dev/null \
+  sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*//p" "${ENV_FILE}" 2>/dev/null \
     | tail -n 1 | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
 }
 

@@ -137,7 +137,7 @@ class MemberHangarPageControllerTest {
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Iridium", "IRI", "SQUADRON", Boolean.FALSE),
+                    UUID.randomUUID(), "Alpha", "ALP", "SQUADRON", Boolean.FALSE),
                 new OrgUnitMembershipOptionDto(
                     UUID.randomUUID(), "Sondereinheit", "SE", "SPECIAL_COMMAND", Boolean.FALSE)));
 

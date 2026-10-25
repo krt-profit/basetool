@@ -111,7 +111,7 @@ class BankDashboardGroupingMvcTest {
                 List.of(
                     account(
                         "KB-0010",
-                        "Staffel IRIDIUM",
+                        "Staffel ALPHA",
                         "ORG_UNIT",
                         UUID.randomUUID(),
                         "Bereich Forschung",
@@ -153,7 +153,7 @@ class BankDashboardGroupingMvcTest {
         .thenReturn(
             new BankDashboardDto(
                 false,
-                List.of(account("KB-0001", "Staffel IRIDIUM", "ORG_UNIT", null, null, null)),
+                List.of(account("KB-0001", "Staffel ALPHA", "ORG_UNIT", null, null, null)),
                 null));
 
     mockMvc
@@ -174,7 +174,7 @@ class BankDashboardGroupingMvcTest {
         .thenReturn(
             new BankDashboardDto(
                 false,
-                List.of(account("KB-0001", "Staffel IRIDIUM", "ORG_UNIT", null, null, null)),
+                List.of(account("KB-0001", "Staffel ALPHA", "ORG_UNIT", null, null, null)),
                 null));
 
     mockMvc

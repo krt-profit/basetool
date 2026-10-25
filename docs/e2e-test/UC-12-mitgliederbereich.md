@@ -25,7 +25,7 @@ jede Anwendungsrolle.
 - Keine Sitzung (jeweils ein frischer Browser-Kontext).
 - Für den Deep-Link-Teil: `test-member` (der Seeder legt ihn an) und eine einmalige Anmeldung
   vorab, damit der Nutzungsbedingungen-Gate die gemerkte Ziel-URL nicht verbraucht.
-- Für den Rollen-Teil: der Realm-Fixture-Nutzer `test-norole` (in `default-roles-iri`, ohne
+- Für den Rollen-Teil: der Realm-Fixture-Nutzer `test-norole` (in `default-roles-basetool`, ohne
   Anwendungsrolle).
 
 ## Auslöser

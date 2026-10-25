@@ -1387,7 +1387,7 @@ class InventoryPageControllerMvcTest {
     UUID sk = UUID.randomUUID();
     stubInputPageWithOwnerOptions(
         List.of(
-            new OrgUnitMembershipOptionDto(staffel, "IRIDIUM", "IRI", "SQUADRON", true),
+            new OrgUnitMembershipOptionDto(staffel, "ALPHA", "ALP", "SQUADRON", true),
             new OrgUnitMembershipOptionDto(sk, "Bergbau", "BB", "SPECIAL_COMMAND", true)));
 
     mockMvc
@@ -1396,8 +1396,8 @@ class InventoryPageControllerMvcTest {
                 .sessionAttr(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, sk.toString()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("selected=\"selected\">Bergbau</option>")))
-        .andExpect(content().string(not(containsString("selected=\"selected\">IRIDIUM"))))
-        .andExpect(content().string(containsString("value=\"" + staffel + "\">IRIDIUM</option>")))
+        .andExpect(content().string(not(containsString("selected=\"selected\">ALPHA"))))
+        .andExpect(content().string(containsString("value=\"" + staffel + "\">ALPHA</option>")))
         .andExpect(
             content()
                 .string(
@@ -1419,7 +1419,7 @@ class InventoryPageControllerMvcTest {
   void viewInputPage_ShouldAskForAnOwnerChoiceWithoutAnActiveOrgUnit() throws Exception {
     stubInputPageWithOwnerOptions(
         List.of(
-            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true),
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true),
             new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Bergbau", "BB", "SQUADRON", true)));
 
     mockMvc
@@ -1446,7 +1446,7 @@ class InventoryPageControllerMvcTest {
   void viewInputPage_ShouldKeepAHiddenOwnerPickerOnTheOnBehalfForm() throws Exception {
     stubInputPageWithOwnerOptions(
         List.of(
-            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true)));
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true)));
 
     mockMvc
         .perform(get("/inventory/input").param("source", "admin"))

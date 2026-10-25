@@ -99,7 +99,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
         new BankAccountDto(
             accountId,
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "ACTIVE",
             null,
@@ -163,7 +163,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
           new OrgUnitBankAccountSettingsDto(
               accountId,
               "KB-0001",
-              "Staffel IRIDIUM",
+              "Staffel ALPHA",
               "ORG_UNIT",
               "SQUADRON",
               new BigDecimal("2000000"),

@@ -44,8 +44,8 @@ then areas, squadrons and special commands, each by name:
     },
     {
       "id": "2d8b4f30-6e3c-4a0a-9c73-5b2e7f9c1d32",
-      "name": "Iridium",
-      "shorthand": "IRI",
+      "name": "Alpha",
+      "shorthand": "ALP",
       "kind": "SQUADRON"
     }
   ]

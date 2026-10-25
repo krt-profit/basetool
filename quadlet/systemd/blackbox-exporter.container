@@ -12,9 +12,9 @@ NoNewPrivileges=true
 Network=net-monitoring-core.network
 Network=net-monitoring-scrape.network
 Network=net-blackbox-v6.network
-Volume=/var/iri/code/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
-Volume=/var/iri/monitoring/certs/basetool-ca.crt:/etc/blackbox/certs/basetool-ca.crt:ro
-EnvironmentFile=/var/iri/code/env.d/blackbox-exporter.env
+Volume=/opt/basetool/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+Volume=/etc/basetool/monitoring/certs/basetool-ca.crt:/etc/blackbox/certs/basetool-ca.crt:ro
+EnvironmentFile=/etc/basetool/env.d/blackbox-exporter.env
 Exec=--config.file=/etc/blackbox/blackbox.yml
 Memory=64M
 PidsLimit=512

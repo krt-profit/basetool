@@ -173,7 +173,7 @@ class LeitungPageControllerTest {
                         null,
                         List.of(
                             new SquadronChartDto(
-                                squadron, "IRIDIUM", "IRI", null, List.of(), List.of(), false,
+                                squadron, "ALPHA", "ALP", null, List.of(), List.of(), false,
                                 false)),
                         List.of(
                             new SpecialCommandChartDto(sk, "Bergung", "BRG", List.of(), false)))),

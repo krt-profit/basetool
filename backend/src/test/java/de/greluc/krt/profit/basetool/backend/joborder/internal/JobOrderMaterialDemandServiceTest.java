@@ -247,13 +247,13 @@ class JobOrderMaterialDemandServiceTest {
   @Test
   @DisplayName("A MATERIAL and an ITEM order of one unit fold into a single material bucket")
   void aggregatesBothOrderKindsIntoOneBucket() {
-    Squadron iridium = squadron("IRI");
-    JobOrder matOrder = materialOrder(iridium, 1, titanium, QualityTierFixtures.good(), 400.0);
-    JobOrder itmOrder = itemOrder(iridium, 2);
+    Squadron alpha = squadron("ALP");
+    JobOrder matOrder = materialOrder(alpha, 1, titanium, QualityTierFixtures.good(), 400.0);
+    JobOrder itmOrder = itemOrder(alpha, 2);
     givenVisibleOrders(List.of(matOrder, itmOrder));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
-    when(squadronMapper.orgUnitToReferenceDto(iridium))
-        .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
+    when(squadronMapper.orgUnitToReferenceDto(alpha))
+        .thenReturn(new SquadronReferenceDto(alpha.getId(), alpha.getName(), "ALP"));
     when(jobOrderItemService.aggregateMaterials(itmOrder))
         .thenReturn(
             List.of(
@@ -272,7 +272,7 @@ class JobOrderMaterialDemandServiceTest {
 
     assertThat(overview.groups()).hasSize(1);
     MaterialDemandGroupDto group = overview.groups().get(0);
-    assertThat(group.orgUnit().shorthand()).isEqualTo("IRI");
+    assertThat(group.orgUnit().shorthand()).isEqualTo("ALP");
     assertThat(group.materials()).hasSize(1);
 
     MaterialDemandRowDto row = group.materials().get(0);
@@ -287,14 +287,14 @@ class JobOrderMaterialDemandServiceTest {
   @Test
   @DisplayName("Demand is grouped by the responsible, not the requesting, org unit")
   void groupsByResponsibleOrgUnit() {
-    Squadron iridium = squadron("IRI");
+    Squadron alpha = squadron("ALP");
     Squadron nova = squadron("NOV");
-    JobOrder first = materialOrder(iridium, 1, titanium, QualityTierFixtures.none(), 10.0);
+    JobOrder first = materialOrder(alpha, 1, titanium, QualityTierFixtures.none(), 10.0);
     JobOrder second = materialOrder(nova, 2, titanium, QualityTierFixtures.none(), 20.0);
     givenVisibleOrders(List.of(first, second));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
-    when(squadronMapper.orgUnitToReferenceDto(iridium))
-        .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
+    when(squadronMapper.orgUnitToReferenceDto(alpha))
+        .thenReturn(new SquadronReferenceDto(alpha.getId(), alpha.getName(), "ALP"));
     when(squadronMapper.orgUnitToReferenceDto(nova))
         .thenReturn(new SquadronReferenceDto(nova.getId(), nova.getName(), "NOV"));
 
@@ -303,7 +303,7 @@ class JobOrderMaterialDemandServiceTest {
     assertThat(overview.groups()).hasSize(2);
     assertThat(overview.groups())
         .extracting(group -> group.orgUnit().shorthand())
-        .containsExactly("IRI", "NOV");
+        .containsExactly("ALP", "NOV");
     assertThat(overview.groups().get(0).materials().get(0).requiredAmount()).isEqualTo(10.0);
     assertThat(overview.groups().get(1).materials().get(0).requiredAmount()).isEqualTo(20.0);
   }
@@ -390,12 +390,12 @@ class JobOrderMaterialDemandServiceTest {
   @Test
   @DisplayName("A fully covered bucket reports a zero gap rather than a negative one")
   void outstandingIsFlooredAtZeroWhenStockExceedsDemand() {
-    Squadron iridium = squadron("IRI");
-    JobOrder order = materialOrder(iridium, 9, titanium, QualityTierFixtures.none(), 100.0);
+    Squadron alpha = squadron("ALP");
+    JobOrder order = materialOrder(alpha, 9, titanium, QualityTierFixtures.none(), 100.0);
     givenVisibleOrders(List.of(order));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
-    when(squadronMapper.orgUnitToReferenceDto(iridium))
-        .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
+    when(squadronMapper.orgUnitToReferenceDto(alpha))
+        .thenReturn(new SquadronReferenceDto(alpha.getId(), alpha.getName(), "ALP"));
     when(stockIndex.bookedFor(eq(order.getId()), anyList())).thenReturn(new double[] {180.0});
 
     MaterialDemandRowDto row =
@@ -408,15 +408,15 @@ class JobOrderMaterialDemandServiceTest {
   @Test
   @DisplayName("A PIECE material's aggregated amounts stay whole units")
   void pieceMaterialAmountsAreRoundedToWholeUnits() {
-    Squadron iridium = squadron("IRI");
+    Squadron alpha = squadron("ALP");
     Material core = material("Quantum Core", QuantityType.PIECE);
     MaterialDto coreDto = materialDto(core);
-    JobOrder first = materialOrder(iridium, 1, core, QualityTierFixtures.none(), 2.4);
-    JobOrder second = materialOrder(iridium, 2, core, QualityTierFixtures.none(), 3.4);
+    JobOrder first = materialOrder(alpha, 1, core, QualityTierFixtures.none(), 2.4);
+    JobOrder second = materialOrder(alpha, 2, core, QualityTierFixtures.none(), 3.4);
     givenVisibleOrders(List.of(first, second));
     when(materialMapper.toDto(core)).thenReturn(coreDto);
-    when(squadronMapper.orgUnitToReferenceDto(iridium))
-        .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
+    when(squadronMapper.orgUnitToReferenceDto(alpha))
+        .thenReturn(new SquadronReferenceDto(alpha.getId(), alpha.getName(), "ALP"));
 
     MaterialDemandRowDto row =
         service.getMaterialDemandOverview().groups().get(0).materials().get(0);
@@ -427,10 +427,10 @@ class JobOrderMaterialDemandServiceTest {
   @Test
   @DisplayName("One linked stock row is counted once across an order's GOOD and NONE buckets")
   void linkedStockIsAllocatedAcrossQualityBucketsWithoutDoubleCounting() {
-    Squadron iridium = squadron("IRI");
+    Squadron alpha = squadron("ALP");
     Material stileron = material("Stileron", QuantityType.SCU);
     MaterialDto stileronDto = materialDto(stileron);
-    JobOrder order = materialOrder(iridium, 7, stileron, QualityTierFixtures.good(), 0.1);
+    JobOrder order = materialOrder(alpha, 7, stileron, QualityTierFixtures.good(), 0.1);
     order.getMaterials().add(line(stileron, QualityTierFixtures.none(), 2.64));
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(ownerScopeService.currentScopePredicate())
@@ -449,8 +449,8 @@ class JobOrderMaterialDemandServiceTest {
     when(jobOrderStockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(realIndex);
     when(materialClaimService.getClaimBucketsForOrders(anyList())).thenReturn(Map.of());
     when(materialMapper.toDto(stileron)).thenReturn(stileronDto);
-    when(squadronMapper.orgUnitToReferenceDto(iridium))
-        .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
+    when(squadronMapper.orgUnitToReferenceDto(alpha))
+        .thenReturn(new SquadronReferenceDto(alpha.getId(), alpha.getName(), "ALP"));
 
     List<MaterialDemandRowDto> rows =
         service.getMaterialDemandOverview().groups().get(0).materials();

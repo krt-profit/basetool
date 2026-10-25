@@ -151,10 +151,10 @@
     group: root
     mode: "0644"
     content: |
-      CONFIG_FILE="{{ basetool_host_root_dir }}/code/monitoring/alloy/config.alloy"
+      CONFIG_FILE="{{ basetool_host_release_dir }}/monitoring/alloy/config.alloy"
       CUSTOM_ARGS="--server.http.listen-addr={{ basetool_host_alloy_listen }}"
-      IRI_ALLOY_LOKI_ENDPOINT="{{ basetool_host_alloy_loki_endpoint }}"
-      IRI_ALLOY_TEMPO_ENDPOINT="{{ basetool_host_alloy_tempo_endpoint }}"
+      BASETOOL_ALLOY_LOKI_ENDPOINT="{{ basetool_host_alloy_loki_endpoint }}"
+      BASETOOL_ALLOY_TEMPO_ENDPOINT="{{ basetool_host_alloy_tempo_endpoint }}"
   notify: Restart alloy
 
 - name: Make room for the alloy drop-ins
@@ -325,22 +325,22 @@
     mode: "{{ item.mode }}"
   loop:
     - src: cgroup-container-metrics.py
-      dest: "{{ basetool_host_root_dir }}/code/scripts/cgroup-container-metrics.py"
+      dest: "{{ basetool_host_release_dir }}/scripts/cgroup-container-metrics.py"
       mode: "0755"
-    - src: iri-container-metrics.service
-      dest: /etc/systemd/system/iri-container-metrics.service
+    - src: basetool-container-metrics.service
+      dest: /etc/systemd/system/basetool-container-metrics.service
       mode: "0644"
-    - src: iri-container-metrics.timer
-      dest: /etc/systemd/system/iri-container-metrics.timer
+    - src: basetool-container-metrics.timer
+      dest: /etc/systemd/system/basetool-container-metrics.timer
       mode: "0644"
     - src: cert-expiry-metrics.py
-      dest: "{{ basetool_host_root_dir }}/code/scripts/cert-expiry-metrics.py"
+      dest: "{{ basetool_host_release_dir }}/scripts/cert-expiry-metrics.py"
       mode: "0755"
-    - src: iri-cert-expiry.service
-      dest: /etc/systemd/system/iri-cert-expiry.service
+    - src: basetool-cert-expiry.service
+      dest: /etc/systemd/system/basetool-cert-expiry.service
       mode: "0644"
-    - src: iri-cert-expiry.timer
-      dest: /etc/systemd/system/iri-cert-expiry.timer
+    - src: basetool-cert-expiry.timer
+      dest: /etc/systemd/system/basetool-cert-expiry.timer
       mode: "0644"
   notify: Reload systemd for the observability units
   register: basetool_host_collectors
@@ -354,8 +354,8 @@
   changed_when: false
   failed_when: basetool_host_metrics_verify.rc != 0
   loop:
-    - iri-container-metrics.service
-    - iri-cert-expiry.service
+    - basetool-container-metrics.service
+    - basetool-cert-expiry.service
   when: not ansible_check_mode
 
 - name: Start the metric timers
@@ -365,25 +365,25 @@
     state: started
     daemon_reload: true
   loop:
-    - iri-container-metrics.timer
-    - iri-cert-expiry.timer
+    - basetool-container-metrics.timer
+    - basetool-cert-expiry.timer
   when: not ansible_check_mode
 
 - name: Ask whether the certificate collector has ever written
   ansible.builtin.stat:
-    path: "{{ basetool_host_root_dir }}/monitoring/textfile/certificates.prom"
+    path: "{{ basetool_host_textfile_dir }}/certificates.prom"
   register: basetool_host_cert_metrics_file
 
 - name: Ask whether there is anything for it to read
   ansible.builtin.find:
-    paths: "{{ basetool_host_root_dir }}/monitoring/certs"
+    paths: "{{ basetool_host_config_dir }}/monitoring/certs"
     patterns: "*.crt,*.pem,*.cer"
     file_type: file
   register: basetool_host_cert_files
 
 - name: Take the first certificate reading now
   ansible.builtin.systemd_service:
-    name: iri-cert-expiry.service
+    name: basetool-cert-expiry.service
     state: started
   when:
     - not ansible_check_mode
@@ -392,7 +392,7 @@
 
 - name: Read back what the collector wrote
   ansible.builtin.slurp:
-    src: "{{ basetool_host_root_dir }}/monitoring/textfile/certificates.prom"
+    src: "{{ basetool_host_textfile_dir }}/certificates.prom"
   register: basetool_host_cert_metrics
   failed_when: false
   when: not ansible_check_mode
@@ -401,7 +401,7 @@
   ansible.builtin.debug:
     msg: >-
       {{ (basetool_host_cert_metrics.content | b64decode).splitlines() | select('match', 'basetool_certificate_expiry_timestamp_seconds') | list | length }}
-      certificate file(s) under {{ basetool_host_root_dir }}/monitoring/certs are now watched for
+      certificate file(s) under {{ basetool_host_config_dir }}/monitoring/certs are now watched for
       expiry -- CertificateFileExpiringSoon at 14 days, SelfSignedCertificateExpiring at 90.
   when:
     - not ansible_check_mode
@@ -410,7 +410,7 @@
 - name: Say so loudly when there was nothing to read
   ansible.builtin.debug:
     msg: >-
-      No certificate metrics were written: {{ basetool_host_root_dir }}/monitoring/certs holds
+      No certificate metrics were written: {{ basetool_host_config_dir }}/monitoring/certs holds
       {{ basetool_host_cert_files.matched | default(0) }} readable *.crt / *.pem / *.cer, so
       CertificateFileExpiringSoon and SelfSignedCertificateExpiring have no input on this host and
       CertificateMetricsStale is what will say so. On a host that has not cut over yet this is the
@@ -425,9 +425,9 @@
     msg: >-
       Host-side monitoring: node_exporter on {{ basetool_host_node_exporter_listen }} (systemd +
       textfile collectors), prometheus-podman-exporter on {{ basetool_host_podman_exporter_listen }}
-      as a user unit of {{ basetool_host_service_user }}, and iri-container-metrics.timer (every 30s)
-      plus iri-cert-expiry.timer (daily 03:40) writing
-      {{ basetool_host_root_dir }}/monitoring/textfile. alloy is ENABLED but NOT started -- its
+      as a user unit of {{ basetool_host_service_user }}, and basetool-container-metrics.timer (every 30s)
+      plus basetool-cert-expiry.timer (daily 03:40) writing
+      {{ basetool_host_textfile_dir }}. alloy is ENABLED but NOT started -- its
       configuration arrives with the first config bundle. The containerised monitoring services
       reach these over host.containers.internal, verified 2026-09-18; the host firewall keeps both
       ports off the network, also verified.

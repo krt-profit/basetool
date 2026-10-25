@@ -37,7 +37,7 @@ groups:
           severity: critical
         annotations:
           summary: "Disk >90% on {{ $labels.mountpoint }}"
-          description: "Filesystem {{ $labels.mountpoint }} is over 90% full. The monitoring stores share /var/iri with both PGDATA dirs — an overrun must never ENOSPC the databases."
+          description: "Filesystem {{ $labels.mountpoint }} is over 90% full. The monitoring stores share /var/lib/basetool with both PGDATA dirs — an overrun must never ENOSPC the databases."
 
       - alert: HostInodesCritical
         expr: (1 - (node_filesystem_files_free{fstype!~"tmpfs|overlay"} / node_filesystem_files{fstype!~"tmpfs|overlay"})) > 0.90
@@ -55,7 +55,7 @@ groups:
           severity: critical
         annotations:
           summary: "systemd unit failed: {{ $labels.name }}"
-          description: "The systemd unit {{ $labels.name }} is in the failed state (e.g. iri-deploy / iri-backup / iri-restore-drill)."
+          description: "The systemd unit {{ $labels.name }} is in the failed state (e.g. basetool-deploy / basetool-backup / basetool-restore-drill)."
 
       - alert: ContainerRestartLoop
         expr: changes(basetool:container:start_time_seconds[15m]) > 3
@@ -75,7 +75,7 @@ groups:
           severity: critical
         annotations:
           summary: "No container metrics: fewer than 10 named containers are reporting"
-          description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the cgroup-fed container alerts (working-set, OOM, CPU throttle) are silently blind. The restart-loop alert reads a different source and has its own guard, ContainerStartTimeMissing. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
+          description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the cgroup-fed container alerts (working-set, OOM, CPU throttle) are silently blind. The restart-loop alert reads a different source and has its own guard, ContainerStartTimeMissing. The source is scripts/cgroup-container-metrics.py and its basetool-container-metrics.timer (`systemctl status basetool-container-metrics.timer`, /var/lib/basetool/textfile/containers.prom)."
 
       - alert: ContainerStartTimeMissing
         expr: >-
@@ -95,7 +95,7 @@ groups:
           severity: critical
         annotations:
           summary: "PostgreSQL down: {{ $labels.database }}"
-          description: "postgres-exporter for {{ $labels.database }} has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."
+          description: "postgres-exporter for {{ $labels.database }} has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."
 
       - alert: RedisDown
         expr: redis_up == 0
@@ -104,7 +104,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis down"
-          description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/iri/redis/users.acl stops it from starting at all (ADR-0088)."
+          description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/lib/basetool/redis/users.acl stops it from starting at all (ADR-0088)."
 
       - alert: PostgresConnectionsCritical
         expr: sum by (database) (pg_stat_activity_count) / on(database) pg_settings_max_connections > 0.80
@@ -124,7 +124,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
-          description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/iri/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
+          description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/lib/basetool/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
 
       - alert: RedisRdbSaveFailing
         expr: redis_rdb_last_bgsave_status == 0
@@ -133,7 +133,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis background save is failing"
-          description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/iri/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
+          description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/lib/basetool/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
 
       - alert: RedisAofWriteFailing
         expr: redis_aof_last_write_status == 0 and redis_aof_enabled == 1
@@ -142,7 +142,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis AOF writes are failing"
-          description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/iri/redis bind mount and the redis log."
+          description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/lib/basetool/redis bind mount and the redis log."
 
       - alert: RedisAclDenials
         expr: >-
@@ -156,7 +156,7 @@ groups:
           severity: warning
         annotations:
           summary: "Redis is refusing authentication or commands under its ACL ({{ $value | printf \"%.0f\" }} in 5m)"
-          description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+          description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
 
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
@@ -194,7 +194,7 @@ groups:
           severity: warning
         annotations:
           summary: "Certificate expiry metrics are stale"
-          description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
+          description: "basetool-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status basetool-cert-expiry.timer basetool-cert-expiry.service` and /var/lib/basetool/textfile/certificates.prom on the host."
 
       - alert: ContainerUnhealthy
         expr: >-
@@ -206,7 +206,7 @@ groups:
           severity: warning
         annotations:
           summary: "Container unhealthy: {{ $labels.name }}"
-          description: "Container {{ $labels.name }} has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run {{ $labels.name }}` and `journalctl CONTAINER_NAME={{ $labels.name }}`."
+          description: "Container {{ $labels.name }} has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) podman healthcheck run {{ $labels.name }}` and `journalctl CONTAINER_NAME={{ $labels.name }}`."
 
       - alert: HostSecurityUpdatesFailing
         expr: basetool_host_updates_last_run_success == 0

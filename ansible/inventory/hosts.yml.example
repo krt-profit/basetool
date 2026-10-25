@@ -12,7 +12,7 @@ basetool_hosts:
         - "api.basetool.example.test:host-gateway"
         - "ingest.basetool.example.test:host-gateway"
         - "grafana.basetool.example.test:host-gateway"
-      basetool_host_jvm_truststore_path: /var/iri/secrets/truststore.p12
+      basetool_host_jvm_truststore_path: /etc/basetool/secrets/truststore.p12
     production:
       ansible_host: 203.0.113.0       # the new Hetzner CPX42
       ansible_user: greluc

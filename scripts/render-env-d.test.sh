@@ -58,12 +58,12 @@ expect_line "embedded_in_a_string"   'A=yes'            'K=pre-${A}-post'       
 
 expect_line "nested_default" \
   'H=https://x.example/auth' \
-  'K=${ISS:-${H:-https://fallback/auth}/realms/iri}' \
-  'K=https://x.example/auth/realms/iri'
+  'K=${ISS:-${H:-https://fallback/auth}/realms/basetool}' \
+  'K=https://x.example/auth/realms/basetool'
 expect_line "nested_default_all_unset" \
   '# nothing set' \
-  'K=${ISS:-${H:-https://fallback/auth}/realms/iri}' \
-  'K=https://fallback/auth/realms/iri'
+  'K=${ISS:-${H:-https://fallback/auth}/realms/basetool}' \
+  'K=https://fallback/auth/realms/basetool'
 
 expect_line "dollar_in_value"        'P=aa$bb-cc'       'K=${P}'                      'K=aa$bb-cc'
 expect_line "quotes_are_stripped"    'P="quoted"'       'K=${P}'                      'K=quoted'

@@ -7,9 +7,9 @@ tests:
   - name: silent - failed code entries and unknown clients do not count
     interval: 30m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="invalid_oauth2_user_code", client_id="null"}'
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="oauth2_device_verify_user_code", error="invalid_oauth2_user_code", client_id="null"}'
         values: "0x336 50+50x6"
-      - series: 'keycloak_user_events_total{job="keycloak", realm="iri", idp="", event="oauth2_device_verify_user_code", error="", client_id="unknown"}'
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="oauth2_device_verify_user_code", error="", client_id="unknown"}'
         values: "0x336 50+50x6"
     alert_rule_test:
       - eval_time: 170h

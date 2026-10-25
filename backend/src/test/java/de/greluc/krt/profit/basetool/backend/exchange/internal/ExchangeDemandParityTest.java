@@ -149,10 +149,10 @@ class ExchangeDemandParityTest {
 
   @Test
   void theOrgDemandEqualsTheWebGapPerMaterialAndQualityFloor() {
-    Squadron iridium = squadron("IRI");
-    JobOrder first = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
-    JobOrder second = order(iridium, 2, JobOrderType.MATERIAL, JobOrderStatus.IN_PROGRESS);
-    JobOrder items = order(iridium, 3, JobOrderType.ITEM, JobOrderStatus.OPEN);
+    Squadron alpha = squadron("ALP");
+    JobOrder first = order(alpha, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
+    JobOrder second = order(alpha, 2, JobOrderType.MATERIAL, JobOrderStatus.IN_PROGRESS);
+    JobOrder items = order(alpha, 3, JobOrderType.ITEM, JobOrderStatus.OPEN);
     requires(
         first,
         new MaterialRequirement(agricium, GOOD, 100.0),
@@ -162,7 +162,7 @@ class ExchangeDemandParityTest {
     booked(first, agricium, GOOD, 40.0);
     booked(first, beryl, NONE, 30.0);
     booked(second, agricium, NONE, 5.0);
-    givenOrders(Set.of(iridium.getId()), first, second, items);
+    givenOrders(Set.of(alpha.getId()), first, second, items);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
     List<ExchangeDemandMaterialDto> lines = exchange.demand(MEMBER, false).materials();
@@ -220,9 +220,9 @@ class ExchangeDemandParityTest {
 
   @Test
   void theOrgDemandOfTwoUnitsEqualsTheWebGroupsSummed() {
-    Squadron iridium = squadron("IRI");
+    Squadron alpha = squadron("ALP");
     Squadron nova = squadron("NOV");
-    JobOrder first = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
+    JobOrder first = order(alpha, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
     JobOrder second = order(nova, 2, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
     requires(first, new MaterialRequirement(agricium, GOOD, 10.0));
     requires(
@@ -231,7 +231,7 @@ class ExchangeDemandParityTest {
         new MaterialRequirement(beryl, NONE, 3.0));
     booked(first, agricium, GOOD, 2.5);
     booked(second, beryl, NONE, 3.0);
-    givenOrders(Set.of(iridium.getId(), nova.getId()), first, second);
+    givenOrders(Set.of(alpha.getId(), nova.getId()), first, second);
 
     MaterialDemandOverviewDto overview = web.getMaterialDemandOverview();
     Map<Bucket, Double> webGaps = webGaps(overview);
@@ -246,13 +246,13 @@ class ExchangeDemandParityTest {
 
   @Test
   void anOverBookedOrderOffsetsAnotherOrdersGapInTheSameUnitOnBothSurfaces() {
-    Squadron iridium = squadron("IRI");
-    JobOrder covered = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
-    JobOrder lacking = order(iridium, 2, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
+    Squadron alpha = squadron("ALP");
+    JobOrder covered = order(alpha, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
+    JobOrder lacking = order(alpha, 2, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
     requires(covered, new MaterialRequirement(agricium, NONE, 10.0));
     requires(lacking, new MaterialRequirement(agricium, NONE, 20.0));
     booked(covered, agricium, NONE, 25.0);
-    givenOrders(Set.of(iridium.getId()), covered, lacking);
+    givenOrders(Set.of(alpha.getId()), covered, lacking);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
 
@@ -264,11 +264,11 @@ class ExchangeDemandParityTest {
   @Test
   void pieceCountedDemandIsRoundedBeforeTheSubtractionOnBothSurfaces() {
     MaterialDto frames = pieceMaterial("Frame");
-    Squadron iridium = squadron("IRI");
-    JobOrder order = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
+    Squadron alpha = squadron("ALP");
+    JobOrder order = order(alpha, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
     requires(order, new MaterialRequirement(frames, NONE, 2.4));
     booked(order, frames, NONE, 1.6);
-    givenOrders(Set.of(iridium.getId()), order);
+    givenOrders(Set.of(alpha.getId()), order);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
 

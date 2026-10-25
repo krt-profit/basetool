@@ -595,16 +595,16 @@ class ExchangeWireContractTest {
   /**
    * Reads a published schema by its {@code $id}, from the gateway's committed schema folder.
    *
-   * @param iri the schema's {@code $id}
+   * @param schemaId the schema's {@code $id}
    * @return its text, or {@code null} for a schema that is not one of the published ones
    */
-  private static @Nullable String publishedSchema(@NotNull String iri) {
-    if (!iri.startsWith(BASE)) {
+  private static @Nullable String publishedSchema(@NotNull String schemaId) {
+    if (!schemaId.startsWith(BASE)) {
       return null;
     }
     try {
       return Files.readString(
-          SCHEMAS.resolve(iri.substring(BASE.length())), StandardCharsets.UTF_8);
+          SCHEMAS.resolve(schemaId.substring(BASE.length())), StandardCharsets.UTF_8);
     } catch (IOException missing) {
       return null;
     }

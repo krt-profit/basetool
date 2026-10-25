@@ -19,7 +19,7 @@ view, and because each one before the exchange's (§6.8) has burned somebody at 
 5. The frontend receives the tokens, creates a Spring Session in **Redis**, and calls the backend
    as a *resource server* with a bearer token. The backend never sees a credential. The code-for-token
    exchange, the ID token's keys and the userinfo call are the frontend's own requests to Keycloak:
-   with `IRI_KEYCLOAK_BACKCHANNEL_URI` set they go to the internal connector, otherwise through the
+   with `BASETOOL_KEYCLOAK_BACKCHANNEL_URI` set they go to the internal connector, otherwise through the
    edge (REQ-SEC-087, ADR-0318).
 
 The session lives in Redis rather than in memory so it survives a frontend restart — which a deploy
@@ -92,14 +92,14 @@ REQ-XCH-019. *Until 2026-09-28 the extractor posted to the gateway's own `/v1/re
 The only way the running application and its configuration change, and nobody drives it (the host
 itself changes only through the Ansible role, which never delivers):
 
-1. `iri-deploy.timer` fires on the host every five minutes and runs `deploy.sh` as the `deploy`
+1. `basetool-deploy.timer` fires on the host every five minutes and runs `deploy.sh` as the `deploy`
    account.
 2. It resolves the `:stable` tags of the app images, the **config bundle** and the
    **Keycloak provider-JAR bundle** to immutable digests.
 3. **Every digest is Cosign-verified on the host** against the release workflow's keyless identity
    *before* anything is pulled, extracted or applied. A `:stable` tag moved out-of-band to an
    untrusted digest is rejected here — which is what makes a blind `:stable` pull safe.
-4. Verified content is unpacked, `env.d` files are rendered from `.env` by `render-env-d.py`, and
+4. Verified content is unpacked, `env.d` files are rendered from `basetool.env` by `render-env-d.py`, and
    the Quadlet units are reconciled through the service user's systemd instance, behind a health
    gate that rolls back on failure (`REQ-OPS-003`). A failure *before* the gate — an unwritable
    directory, a failed mirror, a failed pull — is refused up front where it can be, and otherwise
@@ -119,11 +119,11 @@ itself changes only through the Ansible role, which never delivers):
 
 ## 6.7 Every night a backup, every week the drill that proves it
 
-1. `iri-backup.timer` (daily, 04:15) runs `backup.sh`: `pg_dump` of both databases, Grafana's
-   SQLite, the monitoring secrets, the three `edge-*` volumes, `.env`, the keystore, the realm
+1. `basetool-backup.timer` (daily, 04:15) runs `backup.sh`: `pg_dump` of both databases, Grafana's
+   SQLite, the monitoring secrets, the three `edge-*` volumes, `basetool.env`, the keystore, the realm
    export, the Keycloak providers and the **redis ACL** — pushed with **restic** through an
    **rclone** WebDAV remote to Nextcloud, under a GFS retention policy.
-2. `iri-restore-drill.timer` (weekly, Sunday 05:30) runs `restore-drill.sh`, which restores the
+2. `basetool-restore-drill.timer` (weekly, Sunday 05:30) runs `restore-drill.sh`, which restores the
    **latest snapshot** into a throwaway PostgreSQL and checks seven artifacts, writing the result
    as Prometheus textfile metrics (`basetool_restore_drill_artifact_ok`).
 

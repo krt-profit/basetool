@@ -75,7 +75,7 @@ class OrdersSquadronFilterE2eTest {
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Filter Material");
       iridiumOrderId =
           seeder.createJobOrder(
-              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Filter IRI Order", materialId, 650, 25);
+              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Filter ALP Order", materialId, 650, 25);
     }
   }
 

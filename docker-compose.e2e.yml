@@ -1,10 +1,10 @@
 services:
   db-backend-dev:
     volumes: !override
-      - iri-e2e-db-backend:/var/lib/postgresql/data
+      - basetool-e2e-db-backend:/var/lib/postgresql/data
   db-keycloak-dev:
     volumes: !override
-      - iri-e2e-db-keycloak:/var/lib/postgresql/data
+      - basetool-e2e-db-keycloak:/var/lib/postgresql/data
   redis-dev:
     command: redis-server --save "" --appendonly no --notify-keyspace-events Egx --aclfile /etc/redis/users.acl
     volumes: !override
@@ -13,7 +13,7 @@ services:
     build:
       context: .
       dockerfile: docker/sandbox/keycloak/Dockerfile
-    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-sandbox-keycloak:${IRI_BASETOOL_VERSION:-local}
+    image: ghcr.io/${BASETOOL_IMAGE_NAMESPACE:-krt-profit}/basetool-sandbox-keycloak:${BASETOOL_VERSION:-local}
     command: start-dev --import-realm --cache=local
     environment:
       KC_HOSTNAME: http://host.docker.internal:18080/auth
@@ -23,7 +23,7 @@ services:
           - keycloak
           - host.docker.internal
     volumes: !override
-      - ./realm-export.json:/opt/keycloak/data/import/realm-iri.json:ro
+      - ./realm-export.json:/opt/keycloak/data/import/realm-basetool.json:ro
   backend-dev:
     user: "0:0"
     environment:
@@ -68,5 +68,5 @@ services:
           - ingest
 
 volumes:
-  iri-e2e-db-backend:
-  iri-e2e-db-keycloak:
+  basetool-e2e-db-backend:
+  basetool-e2e-db-keycloak:

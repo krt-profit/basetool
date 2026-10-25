@@ -82,8 +82,8 @@
                     </thead>
                     <tbody>
                         <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
-                            <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
-                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
+                            <td><span class="cell-title" th:text="${squadron.shorthand}">ALP</span></td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">ALPHA</td>
                             <td class="cell-actions">
                                 <label class="krt-switch">
                                     <input type="checkbox" role="switch"
@@ -118,8 +118,8 @@
                     </thead>
                     <tbody>
                         <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
-                            <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
-                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
+                            <td><span class="cell-title" th:text="${squadron.shorthand}">ALP</span></td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">ALPHA</td>
                             <td class="cell-actions">
                                 <label class="krt-switch">
                                     <input type="checkbox" role="switch"

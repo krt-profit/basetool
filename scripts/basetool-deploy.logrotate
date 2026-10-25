@@ -1,6 +1,6 @@
-/var/log/iri-container-cleanup.log {
+/var/log/basetool/deploy.log {
     weekly
-    rotate 8
+    rotate 12
     missingok
     notifempty
     compress

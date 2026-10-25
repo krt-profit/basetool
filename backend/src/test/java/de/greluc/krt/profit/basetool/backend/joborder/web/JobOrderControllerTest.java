@@ -242,7 +242,7 @@ class JobOrderControllerTest {
         new MaterialDemandOverviewDto(
             List.of(
                 new MaterialDemandGroupDto(
-                    new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"), List.of())));
+                    new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"), List.of())));
     when(jobOrderMaterialDemandService.getMaterialDemandOverview()).thenReturn(overview);
 
     MaterialDemandOverviewDto result = controller.getMaterialDemand();

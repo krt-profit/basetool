@@ -9,8 +9,8 @@ credentials.
 How each step works is on the [authentication](authentication.md) page.
 
 - Use the OAuth 2.0 device authorization grant (RFC 8628) against the pinned production issuer
-  `https://profit-base.online/auth/realms/iri`, with your registered public client id and no client
-  secret.
+  `https://profit-base.online/auth/realms/basetool`, with your registered public client id and no
+  client secret.
 - Show the `user_code` and the bare `verification_uri`, and let the member type the code in their
   browser. Never open, show or send `verification_uri_complete`, not even as a QR code: it skips the
   page where the Basetool warns about device-code phishing.

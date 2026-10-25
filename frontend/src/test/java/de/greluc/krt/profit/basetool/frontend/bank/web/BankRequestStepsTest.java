@@ -55,7 +55,7 @@ class BankRequestStepsTest {
         id,
         UUID.randomUUID(),
         "KB-0042",
-        "IRI Betriebskonto",
+        "ALP Betriebskonto",
         null,
         null,
         null,

@@ -22,7 +22,7 @@ STUB
 chmod +x "${WORK}/bin/needs-restarting"
 
 run() {
-  env IRI_HOST_UPDATES_METRICS_FILE="${OUT}" IRI_NEEDS_RESTARTING="${WORK}/bin/needs-restarting" \
+  env BASETOOL_HOST_UPDATES_METRICS_FILE="${OUT}" BASETOOL_NEEDS_RESTARTING="${WORK}/bin/needs-restarting" \
     "$@" bash "${SUT}"
 }
 
@@ -83,7 +83,7 @@ run SERVICE_RESULT=success NR_RC=0
 leftovers="$(find "${WORK}/textfile" -name '.host-updates.prom.*' | wc -l | tr -d ' ')"
 if [[ "${leftovers}" == 0 ]]; then ok "no temporary file is left behind"; else bad "${leftovers} temporary file(s) left behind"; fi
 if grep -q '^# TYPE basetool_host_reboot_required gauge$' "${OUT}"; then ok "each series is typed"; else bad "missing TYPE line"; fi
-if run SERVICE_RESULT=success IRI_HOST_UPDATES_METRICS_FILE="${WORK}/nowhere/x.prom" 2>/dev/null; then
+if run SERVICE_RESULT=success BASETOOL_HOST_UPDATES_METRICS_FILE="${WORK}/nowhere/x.prom" 2>/dev/null; then
   bad "an unwritable output directory reported success"
 else
   ok "an unwritable output directory is a failure, not a quiet no-op"

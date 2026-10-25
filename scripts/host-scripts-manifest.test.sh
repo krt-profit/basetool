@@ -57,7 +57,7 @@ apply_path_entries() {
 
 sourced_libs() {
   # shellcheck disable=SC2016
-  sed -n 's#^\. "\${IRI_SCRIPT_DIR}/\(lib/[A-Za-z0-9._-]*\)"$#\1#p' "${SCRIPT_DIR}/deploy.sh"
+  sed -n 's#^\. "\${BASETOOL_SCRIPT_DIR}/\(lib/[A-Za-z0-9._-]*\)"$#\1#p' "${SCRIPT_DIR}/deploy.sh"
 }
 
 scenario_list_names_real_unique_files() {

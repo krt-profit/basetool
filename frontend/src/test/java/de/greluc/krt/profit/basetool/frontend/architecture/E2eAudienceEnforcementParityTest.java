@@ -44,7 +44,9 @@ class E2eAudienceEnforcementParityTest {
   /** Throwaway realm the E2E Keycloak imports; carries the audience mapper under test. */
   private static final String REALM_EXPORT = "src/e2e/resources/realm-export.e2e.json";
 
-  /** The extension that feeds {@code IRI_BACKEND_EXPECTED_AUDIENCES} into the compose stack. */
+  /**
+   * The extension that feeds {@code BASETOOL_BACKEND_EXPECTED_AUDIENCES} into the compose stack.
+   */
   private static final String STACK_EXTENSION =
       "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/E2eStackExtension.java";
 

@@ -61,7 +61,7 @@ class JobOrderHandoverMapperTest {
     handover.setJobOrder(jo);
     handover.setHandoverTime(when);
     handover.setRecipientHandle("recipient");
-    handover.setRecipientSquadron("Iridium");
+    handover.setRecipientSquadron("Alpha");
     handover.setVersion(2L);
 
     JobOrderHandoverDto dto = mapper.toDto(handover);
@@ -72,7 +72,7 @@ class JobOrderHandoverMapperTest {
         jobOrderId, dto.jobOrderId(), "jobOrderId must be flattened from nested jobOrder.id");
     assertEquals(when, dto.handoverTime());
     assertEquals("recipient", dto.recipientHandle());
-    assertEquals("Iridium", dto.recipientSquadron());
+    assertEquals("Alpha", dto.recipientSquadron());
     assertEquals(2L, dto.version());
   }
 

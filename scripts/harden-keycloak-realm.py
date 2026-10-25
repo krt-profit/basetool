@@ -701,7 +701,7 @@ class FakeKeycloak:
     """An in-memory realm that answers the kcadm shapes this script emits, for --selftest."""
 
     def __init__(self) -> None:
-        self.realm = {"realm": "iri", "resetPasswordAllowed": True, "browserFlow": "browser",
+        self.realm = {"realm": "basetool", "resetPasswordAllowed": True, "browserFlow": "browser",
                       "ssoSessionIdleTimeout": 2592000, "ssoSessionMaxLifespan": 15552000,
                       "ssoSessionIdleTimeoutRememberMe": 2592000,
                       "ssoSessionMaxLifespanRememberMe": 15552000,
@@ -763,7 +763,7 @@ class FakeKcadm(HardenKcadm):
     """HardenKcadm over a FakeKeycloak; counts writes so dry runs can be shown to write nothing."""
 
     def __init__(self, fake: FakeKeycloak, dry_run: bool):
-        super().__init__([], "iri", dry_run)
+        super().__init__([], "basetool", dry_run)
         self.fake = fake
 
     def get_realm(self) -> dict:
@@ -799,7 +799,7 @@ class FakeKcadm(HardenKcadm):
             return
         fake = self.fake
         fake.writes.append(f"{verb} {path}")
-        if verb == "update" and path == "realms/iri":
+        if verb == "update" and path == "realms/basetool":
             fake.realm.update(payload)
         elif verb == "update" and path.startswith("identity-provider/instances/"):
             if not merge and not payload.get("providerId"):
@@ -975,13 +975,13 @@ def selftest() -> int:
 
     print("the identity provider and the required action are updated in merge mode")
     sent: list[list[str]] = []
-    recorder = HardenKcadm(["kcadm"], "iri", dry_run=False)
+    recorder = HardenKcadm(["kcadm"], "basetool", dry_run=False)
     recorder._run = lambda argv, stdin=None: sent.append(argv) or ""
     recorder.write("update", "identity-provider/instances/discord", {"x": 1}, "idp", merge=True)
-    recorder.write("update", "realms/iri", {"x": 1}, "realm")
-    check(sent[0] == ["update", "identity-provider/instances/discord", "-r", "iri", "-m", "-f", "-"],
+    recorder.write("update", "realms/basetool", {"x": 1}, "realm")
+    check(sent[0] == ["update", "identity-provider/instances/discord", "-r", "basetool", "-m", "-f", "-"],
           "an identity-provider update sends -m before -f")
-    check(sent[1] == ["update", "realms/iri", "-r", "iri", "-f", "-"],
+    check(sent[1] == ["update", "realms/basetool", "-r", "basetool", "-f", "-"],
           "a realm update stays a plain -f body")
     fake = FakeKeycloak()
     refused = False
@@ -1020,7 +1020,7 @@ def selftest() -> int:
 def build_parser() -> argparse.ArgumentParser:
     """The command line."""
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    parser.add_argument("--realm", default="iri")
+    parser.add_argument("--realm", default="basetool")
     parser.add_argument("--container", default="keycloak")
     parser.add_argument("--kcadm-command", help="override the kcadm invocation (a quoted command line)")
     parser.add_argument("--step", action="append", choices=["2", "11", "12", "all"],

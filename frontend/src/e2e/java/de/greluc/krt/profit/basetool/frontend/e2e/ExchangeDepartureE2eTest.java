@@ -65,7 +65,7 @@ class ExchangeDepartureE2eTest {
   private static final String KEYCLOAK = "http://localhost:18080/auth";
 
   /** The realm roles the member holds directly; the default role carries „KRT Member" too. */
-  private static final List<String> MEMBER_ROLES = List.of("KRT Member", "default-roles-iri");
+  private static final List<String> MEMBER_ROLES = List.of("KRT Member", "default-roles-basetool");
 
   private static Playwright playwright;
   private static Browser browser;
@@ -125,7 +125,7 @@ class ExchangeDepartureE2eTest {
                     http,
                     token,
                     "GET",
-                    "/admin/realms/iri/users?exact=true&username=" + encode(MEMBER),
+                    "/admin/realms/basetool/users?exact=true&username=" + encode(MEMBER),
                     null))
             .getAsJsonArray();
     assertEquals(1, users.size(), "Keycloak knows the member once");
@@ -138,7 +138,7 @@ class ExchangeDepartureE2eTest {
                       http,
                       token,
                       "GET",
-                      "/admin/realms/iri/roles/" + encode(name).replace("+", "%20"),
+                      "/admin/realms/basetool/roles/" + encode(name).replace("+", "%20"),
                       null))
               .getAsJsonObject();
       JsonObject reference = new JsonObject();
@@ -150,7 +150,7 @@ class ExchangeDepartureE2eTest {
         http,
         token,
         "DELETE",
-        "/admin/realms/iri/users/" + userId + "/role-mappings/realm",
+        "/admin/realms/basetool/users/" + userId + "/role-mappings/realm",
         roles.toString());
   }
 

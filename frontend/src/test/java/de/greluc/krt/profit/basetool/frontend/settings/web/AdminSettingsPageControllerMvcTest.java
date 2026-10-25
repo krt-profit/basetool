@@ -278,10 +278,10 @@ class AdminSettingsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void thePageRendersTheFormPattern() throws Exception {
-    SquadronDto iridium =
-        new SquadronDto(UUID.randomUUID(), "IRIDIUM", "IRI", "", true, true, false, 0L);
+    SquadronDto alpha =
+        new SquadronDto(UUID.randomUUID(), "ALPHA", "ALP", "", true, true, false, 0L);
 
-    String html = renderPage(List.of(iridium));
+    String html = renderPage(List.of(alpha));
 
     assertThat(html)
         .contains("data-testid=\"page-head\"")
@@ -312,8 +312,8 @@ class AdminSettingsPageControllerMvcTest {
         .contains("<label class=\"krt-switch\">")
         .containsPattern("class=\"squadron-promotion-toggle\"[^>]*checked")
         .containsPattern(
-            "class=\"squadron-profit-toggle\"[^>]*aria-label=\"Auftragsbearbeitung: IRI\"")
-        .contains("class=\"cell-title\">IRI<");
+            "class=\"squadron-profit-toggle\"[^>]*aria-label=\"Auftragsbearbeitung: ALP\"")
+        .contains("class=\"cell-title\">ALP<");
   }
 
   /** Without squadrons the per-squadron sections show the empty state instead of a table. */

@@ -24,7 +24,7 @@ cleaner" — an entry earns its place by naming a failure that can actually happ
 
 ## 11.1 The cleanup rename — **closed 2026-09-22**
 
-The weekly cleanup job was `iri-docker-cleanup` and called `docker` directly; ADR-0194 renamed and
+The weekly cleanup job called `docker` directly; ADR-0194 renamed and
 fixed it (§7.4a). Because the alert rules ride the config bundle while the scripts come from the
 Ansible role, the alert accepted both metric names and Alloy watched both log paths for the length
 of the rename, with the stated removal condition *"once both Rocky hosts have run the role"*.
@@ -32,7 +32,6 @@ of the rename, with the stated removal condition *"once both Rocky hosts have ru
 Both have, and the retired Docker host never will, so the second name and the second path were
 removed on 2026-09-22 (OPS-SIMP-02). `container_cleanup_rename_test.yml` now locks the one name —
 fresh is silent, stale and absent fire, and the retired name alone no longer satisfies the alert.
-The role still stops and removes the old `iri-docker-cleanup` units wherever it finds them.
 
 ## 11.2 The frontend hand-mirrors the backend's DTOs
 
@@ -94,7 +93,7 @@ The same hairpin carries the application traffic that dials a public name, and t
 it with one source, the host's own public address (measured 2026-10-24). That address is not on the
 `/auth/admin` allow-list — three admin paths answered `403` from it — so a container that hairpins
 does not reach the Keycloak console. ADR-0318 takes the frontend's and the backend's Keycloak calls
-off the hairpin once `IRI_KEYCLOAK_BACKCHANNEL_URI` is set; their aliases can then go.
+off the hairpin once `BASETOOL_KEYCLOAK_BACKCHANNEL_URI` is set; their aliases can then go.
 
 Two things to know before changing it. Podman **replaces** its own `--map-guest-addr` rather than
 appending, so dropping the v4 entry from `pasta_options` takes `host-gateway` from open to
@@ -158,13 +157,27 @@ ADR-0247 the config bundle carries the scripts' hashes and `deploy.sh` compares 
 `REQ-OPS-045`). Two gaps remain, both accepted: **a host whose `deploy.sh` lacks the check cannot
 police itself** — its first install comes through the role, and until then the mandatory comparison in
 `docs/deployment.md` and the absent-metric alert `HostScriptsCheckStale` are the protection; and
-**the role's units, drop-ins, logrotate and tmpfiles files outside `/var/iri/code/scripts` are not
+**the role's units, drop-ins, logrotate and tmpfiles files outside `/opt/basetool/scripts` are not
 hashed**. Extending `scripts/host-scripts.list` with their installed paths closes the second.
+
+## 11.5e The layout and realm cutover — planned 2026-10-24
+
+The move to the FHS layout, the account rename and the Keycloak realm rename ([ADR-0319](../adr/0319-the-host-follows-the-rhel-fhs-layout-and-the-product-carries-no-legacy-name.md))
+happen in one maintenance window. **What it costs:** the site is down for the window; every browser
+session, refresh token and offline token is void, so every member signs in again; every external exchange
+client must switch to the new issuer or it stops working. **What can go wrong:** the default-role rename
+by id is undocumented upstream (the script reads it back and fails loudly), the rootless Podman store is
+reset and its three named volumes travel as exports, and the migration scripts have no undo phase.
+**The way back is a server snapshot taken immediately before the window** — it loses whatever is written
+after it, which is why the window is a full stop. The rehearsal on the testing host and the exact steps
+are in [`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](../HOST_LAYOUT_MIGRATION_RUNBOOK.md). Closed when the runbook
+is archived; the migration scripts leave the repository once the last pre-migration snapshot has aged out
+of the retention.
 
 ## 11.6 Open follow-ups from the cutover
 
 - **The retired Docker host is shut down, not decommissioned.** It is kept only as the way back
-  (§7.7). While it exists it holds a complete copy of production — both databases, `.env`, the
+  (§7.7). While it exists it holds a complete copy of production — both databases, `basetool.env`, the
   keystore, the realm export, the certificates — and a power-on would start whatever timers it
   still has enabled. **Closes** when the rollback window is
   declared over and the machine is wiped and deleted at the provider; whether any secret it holds
@@ -183,15 +196,15 @@ hashed**. Extending `scripts/host-scripts.list` with their installed paths close
   **closes** when a window allows one and `ls /proc/pressure` answers. *(2026-09-25: production was
   rebooted at 15:56 UTC for kernel 6.12.0-211.58.1; whether `/proc/pressure` now answers was not
   recorded — re-check before closing this.)*
-- **After a reboot, the four `iri-*` jobs fail once.** On the 2026-09-25 reboot, `iri-deploy`,
-  `iri-backup`, `iri-restore-drill` and `iri-container-cleanup` all started at boot and failed
+- **After a reboot, the four `basetool-*` jobs fail once.** On the 2026-09-25 reboot, `basetool-deploy`,
+  `basetool-backup`, `basetool-restore-drill` and `basetool-container-cleanup` all started at boot and failed
   within a second with "no lingering user could be found" — a failure shape §7.4b's boot-time wait
   does not cover. The stack is unaffected and the next regular tick succeeds, but the units sit
   `failed` until then. **Fixed in the repository by #2069** (2026-09-25): the timers no longer pull
   their service in, the four units are ordered after the service user's manager, and `rt_detect`
   waits for what a sandboxed job can actually see — §7.4b has both causes.
   **Closes** when the role's `--tags scripts` run has put it on production and a reboot, testing
-  host first, leaves no `iri-*` unit `failed`
+  host first, leaves no `basetool-*` unit `failed`
   ([`deployment.md` → host patching](../deployment.md#updating-the-operational-scripts-and-units)).
 - **A Keycloak restart is a full-app restart.** `backend` `Requires=` keycloak and `frontend` /
   `ingest` require backend, so `systemctl --user restart keycloak.service` — by hand or by a
@@ -218,7 +231,7 @@ hashed**. Extending `scripts/host-scripts.list` with their installed paths close
   automatically would be a full-app restart on one failed probe.
 - **A configured Discord precheck can fail open with nobody noticing.** The account-existence
   precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
-  production the truststore `.env` named never existed and the warning repeated at every start for
+  production the truststore `basetool.env` named never existed and the warning repeated at every start for
   at least seven days before a rollout step found it (2026-09-25, fixed the same day). No alert reads
   that line — `KeycloakErrorRateHigh`, whose description names this very path, counts `ERROR` lines, and
   this is one `WARN` per start. The runbook's verify step now reads it; an alert is not built.
@@ -280,7 +293,7 @@ not happened.
   minter, the switches and the fallback mounts; the owner ran the four-step rollout
   ([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)):
   steps 1–2 at ~15:40/~15:52 UTC, step 3 with v1.12.0 (deployed 17:38–17:44 UTC), step 4 at
-  17:58–18:03 UTC. The units mount `/var/iri/secrets/tls/<service>.p12`,
+  17:58–18:03 UTC. The units mount `/etc/basetool/secrets/tls/<service>.p12`,
   `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate. Left behind: a
   release rollback to 1.11.0 or older now needs step 4 undone first — above all the Discord
   precheck's truststore, or that guard fails open again without an outage to notice it by.
@@ -330,7 +343,7 @@ since the go-live of 2026-09-28, so these risks hold now.
   extension until the member disconnects it or the offline session expires.
 - **An extension's origin is bound to its client, but only by configuration** (ADR-0304). The
   gateway refuses an extension origin carrying another client's token. The binding lives in the
-  gateway's `.env` and is set by hand at approval; a missing entry fails closed (`403
+  gateway's `basetool.env` and is set by hand at approval; a missing entry fails closed (`403
   ORIGIN_NOT_ALLOWED` or a failed CORS check), a wrong one binds the origin to the wrong client
   until it is corrected. A permission-widening release is caught only by the re-review the
   developer asks for — nothing in the Basetool sees the manifest of what members install.

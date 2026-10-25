@@ -126,7 +126,7 @@ rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/docker-compose.yml" \
-  's|KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}|KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online}|' \
+  's|KC_HOSTNAME: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}|KC_HOSTNAME: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online}|' \
   "origin-only KC_HOSTNAME"
 run_checker "$FIXTURE" --only prod-defaults
 expect_failure "an origin-only KC_HOSTNAME beside /auth is rejected" "would SERVE"
@@ -142,18 +142,18 @@ rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/docker-compose.yml" \
-  's|KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}|KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://profit-base.online/auth/realms/iri}|g' \
+  's|KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI:-${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool}|KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI:-https://profit-base.online/auth/realms/basetool}|g' \
   "issuer decoupled from the hostname"
 run_checker "$FIXTURE" --only prod-defaults
 expect_success "the decoupled issuer still passes on the defaults -- which is why case 3 exists"
 run_checker "$FIXTURE" --only prod-hostname-override
-expect_failure "a decoupled issuer no longer follows IRI_KEYCLOAK_HOSTNAME" \
+expect_failure "a decoupled issuer no longer follows BASETOOL_KEYCLOAK_HOSTNAME" \
   "this is what fails the moment the issuer becomes a second independent literal again"
 rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/docker-compose.test.yml" \
-  '0,\|KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri|s||KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/stale|' \
+  '0,\|KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/basetool|s||KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/stale|' \
   "one service left on a stale realm"
 run_checker "$FIXTURE" --only test-stack
 expect_failure "services that disagree on the issuer are rejected" "do not agree on the issuer"
@@ -161,7 +161,7 @@ rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/backend/src/main/resources/application-prod.yml" \
-  's|${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}|${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}|' \
+  's|${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/basetool}|${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/basetool}|' \
   "Spring fallback left on the retired host"
 run_checker "$FIXTURE" --only spring-defaults
 expect_failure "a Spring fallback default that names the retired issuer is rejected" \
@@ -170,16 +170,16 @@ rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/docker-compose.monitoring.yml" \
-  's|${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect|https://profit-base.online/auth/realms/iri/protocol/openid-connect|g' \
+  's|${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool/protocol/openid-connect|https://profit-base.online/auth/realms/basetool/protocol/openid-connect|g' \
   "Grafana endpoints decoupled from the hostname"
 run_checker "$FIXTURE" --only monitoring-oidc
-expect_failure "decoupled Grafana endpoints no longer follow IRI_KEYCLOAK_HOSTNAME" \
+expect_failure "decoupled Grafana endpoints no longer follow BASETOOL_KEYCLOAK_HOSTNAME" \
   "realm other than the one minting"
 rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/docker-compose.monitoring.yml" \
-  's|\(GF_AUTH_GENERIC_OAUTH_TOKEN_URL: .*\)/realms/iri/|\1/realms/stale/|' \
+  's|\(GF_AUTH_GENERIC_OAUTH_TOKEN_URL: .*\)/realms/basetool/|\1/realms/stale/|' \
   "one Grafana endpoint on a stale realm"
 run_checker "$FIXTURE" --only monitoring-oidc
 expect_failure "a Grafana endpoint on the wrong realm is rejected" "GF_AUTH_GENERIC_OAUTH_TOKEN_URL"
@@ -219,7 +219,7 @@ rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/docker-compose.yml" \
-  's|^\(\s*\)KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI.*$|\1KEYCLOAK_ISSUER_URI_RENAMED: unused|' \
+  's|^\(\s*\)KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI.*$|\1KEYCLOAK_ISSUER_URI_RENAMED: unused|' \
   "issuer variable renamed away"
 run_checker "$FIXTURE" --only prod-defaults
 expect_failure "a stack with no issuer at all is reported, not passed" "this scenario checked nothing"

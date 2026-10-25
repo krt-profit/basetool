@@ -94,10 +94,10 @@
                     <h2 class="demand-group-title">
                         <span th:if="${group.orgUnit() != null}" class="squadron-badge"
                               th:title="${group.orgUnit().name()}"
-                              th:text="${group.orgUnit().shorthand()}">IRI</span>
+                              th:text="${group.orgUnit().shorthand()}">ALP</span>
                         <span th:if="${group.orgUnit() == null}" class="squadron-badge squadron-badge-muted"
                               th:title="#{orders.demand.group.unassigned}">—</span>
-                        <span th:if="${group.orgUnit() != null}" th:text="${group.orgUnit().name()}">Iridium</span>
+                        <span th:if="${group.orgUnit() != null}" th:text="${group.orgUnit().name()}">Alpha</span>
                         <span th:if="${group.orgUnit() == null}" th:text="#{orders.demand.group.unassigned}">Ohne bearbeitende Einheit</span>
                     </h2>
 

@@ -334,7 +334,7 @@ class OrdersDetailPatternRenderTest {
         orderId,
         Instant.now(),
         "Recipient",
-        "IRI",
+        "ALP",
         null,
         null,
         List.of(line),

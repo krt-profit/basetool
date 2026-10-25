@@ -78,8 +78,8 @@ public class IngestGatePostureMetric {
       log.info("Ingest gate posture: {}", posture.describe());
     } else {
       log.warn(
-          "Ingest gate posture: {} — the audience check is OFF, so any valid realm token passes"
-              + " the decoder (set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest once the realm"
+          "Ingest gate posture: {} — the audience check is OFF, so any valid realm token passes the"
+              + " decoder (set BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest once the realm"
               + " stamps it)",
           posture.describe());
     }

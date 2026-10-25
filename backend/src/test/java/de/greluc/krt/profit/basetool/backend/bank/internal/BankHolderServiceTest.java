@@ -251,7 +251,7 @@ class BankHolderServiceTest {
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     "KB-0001",
-                    "Staffel IRIDIUM",
+                    "Staffel ALPHA",
                     new BigDecimal("1000"))));
     when(holderPostingRepository.findHolderLegsByTransactionIds(any()))
         .thenReturn(
@@ -266,7 +266,7 @@ class BankHolderServiceTest {
     assertEquals(2, rows.size());
     BankHolderBookingDto depositRow = rows.get(0);
     assertEquals("KB-0001", depositRow.counterAccountNo());
-    assertEquals("Staffel IRIDIUM", depositRow.counterAccountName());
+    assertEquals("Staffel ALPHA", depositRow.counterAccountName());
     assertNull(depositRow.counterHolderHandle());
     BankHolderBookingDto umbuchungRow = rows.get(1);
     assertEquals("carol", umbuchungRow.counterHolderHandle());

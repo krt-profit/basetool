@@ -376,7 +376,7 @@ fi
 say ""
 say "== what starts the jobs at boot, and what they are ordered after =="
 timers=0
-for timer in "${HERE}"/iri-*.timer; do
+for timer in "${HERE}"/basetool-*.timer; do
   [[ -e "${timer}" ]] || continue
   timers=$((timers + 1))
   name="$(basename "${timer}")"
@@ -391,25 +391,25 @@ for timer in "${HERE}"/iri-*.timer; do
     bad "${name} does not name ${name%.timer}.service in Unit="
   fi
 done
-(( timers >= 6 )) || bad "expected the six iri-*.timer files beside this suite, found ${timers}"
+(( timers >= 6 )) || bad "expected the six basetool-*.timer files beside this suite, found ${timers}"
 
-DEPLOY_TIMER="${HERE}/iri-deploy.timer"
+DEPLOY_TIMER="${HERE}/basetool-deploy.timer"
 if grep -Eq '^OnCalendar=\*-\*-\* \*:00/5:00$' "${DEPLOY_TIMER}" \
    && grep -Eq '^AccuracySec=1s$' "${DEPLOY_TIMER}" \
    && grep -Eq '^RandomizedDelaySec=0$' "${DEPLOY_TIMER}" \
    && grep -Eq '^Persistent=false$' "${DEPLOY_TIMER}"; then
-  ok "iri-deploy.timer fires on the 5-minute wall-clock grid, to the second, without jitter or catch-up"
+  ok "basetool-deploy.timer fires on the 5-minute wall-clock grid, to the second, without jitter or catch-up"
 else
-  bad "iri-deploy.timer must be OnCalendar=*-*-* *:00/5:00 with AccuracySec=1s, RandomizedDelaySec=0, Persistent=false"
+  bad "basetool-deploy.timer must be OnCalendar=*-*-* *:00/5:00 with AccuracySec=1s, RandomizedDelaySec=0, Persistent=false"
 fi
 if grep -Eq '^[[:space:]]*On(Boot|Startup|Active|UnitActive|UnitInactive)Sec[[:space:]]*=' "${DEPLOY_TIMER}"; then
-  bad "iri-deploy.timer has a monotonic trigger -- it fires off the grid"
+  bad "basetool-deploy.timer has a monotonic trigger -- it fires off the grid"
 else
   ok "...and has no monotonic trigger that would fire between the marks"
 fi
 
 ROLE="${HERE}/../ansible/roles/basetool_host"
-ORDER_TMPL="${ROLE}/templates/iri-deploy-account-order.conf.j2"
+ORDER_TMPL="${ROLE}/templates/basetool-deploy-account-order.conf.j2"
 if grep -Eq '^After=.*systemd-logind\.service' "${ORDER_TMPL}" 2>/dev/null \
    && grep -Eq '^After=.*user@\{\{ basetool_host_service_uid \}\}\.service' "${ORDER_TMPL}"; then
   ok "the ordering drop-in orders after systemd-logind and user@<service uid>"
@@ -421,7 +421,7 @@ if grep -Eq '^[[:space:]]*(Requires|Wants|BindsTo|Requisite|Upholds)[[:space:]]*
 else
   ok "...and pulls nothing in"
 fi
-if awk '/src: iri-deploy-account-order\.conf\.j2/ { t = 1 }
+if awk '/src: basetool-deploy-account-order\.conf\.j2/ { t = 1 }
         t && /dest: .*\{\{ item \}\}\.d\/20-service-user\.conf/ { d = 1 }
         t && d && /loop: "\{\{ basetool_host_deploy_account_units \}\}"/ { found = 1; exit }
         END { exit !found }' "${ROLE}/tasks/25-scripts.yml"; then
@@ -680,8 +680,8 @@ expect_call "a named volume is read through the helper" podman \
   'rt_read_mount edge-certs postgres:18-alpine tar -C /src -cz .' \
   'run --rm -v edge-certs:/src:ro postgres:18-alpine tar -C /src -cz .'
 expect_call "...and a host path identically" podman \
-  'rt_read_mount /var/iri/monitoring postgres:18-alpine cat /src/x' \
-  'run --rm -v /var/iri/monitoring:/src:ro'
+  'rt_read_mount /var/lib/basetool/monitoring postgres:18-alpine cat /src/x' \
+  'run --rm -v /var/lib/basetool/monitoring:/src:ro'
 expect_call "the mount is read-only, so a backup cannot write to what it reads" podman \
   'rt_read_mount edge-certs img tar -C /src -cz .' ':/src:ro'
 expect_out "a volume that does not exist is reported, not assumed present" podman \
@@ -743,7 +743,8 @@ printf '#!%s\necho running\n' "$(command -v bash)" > "${SCRIPT_BIN}/systemctl"
 chmod +x "${SCRIPT_BIN}/systemctl"
 SCRIPT_COMPOSE="${WORK}/compose"
 mkdir -p "${SCRIPT_COMPOSE}/quadlet/systemd" "${WORK}/state"
-: > "${SCRIPT_COMPOSE}/.env"
+mkdir -p "${WORK}/config"
+: > "${WORK}/config/basetool.env"
 : > "${WORK}/backup.env"
 
 run_job() {
@@ -753,8 +754,8 @@ run_job() {
   [[ -n "$unit" ]] && printf '%s\n' "$unit" > "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
   # shellcheck disable=SC2031
   PATH="${SCRIPT_BIN}:${PATH}" RT_BACKEND=podman RT_UNIT_DIR="${WORK}/nowhere" RT_STARTUP_WAIT=0 \
-    IRI_COMPOSE_DIR="${SCRIPT_COMPOSE}" IRI_BACKUP_ENV="${WORK}/backup.env" IRI_STATE_DIR="${WORK}/state" \
-    IRI_BACKUP_DIR="${WORK}/backupdir" TEXTFILE_DIR="${WORK}/textfile" \
+    BASETOOL_COMPOSE_DIR="${SCRIPT_COMPOSE}" BASETOOL_CONFIG_DIR="${WORK}/config" BASETOOL_BACKUP_ENV="${WORK}/backup.env" BASETOOL_STATE_DIR="${WORK}/state" \
+    BASETOOL_BACKUP_DIR="${WORK}/backupdir" TEXTFILE_DIR="${WORK}/textfile" \
     bash "${HERE}/${job}.sh" 2>&1
 }
 PIN="Image=docker.io/postgres:18-alpine@sha256:$(printf 'a%.0s' $(seq 1 64))"
@@ -806,22 +807,22 @@ expect_no_call "the quiesce does not re-apply the digest pin" podman \
 say ""
 say "== the throwaway container the restore drill proves recoverability in =="
 expect_call "it is started detached, by name" podman \
-  'rt_run_detached iri-restore-drill postgres:18-alpine -e POSTGRES_USER=drill' \
-  'run -d --name iri-restore-drill -e POSTGRES_USER=drill postgres:18-alpine'
+  'rt_run_detached basetool-restore-drill postgres:18-alpine -e POSTGRES_USER=drill' \
+  'run -d --name basetool-restore-drill -e POSTGRES_USER=drill postgres:18-alpine'
 expect_no_call "it joins none of the deployment's networks" podman \
-  'rt_run_detached iri-restore-drill img -e A=b' '--network'
+  'rt_run_detached basetool-restore-drill img -e A=b' '--network'
 printf 'a dump\n' > "${WORK}/krt_basetool.dump"
 expect_call "a dump is streamed in on stdin, not read by the service user" podman \
-  'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
-  'exec -i iri-restore-drill sh -c'
+  'rt_cp_to '"${WORK}"'/krt_basetool.dump basetool-restore-drill /tmp/krt_basetool.dump' \
+  'exec -i basetool-restore-drill sh -c'
 expect_no_call "...and never through podman cp -, which exits 125 on a completed copy" podman \
-  'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
+  'rt_cp_to '"${WORK}"'/krt_basetool.dump basetool-restore-drill /tmp/krt_basetool.dump' \
   'cp -'
 expect_no_call "...so the service user never opens the deploy account's file" podman \
-  'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
+  'rt_cp_to '"${WORK}"'/krt_basetool.dump basetool-restore-drill /tmp/krt_basetool.dump' \
   "cp ${WORK}/krt_basetool.dump"
 expect_call "and it is removed whatever state it is in" podman \
-  'rt_rm_force iri-restore-drill' 'rm -f -v iri-restore-drill'
+  'rt_rm_force basetool-restore-drill' 'rm -f -v basetool-restore-drill'
 
 say ""
 say "== credentials never reach a command line =="
@@ -835,13 +836,18 @@ say ""
 say "== lib/common.sh: the helpers the four operational scripts share (OPS-SIMP-04) =="
 COMMON="${HERE}/lib/common.sh"
 CENV="${WORK}/common-env"; mkdir -p "${CENV}/textfile"
-printf 'A=1\nIRI_MONITORING_ENABLED = "true"\nKEY=first\nKEY=last\nQ=\x27single\x27\n' > "${CENV}/.env"
+printf 'A=1\nBASETOOL_MONITORING_ENABLED = "true"\nKEY=first\nKEY=last\nQ=\x27single\x27\n' > "${CENV}/basetool.env"
 common() {
-  ( set +e; export COMPOSE_DIR="${CENV}" TEXTFILE_DIR="${CENV}/textfile"
+  ( set +e; export CONFIG_DIR="${CENV}" TEXTFILE_DIR="${CENV}/textfile"
     # shellcheck disable=SC1090
     . "$COMMON"; eval "$1" )
 }
-got="$(common 'read_env IRI_MONITORING_ENABLED')"
+# shellcheck disable=SC2016
+got="$(env -u CONFIG_DIR -u ENV_FILE -u ENV_D_DIR -u COMPOSE_DIR bash -c '. "$1"; printf "%s %s %s %s" "$COMPOSE_DIR" "$CONFIG_DIR" "$ENV_FILE" "$ENV_D_DIR"' _ "$COMMON")"
+if [[ "$got" == "/opt/basetool /etc/basetool /etc/basetool/basetool.env /etc/basetool/env.d" ]]; then ok "the release tree and the host config are separate roots"; else bad "defaults gave '${got}'"; fi
+got="$(BASETOOL_CONFIG_DIR=/x BASETOOL_ENV_FILE=/y/e.env bash -c '. "$1"; printf "%s %s" "$ENV_FILE" "$ENV_D_DIR"' _ "$COMMON")"
+if [[ "$got" == "/y/e.env /x/env.d" ]]; then ok "BASETOOL_ENV_FILE and BASETOOL_CONFIG_DIR override independently"; else bad "overrides gave '${got}'"; fi
+got="$(common 'read_env BASETOOL_MONITORING_ENABLED')"
 if [[ "$got" == "true" ]]; then ok "read_env strips whitespace and quotes"; else bad "read_env gave '${got}'"; fi
 got="$(common 'read_env KEY')"
 if [[ "$got" == "last" ]]; then ok "the last assignment wins, as for compose"; else bad "read_env gave '${got}'"; fi

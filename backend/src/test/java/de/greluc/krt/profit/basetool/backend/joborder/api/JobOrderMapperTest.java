@@ -117,9 +117,9 @@ class JobOrderMapperTest {
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(id);
     jobOrder.setDisplayId(42);
-    Squadron iridium = new Squadron();
-    iridium.setShorthand("Iridium");
-    jobOrder.setRequestingOrgUnit(iridium);
+    Squadron alpha = new Squadron();
+    alpha.setShorthand("Alpha");
+    jobOrder.setRequestingOrgUnit(alpha);
     jobOrder.setHandle("recipient");
     jobOrder.setComment("Bring to ArcCorp");
     jobOrder.setPriority(3);
@@ -136,7 +136,7 @@ class JobOrderMapperTest {
     assertEquals(id, dto.id());
     assertEquals(42, dto.displayId());
     assertNotNull(dto.requestingOrgUnit());
-    assertEquals("Iridium", dto.requestingOrgUnit().shorthand());
+    assertEquals("Alpha", dto.requestingOrgUnit().shorthand());
     assertEquals("recipient", dto.handle());
     assertEquals("Bring to ArcCorp", dto.comment());
     assertEquals(3, dto.priority());
@@ -166,9 +166,9 @@ class JobOrderMapperTest {
   void toDto_withNullCollections_shouldProduceNullCollections() {
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
-    Squadron iridium = new Squadron();
-    iridium.setShorthand("Iridium");
-    jobOrder.setRequestingOrgUnit(iridium);
+    Squadron alpha = new Squadron();
+    alpha.setShorthand("Alpha");
+    jobOrder.setRequestingOrgUnit(alpha);
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setMaterials(null);
     jobOrder.setAssignees(null);
@@ -186,9 +186,9 @@ class JobOrderMapperTest {
   void toDto_withHandovers_shouldMapEachHandoverViaHandoverMapper() {
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
-    Squadron iridium = new Squadron();
-    iridium.setShorthand("Iridium");
-    jobOrder.setRequestingOrgUnit(iridium);
+    Squadron alpha = new Squadron();
+    alpha.setShorthand("Alpha");
+    jobOrder.setRequestingOrgUnit(alpha);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
 
     JobOrderHandover handover = new JobOrderHandover();
@@ -196,7 +196,7 @@ class JobOrderMapperTest {
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(Instant.parse("2026-05-10T08:00:00Z"));
     handover.setRecipientHandle("buyer");
-    handover.setRecipientSquadron("Iridium");
+    handover.setRecipientSquadron("Alpha");
     handover.setVersion(1L);
 
     jobOrder.setHandovers(new HashSet<>(Set.of(handover)));

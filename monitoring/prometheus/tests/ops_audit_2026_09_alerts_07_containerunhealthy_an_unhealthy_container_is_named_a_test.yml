@@ -36,4 +36,4 @@ tests:
               name: "keycloak"
             exp_annotations:
               summary: "Container unhealthy: keycloak"
-              description: "Container keycloak has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run keycloak` and `journalctl CONTAINER_NAME=keycloak`."
+              description: "Container keycloak has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) podman healthcheck run keycloak` and `journalctl CONTAINER_NAME=keycloak`."

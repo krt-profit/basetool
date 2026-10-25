@@ -11,11 +11,11 @@ the gateway and the identity provider check it. The
 
 | | |
 | --- | --- |
-| Issuer (pinned) | `https://profit-base.online/auth/realms/iri` |
-| Discovery | `https://profit-base.online/auth/realms/iri/.well-known/openid-configuration` |
-| Device authorization endpoint | `https://profit-base.online/auth/realms/iri/protocol/openid-connect/auth/device` |
-| Token endpoint | `https://profit-base.online/auth/realms/iri/protocol/openid-connect/token` |
-| Revocation endpoint | `https://profit-base.online/auth/realms/iri/protocol/openid-connect/revoke` |
+| Issuer (pinned) | `https://profit-base.online/auth/realms/basetool` |
+| Discovery | `https://profit-base.online/auth/realms/basetool/.well-known/openid-configuration` |
+| Device authorization endpoint | `https://profit-base.online/auth/realms/basetool/protocol/openid-connect/auth/device` |
+| Token endpoint | `https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token` |
+| Revocation endpoint | `https://profit-base.online/auth/realms/basetool/protocol/openid-connect/revoke` |
 | Client | public, your registered client id, **no secret**, device grant only |
 | Proof of possession | DPoP with ES256 (P-256) on every token request and every API call |
 | Access token | lives **300 s**, audience `basetool-ingest` |
@@ -60,7 +60,7 @@ this one key.
 The device authorization request carries no proof; nothing is issued there.
 
 ```http
-POST /auth/realms/iri/protocol/openid-connect/auth/device HTTP/1.1
+POST /auth/realms/basetool/protocol/openid-connect/auth/device HTTP/1.1
 Host: profit-base.online
 Content-Type: application/x-www-form-urlencoded
 
@@ -95,7 +95,7 @@ Poll every `interval` seconds, each time with a **new** proof (`htm` `POST`, `ht
 endpoint, no `ath`):
 
 ```http
-POST /auth/realms/iri/protocol/openid-connect/token HTTP/1.1
+POST /auth/realms/basetool/protocol/openid-connect/token HTTP/1.1
 Host: profit-base.online
 Content-Type: application/x-www-form-urlencoded
 DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwi...
@@ -247,7 +247,7 @@ The access token lives 300 seconds. Refresh shortly before `expires_in` runs out
 `UNAUTHENTICATED`:
 
 ```http
-POST /auth/realms/iri/protocol/openid-connect/token HTTP/1.1
+POST /auth/realms/basetool/protocol/openid-connect/token HTTP/1.1
 Host: profit-base.online
 Content-Type: application/x-www-form-urlencoded
 DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwi...

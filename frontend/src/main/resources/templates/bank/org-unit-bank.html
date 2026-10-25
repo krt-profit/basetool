@@ -117,11 +117,11 @@
                                 <td class="ou-open-title">
                                     <span class="cell-title" th:switch="${r.type()}">
                                         <th:block th:case="'DEPOSIT'"
-                                                  th:text="(${r.counterpartyHandle() != null} ? ${@handles.display(r.counterpartyHandle())} : ${@handles.display(r.requesterHandle())}) + ' &#8594; ' + ${r.accountName()}">vexx &#8594; IRI R&uuml;cklage</th:block>
+                                                  th:text="(${r.counterpartyHandle() != null} ? ${@handles.display(r.counterpartyHandle())} : ${@handles.display(r.requesterHandle())}) + ' &#8594; ' + ${r.accountName()}">vexx &#8594; ALP R&uuml;cklage</th:block>
                                         <th:block th:case="'TRANSFER'"
-                                                  th:text="${r.accountName()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">IRI Betriebskonto &#8594; KB-0002</th:block>
+                                                  th:text="${r.accountName()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">ALP Betriebskonto &#8594; KB-0002</th:block>
                                         <th:block th:case="*"
-                                                  th:text="${r.accountName()} + (${r.counterpartyHandle() != null} ? ' &#8594; ' + ${@handles.display(r.counterpartyHandle())} : '')">IRI Betriebskonto &#8594; greluc</th:block>
+                                                  th:text="${r.accountName()} + (${r.counterpartyHandle() != null} ? ' &#8594; ' + ${@handles.display(r.counterpartyHandle())} : '')">ALP Betriebskonto &#8594; greluc</th:block>
                                     </span>
                                     <span class="cell-sub" th:if="${!#strings.isEmpty(r.justification())}"
                                           th:text="${r.justification()}">Treibstoff + Munition Flotten&uuml;bung</span>
@@ -229,7 +229,7 @@
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                                 <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                                 <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
-                                                      th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
+                                                      th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (ALPHA)</span>
                                             </div>
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                                 <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
@@ -261,7 +261,7 @@
                                 <input type="hidden" name="version" th:value="${r.version()}">
                                 <div class="bank-form-row">
                                     <span class="bank-detail-label" th:text="#{bank.request.col.account}">Konto</span>
-                                    <span class="bank-detail-value" th:text="${r.accountName()} + ' (' + ${r.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</span>
+                                    <span class="bank-detail-value" th:text="${r.accountName()} + ' (' + ${r.accountNo()} + ')'">Staffel ALPHA (KB-0001)</span>
                                     <span class="bank-field-hint" th:text="#{bank.request.edit.fixedHint}">Konto und Vorgang lassen sich nicht &auml;ndern.</span>
                                 </div>
                                 <div class="bank-form-row">
@@ -311,7 +311,7 @@
                                             <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
                                             <option th:if="${r.counterpartyOrgUnitId() != null}"
                                                     th:value="${r.counterpartyOrgUnitId()}" th:selected="true"
-                                                    th:text="${r.counterpartyOrgUnitName()}">IRIDIUM</option>
+                                                    th:text="${r.counterpartyOrgUnitName()}">ALPHA</option>
                                         </select>
                                         <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
                                     </div>
@@ -425,7 +425,7 @@
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                                 <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                                 <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
-                                                      th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
+                                                      th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (ALPHA)</span>
                                             </div>
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                                 <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>

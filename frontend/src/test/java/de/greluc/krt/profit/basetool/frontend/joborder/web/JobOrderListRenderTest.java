@@ -156,7 +156,7 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
         new JobOrderDto(
             UUID.randomUUID(),
             42,
-            new SquadronReferenceDto(UUID.randomUUID(), "Iridium Squadron", "IRI"),
+            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"),
             null,
             "Tester",
             null,
@@ -184,10 +184,10 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
     String html = result.getResponse().getContentAsString();
     assertThat(html)
         .as("the responsible unit's shorthand renders as a squadron badge in the overview")
-        .contains("IRI");
+        .contains("ALP");
     assertThat(html)
         .as("the responsible unit's full name renders as the badge title")
-        .contains("Iridium Squadron");
+        .contains("Alpha Squadron");
     assertThat(html)
         .as("the responsible-unit caption element renders under the id + type")
         .contains("order-responsible-label");

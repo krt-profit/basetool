@@ -52,7 +52,7 @@ class BankGrantsPageControllerTest {
 
   private static BankGrantDto grant(UUID userId, String handle, UUID accountId) {
     return new BankGrantDto(
-        userId, handle, accountId, "KB-0001", "Staffel IRIDIUM", true, false, false, true, 0L);
+        userId, handle, accountId, "KB-0001", "Staffel ALPHA", true, false, false, true, 0L);
   }
 
   /** A minimal account-detail payload so the controller can seed the filter combobox's account. */
@@ -61,7 +61,7 @@ class BankGrantsPageControllerTest {
         new BankAccountDto(
             accountId,
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "ACTIVE",
             null,

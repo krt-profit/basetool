@@ -70,8 +70,8 @@ class OAuth2ScopeRequestParamLeakTest {
         .clientId("basetool-frontend")
         .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
         .redirectUri("{baseUrl}/login/oauth2/code/keycloak")
-        .authorizationUri("https://kc/realms/iri/protocol/openid-connect/auth")
-        .tokenUri("https://kc/realms/iri/protocol/openid-connect/token")
+        .authorizationUri("https://kc/realms/basetool/protocol/openid-connect/auth")
+        .tokenUri("https://kc/realms/basetool/protocol/openid-connect/token")
         .build();
   }
 

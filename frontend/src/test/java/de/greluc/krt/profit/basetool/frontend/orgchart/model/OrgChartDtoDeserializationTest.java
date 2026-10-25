@@ -53,7 +53,7 @@ class OrgChartDtoDeserializationTest {
         },
         "squadrons": [
           {
-            "orgUnitId":"00000000-0000-0000-0000-000000000001","name":"IRIDIUM","shorthand":"IRI",
+            "orgUnitId":"00000000-0000-0000-0000-000000000001","name":"ALPHA","shorthand":"ALP",
             "lead":{"positionId":"00000000-0000-0000-0000-0000000000a3","positionType":"SQUADRON_LEAD",
                     "userId":"00000000-0000-0000-0000-0000000000b3","userName":"Lead","sortIndex":0,"version":1},
             "commands":[
@@ -102,7 +102,7 @@ class OrgChartDtoDeserializationTest {
 
     assertEquals(1, chart.squadrons().size());
     SquadronChartDto squadron = chart.squadrons().getFirst();
-    assertEquals("IRIDIUM", squadron.name());
+    assertEquals("ALPHA", squadron.name());
     assertEquals("SQUADRON_LEAD", squadron.lead().positionType());
     assertTrue(squadron.canAddCommand());
     assertFalse(squadron.canAddEnsign());

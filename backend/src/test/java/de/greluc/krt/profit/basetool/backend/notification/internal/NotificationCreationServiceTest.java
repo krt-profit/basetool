@@ -83,7 +83,7 @@ class NotificationCreationServiceTest {
         9,
         "h",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
-        "IRI",
+        "ALP",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
         null);
@@ -237,7 +237,7 @@ class NotificationCreationServiceTest {
         new BigDecimal("500"),
         "KB-0007",
         "requester",
-        "IRI",
+        "ALP",
         UUID.fromString("00000000-0000-0000-0000-00000000f003"),
         changed);
   }

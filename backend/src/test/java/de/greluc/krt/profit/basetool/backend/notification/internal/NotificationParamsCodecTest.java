@@ -38,7 +38,7 @@ class NotificationParamsCodecTest {
   void serializeThenDeserializeRoundTrips() {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("displayId", "42");
-    params.put("orgUnit", "IRI");
+    params.put("orgUnit", "ALP");
 
     String json = codec.serialize(params);
     Map<String, String> back = codec.deserialize(json);

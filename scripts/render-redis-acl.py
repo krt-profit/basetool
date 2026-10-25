@@ -10,8 +10,8 @@ Usage
 -----
 ::
 
-    render-redis-acl.py --env /var/iri/code/.env \\
-        --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl
+    render-redis-acl.py --env /etc/basetool/basetool.env \\
+        --template /opt/basetool/scripts/redis-users.acl.tmpl --out /var/lib/basetool/redis/users.acl
     render-redis-acl.py ... --check       # report drift, write nothing
     render-redis-acl.py --selftest        # the regression tests, no files touched
 
@@ -254,7 +254,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="render-redis-acl.py")
     parser.add_argument("--env", help="the host .env")
     parser.add_argument("--template", help="scripts/redis-users.acl.tmpl")
-    parser.add_argument("--out", help="the ACL file to write, normally /var/iri/redis/users.acl")
+    parser.add_argument("--out", help="the ACL file to write, normally /var/lib/basetool/redis/users.acl")
     parser.add_argument("--check", action="store_true", help="report drift and write nothing")
     parser.add_argument("--selftest", action="store_true", help="run the regression tests")
     args = parser.parse_args(argv)

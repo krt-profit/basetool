@@ -108,7 +108,7 @@
                             <td class="hangar-cell-unit" data-testid="member-hangar-unit" th:attr="data-label=#{hangar.ship.owning_unit}">
                                 <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
                                       th:title="${ship.owningSquadron.name()}"
-                                      th:text="${ship.owningSquadron.shorthand() != null ? ship.owningSquadron.shorthand() : ship.owningSquadron.name()}">IRI</span>
+                                      th:text="${ship.owningSquadron.shorthand() != null ? ship.owningSquadron.shorthand() : ship.owningSquadron.name()}">ALP</span>
                                 <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                             </td>
                             <td class="cell-actions">
@@ -226,7 +226,7 @@
                         <select id="member-ship-unit-select" name="orgUnitId" data-testid="member-hangar-unit-select">
                             <option value="" th:text="#{hangar.ship.unit.none}">Keine Einheit</option>
                             <option th:each="o : ${ownerOptions}" th:value="${o.orgUnitId()}"
-                                    th:text="${o.orgUnitShorthand() != null ? o.orgUnitName() + ' (' + o.orgUnitShorthand() + ')' : o.orgUnitName()}">Iridium (IRI)</option>
+                                    th:text="${o.orgUnitShorthand() != null ? o.orgUnitName() + ' (' + o.orgUnitShorthand() + ')' : o.orgUnitName()}">Alpha (ALP)</option>
                         </select>
                     </div>
                     <p class="form-hint m-0" th:text="#{memberHangar.unit.hint}">Zur Wahl stehen die Einheiten des Mitglieds. Das Mitglied wird benachrichtigt.</p>

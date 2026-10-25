@@ -87,7 +87,7 @@ class PurchasingNeedObserverTest {
     UUID second = UUID.randomUUID();
     Squadron unit = new Squadron();
     unit.setId(UNIT);
-    unit.setName("Iridium");
+    unit.setName("Alpha");
     when(settingsService.isEnabled()).thenReturn(true);
     when(delegateRepository.findActiveUserIds(any(Instant.class)))
         .thenReturn(List.of(first, second));
@@ -101,7 +101,7 @@ class PurchasingNeedObserverTest {
     assertThat(notice.actorSub()).isEqualTo(ACTOR);
     assertThat(notice.contextRecipientUserIds()).containsExactlyInAnyOrder(first, second);
     assertThat(notice.renderParams())
-        .containsEntry("unit", "Iridium")
+        .containsEntry("unit", "Alpha")
         .containsEntry("entry", "Quantanium")
         .containsEntry("amount", "6");
   }

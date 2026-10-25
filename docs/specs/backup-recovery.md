@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-24.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
 
 # Backup & disaster recovery
@@ -14,8 +14,8 @@ ransomware event would be unrecoverable.
 This spec pins the binding requirements for an **automated, scheduled, client-side-encrypted,
 off-site** backup of everything needed for a full restore, plus a recurring proof that those
 backups are actually recoverable. The implementation is `scripts/backup.sh` /
-`scripts/restore-drill.sh` driven by the `iri-backup.{service,timer}` and
-`iri-restore-drill.{service,timer}` systemd units; the operator runbook (the *how-to*) lives in
+`scripts/restore-drill.sh` driven by the `basetool-backup.{service,timer}` and
+`basetool-restore-drill.{service,timer}` systemd units; the operator runbook (the *how-to*) lives in
 [`docs/backup.md`](../backup.md). See [ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
 for the decision record (restic over rclone WebDAV to Nextcloud; why not the UniFi
 `drop.ui.com` share or SMB-over-VPN).
@@ -29,7 +29,7 @@ These requirements continue the `REQ-OPS-*` series begun in
 
 A scheduled job captures the full-restore surface (REQ-OPS-010), encrypts it **client-side**,
 and stores it on an **off-site** target that is independent of the production host. Encryption
-is mandatory and non-negotiable: every backup contains host secrets (`.env`, keystore) and
+is mandatory and non-negotiable: every backup contains host secrets (`basetool.env`, keystore) and
 PII (the Keycloak user database), so the storage target must never see plaintext. The default
 schedule is **daily at 04:15 host-local**, with **GFS retention** (keep 7 daily, 4 weekly, 6
 monthly) and a post-upload **integrity check**. Delivery is **outbound-only** (the host pushes;
@@ -37,7 +37,7 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 
 **Acceptance**
 
-- [ ] `iri-backup.timer` fires `backup.sh` daily at 04:15; `Persistent=true` catches up a missed run.
+- [ ] `basetool-backup.timer` fires `backup.sh` daily at 04:15; `Persistent=true` catches up a missed run.
   That catch-up is the only run at boot — the timer does not pull the service in — and it waits for
   the service user's manager instead of failing (REQ-OPS-016, since 2026-09-25).
 - [ ] The repository is a restic repo (client-side encrypted, deduplicated); the storage target
@@ -54,13 +54,13 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 - [ ] The job opens no listening socket and requires no inbound access to the host.
 - [ ] A successful run writes `basetool_backup_last_success_timestamp`; `BackupStaleOrMissing`
   pages when it is older than 26 h or absent, so a failed or never-run backup is not silent.
-- [ ] The helper container that reads the secrets, certificates and `.env` (and the restore drill's
+- [ ] The helper container that reads the secrets, certificates and `basetool.env` (and the restore drill's
   throwaway Postgres) runs only from a **digest-pinned** image — `db-backend`'s own `@sha256:` pin or
   an override carrying one. An unreadable unit, an unpinned tag or an unpinned override makes
   `backup.sh` / `restore-drill.sh` abort with `FATAL` before any container starts and without
   writing the success metric (`scripts/container-runtime.test.sh`).
 
-**Enforced by:** `scripts/backup.sh` · `scripts/lib/restic-repo.sh` · `scripts/iri-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
+**Enforced by:** `scripts/backup.sh` · `scripts/lib/restic-repo.sh` · `scripts/basetool-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
 ### REQ-OPS-009 — Consistency via a minimal, bounded nightly quiesce
 
@@ -79,7 +79,7 @@ serves the existing maintenance page. An operator may opt into a zero-downtime o
 - [ ] The dump runs with `frontend`/`backend`/`ingest` stopped; they are restarted before the
   restic upload begins.
 - [ ] A `trap` restarts the writers on any failure path — a failed dump never leaves production down.
-- [ ] `backup.sh` acquires the same `flock` (`/var/lock/iri-deploy.lock`) as `deploy.sh` and
+- [ ] `backup.sh` acquires the same `flock` (`/run/lock/basetool-deploy.lock`) as `deploy.sh` and
   releases it as soon as the writers are back up.
 - [ ] The scheduled start is at 04:15, inside the 04:00–05:00 window.
 
@@ -91,7 +91,7 @@ The backup set is exactly what a full restore needs, and exclusions are delibera
 accidental. **Captured:** `pg_dump -Fc` of `krt_basetool`; `pg_dump -Fc` of `keycloak` (the live
 source of truth — **not** the sanitized `realm-export.json`); the **edge's TLS material and ACME
 account state** (the `edge-certs`, `edge-acme-state` and `edge-acme-webroot` volumes); and the host
-secrets/config needed to stand the stack up (`.env`, `keystore.p12`, `realm-export.json`,
+secrets/config needed to stand the stack up (`basetool.env`, `keystore.p12`, `realm-export.json`,
 `keycloak/providers`, and the **redis `users.acl`**); and the monitoring plane (ADR-0072) — the
 Grafana SQLite database, the rendered monitoring secrets/certs, the Alertmanager state, and a weekly
 Prometheus TSDB snapshot. **Excluded by design:** Redis *session* data — `appendonlydir` and
@@ -105,7 +105,7 @@ regenerable.
 > ([`MGMT_VPN_PLAN.md`](../archive/MGMT_VPN_PLAN.md)) — so there is nothing to exclude.
 
 > [!warning] Two of those were added on 2026-09-18, and their absence was a live gap
-> This paragraph named *"the nginx-proxy-manager state (`/var/iri/npm` = SQLite config + Let's
+> This paragraph named *"the nginx-proxy-manager state ([…] SQLite config + Let's
 > Encrypt)"* — and NPM had been removed from the stack. Its successor keeps the same material in
 > three **named volumes**, and the backup captured none of them while still capturing the retired
 > proxy's directory. So production's certificates and ACME account key were not in any snapshot: a
@@ -134,7 +134,7 @@ the *entire* run — the 2026-07-06 regression, where tightening the keystore mo
 whole off-site backup, DB dumps included. A keystore read failure is therefore logged and **skipped**,
 never fatal, so the irreplaceable database dumps always reach the repo.
 
-Because the host-config archive carries the live secrets (`.env`, `keystore.p12`, `realm-export.json`,
+Because the host-config archive carries the live secrets (`basetool.env`, `keystore.p12`, `realm-export.json`,
 the `keycloak/providers` JARs, the redis ACL), a restore that follows a **suspected host
 compromise** (ransomware is a named DR driver, above) restores *potentially-exposed* secrets. Such a restore must therefore be
 followed by **rotation** of the restored secrets — the DB/Redis/Keycloak-admin passwords, the OIDC
@@ -150,6 +150,11 @@ as clean. A restore for hardware loss / accidental deletion (no compromise suspe
   realm/users/clients.
 - [ ] The restore runbook documents that a **compromise-driven** restore must be followed by
   rotating the restored secrets; a non-compromise restore need not.
+- [ ] The restore runbook documents restoring a snapshot taken **before the host-layout migration**
+  (ADR-0319): the timestamped directory is found by name, `config/dotenv` and `config/realm-export.json`
+  are rewritten with `scripts/migrate-host-env.py` before use, and the restored Keycloak dump (realm
+  `iri`) is renamed with `scripts/rename-keycloak-realm.py` before the apps start
+  ([`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](../HOST_LAYOUT_MIGRATION_RUNBOOK.md) § 8).
 
 **Enforced by:** `scripts/backup.sh` (capture list) · **Runbook:** [`docs/backup.md`](../backup.md) → *What is and isn't backed up*, *Rotate secrets after a compromise-driven restore*
 
@@ -170,7 +175,7 @@ content, so nothing it logs can carry a key — and reports each through
 
 **Acceptance**
 
-- [ ] `iri-restore-drill.timer` runs `restore-drill.sh` weekly.
+- [ ] `basetool-restore-drill.timer` runs `restore-drill.sh` weekly.
 - [ ] The drill restores into an ephemeral container and tears it down; it never writes to a
   production database, volume, or the live stack.
 - [ ] An empty/garbage restore (no `flyway_schema_history` rows, or table counts below the floor)
@@ -182,26 +187,26 @@ content, so nothing it logs can carry a key — and reports each through
   missed, plus a day of slack — or absent. It said 35 days until 2026-09-22, which let four
   consecutive weekly drills fail before anyone was told.
 
-**Enforced by:** `scripts/restore-drill.sh` · `scripts/iri-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
+**Enforced by:** `scripts/restore-drill.sh` · `scripts/basetool-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
 ### REQ-OPS-012 — Backup credentials are host-only secrets
 
 The restic repository password and the rclone/Nextcloud **app password** are host-only secrets in
-`/etc/iri/backup.env` (and the rclone config), readable only by the backup user. They are **never**
+`/etc/basetool/deploy/backup.env` (and the rclone config), readable only by the backup user. They are **never**
 committed to git and **never** carried in the `basetool-config` OCI bundle — the same prohibition
-REQ-OPS-005 places on `.env`/keystore. The Nextcloud target is accessed via a **dedicated,
+REQ-OPS-005 places on `basetool.env`/keystore. The Nextcloud target is accessed via a **dedicated,
 non-admin account + revocable app password** (not the human account password, not a public share
 link), so a host compromise is contained by revoking one token.
 
 **Acceptance**
 
-- [ ] `/etc/iri/backup.env` and the rclone config are mode `0600`/owner-restricted and outside the repo.
+- [ ] `/etc/basetool/deploy/backup.env` and the rclone config are mode `0600`/owner-restricted and outside the repo.
 - [ ] No backup credential, restic password, or Nextcloud app password appears in git history or the
   config bundle.
 - [ ] The runbook provisions a dedicated Nextcloud account with an app password and quota, not a
   public/anonymous share link.
 
-**Enforced by:** `/etc/iri/backup.env` (host) · `scripts/backup.sh` (sources it, never logs it) · **Runbook:** [`docs/backup.md`](../backup.md) → *Set up the Nextcloud target*
+**Enforced by:** `/etc/basetool/deploy/backup.env` (host) · `scripts/backup.sh` (sources it, never logs it) · **Runbook:** [`docs/backup.md`](../backup.md) → *Set up the Nextcloud target*
 
 ## Out of scope
 

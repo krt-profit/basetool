@@ -57,7 +57,7 @@
                 th:if="${mineTabCount != null}" th:text="${mineTabCount}">7</span></a>
         <a th:href="@{/hangar/squadron}" class="tab" th:classappend="${!mineTab} ? 'active'"
            th:attr="aria-current=${!mineTab} ? 'page' : null" data-testid="hangar-tab-unit"
-           ><span th:text="${unitLabel != null} ? #{hangar.tab.unit(${unitLabel})} : #{hangar.tab.unit.plain}">Org-Einheit IRI</span><span class="tab-count" id="hangar-tab-count-unit"
+           ><span th:text="${unitLabel != null} ? #{hangar.tab.unit(${unitLabel})} : #{hangar.tab.unit.plain}">Org-Einheit ALP</span><span class="tab-count" id="hangar-tab-count-unit"
                 th:if="${unitTabCount != null}" th:text="${unitTabCount}"
                 th:attr="data-list-count-for=${!mineTab} ? 'squadron-results' : null">31</span></a>
     </nav>
@@ -144,7 +144,7 @@
                             <td class="hangar-cell-unit" data-testid="hangar-ship-unit" th:attr="data-label=#{hangar.ship.owning_unit}">
                                 <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
                                       th:title="${ship.owningSquadron.name()}"
-                                      th:text="${ship.owningSquadron.shorthand() != null ? ship.owningSquadron.shorthand() : ship.owningSquadron.name()}">IRI</span>
+                                      th:text="${ship.owningSquadron.shorthand() != null ? ship.owningSquadron.shorthand() : ship.owningSquadron.name()}">ALP</span>
                                 <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                             </td>
                             <td class="cell-actions">
@@ -457,7 +457,7 @@
                         <select id="ship-unit-select" name="orgUnitId" data-testid="hangar-unit-select">
                             <option value="" th:text="#{hangar.ship.unit.none}">Keine Einheit</option>
                             <option th:each="o : ${unitOptions}" th:value="${o.orgUnitId()}"
-                                    th:text="${o.orgUnitShorthand() != null ? o.orgUnitName() + ' (' + o.orgUnitShorthand() + ')' : o.orgUnitName()}">Iridium (IRI)</option>
+                                    th:text="${o.orgUnitShorthand() != null ? o.orgUnitName() + ' (' + o.orgUnitShorthand() + ')' : o.orgUnitName()}">Alpha (ALP)</option>
                         </select>
                     </div>
                     <p class="form-hint m-0" th:text="#{hangar.ship.unit.hint}">Das Schiff erscheint im Hangar der gewählten Einheit.</p>

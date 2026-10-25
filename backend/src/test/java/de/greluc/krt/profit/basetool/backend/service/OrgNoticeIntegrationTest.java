@@ -133,7 +133,7 @@ class OrgNoticeIntegrationTest {
   void aMismatchReachesTheAdminsAndGoesWhenTheRolesFit() {
     creationService.createFromEvent(
         OrgNotices.leadershipRoleMismatch(
-            MEMBER, "org-member", "IRI", "APPOINTED", "ENSIGN", "MISSING_OFFICER", LEADER));
+            MEMBER, "org-member", "ALP", "APPOINTED", "ENSIGN", "MISSING_OFFICER", LEADER));
     assertThat(inbox(ADMIN)).containsExactly(NotificationType.ORG_LEADERSHIP_ROLE_MISMATCH);
 
     creationService.createFromEvent(OrgNotices.leadershipRolesAgree(MEMBER));
@@ -145,10 +145,10 @@ class OrgNoticeIntegrationTest {
   void aSecondMismatchOfTheSameMemberReplacesTheFirst() {
     creationService.createFromEvent(
         OrgNotices.leadershipRoleMismatch(
-            MEMBER, "org-member", "IRI", "APPOINTED", "ENSIGN", "MISSING_OFFICER", null));
+            MEMBER, "org-member", "ALP", "APPOINTED", "ENSIGN", "MISSING_OFFICER", null));
     creationService.createFromEvent(
         OrgNotices.leadershipRoleMismatch(
-            MEMBER, "org-member", "IRI", "REMOVED", "ENSIGN", "SURPLUS_OFFICER", null));
+            MEMBER, "org-member", "ALP", "REMOVED", "ENSIGN", "SURPLUS_OFFICER", null));
 
     assertThat(inbox(ADMIN)).containsExactly(NotificationType.ORG_LEADERSHIP_ROLE_MISMATCH);
   }
@@ -160,7 +160,7 @@ class OrgNoticeIntegrationTest {
             MEMBER,
             "org-member",
             new OrgUnitRef(squadron.getId(), OrgUnitKind.SQUADRON),
-            "IRI",
+            "ALP",
             MemberDepartedEvent.REASON_DISABLED,
             false));
 

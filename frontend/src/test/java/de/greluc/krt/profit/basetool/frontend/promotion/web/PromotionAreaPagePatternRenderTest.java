@@ -116,7 +116,7 @@ class PromotionAreaPagePatternRenderTest {
         .perform(
             get(path)
                 .locale(Locale.GERMAN)
-                .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+                .sessionAttr("basetool.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         .andReturn()
         .getResponse()

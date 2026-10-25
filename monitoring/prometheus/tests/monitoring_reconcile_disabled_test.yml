@@ -21,7 +21,7 @@ tests:
               component: deploy
             exp_annotations:
               summary: "Monitoring reconcile is disabled while the stack is running"
-              description: "deploy.sh sees the iri-monitoring stack running but IRI_MONITORING_ENABLED != 'true', so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox — silent config drift, and PrometheusConfigStale cannot catch it (its applied-stamp metric is written only from inside the gated reconcile). Fix: add /etc/systemd/system/iri-deploy.service.d/monitoring.conf with `Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`."
+              description: "deploy.sh sees the basetool-monitoring stack running but BASETOOL_MONITORING_ENABLED != 'true', so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox — silent config drift, and PrometheusConfigStale cannot catch it (its applied-stamp metric is written only from inside the gated reconcile). Fix: add /etc/systemd/system/basetool-deploy.service.d/monitoring.conf with `Environment=BASETOOL_MONITORING_ENABLED=true`, then `systemctl daemon-reload`."
 
   - name: silent when the reconcile is enabled and runs (gauge == 0)
     interval: 1m

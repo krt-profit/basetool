@@ -52,8 +52,8 @@ import org.springframework.security.oauth2.jwt.JwtException;
  */
 class KeycloakBackchannelConfigTest {
 
-  private static final String ISSUER = "https://profit-base.online/auth/realms/iri";
-  private static final String INTERNAL = "https://keycloak:18443/auth/realms/iri";
+  private static final String ISSUER = "https://profit-base.online/auth/realms/basetool";
+  private static final String INTERNAL = "https://keycloak:18443/auth/realms/basetool";
 
   private static final String PROPERTY = "spring.security.oauth2.client.";
 
@@ -186,7 +186,7 @@ class KeycloakBackchannelConfigTest {
               .addHeader("Content-Type", "application/json")
               .setBody("{\"keys\":[]}"));
       keycloak.start();
-      String realm = keycloak.url("/auth/realms/iri").toString();
+      String realm = keycloak.url("/auth/realms/basetool").toString();
       ClientRegistration registration =
           KeycloakBackchannelConfig.keycloakRegistration(clientProperties(), realm);
       JwtDecoderFactory<ClientRegistration> factory =
@@ -199,7 +199,7 @@ class KeycloakBackchannelConfigTest {
       assertThatThrownBy(() -> decoder.decode(UNSIGNED_RS256_TOKEN))
           .isInstanceOf(JwtException.class);
       RecordedRequest jwks = keycloak.takeRequest();
-      assertThat(jwks.getPath()).isEqualTo("/auth/realms/iri/protocol/openid-connect/certs");
+      assertThat(jwks.getPath()).isEqualTo("/auth/realms/basetool/protocol/openid-connect/certs");
     }
   }
 

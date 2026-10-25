@@ -40,7 +40,7 @@ PROVISIONER = REPO / "scripts" / "provision-keycloak-realm.py"
 BASE_REALM = REPO / "scripts" / "keycloak" / "test-realm-base.json"
 BUILTIN_SCOPES = REPO / "scripts" / "keycloak" / "builtin-client-scopes.json"
 
-REALM = "iri"
+REALM = "basetool"
 THROWAWAY = "do-not-use-in-prod"
 GATEWAY_CLIENT = "basetool-ingest-gateway"
 LOAD_MEMBERS = 16
@@ -76,8 +76,8 @@ class Target:
 
 SANDBOX = Target(
     name="sandbox",
-    output=REPO / "docker" / "sandbox" / "keycloak" / "realm-iri.json",
-    display_name="IRI (SANDBOX REALM - throwaway, do not use in prod)",
+    output=REPO / "docker" / "sandbox" / "keycloak" / "realm-basetool.json",
+    display_name="Basetool (SANDBOX REALM - throwaway, do not use in prod)",
     secrets={
         "basetool-frontend": f"sandbox-frontend-client-secret-{THROWAWAY}",
         "backend-service": f"sandbox-backend-service-secret-{THROWAWAY}",

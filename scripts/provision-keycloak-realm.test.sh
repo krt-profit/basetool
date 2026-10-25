@@ -39,7 +39,7 @@ builtin_scopes = ["acr", "address", "basic", "email", "microprofile-jwt", "offli
                   "organization", "phone", "profile", "roles", "service_account", "web-origins"]
 scopes = [{"id": f"s-{n}", "name": n, "protocol": "openid-connect", "attributes": {}}
           for n in builtin_scopes]
-roles = [{"id": "r-default", "name": "default-roles-iri"},
+roles = [{"id": "r-default", "name": "default-roles-basetool"},
          {"id": "r-krt", "name": "KRT Member"}, {"id": "r-off", "name": "Officer"},
          {"id": "r-adm", "name": "Admin"}, {"id": "r-bem", "name": "Bank Employee"},
          {"id": "r-offline", "name": "offline_access"},
@@ -48,13 +48,13 @@ realm_management = {"id": "c-rm", "clientId": "realm-management", "attributes": 
 account = {"id": "c-account", "clientId": "account", "attributes": {}}
 
 realm = {
-    "realm": "iri", "revokeRefreshToken": True, "refreshTokenMaxReuse": 0,
+    "realm": "basetool", "revokeRefreshToken": True, "refreshTokenMaxReuse": 0,
     "accessTokenLifespan": 300, "ssoSessionIdleTimeout": 2592000,
     "ssoSessionMaxLifespan": 15552000, "offlineSessionMaxLifespanEnabled": False,
     "offlineSessionMaxLifespan": 5184000, "clientSessionIdleTimeout": 0,
     "clientSessionMaxLifespan": 0, "clientOfflineSessionIdleTimeout": 0,
     "clientOfflineSessionMaxLifespan": 0, "oauth2DeviceCodeLifespan": 600,
-    "defaultRole": {"id": "r-default", "name": "default-roles-iri"},
+    "defaultRole": {"id": "r-default", "name": "default-roles-basetool"},
 }
 data = {
     "realm": realm,
@@ -409,7 +409,7 @@ run_provisioner() {
   local state="$1"; shift
   local rc=0
   : >"${state}/calls.log"
-  KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --realm iri --public-origin "$ORIGIN" \
+  KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --realm basetool --public-origin "$ORIGIN" \
     --kcadm-command "${PYTHON} $(to_child_path "${state}/kcadm_stub.py")" "$@" 2>&1 || rc=$?
   echo "$rc" >"${state}/rc"
 }
@@ -469,7 +469,7 @@ assert_eq "$(cat "${state}/state.json")" "$before" "the realm is byte-for-byte u
 assert_contains "$output" "+ create client 'basetool-ingest-gateway'" "the plan names the missing gateway"
 assert_contains "$output" "+ create client scope 'extractor-ingest-only'" "the plan names the missing scope"
 assert_contains "$output" "~ revokeRefreshToken: true -> false" "the plan names the token-setting drift"
-assert_contains "$output" "IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET" "the plan says which .env value needs the new secret"
+assert_contains "$output" "BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET" "the plan says which .env value needs the new secret"
 rm -rf "$state"
 
 echo "2. from an empty realm, --apply builds the production shape"
@@ -933,7 +933,7 @@ rm -rf "$state"
 
 echo "18. every member may hold an offline session: the default role and the client scope carry offline_access"
 OFFLINE_TITLE="offline_access for every member"
-COMPOSITE_LINE="+ default role 'default-roles-iri': composite realm role 'offline_access' (every member may hold an offline session)"
+COMPOSITE_LINE="+ default role 'default-roles-basetool': composite realm role 'offline_access' (every member may hold an offline session)"
 MAPPING_LINE="+ client scope 'offline_access': realm role 'offline_access' mapped (a client with fullScopeAllowed off may then issue an offline token)"
 section_first_line() { printf '%s\n' "$1" | grep -A1 -F "] ${OFFLINE_TITLE}" | tail -1; }
 seed_offline() {
@@ -965,7 +965,7 @@ assert_eq "$(query "$state" "sorted(r['name'] for r in d['roles'] if r['id'] in 
   "['KRT Member', 'offline_access', 'uma_authorization']" "the default role holds offline_access beside what it had"
 assert_eq "$(query "$state" "[r['name'] for r in d['scope_role_mappings']['s-offline_access']]")" \
   "['offline_access']" "the offline_access client scope maps the offline_access role"
-assert_contains "$(cat "${state}/bodies.log")" 'create roles/default-roles-iri/composites [{"id": "r-offline", "name": "offline_access"}]' \
+assert_contains "$(cat "${state}/bodies.log")" 'create roles/default-roles-basetool/composites [{"id": "r-offline", "name": "offline_access"}]' \
   "the composite is posted by the role's id"
 assert_contains "$(cat "${state}/bodies.log")" 'create client-scopes/s-offline_access/scope-mappings/realm [{"id": "r-offline", "name": "offline_access"}]' \
   "and so is the scope mapping"
@@ -1099,7 +1099,7 @@ assert_contains "$output" "client 'basetool-seed' is not in the production shape
 assert_eq "$(query "$state" "client('basetool-seed') is None")" "False" "the provisioner never deletes it"
 : >"${state}/calls.log"
 rc=0
-KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --realm iri --public-origin https://profit-base.online \
+KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --realm basetool --public-origin https://profit-base.online \
   --seed-client --kcadm-command "${PYTHON} $(to_child_path "${state}/kcadm_stub.py")" >/dev/null 2>&1 || rc=$?
 assert_eq "$([[ $rc -ne 0 ]] && echo refused || echo accepted)" "refused" "--seed-client refuses a production origin"
 assert_eq "$(wc -l <"${state}/calls.log" | tr -d ' ')" "0" "and refuses before kcadm is called"

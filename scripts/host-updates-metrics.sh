@@ -7,7 +7,7 @@
 
 set -uo pipefail
 
-OUT="${IRI_HOST_UPDATES_METRICS_FILE:-/var/iri/monitoring/textfile/host-updates.prom}"
+OUT="${BASETOOL_HOST_UPDATES_METRICS_FILE:-/var/lib/basetool/textfile/host-updates.prom}"
 
 previous() {
   local value
@@ -19,8 +19,8 @@ previous() {
 
 reboot_required() {
   local rc
-  if [[ -n "${IRI_NEEDS_RESTARTING:-}" ]]; then
-    ${IRI_NEEDS_RESTARTING} -r >/dev/null 2>&1
+  if [[ -n "${BASETOOL_NEEDS_RESTARTING:-}" ]]; then
+    ${BASETOOL_NEEDS_RESTARTING} -r >/dev/null 2>&1
   elif command -v needs-restarting >/dev/null 2>&1; then
     needs-restarting -r >/dev/null 2>&1
   elif command -v dnf >/dev/null 2>&1; then

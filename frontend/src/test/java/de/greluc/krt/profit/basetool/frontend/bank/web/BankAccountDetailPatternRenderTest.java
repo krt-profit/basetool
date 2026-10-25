@@ -101,7 +101,7 @@ class BankAccountDetailPatternRenderTest {
     return new BankAccountDto(
         ACCOUNT_ID,
         "KB-0042",
-        "IRI Betriebskonto",
+        "ALP Betriebskonto",
         "ORG_UNIT",
         "ACTIVE",
         null,
@@ -291,7 +291,7 @@ class BankAccountDetailPatternRenderTest {
     when(backendApiClient.get(eq("/api/v1/bank/org-units/transfer-targets"), anyTypeRef()))
         .thenReturn(
             List.of(
-                new BankAccountRefDto(ACCOUNT_ID, "KB-0042", "IRI Betriebskonto", "ORG_UNIT"),
+                new BankAccountRefDto(ACCOUNT_ID, "KB-0042", "ALP Betriebskonto", "ORG_UNIT"),
                 new BankAccountRefDto(UUID.randomUUID(), "KB-0001", "KRT-Konto", "CARTEL")));
     stubSeries();
 
@@ -328,12 +328,12 @@ class BankAccountDetailPatternRenderTest {
         new OrgUnitBankBalanceDto(
             ACCOUNT_ID,
             "KB-0042",
-            "IRI Betriebskonto",
+            "ALP Betriebskonto",
             "ACTIVE",
             "ORG_UNIT",
             orgUnitId,
-            "IRIDIUM",
-            "IRI",
+            "ALPHA",
+            "ALP",
             "SQUADRON",
             new BigDecimal("3148200"),
             true,
@@ -355,7 +355,7 @@ class BankAccountDetailPatternRenderTest {
         .thenReturn(List.of(overLimit));
     when(backendApiClient.get(eq("/api/v1/bank/org-units/transfer-targets"), anyTypeRef()))
         .thenReturn(
-            List.of(new BankAccountRefDto(ACCOUNT_ID, "KB-0042", "IRI Betriebskonto", "ORG_UNIT")));
+            List.of(new BankAccountRefDto(ACCOUNT_ID, "KB-0042", "ALP Betriebskonto", "ORG_UNIT")));
 
     String html = render("/org-unit-bank");
 

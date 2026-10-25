@@ -280,23 +280,23 @@ expect_not "the measured control no longer reads as an unmeasured hypothesis" \
 echo "== the config tree is mounted read-only, everywhere (OPS-SEC-04) =="
 expect "a writable config-tree mount is refused" \
   'print(g._volume("./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme", "keycloak"))' \
-  'REFUSAL: keycloak: mounts /var/iri/code/keycloak-theme/krt-theme from the config tree without `:ro`'
+  'REFUSAL: keycloak: mounts /opt/basetool/keycloak-theme/krt-theme from the config tree without `:ro`'
 expect "an absolute config-tree path is held to the same rule" \
-  'print(g._volume("/var/iri/code/keycloak/providers:/opt/keycloak/providers", "keycloak"))' \
+  'print(g._volume("/opt/basetool/keycloak/providers:/opt/keycloak/providers", "keycloak"))' \
   'without `:ro`'
 expect "the same mount with :ro passes" \
   'print(g._volume("./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro", "keycloak"))' \
-  '/var/iri/code/keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro'
+  '/opt/basetool/keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro'
 expect "a data mount outside the config tree stays writable" \
-  'print(g._volume("/var/iri/keycloak/log:/var/log/keycloak", "keycloak"))' \
-  '/var/iri/keycloak/log:/var/log/keycloak'
+  'print(g._volume("/var/log/basetool/keycloak:/var/log/keycloak", "keycloak"))' \
+  '/var/log/basetool/keycloak:/var/log/keycloak'
 expect_not "the production keycloak unit no longer mounts realm-export.json -- prod runs start, never --import-realm" \
   'files, _ = g.generate(); print(files["quadlet/systemd/keycloak.container"])' \
   'realm-export.json'
-expect "every Volume= from /var/iri/code in every generated unit ends in :ro" \
+expect "every Volume= from /opt/basetool in every generated unit ends in :ro" \
   'files, _ = g.generate()
 bad = [l for t in files.values() for l in t.splitlines()
-       if l.startswith("Volume=/var/iri/code") and "ro" not in l.split(":")[2:3][0].split(",") ]
+       if l.startswith("Volume=/opt/basetool") and "ro" not in l.split(":")[2:3][0].split(",") ]
 print("writable:", bad)' \
   'writable: []'
 

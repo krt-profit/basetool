@@ -5,6 +5,31 @@
     system: true
     state: present
 
+- name: Read the subordinate id files
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+  register: basetool_host_subid_files
+  failed_when: false
+
+- name: Refuse a subordinate id range that belongs to another account
+  ansible.builtin.assert:
+    that:
+      - >-
+        (item.content | default('') | b64decode).splitlines()
+        | select('match', '^(?!' ~ basetool_host_service_user ~ ':)[^:]+:' ~ basetool_host_subuid_base ~ ':')
+        | list | length == 0
+    fail_msg: >-
+      {{ item.item }} already assigns the subordinate range starting at {{ basetool_host_subuid_base }}
+      to another account. Rename that account to {{ basetool_host_service_user }} (usermod, then edit
+      the id files by hand) instead of letting this role create a second service user.
+    quiet: true
+  loop: "{{ basetool_host_subid_files.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
 - name: Create the rootless service user
   ansible.builtin.user:
     name: "{{ basetool_host_service_user }}"

@@ -9,7 +9,7 @@
           ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
           ><span th:text="#{__${eyebrowKey}__}">Bank</span></a>
         <div class="page-title">
-            <h1 th:text="${acct.name()}">IRI Betriebskonto</h1>
+            <h1 th:text="${acct.name()}">ALP Betriebskonto</h1>
             <span class="chip chip--data" th:attr="data-testid=${noTestId}" th:text="${acct.accountNo()}">KB-0001</span>
             <span class="chip chip--data" th:text="#{'bank.account.type.' + ${acct.type()}}">Org-Einheit</span>
             <span class="chip chip--muted" th:if="${acct.status() != 'ACTIVE'}" data-testid="bank-account-status"
@@ -84,7 +84,7 @@
         </div>
         <div th:if="${acct.orgUnit() != null}">
             <dt th:text="#{bank.detail.info.orgUnit}">Org-Einheit</dt>
-            <dd th:text="${acct.orgUnit().name()}">IRIDIUM</dd>
+            <dd th:text="${acct.orgUnit().name()}">ALPHA</dd>
         </div>
         <div th:if="${acct.areaName() != null}">
             <dt th:text="#{bank.detail.info.area}">Bereich</dt>
@@ -164,7 +164,7 @@
                     <span class="cell-title" th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
                           th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + (${b.counterAccountName() != null} ? ${b.counterAccountName()} + ' (' + ${b.counterAccountNo()} + ')' : ${b.counterAccountNo()})">&#8594; KRT-Konto (KB-0002)</span>
                     <span class="cell-title" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() != null}"
-                          th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">vexx (IRIDIUM)</span>
+                          th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">vexx (ALPHA)</span>
                     <span class="cell-title bank-party-none" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() == null}">&ndash;</span>
                     <span class="cell-sub" th:if="${!#strings.isEmpty(b.justification())}"
                           th:attr="data-testid=${testIdPrefix + '-justification'}" th:text="${b.justification()}">Erl&ouml;s Quantanium-Verkauf</span>

@@ -44,7 +44,7 @@ HARDEN = SCRIPT_DIR / "harden-keycloak-realm.py"
 sys.path.insert(0, str(SCRIPT_DIR / "keycloak"))
 from hardening_probe import Browser, Outcome, parse_forms  # noqa: E402
 
-REALM = "iri"
+REALM = "basetool"
 CLIENT = "hardening-probe"
 REDIRECT = "http://127.0.0.1:9/callback"
 MEMBER = ("sandbox-member", "sandbox-member-pw-do-not-use-in-prod")

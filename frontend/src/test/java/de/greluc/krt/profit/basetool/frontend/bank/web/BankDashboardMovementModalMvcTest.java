@@ -69,7 +69,7 @@ class BankDashboardMovementModalMvcTest {
     return new BankDashboardAccountDto(
         UUID.randomUUID(),
         "KB-0001",
-        "Staffel IRIDIUM",
+        "Staffel ALPHA",
         "ORG_UNIT",
         status,
         new BigDecimal("1000"),

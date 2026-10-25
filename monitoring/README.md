@@ -25,22 +25,22 @@ them that recurs lives here.
 
 **What runs where.** The monitoring plane is two halves on one host:
 
-- **Nine Quadlet container units** of the rootless service user `iri`, generated from
+- **Nine Quadlet container units** of the rootless service user `basetool`, generated from
   `docker-compose.monitoring.yml` by [`scripts/generate-quadlet.py`](../scripts/generate-quadlet.py)
   into [`quadlet/systemd/`](../quadlet/systemd/) and installed by `deploy.sh` into
   `/etc/containers/systemd/users/<uid>/`: `prometheus`, `grafana`, `loki`, `tempo`, `alertmanager`,
   `blackbox-exporter`, `postgres-exporter-backend`, `postgres-exporter-keycloak`, `redis-exporter`.
-  Each is a `systemctl --user` unit of `iri`, and its environment is rendered from the host `.env`
-  into `/var/iri/code/env.d/<svc>.env` by [`scripts/render-env-d.py`](../scripts/render-env-d.py).
+  Each is a `systemctl --user` unit of `basetool`, and its environment is rendered from the host `basetool.env`
+  into `/etc/basetool/env.d/<svc>.env` by [`scripts/render-env-d.py`](../scripts/render-env-d.py).
 - **Host services** installed and configured by the Ansible role
   ([`ansible/roles/basetool_host/tasks/27-observability.yml`](../ansible/roles/basetool_host/tasks/27-observability.yml)),
   because a rootless container cannot do their job: `node_exporter` (`:9100`; needs the systemd
   dbus socket), `alloy` (`:12345`; needs the real `adm` and `systemd-journal` groups), and
-  `prometheus-podman-exporter` (`:9882`, a **user** unit of `iri`, so it sees the rootless
+  `prometheus-podman-exporter` (`:9882`, a **user** unit of `basetool`, so it sees the rootless
   containers). Two collector timers write into node_exporter's textfile directory
-  `/var/iri/monitoring/textfile`: `iri-container-metrics.timer` (every 30 s,
+  `/var/lib/basetool/textfile`: `basetool-container-metrics.timer` (every 30 s,
   [`scripts/cgroup-container-metrics.py`](../scripts/cgroup-container-metrics.py) — the replacement
-  for cAdvisor) and `iri-cert-expiry.timer` (daily 03:40,
+  for cAdvisor) and `basetool-cert-expiry.timer` (daily 03:40,
   [`scripts/cert-expiry-metrics.py`](../scripts/cert-expiry-metrics.py)). `deploy.sh`, `backup.sh`,
   `restore-drill.sh` and `container-cleanup.sh` write their own textfile metrics there too; `deploy.sh` also writes `host-scripts.prom` (`basetool_host_scripts_drift`, REQ-OPS-045).
 
@@ -50,7 +50,7 @@ frontend, ingest and Keycloak units reach Alloy's OTLP receiver through `AddHost
 (`PODMAN_HOST_ALIASES` in the generator). Host-to-container: rootless networks live in a user
 namespace the host has no route into, so Loki (`127.0.0.1:3100`) and Tempo's OTLP port
 (`127.0.0.1:4327`) are published on loopback for the host-native Alloy (`PODMAN_LOOPBACK_PUBLISH`,
-`IRI_ALLOY_LOKI_ENDPOINT` / `IRI_ALLOY_TEMPO_ENDPOINT` in `/etc/sysconfig/alloy`). The host services
+`BASETOOL_ALLOY_LOKI_ENDPOINT` / `BASETOOL_ALLOY_TEMPO_ENDPOINT` in `/etc/sysconfig/alloy`). The host services
 bind all interfaces and are kept off the internet by the default-deny `firewalld` zone.
 
 **Networks** (Quadlet `.network` units): `net-monitoring-scrape` (Prometheus, the exporters, the app
@@ -74,9 +74,9 @@ behind Keycloak OIDC and restricted to the realm role `Admin` (REQ-OBS-008).
 | redis_exporter | Quadlet unit | same pattern |
 | Alloy | host service (`alloy.service`, rpm.grafana.com) | `27-observability.yml` + `alloy.service.d/10-log-sources.conf`, `20-resources.conf` (512M, `GOMEMLIMIT=360MiB`) |
 | node_exporter | host service (`prometheus-node-exporter.service`, EPEL) | `27-observability.yml` (`basetool_host_node_exporter_flags`) + `prometheus-node-exporter.service.d/20-resources.conf` (64M, `GOMEMLIMIT=48MiB`) |
-| prometheus-podman-exporter | user unit of `iri` (EPEL) | `27-observability.yml` |
-| container metrics collector | `iri-container-metrics.timer` (root, read-only) | `scripts/cgroup-container-metrics.py` — the container cgroups plus the two host services above |
-| certificate expiry collector | `iri-cert-expiry.timer` (root, read-only) | `scripts/cert-expiry-metrics.py` |
+| prometheus-podman-exporter | user unit of `basetool` (EPEL) | `27-observability.yml` |
+| container metrics collector | `basetool-container-metrics.timer` (root, read-only) | `scripts/cgroup-container-metrics.py` — the container cgroups plus the two host services above |
+| certificate expiry collector | `basetool-cert-expiry.timer` (root, read-only) | `scripts/cert-expiry-metrics.py` |
 
 **Versions are deliberately not listed here.** A hand-maintained version column went stale on the
 next Dependabot bump (it was wrong on 8 of 12 rows before it was removed), and it answers the wrong
@@ -88,7 +88,7 @@ grep -E '^\s+image:' docker-compose.monitoring.yml
 grep -h '^Image=' quadlet/systemd/{prometheus,grafana,loki,tempo,alertmanager,blackbox-exporter}.container
 
 # Actually running on the host — the one that matters during an incident:
-sudo -u iri podman ps --format '{{.Names}} {{.Image}}'
+sudo -u basetool podman ps --format '{{.Names}} {{.Image}}'
 rpm -q alloy node-exporter prometheus-podman-exporter     # the host services
 ```
 
@@ -149,7 +149,7 @@ deliberately not pins opts out with an `image-pin-gate: ignore-file` marker in i
 
 ### How a config change reaches the running process
 
-The config bundle is mirrored to `/var/iri/code` on every release. What happens next depends on the
+The config bundle is mirrored to `/opt/basetool` on every release. What happens next depends on the
 component:
 
 | Change to | Reaches the process | How |
@@ -167,11 +167,11 @@ component:
 started with and restarts it on any drift, on **every** healthy tick — the release apply and the
 steady-state no-op alike — so a missed apply self-heals on the next tick. A `SIGHUP` is deliberately
 not used: the configs are single-file bind mounts, the mirror writes a fresh inode, and a reloaded
-process would re-read the old one. The reconcile runs only while `IRI_MONITORING_ENABLED=true`
-(read from the host `.env`; see **MonitoringReconcileDisabled** below). Manual restarts:
+process would re-read the old one. The reconcile runs only while `BASETOOL_MONITORING_ENABLED=true`
+(read from the host `basetool.env`; see **MonitoringReconcileDisabled** below). Manual restarts:
 
 ```bash
-SYSTEMCTL="sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user"
+SYSTEMCTL="sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user"
 ${SYSTEMCTL} restart alertmanager.service       # or loki / tempo / prometheus / grafana
 sudo systemctl restart alloy.service            # the host-native shipper
 ```
@@ -207,45 +207,45 @@ section above.
 | **BlackboxProbeFailed** | An HTTPS liveness probe failed. Curl the endpoint from outside and from the host; check the edge (`${SYSTEMCTL} status edge.service`), the host front end (`systemctl status haproxy`), the certificate and upstream health. If it fails from inside only, check the public-name aliases (ADR-0196): a rootless container cannot reach its own host through the public address. |
 | **EdgeIpv6Unreachable** | A public vhost answers over IPv4 but not IPv6. Check the AAAA record and the front end's v6 listener; `curl -6` from an IPv6-capable host. If it answers from outside, the probe path itself is broken: the v6 alias and pasta's v6 guest mapping (`basetool_host_public_name_aliases_v6`, `basetool_host_pasta_map_guest_addrs`) — the 2026-09-22 false positive. |
 | **DnsResolutionFailed** | The public DNS probe against 1.1.1.1 failed — the apex or the API vhost is not resolving an A/AAAA record. Check the zone (`dig A`/`dig AAAA profit-base.online @1.1.1.1`). |
-| **HostDiskCritical / HostDiskWarning** | Disk filling. Find the largest consumers (`du -xh /var/iri --max-depth 2`, `journalctl --disk-usage`, `sudo -u iri podman system df`). Reclaim images with the cleanup job (`systemctl start iri-container-cleanup.service`); **never** `podman volume prune` — it removes the named `edge-certs` / `edge-acme-state` volumes (ADR-0194). Critical = act now; the monitoring stores share `/var/iri` with both PGDATA directories. |
-| **HostInodesCritical** | **CRITICAL.** A filesystem has used more than 90 % of its inodes — writes fail with free space left. Look for directories with many small files (`find /var/iri -xdev -type d -size +1M`, the journal, container storage) and reclaim them the same way as disk space above. |
+| **HostDiskCritical / HostDiskWarning** | Disk filling. Find the largest consumers (`du -xh /var/lib/basetool --max-depth 2`, `journalctl --disk-usage`, `sudo -u basetool podman system df`). Reclaim images with the cleanup job (`systemctl start basetool-container-cleanup.service`); **never** `podman volume prune` — it removes the named `edge-certs` / `edge-acme-state` volumes (ADR-0194). Critical = act now; the monitoring stores share `/var/lib/basetool` with both PGDATA directories. |
+| **HostInodesCritical** | **CRITICAL.** A filesystem has used more than 90 % of its inodes — writes fail with free space left. Look for directories with many small files (`find /var/lib/basetool -xdev -type d -size +1M`, the journal, container storage) and reclaim them the same way as disk space above. |
 | **HostMemoryLow** | Under 10 % of host memory available for 10 minutes; the next spike risks the OOM killer, which sacrifices Grafana/Tempo first by design. Read dashboard `01-host` and the container memory panels on `02` to find the grower. |
 | **HostCpuHigh / HostLoadHigh** | CPU above 90 % busy, or a 15-minute load above twice the vCPU count, for 15 minutes — every co-located service slows. Find the workload on `02` (per-container CPU and throttling) before touching limits; a high load with idle CPU is I/O contention (`HostIoPressure`). |
 | **HostClockDrift** | The host clock is more than 0.25 s off NTP — JWT `iat`/`exp` checks and TLS handshakes start failing (spurious login errors). `chronyc tracking` and `systemctl status chronyd`. |
 | **HostNetworkErrors** | A physical interface keeps counting receive/transmit errors — a failing NIC or a saturated link. `dmesg`, `ip -s link show <device>` and the provider's network status. |
 | **HostMemoryPressureStalled / HostCpuPressure / HostIoPressure** | PSI pressure on the host; memory full-pressure is the earliest saturation signal before the OOM killer. Read dashboard `01-host`, then the container memory panels. If the panels are **empty**, PSI is off: `ls /proc/pressure` must exist — the role sets `psi=1` for the next boot and does not reboot (`grubby --info=DEFAULT` shows what the next boot will carry). |
-| **PostgresDown / RedisDown** | The exporter answers but cannot reach its database or Redis (`pg_up == 0` / `redis_up == 0`) for 2 minutes — `TargetDown` cannot see this, because the exporter itself is up. `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or `db-keycloak` / `redis`) and `journalctl CONTAINER_NAME=<svc>`. A missing or unreadable `/var/iri/redis/users.acl` keeps Redis from starting at all (ADR-0088). The nightly backup does not stop either, so these never fire for the 04:15 quiesce. |
-| **ContainerUnhealthy** | A container has failed its **own** health check for 10 minutes (`podman_container_health == 1`, joined to `podman_container_info` for the name). deploy.sh restarts only backend/frontend/ingest; for every other container nothing restarts it. `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run <name>` and `journalctl CONTAINER_NAME=<name>`. |
+| **PostgresDown / RedisDown** | The exporter answers but cannot reach its database or Redis (`pg_up == 0` / `redis_up == 0`) for 2 minutes — `TargetDown` cannot see this, because the exporter itself is up. `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status db-backend.service` (or `db-keycloak` / `redis`) and `journalctl CONTAINER_NAME=<svc>`. A missing or unreadable `/var/lib/basetool/redis/users.acl` keeps Redis from starting at all (ADR-0088). The nightly backup does not stop either, so these never fire for the 04:15 quiesce. |
+| **ContainerUnhealthy** | A container has failed its **own** health check for 10 minutes (`podman_container_health == 1`, joined to `podman_container_info` for the name). deploy.sh restarts only backend/frontend/ingest; for every other container nothing restarts it. `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) podman healthcheck run <name>` and `journalctl CONTAINER_NAME=<name>`. |
 | **HostSecurityUpdatesFailing / HostSecurityUpdatesStale** | `dnf-automatic` failed its last run, or has not finished one for over two days (or never recorded one). `journalctl -u dnf-automatic.service`, `systemctl list-timers dnf-automatic.timer`, and that `/etc/systemd/system/dnf-automatic.service.d/20-basetool-metrics.conf` exists (role `tasks/45-updates.yml`). REQ-OPS-032. |
-| **HostRebootRequired** | An installed update (kernel, glibc, systemd) has waited a day for a reboot (`needs-restarting -r`). dnf-automatic never reboots — it is an owner decision. The stack comes back on its own after a reboot; the boot unit `iri-host-updates-metrics.service` clears the flag. |
+| **HostRebootRequired** | An installed update (kernel, glibc, systemd) has waited a day for a reboot (`needs-restarting -r`). dnf-automatic never reboots — it is an owner decision. The stack comes back on its own after a reboot; the boot unit `basetool-host-updates-metrics.service` clears the flag. |
 | **PostgresConnectionsCritical** | Connection pool near max. Check for a connection leak or runaway query; inspect HikariCP and `pg_stat_activity`. |
 | **PostgresWraparoundCritical** | XID wraparound age > 1.5 billion (the metric value is an XID count, not seconds). Autovacuum is not freezing; the DB nears a forced read-only shutdown. Check autovacuum progress and terminate long-idle transactions urgently. |
-| **PostgresFatalOrPanic** | **CRITICAL.** A PostgreSQL container logged a `PANIC` or a non-benign `FATAL` (the restart-lifecycle FATALs are excluded). Read `{app=~"postgres-.+"} \|~ "FATAL\|PANIC"` in Loki; a PANIC means the server restarted — check disk space on `/var/iri`, then `journalctl CONTAINER_NAME=db-backend` (or `db-keycloak`). |
+| **PostgresFatalOrPanic** | **CRITICAL.** A PostgreSQL container logged a `PANIC` or a non-benign `FATAL` (the restart-lifecycle FATALs are excluded). Read `{app=~"postgres-.+"} \|~ "FATAL\|PANIC"` in Loki; a PANIC means the server restarted — check disk space on `/var/lib/basetool`, then `journalctl CONTAINER_NAME=db-backend` (or `db-keycloak`). |
 | **PostgresDeadlocks** | Deadlocks in the last 15 minutes. The PostgreSQL log names both statements; in the backend it is usually two transactions locking the same rows in opposite order — check the multi-step transaction rules in `backend/CLAUDE.md`. |
 | **PostgresLongTransaction** | A transaction has been open for over an hour and blocks autovacuum (bloat, XID age). Find it in `pg_stat_activity` (`state`, `xact_start`, `application_name`) and end it with `pg_terminate_backend(pid)` once you know what it is — a gated write on production. |
 | **PostgresCacheHitLow** | The buffer-cache hit ratio of one database stayed under 90 % for 30 minutes — queries read from disk. Check recent query or plan changes and `shared_buffers` against the container's memory. |
 | **PostgresTempFiles** | More than 1 GB of temp files in an hour — queries spill to disk (a bad plan or `work_mem` too small). Find the heavy queries by `temp_blks_written` in `pg_stat_statements` if it is loaded, else the PostgreSQL log. |
-| **RedisRdbStale** | Redis has held **unsaved changes** for over an hour with no completed RDB snapshot — the snapshot fork is failing or blocked. AOF is the primary durability layer, so this is not a data-loss signal by itself; check disk space on `/var/iri/redis` and the Redis log. It does **not** fire on an idle store: `--save "60 1"` snapshots only when a key changed (the unguarded rule paged twice on 2026-09-08 for exactly that). |
-| **RedisRdbSaveFailing** | `rdb_last_bgsave_status:err` — the background save itself failed. Usual causes: no disk space or no write permission on `/var/iri/redis` (owned by the translated uid of container uid 999), or a fork refused for memory. |
-| **RedisAofWriteFailing** | `aof_last_write_status:err` while AOF is enabled — the **primary** durability layer is not reaching disk. Check disk space and permissions on `/var/iri/redis` and the Redis log. |
+| **RedisRdbStale** | Redis has held **unsaved changes** for over an hour with no completed RDB snapshot — the snapshot fork is failing or blocked. AOF is the primary durability layer, so this is not a data-loss signal by itself; check disk space on `/var/lib/basetool/redis` and the Redis log. It does **not** fire on an idle store: `--save "60 1"` snapshots only when a key changed (the unguarded rule paged twice on 2026-09-08 for exactly that). |
+| **RedisRdbSaveFailing** | `rdb_last_bgsave_status:err` — the background save itself failed. Usual causes: no disk space or no write permission on `/var/lib/basetool/redis` (owned by the translated uid of container uid 999), or a fork refused for memory. |
+| **RedisAofWriteFailing** | `aof_last_write_status:err` while AOF is enabled — the **primary** durability layer is not reaching disk. Check disk space and permissions on `/var/lib/basetool/redis` and the Redis log. |
 | **RedisMemoryHigh** | Redis used >85% of its maxmemory. Under `noeviction` the ceiling makes new logins/session writes fail. Check for session growth or a leak on the Redis dashboard. |
 | **RedisEvictions** | Redis evicted keys — impossible under `noeviction`. Someone changed `maxmemory-policy`, which silently logs users out. Restore `noeviction` and find what changed the config. |
 | **RedisConnectionsRejected** | `maxclients` reached — a connection leak or client storm. Check Lettuce pool usage and the Redis client list. |
 | **RedisAclDenials** | Redis refused an `AUTH` or a command under its ACL for five minutes (`acl_access_denied_auth/cmd/key/channel`). With one ACL user per service (REQ-SEC-068) that is a `REDIS_<SVC>_PASSWORD` not matching the rendered `users.acl`, a template rule too narrow for what the service does, or a foreign client. Read `ACL LOG` by field only — its `object` can be a session id ([`docs/deployment.md`](../docs/deployment.md#the-redis-acl)). **Not a cause on release 1.11.0 only:** `basetool-frontend` refused `config\|get` (`reason=command`) twice per frontend start — its keyspace-notification check, refused by design; it did not fire the alert on 2026-09-25. From the release carrying #2067 the frontend sends a `PING` instead and no refusal is expected — verified gone on production after the v1.12.0 deploy, 2026-09-25. |
 | **CertificateExpiringSoon** | A **served** certificate is near expiry. Public edge certificates: the `acme` unit renews them into the `edge-certs` volume and `deploy.sh`'s `reconcile_edge` restarts the edge within one tick — check `{app="acme"}` in Loki and `AcmeRenewalFailing`. Internal certificates (`keystore.p12` on the apps and Keycloak, Grafana's own leaf): rotate per [`docs/deployment.md`](../docs/deployment.md) (keystore rotation). |
-| **CertificateFileExpiringSoon** | A CA-issued certificate **file** under `/var/iri/monitoring/certs` expires in under 14 days. No listener serves it, so no probe sees it; the labels name `path`, `subject` and `issuer`. Re-issue it, put the file in place, restart what reads it, then re-read with `sudo systemctl start iri-cert-expiry.service`. |
+| **CertificateFileExpiringSoon** | A CA-issued certificate **file** under `/etc/basetool/monitoring/certs` expires in under 14 days. No listener serves it, so no probe sees it; the labels name `path`, `subject` and `issuer`. Re-issue it, put the file in place, restart what reads it, then re-read with `sudo systemctl start basetool-cert-expiry.service`. |
 | **SelfSignedCertificateExpiring** | A **self-signed** certificate file expires in under 90 days — in practice `basetool-ca.crt`, the internal trust anchor. 90 days because replacing a root means re-issuing everything it signed and rolling the anchor through the edge's `proxy_ssl_trusted_certificate` and the blackbox `https_internal` module together. Start the rotation now. Grafana's self-signed leaf lands here too and is a one-file job. |
-| **CertificateMetricsStale** | The certificate collector stopped writing (newest sample >36h), or never wrote on a host whose node_exporter has been up 36h. `systemctl status iri-cert-expiry.timer iri-cert-expiry.service`; check `/var/iri/monitoring/textfile/certificates.prom`. |
+| **CertificateMetricsStale** | The certificate collector stopped writing (newest sample >36h), or never wrote on a host whose node_exporter has been up 36h. `systemctl status basetool-cert-expiry.timer basetool-cert-expiry.service`; check `/var/lib/basetool/textfile/certificates.prom`. |
 | **ContainerRestartLoop** | A container is crash-looping. `${SYSTEMCTL} status <svc>.service` and `journalctl _SYSTEMD_USER_UNIT=<svc>.service`, check the last deploy and the unit's `Memory=` / `PidsLimit=`; roll back if a bad image shipped. Reads `basetool:container:start_time_seconds` (the podman exporter's start time, one series per name across recreates). Until 2026-09-22 it read cAdvisor's `container_start_time_seconds` and could not fire on the Podman host (REQ-OBS-014). |
-| **ContainerMetricsMissing / CoreContainerMetricsMissing** | Fewer containers report `basetool:container:present` than expected, so the cgroup-fed container alerts (working set, OOM, CPU throttle) are blind. Check the collector: `systemctl status iri-container-metrics.timer`, `/var/iri/monitoring/textfile/containers.prom`, and `ContainerCgroupCollectorStale` / `…FoundNothing`. |
+| **ContainerMetricsMissing / CoreContainerMetricsMissing** | Fewer containers report `basetool:container:present` than expected, so the cgroup-fed container alerts (working set, OOM, CPU throttle) are blind. Check the collector: `systemctl status basetool-container-metrics.timer`, `/var/lib/basetool/textfile/containers.prom`, and `ContainerCgroupCollectorStale` / `…FoundNothing`. |
 | **ContainerStartTimeMissing** | Fewer than 10 containers report `basetool:container:start_time_seconds` (or none), so `ContainerRestartLoop` cannot fire. The source is the podman exporter, not the cgroup collector: check the `podman-exporter` container and its socket access, and `TargetDown`. |
-| **ContainerCgroupCollectorStale / ContainerCgroupCollectorFoundNothing** | The cgroup collector stopped writing (or never wrote — `absent()`, since 2026-09-22), or writes a fresh file matching **no** cgroup (a changed slice layout). Every container memory/OOM/CPU/pids alert has lost its input. `sudo /var/iri/code/scripts/cgroup-container-metrics.py --dry-run` shows what it would write; it finds containers as `user.slice/user-<uid>.slice/user@<uid>.service/app.slice/<name>.service` and reads each one's `libpod-payload-<id>` child, where podman puts the limits under Quadlet's `--cgroups=split` (the unit's own cgroup reads `memory.max max`); Podman's transient healthcheck units (`<64-hex id>-<hex>.service`) are skipped. |
+| **ContainerCgroupCollectorStale / ContainerCgroupCollectorFoundNothing** | The cgroup collector stopped writing (or never wrote — `absent()`, since 2026-09-22), or writes a fresh file matching **no** cgroup (a changed slice layout). Every container memory/OOM/CPU/pids alert has lost its input. `sudo /opt/basetool/scripts/cgroup-container-metrics.py --dry-run` shows what it would write; it finds containers as `user.slice/user-<uid>.slice/user@<uid>.service/app.slice/<name>.service` and reads each one's `libpod-payload-<id>` child, where podman puts the limits under Quadlet's `--cgroups=split` (the unit's own cgroup reads `memory.max max`); Podman's transient healthcheck units (`<64-hex id>-<hex>.service`) are skipped. |
 | **HostServiceMetricsMissing** | The cgroup collector stopped publishing `alloy` or `node-exporter`, the two host services it reads beside the containers. Either the service is down (`TargetDown` / `SystemdUnitFailed` say so) or its unit was renamed or moved out of `system.slice`, and its memory/OOM/pids alerts have lost their input. Compare `DEFAULT_HOST_SERVICES` in `scripts/cgroup-container-metrics.py` with `systemctl status alloy prometheus-node-exporter`. |
 | **ContainerOomKilled** | A container was OOM-killed. Check its `Memory=` limit and anon memory on dashboard `02`; on the memory-capped host confirm the OOM hit the intended sacrifice victim, not a core service. |
 | **ContainerMemoryHigh** | A container's anonymous (unreclaimable) memory is within 10 % of its `Memory=` limit for 10 minutes — the OOM early warning. Page cache is deliberately excluded; read *Why `ContainerMemoryHigh` keys off anon memory* below before raising a limit. |
 | **ContainerCpuThrottledHigh** | A container is CPU-starved against its `--cpus` quota (>25% of CFS periods throttled). Read the throttled seconds, not only the ratio (sizing section below). |
-| **ContainerPidsHigh** | A container is within 20% of its **own** pids cap (cap-relative, so it covers the 512-capped monitoring services and the 2048-capped JVMs). Every task counts, so an unreaped-zombie or thread leak (2026-07-12 ingest native-thread OOM; 2026-07-26 grafana at 512/512 with 493 `ssl_client` zombies) exhausts it and the kernel refuses new tasks — usually first seen as a health check failing with `can't fork`. Confirm with `cat /sys/fs/cgroup/user.slice/user-$(id -u iri).slice/user@$(id -u iri).service/app.slice/<svc>.service/libpod-payload-*/pids.{current,max,events}` (the payload child — the unit's own `pids.max` is the user manager's default, not the container's cap) and count zombies with `ps -eo stat,ppid \| awk '$1 ~ /^Z/'`. Reap them (`--init`) or cap the leaking pool. Do NOT raise the cap. |
-| **SystemdUnitFailed** | A **system** unit failed (not `dnf-makecache.service`, a distribution timer that heals on its next run when a mirror answers 5xx; `dnf-automatic` and `HostSecurityUpdatesStale` cover patching) (`iri-deploy`, `iri-backup`, `iri-restore-drill`, the collectors, `alloy`, …). `systemctl status <unit>` + `journalctl -u <unit>`. The application containers are **user** units and are not covered here — their state is `podman_container_state` / `podman_container_health` from the podman exporter. |
+| **ContainerPidsHigh** | A container is within 20% of its **own** pids cap (cap-relative, so it covers the 512-capped monitoring services and the 2048-capped JVMs). Every task counts, so an unreaped-zombie or thread leak (2026-07-12 ingest native-thread OOM; 2026-07-26 grafana at 512/512 with 493 `ssl_client` zombies) exhausts it and the kernel refuses new tasks — usually first seen as a health check failing with `can't fork`. Confirm with `cat /sys/fs/cgroup/user.slice/user-$(id -u basetool).slice/user@$(id -u basetool).service/app.slice/<svc>.service/libpod-payload-*/pids.{current,max,events}` (the payload child — the unit's own `pids.max` is the user manager's default, not the container's cap) and count zombies with `ps -eo stat,ppid \| awk '$1 ~ /^Z/'`. Reap them (`--init`) or cap the leaking pool. Do NOT raise the cap. |
+| **SystemdUnitFailed** | A **system** unit failed (not `dnf-makecache.service`, a distribution timer that heals on its next run when a mirror answers 5xx; `dnf-automatic` and `HostSecurityUpdatesStale` cover patching) (`basetool-deploy`, `basetool-backup`, `basetool-restore-drill`, the collectors, `alloy`, …). `systemctl status <unit>` + `journalctl -u <unit>`. The application containers are **user** units and are not covered here — their state is `podman_container_state` / `podman_container_health` from the podman exporter. |
 | **BankLedgerIntegrityViolation** | **CRITICAL.** Investigate the ledger before any further bank mutation. Reconcile balances and identify the divergent entry first. |
 | **BankLedgerIntegritySweepStale** | **CRITICAL.** The hourly bank integrity sweep stopped running — while stale the violations gauge is frozen and `BankLedgerIntegrityViolation` cannot fire. Restart the sweep / backend and confirm it succeeds before trusting a clean reading. |
 | **JobOrderItemBlueprintDrift** | The integrity sweep found ordered-item lines whose blueprint no longer produces the ordered item — an SC-Wiki re-sync re-pointed it after the order was placed, so those orders show a foreign recipe. The backend log names each order; re-saving an affected order re-derives its lines. |
@@ -273,7 +273,7 @@ section above.
 | **ExchangeClientRefusalsSpike** | One registered client (`client_id`) was refused more than 30 times in 15 minutes for a reason other than its own limits (`rate_limited`, `quota_exceeded`, `idempotency_in_progress`, `relay_busy`) — typically a release below the minimum version, an ungranted capability, revoked keys or broken DPoP proofs. Check the per-client panel on the operations dashboard, then contact the client's author or suspend it under *Administration → Verbundene Anwendungen* (REQ-XCH-028). |
 | **ExchangeClientDeviceLoginSurge** | Members confirmed device codes for one client (`client_id`) more than three times as often in the last hour as in its average hour of the past week, and at least 5 times. For a client with a browser-extension build its Keycloak Web Origins are `*`, so a page can drive its device flow in members' browsers (ADR-0303). Open the Exchange dashboard's *Keycloak sign-in events per client* panel and the connected-apps audit trail: new connections from members who did not ask for them point to phishing, so suspend the client under *Administration → Verbundene Anwendungen* and tell its developer; a client release or a promotion that brings many members at once is the harmless reading. A device flow that is only started or polled emits no Keycloak event, so this alert sees only confirmed codes. |
 | **ExchangeClientTokenRequestSurge** | Device-code redemptions and refreshes for one exchange client (`client_id`, first-party clients excluded) are more than three times its usual hourly rate and at least 30 in the hour. Compare with the client's gateway traffic: a matching rise in refusals or relays is usually a client release refreshing in a loop (contact the developer, or set a minimum version); token requests without gateway traffic point to someone driving the sign-in from browsers. |
-| **KeycloakEventMetricsUntagged** | Keycloak counts refresh events but none carries `client_id`, so the two surge alerts above match nothing. Check that the rendered `keycloak.env` still has `clientId` in `KC_EVENT_METRICS_USER_TAGS` and the `oauth2_device_*` events in `KC_EVENT_METRICS_USER_EVENTS` (the compose defaults); a host `.env` override wins over them. |
+| **KeycloakEventMetricsUntagged** | Keycloak counts refresh events but none carries `client_id`, so the two surge alerts above match nothing. Check that the rendered `keycloak.env` still has `clientId` in `KC_EVENT_METRICS_USER_TAGS` and the `oauth2_device_*` events in `KC_EVENT_METRICS_USER_EVENTS` (the compose defaults); a host `basetool.env` override wins over them. |
 | **ExchangeDpopProofsFailing** | Exchange clients keep presenting DPoP proofs the gateway refuses — invalid, replayed or for another key (REQ-XCH-006). A misimplemented client or a replay attempt; nonce challenges do not count. |
 | **ExchangeDpopProofLimitSustained** | For 15 minutes the gateway refused more than 3 exchange proofs a minute with `429 DPOP_PROOF_LIMIT` — a member's clients keep 600 live proofs (about 20 requests a second); a single burst cannot fire it. The refusal carries no client, so find it by `sum by (client_id) (rate(basetool_ingest_exchange_refused_total{reason="rate_limited"}[10m]))` and the Exchange dashboard's per-client panels; contact the author, and suspend the client under *Administration → Verbundene Anwendungen* if it does not stop (REQ-XCH-028). A suspected stolen token: suspend first, then ask the member to disconnect the installation. Raise `app.exchange.limits.dpop-proofs-per-member` only for a client with a registry `requestsPerMinute` far above the default (REQ-XCH-006). |
 | **IngestDpopReplayCacheFull** | The DPoP `jti` replay cache of one path scope (`exchange` / `other`) holds its total cap (`app.exchange.limits.dpop-proofs-total`, 100 000) and refuses every new proof there — on `exchange` with `503 SERVICE_UNAVAILABLE` and `Retry-After` (which `IdentityProviderUnavailable` leaves out); on `other` with `401`. Each member is capped on its own (600 live proofs), so this takes many members at their cap — check `basetool_ingest_dpop_replay_refused_total{reason="member_cap"}` and the per-IP limiter before raising the cap (REQ-XCH-006). |
@@ -296,12 +296,12 @@ section above.
 | **UserCallsignCollision** | A login with an unknown subject met an existing account holding the same callsign, so a new pending registration was created. Resolve it in the registration queue (the row carries the duplicate-callsign marker) by an explicit merge — never by approving a second account for one member. |
 | **IngestHandoffErrors** | The ingest gateway is failing requests (`reason` label): `staging_unavailable` — Redis refused a staged draft or change set (see `IngestStagingUnavailable`); `internal` — an unexpected `500`, whose stack trace is in the gateway log. Relay failures to the backend are `ExchangeRelayFailing`'s. |
 | **IngestStagingUnavailable** | The gateway could not park a client's draft or held-back change set in Redis. Check the `redis` unit and the gateway's Redis configuration — the backend itself is fine. |
-| **IngestAudienceGateOff** | The gateway's JWT audience check is off (`basetool_ingest_gate_enforcing{gate="audience"}` = 0), so any valid realm token passes its decoder. Set `IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest` (**never** the backend's audience; the `exchange.*` client scopes stamp it) per `docs/archive/INGEST_KEYCLOAK_SETUP.md` step 7a, re-render `env.d`, restart `ingest`. The startup log's `Audience gate` line shows the posture. |
-| **IngestServiceAccountTokenFailing** | The gateway's own client-credentials grant against Keycloak has failed for 10 minutes: every exchange relay fails, and the client cannot tell the member why. Check `IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID` / `_SECRET` / `_TOKEN_URI` in the rendered `env.d/ingest.env` (without printing the secret) and Keycloak reachability from the gateway. |
+| **IngestAudienceGateOff** | The gateway's JWT audience check is off (`basetool_ingest_gate_enforcing{gate="audience"}` = 0), so any valid realm token passes its decoder. Set `BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest` (**never** the backend's audience; the `exchange.*` client scopes stamp it) per `docs/archive/INGEST_KEYCLOAK_SETUP.md` step 7a, re-render `env.d`, restart `ingest`. The startup log's `Audience gate` line shows the posture. |
+| **IngestServiceAccountTokenFailing** | The gateway's own client-credentials grant against Keycloak has failed for 10 minutes: every exchange relay fails, and the client cannot tell the member why. Check `BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_ID` / `_SECRET` / `_TOKEN_URI` in the rendered `env.d/ingest.env` (without printing the secret) and Keycloak reachability from the gateway. |
 | **IngestAuthFailureSpike** | The gateway rejects presented tokens (`reason="invalid_token"`: expired, wrong issuer or audience, bad signature) at an elevated rate on one `path_scope` — `exchange` is the exchange routes, `other` every other path. Normally zero; possible token guessing, or a client sending stale tokens. Split with `sum by (reason, path_scope) (rate(basetool_ingest_auth_failures_total[5m]))`. |
 | **IngestUnauthenticatedFlood** | More than 60 credential-less requests a minute on one `path_scope` for 15 minutes — scanning or a looping client, not credential guessing. Check `basetool_bot_blocked_total` and the per-IP rate limiter before widening anything. |
 | **IngestPayloadRejectedSpike** | The gateway refuses oversized `/exchange` bodies (`413`) at an elevated rate — oversized-body probing against the public surface, or a misconfigured client. Read the source addresses in `{app="edge"}` for `ingest.profit-base.online` and check the fail2ban jails (`{app="host-fail2ban"}`). |
-| **OnBehalfOfRefusedSpike** | The backend keeps refusing an `X-Ingest-On-Behalf-Of` header from a caller that is not on the gateway allowlist (`reason="not_a_gateway"`). Either `IRI_INGEST_GATEWAY_CLIENT_IDS` does not match the gateway's real client id — then uploads fail too — or somebody is probing for impersonation. Check the gateway's own token first, then the access log for the source. |
+| **OnBehalfOfRefusedSpike** | The backend keeps refusing an `X-Ingest-On-Behalf-Of` header from a caller that is not on the gateway allowlist (`reason="not_a_gateway"`). Either `BASETOOL_INGEST_GATEWAY_CLIENT_IDS` does not match the gateway's real client id — then uploads fail too — or somebody is probing for impersonation. Check the gateway's own token first, then the access log for the source. |
 | **ActingMemberNotLiveRefused** | The gateway keeps naming a member the backend will not act for — unknown locally, or gone from the last Keycloak roster. Usually an offboarded member's connected application still running: find them by the correlationId in the backend log. If the refused subjects vary, somebody is enumerating user ids; the source is in the access log. |
 | **OnBehalfOfWithoutAuthenticatedCaller** | For 30 minutes `ActingMemberFilter` refused on-behalf-of requests that reached it with no authenticated caller. If uploads fail too, suspect the security filter order (`SecurityConfig` against ADR-0129) or silent authentication failures; if they work, an unauthenticated caller is sending the header — check the access log. |
 | **ApiUnknownClient** | A token whose `azp` names no known client drove `/api/**` for 10 minutes. Either a first-party client was added to the realm without `app.monitoring.api-clients.known-client-ids`, or something unapproved uses the API — identify it from Keycloak's client sessions and `{app="edge"}` for the api vhost. The label stays `other` by design. |
@@ -357,8 +357,8 @@ section above.
 | **ClientErrorSpike** | The browser error beacon reports one `kind` at >20/h and >3x its 24h average. Check the last frontend deploy; raise `ClientErrorReportController` to DEBUG for the message and script URL (for `csp_violation` read `basetool_client_csp_violation_total` by `directive` and `code_origin` first, dashboard `07` panel 85 — `code_origin="extension"` is a browser extension, not our code; the DEBUG line then adds the blocked origin; a Trusted Types sink shows as `require-trusted-types-for Element innerHTML`, an unlisted policy as `trusted-types <name>`, ADR-0239). |
 | **DiscordPrecheckUnauthorizedSpike / DiscordPrecheckDisabledOnProd** | The Discord precheck is answering 401 at an elevated rate (secret guessing), or 503 with a blank secret (config drift — the SPI then fails open). |
 | **RateLimitRejectionRatioHigh** | More than 1% of rate-limit evaluations on one module/bucket are rejected. Check the source and whether the limit needs tuning. |
-| **KeycloakLoginErrorSpike / KeycloakErrorRateHigh / KeycloakEventMetricsAbsent** | Failed logins jumped, Keycloak is logging ERRORs (check the fail-open Discord SPI path first), or the event counter is missing while Keycloak serves token traffic (check `KC_METRICS_ENABLED=true` in `.env` — the generated template defaults it to off). For the spike, `sum by (error) (rate(keycloak_user_events_total{event=~"login\|identity_provider_login", error!=""}[5m]))` names the cause: `invalid_user_credentials` points at password guessing, `cookie_not_found` at abandoned Discord logins (REQ-SEC-071). Keycloak has no `*_error` event names; a failure carries the base event name and a non-empty `error` label. |
-| **JvmStartupCacheRejected** | A backend, frontend or ingest JVM refused the AOT cache baked into its image and started without it (`{app=~"(backend\|frontend\|ingest)-stdout"} \|~ "Unable to use AOT cache"`). The service is up, only slower to start. The usual cause is a `-XX:UseCompactObjectHeaders` in `JAVA_TOOL_OPTIONS` / `IRI_EXTRA_JAVA_OPTS` that differs from the image's (ADR-0180 rollback lever); expected while that lever is pulled on purpose, otherwise align the flag or rebuild the image (REQ-OPS-030, ADR-0209). |
+| **KeycloakLoginErrorSpike / KeycloakErrorRateHigh / KeycloakEventMetricsAbsent** | Failed logins jumped, Keycloak is logging ERRORs (check the fail-open Discord SPI path first), or the event counter is missing while Keycloak serves token traffic (check `KC_METRICS_ENABLED=true` in `basetool.env` — the generated template defaults it to off). For the spike, `sum by (error) (rate(keycloak_user_events_total{event=~"login\|identity_provider_login", error!=""}[5m]))` names the cause: `invalid_user_credentials` points at password guessing, `cookie_not_found` at abandoned Discord logins (REQ-SEC-071). Keycloak has no `*_error` event names; a failure carries the base event name and a non-empty `error` label. |
+| **JvmStartupCacheRejected** | A backend, frontend or ingest JVM refused the AOT cache baked into its image and started without it (`{app=~"(backend\|frontend\|ingest)-stdout"} \|~ "Unable to use AOT cache"`). The service is up, only slower to start. The usual cause is a `-XX:UseCompactObjectHeaders` in `JAVA_TOOL_OPTIONS` / `BASETOOL_EXTRA_JAVA_OPTS` that differs from the image's (ADR-0180 rollback lever); expected while that lever is pulled on purpose, otherwise align the flag or rebuild the image (REQ-OPS-030, ADR-0209). |
 | **SshPasswordLoginOnKeyOnlyHost** | **CRITICAL — possible compromise.** Treat as an intrusion: review auth logs, lock the account, rotate keys. |
 | **SshFailedAuthSpike** | Failed SSH auth surge, rejected keys (`authenticating user … [preauth]`) included. Check source IPs on the *SSH / host auth* dashboard; its fail2ban panels show whether the jail banned them. |
 | **SshRootLoginAccepted** | A successful **root** SSH login. Once root is locked (REQ-OPS-052) sshd refuses root, so this means the access policy was changed or bypassed — treat it as compromise (review auth logs and `ausearch -k sshd-config`, rotate keys). Before the lock it is the operator's own session. |
@@ -371,30 +371,30 @@ section above.
 | **EdgeMembersOnlyRedirectBroken** | **CRITICAL.** `/missions`, `/operations` or `/orders` stopped redirecting an anonymous browser navigation to the login — member data may be public. Check the edge cache/`location` rules and the frontend's security chain. |
 | **EdgePublicSurfaceNot200** | A page that must stay public no longer answers 200 (REQ-SEC-052). |
 | **AcmeRenewalFailing** | The `acme` unit logged more than one failed renewal in 26h. Read `{app="acme"}`; the edge keeps serving the old certificate until it expires, and `CertificateExpiringSoon` is the backstop. |
-| **DeployRolledBack / DeployFailed** | A promoted release did not ship. Read why in Loki: `{app="ops-deploy"} \|~ "rolling back\|SECURITY: cosign\|health check failed\|FATAL"`, then widen to `{app="ops-deploy"}`. **Not** `journalctl -u iri-deploy.service`: the unit appends its output to `/var/log/iri-deploy.log`. Determine the cause before re-promoting. |
+| **DeployRolledBack / DeployFailed** | A promoted release did not ship. Read why in Loki: `{app="ops-deploy"} \|~ "rolling back\|SECURITY: cosign\|health check failed\|FATAL"`, then widen to `{app="ops-deploy"}`. **Not** `journalctl -u basetool-deploy.service`: the unit appends its output to `/var/log/basetool-deploy.log`. Determine the cause before re-promoting. |
 | **DeployHealthRestartFailing** | The deployed release could not be restored: a container runs the target image but is unhealthy and the targeted restart will not stick, or (since 2026-09-25) a re-apply of the deployed release — a drift re-apply after a missing container or a wrong image, or (since 2026-09-26) an operator's `deploy.sh --reapply` — did not bring it up; it is retried after 300 s, doubling to 1 h. A runtime fault, deliberately not a rollback: the rollback anchors still name the release before it. `{app="ops-deploy"} \|~ "health drift\|re-appl\|did not come up"` names the service(s). |
-| **DeployHeartbeatStale** | No tick has found the stack at target and healthy for over an hour (or the heartbeat was never written): the deployer stopped, is stuck on its lock, aborts before writing, or is deliberately skipping. `systemctl list-timers iri-deploy.timer`, `systemctl status iri-deploy.service`, then `{app="ops-deploy"}` for the last tick. A gated stateful-infra change and a post-rollback backoff also stop it — `DeployConfigBlocked` / `DeployRolledBack` name those. |
+| **DeployHeartbeatStale** | No tick has found the stack at target and healthy for over an hour (or the heartbeat was never written): the deployer stopped, is stuck on its lock, aborts before writing, or is deliberately skipping. `systemctl list-timers basetool-deploy.timer`, `systemctl status basetool-deploy.service`, then `{app="ops-deploy"}` for the last tick. A gated stateful-infra change and a post-rollback backoff also stop it — `DeployConfigBlocked` / `DeployRolledBack` name those. |
 | **DeployConfigBlocked** | A deploy was blocked on a stateful-infra guard. `{app="ops-deploy"} \|~ "CARVE-OUT"` names the image pin that tripped it. Run the documented stateful-infra upgrade ([`docs/deployment.md`](../docs/deployment.md)), then re-run `deploy.sh --force`. |
 | **GhcrPullTokenExpired / GhcrPullTokenExpiring** | The GHCR pull token's recorded expiry has passed or is <14d away; a lapsed token stops every deploy at the registry login. Rotate it and update the `.expiry` sidecar ([`docs/deployment.md`](../docs/deployment.md)). The account name in `{app="ops-deploy"} \|~ "logging in to"` is masked (REQ-OBS-004). |
-| **BackupStaleOrMissing** | No successful backup for 26h, or the metric is absent. `{app="ops-backup"} \|~ "FATAL\|WARN"` carries the abort reason; an empty stream means the unit never fired (`systemctl list-timers iri-backup.timer`). See [`docs/backup.md`](../docs/backup.md). If the log shows `403 Forbidden` from rclone, the store's edge has blocked the host — see *The store's edge blocks the host* there. |
-| **BackupRetentionNotApplied** | The repository holds more snapshots than `IRI_KEEP_DAILY + IRI_KEEP_WEEKLY + IRI_KEEP_MONTHLY`, so `restic forget` is not removing what it should and every run reads more from the store. `{app="ops-backup"} \|~ "retention\|snapshots kept"`; `backup.sh --dry-run` lists the snapshots and their paths. |
+| **BackupStaleOrMissing** | No successful backup for 26h, or the metric is absent. `{app="ops-backup"} \|~ "FATAL\|WARN"` carries the abort reason; an empty stream means the unit never fired (`systemctl list-timers basetool-backup.timer`). See [`docs/backup.md`](../docs/backup.md). If the log shows `403 Forbidden` from rclone, the store's edge has blocked the host — see *The store's edge blocks the host* there. |
+| **BackupRetentionNotApplied** | The repository holds more snapshots than `BASETOOL_KEEP_DAILY + BASETOOL_KEEP_WEEKLY + BASETOOL_KEEP_MONTHLY`, so `restic forget` is not removing what it should and every run reads more from the store. `{app="ops-backup"} \|~ "retention\|snapshots kept"`; `backup.sh --dry-run` lists the snapshots and their paths. |
 | **RestoreDrillStaleOrMissing / RestoreDrillArtifactNotRestorable** | No successful drill for 8 days (one weekly drill missed; 35 days until 2026-09-22), or one artifact did not restore. `{app="ops-restore-drill"} \|~ "FATAL\|WARN"`, filtered on the artifact from the alert label. A non-restorable artifact means backups are unverified — fix before relying on them. See the restore-drill section below. |
-| **HostScriptDrift** | A script the role installs under `/var/iri/code/scripts` is not the deployed release's (`differs`) or is absent (`missing`); the `file` label names it. `{app="ops-deploy"} \|~ "host scripts:"` lists them. Scripts reach a host only through the role: run it from the release's tag with `--tags deploy,scripts` ([`docs/deployment.md`](../docs/deployment.md) → *Before a promotion: the host scripts*). A stale `deploy.sh`, `lib/` or `render-env-d.py` also makes the next release be refused (`HOST SCRIPTS:`, `DeployFailed`). |
+| **HostScriptDrift** | A script the role installs under `/opt/basetool/scripts` is not the deployed release's (`differs`) or is absent (`missing`); the `file` label names it. `{app="ops-deploy"} \|~ "host scripts:"` lists them. Scripts reach a host only through the role: run it from the release's tag with `--tags deploy,scripts` ([`docs/deployment.md`](../docs/deployment.md) → *Before a promotion: the host scripts*). A stale `deploy.sh`, `lib/` or `render-env-d.py` also makes the next release be refused (`HOST SCRIPTS:`, `DeployFailed`). |
 | **HostScriptsCheckStale** | No tick compared the host scripts with a release manifest for 12h, or the metric is absent — on a host with a deployed release that means its `deploy.sh` predates the check and is stale. Run the role from the release's tag. Also absent while the deployed release carries no `host-scripts.sha256`, and stale while the deploy timer is stopped. |
 | **ContainerCleanupStaleOrMissing** | The weekly cleanup job is overdue. `{app="ops-cleanup"}` over 10d shows the last run; an empty stream means the timer never fired. |
 | **PrometheusTsdbApproachingCap** | Prometheus TSDB nearing the 40GB / 180d cap. Verify retention and disk; investigate label cardinality if growth is abnormal. |
 | **AlertmanagerNotificationsFailing** | Alertmanager cannot deliver. Check its log (`{app="mon-alertmanager"}`) and the receiver config; this alert itself routes to Discord because e-mail may be what is broken. |
 | **PrometheusConfigReloadFailed / AlertmanagerConfigReloadFailed / AlloyConfigReloadFailed / BlackboxConfigReloadFailed** | A config load failed and the component runs the last-good config. Run the matching lint (Local validation below) and re-deploy. **`alloy validate` exits 0 even when it fails** (1.19.2, measured 2026-09-20) — read its output, not `$?`. |
-| **PrometheusConfigStale** | The on-disk Prometheus config is newer than the last successful load, and `deploy.sh`'s self-heal is not converging. Check that `iri-deploy.timer` runs and `IRI_MONITORING_ENABLED=true`, then `${SYSTEMCTL} restart prometheus.service`. |
-| **MonitoringReconcileDisabled** | The monitoring units run but `IRI_MONITORING_ENABLED` is not `true`, so config changes never reach them and `PrometheusConfigStale` cannot catch it. Set `IRI_MONITORING_ENABLED=true` in `/var/iri/code/.env` — `deploy.sh` reads that one key from it — or in an `Environment=` drop-in on `iri-deploy.service`, which wins. To retire monitoring on a host instead, stop and disable the nine units so the gauge stops being written. |
+| **PrometheusConfigStale** | The on-disk Prometheus config is newer than the last successful load, and `deploy.sh`'s self-heal is not converging. Check that `basetool-deploy.timer` runs and `BASETOOL_MONITORING_ENABLED=true`, then `${SYSTEMCTL} restart prometheus.service`. |
+| **MonitoringReconcileDisabled** | The monitoring units run but `BASETOOL_MONITORING_ENABLED` is not `true`, so config changes never reach them and `PrometheusConfigStale` cannot catch it. Set `BASETOOL_MONITORING_ENABLED=true` in `/etc/basetool/basetool.env` — `deploy.sh` reads that one key from it — or in an `Environment=` drop-in on `basetool-deploy.service`, which wins. To retire monitoring on a host instead, stop and disable the nine units so the gauge stops being written. |
 | **PrometheusRuleEvaluationFailures / LokiRuleEvaluationFailures** | A rule fails to evaluate, so its alerts cannot fire. Check the named group for a bad expression. |
 | **PrometheusNotificationsDropped / LokiRulerNotificationsFailing** | Firing alerts may not reach Alertmanager. Check the Prometheus/Loki-ruler → Alertmanager link. |
-| **PrometheusTsdbProblems** | WAL corruption or a failed compaction. Check disk health/space on `/var/iri` and the Prometheus log. |
-| **NodeTextfileScrapeError** | node_exporter could not parse a `.prom` file in `/var/iri/monitoring/textfile` — an ops-automation, container or certificate metric may be stale. |
+| **PrometheusTsdbProblems** | WAL corruption or a failed compaction. Check disk health/space on `/var/lib/basetool` and the Prometheus log. |
+| **NodeTextfileScrapeError** | node_exporter could not parse a `.prom` file in `/var/lib/basetool/textfile` — an ops-automation, container or certificate metric may be stale. |
 | **AlloyComponentUnhealthy** | An Alloy component is unhealthy. `journalctl -u alloy.service --since -1h`; the component graph is on Alloy's UI at `:12345` (host-local only). |
-| **TempoReceiverSilent / AlloyOtlpReceiverSilent** | The apps report tracing on (`basetool_tracing_enabled=1`) and spans are not arriving. **Both** firing: the spans never reached the collector — on this host the usual cause is an app unit missing `AddHost=alloy:host-gateway` (the drop happens inside the app's OTLP exporter, which logs nothing). **Only `TempoReceiverSilent`**: Alloy accepts spans and cannot forward them — check `IRI_ALLOY_TEMPO_ENDPOINT` in `/etc/sysconfig/alloy` and Tempo's loopback publish. |
-| **TempoSpansRefused / TempoWritePathFailing** | Tempo refused spans at its receiver, or its live store failed to complete or flush blocks — traces are lost. Right after a Tempo restart with no `ContainerOomKilled` / `HostDisk*` it is the ungraceful-shutdown WAL transient and heals itself; otherwise read `{app="mon-tempo"}`, the container's memory on `02` and disk space on `/var/iri`. |
-| **TempoGeneratorRemoteWriteFailing** | Tempo's metrics generator cannot remote-write service-graph samples to Prometheus for 10 minutes, so the service map goes stale. In order: the `grafana` web-auth credential Tempo sends matches the bcrypt hash in `/var/iri/monitoring/secrets/prometheus-web.yml`; both units were restarted after that file last changed (`${SYSTEMCTL} restart prometheus.service tempo.service` — a stale loaded hash gives `401` despite a correct password); Prometheus's remote-write receiver is on. |
+| **TempoReceiverSilent / AlloyOtlpReceiverSilent** | The apps report tracing on (`basetool_tracing_enabled=1`) and spans are not arriving. **Both** firing: the spans never reached the collector — on this host the usual cause is an app unit missing `AddHost=alloy:host-gateway` (the drop happens inside the app's OTLP exporter, which logs nothing). **Only `TempoReceiverSilent`**: Alloy accepts spans and cannot forward them — check `BASETOOL_ALLOY_TEMPO_ENDPOINT` in `/etc/sysconfig/alloy` and Tempo's loopback publish. |
+| **TempoSpansRefused / TempoWritePathFailing** | Tempo refused spans at its receiver, or its live store failed to complete or flush blocks — traces are lost. Right after a Tempo restart with no `ContainerOomKilled` / `HostDisk*` it is the ungraceful-shutdown WAL transient and heals itself; otherwise read `{app="mon-tempo"}`, the container's memory on `02` and disk space on `/var/lib/basetool`. |
+| **TempoGeneratorRemoteWriteFailing** | Tempo's metrics generator cannot remote-write service-graph samples to Prometheus for 10 minutes, so the service map goes stale. In order: the `grafana` web-auth credential Tempo sends matches the bcrypt hash in `/etc/basetool/monitoring/secrets/prometheus-web.yml`; both units were restarted after that file last changed (`${SYSTEMCTL} restart prometheus.service tempo.service` — a stale loaded hash gives `401` despite a correct password); Prometheus's remote-write receiver is on. |
 | **TempoGeneratorSeriesLimited** | The metrics generator dropped series at its `max_active_series` cap in the last hour, so the service graph is incomplete. Raise the cap or add service-graph `filter_policies` in `tempo/tempo.yaml`. |
 | **LokiIngestSilent / LogStreamSilent / LokiWriteFailing / LokiDiscardingLines** | Log shipping is broken or a tailed file is dead. `LogStreamSilent`'s `stream` label names the tail: `keycloak` (highest impact — the only signal for the fail-open Discord SPI gate), `backend` / `frontend` / `ingest`, `host-auth`, `host-auditd`, `host-fail2ban`, `ops-deploy`. It fires on absence of that path's `loki_source_file_read_lines_total`, i.e. the file is not tailed at all. Read the cause from Alloy first: `journalctl -u alloy.service --since -6h \| grep "final error sending batch"`, then check the drop-in binds (`systemctl cat alloy.service`), the file's group (`adm`) and `runuser -u alloy -- test -r <file>`. **`LokiIngestSilent` does not see partial silence**: if the *container* streams (`<svc>-stdout`, `edge`, `mon-*`) vanish while the file tails keep flowing, check that the journal is persistent (`ls /var/log/journal`) — the cutover-day failure. A persistent `LokiWriteFailing` with `reason="ingester_error"` naming one near-idle container is an entry older than Loki's 168h window; `stage.drop older_than = "167h"` in `container_mask` guards it — do **not** raise Loki's reject window. |
 | **Watchdog** | The dead-man's switch — it **always** fires and routes only to the external healthchecks.io heartbeat. If healthchecks.io goes red, the monitoring stack or the host is down. |
@@ -432,11 +432,11 @@ Every command here runs on the host as root unless it says otherwise. The contai
 stored on disk as `subuid_base + N - 1` under rootless Podman; derive it, never transcribe it:
 
 ```bash
-IRI_UID=$(id -u iri)
-SUB=$(grep '^iri:' /etc/subuid | cut -d: -f2)          # 100000 on both hosts today
+BASETOOL_UID=$(id -u basetool)
+SUB=$(grep '^basetool:' /etc/subuid | cut -d: -f2)          # 100000 on both hosts today
 own() { echo $(( SUB + $1 - 1 )); }                     # own 65534 -> 165533, own 472 -> 100471
-SYSTEMCTL="sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} systemctl --user"
-PODMAN="sudo -u iri podman"
+SYSTEMCTL="sudo -u basetool XDG_RUNTIME_DIR=/run/user/${BASETOOL_UID} systemctl --user"
+PODMAN="sudo -u basetool podman"
 ```
 
 ### Querying Prometheus on the host
@@ -467,28 +467,28 @@ procedure; this is its monitoring half.
 
 | What | Done by |
 | --- | --- |
-| `/var/iri/monitoring/{data,certs,secrets}` (owned by `iri`), `textfile` (owned by `deploy`, 0755) | role, `30-directories.yml` |
+| `/etc/basetool/monitoring/{certs,secrets}` and `/var/lib/basetool/monitoring` (owned by `basetool`), `/var/lib/basetool/textfile` (owned by `deploy`, 0755) | role, `30-directories.yml` |
 | the per-service data dirs with **translated** owners — `data/{prometheus,alertmanager}` → 65534, `data/grafana` → 472, `data/{loki,tempo}` → 10001 | role, `basetool_host_container_owners` |
 | node_exporter, alloy (+ its log-source drop-in and `/etc/sysconfig/alloy`), the podman exporter, both collector timers, the persistent journal, `psi=1`, rsyslog/auditd `adm` readability | role, `27-observability.yml` |
-| the nine Quadlet units and their `env.d` files (from `.env`) | the first `deploy.sh` run |
-| `.env` (all `MONITORING_*`, `PROMETHEUS_WEB_PASSWORD`, `PG_EXPORTER_*`, `REDIS_EXPORTER_PASSWORD`, `GRAFANA_*`, `KC_METRICS_ENABLED`, `IRI_MONITORING_ENABLED`), the Redis ACL with its `monitoring` user, the Keycloak `grafana` client | the backup restore |
+| the nine Quadlet units and their `env.d` files (from `basetool.env`) | the first `deploy.sh` run |
+| `basetool.env` (all `MONITORING_*`, `PROMETHEUS_WEB_PASSWORD`, `PG_EXPORTER_*`, `REDIS_EXPORTER_PASSWORD`, `GRAFANA_*`, `KC_METRICS_ENABLED`, `BASETOOL_MONITORING_ENABLED`), the Redis ACL with its `monitoring` user, the Keycloak `grafana` client | the backup restore |
 
 Podman refuses to start a unit whose bind source is missing (it does not create it the way Docker
 did), so the files below must exist **before** the first deploy starts the monitoring units.
 
-**1. The four secrets** — `/var/iri/monitoring/secrets/{scrape_password, prometheus_web_password,
+**1. The four secrets** — `/etc/basetool/monitoring/secrets/{scrape_password, prometheus_web_password,
 prometheus-web.yml, alertmanager.yml}`, owner `own 65534`, mode 600.
 
 - **From a backup** (the normal case): restore `monitoring/secrets.tar.gz` per
-  [`docs/backup.md`](../docs/backup.md) step 4. The restored values match the restored `.env` by
-  construction — do not mint new ones next to a restored `.env`.
+  [`docs/backup.md`](../docs/backup.md) step 4. The restored values match the restored `basetool.env` by
+  construction — do not mint new ones next to a restored `basetool.env`.
 - **Without a usable backup:** mint them. `alertmanager.yml` cannot be minted — it carries the SMTP
   credential, the healthchecks.io ping URL and the Discord webhook — so re-render it (next section).
   `scrape_password` is the password the three `basetool-*` scrape jobs send to the management ports
   (ADR-0265).
 
   ```bash
-  cd /var/iri/monitoring/secrets
+  cd /etc/basetool/monitoring/secrets
   openssl rand -base64 36 | tr -d '\n' > scrape_password
   openssl rand -base64 36 | tr -d '\n' > prometheus_web_password
   WEB_PW="$(cat prometheus_web_password)"
@@ -497,10 +497,10 @@ prometheus-web.yml, alertmanager.yml}`, owner `own 65534`, mode 600.
   unset WEB_PW BCRYPT
   chown "$(own 65534):$(own 65534)" scrape_password prometheus_web_password prometheus-web.yml
   chmod 600 scrape_password prometheus_web_password prometheus-web.yml
-  restorecon -RF /var/iri/monitoring/secrets
+  restorecon -RF /etc/basetool/monitoring/secrets
   ```
 
-  Then set the **same** values in `.env`: `PROMETHEUS_WEB_PASSWORD` (read by Grafana's datasource
+  Then set the **same** values in `basetool.env`: `PROMETHEUS_WEB_PASSWORD` (read by Grafana's datasource
   and Tempo's remote write — a mismatch makes every panel 401 and fires
   `TempoGeneratorRemoteWriteFailing`) and `MONITORING_SCRAPE_PASSWORD`, with
   `MONITORING_SCRAPE_USER=monitoring` (a mismatch makes the three `basetool-*` targets 401 and fires
@@ -513,15 +513,15 @@ the four app scrapes and the blackbox `https_internal` module trusts. From a bac
 the command line):
 
 ```bash
-openssl pkcs12 -in /var/iri/secrets/keystore.p12 -clcerts -nokeys \
-  | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
+openssl pkcs12 -in /etc/basetool/secrets/keystore.p12 -clcerts -nokeys \
+  | openssl x509 -out /etc/basetool/monitoring/certs/basetool-ca.crt
 # add -legacy after `pkcs12` if OpenSSL 3.x rejects the keytool-made p12
-chmod 644 /var/iri/monitoring/certs/basetool-ca.crt && restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
-openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext subjectAltName
+chmod 644 /etc/basetool/monitoring/certs/basetool-ca.crt && restorecon -F /etc/basetool/monitoring/certs/basetool-ca.crt
+openssl x509 -in /etc/basetool/monitoring/certs/basetool-ca.crt -noout -subject -ext subjectAltName
 ```
 
 Once the per-service internal TLS is rolled out (REQ-SEC-070) the file is the **internal CA**
-instead — `install -m 0644 /var/iri/secrets/tls/ca.crt /var/iri/monitoring/certs/basetool-ca.crt`
+instead — `install -m 0644 /etc/basetool/secrets/tls/ca.crt /etc/basetool/monitoring/certs/basetool-ca.crt`
 — and the steps above no longer apply: the per-service keystores hold leaves, not the anchor. Every
 consumer (Prometheus `server_name`, the blackbox module, the edge's `proxy_ssl_name`) already checks
 the service's name, so nothing in their configuration changes; during the rollout the file briefly
@@ -538,8 +538,8 @@ then the edge pins this exact file, and after re-minting it **restart the edge a
 Grafana**, or the Grafana host answers `503`.
 
 ```bash
-cd /var/iri/monitoring/certs
-GH="$(sed -n 's/^EDGE_HOST_GRAFANA=//p' /var/iri/code/.env | tr -d '"')"; GH="${GH:-grafana.profit-base.online}"
+cd /etc/basetool/monitoring/certs
+GH="$(sed -n 's/^EDGE_HOST_GRAFANA=//p' /etc/basetool/basetool.env | tr -d '"')"; GH="${GH:-grafana.profit-base.online}"
 openssl req -x509 -newkey rsa:2048 -nodes -keyout grafana.key -out grafana.crt \
   -subj "/CN=grafana" -addext "subjectAltName=DNS:grafana,DNS:${GH}" -days 825
 chown "$(own 472):$(own 472)" grafana.crt grafana.key
@@ -551,7 +551,7 @@ chmod 640 grafana.key && chmod 644 grafana.crt && restorecon -F grafana.crt graf
 database dump), so on a host restored from dumps check `pg_up` for both `postgres-*` jobs after the
 first deploy and, where it is `0` with `role "monitoring" does not exist`, create the role in that
 cluster. `\password` keeps the value out of shell history and the server log; it must equal
-`PG_EXPORTER_BACKEND_PASSWORD` / `PG_EXPORTER_KEYCLOAK_PASSWORD` in `.env`:
+`PG_EXPORTER_BACKEND_PASSWORD` / `PG_EXPORTER_KEYCLOAK_PASSWORD` in `basetool.env`:
 
 ```bash
 ${PODMAN} exec -it db-backend sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432'
@@ -560,17 +560,17 @@ ${PODMAN} exec -it db-keycloak sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 #   the same, with PG_EXPORTER_KEYCLOAK_PASSWORD
 ```
 
-**5. Verify.** After the first deploy with `IRI_MONITORING_ENABLED=true`:
+**5. Verify.** After the first deploy with `BASETOOL_MONITORING_ENABLED=true`:
 
 ```bash
 ${SYSTEMCTL} is-active prometheus grafana loki tempo alertmanager blackbox-exporter \
   postgres-exporter-backend postgres-exporter-keycloak redis-exporter prometheus-podman-exporter
-systemctl is-active alloy prometheus-node-exporter iri-container-metrics.timer iri-cert-expiry.timer
+systemctl is-active alloy prometheus-node-exporter basetool-container-metrics.timer basetool-cert-expiry.timer
 ls /proc/pressure /var/log/journal >/dev/null && echo "psi + persistent journal ok"
 q 'up == 0'                                   # expect an empty result
 q 'count(basetool:container:present)'         # expect every running container
-systemctl start iri-cert-expiry.service
-grep -c '^basetool_certificate_expiry_timestamp_seconds' /var/iri/monitoring/textfile/certificates.prom   # expect 2
+systemctl start basetool-cert-expiry.service
+grep -c '^basetool_certificate_expiry_timestamp_seconds' /var/lib/basetool/textfile/certificates.prom   # expect 2
 python3 scripts/check-conformance.py --ssh <host>   # from a workstation; covers scrape-targets-up, container-metrics, log-streams
 ```
 
@@ -588,14 +588,14 @@ channel is required — the render must not leave it empty). Export them in a ro
 echoing them (e.g. `read -rs SMTP_AUTH_PASSWORD; export SMTP_AUTH_PASSWORD`), then:
 
 ```bash
-envsubst < /var/iri/code/monitoring/alertmanager/alertmanager.yml.tmpl > /var/iri/monitoring/secrets/alertmanager.yml.new
-grep -n '\${' /var/iri/monitoring/secrets/alertmanager.yml.new | grep -v '^[0-9]*:[[:space:]]*#'   # expect no output: nothing left unrendered
-chown "$(own 65534):$(own 65534)" /var/iri/monitoring/secrets/alertmanager.yml.new
-chmod 600 /var/iri/monitoring/secrets/alertmanager.yml.new
-${PODMAN} run --rm -v /var/iri/monitoring/secrets/alertmanager.yml.new:/cfg.yml:ro \
+envsubst < /opt/basetool/monitoring/alertmanager/alertmanager.yml.tmpl > /etc/basetool/monitoring/secrets/alertmanager.yml.new
+grep -n '\${' /etc/basetool/monitoring/secrets/alertmanager.yml.new | grep -v '^[0-9]*:[[:space:]]*#'   # expect no output: nothing left unrendered
+chown "$(own 65534):$(own 65534)" /etc/basetool/monitoring/secrets/alertmanager.yml.new
+chmod 600 /etc/basetool/monitoring/secrets/alertmanager.yml.new
+${PODMAN} run --rm -v /etc/basetool/monitoring/secrets/alertmanager.yml.new:/cfg.yml:ro \
   --entrypoint amtool quay.io/prometheus/alertmanager:v0.34.1 check-config /cfg.yml
-mv /var/iri/monitoring/secrets/alertmanager.yml.new /var/iri/monitoring/secrets/alertmanager.yml
-restorecon -F /var/iri/monitoring/secrets/alertmanager.yml
+mv /etc/basetool/monitoring/secrets/alertmanager.yml.new /etc/basetool/monitoring/secrets/alertmanager.yml
+restorecon -F /etc/basetool/monitoring/secrets/alertmanager.yml
 ${SYSTEMCTL} restart alertmanager.service       # a single-file mount: restart, never reload
 unset SMTP_SMARTHOST SMTP_FROM SMTP_AUTH_USERNAME SMTP_AUTH_PASSWORD ALERT_EMAIL_TO HEARTBEAT_URL DISCORD_WEBHOOK_URL
 ```
@@ -607,19 +607,19 @@ Do not ship a file `amtool` rejects — a bad config means alerts silently do no
 
 After a compromise-driven restore ([`docs/backup.md`](../docs/backup.md) → *Rotate secrets*) or on
 suspicion: mint new `scrape_password` / `prometheus_web_password` / `prometheus-web.yml` as in step 1
-above, put the same values into `.env`, then restart **everything that holds the old value** —
+above, put the same values into `basetool.env`, then restart **everything that holds the old value** —
 `prometheus`, `tempo` and `grafana` (the last two authenticate to Prometheus with the shared
 `grafana` credential and can wedge on a cached 401) — and let the next deploy re-render `env.d`, or
 run `deploy.sh --force`. Rotate the Alertmanager receiver credentials at their providers and
 re-render. The PostgreSQL / Redis exporter passwords live in the databases and the Redis ACL as well
-as in `.env`, and have to move in both places at once.
+as in `basetool.env`, and have to move in both places at once.
 
 ### Keystore and certificate rotation
 
 The procedure is [`docs/deployment.md`](../docs/deployment.md) (keystore rotation); it owns the
 monitoring-side steps too. Afterwards, from here: all four app targets and `keycloak` are `up`
 (`q 'up{job=~"basetool-.*|keycloak"}'`), every `blackbox-internal-tls*` target has
-`probe_success == 1`, and `sudo systemctl start iri-cert-expiry.service` has re-read the files — the
+`probe_success == 1`, and `sudo systemctl start basetool-cert-expiry.service` has re-read the files — the
 collector otherwise reports the **old** CA's expiry until the next 03:40.
 
 ### After a Temurin bump: re-check the JvmNativeThreadExhaustion signature
@@ -662,7 +662,7 @@ container log, then restore the limit and tear the stack down with `down --volum
 
 ### Restore drill: the monitoring artifacts
 
-`iri-restore-drill.timer` runs [`scripts/restore-drill.sh`](../scripts/restore-drill.sh) weekly
+`basetool-restore-drill.timer` runs [`scripts/restore-drill.sh`](../scripts/restore-drill.sh) weekly
 (Sunday 05:30, REQ-OPS-011). Besides the two databases it restores the monitoring artifacts from the
 latest snapshot and reports each on its own — they never gate the database proof:
 
@@ -676,9 +676,9 @@ before the first drill, or the drill restores a snapshot without the monitoring 
 `RestoreDrillArtifactNotRestorable` on a false negative:
 
 ```bash
-systemctl start iri-backup.service            # capture a snapshot that contains them
-systemctl start iri-restore-drill.service
-grep '^basetool_restore_drill' /var/iri/monitoring/textfile/restore_drill.prom
+systemctl start basetool-backup.service            # capture a snapshot that contains them
+systemctl start basetool-restore-drill.service
+grep '^basetool_restore_drill' /var/lib/basetool/textfile/restore_drill.prom
 # expect every basetool_restore_drill_artifact_ok{artifact="…"} at 1, and a fresh last_success timestamp
 ```
 
@@ -739,7 +739,7 @@ confirmation that a changed limit actually **reached** the running container —
 the real root cause of a recurring working-set alert in July 2026:
 
 ```bash
-CG=/sys/fs/cgroup/user.slice/user-${IRI_UID}.slice/user@${IRI_UID}.service/app.slice
+CG=/sys/fs/cgroup/user.slice/user-${BASETOOL_UID}.slice/user@${BASETOOL_UID}.service/app.slice
 # libpod-payload-<id> is the container itself; frontend.service above it reads memory.max "max"
 grep -E '^(anon|file|file_mapped|kernel_stack|slab) ' ${CG}/frontend.service/libpod-payload-*/memory.stat
 cat ${CG}/frontend.service/libpod-payload-*/memory.max

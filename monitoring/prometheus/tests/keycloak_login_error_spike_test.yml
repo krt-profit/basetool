@@ -7,9 +7,9 @@ tests:
   - name: fires - failed password logins at 20 per minute
     interval: 1m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="invalid_user_credentials", event="login", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="invalid_user_credentials", event="login", idp="", realm="basetool"}'
         values: "0+20x40"
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="login", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="login", idp="", realm="basetool"}'
         values: "0+5x40"
     alert_rule_test:
       - eval_time: 30m
@@ -17,7 +17,7 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
-              realm: iri
+              realm: basetool
             exp_annotations:
               summary: "Keycloak login-error spike"
               description: "Keycloak is recording failed logins or failed Discord-broker logins (event login / identity_provider_login with a non-empty error label) at an elevated rate. Break it down by the error label on dashboard 06 and in the Keycloak event log."
@@ -25,9 +25,9 @@ tests:
   - name: fires - broker errors split across codes add up past the threshold
     interval: 1m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="cookie_not_found", event="identity_provider_login", idp="discord", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="cookie_not_found", event="identity_provider_login", idp="discord", realm="basetool"}'
         values: "0+8x40"
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="user_not_found", event="login", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="user_not_found", event="login", idp="", realm="basetool"}'
         values: "0+8x40"
     alert_rule_test:
       - eval_time: 30m
@@ -35,7 +35,7 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
-              realm: iri
+              realm: basetool
             exp_annotations:
               summary: "Keycloak login-error spike"
               description: "Keycloak is recording failed logins or failed Discord-broker logins (event login / identity_provider_login with a non-empty error label) at an elevated rate. Break it down by the error label on dashboard 06 and in the Keycloak event log."
@@ -43,11 +43,11 @@ tests:
   - name: silent - heavy successful traffic carries an empty error label
     interval: 1m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="login", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="login", idp="", realm="basetool"}'
         values: "0+60x40"
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="refresh_token", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="refresh_token", idp="", realm="basetool"}'
         values: "0+120x40"
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="identity_provider_login", idp="discord", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="", event="identity_provider_login", idp="discord", realm="basetool"}'
         values: "0+30x40"
     alert_rule_test:
       - eval_time: 30m
@@ -57,7 +57,7 @@ tests:
   - name: silent - errors on other event types do not count
     interval: 1m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="invalid_token", event="refresh_token", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="invalid_token", event="refresh_token", idp="", realm="basetool"}'
         values: "0+30x40"
     alert_rule_test:
       - eval_time: 30m
@@ -67,7 +67,7 @@ tests:
   - name: silent - occasional failed logins stay below the threshold
     interval: 1m
     input_series:
-      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="invalid_user_credentials", event="login", idp="", realm="iri"}'
+      - series: 'keycloak_user_events_total{job="keycloak", instance="keycloak:9000", error="invalid_user_credentials", event="login", idp="", realm="basetool"}'
         values: "0+3x40"
     alert_rule_test:
       - eval_time: 30m

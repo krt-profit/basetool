@@ -123,7 +123,7 @@ class BankAccountDetailMovementModalMvcTest {
         new BankAccountDto(
             id,
             "KB-0001",
-            "Staffel IRIDIUM",
+            "Staffel ALPHA",
             "ORG_UNIT",
             "ACTIVE",
             null,

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-RUNTIME="${IRI_RUNTIME:-docker}"
-CONTAINER="${IRI_KC_DB_CONTAINER:-db-keycloak}"
-PORT="${IRI_KC_DB_PORT:-15433}"
+RUNTIME="${BASETOOL_RUNTIME:-docker}"
+CONTAINER="${BASETOOL_KC_DB_CONTAINER:-db-keycloak}"
+PORT="${BASETOOL_KC_DB_PORT:-15433}"
 
 usage() {
   cat <<'USAGE'

@@ -67,10 +67,10 @@ dieser Skill schreibt auf dem Host nichts und darf es auch nicht.
 > Nutzer**, schreib die Adresse nirgends ins Repo.
 
 > [!note] Seit 2026-09-22 über Podman
-> Die Produktion läuft als **rootless Podman** unter dem Dienstkonto `iri` (arc42 §7). Das
-> Skript setzt deshalb `cd / && sudo -n -u iri podman exec -i db-backend …` ab — dieselbe Form
+> Die Produktion läuft als **rootless Podman** unter dem Dienstkonto `basetool` (arc42 §7). Das
+> Skript setzt deshalb `cd / && sudo -n -u basetool podman exec -i db-backend …` ab — dieselbe Form
 > wie `rt_exec` in `scripts/lib/container-runtime.sh`. Das `cd /` ist nötig, weil die
-> SSH-Sitzung in `/root` beginnt, das `iri` nicht betreten darf. Am 2026-09-22 mit einer
+> SSH-Sitzung in `/root` beginnt, das `basetool` nicht betreten darf. Am 2026-09-22 mit einer
 > Nur-Lese-Abfrage auf dem Host geprüft.
 
 > [!note] SSH geht auf diesem Rechner nur über den Windows-Client

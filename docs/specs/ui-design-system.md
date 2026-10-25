@@ -26,7 +26,7 @@
 
 ## Context & goal
 
-The Profit Basetool is the squadron-management web app of the "DAS KARTELL" / IRIDIUM
+The Profit Basetool is the squadron-management web app of the "DAS KARTELL"
 org. Its UI must read unmistakably as that brand: a dark sci-fi HUD, the orange house
 colour, and the official corporate-design tokens — applied consistently across every
 screen and all four device classes. The design skill is the **visual** source of truth;

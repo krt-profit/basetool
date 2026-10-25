@@ -1,14 +1,14 @@
 ---
-basetool_host_service_user: iri
-basetool_host_service_group: iri
+basetool_host_service_user: basetool
+basetool_host_service_group: basetool
 
 basetool_host_deploy_user: deploy
 
 basetool_host_deploy_account_units:
-  - iri-deploy.service
-  - iri-backup.service
-  - iri-restore-drill.service
-  - iri-container-cleanup.service
+  - basetool-deploy.service
+  - basetool-backup.service
+  - basetool-restore-drill.service
+  - basetool-container-cleanup.service
 
 basetool_host_deploy_podman_subcommands:
   - cp
@@ -50,9 +50,16 @@ basetool_host_scripts_src: "{{ playbook_dir }}/../scripts"
 basetool_host_subuid_base: 100000
 basetool_host_subuid_count: 65536
 
-basetool_host_root_dir: /var/iri
-basetool_host_state_dir: /var/lib/iri
-basetool_host_token_dir: /etc/iri
+basetool_host_release_dir: /opt/basetool
+basetool_host_config_dir: /etc/basetool
+basetool_host_data_dir: /var/lib/basetool
+basetool_host_log_dir: /var/log/basetool
+basetool_host_cache_dir: /var/cache/basetool
+basetool_host_state_dir: "{{ basetool_host_data_dir }}/deploy"
+basetool_host_token_dir: "{{ basetool_host_config_dir }}/deploy"
+basetool_host_textfile_dir: "{{ basetool_host_data_dir }}/textfile"
+basetool_host_env_file: "{{ basetool_host_config_dir }}/basetool.env"
+basetool_host_env_d_dir: "{{ basetool_host_config_dir }}/env.d"
 
 basetool_host_min_podman_major: 5
 basetool_host_min_podman_minor: 8
@@ -69,48 +76,56 @@ basetool_host_container_owners:
   - container_uid: 10001
     reason: "the app modules write their logs here"
     paths:
-      - backend/log
-      - frontend/log
-      - ingest/log
-      - monitoring/data/loki
-      - monitoring/data/tempo
+      - "{{ basetool_host_log_dir }}/backend"
+      - "{{ basetool_host_log_dir }}/frontend"
+      - "{{ basetool_host_log_dir }}/ingest"
+      - "{{ basetool_host_data_dir }}/monitoring/loki"
+      - "{{ basetool_host_data_dir }}/monitoring/tempo"
   - container_uid: 65534
     reason: "prometheus and alertmanager write their TSDB and notification state here"
     paths:
-      - monitoring/data/prometheus
-      - monitoring/data/alertmanager
+      - "{{ basetool_host_data_dir }}/monitoring/prometheus"
+      - "{{ basetool_host_data_dir }}/monitoring/alertmanager"
   - container_uid: 472
     reason: "grafana's sqlite database, dashboards and plugin state"
     paths:
-      - monitoring/data/grafana
+      - "{{ basetool_host_data_dir }}/monitoring/grafana"
   - container_uid: 1000
     reason: "without it Keycloak logs OPEN_FAILURE and silently keeps console-only logging"
     paths:
-      - keycloak/log
+      - "{{ basetool_host_log_dir }}/keycloak"
   - container_uid: 999
     reason: >-
       redis cannot chown its own /data because users.acl is mounted :ro from the same directory,
       so it dies on "Can't open or create append-only dir" and the health gate rolls the deploy back
     paths:
-      - redis
+      - "{{ basetool_host_data_dir }}/redis"
   - container_uid: 70
     reason: "the postgres data directories"
     paths:
-      - db-backend
-      - db-keycloak
+      - "{{ basetool_host_data_dir }}/db-backend"
+      - "{{ basetool_host_data_dir }}/db-keycloak"
+
+basetool_host_root_dirs:
+  - "{{ basetool_host_config_dir }}"
+  - "{{ basetool_host_config_dir }}/monitoring"
+  - "{{ basetool_host_data_dir }}"
+  - "{{ basetool_host_log_dir }}"
+  - "{{ basetool_host_cache_dir }}"
 
 basetool_host_service_user_dirs:
-  - secrets
-  - monitoring/data
-  - monitoring/certs
-  - monitoring/secrets
+  - "{{ basetool_host_config_dir }}/secrets"
+  - "{{ basetool_host_data_dir }}/monitoring"
+  - "{{ basetool_host_config_dir }}/monitoring/certs"
+  - "{{ basetool_host_config_dir }}/monitoring/secrets"
 
 basetool_host_manage_observability: true
 
 basetool_host_deploy_user_dirs:
-  - monitoring/textfile
-  - code
-  - code/keycloak/providers
+  - "{{ basetool_host_textfile_dir }}"
+  - "{{ basetool_host_release_dir }}"
+  - "{{ basetool_host_release_dir }}/keycloak/providers"
+  - "{{ basetool_host_cache_dir }}/restic"
 
 basetool_host_observability_packages:
   - node-exporter
@@ -121,7 +136,7 @@ basetool_host_node_exporter_listen: ":9100"
 basetool_host_enable_psi: true
 basetool_host_node_exporter_flags:
   - "--collector.systemd"
-  - "--collector.textfile.directory={{ basetool_host_root_dir }}/monitoring/textfile"
+  - "--collector.textfile.directory={{ basetool_host_textfile_dir }}"
   - "--no-collector.wifi"
   - "--web.listen-address={{ basetool_host_node_exporter_listen }}"
 basetool_host_podman_exporter_listen: ":9882"
@@ -219,7 +234,7 @@ basetool_host_hardening_exclusions:
 
 basetool_host_hardening_tailoring_ns: krt.basetool
 basetool_host_hardening_tailored_profile: "xccdf_krt.basetool_profile_{{ basetool_host_hardening_profile | regex_replace('^.*_profile_', '') }}_basetool"
-basetool_host_hardening_tailoring_file: /etc/iri/ssg-tailoring.xml
+basetool_host_hardening_tailoring_file: /etc/basetool/ssg-tailoring.xml
 basetool_host_hardening_tailoring_time: "2026-09-20T00:00:00Z"
 
 basetool_host_edge_trusted_proxies:

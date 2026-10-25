@@ -267,7 +267,7 @@ class JobOrderStolenChipRenderTest extends JobOrderPageMvcTestBase {
    */
   private static JobOrderHandoverDto handover(UUID orderId, List<JobOrderHandoverItemDto> items) {
     return new JobOrderHandoverDto(
-        UUID.randomUUID(), orderId, Instant.now(), "Recipient", "IRI", null, null, items, 1L);
+        UUID.randomUUID(), orderId, Instant.now(), "Recipient", "ALP", null, null, items, 1L);
   }
 
   /**

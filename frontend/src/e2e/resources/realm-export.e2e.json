@@ -1257,11 +1257,11 @@
   "defaultRole": {
     "clientRole": false,
     "composite": true,
-    "containerId": "iri",
+    "containerId": "basetool",
     "description": "${role_default-roles}",
-    "name": "default-roles-iri"
+    "name": "default-roles-basetool"
   },
-  "displayName": "IRI (E2E TEST REALM - throwaway, do not use in prod)",
+  "displayName": "Basetool (E2E TEST REALM - throwaway, do not use in prod)",
   "duplicateEmailsAllowed": false,
   "editUsernameAllowed": false,
   "enabled": true,
@@ -1272,7 +1272,7 @@
   "oauth2DevicePollingInterval": 5,
   "offlineSessionMaxLifespan": 7776000,
   "offlineSessionMaxLifespanEnabled": true,
-  "realm": "iri",
+  "realm": "basetool",
   "refreshTokenMaxReuse": 5,
   "registrationAllowed": false,
   "requiredActions": [
@@ -1321,14 +1321,14 @@
       {
         "clientRole": false,
         "composite": false,
-        "containerId": "iri",
+        "containerId": "basetool",
         "description": "${role_offline-access}",
         "name": "offline_access"
       },
       {
         "clientRole": false,
         "composite": false,
-        "containerId": "iri",
+        "containerId": "basetool",
         "description": "${role_uma_authorization}",
         "name": "uma_authorization"
       },
@@ -1342,7 +1342,7 @@
           ]
         },
         "description": "${role_default-roles}",
-        "name": "default-roles-iri"
+        "name": "default-roles-basetool"
       }
     ]
   },
@@ -1587,7 +1587,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "test-exchange"
@@ -1604,7 +1604,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "test-exchange-2"
@@ -1621,7 +1621,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "test-exchange-3"
@@ -1638,7 +1638,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ],
       "username": "test-exchange-departed"
@@ -1654,7 +1654,7 @@
       "enabled": true,
       "id": "0e2e0000-0000-4000-8000-0000000000a1",
       "realmRoles": [
-        "default-roles-iri"
+        "default-roles-basetool"
       ],
       "serviceAccountClientId": "backend-service",
       "username": "service-account-backend-service"
@@ -1663,7 +1663,7 @@
       "enabled": true,
       "id": "0e2e0000-0000-4000-8000-0000000000a2",
       "realmRoles": [
-        "default-roles-iri"
+        "default-roles-basetool"
       ],
       "serviceAccountClientId": "basetool-ingest-gateway",
       "username": "service-account-basetool-ingest-gateway"

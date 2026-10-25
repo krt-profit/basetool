@@ -17,10 +17,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/lib/container-runtime.sh"
 
-IMAGE_UNTIL="${IRI_CLEANUP_IMAGE_UNTIL:-336h}"
-CONTAINER_UNTIL="${IRI_CLEANUP_CONTAINER_UNTIL:-24h}"
-NETWORK_UNTIL="${IRI_CLEANUP_NETWORK_UNTIL:-24h}"
-LOCKFILE="${IRI_CLEANUP_LOCKFILE:-/var/lock/iri-container-cleanup.lock}"
+IMAGE_UNTIL="${BASETOOL_CLEANUP_IMAGE_UNTIL:-336h}"
+CONTAINER_UNTIL="${BASETOOL_CLEANUP_CONTAINER_UNTIL:-24h}"
+NETWORK_UNTIL="${BASETOOL_CLEANUP_NETWORK_UNTIL:-24h}"
+LOCKFILE="${BASETOOL_CLEANUP_LOCKFILE:-/run/lock/basetool-container-cleanup.lock}"
 
 START_EPOCH="$(date +%s)"
 
@@ -45,11 +45,11 @@ Options:
   -h, --help   Show this help.
 
 Environment (defaults in brackets):
-  IRI_CLEANUP_IMAGE_UNTIL=336h       minimum age of an unused image
-  IRI_CLEANUP_CONTAINER_UNTIL=24h    minimum age of a stopped container
-  IRI_CLEANUP_NETWORK_UNTIL=24h      minimum age of an unused network
-  IRI_CLEANUP_LOCKFILE=/var/lock/iri-container-cleanup.lock
-  IRI_MONITORING_TEXTFILE_DIR=/var/iri/monitoring/textfile
+  BASETOOL_CLEANUP_IMAGE_UNTIL=336h       minimum age of an unused image
+  BASETOOL_CLEANUP_CONTAINER_UNTIL=24h    minimum age of a stopped container
+  BASETOOL_CLEANUP_NETWORK_UNTIL=24h      minimum age of an unused network
+  BASETOOL_CLEANUP_LOCKFILE=/run/lock/basetool-container-cleanup.lock
+  BASETOOL_MONITORING_TEXTFILE_DIR=/var/lib/basetool/textfile
 USAGE
       exit 0
       ;;

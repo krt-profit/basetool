@@ -10,7 +10,7 @@ groups:
           severity: critical
         annotations:
           summary: "Deploy rolled back (health gate reverted a promoted release)"
-          description: "The last deploy outcome was a rollback newer than the last successful deploy (or a rollback with no successful deploy on record) — the health gate reverted a promoted release to the one deployed before it. Only a change of target can roll back: a failed drift re-apply of the release already deployed never does, and pages DeployHealthRestartFailing instead. Read WHY in Grafana -> Explore -> Loki over the last 6h: `{app=\"ops-deploy\"} |~ \"rolling back|SECURITY: cosign|health check failed|FATAL\"`, then widen to the bare `{app=\"ops-deploy\"}` for the surrounding run. That line is what separates a health-gate timeout from a cosign signature rejection, a missing previous digest pin, or a rollback that itself failed. `journalctl -u iri-deploy.service` shows NONE of this — the unit appends stdout/stderr to /var/log/iri-deploy.log instead of journald."
+          description: "The last deploy outcome was a rollback newer than the last successful deploy (or a rollback with no successful deploy on record) — the health gate reverted a promoted release to the one deployed before it. Only a change of target can roll back: a failed drift re-apply of the release already deployed never does, and pages DeployHealthRestartFailing instead. Read WHY in Grafana -> Explore -> Loki over the last 6h: `{app=\"ops-deploy\"} |~ \"rolling back|SECURITY: cosign|health check failed|FATAL\"`, then widen to the bare `{app=\"ops-deploy\"}` for the surrounding run. That line is what separates a health-gate timeout from a cosign signature rejection, a missing previous digest pin, or a rollback that itself failed. `journalctl -u basetool-deploy.service` shows NONE of this — the unit appends stdout/stderr to /var/log/basetool/deploy.log instead of journald."
 
       - alert: DeployFailed
         expr: >-
@@ -21,7 +21,7 @@ groups:
           severity: critical
         annotations:
           summary: "Deploy failed (newer than last success)"
-          description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install). A tick that lands inside a running promotion does not fire this; a stable set that stays a mix of releases for over 15 minutes (an interrupted promotion) does. deploy.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-deploy\"} |~ \"FATAL\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-deploy\"}` for the run around it. Not visible via `journalctl -u iri-deploy.service` (stdout/stderr are appended to /var/log/iri-deploy.log, not journald)."
+          description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install). A tick that lands inside a running promotion does not fire this; a stable set that stays a mix of releases for over 15 minutes (an interrupted promotion) does. deploy.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-deploy\"} |~ \"FATAL\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-deploy\"}` for the run around it. Not visible via `journalctl -u basetool-deploy.service` (stdout/stderr are appended to /var/log/basetool/deploy.log, not journald)."
 
       - alert: DeployHealthRestartFailing
         expr: >-
@@ -32,7 +32,7 @@ groups:
           severity: critical
         annotations:
           summary: "Deploy-bot cannot restore the deployed release (targeted restart or drift re-apply failed)"
-          description: "The running release could not be restored, and nothing was rolled back. Either a container runs the current target image but is unhealthy and deploy.sh's targeted restart did not bring it back (`health drift`), or the running stack drifted from the deployed release — a missing container, a wrong image — and re-applying that same release did not bring it back (`re-apply`). The runtime is broken on the deployed release; the rollback anchors still name the release before it. Investigate the app (threads/memory/dependencies) via the container + JVM dashboards. `{app=\"ops-deploy\"} |~ \"health drift|re-appl|did not come up\"` in Grafana -> Explore -> Loki names the affected service(s) and the attempt count; `journalctl -u iri-deploy.service` does not (stdout/stderr are appended to /var/log/iri-deploy.log)."
+          description: "The running release could not be restored, and nothing was rolled back. Either a container runs the current target image but is unhealthy and deploy.sh's targeted restart did not bring it back (`health drift`), or the running stack drifted from the deployed release — a missing container, a wrong image — and re-applying that same release did not bring it back (`re-apply`). The runtime is broken on the deployed release; the rollback anchors still name the release before it. Investigate the app (threads/memory/dependencies) via the container + JVM dashboards. `{app=\"ops-deploy\"} |~ \"health drift|re-appl|did not come up\"` in Grafana -> Explore -> Loki names the affected service(s) and the attempt count; `journalctl -u basetool-deploy.service` does not (stdout/stderr are appended to /var/log/basetool/deploy.log)."
 
       - alert: DeployConfigBlocked
         expr: basetool_deploy_config_blocked == 1
@@ -41,7 +41,7 @@ groups:
           severity: critical
         annotations:
           summary: "Deploy stuck on a gated config change (>6h)"
-          description: "A postgres/Keycloak image change is operator-gated (config-blocked.marker) and has not been cleared for 6 hours — deploys are silently stuck. `{app=\"ops-deploy\"} |~ \"CARVE-OUT\"` in Grafana -> Explore -> Loki shows which image pin tripped the gate; `journalctl -u iri-deploy.service` does not (stdout/stderr are appended to /var/log/iri-deploy.log)."
+          description: "A postgres/Keycloak image change is operator-gated (config-blocked.marker) and has not been cleared for 6 hours — deploys are silently stuck. `{app=\"ops-deploy\"} |~ \"CARVE-OUT\"` in Grafana -> Explore -> Loki shows which image pin tripped the gate; `journalctl -u basetool-deploy.service` does not (stdout/stderr are appended to /var/log/basetool/deploy.log)."
 
       - alert: BackupStaleOrMissing
         expr: (time() - basetool_backup_last_success_timestamp) > 26 * 3600 or absent(basetool_backup_last_success_timestamp)
@@ -50,7 +50,7 @@ groups:
           severity: critical
         annotations:
           summary: "Backup stale >26h or metric absent"
-          description: "The nightly backup last succeeded more than 26 hours ago, or the backup metric is absent (never ran). backup.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-backup\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-backup\"}` for the run. A completely empty stream over the window means the unit never fired at all — check `systemctl list-timers iri-backup.timer`. Not visible via `journalctl -u iri-backup.service` (stdout/stderr are appended to /var/log/iri-backup.log)."
+          description: "The nightly backup last succeeded more than 26 hours ago, or the backup metric is absent (never ran). backup.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-backup\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-backup\"}` for the run. A completely empty stream over the window means the unit never fired at all — check `systemctl list-timers basetool-backup.timer`. Not visible via `journalctl -u basetool-backup.service` (stdout/stderr are appended to /var/log/basetool/backup.log)."
 
       - alert: RestoreDrillStaleOrMissing
         expr: (time() - basetool_restore_drill_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_restore_drill_last_success_timestamp)
@@ -59,7 +59,7 @@ groups:
           severity: critical
         annotations:
           summary: "Restore drill stale >8d or metric absent"
-          description: "The weekly restore drill (iri-restore-drill.timer, Sun 05:30) has not succeeded for more than 8 days -- at least one weekly drill failed or did not run -- or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 10d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers iri-restore-drill.timer`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
+          description: "The weekly restore drill (basetool-restore-drill.timer, Sun 05:30) has not succeeded for more than 8 days -- at least one weekly drill failed or did not run -- or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 10d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers basetool-restore-drill.timer`. Not visible via `journalctl -u basetool-restore-drill.service` (stdout/stderr are appended to /var/log/basetool/restore-drill.log)."
 
       - alert: RestoreDrillArtifactNotRestorable
         expr: basetool_restore_drill_artifact_ok == 0
@@ -68,7 +68,7 @@ groups:
           severity: critical
         annotations:
           summary: "Restore drill: artifact not restorable ({{ $labels.artifact }})"
-          description: "The last restore drill could not restore/verify artifact '{{ $labels.artifact }}' — backups for that artifact are unverified. The per-artifact failure detail is in Grafana -> Explore -> Loki: `{app=\"ops-restore-drill\"} |= \"{{ $labels.artifact }}\"`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
+          description: "The last restore drill could not restore/verify artifact '{{ $labels.artifact }}' — backups for that artifact are unverified. The per-artifact failure detail is in Grafana -> Explore -> Loki: `{app=\"ops-restore-drill\"} |= \"{{ $labels.artifact }}\"`. Not visible via `journalctl -u basetool-restore-drill.service` (stdout/stderr are appended to /var/log/basetool/restore-drill.log)."
 
       - alert: GhcrPullTokenExpired
         expr: basetool_ghcr_token_expiry_timestamp < time()
@@ -77,7 +77,7 @@ groups:
           severity: critical
         annotations:
           summary: "GHCR pull token expired — deploys are failing"
-          description: "The production GHCR pull token's recorded expiry is in the past; the registry login fails and no promotion can deploy. Rotate the token (docs/deployment.md → Token rotation) and update its .expiry file. Confirm the actual login failure in Grafana -> Explore -> Loki: `{app=\"ops-deploy\"} |~ \"logging in to|login to .* failed\"` (the GHCR account name in the first of those lines is masked by the shipper — REQ-OBS-004). Not visible via `journalctl -u iri-deploy.service` (stdout/stderr are appended to /var/log/iri-deploy.log)."
+          description: "The production GHCR pull token's recorded expiry is in the past; the registry login fails and no promotion can deploy. Rotate the token (docs/deployment.md → Token rotation) and update its .expiry file. Confirm the actual login failure in Grafana -> Explore -> Loki: `{app=\"ops-deploy\"} |~ \"logging in to|login to .* failed\"` (the GHCR account name in the first of those lines is masked by the shipper — REQ-OBS-004). Not visible via `journalctl -u basetool-deploy.service` (stdout/stderr are appended to /var/log/basetool/deploy.log)."
 
   - name: ops-automation-warning
     rules:
@@ -90,7 +90,7 @@ groups:
           severity: warning
         annotations:
           summary: "Deploy heartbeat stale >1h (no tick has verified the stack)"
-          description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers iri-deploy.timer` and `systemctl status iri-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."
+          description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers basetool-deploy.timer` and `systemctl status basetool-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."
 
       - alert: GhcrPullTokenExpiring
         expr: (basetool_ghcr_token_expiry_timestamp - time()) < 14 * 24 * 3600
@@ -108,7 +108,7 @@ groups:
           severity: warning
         annotations:
           summary: "Backup repository keeps more snapshots than its retention allows ({{ $value }})"
-          description: "After the last successful backup the off-site restic repository held more snapshots than the GFS retention (IRI_KEEP_DAILY + IRI_KEEP_WEEKLY + IRI_KEEP_MONTHLY) can keep, so `restic forget` removed nothing it should have. The repository grows every night, and every run then reads more files from the store — a burst large enough to be blocked as a crawler by the store's edge. `{app=\"ops-backup\"} |~ \"retention|snapshots kept\"` in Grafana -> Explore -> Loki shows what forget kept; `backup.sh --dry-run` lists the snapshots and their paths. Not visible via `journalctl -u iri-backup.service` (stdout/stderr are appended to /var/log/iri-backup.log)."
+          description: "After the last successful backup the off-site restic repository held more snapshots than the GFS retention (BASETOOL_KEEP_DAILY + BASETOOL_KEEP_WEEKLY + BASETOOL_KEEP_MONTHLY) can keep, so `restic forget` removed nothing it should have. The repository grows every night, and every run then reads more files from the store — a burst large enough to be blocked as a crawler by the store's edge. `{app=\"ops-backup\"} |~ \"retention|snapshots kept\"` in Grafana -> Explore -> Loki shows what forget kept; `backup.sh --dry-run` lists the snapshots and their paths. Not visible via `journalctl -u basetool-backup.service` (stdout/stderr are appended to /var/log/basetool/backup.log)."
 
       - alert: ContainerCleanupStaleOrMissing
         expr: |
@@ -119,7 +119,7 @@ groups:
           severity: warning
         annotations:
           summary: "container-cleanup stale >8d or metric absent"
-          description: "The weekly container-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers iri-container-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u iri-container-cleanup.service` (stdout/stderr are appended to /var/log/iri-container-cleanup.log). The job never prunes volumes (ADR-0194), so it reclaims less than the retired Docker host's did — that is correct rather than a partial run."
+          description: "The weekly container-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers basetool-container-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u basetool-container-cleanup.service` (stdout/stderr are appended to /var/log/basetool/container-cleanup.log). The job never prunes volumes (ADR-0194), so it reclaims less than the retired Docker host's did — that is correct rather than a partial run."
 
       - alert: HostScriptDrift
         expr: basetool_host_scripts_drift > 0
@@ -128,7 +128,7 @@ groups:
           severity: warning
         annotations:
           summary: "Host script {{ $labels.file }} is not the deployed release's ({{ $labels.kind }})"
-          description: "deploy.sh hashes every script the role installs under /var/iri/code/scripts and compares it with the host-scripts.sha256 manifest its release carries; {{ $labels.file }} is `{{ $labels.kind }}` (`differs` = other bytes, `missing` = not installed). Scripts reach a host only through the Ansible role, never the config bundle, so a stale one keeps running until the role is re-run from the release's tag: `ansible-playbook site.yml --limit <host> --tags deploy,scripts --check --diff`, then without `--check` (an owner-approved host write on production). A stale deploy.sh, lib/common.sh, lib/container-runtime.sh or render-env-d.py also makes deploy.sh REFUSE the next release (`HOST SCRIPTS:` FATAL, DeployFailed). Which files: `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki. docs/deployment.md, Before a promotion: the host scripts."
+          description: "deploy.sh hashes every script the role installs under /opt/basetool/scripts and compares it with the host-scripts.sha256 manifest its release carries; {{ $labels.file }} is `{{ $labels.kind }}` (`differs` = other bytes, `missing` = not installed). Scripts reach a host only through the Ansible role, never the config bundle, so a stale one keeps running until the role is re-run from the release's tag: `ansible-playbook site.yml --limit <host> --tags deploy,scripts --check --diff`, then without `--check` (an owner-approved host write on production). A stale deploy.sh, lib/common.sh, lib/container-runtime.sh or render-env-d.py also makes deploy.sh REFUSE the next release (`HOST SCRIPTS:` FATAL, DeployFailed). Which files: `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki. docs/deployment.md, Before a promotion: the host scripts."
 
       - alert: HostScriptsCheckStale
         expr: (time() - basetool_host_scripts_check_timestamp_seconds) > 12 * 3600 or absent(basetool_host_scripts_check_timestamp_seconds)

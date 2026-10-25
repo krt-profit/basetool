@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-REALM = "iri"
+REALM = "basetool"
 
 PROD_BASE = "https://profit-base.online/auth"
 
@@ -134,7 +134,7 @@ SCENARIOS = [
         "prod-hostname-override",
         [BASE],
         "prod",
-        {"IRI_KEYCLOAK_HOSTNAME": FAKE_BASE},
+        {"BASETOOL_KEYCLOAK_HOSTNAME": FAKE_BASE},
         FAKE_BASE + "/realms/" + REALM,
         "the issuer follows the hostname -- this is what fails the moment the issuer becomes a "
         "second independent literal again",
@@ -143,7 +143,7 @@ SCENARIOS = [
         "prod-issuer-override",
         [BASE],
         "prod",
-        {"IRI_KEYCLOAK_HOSTNAME": FAKE_BASE, "IRI_KEYCLOAK_ISSUER_URI": FAKE_ISSUER_OVERRIDE},
+        {"BASETOOL_KEYCLOAK_HOSTNAME": FAKE_BASE, "BASETOOL_KEYCLOAK_ISSUER_URI": FAKE_ISSUER_OVERRIDE},
         FAKE_ISSUER_OVERRIDE,
         "the explicit issuer still wins, for a deployment where the two genuinely differ",
         enforce_pair=False,
@@ -212,7 +212,7 @@ def render_files(root: Path, files, profile, overrides) -> dict:
         RuntimeError: if ``docker compose config`` fails, with its stderr attached.
     """
     env = dict(os.environ)
-    for key in ("IRI_KEYCLOAK_HOSTNAME", "IRI_KEYCLOAK_ISSUER_URI"):
+    for key in ("BASETOOL_KEYCLOAK_HOSTNAME", "BASETOOL_KEYCLOAK_ISSUER_URI"):
         env.pop(key, None)
     env.update(placeholder_env(root, files))
     env.update(overrides)
@@ -290,10 +290,10 @@ def split_issuer(issuer: str):
     """Splits an issuer URI into the base Keycloak advertises and the realm.
 
     Args:
-        issuer: e.g. ``https://profit-base.online/auth/realms/iri``.
+        issuer: e.g. ``https://profit-base.online/auth/realms/basetool``.
 
     Returns:
-        A tuple of (base, realm) -- e.g. (``https://profit-base.online/auth``, ``iri``) -- or
+        A tuple of (base, realm) -- e.g. (``https://profit-base.online/auth``, ``basetool``) -- or
         (issuer, None) if it carries no ``/realms/`` segment at all.
     """
     marker = "/realms/"
@@ -468,7 +468,7 @@ def check_spring_defaults(root: Path, problems: list) -> str:
 def check_monitoring_oidc(root: Path, problems: list) -> str:
     """Rule E -- Grafana's three OIDC endpoints sit on the issuer the apps validate.
 
-    Checked on the production defaults and with ``IRI_KEYCLOAK_HOSTNAME`` overridden.
+    Checked on the production defaults and with ``BASETOOL_KEYCLOAK_HOSTNAME`` overridden.
 
     Args:
         root: the repository root.
@@ -479,7 +479,7 @@ def check_monitoring_oidc(root: Path, problems: list) -> str:
     """
     cases = [
         ("defaults", {}, PROD_BASE),
-        ("hostname-override", {"IRI_KEYCLOAK_HOSTNAME": FAKE_BASE}, FAKE_BASE),
+        ("hostname-override", {"BASETOOL_KEYCLOAK_HOSTNAME": FAKE_BASE}, FAKE_BASE),
     ]
     checked = 0
     for label, overrides, base in cases:
@@ -589,7 +589,7 @@ def check_prod_base_is_real(root: Path, problems: list) -> None:
         problems: accumulator; a mismatch is appended.
     """
     text = (root / BASE).read_text(encoding="utf-8")
-    if ("KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-%s}" % PROD_BASE) not in text:
+    if ("KC_HOSTNAME: ${BASETOOL_KEYCLOAK_HOSTNAME:-%s}" % PROD_BASE) not in text:
         problems.append(
             "self-check: docker-compose.yml no longer defaults KC_HOSTNAME to %s, so this script's "
             "PROD_BASE -- and every expectation built from it -- is stale. Update PROD_BASE in "

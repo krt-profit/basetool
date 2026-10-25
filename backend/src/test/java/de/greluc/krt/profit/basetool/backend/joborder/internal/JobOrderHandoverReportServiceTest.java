@@ -73,7 +73,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(Instant.parse("2025-06-15T10:30:00Z"));
     handover.setRecipientHandle("TestPilot");
-    handover.setRecipientSquadron("IRIDIUM");
+    handover.setRecipientSquadron("ALPHA");
   }
 
   @Test

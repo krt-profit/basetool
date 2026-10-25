@@ -57,7 +57,7 @@ class KeycloakHealthIndicatorTest {
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
-    issuerUri = server.url("/realms/iri").toString();
+    issuerUri = server.url("/realms/basetool").toString();
   }
 
   @AfterEach
@@ -92,7 +92,7 @@ class KeycloakHealthIndicatorTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req, "indicator did not issue an HTTP request");
     assertEquals("GET", req.getMethod());
-    assertEquals("/realms/iri/.well-known/openid-configuration", req.getPath());
+    assertEquals("/realms/basetool/.well-known/openid-configuration", req.getPath());
   }
 
   @Test
@@ -109,7 +109,7 @@ class KeycloakHealthIndicatorTest {
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
-    assertEquals("/realms/iri/.well-known/openid-configuration", req.getPath());
+    assertEquals("/realms/basetool/.well-known/openid-configuration", req.getPath());
   }
 
   @Test
@@ -126,7 +126,7 @@ class KeycloakHealthIndicatorTest {
 
   @Test
   void health_returns_down_when_server_is_unreachable() {
-    String deadIssuerUri = server.url("/realms/iri").toString();
+    String deadIssuerUri = server.url("/realms/basetool").toString();
     try {
       server.shutdown();
     } catch (Exception ex) {
@@ -149,14 +149,14 @@ class KeycloakHealthIndicatorTest {
     server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
     KeycloakHealthIndicator indicator =
         new KeycloakHealthIndicator(
-            "https://profit-base.invalid/auth/realms/iri",
-            new KeycloakBackchannelProperties(server.url("/auth/realms/iri/").toString()),
+            "https://profit-base.invalid/auth/realms/basetool",
+            new KeycloakBackchannelProperties(server.url("/auth/realms/basetool/").toString()),
             new DefaultSslBundleRegistry());
 
     assertEquals(Status.UP, indicator.health().getStatus());
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
-    assertEquals("/auth/realms/iri/.well-known/openid-configuration", req.getPath());
+    assertEquals("/auth/realms/basetool/.well-known/openid-configuration", req.getPath());
   }
 
   @Test
@@ -169,7 +169,7 @@ class KeycloakHealthIndicatorTest {
     assertEquals(Status.UP, indicator.health().getStatus());
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
-    assertEquals("/realms/iri/.well-known/openid-configuration", req.getPath());
+    assertEquals("/realms/basetool/.well-known/openid-configuration", req.getPath());
   }
 
   @Test

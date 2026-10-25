@@ -20,11 +20,11 @@ Usage
 -----
 ::
 
-    python3 scripts/cert-expiry-metrics.py --output /var/iri/monitoring/textfile/certificates.prom
+    python3 scripts/cert-expiry-metrics.py --output /var/lib/basetool/textfile/certificates.prom
 
     python3 scripts/cert-expiry-metrics.py --dry-run
 
-    python3 scripts/cert-expiry-metrics.py --dir /var/iri/monitoring/certs --dir /etc/pki/basetool
+    python3 scripts/cert-expiry-metrics.py --dir /etc/basetool/monitoring/certs --dir /etc/pki/basetool
 
 Exit codes: ``0`` wrote (or would have written) a file, ``1`` no certificate was found or the write
 failed, ``2`` bad invocation.
@@ -40,7 +40,7 @@ import sys
 import time
 from typing import Iterable, NamedTuple
 
-DEFAULT_DIRS = ("/var/iri/monitoring/certs",)
+DEFAULT_DIRS = ("/etc/basetool/monitoring/certs",)
 
 SUFFIXES = (".crt", ".pem", ".cer")
 

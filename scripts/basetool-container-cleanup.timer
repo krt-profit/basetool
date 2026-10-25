@@ -9,7 +9,7 @@ Persistent=true
 
 RandomizedDelaySec=5min
 
-Unit=iri-container-cleanup.service
+Unit=basetool-container-cleanup.service
 
 [Install]
 WantedBy=timers.target

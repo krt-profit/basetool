@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-24.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
 
 # Deployment delivery & promotion
@@ -9,7 +9,7 @@ How code and configuration reach the production host, and the safety invariants 
 delivery must never violate. The operational runbook (the *how-to*) lives in
 [`docs/deployment.md`](../deployment.md); this spec pins the *binding requirements* (the
 *what-must-hold*) behind it so they are testable, referenceable, and cannot be silently
-eroded. The implementation is `scripts/deploy.sh` driven by `scripts/iri-deploy.{service,timer}`,
+eroded. The implementation is `scripts/deploy.sh` driven by `scripts/basetool-deploy.{service,timer}`,
 the GitHub Actions workflows `release-images.yml` / `promote.yml`, the
 `basetool-config` artifact built from `docker/config/Dockerfile`, and the
 `basetool-keycloak-spi` provider-JAR artifact built from `docker/keycloak-spi/Dockerfile`.
@@ -57,14 +57,14 @@ already published.
 - [ ] The Ansible role that provisions the host ships no image, unit file or configuration bundle
   and is never scheduled on the host (ADR-0188); the scripts and units it installs carry no image
   digest or application version.
-- [ ] `iri-deploy.timer` polls on the wall-clock grid — at :00, :05, :10 … of every hour, to the
+- [ ] `basetool-deploy.timer` polls on the wall-clock grid — at :00, :05, :10 … of every hour, to the
   second (`OnCalendar=*-*-* *:00/5:00`, `AccuracySec=1s`, `RandomizedDelaySec=0`) — and never
   between the marks: no boot or activation-relative trigger, and no catch-up run after downtime
   (`Persistent=false`). A run that outlasts five minutes skips the marks it overlaps; the next
   run is on the grid again (`container-runtime.test.sh`).
 
-**Enforced by:** `scripts/deploy.sh` · `scripts/iri-deploy.service` (sandbox) ·
-`scripts/iri-deploy.timer` · **Runbook:** `docs/deployment.md` → *Why this design*
+**Enforced by:** `scripts/deploy.sh` · `scripts/basetool-deploy.service` (sandbox) ·
+`scripts/basetool-deploy.timer` · **Runbook:** `docs/deployment.md` → *Why this design*
 
 ### REQ-OPS-002 — Deliberate promotion
 
@@ -135,7 +135,7 @@ health, and on a health-check failure restores the previous state and exits non-
 covers **both** the app-image digest pin **and** the host config tree swapped in this deploy.
 
 The pin has a record and, under Quadlet, a binding. The record is
-`/var/lib/iri/current-digest-pin.yml` (its predecessor is the rollback anchor); Compose reads it
+`/var/lib/basetool/deploy/current-digest-pin.yml` (its predecessor is the rollback anchor); Compose reads it
 directly as an override (`up -d --wait --wait-timeout`). Quadlet reads unit files, so the binding
 is one drop-in per app service, `<svc>.container.d/10-digest-pin.conf`, whose `Image=` replaces
 the unit's tag; the apply is one `systemctl --user stop` naming every service whose pin or unit
@@ -143,7 +143,7 @@ changed this run (keycloak too when the provider JAR moved, REQ-OPS-007), which 
 them down with them, followed by a `start` of every stack unit in dependency order — so each affected
 unit stops once and starts once. It was a per-service `restart` until 2026-09-25: a restart travels
 along `Requires=`, and the restarts that followed ran the dependents again (ADR-0213). The wait is structural — `Notify=healthy` makes the unit
-`Type=notify`, bounded by its generated `TimeoutStartSec=` (so `IRI_HEALTH_TIMEOUT` governs the
+`Type=notify`, bounded by its generated `TimeoutStartSec=` (so `BASETOOL_HEALTH_TIMEOUT` governs the
 Compose path only). A rollback that restored the record without re-materialising the drop-ins would
 roll forward into the failed release, so both move together, together with the previous unit files.
 
@@ -193,10 +193,10 @@ just rolled back. **Deleting `last-deployed.digests`** is not a re-apply: the ru
 that its target is the deployed release, takes the release path, and rotates all three anchors onto
 the release that is already deployed.
 
-**Backoff durations.** A failed **release** (a new target) is retried after `IRI_BACKOFF_BASE`
-(600 s), doubling per consecutive failure, capped at `IRI_BACKOFF_MAX` (6 h), from
+**Backoff durations.** A failed **release** (a new target) is retried after `BASETOOL_BACKOFF_BASE`
+(600 s), doubling per consecutive failure, capped at `BASETOOL_BACKOFF_MAX` (6 h), from
 `failed.digests`. A failed **re-apply** of the deployed release — drift or `--reapply` — uses the
-self-heal's durations, `IRI_HEALTH_RESTART_BASE` (300 s) doubling to `IRI_HEALTH_RESTART_MAX` (1 h),
+self-heal's durations, `BASETOOL_HEALTH_RESTART_BASE` (300 s) doubling to `BASETOOL_HEALTH_RESTART_MAX` (1 h),
 from `reapply-failed.digests` (the owner's decision of 2026-09-26): it restores the release
 production is on, like the heal, and a missing container should not stay missing for six hours. The
 record is kept apart from the heal's `health-restart.digests`, so a failed heal of one service never
@@ -211,7 +211,7 @@ holds back the re-apply of another service's missing container. `--force` bypass
 > (`scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back` and the three after it).
 
 > [!bug] Added 2026-09-25 — this path was silent until then
-> v1.11.0 met a root-owned `/var/iri/code/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
+> v1.11.0 met a root-owned `/opt/basetool/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
 > subtrees, died on rsync exit 23 inside `mirror_dir`, and ended under `set -e` with no FATAL line, no
 > backoff record, no restore and no metric; `DeployFailed` could not fire and production stayed on
 > the old release for fifteen minutes. The second tick also snapshotted the half-mirrored tree as
@@ -223,7 +223,7 @@ holds back the re-apply of another service's missing container. `--force` bypass
 
 - [ ] A `:stable` tag flip in GHCR mid-deploy cannot partially apply: the deploy applies a
   single resolved digest set or none.
-- [ ] When the new images fail to become healthy (within `IRI_HEALTH_TIMEOUT` under Compose, the
+- [ ] When the new images fail to become healthy (within `BASETOOL_HEALTH_TIMEOUT` under Compose, the
   unit's `TimeoutStartSec=` under Quadlet), the previous digest pin — record **and**, under
   Quadlet, the drop-ins — **and** the previous config tree and unit files are restored before the
   run exits non-zero.
@@ -251,8 +251,8 @@ holds back the re-apply of another service's missing container. `--force` bypass
   nor `basetool_deploy_last_failure_timestamp`, records the deployed target in
   `reapply-failed.digests` and stamps `basetool_deploy_last_health_restart_failed_timestamp`. A later
   release rotates the anchor to the deployed release, and its rollback lands there.
-- [ ] A failed re-apply is backed off 300 s, doubling, capped at 1 h (`IRI_HEALTH_RESTART_*`); a
-  failed release 600 s, doubling, capped at 6 h (`IRI_BACKOFF_*`). Neither writes the other's record.
+- [ ] A failed re-apply is backed off 300 s, doubling, capped at 1 h (`BASETOOL_HEALTH_RESTART_*`); a
+  failed release 600 s, doubling, capped at 6 h (`BASETOOL_BACKOFF_*`). Neither writes the other's record.
 - [ ] `deploy.sh --reapply` re-applies the release `last-deployed.digests` names, whatever the tag
   names, and resolves no tag; it rotates no anchor, restarts keycloak only for a live provider JAR
   that differs from the deployed one, stamps no `basetool_deploy_last_success_timestamp`, and leaves
@@ -287,7 +287,7 @@ area (the 2026-09-12 edge and 2026-09-16 acme gaps).
 `scripts/generate-quadlet.py` generates `quadlet/systemd/` and `quadlet/env.d/*.env.tmpl` from them,
 both are committed, and `repo-lint.yml` (`quadlet-drift`) fails a change whose units no longer match
 the compose files. A Dependabot compose bump regenerates them on its own branch (REQ-OPS-035). On a config change `deploy.sh` renders one environment file per service from the
-host's `.env` (`scripts/render-env-d.py`, which refuses to write a half-rendered set), installs every
+host's `basetool.env` (`scripts/render-env-d.py`, which refuses to write a half-rendered set), installs every
 unit the bundle names into the service user's delivery directory
 (`/etc/containers/systemd/users/<uid>/`), **stops** a unit the bundle no longer names before removing
 its file, and never touches the `.container.d/` drop-ins beside them. A host with no units at all is
@@ -331,6 +331,10 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   before removing it, and leaves every `.container.d/` drop-in in place. A changed monitoring or
   `acme` unit is restarted too (since 2026-09-22 — see REQ-OPS-013).
 - [ ] `generate-quadlet.py --check` fails CI when `quadlet/` no longer matches the compose files.
+- [ ] The host environment file lives at `/etc/basetool/basetool.env` (`BASETOOL_CONFIG_DIR`,
+  `BASETOOL_ENV_FILE`), **outside the release tree** `/opt/basetool` (`BASETOOL_COMPOSE_DIR`): the
+  config-tree swap, its snapshot and every rollback never touch it, and `deploy.sh` aborts before `up`
+  when it is missing after the swap (ADR-0319).
 
 **Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `apply_config_tree`,
 `install_quadlet_units`) · `scripts/render-env-d.py` ·
@@ -341,7 +345,7 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
 ### REQ-OPS-005 — No secrets in the delivered bundle
 
 The `basetool-config` bundle is an explicit allowlist and must **never** carry host secrets —
-`.env`, `keystore.p12` (or any `*.p12`/`*.jks`/`*.pem`/`*.key`), `realm-export.json`, or the
+`basetool.env`, `keystore.p12` (or any `*.p12`/`*.jks`/`*.pem`/`*.key`), `realm-export.json`, or the
 `keycloak/providers/` JARs. This is enforced at three layers: the Dockerfile's COPY allowlist,
 `.dockerignore` barring secrets from the build context, a CI assertion that pulls the built
 bundle and fails the release on any secret-shaped file, and a final re-assertion in
@@ -354,8 +358,8 @@ bundle and fails the release on any secret-shaped file, and a final re-assertion
   `keycloak-theme`, `monitoring`, `quadlet/env.d`, and `quadlet/systemd` holding at least one
   `.container` unit.
 - [ ] The `env.d` templates carry `${VAR}` references only; every value is rendered on the host
-  from its own `.env` and never enters the bundle.
-- [ ] `deploy.sh` aborts before applying if the staged bundle contains `.env`, a keystore, a
+  from its own `basetool.env` and never enters the bundle.
+- [ ] `deploy.sh` aborts before applying if the staged bundle contains `basetool.env`, a keystore, a
   `realm-export.json`, or a `keycloak/providers` directory.
 
 **Enforced by:** `docker/config/Dockerfile` · `.dockerignore` · `.github/workflows/release-images.yml` (*Assert config bundle carries no host secrets*) · `scripts/deploy.sh` (`assert_no_secrets`)
@@ -523,7 +527,7 @@ distinguishes two classes, and the case where both occur:
 - **Health only** — every divergent container is on the target image but not healthy: the release
   is right and the runtime is sick, so `deploy.sh` restarts **only** those services, with no pull,
   no signature re-verification and no release rollback, throttled by its own backoff
-  (`IRI_HEALTH_RESTART_BASE` / `_MAX`, 300 s doubling to 1 h). A restart that does not restore
+  (`BASETOOL_HEALTH_RESTART_BASE` / `_MAX`, 300 s doubling to 1 h). A restart that does not restore
   health is recorded in `deploy-health.prom` and raises `DeployHealthRestartFailing`, never a false
   `DeployRolledBack` ([ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md)).
   **Since 2026-09-25 the restart is one restart window** (ADR-0083's amendment, the release apply's
@@ -571,7 +575,7 @@ the recreate is `systemctl --user restart <svc>.service` for the containers and 
 `systemctl restart alloy.service` for Alloy, which runs as a host service (the deploy account holds
 exactly that one sudo grant). Before that
 per-service config diff the reconcile additionally applies the monitoring **definitions** — a plain
-`docker compose -p iri-monitoring … up -d` (no `--force-recreate`) under Compose, a
+`docker compose -p basetool-monitoring … up -d` (no `--force-recreate`) under Compose, a
 `daemon-reload` plus, under Quadlet, a `systemctl --user restart` of each monitoring unit this
 release re-defined and a `start` of the others — so a monitoring definition drift — a service's
 memory limit, `environment`, `volumes`, or image pin, none of which the config-subtree diff can see —
@@ -595,9 +599,9 @@ Without the definition apply a compose-definition change
 reached the running container only on a full app deploy, so on a quiet host it silently never landed —
 the 2026-07-17 case where Alloy ran the stale 256M/230MiB definition for days while disk said
 384M/300MiB (and cAdvisor a stale containerd mount), tripping a chronic `ContainerWorkingSetHigh`. A
-host that runs the monitoring stack **must** set `IRI_MONITORING_ENABLED=true` — in the host `.env`,
+host that runs the monitoring stack **must** set `BASETOOL_MONITORING_ENABLED=true` — in the host `basetool.env`,
 from which `deploy.sh` reads that one key when its environment does not carry it, or as an
-`Environment=` drop-in on `iri-deploy.service`, which wins over the file. If the stack is running but
+`Environment=` drop-in on `basetool-deploy.service`, which wins over the file. If the stack is running but
 the flag is unset the reconcile gates itself off, yet the config-bundle rsync keeps rewriting
 `monitoring/**` on disk every tick — so on-disk rule/scrape changes silently never reach the running
 Prometheus (the 2026-07-13 drift). `PrometheusConfigStale` cannot catch that: its applied-stamp series
@@ -619,7 +623,7 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   fast-exit — applies the monitoring definitions (`up -d` under Compose, `start` of the nine units
   under Quadlet) so a definition drift is applied per service, while a fully converged monitoring
   stack (config subtree matching every snapshot) triggers no recreate.
-- [ ] On a host running the monitoring stack with `IRI_MONITORING_ENABLED` unset, every tick logs a
+- [ ] On a host running the monitoring stack with `BASETOOL_MONITORING_ENABLED` unset, every tick logs a
   WARN and emits `basetool_monitoring_reconcile_disabled{component="deploy"} == 1` (the
   `MonitoringReconcileDisabled` signal); with the flag set, the gauge is `0` and the reconcile runs.
 - [ ] A matching marker over a container running a non-target image digest, or a missing
@@ -732,7 +736,7 @@ to face the internet.
 both directions: a container that should be read-only and is not, and `keycloak` becoming read-only
 without this record being updated.
 
-**The config tree is mounted read-only, everywhere** (since 2026-09-22). `/var/iri/code` is what the
+**The config tree is mounted read-only, everywhere** (since 2026-09-22). `/opt/basetool` is what the
 deployer rewrites from the signed config bundle on every release; a container that can write into it
 can change what the next release applies. `keycloak` mounted its theme, its provider directory and
 `realm-export.json` writable until then. The realm export is no longer mounted into the production
@@ -769,7 +773,7 @@ PostgreSQL's clean shutdown.
   `PidsLimit=` and `ReadOnly=true`; only `acme` adds a capability (`CHOWN`); `db-backend`,
   `db-keycloak` and `redis` run with `User=`/`Group=` 70, 70 and 999. `check-conformance.py`'s
   `containers-unprivileged` and `containers-read-only` assert the running host.
-- [ ] Every `Volume=` whose source is under `/var/iri/code` ends in `:ro`, and the production
+- [ ] Every `Volume=` whose source is under `/opt/basetool` ends in `:ro`, and the production
   `keycloak` unit mounts no `realm-export.json` (`generate-quadlet.py` refuses the first,
   `generate-quadlet.test.sh` asserts both).
 - [ ] `net-db-backend`, `net-db-keycloak`, `net-redis-backend`, `net-redis-frontend` and
@@ -814,7 +818,7 @@ commit is an ancestor of `main` (audit item CI-SEC-02) — so a release identity
 that did not pass review. Who may create such a tag at all is the tag ruleset's `creation` rule.
 The gate is **fail-closed**: a host without `cosign` (with verification enabled) aborts the tick
 rather than falling back to trusting an unverified image. A single break-glass override
-(`IRI_COSIGN_VERIFY=false`) exists **only** to ride out a Sigstore public-good outage that is
+(`BASETOOL_COSIGN_VERIFY=false`) exists **only** to ride out a Sigstore public-good outage that is
 blocking every deploy; it is logged loudly on every skipped verification.
 
 **Version compatibility.** cosign is not backward-compatible across majors: cosign 3.x verifies
@@ -829,8 +833,8 @@ reaches `verify-blob` only and therefore never exposed this OCI-image gate.
 **A transient failure is not a supply-chain alarm.** Verification is a network round-trip — it
 fetches the signature layer from GHCR and reaches the Sigstore roots — so it fails for the same
 transient reasons `release-images.yml` already wraps `cosign sign` in a 5-attempt retry for. The
-gate therefore **retries** (`IRI_COSIGN_VERIFY_ATTEMPTS`, default 3, delay
-`IRI_COSIGN_VERIFY_DELAY` doubling per attempt) before it escalates, and it **captures cosign's
+gate therefore **retries** (`BASETOOL_COSIGN_VERIFY_ATTEMPTS`, default 3, delay
+`BASETOOL_COSIGN_VERIFY_DELAY` doubling per attempt) before it escalates, and it **captures cosign's
 stderr** so both the retry log and the abort quote the actual reason. Discarding that output made a
 registry blip and a forged image produce byte-identical operator-facing output. On 2026-08-05 that
 cost a critical `DeployFailed` page reading "refusing to deploy an unverified/untrusted image":
@@ -856,8 +860,8 @@ on a genuinely bad signature, which still aborts fail-closed.
 - [ ] `deploy.sh --check-only` verifies every resolved digest as a dry-run signature preflight —
   reporting per artifact and exiting non-zero on failure — **without** writing a deploy metric or
   applying anything (so it does not trip `DeployFailed`); it runs even over a converged no-op stack.
-- [ ] `cosign` missing on the host with `IRI_COSIGN_VERIFY=true` fails the pre-flight; the sole
-  documented override is `IRI_COSIGN_VERIFY=false` for a Sigstore outage. "Not on `PATH`" is not
+- [ ] `cosign` missing on the host with `BASETOOL_COSIGN_VERIFY=true` fails the pre-flight; the sole
+  documented override is `BASETOOL_COSIGN_VERIFY=false` for a Sigstore outage. "Not on `PATH`" is not
   "missing": the pre-flight also looks in `/usr/local/bin`, `/usr/bin` and `/opt/cosign/bin`, because
   sudo's `secure_path` on Rocky omits the directory the role installs into.
 - [ ] The host cosign is installed by the Ansible role from the upstream release, checked against
@@ -891,7 +895,7 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   OPS-SEC-08). `podman run` and `exec` are among them, so the boundary is still "any code as that
   user, never root". The Docker deployment's `docker` group, which is
   root-equivalent by design, does not exist on the production host.
-- **Systemd sandbox.** `iri-deploy.service` confines the `deploy.sh` process with
+- **Systemd sandbox.** `basetool-deploy.service` confines the `deploy.sh` process with
   `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp`, `PrivateDevices`,
   `ProtectKernelTunables`/`Modules`/`Logs`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`,
   `ProtectProc=invisible`, `RestrictRealtime`, `RestrictSUIDSGID`, `RemoveIPC`, `LockPersonality`,
@@ -900,9 +904,10 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   and a `CapabilityBoundingSet=~` **blocklist** (`CAP_SYS_ADMIN`, `CAP_SYS_MODULE`, `CAP_SYS_RAWIO`,
   `CAP_SYS_BOOT`, `CAP_SYS_TIME`, `CAP_NET_ADMIN`, `CAP_MAC_ADMIN`, `CAP_MAC_OVERRIDE`,
   `CAP_SYS_PTRACE`). `ReadWritePaths` is the **narrow** set the script actually writes
-  (`/etc/containers/systemd/users /var/lib/iri /var/log /var/lock /var/iri/code
-  /var/iri/monitoring`) — NOT the whole `/var/iri`, whose database and redis bind mounts are written
-  by the containers, out-of-band from this sandbox.
+  (`/etc/containers/systemd/users /etc/basetool/env.d /var/lib/basetool/deploy
+  /var/lib/basetool/textfile /var/log/basetool /run/lock /opt/basetool`) — NOT the whole
+  `/var/lib/basetool`, whose database and redis bind mounts are written by the containers,
+  out-of-band from this sandbox.
 
   > [!note] Corrected 2026-09-22 — four directives this requirement named are gone, on purpose
   > It required `NoNewPrivileges`, `RestrictNamespaces`, an **empty** `CapabilityBoundingSet` and a
@@ -915,17 +920,17 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 - **Keystore not world-readable.** The shared `keystore.p12` is `0640` with its group set to the
   app modules' uid and a POSIX ACL granting read to Keycloak's — under rootless Podman the
   **translated** host uids, `root:110000` plus `user:100999:r` (subuid base 100000), and an extra
-  `user:iri:r` so the backup helper, which runs as the service user, can read it. The private-key
+  `user:basetool:r` so the backup helper, which runs as the service user, can read it. The private-key
   material is never readable by `other`; the Docker host's `root:10001` + `u:1000` is the same rule
-  before translation. The per-service keystores under `/var/iri/secrets/tls/` (REQ-SEC-070)
-  follow the same rule, each readable only by the service it belongs to (and `iri` for the backup);
+  before translation. The per-service keystores under `/etc/basetool/secrets/tls/` (REQ-SEC-070)
+  follow the same rule, each readable only by the service it belongs to (and `basetool` for the backup);
   the CA-only truststore and `ca.crt` hold no key and may be `0644`.
 - **The pre-flight checks the keystore the stack will actually mount** (since 2026-09-22). Under
-  Compose that is `IRI_KEYSTORE_HOST_PATH` from `.env`; under Quadlet it is the source of the units'
+  Compose that is `BASETOOL_KEYSTORE_HOST_PATH` from `basetool.env`; under Quadlet it is the source of the units'
   `Volume=…:/run/secrets/keystore.p12`, which `generate-quadlet.py` fixes at
-  `/var/iri/secrets/keystore.p12` and which never reads `.env` again. `deploy.sh` checked `.env` on
+  `/etc/basetool/secrets/keystore.p12` and which never reads `basetool.env` again. `deploy.sh` checked `basetool.env` on
   both runtimes until then, so on the Podman host it could certify a file the units do not mount; it
-  now reads the path out of the installed units and falls back to `.env` only while no unit names a
+  now reads the path out of the installed units and falls back to `basetool.env` only while no unit names a
   keystore mount (a host before its first bundle). Since REQ-SEC-070 it checks **every**
   PKCS#12 the units mount under `/run/secrets/` — each service's own keystore and the internal
   truststore — not just the first match.
@@ -935,7 +940,7 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   could be found". It changes to `/` right after resolving its own directory (since 2026-09-22), as
   `container-cleanup.sh` already did. The timer was never affected: systemd starts a service in `/`.
 - **The sandboxed jobs start only when they can see the stack, and only when they are due**
-  (since 2026-09-25). A timer only *triggers* its service (`Unit=`); none of the `iri-*.timer`
+  (since 2026-09-25). A timer only *triggers* its service (`Unit=`); none of the `basetool-*.timer`
   files pulls it in with `Requires=`/`Wants=`, which started all four deploy-account jobs at every
   boot without the timer elapsing. The four units are ordered
   `After=systemd-logind.service user@<service uid>.service` by the role's drop-in
@@ -954,7 +959,7 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 
 **Acceptance**
 
-- [ ] `iri-deploy.service` sets the sandbox baseline above, the capability blocklist, a seccomp
+- [ ] `basetool-deploy.service` sets the sandbox baseline above, the capability blocklist, a seccomp
   `SystemCallFilter`, and a `ReadWritePaths` that excludes the database and redis bind mounts.
 - [ ] The deploy account holds no privileged group and no sudo grant beyond the three commands of
   the bridge; `22-deploy-user.yml` proves the grant works rather than only that it parses.
@@ -964,19 +969,24 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 - [ ] `deploy.sh` writes `basetool_ghcr_token_expiry_timestamp` when `${TOKEN_FILE}.expiry` exists
   (and nothing when it does not); `ops-automation.yml` alerts on <14 d / expired only — **not** on
   absence, so a non-expiring token is not false-warned.
-- [ ] No `scripts/iri-*.timer` carries `Requires=`/`Wants=`/`BindsTo=`/`Requisite=`/`Upholds=`, and
+- [ ] No `scripts/basetool-*.timer` carries `Requires=`/`Wants=`/`BindsTo=`/`Requisite=`/`Upholds=`, and
   each names its service in `Unit=`; the role installs `20-service-user.conf` beside every unit in
   `basetool_host_deploy_account_units`, with `After=systemd-logind.service user@<uid>.service` and no
-  pull-in (`container-runtime.test.sh`). On a host, `systemctl show iri-backup.service -p After`
+  pull-in (`container-runtime.test.sh`). On a host, `systemctl show basetool-backup.service -p After`
   names `user@<uid>.service`.
 - [ ] `rt_detect` runs no podman while the runtime is not visible, waits out a refusal while the
   manager is starting, refuses at once for a running/degraded one, and its refusal carries podman's
-  last error line (`container-runtime.test.sh`). After a reboot no `iri-*` unit is `failed`.
+  last error line (`container-runtime.test.sh`). After a reboot no `basetool-*` unit is `failed`.
+- [ ] The role labels `/opt/basetool`, `/etc/basetool`, `/var/lib/basetool` and
+  `/var/log/basetool/(backend|frontend|ingest|keycloak)` `container_file_t`, `/opt/basetool/scripts`
+  `bin_t`, `/etc/basetool/deploy` `etc_t` and `/var/lib/basetool/deploy` `var_lib_t`; the host-script
+  logs in `/var/log/basetool` stay `var_log_t` so logrotate can rotate them (ADR-0319,
+  `tasks/40-selinux.yml`).
 
-**Enforced by:** `scripts/iri-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
+**Enforced by:** `scripts/basetool-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
 `ansible/roles/basetool_host/tasks/22-deploy-user.yml` (the sudoers bridge) ·
-`scripts/iri-*.timer`, `ansible/roles/basetool_host/templates/iri-deploy-account-order.conf.j2`,
+`scripts/basetool-*.timer`, `ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2`,
 `scripts/lib/container-runtime.sh` (`rt_runtime_visible`, `rt_probe_service_user`) ·
 **Runbook:** `docs/deployment.md` → *Accounts and what runs where*, *Internal keystore and
 certificate rotation*, *Token rotation*
@@ -1090,7 +1100,7 @@ to re-login — **not** a throwaway cache (ADR-0074):
   2026-09-08; **no cadence can do that**, because Redis snapshots only when a key changed, so an idle
   store's save age climbs regardless — which is what made the unguarded probe page twice that night.
   The probe was corrected instead (see the observability bullet below). Both files live on the
-  `/var/iri/redis` bind mount and are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
+  `/var/lib/basetool/redis` bind mount and are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
   `appendfsync always` mode (one fsync per write, the pre-M-7 pathology) is deliberately **not** used.
 - **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 768mb` (ADR-0221; 384mb until WP 2.1 of epic #2078) sits below the 1024 MB
   container limit, leaving copy-on-write headroom for the RDB / AOF-rewrite forks and fragmentation,
@@ -1606,18 +1616,18 @@ A non-production environment usually sits behind a NAT that does not hairpin, so
 Keycloak name resolves to a WAN address its own containers cannot reach. Backend, frontend and
 ingest load the OIDC metadata from that name at startup, so they never become healthy and the
 health gate rolls the deploy back — a failure that looks like a broken image and is a
-name-resolution problem. `IRI_KEYCLOAK_HOST_ALIAS` supplies a Docker `extra_hosts` entry that
+name-resolution problem. `BASETOOL_KEYCLOAK_HOST_ALIAS` supplies a Docker `extra_hosts` entry that
 points the name at the host's own reverse proxy; its default, `localhost:127.0.0.1`, is a no-op.
 
 > [!note] Corrected 2026-09-22 — on a rootless host this is not a non-production concern
 > Under rootless Podman **no** container can reach its own host through the host's public address,
 > production included: measured on the production host at the cutover, ports 22, 80 and 443 on its
 > public IPv4 and IPv6 all refused from inside a container while `host-gateway` answered. Quadlet
-> units cannot interpolate `IRI_KEYCLOAK_HOST_ALIAS` either — the generator bakes in the no-op
+> units cannot interpolate `BASETOOL_KEYCLOAK_HOST_ALIAS` either — the generator bakes in the no-op
 > default. So every rootless host, production first, aliases **all three** of its public names to
 > `host-gateway` through a drop-in the Ansible role writes from `basetool_host_public_name_aliases`
 > (`<svc>.container.d/10-host-alias.conf` for backend, frontend, ingest, grafana and
-> blackbox-exporter), and the first entry must equal `IRI_KEYCLOAK_HOST_ALIAS` in `.env` —
+> blackbox-exporter), and the first entry must equal `BASETOOL_KEYCLOAK_HOST_ALIAS` in `basetool.env` —
 > `check-conformance.py`'s `env-reaches-the-units` fails when they disagree
 > ([ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)).
 > The sentence this replaces said the default left production untouched, which stopped being true
@@ -1628,15 +1638,15 @@ plain `RestTemplate` and therefore validates against the **JVM default trust sto
 `backend-trust` / `keycloak-trust` SSL bundles cover the inter-service clients only (the frontend's
 WebClients, the backend's Keycloak admin client, the ingest's `RestClient`s — ADR-0204). An
 environment whose proxy presents a self-signed certificate fails with `PKIX path building failed`
-at exactly the same point. `IRI_TRUSTSTORE_HOST_PATH` mounts a trust store at
-`/run/secrets/truststore.p12` and `IRI_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`
+at exactly the same point. `BASETOOL_TRUSTSTORE_HOST_PATH` mounts a trust store at
+`/run/secrets/truststore.p12` and `BASETOOL_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`
 switches that select it. Both default to no-ops: the mount resolves to the same file as the
 keystore, and with no extra options nothing reads it. Under Quadlet the mount path is baked into the
 units — since the per-service internal TLS (REQ-SEC-070) at the CA-only
-`/var/iri/secrets/tls/truststore.p12`, so the shared keystore's private key is no longer mounted into
+`/etc/basetool/secrets/tls/truststore.p12`, so the shared keystore's private key is no longer mounted into
 every app through this path — so a rootless host with a privately signed edge gets its truststore from a
 second role-written drop-in instead (`basetool_host_jvm_truststore_path` →
-`/run/secrets/jvm-truststore.p12`, `20-jvm-truststore.conf`), and `IRI_EXTRA_JAVA_OPTS` names that
+`/run/secrets/jvm-truststore.p12`, `20-jvm-truststore.conf`), and `BASETOOL_EXTRA_JAVA_OPTS` names that
 path. Production's edge certificate is publicly signed and sets neither.
 
 That trust store **must be built as a copy of the JVM's own anchors plus the environment's
@@ -1648,25 +1658,25 @@ off the command line where `ps` would show it.
 
 Because a non-production environment runs the **same promoted config bundle** under a different
 domain, the public identity `docker-compose.yml` bakes in is a variable with a production default:
-`IRI_KEYCLOAK_HOSTNAME`, which becomes Keycloak's `KC_HOSTNAME`. Unset, it resolves to the
+`BASETOOL_KEYCLOAK_HOSTNAME`, which becomes Keycloak's `KC_HOSTNAME`. Unset, it resolves to the
 production value, so production behaviour is unchanged. `KC_HOSTNAME_STRICT` stays `true` in every
 environment — Keycloak keeps rejecting requests under any name other than the configured one.
 
 **That hostname is the single source, and the issuer is derived from it** (ADR-0167): the backend,
 frontend and ingest service templates each read
-`${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-<production>}/realms/iri}`. Until then the two
+`${BASETOOL_KEYCLOAK_ISSUER_URI:-${BASETOOL_KEYCLOAK_HOSTNAME:-<production>}/realms/basetool}`. Until then the two
 were independent values that had to be kept in agreement by hand — `.env.example` said so in as many
 words, and nothing checked it. The failure when they disagree is the one ADR-0166 measured: Keycloak
 reports **healthy** while backend, frontend and ingest each die at start-up on `The Issuer "…" did
 not match the requested issuer "…"`, which reads as a backend fault and is a failed deploy.
-`IRI_KEYCLOAK_ISSUER_URI` remains as an override for a deployment whose advertised issuer genuinely
+`BASETOOL_KEYCLOAK_ISSUER_URI` remains as an override for a deployment whose advertised issuer genuinely
 differs from `KC_HOSTNAME`; setting it wins over the derivation.
 
 **The monitoring stack derives from the same variable.** Grafana's `generic_oauth` provider has no
 discovery option, so `docker-compose.monitoring.yml` names the authorize, token and userinfo URLs
-individually; all three now share one `${IRI_KEYCLOAK_HOSTNAME:-…}` expansion. Under Compose both
-projects run with the same `--project-directory`, so they read the same `.env`; under Quadlet
-`render-env-d.py` renders every service's environment, Grafana's included, from that one `.env`.
+individually; all three now share one `${BASETOOL_KEYCLOAK_HOSTNAME:-…}` expansion. Under Compose both
+projects run with the same `--project-directory`, so they read the same `basetool.env`; under Quadlet
+`render-env-d.py` renders every service's environment, Grafana's included, from that one `basetool.env`.
 Either way one value moves the app stack and Grafana together. A monitoring stack started from
 elsewhere falls back to the production default, unchanged.
 
@@ -1699,30 +1709,30 @@ for why the missing-probe half is not redundant.
 - [ ] It cosign-verifies against the **same** release-images identity regexp as `promote.yml`.
 - [ ] The `approve` job declares `environment: testing` on its own single job (not the matrix),
   so one deployment record is minted per run.
-- [ ] `IRI_KEYCLOAK_HOSTNAME` and `IRI_KEYCLOAK_ISSUER_URI` unset ⇒ the rendered compose is
+- [ ] `BASETOOL_KEYCLOAK_HOSTNAME` and `BASETOOL_KEYCLOAK_ISSUER_URI` unset ⇒ the rendered compose is
   byte-identical to the pre-change production values.
-- [ ] `IRI_KEYCLOAK_HOSTNAME` set **alone** ⇒ the issuer of all three apps moves with it, in the
+- [ ] `BASETOOL_KEYCLOAK_HOSTNAME` set **alone** ⇒ the issuer of all three apps moves with it, in the
   rendered compose. This is what distinguishes a derived value from two literals that happen to
   agree today, and it is the case `check-keycloak-issuer.py`'s `prod-hostname-override` scenario
   exists for.
-- [ ] `IRI_KEYCLOAK_ISSUER_URI` set as well ⇒ it wins over the derivation.
+- [ ] `BASETOOL_KEYCLOAK_ISSUER_URI` set as well ⇒ it wins over the derivation.
 - [ ] A full-URL `KC_HOSTNAME` whose path differs from `KC_HTTP_RELATIVE_PATH` ⇒ CI fails before
   the configuration can be deployed (ADR-0166's measured broken row).
 - [ ] Every `application*.yml` fallback default for `KEYCLOAK_ISSUER_URI` names the issuer
   `docker-compose.yml` deploys, so an app started without the variable does not trust a retired one.
-- [ ] `IRI_KEYCLOAK_HOSTNAME` unset ⇒ the rendered `docker-compose.monitoring.yml` Grafana OIDC URLs
+- [ ] `BASETOOL_KEYCLOAK_HOSTNAME` unset ⇒ the rendered `docker-compose.monitoring.yml` Grafana OIDC URLs
   are byte-identical to the pre-change values; set ⇒ all three follow it.
 - [ ] Every `monitoring/prometheus/prometheus.yml` target under the identity path sits on the
   deployed identity base, and the discovery document, `/auth/health` and `/auth/metrics` are all
   still probed.
-- [ ] `IRI_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
+- [ ] `BASETOOL_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
   which resolves to what `localhost` already resolves to (Compose; the generated units carry exactly
   that default).
 - [ ] A rootless host's inventory lists every public name the containers dial in
   `basetool_host_public_name_aliases`; the role writes the drop-ins and removes them when the list
-  is empty, and `env-reaches-the-units` fails when its first entry and `IRI_KEYCLOAK_HOST_ALIAS`
+  is empty, and `env-reaches-the-units` fails when its first entry and `BASETOOL_KEYCLOAK_HOST_ALIAS`
   disagree.
-- [ ] `IRI_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
+- [ ] `BASETOOL_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
   truststore mount points at the same file as the keystore mount (read, but never consulted).
 - [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting
   it does not strip the public anchors; the keystore password appears in no process argument.
@@ -2093,13 +2103,13 @@ to the shared group and restores the defect exactly.
 
 ## Out of scope
 
-- The deploy script (`deploy.sh`), the other operational scripts and their `iri-*` systemd units
+- The deploy script (`deploy.sh`), the other operational scripts and their `basetool-*` systemd units
   are **not** delivered via the bundle (self-update hazard). They are installed and updated by the
   Ansible role (`25-scripts.yml`, `27-observability.yml`) as a deliberate, operator-driven host
   change (ADR-0188) — never by a promotion. The Quadlet units of the stack itself, by contrast,
   **are** bundle payload (REQ-OPS-004). Bootstrap, token rotation, keystore rotation and the edge
   mechanics live in `docs/deployment.md` and `ansible/README.md`.
-- Application-level configuration delivered as environment variables in `.env` is host-only and
+- Application-level configuration delivered as environment variables in `basetool.env` is host-only and
   out of scope here (it is never bundled). The list of env keys lives in `README.md`.
 
 ### REQ-OPS-028 — Every JVM container names its garbage collector
@@ -2223,7 +2233,7 @@ in ADR-0209 — with nothing failing. The check rules in both directions.
   that only tested whether the archive *existed*), and the backend and frontend training runs had in
   fact been dying at the missing keystore for as long as that code existed, unnoticed.
 - **At run time.** A deployment that starts with a different layout — including the documented
-  rollback `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` — writes the lines above to its
+  rollback `BASETOOL_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` — writes the lines above to its
   `<svc>-stdout` stream, and the Loki rule **`JvmStartupCacheRejected`** (warning) fires on them.
   `scripts/check-loki-rule-signatures.py` holds the rule to the verbatim lines.
 
@@ -2285,7 +2295,7 @@ an existing file's owner — so without cleanup those files ship inside the imag
 whole requirement: a later `RUN rm` only stacks a whiteout on top and still ships the bytes
 underneath, so "cleaned up afterwards" would leave the payload in the published image and merely
 hide it. `/app/logs` itself must survive, owned by `10001:10001` — it is the mount point the compose
-templates bind `/var/iri/<svc>/log` over. The same `RUN` also removes the empty, root-owned
+templates bind `/var/log/basetool/<svc>` over. The same `RUN` also removes the empty, root-owned
 `/tmp/tomcat.*` and `/tmp/tomcat-docbase.*` working directories each start leaves behind (found
 2026-09-23; every image since the training run existed carried two of them).
 
@@ -2297,7 +2307,7 @@ the container exits 1 — before any application code runs, and therefore before
 configuration errors an operator running the image bare would actually be trying to read.
 
 > [!note] Production never saw this, and that is the point
-> `docker-compose.yml` bind-mounts `/var/iri/<svc>/log` over `/app/logs` on all three services, so
+> `docker-compose.yml` bind-mounts `/var/log/basetool/<svc>` over `/app/logs` on all three services, so
 > the baked files were hidden on every deployed start. The defect was **latent for the life of the
 > Alpine images**: the artefact was broken while the deployment was not, and no probe, alert or log
 > line could have said so. A mount may supply data; it may never be the thing that makes an image
@@ -2376,7 +2386,7 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
   it must.
 
 **Enforced by:** `ansible/roles/basetool_host/tasks/45-updates.yml` ·
-`scripts/host-updates-metrics.sh` · `scripts/iri-host-updates-metrics.service` ·
+`scripts/host-updates-metrics.sh` · `scripts/basetool-host-updates-metrics.service` ·
 `monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` ·
 `scripts/check-monitoring-configs.sh` · **Decision:**
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
@@ -2398,6 +2408,10 @@ there.
   unintended is reproduced and marked `PROD-AS-IS`, and changes in production first.
 - **Environment-specific values are arguments** (`--public-origin`, `--grafana-origin`). No
   production hostname is written into another realm.
+- **The realm is named `basetool`**, default role `default-roles-basetool`, in every environment.
+  Production is renamed from its former name at the host-layout cutover (ADR-0319, runbook
+  `HOST_LAYOUT_MIGRATION_RUNBOOK.md`) by `scripts/rename-keycloak-realm.py`, which renames the realm, then the default role by id, then the
+  frontend client's labels, verifies the result by reading it back, and does nothing on a second run.
 - **Dry run by default.** `--apply` writes, then re-plans; the apply fails unless the second plan is
   empty. A realm in shape produces no write at all.
 - **Additive.** An object only the target realm has is reported and left alone. The exceptions are
@@ -2429,7 +2443,7 @@ there.
   or profile is lost, and the verify pass fails while one is left. The client is never reported as
   “not in the production shape”, and the id stays reserved for third-party clients.
 - **No secret is printed, logged or sent back.** A confidential client the run creates is reported
-  with the Admin Console path to its generated secret and the `.env` variables that need it.
+  with the Admin Console path to its generated secret and the `basetool.env` variables that need it.
 - **Built-in Keycloak objects are never touched**; realm-wide hardening stays in
   `KEYCLOAK_HARDENING_RUNBOOK.md`. The one exception is additive: **every member may hold an
   offline session** (owner decision 2026-09-28, ADR-0202 amendment 5). The provisioner adds the
@@ -2627,13 +2641,13 @@ compared after their digests passed the cosign gate — do not all carry the sam
 whose label cannot be read. The refusal is not recorded as a bad target (no backoff): the next tick
 retries, and the promotion finishing makes it pass. `config` and `keycloak-spi` take part when they
 resolve; an unresolvable one keeps its existing "no change this tick" behaviour. Break-glass:
-`IRI_REQUIRE_ONE_RELEASE=false`, announced in the log.
+`BASETOOL_REQUIRE_ONE_RELEASE=false`, announced in the log.
 
 The single `promote` job still moves the five tags one after another, so a tick can land inside
 that window (about 30 s per promotion). Labels that **differ** are therefore first waited out as a
 promotion in progress: the tick applies nothing, exits 0 and stamps no failure, and
 `mixed-release.since` in the state directory records when the mixed set was first seen. Only a
-mixed set that outlasts `IRI_MIXED_RELEASE_GRACE` (default 900 s) fails the deploy, because then
+mixed set that outlasts `BASETOOL_MIXED_RELEASE_GRACE` (default 900 s) fails the deploy, because then
 a promotion was interrupted. A **missing** label is never waited out. One release removes the
 record.
 
@@ -3024,12 +3038,12 @@ until 2026-10-10 nothing said so: v1.14.0 was applied by a `deploy.sh` that stil
 after the apps, and the promotion failed.
 
 - **The release carries the hashes.** `scripts/host-scripts.list` names every file the role installs
-  under `/var/iri/code/scripts`. The config image ships `/config/host-scripts.sha256`
+  under `/opt/basetool/scripts`. The config image ships `/config/host-scripts.sha256`
   (`<sha256>  <path>` per file, `sha256sum -c` format), generated from the commit by
   `scripts/host-scripts-manifest.sh generate` in the `build-config` job, and the job fails when the
   file is missing or empty. A repo self-test keeps the list equal to what the role installs.
 - **The host compares on every tick.** `deploy.sh` keeps the deployed release's manifest as
-  `/var/iri/code/host-scripts.sha256` (delivered and rolled back with the config tree) and hashes the
+  `/opt/basetool/host-scripts.sha256` (delivered and rolled back with the config tree) and hashes the
   listed files in its own directory against it on every tick that stages no bundle (a staging tick
   compares the incoming manifest instead). It logs one
   `host scripts:` line per differing or missing file and writes `host-scripts.prom`:
@@ -3044,9 +3058,9 @@ after the apps, and the promotion failed.
   `deploy.sh`, `lib/common.sh`, `lib/container-runtime.sh` or `render-env-d.py` differ or are missing it
   exits 1 with a `HOST SCRIPTS:` FATAL that names them and the role command, stamps a failed deploy, and
   records no backoff and no marker, so the first tick after the role run applies the release. Other
-  stale scripts only warn. `--force` and `IRI_REQUIRE_CURRENT_SCRIPTS=false` bypass it, loudly.
+  stale scripts only warn. `--force` and `BASETOOL_REQUIRE_CURRENT_SCRIPTS=false` bypass it, loudly.
 - **The comparison before a promotion is mandatory** (`docs/deployment.md` → *Before a promotion: the
-  host scripts*): every file under `/var/iri/code/scripts` against the tag, byte-exact, and a mismatch
+  host scripts*): every file under `/opt/basetool/scripts` against the tag, byte-exact, and a mismatch
   blocks the promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
   production write).
 - **Bootstrap.** A host whose `deploy.sh` lacks this check cannot guard itself; its first install comes
@@ -3274,8 +3288,8 @@ neither tool can reach production (ADR-0279).
 - **It signs in through a testing-only client.** `basetool-seed` (password grant, service account
   with `manage-users`, `query-users`, `view-users`, `view-realm`) is created only by
   `provision-keycloak-realm.py --seed-client`, which refuses a production origin before it reads the
-  realm. The testing backend accepts it through `IRI_BACKEND_ACCEPTED_CLIENT_IDS` in the testing
-  `.env` (REQ-SEC-024); the release default stays `basetool-frontend,basetool-ingest-gateway`.
+  realm. The testing backend accepts it through `BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS` in the testing
+  `basetool.env` (REQ-SEC-024); the release default stays `basetool-frontend,basetool-ingest-gateway`.
 - **It refuses production.** `seed` and `purge` exit when `--keycloak-url` or `--api-url` names a
   production host, and the client secret is read only from `$SEED_CLIENT_SECRET`.
 - **Its accounts are marked and synthetic.** Every seeded account carries an `@briefing.invalid`
@@ -3299,7 +3313,7 @@ neither tool can reach production (ADR-0279).
 - **Passwords stay out of the repository.** The handout (`teilnehmer.csv`), the presenter list and
   the saved passwords go into `--out`, which the script refuses inside the repository.
 - **The reset empties the Basetool database only.** `scripts/testing-reset.sh
-  --wipe-testing-database` refuses without that flag and unless the host `.env` sets
+  --wipe-testing-database` refuses without that flag and unless the host `basetool.env` sets
   `APP_INSTANCE_TEST_SYSTEM=true`; it takes the deploy lock, stops `frontend`, `ingest` and `backend`,
   drops and recreates `$POSTGRES_DB`, and starts them again. A failed drop restarts the writers on the
   old database; a failed create leaves them stopped. Keycloak, Redis and every other volume stay.

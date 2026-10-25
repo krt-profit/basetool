@@ -63,7 +63,7 @@ class KeycloakBackchannelTokenTrustTest {
   private static final HeldCertificate KEYCLOAK_CERT =
       new HeldCertificate.Builder().addSubjectAlternativeName("keycloak").build();
 
-  private static final String BACKCHANNEL = "https://keycloak:18443/auth/realms/iri";
+  private static final String BACKCHANNEL = "https://keycloak:18443/auth/realms/basetool";
 
   @Test
   void withABackchannelThePinnedCertificateIsTrusted() throws Exception {
@@ -199,7 +199,7 @@ class KeycloakBackchannelTokenTrustTest {
             .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
             .scope("openid", "profile")
             .authorizationUri(
-                "https://profit-base.online/auth/realms/iri/protocol/openid-connect/auth")
+                "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/auth")
             .tokenUri(tokenUri)
             .build();
     return new OAuth2RefreshTokenGrantRequest(

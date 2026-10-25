@@ -180,13 +180,13 @@ class BankBookingRequestServiceTest {
     BankAccount account = new BankAccount();
     account.setId(id);
     account.setAccountNo("KB-0001");
-    account.setName("Staffel IRIDIUM");
+    account.setName("Staffel ALPHA");
     account.setType(BankAccountType.ORG_UNIT);
     account.setStatus(BankAccountStatus.ACTIVE);
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
-    squadron.setName("IRIDIUM");
-    squadron.setShorthand("IRI");
+    squadron.setName("ALPHA");
+    squadron.setShorthand("ALP");
     account.setOrgUnit(squadron);
     return account;
   }
@@ -248,7 +248,7 @@ class BankBookingRequestServiceTest {
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
-                    orgUnitId, "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, true)));
+                    orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
     when(requestRepository.save(any(BankBookingRequest.class)))
         .thenAnswer(
             invocation -> {
@@ -276,7 +276,7 @@ class BankBookingRequestServiceTest {
     assertThat(dto.counterpartyUserId()).isEqualTo(recipientId);
     assertThat(dto.counterpartyHandle()).isEqualTo("payee");
     assertThat(dto.counterpartyOrgUnitId()).isEqualTo(orgUnitId);
-    assertThat(dto.counterpartyOrgUnitName()).isEqualTo("IRIDIUM");
+    assertThat(dto.counterpartyOrgUnitName()).isEqualTo("ALPHA");
   }
 
   /**
@@ -967,13 +967,13 @@ class BankBookingRequestServiceTest {
     request.setCounterpartyUserId(recipientId);
     request.setCounterpartyHandle("payee");
     request.setCounterpartyOrgUnitId(orgUnitId);
-    request.setCounterpartyOrgUnitName("IRIDIUM");
+    request.setCounterpartyOrgUnitName("ALPHA");
     stubWithdrawalConfirm(requestId, accountId, holderId, txId, request);
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
-                    orgUnitId, "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, true)));
+                    orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
 
     service.confirm(requestId, holderId, null, false, null, 0L, null);
 

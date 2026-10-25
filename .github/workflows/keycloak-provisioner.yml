@@ -7,6 +7,8 @@ on:
       - "scripts/keycloak_kcadm.py"
       - "scripts/provision-keycloak-realm.py"
       - "scripts/provision-keycloak-realm.test.sh"
+      - "scripts/rename-keycloak-realm.py"
+      - "scripts/rename-keycloak-realm.test.sh"
       - "scripts/harden-keycloak-realm.py"
       - "scripts/harden-keycloak-realm.integration.py"
       - "scripts/keycloak/**"
@@ -17,6 +19,8 @@ on:
       - "scripts/keycloak_kcadm.py"
       - "scripts/provision-keycloak-realm.py"
       - "scripts/provision-keycloak-realm.test.sh"
+      - "scripts/rename-keycloak-realm.py"
+      - "scripts/rename-keycloak-realm.test.sh"
       - "scripts/harden-keycloak-realm.py"
       - "scripts/harden-keycloak-realm.integration.py"
       - "scripts/keycloak/**"
@@ -48,6 +52,7 @@ jobs:
           python3 -m py_compile scripts/keycloak_kcadm.py scripts/provision-keycloak-realm.py
           python3 -m py_compile scripts/harden-keycloak-realm.py scripts/harden-keycloak-realm.integration.py
           python3 -m py_compile scripts/keycloak/hardening_probe.py
+          python3 -m py_compile scripts/rename-keycloak-realm.py
 
       - name: Run the realm hardening self-test
         shell: bash
@@ -58,3 +63,9 @@ jobs:
         run: |
           chmod +x scripts/provision-keycloak-realm.py scripts/provision-keycloak-realm.test.sh
           scripts/provision-keycloak-realm.test.sh
+
+      - name: Run realm rename self-tests
+        shell: bash
+        run: |
+          chmod +x scripts/rename-keycloak-realm.py scripts/rename-keycloak-realm.test.sh
+          scripts/rename-keycloak-realm.test.sh

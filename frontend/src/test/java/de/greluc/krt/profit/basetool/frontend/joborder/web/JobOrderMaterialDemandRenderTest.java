@@ -153,7 +153,7 @@ class JobOrderMaterialDemandRenderTest {
         new MaterialDemandOverviewDto(
             List.of(
                 new MaterialDemandGroupDto(
-                    new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"), List.of(row))));
+                    new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"), List.of(row))));
     when(backendApiClient.get(contains("/material-demand"), anyClass())).thenReturn(overview);
 
     String html =
@@ -170,7 +170,7 @@ class JobOrderMaterialDemandRenderTest {
     assertThat(html)
         .as("one section per responsible org unit")
         .contains("data-testid=\"demand-group\"");
-    assertThat(html).as("the org unit's badge").contains(">IRI<");
+    assertThat(html).as("the org unit's badge").contains(">ALP<");
     assertThat(html).as("the material name").contains("Titanium");
     assertThat(html).as("required amount").contains("1.000,000");
     assertThat(html).as("booked amount").contains("250,000");
@@ -199,7 +199,7 @@ class JobOrderMaterialDemandRenderTest {
             new MaterialDemandOverviewDto(
                 List.of(
                     new MaterialDemandGroupDto(
-                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"),
                         List.of(row)))));
 
     String html =
@@ -260,7 +260,7 @@ class JobOrderMaterialDemandRenderTest {
             new MaterialDemandOverviewDto(
                 List.of(
                     new MaterialDemandGroupDto(
-                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"),
                         List.of(row)))));
 
     String html =
@@ -291,7 +291,7 @@ class JobOrderMaterialDemandRenderTest {
             new MaterialDemandOverviewDto(
                 List.of(
                     new MaterialDemandGroupDto(
-                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"),
                         List.of(
                             new MaterialDemandRowDto(
                                 material("Quantum Core", "PIECE"),
@@ -366,7 +366,7 @@ class JobOrderMaterialDemandRenderTest {
             new MaterialDemandOverviewDto(
                 List.of(
                     new MaterialDemandGroupDto(
-                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"),
                         List.of(
                             new MaterialDemandRowDto(
                                 titanium,
@@ -423,7 +423,7 @@ class JobOrderMaterialDemandRenderTest {
             new MaterialDemandOverviewDto(
                 List.of(
                     new MaterialDemandGroupDto(
-                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"),
                         List.of(good, none)),
                     new MaterialDemandGroupDto(
                         new SquadronReferenceDto(UUID.randomUUID(), "Nova", "NOV"),

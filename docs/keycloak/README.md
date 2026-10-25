@@ -1,6 +1,6 @@
 # Keycloak realm configuration
 
-This directory documents the production Keycloak realm (`iri`) that backs the Profit Basetool
+This directory documents the production Keycloak realm (`basetool`) that backs the Profit Basetool
 deployment, **in sanitized form**, so the realm's configuration is versioned and reviewable
 without ever committing secrets or PII. Last reviewed: 2026-09-22.
 
@@ -46,7 +46,7 @@ reaches a command line; from PowerShell, strip carriage returns from the file fi
 makes psql read `\pset footer off\r`):
 
 ```sh
-ssh <host> 'cd / && sudo -n -u iri podman exec -i db-keycloak sh -c "psql -qAt -U \$POSTGRES_USER -d \$POSTGRES_DB -p 15433 -f -"' \
+ssh <host> 'cd / && sudo -n -u basetool podman exec -i db-keycloak sh -c "psql -qAt -U \$POSTGRES_USER -d \$POSTGRES_DB -p 15433 -f -"' \
     < scripts/keycloak-config-snapshot.sql > realm-<env>.txt
 diff realm-prod.txt realm-testing.txt
 ```
@@ -66,7 +66,7 @@ printing a secret
 `REQ-OPS-033`). It also deletes, as one named retirement, the discontinued Android app's client
 `basetool-android` with its `krt-mobile-dpop-policy` policy and `krt-mobile-dpop` profile wherever
 they remain (ADR-0202 amendment 7, ADR-0268); every other client policy and profile is kept. It also
-keeps `offline_access` in `default-roles-iri` and mapped on the
+keeps `offline_access` in `default-roles-basetool` and mapped on the
 `offline_access` client scope, so every member may hold the extractor's and the third-party
 clients' offline sessions (ADR-0202 amendment 5; without the composite their device login is
 refused `400 not_allowed`), and it offers the scope to no other client: `offline_access` is
@@ -78,7 +78,7 @@ the kcadm session it needs on production: [below](#runbook--a-kcadm-session-on-t
 ## Files
 
 - [`realm-config.reference.json`](realm-config.reference.json) — a **sanitized reference** of the
-  prod `iri` realm. It is **not** an importable realm dump and **must not** be used to provision a
+  prod `basetool` realm. It is **not** an importable realm dump and **must not** be used to provision a
   realm directly. It captures the configuration that matters for this codebase (token/session
   lifetimes, the application clients, the `extractor-ingest` audience scope and the
   extractor-exclusive `extractor-ingest-only` scope behind the ingest client-identity gate, roles,
@@ -115,7 +115,7 @@ not hand-edit the output, and do not cross-contaminate it with this reference.
 `realm-config.reference.json` is **generated**, not hand-edited. Refresh it with:
 
 ```bash
-# 1. Export the iri realm from the Admin Console into a file OUTSIDE the repository
+# 1. Export the basetool realm from the Admin Console into a file OUTSIDE the repository
 # 2. Sanitize — the script refuses to write when anything sensitive survives
 python scripts/sanitize-realm-export.py RAW_EXPORT.json docs/keycloak/realm-config.reference.json
 # 3. Delete the raw export
@@ -140,7 +140,7 @@ entries of Keycloak's built-in clients are dropped like those clients. Until the
 dropped them, so the reference could not show whether an offline token was possible at all when SC
 Extractor 2.10.0's sign-in was refused `400 not_allowed`: production's `offline_access` client
 scope mapped the role all along, and what it lacked was the `offline_access` composite on
-`default-roles-iri` (ADR-0202 amendment 5). The current file carries that one mapping by hand; the
+`default-roles-basetool` (ADR-0202 amendment 5). The current file carries that one mapping by hand; the
 next regeneration brings every entry. `scripts/sanitize-realm-export.py --selftest` (in
 `repo-lint.yml`) pins what is kept and dropped.
 
@@ -158,7 +158,7 @@ The script strips or replaces the following — **never commit any of them**:
 - **SMTP credentials & address** → `smtp.example.invalid` / `noreply@example.invalid` /
   `__SMTP_USER__`. The real SMTP host, account and reply-to address are operator secrets and live
   only in the deploy environment.
-- **Real public URLs** (`profit-base.online`, `iri-base.org`) → `basetool.example.invalid` in all
+- **Real public URLs** (`profit-base.online`) → `basetool.example.invalid` in all
   `redirectUris` / `webOrigins` / `post.logout.redirect.uris`. Internal Docker network aliases
   (`backend:11261`, `frontend:18081`) are kept because they document the service topology and are
   not secret.
@@ -215,7 +215,7 @@ role → filter by `realm-management` → `view-realm`**) or with `kcadm.sh`:
 
 ```bash
 # Authenticate kcadm against the running Keycloak first (adjust server/admin creds), then:
-kcadm.sh add-roles -r iri \
+kcadm.sh add-roles -r basetool \
   --uusername service-account-backend-service \
   --cclientid realm-management \
   --rolename view-realm
@@ -264,9 +264,9 @@ were verified against a Keycloak 26.7 started with the production command line a
 keystore (2026-08-17). `KC_HOSTNAME_STRICT=true` does **not** interfere — `https://localhost:18443`
 and `https://keycloak:18443` both authenticate.
 
-And since the rootless-Podman cutover (2026-09-22) the container belongs to the service user `iri`
+And since the rootless-Podman cutover (2026-09-22) the container belongs to the service user `basetool`
 and runs with a **read-only root filesystem**, so kcadm cannot write its default session file
-(`/opt/keycloak/.keycloak/kcadm.config`): every call goes through `sudo -u iri podman exec` and
+(`/opt/keycloak/.keycloak/kcadm.config`): every call goes through `sudo -u basetool podman exec` and
 carries `--config` pointing at the unit's writable tmpfs. That was derived from the generated unit
 and first exercised on the production host on 2026-09-25 (the owner's session for the confidential
 frontend client, steps 1–2 below typed interactively); the helper and its reasoning are in
@@ -278,7 +278,7 @@ scripts are not deployed to the host (copy them over, with `keycloak_kcadm.py` a
 ```bash
 cd /
 KCCFG=/opt/keycloak/data/tmp/kcadm.config
-KCADM="sudo -u iri podman exec -i keycloak sh -c 'exec /opt/keycloak/bin/kcadm.sh \"\$@\" --config $KCCFG' kcadm"
+KCADM="sudo -u basetool podman exec -i keycloak sh -c 'exec /opt/keycloak/bin/kcadm.sh \"\$@\" --config $KCCFG' kcadm"
 
 # 1. trust the self-signed connector cert. `--trustpass -` prompts, which needs the TTY that
 #    `-it` provides; without one kcadm refuses with "Console is not active". The password is
@@ -286,7 +286,7 @@ KCADM="sudo -u iri podman exec -i keycloak sh -c 'exec /opt/keycloak/bin/kcadm.s
 #    SERVER_SSL_KEY_STORE_PASSWORD in the host .env).
 #    After the internal-TLS step-3 release (#2036) this path is Keycloak's OWN leaf keystore -- see
 #    the note after this block.
-sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
+sudo -u basetool podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
     --trustpass - /run/secrets/keystore.p12 --config "$KCCFG"
 
 # 2. authenticate as the provisioning service account (see the section below — an admin account
@@ -294,18 +294,18 @@ sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststor
 #    every command without a stored credential, and says "No server specified. Use --server, or
 #    'kcadm.sh config credentials'." rather than anything about being unauthenticated.
 #    Omitting --secret makes it prompt, keeping the secret out of shell history.
-sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server https://localhost:18443/auth --realm iri --client basetool-provisioner --config "$KCCFG"
+sudo -u basetool podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+    --server https://localhost:18443/auth --realm basetool --client basetool-provisioner --config "$KCCFG"
 
 # 3. the script's dry run, then its apply — the full argument list is in the procedure linked
 #    under "One script writes the whole Basetool-owned part of a realm" above
-python3 provision-keycloak-realm.py --realm iri --public-origin https://profit-base.online \
+python3 provision-keycloak-realm.py --realm basetool --public-origin https://profit-base.online \
     --kcadm-command "$KCADM" --frontend-client confidential
-python3 provision-keycloak-realm.py --realm iri --public-origin https://profit-base.online \
+python3 provision-keycloak-realm.py --realm basetool --public-origin https://profit-base.online \
     --kcadm-command "$KCADM" --frontend-client confidential --apply
 
 # 4. clean up: kcadm.config stores the truststore password AND a token in cleartext.
-sudo -u iri podman exec keycloak rm -f "$KCCFG"
+sudo -u basetool podman exec keycloak rm -f "$KCCFG"
 ```
 
 The session file lives on a tmpfs, and under Quadlet every restart is a recreate (`--replace`), so
@@ -317,7 +317,7 @@ Docker Compose stack the root filesystem is writable: plain `docker exec keycloa
 > *(added 2026-09-25)* Until #2036's release is deployed, `/run/secrets/keystore.p12` in the
 > keycloak container is the **shared** self-signed keystore, and step 1 works as written — it did on
 > production on 2026-09-25. From that release on, `quadlet/systemd/keycloak.container` mounts
-> `/var/iri/secrets/tls/keycloak.p12` at that path — Keycloak's **own leaf**, signed by the internal
+> `/etc/basetool/secrets/tls/keycloak.p12` at that path — Keycloak's **own leaf**, signed by the internal
 > CA — and mounts **no** truststore at all (unlike backend, frontend and ingest, which get
 > `/run/secrets/internal-truststore.p12`). Two consequences, neither verified yet:
 >
@@ -326,7 +326,7 @@ Docker Compose stack the root filesystem is writable: plain `docker exec keycloa
 >   `https://localhost:18443`, whose leaf names `localhost`. The password is the same
 >   (`KC_HTTPS_KEY_STORE_PASSWORD`; the mint used it for every store).
 > - If it fails with a PKIX error, give kcadm the CA-only truststore through the tmpfs the session
->   file already uses — `sudo -u iri podman exec -i keycloak sh -c 'cat > /opt/keycloak/data/tmp/truststore.p12' < /var/iri/secrets/tls/truststore.p12`,
+>   file already uses — `sudo -u basetool podman exec -i keycloak sh -c 'cat > /opt/keycloak/data/tmp/truststore.p12' < /etc/basetool/secrets/tls/truststore.p12`,
 >   then `config truststore --trustpass - /opt/keycloak/data/tmp/truststore.p12` — and delete it in
 >   step 4 with the session file. That is a write into the container like the session file itself.
 >
@@ -347,13 +347,13 @@ fails, and it fails as `invalid_grant` / **"Invalid user credentials"**, which r
 password and sends you looking in the wrong place. The realm's own log is what disambiguates it:
 
 ```bash
-sudo -u iri podman logs --tail 300 keycloak 2>&1 | grep LOGIN_ERROR \
+sudo -u basetool podman logs --tail 300 keycloak 2>&1 | grep LOGIN_ERROR \
     | grep -oE 'realmName="[^"]*"|error="[^"]*"' | tail -10
 ```
 
 `error="invalid_user_credentials"` for an account whose password demonstrably works in the Admin
 Console means the second factor, not the password. (`user_temporarily_disabled` would mean the
-brute-force lockout instead — `iri` has `bruteForceProtected` on with `failureFactor: 5`, so retrying
+brute-force lockout instead — `basetool` has `bruteForceProtected` on with `failureFactor: 5`, so retrying
 a failing login is actively counterproductive.)
 
 Create a short-lived provisioning identity in the Admin Console instead — **Clients → Create client**:

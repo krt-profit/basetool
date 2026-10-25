@@ -1,6 +1,6 @@
 {
-  "realm": "iri",
-  "displayName": "IRI (E2E TEST REALM - throwaway, do not use in prod)",
+  "realm": "basetool",
+  "displayName": "Basetool (E2E TEST REALM - throwaway, do not use in prod)",
   "enabled": true,
   "sslRequired": "none",
   "registrationAllowed": false,
@@ -60,17 +60,17 @@
         "description": "${role_offline-access}",
         "composite": false,
         "clientRole": false,
-        "containerId": "iri"
+        "containerId": "basetool"
       },
       {
         "name": "uma_authorization",
         "description": "${role_uma_authorization}",
         "composite": false,
         "clientRole": false,
-        "containerId": "iri"
+        "containerId": "basetool"
       },
       {
-        "name": "default-roles-iri",
+        "name": "default-roles-basetool",
         "description": "${role_default-roles}",
         "composite": true,
         "composites": {
@@ -391,7 +391,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ]
     },
@@ -408,7 +408,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ]
     },
@@ -425,7 +425,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ]
     },
@@ -442,16 +442,16 @@
         }
       ],
       "realmRoles": [
-        "default-roles-iri",
+        "default-roles-basetool",
         "KRT Member"
       ]
     }
   ],
   "defaultRole": {
-    "name": "default-roles-iri",
+    "name": "default-roles-basetool",
     "description": "${role_default-roles}",
     "composite": true,
     "clientRole": false,
-    "containerId": "iri"
+    "containerId": "basetool"
   }
 }

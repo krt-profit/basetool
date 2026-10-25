@@ -109,7 +109,7 @@ class MaterialgesuchPageControllerMvcTest {
         120.0,
         600,
         new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-        List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+        List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON")),
         true,
         Instant.now(),
         "Suche gegen **Titanium**.",
@@ -136,7 +136,7 @@ class MaterialgesuchPageControllerMvcTest {
         .andExpect(content().string(containsString("data-testid=\"mb-create-request\"")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
-        .andExpect(content().string(containsString(">IRI<")))
+        .andExpect(content().string(containsString(">ALP<")))
         .andExpect(content().string(containsString("600")))
         .andExpect(content().string(containsString("data-mg-edit")))
         .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")))

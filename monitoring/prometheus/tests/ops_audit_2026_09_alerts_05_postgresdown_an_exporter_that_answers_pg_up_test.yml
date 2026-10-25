@@ -26,4 +26,4 @@ tests:
               database: "basetool-backend"
             exp_annotations:
               summary: "PostgreSQL down: basetool-backend"
-              description: "postgres-exporter for basetool-backend has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."
+              description: "postgres-exporter for basetool-backend has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."

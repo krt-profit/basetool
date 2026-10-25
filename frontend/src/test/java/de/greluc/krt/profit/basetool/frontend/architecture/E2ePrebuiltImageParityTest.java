@@ -89,7 +89,7 @@ class E2ePrebuiltImageParityTest {
     assertThat(workflowImages())
         .as(
             "e2e.yml's build-stack job must build the images compose looks for with"
-                + " IRI_BASETOOL_VERSION=%s; a drift makes every matrix cell try to pull :%s from"
+                + " BASETOOL_VERSION=%s; a drift makes every matrix cell try to pull :%s from"
                 + " GHCR",
             tag, tag)
         .containsExactlyInAnyOrderElementsOf(expected);
@@ -130,7 +130,7 @@ class E2ePrebuiltImageParityTest {
   /**
    * Reads the extension's {@code IMAGE_TAG} literal.
    *
-   * @return the tag the extension sets as {@code IRI_BASETOOL_VERSION}
+   * @return the tag the extension sets as {@code BASETOOL_VERSION}
    * @throws IOException if the extension source cannot be read
    */
   private static String extensionImageTag() throws IOException {
@@ -157,8 +157,8 @@ class E2ePrebuiltImageParityTest {
 
   /**
    * Renders the built services' {@code image:} templates the way compose does for the E2E stack:
-   * {@code IRI_IMAGE_NAMESPACE} unset (its default applies) and {@code IRI_BASETOOL_VERSION} set to
-   * {@code tag}. Distinct values only -- the prod and dev twins share one template.
+   * {@code BASETOOL_IMAGE_NAMESPACE} unset (its default applies) and {@code BASETOOL_VERSION} set
+   * to {@code tag}. Distinct values only -- the prod and dev twins share one template.
    *
    * @param tag the tag the extension sets
    * @return the rendered application and sandbox Keycloak image names
@@ -187,8 +187,8 @@ class E2ePrebuiltImageParityTest {
     while (m.find()) {
       String rendered =
           m.group(1)
-              .replace("${IRI_IMAGE_NAMESPACE:-krt-profit}", "krt-profit")
-              .replace("${IRI_BASETOOL_VERSION:-local}", tag);
+              .replace("${BASETOOL_IMAGE_NAMESPACE:-krt-profit}", "krt-profit")
+              .replace("${BASETOOL_VERSION:-local}", tag);
       if (!images.contains(rendered)) {
         images.add(rendered);
       }

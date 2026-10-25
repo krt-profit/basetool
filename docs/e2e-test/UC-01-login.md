@@ -13,7 +13,7 @@ Unauthentifizierter Besucher, der sich als synthetischer Test-User `test-admin` 
 ## Vorbedingungen
 
 - Der Stack läuft (ephemerer Stack oder Staging).
-- Der Keycloak-Realm `iri` ist importiert und enthält den User `test-admin` / `test-admin-pw` (synthetischer Wegwerf-Realm `realm-export.e2e.json`).
+- Der Keycloak-Realm `basetool` ist importiert und enthält den User `test-admin` / `test-admin-pw` (synthetischer Wegwerf-Realm `realm-export.e2e.json`).
 
 ## Auslöser
 

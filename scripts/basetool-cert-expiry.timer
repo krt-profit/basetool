@@ -9,7 +9,7 @@ RandomizedDelaySec=300
 
 Persistent=true
 
-Unit=iri-cert-expiry.service
+Unit=basetool-cert-expiry.service
 
 [Install]
 WantedBy=timers.target

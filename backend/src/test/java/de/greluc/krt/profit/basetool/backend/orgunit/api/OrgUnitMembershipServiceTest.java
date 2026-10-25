@@ -367,7 +367,7 @@ class OrgUnitMembershipServiceTest {
     UUID squadronA = UUID.randomUUID();
     Squadron sqA = new Squadron();
     sqA.setId(squadronA);
-    sqA.setShorthand("IRI");
+    sqA.setShorthand("ALP");
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
     when(squadronRepository.findById(squadronA)).thenReturn(Optional.of(sqA));
     when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);

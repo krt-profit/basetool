@@ -356,7 +356,7 @@ the Wiki scheduler stays at the R1 default (`krt.scwiki.scheduler-enabled
 
 ### 2.2 Pre-deployment checks (R2)
 
-- [ ] R1 (PR [#261](https://github.com/krt-iri/basetool/pull/261))
+- [ ] R1 (PR [#261](https://github.com/krt-profit/basetool/pull/261))
   deployed to prod and stable through one full UEX scheduler tick.
 - [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC
   LIMIT 5` on prod shows V109 as the latest applied migration; no
@@ -504,7 +504,7 @@ scheduler bean ticks; each tick still no-ops while the per-sync flag is off.
 
 ### 3.2 Pre-deployment checks (R3)
 
-- [ ] R2 (PR [#263](https://github.com/krt-iri/basetool/pull/263)) deployed
+- [ ] R2 (PR [#263](https://github.com/krt-profit/basetool/pull/263)) deployed
   and stable; `game_item` + `material` cross-ref columns populated.
 - [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC
   LIMIT 5` shows V112 as the latest applied migration; no V113.
@@ -655,7 +655,7 @@ consumed by R3's `external_sync_report`.)
 
 ### 4.2 Pre-deployment checks (R4)
 
-- [ ] R3 (PR [#266](https://github.com/krt-iri/basetool/pull/266)) deployed;
+- [ ] R3 (PR [#266](https://github.com/krt-profit/basetool/pull/266)) deployed;
   its commodity merge has run at least once so `material.scwiki_uuid` is
   populated (RESOURCE ingredient resolution leans on it).
 - [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC LIMIT 5`
@@ -793,7 +793,7 @@ ships dark — merging it generates no new Wiki traffic on its own.
 
 ### 5.2 Pre-deployment checks (R5)
 
-- [ ] R4 (PR [#267](https://github.com/krt-iri/basetool/pull/267)) deployed and
+- [ ] R4 (PR [#267](https://github.com/krt-profit/basetool/pull/267)) deployed and
   its closure item fill (`item-sync-enabled`) has run at least once.
 - [ ] `krt.scwiki.sync-all-items` unset / `false` in prod `.env` for the merge.
 - [ ] `./gradlew spotlessApply check` green from a clean clone of the R5 branch.
@@ -934,7 +934,7 @@ R6 finally writes them).
 
 ### 6.2 Pre-deployment checks (R6)
 
-- [ ] R5 (PR [#268](https://github.com/krt-iri/basetool/pull/268)) deployed.
+- [ ] R5 (PR [#268](https://github.com/krt-profit/basetool/pull/268)) deployed.
 - [ ] The UEX manufacturer sync has run at least once so `manufacturer` rows carry
   `uex_company_id` (R6 only enriches existing rows):
 
@@ -1044,7 +1044,7 @@ in. This is the only R5-R7 phase that **carries a migration**.
 
 ### 7.2 Pre-deployment checks (R7)
 
-- [ ] R6 (PR [#269](https://github.com/krt-iri/basetool/pull/269)) deployed.
+- [ ] R6 (PR [#269](https://github.com/krt-profit/basetool/pull/269)) deployed.
 - [ ] `game_item` is populated and terminals are synced (the price upsert resolves both):
 
   ```bash
@@ -1164,7 +1164,7 @@ small **data migration** that prepares the destructive R9 cleanup.
 
 ### 8.2 Pre-deployment checks (R8)
 
-- [ ] R7 (PR [#270](https://github.com/krt-iri/basetool/pull/270)) deployed.
+- [ ] R7 (PR [#270](https://github.com/krt-profit/basetool/pull/270)) deployed.
 - [ ] `./gradlew spotlessApply check` green from a clean clone of the R8 branch.
 - [ ] Logical backup taken (V116 overwrites `source_systems` on manual rows and has no clean
   automatic inverse).
@@ -1270,12 +1270,12 @@ the authoritative source; this section is the deploy-time summary.
 
 ### 9.2 Pre-deployment checks (R9)
 
-- [x] R8 (PR [#271](https://github.com/krt-iri/basetool/pull/271)) merged **2026-05-29**. The §8.6
+- [x] R8 (PR [#271](https://github.com/krt-profit/basetool/pull/271)) merged **2026-05-29**. The §8.6
   exit criterion asked for a ~two-week soak; the drop followed on **2026-06-01**, so the soak that
   actually happened was ~2.5 days. The box records that R8 shipped first, not that the two-week
   criterion was met as written.
 - [x] Roadmap Steps 1–2 (reader migrations) shipped **2026-05-29** in PR
-  [#275](https://github.com/krt-iri/basetool/pull/275) — every reader now reads
+  [#275](https://github.com/krt-profit/basetool/pull/275) — every reader now reads
   `source_systems` / `description_de` / `description_en`. They were in production ~2.5 days before
   the drop, not the "~one release window" V125's own header comment names. A bare `git grep -i
   "isManualEntry\|ship_type.*description"` is **not** empty and never will be: it still hits the

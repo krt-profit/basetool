@@ -125,7 +125,7 @@ app:
       cron: ${APP_KEYCLOAK_SYNC_CRON:0 0 5 * * *}
       zone: ${APP_KEYCLOAK_SYNC_ZONE:Europe/Berlin}
       admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080/auth}
-      realm: ${KEYCLOAK_REALM:iri}
+      realm: ${KEYCLOAK_REALM:basetool}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
       client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
   mail:

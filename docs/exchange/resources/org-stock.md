@@ -37,7 +37,7 @@ single entries are an extra, see [Entries](#entries).
 ```json
 {
   "key": "u:7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10|m:c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11|l:5e2a9d71-0c4b-4f8e-b3a6-1d7c8e9f0a22|q:500|s:0",
-  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium"},
+  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Alpha"},
   "material": {"bt": "c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11", "name": "Laranite"},
   "materialKind": {"type": "RAW", "commodity": true},
   "location": {"name": "Area18", "uex": {"kind": "CITY", "id": 4}},
@@ -114,7 +114,7 @@ Each unit in `units` carries `logistician`: whether the member is a Logistician 
   "items": [ ],
   "removed": [],
   "units": [
-    {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium", "shorthand": "IRI", "kind": "SQUADRON", "logistician": true}
+    {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Alpha", "shorthand": "ALP", "kind": "SQUADRON", "logistician": true}
   ],
   "nextCursor": "f1.4711.0",
   "hasMore": false
@@ -190,7 +190,7 @@ A unit the member is not a Logistician of is answered `403 NOT_PERMITTED`.
 
 ```json
 {
-  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium"},
+  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Alpha"},
   "items": [
     {"ref": "q0Fh3kB9xV7m2LwP5nR8tY1cZ4dE6gJ0sU3aH7bK9fM", "name": "Hauler One"}
   ]
@@ -212,7 +212,7 @@ nothing answers empty lists; a unit the member is not a Logistician of is answer
 
 ```json
 {
-  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Iridium"},
+  "unit": {"id": "7d1c2f4e-3b8a-4c55-9e21-6a0f3b2d9c10", "name": "Alpha"},
   "jobOrders": [
     {"id": "4b2d6f80-1a3c-4e57-9b0d-7c5e3a1f2d42", "number": 412, "status": "OPEN"}
   ],

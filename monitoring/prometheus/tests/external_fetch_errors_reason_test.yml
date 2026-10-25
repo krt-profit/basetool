@@ -44,7 +44,7 @@ tests:
   - name: fires - any other failed system unit
     interval: 1m
     input_series:
-      - series: 'node_systemd_unit_state{name="iri-backup.service",state="failed"}'
+      - series: 'node_systemd_unit_state{name="basetool-backup.service",state="failed"}'
         values: "1x60"
     alert_rule_test:
       - eval_time: 30m
@@ -52,8 +52,8 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              name: iri-backup.service
+              name: basetool-backup.service
               state: failed
             exp_annotations:
-              summary: "systemd unit failed: iri-backup.service"
-              description: "The systemd unit iri-backup.service is in the failed state (e.g. iri-deploy / iri-backup / iri-restore-drill)."
+              summary: "systemd unit failed: basetool-backup.service"
+              description: "The systemd unit basetool-backup.service is in the failed state (e.g. basetool-deploy / basetool-backup / basetool-restore-drill)."

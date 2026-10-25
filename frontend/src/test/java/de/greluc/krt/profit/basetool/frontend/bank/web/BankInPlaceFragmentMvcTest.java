@@ -214,6 +214,6 @@ class BankInPlaceFragmentMvcTest {
 
   private static BankGrantDto grant(UUID userId, String handle, UUID accountId) {
     return new BankGrantDto(
-        userId, handle, accountId, "KB-0001", "Staffel IRIDIUM", true, false, false, true, 0L);
+        userId, handle, accountId, "KB-0001", "Staffel ALPHA", true, false, false, true, 0L);
   }
 }

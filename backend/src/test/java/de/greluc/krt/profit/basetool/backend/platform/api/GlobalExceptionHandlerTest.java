@@ -893,7 +893,7 @@ class GlobalExceptionHandlerTest {
             HttpStatus.FORBIDDEN,
             "Forbidden",
             org.springframework.http.HttpHeaders.EMPTY,
-            "{\"error\":\"HTTP 403 Forbidden\",\"realm\":\"iri\"}"
+            "{\"error\":\"HTTP 403 Forbidden\",\"realm\":\"basetool\"}"
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8),
             java.nio.charset.StandardCharsets.UTF_8);
 

@@ -33,7 +33,7 @@ tests:
               job: redis
             exp_annotations:
               summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
-              description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/iri/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
+              description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/lib/basetool/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
 
   - name: silent - pending changes but a recent save
     interval: 1m
@@ -66,7 +66,7 @@ tests:
               job: redis
             exp_annotations:
               summary: "Redis background save is failing"
-              description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/iri/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
+              description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/lib/basetool/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
       - eval_time: 20m
         alertname: RedisRdbStale
         exp_alerts: []
@@ -98,7 +98,7 @@ tests:
               job: redis
             exp_annotations:
               summary: "Redis AOF writes are failing"
-              description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/iri/redis bind mount and the redis log."
+              description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/lib/basetool/redis bind mount and the redis log."
 
   - name: silent - aof disabled
     interval: 1m
