@@ -80,9 +80,12 @@ jobs:
         run: python3 .github/scripts/cut_release.py "${TAG}"
 
       - name: Regenerate CycloneDX SBOMs
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: >-
           ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
-          :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom --no-build-cache --stacktrace
+          :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom
+          "-PreleaseVersion=${VERSION}" --no-build-cache --stacktrace
 
       - name: Drop SBOM churn that is only serial-number / timestamp rotation
         run: |

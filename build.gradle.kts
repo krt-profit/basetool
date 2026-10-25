@@ -17,7 +17,11 @@ plugins {
 
 allprojects {
   group = "de.greluc.krt.profit.basetool"
-  version = "0.0.1-SNAPSHOT"
+  version =
+    providers
+      .gradleProperty("releaseVersion")
+      .filter { it.isNotBlank() }
+      .getOrElse("0.0.1-SNAPSHOT")
 }
 
 tasks.register("generateTermsVersion") {

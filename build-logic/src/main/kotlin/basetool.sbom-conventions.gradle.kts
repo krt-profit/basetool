@@ -54,15 +54,26 @@ val expectedComponents =
 
 tasks.register("verifyCyclonedxBom") {
   group = "verification"
-  description = "Fails when the CycloneDX BOM does not list exactly the resolved runtimeClasspath."
+  description =
+    "Fails when the CycloneDX BOM does not list exactly the resolved runtimeClasspath or does " +
+      "not carry the project version."
   enabled = sbomExplicitlyRequested
   val bomFile = cyclonedxBom.flatMap { it.jsonOutput }
   val projectPath = project.path
+  val expectedVersion = project.version.toString()
   val expectedProvider = expectedComponents
   inputs.file(bomFile).withPropertyName("bom").withPathSensitivity(PathSensitivity.NONE)
+  inputs.property("expectedVersion", expectedVersion)
   inputs.property("expectedComponents", expectedProvider)
   doLast {
     val bom = groovy.json.JsonSlurper().parse(bomFile.get().asFile) as Map<*, *>
+    val bomVersion =
+      ((bom["metadata"] as? Map<*, *>)?.get("component") as? Map<*, *>)?.get("version")
+    if (bomVersion != expectedVersion) {
+      throw GradleException(
+        "$projectPath: the SBOM describes version '$bomVersion', the build is '$expectedVersion'.",
+      )
+    }
     val listed =
       (bom["components"] as? List<*>)
         .orEmpty()
