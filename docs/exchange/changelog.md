@@ -3,6 +3,17 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-25
+
+- **Changed: the issuer moved to `https://profit-base.online/auth/realms/basetool`.** The identity
+  realm was renamed; the discovery document, the device authorization, token and revocation
+  endpoints moved with it, and the old realm answers `404`. Pin the new issuer, take the endpoints
+  from its discovery document and use the new token endpoint as the DPoP `htu`
+  ([authentication](authentication.md)). Tokens of the old realm are refused, so a refresh ends in
+  `invalid_grant` and every installation signs in once more. The sandbox issuer is
+  `http://host.docker.internal:18080/auth/realms/basetool` from the 1.20.0 sandbox images on
+  ([sandbox](sandbox.md)). Client ids, scopes, the token audience and every route are unchanged.
+
 ## 2026-10-20
 
 - **New: an extension's origin is bound to its client.** A request whose `Origin` is another
