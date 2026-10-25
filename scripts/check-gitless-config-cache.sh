@@ -45,6 +45,12 @@ fi
 project_version="$(
   sed -n 's/^[[:space:]]*version = "\(.*\)"$/\1/p' build.gradle.kts | head -1
 )"
+if [[ -z ${project_version} ]]; then
+  project_version="$(
+    sed -n '/^[[:space:]]*version =[[:space:]]*$/,/getOrElse/s/^[[:space:]]*\.getOrElse("\(.*\)")$/\1/p' \
+      build.gradle.kts | head -1
+  )"
+fi
 [[ -n ${project_version} ]] || fail 'could not read the project version from build.gradle.kts'
 
 git_version="$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || true)"
