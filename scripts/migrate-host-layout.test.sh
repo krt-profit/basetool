@@ -931,54 +931,6 @@ check "check says what stop will find: active units by name, services, manager, 
 check "and still changes nothing" test "$BEFORE" = "$(tree_full)"
 : > "$FAKE/ps.out"
 
-echo "== env file modes =="
-
-env_mode_case() {
-  local what="$1" file="$2" mode="$3" state="${4:-template}"
-  restore_state "$state"
-  printf '%s %s\n' "$file" "$mode" > "$FAKE/modes"
-  run_script check
-  check "check blocks ${what} (mode ${mode}), naming only the file" bash -c "test '$RC' = 3 && grep -q '^\[block\] env file ${file} is group-writable or world-accessible' '$OUT' && ! grep -q 'HOSTLOCAL' '$OUT'"
-}
-env_mode_case "a world-readable env backup" /var/iri/code/.env.backup-20260925-175805-step4 644
-env_mode_case "a group-writable env backup" /var/iri/code/.env.backup-20261001-000000-redis 660
-env_mode_case "a world-writable host-local env snapshot" /var/iri/code/.env.bak1 666
-env_mode_case "a world-readable live env file" /var/iri/code/.env 644
-env_mode_case "a world-readable backup.env" /etc/iri/backup.env 604
-env_mode_case "a world-readable env file after the move" /etc/basetool/basetool.env 644 s5
-env_mode_case "a world-readable backup.env after the move" /etc/basetool/deploy/backup.env 644 s5
-env_mode_case "a world-readable host-local env snapshot after the move" /etc/basetool/host-local/release/.env.bak1 644 s5
-env_mode_case "a world-readable rendered env.d file" /var/iri/code/env.d/backend.env 644
-restore_state template
-: > "$FAKE/modes"
-printf '%s\n' /var/iri/code/.env.backup-20260925-175805-step4 > "$FAKE/stat-fail"
-run_script check
-check "check blocks an env file whose mode cannot be read" bash -c "test '$RC' = 3 && grep -q '^\[block\] env file /var/iri/code/.env.backup-20260925-175805-step4 is group-writable or world-accessible' '$OUT'"
-rm -f "$FAKE/stat-fail"
-for ok_mode in 600 640 400 750; do
-  restore_state template
-  printf '%s %s\n' /var/iri/code/.env.backup-20260925-175805-step4 "$ok_mode" > "$FAKE/modes"
-  run_script check
-  check "check accepts an env backup with mode ${ok_mode}" bash -c "test '$RC' = 0 && ! grep -q 'group-writable or world-accessible' '$OUT'"
-done
-restore_state s4
-printf '%s %s\n' /var/iri/code/.env.backup-20260925-175805-step4 644 > "$FAKE/modes"
-refused "move refuses a world-readable env backup, naming only the file" 'group-writable or world-accessible' move
-check "and the refusal names the file" grep -q 'env file: /var/iri/code/.env.backup-20260925-175805-step4' "$OUT"
-restore_state s4
-phase_ok "move leaves the owner and mode of a moved env backup to rename" move
-check "a moved env backup is the same file (rename keeps owner and mode)" bash -c "test \"\$(stat -c %i '$ROOT/etc/basetool/basetool.env.backup-20260925-175805-step4')\" = \"\$(stat -c %i '$CACHE/s4/root/var/iri/code/.env.backup-20260925-175805-step4')\" || test \"\$(stat -c %a '$ROOT/etc/basetool/basetool.env.backup-20260925-175805-step4')\" = \"\$(stat -c %a '$CACHE/s4/root/var/iri/code/.env.backup-20260925-175805-step4')\""
-check "no env backup was copied or chmodded" bash -c "! grep -E 'do: (cp|chmod).*env' '$OUT'"
-
-echo "== a pre-existing host-local directory =="
-
-restore_state s4
-mkdir -p "$ROOT/etc/basetool/host-local/release" "$ROOT/etc/basetool/host-local/data"
-printf '%s\n' '/etc/basetool/host-local/release 1000:1000 755' > "$FAKE/dirstat"
-phase_ok "move succeeds with host-local directories that already exist" move
-check "a pre-existing host-local directory with a wrong owner and mode is corrected" bash -c "grep -q 'do: chmod 0700 $ROOT/etc/basetool/host-local/release\$' '$OUT' && grep -q 'do: chown root:root $ROOT/etc/basetool/host-local/release\$' '$OUT'"
-check "one that already is root:root 0700 is left alone" bash -c "! grep -q 'do: chmod 0700 $ROOT/etc/basetool/host-local/data\$' '$OUT'"
-
 echo "== stop =="
 
 restore_state template
@@ -1246,6 +1198,56 @@ check "the env file is moved before the release tree" bash -c "a=\$(grep -n 'do:
 check "the stack's own data is moved, not copied" bash -c "! grep -q 'do: cp' '$OUT'"
 save_state s5
 noop_rerun "move" move
+
+echo "== env file modes =="
+
+env_mode_case() {
+  local what="$1" file="$2" mode="$3" state="${4:-template}"
+  restore_state "$state"
+  printf '%s %s\n' "$file" "$mode" > "$FAKE/modes"
+  run_script check
+  check "check blocks ${what} (mode ${mode}), naming only the file" bash -c "test '$RC' = 3 && grep -q '^\[block\] env file ${file} is group-writable or world-accessible' '$OUT' && ! grep -q 'HOSTLOCAL' '$OUT'"
+}
+env_mode_case "a world-readable env backup" /var/iri/code/.env.backup-20260925-175805-step4 644
+env_mode_case "a group-writable env backup" /var/iri/code/.env.backup-20261001-000000-redis 660
+env_mode_case "a world-writable host-local env snapshot" /var/iri/code/.env.bak1 666
+env_mode_case "a world-readable live env file" /var/iri/code/.env 644
+env_mode_case "a world-readable backup.env" /etc/iri/backup.env 604
+env_mode_case "a world-readable env file after the move" /etc/basetool/basetool.env 644 s5
+env_mode_case "a world-readable backup.env after the move" /etc/basetool/deploy/backup.env 644 s5
+env_mode_case "a world-readable host-local env snapshot after the move" /etc/basetool/host-local/release/.env.bak1 644 s5
+env_mode_case "a world-readable rendered env.d file" /var/iri/code/env.d/backend.env 644
+restore_state template
+: > "$FAKE/modes"
+printf '%s\n' /var/iri/code/.env.backup-20260925-175805-step4 > "$FAKE/stat-fail"
+run_script check
+check "check blocks an env file whose mode cannot be read" bash -c "test '$RC' = 3 && grep -q '^\[block\] env file /var/iri/code/.env.backup-20260925-175805-step4 is group-writable or world-accessible' '$OUT'"
+rm -f "$FAKE/stat-fail"
+for ok_mode in 600 640 400 750; do
+  restore_state template
+  printf '%s %s\n' /var/iri/code/.env.backup-20260925-175805-step4 "$ok_mode" > "$FAKE/modes"
+  run_script check
+  check "check accepts an env backup with mode ${ok_mode}" bash -c "test '$RC' = 0 && ! grep -q 'group-writable or world-accessible' '$OUT'"
+done
+restore_state s4
+printf '%s %s\n' /var/iri/code/.env.backup-20260925-175805-step4 644 > "$FAKE/modes"
+refused "move refuses a world-readable env backup, naming only the file" 'group-writable or world-accessible' move
+check "and the refusal names the file" grep -q 'env file: /var/iri/code/.env.backup-20260925-175805-step4' "$OUT"
+restore_state s4
+phase_ok "move leaves the owner and mode of a moved env backup to rename" move
+check "a moved env backup is the same file (rename keeps owner and mode)" bash -c "test \"\$(stat -c %i '$ROOT/etc/basetool/basetool.env.backup-20260925-175805-step4')\" = \"\$(stat -c %i '$CACHE/s4/root/var/iri/code/.env.backup-20260925-175805-step4')\" || test \"\$(stat -c %a '$ROOT/etc/basetool/basetool.env.backup-20260925-175805-step4')\" = \"\$(stat -c %a '$CACHE/s4/root/var/iri/code/.env.backup-20260925-175805-step4')\""
+check "no env backup was copied or chmodded" bash -c "! grep -E 'do: (cp|chmod).*env' '$OUT'"
+
+echo "== a pre-existing host-local directory =="
+
+restore_state s4
+mkdir -p "$ROOT/etc/basetool/host-local/release" "$ROOT/etc/basetool/host-local/data"
+printf '%s\n' '/etc/basetool/host-local/release 1000:1000 755' > "$FAKE/dirstat"
+phase_ok "move succeeds with host-local directories that already exist" move
+check "a pre-existing host-local directory with a wrong owner and mode is corrected" bash -c "grep -q 'do: chmod 0700 $ROOT/etc/basetool/host-local/release\$' '$OUT' && grep -q 'do: chown root:root $ROOT/etc/basetool/host-local/release\$' '$OUT'"
+check "one that already is root:root 0700 is left alone" bash -c "! grep -q 'do: chmod 0700 $ROOT/etc/basetool/host-local/data\$' '$OUT'"
+: > "$FAKE/modes"
+rm -f "$FAKE/dirstat"
 
 restore_state s4
 mkdir -p "$ROOT/var/lib/basetool"
