@@ -171,7 +171,8 @@ Phases, in order:
   export-volumes   export the three edge volumes as the old user into the root-only staging dir
   reset-podman     podman system reset as the old user (needs the three verified exports)
   accounts         rename user and group, subuid and subgid, home; linger for the new name
-  move             move every directory and file to its new place, fix the label rules
+  move             park the deploy account's own podman store, move every directory and file to its
+                   new place, fix the label rules
   rewrite          rewrite basetool.env, its backups, backup.env and realm-export.json
   cleanup          remove the old units, logrotate and tmpfiles files and the old label rules
   import-volumes   re-create the edge volumes as the new user and import the exports
@@ -356,6 +357,55 @@ stop_runtime() {
 
 podman_store() {
   printf '%s/.local/share/containers/storage' "$(P "$1")"
+}
+
+store_is_empty_skeleton() {
+  local store="$1" entry rel
+  [[ -d "${store}" && ! -L "${store}" ]] || return 1
+  while IFS= read -r -d '' entry; do
+    rel="${entry#"${store}"/}"
+    case "${rel}" in
+      storage.lock | overlay | overlay/l | overlay/.has-mount-program | overlay-layers | overlay-layers/layers.lock) ;;
+      *) return 1 ;;
+    esac
+  done < <(find "${store}" -mindepth 1 -print0)
+  return 0
+}
+
+store_has_database() {
+  local store
+  store="$(podman_store "$1")"
+  [[ -e "${store}/db.sql" || -e "${store}/libpod" ]]
+}
+
+deploy_store_candidates() {
+  local home
+  home="$(passwd_field "${DEPLOY_USER}" 6)"
+  if [[ -n "${home}" && "${home}" != "${NEW_DEPLOY_HOME}" ]]; then
+    printf '%s\n' "${home}" "${NEW_DEPLOY_HOME}"
+  fi
+}
+
+park_deploy_store() {
+  local home store target="${STAGE}/deploy-podman-storage" uid parked=0
+  user_exists "${DEPLOY_USER}" || return 0
+  while IFS= read -r home; do
+    store="$(podman_store "${home}")"
+    exists_path "${store}" || continue
+    if exists_path "${target}"; then
+      refuse "the deploy account has a podman store under ${home} and ${target} already exists: inspect both and remove one"
+    fi
+    uid="$(passwd_field "${DEPLOY_USER}" 3)"
+    end_pause_process "${uid}"
+    refuse_if_busy user "${uid}" "processes of the ${DEPLOY_USER} account (uid ${uid}) are running: wait for them to end"
+    stage_init
+    say "move: the ${DEPLOY_USER} account's own podman store under ${home} would break podman login after the home moves; parking it"
+    act mv "${store}" "${target}"
+    parked=1
+  done < <(deploy_store_candidates)
+  if (( parked )); then
+    note "kept in ${target}, never deleted; podman login recreates a fresh store"
+  fi
 }
 
 as_user() {
@@ -833,7 +883,7 @@ phase_export_volumes() {
 }
 
 phase_reset_podman() {
-  local uid home
+  local uid home skeleton_target
   if stage_marked reset.done; then
     say "reset-podman: podman system reset as ${OLD_USER}"
     finish reset-podman
@@ -853,7 +903,17 @@ phase_reset_podman() {
   act as_user "${OLD_USER}" podman system reset --force
   stop_runtime "${uid}"
   if (( ! DRY )) && exists_path "$(podman_store "${home}")"; then
-    refuse "a podman store reappeared under ${home} after the reset (a second podman process?): stop it and run the phase again"
+    if store_is_empty_skeleton "$(podman_store "${home}")"; then
+      note "podman recreated an empty store skeleton under ${home} (no database, no images, no containers); staging it"
+      stage_init
+      skeleton_target="${STAGE}/service-podman-skeleton"
+      if exists_path "${skeleton_target}"; then
+        skeleton_target="${skeleton_target}-$(date +%s)"
+      fi
+      act mv "$(podman_store "${home}")" "${skeleton_target}"
+    else
+      refuse "a podman store with content reappeared under ${home} after the reset (a second podman process?): stop it and run the phase again"
+    fi
   fi
   stage_mark reset.done
   finish reset-podman
@@ -963,6 +1023,7 @@ phase_move() {
     print_plan
     refuse "${blockers} path(s) are in conflict or required but absent; fix them and run the phase again"
   fi
+  park_deploy_store
   say "move: ${#PLAN[@]} path(s)"
   for root in "${NEW_PARENTS[@]}"; do
     ensure_tree "${root}"
@@ -1291,6 +1352,45 @@ check_accounts() {
   fi
 }
 
+check_stores() {
+  local home listed=" " deploy_home candidate target="${STAGE}/deploy-podman-storage" store
+  deploy_home="$(passwd_field "${DEPLOY_USER}" 6)"
+  while IFS= read -r candidate; do
+    [[ -n "${candidate}" ]] || continue
+    if exists_path "$(podman_store "${candidate}")"; then
+      if exists_path "${target}"; then
+        report block "the ${DEPLOY_USER} account has a podman store under ${candidate} and ${target} already exists: the move phase would refuse; inspect both and remove one"
+      elif [[ "${candidate}" == "${NEW_DEPLOY_HOME}" ]]; then
+        report todo "a podman store of the ${DEPLOY_USER} account already travelled to ${candidate} (a move that stopped half way): the move phase parks it in ${target}"
+      else
+        report todo "the ${DEPLOY_USER} account has its own podman store under ${candidate}: the move phase parks it in ${target} (podman login breaks otherwise)"
+      fi
+    fi
+  done < <(deploy_store_candidates)
+  if [[ "${deploy_home}" == "${NEW_DEPLOY_HOME}" ]]; then
+    store="$(podman_store "${NEW_DEPLOY_HOME}")"
+    if [[ -f "${store}/db.sql" ]] && grep -qaF /var/lib/iri "${store}/db.sql"; then
+      report warn "the podman database under ${NEW_DEPLOY_HOME}/.local/share/containers/storage still names /var/lib/iri: podman login fails with a database configuration mismatch; park the store in ${target}"
+    fi
+  fi
+  if exists_path "${target}"; then
+    report ok "a podman store of the ${DEPLOY_USER} account is parked in ${target}"
+  fi
+  for home in "$(passwd_field "${OLD_USER}" 6)" "${deploy_home}" "${OLD_HOME}" /var/lib/iri; do
+    [[ -n "${home}" && "${home}" != "${NEW_DEPLOY_HOME}" && "${listed}" != *" ${home} "* ]] || continue
+    listed+="${home} "
+    if store_has_database "${home}"; then
+      if [[ "${home}" == "${deploy_home}" ]]; then
+        report warn "podman database under ${home}/.local/share/containers/storage moves with the home and fails afterwards with a database configuration mismatch (the move phase parks it)"
+      elif [[ "${home}" == "$(passwd_field "${OLD_USER}" 6)" ]]; then
+        report warn "podman database under ${home}/.local/share/containers/storage moves with the home and fails afterwards with a database configuration mismatch (reset-podman removes it)"
+      else
+        report warn "podman database under ${home}/.local/share/containers/storage would move with its home and fail afterwards with a database configuration mismatch: park or remove it before the window"
+      fi
+    fi
+  done
+}
+
 check_units() {
   local f unit n=0 dir name
   shopt -s nullglob
@@ -1527,6 +1627,16 @@ check_filesystems() {
       fi
     fi
   done
+  for home in "$(passwd_field "${DEPLOY_USER}" 6)" /var/lib/iri; do
+    if [[ -n "${home}" ]] && exists_path "$(podman_store "${home}")"; then
+      od="$(stat -c %d "$(podman_store "${home}")")"
+      nd="$(stat -c %d "$(P "$(nearest_existing "${STAGE#"${ROOT}"}")")")"
+      if [[ "${od}" != "${nd}" ]]; then
+        report info "the deploy podman store under ${home} and ${STAGE} are on different filesystems: parking it copies instead of renaming"
+      fi
+      break
+    fi
+  done
 }
 
 nearest_existing() {
@@ -1644,6 +1754,7 @@ phase_check() {
   check_tools
   check_accounts
   check_units
+  check_stores
   check_window
   check_plan
   check_filesystems

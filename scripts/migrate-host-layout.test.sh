@@ -158,6 +158,21 @@ case "$1 $2" in
       mkdir -p "$ROOT/home/iri/.local/share/containers/storage/libpod"
       : > "$ROOT/home/iri/.local/share/containers/storage/libpod/db.sql"
     fi
+    if [[ -e "$FAKE/recreate-skeleton" ]]; then
+      s="$ROOT/home/iri/.local/share/containers/storage"
+      link=""
+      if [[ -e "$FAKE/skeleton-symlink" ]]; then
+        link="$s"
+        s="$FAKE/real-store"
+        mkdir -p "$(dirname "$link")"
+        ln -s "$s" "$link"
+      fi
+      mkdir -p "$s/overlay/l" "$s/overlay-layers"
+      : > "$s/storage.lock"
+      : > "$s/overlay/.has-mount-program"
+      : > "$s/overlay-layers/layers.lock"
+      if [[ -e "$FAKE/skeleton-with-images" ]]; then mkdir -p "$s/overlay-images"; fi
+    fi
     exit 0
     ;;
   *) case "$1" in --version) echo "podman version 5.8.2" ;; esac ;;
@@ -351,6 +366,8 @@ build_template() {
   mkfile "$ROOT/var/lib/systemd/linger/iri" ''
   mkfile "$ROOT/home/iri/.config/containers/containers.conf" 'pasta'
   mkfile "$ROOT/home/iri/.local/share/containers/storage/db.sql" 'db'
+  mkfile "$ROOT/var/lib/iri/.local/share/containers/storage/libpod/bolt_state.db" 'DEPLOY-STORE'
+  mkfile "$ROOT/var/lib/iri/.local/share/containers/storage/db.sql" 'DEPLOY-SQL'
   local u="$ROOT/etc/containers/systemd/users/994" v t s c f row
   for v in edge-certs edge-acme-state edge-acme-webroot; do
     mkfile "$u/${v}.volume" "[Volume]
@@ -843,6 +860,8 @@ check "check names the files that still mention the old layout" bash -c "grep -q
 check "check prints the plan" grep -q '^\[info\] plan: stop -> export-volumes' "$OUT"
 check "check says the cleanup waits for the role" grep -q 'basetool-\* units are not installed yet' "$OUT"
 check "check reports the staging directory it would create" grep -q 'staging directory .* will be created' "$OUT"
+check "check says the move phase parks the deploy account's own podman store" grep -q '^\[todo\] the deploy account has its own podman store under /var/lib/iri: the move phase parks it in .*/deploy-podman-storage' "$OUT"
+check "check warns about the database under the deploy home and under the service home" bash -c "grep -q '^\[warn\] podman database under /var/lib/iri/.local/share/containers/storage moves with the home' '$OUT' && grep -q '^\[warn\] podman database under /home/iri/.local/share/containers/storage moves with the home' '$OUT'"
 
 block_case() {
   local what="$1" pattern="$2" before after
@@ -869,6 +888,9 @@ block_case "a target that exists next to its source" 'both exist: /var/iri/code/
 restore_state template
 mkdir -p "$ROOT/home/basetool"
 block_case "the new home already existing" '/home/basetool already exists'
+restore_state template
+mkdir -p "$ROOT/root/basetool-migration/deploy-podman-storage"
+block_case "a deploy podman store and its parking place both existing" 'the deploy account has a podman store under /var/lib/iri and .*deploy-podman-storage already exists'
 restore_state template
 printf 'iri:200000:65536\n' > "$ROOT/etc/subuid"
 block_case "a subuid range other than the expected one" 'subuid/subgid do not both hold iri:100000:65536'
@@ -1069,6 +1091,23 @@ touch "$FAKE/recreate-db"
 refused_late "reset-podman refuses when a store reappears after the reset" 'reappeared' reset-podman
 check "and records no reset" test ! -e "$ROOT/root/basetool-migration/state/reset.done"
 refused "accounts then refuses as well" 'reset-podman has not completed' accounts
+restore_state s2
+touch "$FAKE/recreate-skeleton"
+phase_ok "reset-podman accepts the empty store skeleton podman recreates" reset-podman
+check "and stages it instead of deleting it" bash -c "test ! -e '$ROOT/home/iri/.local/share/containers/storage' && test -f '$ROOT/root/basetool-migration/service-podman-skeleton/storage.lock'"
+check "and records the reset" test -e "$ROOT/root/basetool-migration/state/reset.done"
+restore_state s2
+touch "$FAKE/recreate-skeleton" "$FAKE/skeleton-with-images"
+refused_late "reset-podman refuses a skeleton that also holds an images directory" 'reappeared' reset-podman
+check "and leaves it in place" test -d "$ROOT/home/iri/.local/share/containers/storage/overlay-images"
+restore_state s2
+touch "$FAKE/recreate-skeleton" "$FAKE/recreate-db"
+refused_late "reset-podman refuses a skeleton that carries a database" 'reappeared' reset-podman
+check "and records no reset either" test ! -e "$ROOT/root/basetool-migration/state/reset.done"
+restore_state s2
+touch "$FAKE/recreate-skeleton" "$FAKE/skeleton-symlink"
+refused_late "reset-podman refuses a store that is a symlink, even to an empty skeleton" 'reappeared' reset-podman
+check "and leaves the link in place" test -L "$ROOT/home/iri/.local/share/containers/storage"
 restore_state s3
 check "after a good reset the old store is gone" test ! -e "$ROOT/home/iri/.local/share/containers/storage"
 mkdir -p "$ROOT/home/iri/.local/share/containers/storage/libpod"
@@ -1140,6 +1179,21 @@ restore_state s4
 printf '  120000  999 postgres\n' > "$FAKE/ps.out"
 refused "move refuses while container processes run" 'container processes' move
 restore_state s4
+printf '  992  555 podman\n' > "$FAKE/ps.out"
+refused "move refuses while a process of the deploy account runs" 'processes of the deploy account' move
+check "and the deploy account's podman store stays where it was" test -e "$ROOT/var/lib/iri/.local/share/containers/storage/db.sql"
+restore_state s4
+mkdir -p "$ROOT/root/basetool-migration/deploy-podman-storage"
+refused "move refuses when the parking place for the deploy store is taken" 'deploy-podman-storage already exists' move
+restore_state s4
+mkdir -p "$ROOT/var/lib/basetool"
+chmod 0755 "$ROOT/var/lib/basetool"
+mv "$ROOT/var/lib/iri" "$ROOT/var/lib/basetool/deploy"
+run_script check
+check "check reports a deploy store that travelled before the account home changed" grep -q '^\[todo\] a podman store of the deploy account already travelled to /var/lib/basetool/deploy' "$OUT"
+phase_ok "move resumes after the deploy state moved but the account home did not" move
+check "the resumed move parks the store that travelled" bash -c "test \"\$(cat '$ROOT/root/basetool-migration/deploy-podman-storage/db.sql')\" = DEPLOY-SQL && test ! -e '$ROOT/var/lib/basetool/deploy/.local/share/containers/storage' && grep -qx 'deploy:x:992:992::/var/lib/basetool/deploy:/sbin/nologin' '$ROOT/etc/passwd'"
+restore_state s4
 mkfile "$ROOT/etc/basetool/basetool.env" 'in the way'
 refused "move refuses a target that exists with other content" '1 path\(s\) are in conflict' move
 check "the conflict leaves the source in place" test -e "$ROOT/var/iri/code/.env"
@@ -1180,6 +1234,9 @@ check "a host-local file keeps its mode" test "$(stat -c %a "$ROOT/etc/basetool/
 check "release entries are not treated as host-local" bash -c "! ls '$ROOT/etc/basetool/host-local/release' | grep -qE '^(scripts|monitoring|keycloak|docker-compose.yml)\$'"
 check "semanage, usermod and groupmod ran with umask 0022" bash -c "grep -q '^semanage' '$FAKE/umask.log' && grep -q '^usermod' '$FAKE/umask.log' && grep -q '^groupmod' '$FAKE/umask.log' && ! grep -qv ' 0022\$' '$FAKE/umask.log'"
 check "the deploy account's home follows its state directory" grep -qx 'deploy:x:992:992::/var/lib/basetool/deploy:/sbin/nologin' "$ROOT/etc/passwd"
+check "the deploy account's own podman store is parked in the staging directory, content intact" bash -c "test \"\$(cat '$ROOT/root/basetool-migration/deploy-podman-storage/libpod/bolt_state.db')\" = DEPLOY-STORE && test \"\$(cat '$ROOT/root/basetool-migration/deploy-podman-storage/db.sql')\" = DEPLOY-SQL"
+check "and no podman store is left under the new deploy home" test ! -e "$ROOT/var/lib/basetool/deploy/.local/share/containers/storage"
+check "the rest of the deploy account's home still arrives" test -f "$ROOT/var/lib/basetool/deploy/.docker/config.json"
 while read -r pattern type; do
   check_fctx "label rule ${pattern} ${type}" "$pattern" "$type"
 done <<'RULES'
@@ -1198,6 +1255,11 @@ check "the env file is moved before the release tree" bash -c "a=\$(grep -n 'do:
 check "the stack's own data is moved, not copied" bash -c "! grep -q 'do: cp' '$OUT'"
 save_state s5
 noop_rerun "move" move
+check "a second move parks nothing" bash -c "! grep -q 'deploy-podman-storage' '$OUT'"
+restore_state s5
+mkfile "$ROOT/var/lib/basetool/deploy/.local/share/containers/storage/db.sql" 'static dir /var/lib/iri/.local/share/containers/storage/libpod'
+run_script check
+check "check warns about a store under the new deploy home whose database still names the old one" grep -q '^\[warn\] the podman database under /var/lib/basetool/deploy/.local/share/containers/storage still names /var/lib/iri' "$OUT"
 
 echo "== env file modes =="
 

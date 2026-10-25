@@ -229,6 +229,11 @@ Run as root from `/` (`ssh greluc@<host>`, `sudo -i`, `M` as in §4). Every WRIT
 each `migrate-host-layout.sh` phase read its closing line and the exit code (§3); each phase takes
 `--dry-run` first (prints `would: …`, changes nothing) and is safe to run again after a failure.
 
+A command block is easier to run as a script than to paste into the ssh session: write it to
+`/home/<operator>/stepN.sh`, start it with `cd /`, read it once, then run `bash /home/<operator>/stepN.sh`
+as root (in a `sudo -i` shell `~` is `/root`, so name the operator's home explicitly). Delete the file
+afterwards when it names a secret or its path.
+
 1. **Announce the start** to the members and the exchange developers. **WRITE** (external).
 
 2. **Stop the job timers** and wait for running jobs. Optionally silence Alertmanager for the window (the
@@ -296,7 +301,9 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
 
    `--check` lists the open `~` changes (realm, default role, the frontend client's labels when they still
    carry the old brand) and no `!` line. If `--apply` ends with `PENDING:` (exit `2`), log in against the
-   **new** realm and run it again; exit `1` is a real failure: read it, fix the cause, re-run.
+   **new** realm and run it again; exit `1` is a real failure: read it, fix the cause, re-run. The first
+   `config credentials` against the new realm is rejected when the client secret is mistyped; nothing is
+   half-done then, so the resume is only: log in to `basetool` again and run `--apply` again.
 
    ```bash
    sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
@@ -331,7 +338,9 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
 
 10. **`reset-podman`** — `podman system reset --force` as `iri`: **deletes every image, container, volume
     and network of that user**; it runs only after the three exports are verified, and it asserts that the
-    old store directory is gone afterwards. **WRITE — destructive, named in the approval.**
+    old store directory is gone afterwards. Podman may recreate an empty skeleton there (a lock file and
+    empty `overlay` directories, no database, no images, no containers); the phase removes exactly that
+    and refuses on anything else. **WRITE — destructive, named in the approval.**
 
     ```bash
     bash "$M/migrate-host-layout.sh" reset-podman
@@ -353,7 +362,11 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
     modes and labels travel), the `deploy` home, the seven new SELinux rules, the two old ones deleted,
     `restorecon -RF` on the five roots. Entries of `/var/iri` and its service directories, `/var/iri/monitoring`
     and `/var/iri/code` that the plan does not map go to `/etc/basetool/host-local/…` (see §1). It refuses, and prints the
-    table, while a row is in conflict. **WRITE.**
+    table, while a row is in conflict. The `deploy` account has its own rootless Podman store in its home
+    (used only for `podman login`); it would fail after the home moves with `database configuration
+    mismatch`, so the phase first moves it to `/root/basetool-migration/deploy-podman-storage` (never
+    deleted; the next `podman login` creates a fresh one) and refuses while a `deploy` process runs.
+    **WRITE.**
 
     ```bash
     bash "$M/migrate-host-layout.sh" move
@@ -406,11 +419,13 @@ each `migrate-host-layout.sh` phase read its closing line and the exit code (§3
     UCTL="sudo -u basetool XDG_RUNTIME_DIR=/run/user/${BASETOOL_UID} systemctl --user"
     UPOD="sudo -u basetool podman"
     ${UPOD} volume ls
-    for v in edge-certs edge-acme-state edge-acme-webroot; do ls -ln "$(${UPOD} volume inspect "$v" --format '{{.Mountpoint}}')" | head -n 5; done
+    for v in edge-certs edge-acme-state edge-acme-webroot; do d="$(${UPOD} volume inspect "$v" --format '{{.Mountpoint}}')"; ls -ldn "$d"; ls -ln "$d" | head -n 5; done
     ```
 
-    The listing must show the three volumes and file owners inside `100000-165535` (the translated
-    container uids).
+    The listing must show the three volumes. `ls -ldn` of a volume's mountpoint shows the directory owned by
+    the service uid itself (container root maps to it); the entries listed inside, the key files, belong to
+    the translated container uid `101`, which is subuid `100100` on a host with the subuid range starting at
+    `100000`.
 
 17. **Host scripts match the tag** — the mandatory comparison of
     [`deployment.md` → Before a promotion: the host scripts](deployment.md#before-a-promotion-the-host-scripts),

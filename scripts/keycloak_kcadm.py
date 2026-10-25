@@ -31,9 +31,14 @@ class Kcadm:
 
     def _run(self, args: list[str], stdin: str | None = None) -> str:
         command = self.prefix + args
-        completed = subprocess.run(
-            command, input=stdin, capture_output=True, text=True, check=False
-        )
+        if stdin is None:
+            completed = subprocess.run(
+                command, stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False
+            )
+        else:
+            completed = subprocess.run(
+                command, input=stdin, capture_output=True, text=True, check=False
+            )
         if completed.returncode != 0:
             raise KcadmError(
                 f"{shlex.join(command)}\n"

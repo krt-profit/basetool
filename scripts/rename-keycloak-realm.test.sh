@@ -471,6 +471,29 @@ run_renamer "$state" --apply
 assert_eq "$(rc_of "$state")" "1" "a default role that is no longer the renamed role fails the run"
 assert_contains "$(out_of "$state")" "no longer the role that was renamed" "naming the cause"
 
+echo "== kcadm stdin =="
+
+cat > "${WORK}/stdin_probe.py" <<'STUB'
+import sys
+
+sys.stdout.write("[" + sys.stdin.read() + "]")
+STUB
+cat > "${WORK}/stdin_check.py" <<'STUB'
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from keycloak_kcadm import Kcadm
+
+kc = Kcadm([sys.executable, sys.argv[2]], "r", False)
+print("none:" + kc._run(["get"]))
+print("body:" + kc._run(["update"], stdin="PAYLOAD"))
+STUB
+printf 'LEAKED-FROM-THE-OPERATOR-TTY' | "$PYTHON" -I "${WORK}/stdin_check.py" "$(to_child_path "$SCRIPT_DIR")" "$(to_child_path "${WORK}/stdin_probe.py")" > "${WORK}/stdin.out" 2>&1
+assert_eq "$?" "0" "the wrapper runs a command with and without input"
+assert_contains "$(cat "${WORK}/stdin.out")" "none:[]" "without input the child's stdin is closed, not inherited from the caller"
+assert_not_contains "$(cat "${WORK}/stdin.out")" "LEAKED" "nothing of the caller's stdin reaches the child"
+assert_contains "$(cat "${WORK}/stdin.out")" "body:[PAYLOAD]" "with input the child still receives it"
+
 echo "== usage =="
 
 "$PYTHON" "$RENAMER" --help > "${WORK}/help.out" 2>&1
