@@ -5,7 +5,7 @@ x-logging: &default-logging
     max-file: "5"
 
 x-db-backend: &db-backend-template
-  image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+  image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
   restart: unless-stopped
   logging: *default-logging
   security_opt:
@@ -52,7 +52,7 @@ x-db-backend: &db-backend-template
     - /var/lib/basetool/db-backend:/var/lib/postgresql/data
 
 x-db-keycloak: &db-keycloak-template
-  image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+  image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
   restart: unless-stopped
   logging: *default-logging
   security_opt:
