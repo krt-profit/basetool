@@ -921,15 +921,15 @@ scripts/check-monitoring-configs.test.sh
 # with the directory elsewhere it matches nothing and promtool silently checks no rule file at all.
 docker run --rm --entrypoint promtool \
   -v "$PWD/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
-  -v "$PWD/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro" prom/prometheus:v3.15.0 \
+  -v "$PWD/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro" prom/prometheus:v3.15.1 \
   check config /etc/prometheus/prometheus.yml
 # The glob'd commands go through `sh -c` so the pattern is expanded INSIDE the container.
-docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.15.0 \
+docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.15.1 \
   -c 'promtool check rules /cfg/alerts/*.yml'
 
 # Alert-rule unit tests (-w /work makes the tests' ../alerts paths resolve)
 docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-  prom/prometheus:v3.15.0 -c 'promtool test rules tests/*_test.yml'
+  prom/prometheus:v3.15.1 -c 'promtool test rules tests/*_test.yml'
 
 # Loki ruler rules — every file parses and every expr is valid LogQL (CI: repo-lint)
 scripts/check-loki-rules.sh

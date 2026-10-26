@@ -292,12 +292,12 @@ esac
 say ""
 say "== Prometheus itself accepts the output =="
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  if docker run --rm -i --entrypoint promtool prom/prometheus:v3.15.0 check metrics < "$OUT" \
+  if docker run --rm -i --entrypoint promtool prom/prometheus:v3.15.1 check metrics < "$OUT" \
        >/dev/null 2>&1; then
     ok "promtool check metrics accepts the file"
   else
     bad "promtool check metrics accepts the file"
-    docker run --rm -i --entrypoint promtool prom/prometheus:v3.15.0 check metrics < "$OUT" 2>&1 \
+    docker run --rm -i --entrypoint promtool prom/prometheus:v3.15.1 check metrics < "$OUT" 2>&1 \
       | sed 's/^/      /' | head -10
   fi
 else
