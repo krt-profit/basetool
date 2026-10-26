@@ -946,7 +946,7 @@ docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanag
 # record is gone (ADR-0268).
 docker run --rm -d --name bb-lint -p 19115:9115 \
   -v "$PWD/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro" \
-  prom/blackbox-exporter:v0.29.0 --config.file=/etc/blackbox/blackbox.yml
+  prom/blackbox-exporter:v0.29.1 --config.file=/etc/blackbox/blackbox.yml
 docker logs bb-lint 2>&1 | grep -E "Loaded config file|level=ERROR"
 for m in dns_apex_a dns_apex_aaaa dns_api_absent dns_api_absent_aaaa; do
   echo "$m: $(curl -s "http://localhost:19115/probe?module=$m&target=1.1.1.1" \
