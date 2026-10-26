@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [v1.20.1](https://github.com/krt-profit/basetool/releases/tag/v1.20.1) - 2026-10-26
+
+### Security
+
+- **Build-Werkzeuge.** `filelock` 4.2.1 in der ansible-lint-Toolchain der CI und `fast-uri` 3.1.9
+  im Lint-Werkzeug des Frontends schließen sieben Dependabot-Meldungen. Die ausgelieferten
+  Anwendungen sind nicht betroffen.
+
+- **Backup.** Die Hilfscontainer der Sicherung schreiben die gelesenen Schlüssel, Zertifikate und
+  Monitoring-Daten nicht mehr zusätzlich ins Systemjournal des Servers.
+
+- **Build-Werkzeuge.** Node.js 24.22.1 für die Frontend-Lints schließt die Brotli-Lücke
+  CVE-2026-111497 im Build. Die ausgelieferten Anwendungen sind nicht betroffen.
+
 ## [v1.20.0](https://github.com/krt-profit/basetool/releases/tag/v1.20.0) - 2026-10-25
 
 ### Changed
