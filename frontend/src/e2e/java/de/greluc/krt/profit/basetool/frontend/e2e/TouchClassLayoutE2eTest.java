@@ -553,6 +553,7 @@ class TouchClassLayoutE2eTest {
     page.waitForFunction(
         "() => document.readyState === 'complete'"
             + " && (!document.fonts || document.fonts.status === 'loaded')"
+            + " && !document.querySelector('main [aria-busy=\"true\"]')"
             + " && (!document.querySelector('.krt-footer')"
             + "     || getComputedStyle(document.documentElement)"
             + "         .getPropertyValue('--krt-footer-height').trim() !== '')");
