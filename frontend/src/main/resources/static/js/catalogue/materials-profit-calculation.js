@@ -76,7 +76,8 @@ function systemChecks() {
 }
 
 /**
- * Shows the result state below the table: a message, or nothing once rows are shown.
+ * Shows the result state below the table: a message, or nothing once rows are shown. The results
+ * carry `aria-busy="true"` while a calculation is loading.
  *
  * @param {'idle' | 'loading' | 'ready' | 'empty' | 'error'} state the state
  * @param {string} [message] the message for every state but `ready`
@@ -85,7 +86,10 @@ function setState(state, message) {
     const results = document.getElementById('profitResults');
     const box = document.getElementById('profitState');
     const text = document.getElementById('profitStateText');
-    if (results) results.setAttribute('data-state', state);
+    if (results) {
+        results.setAttribute('data-state', state);
+        results.setAttribute('aria-busy', String(state === 'loading'));
+    }
     if (box) {
         box.hidden = state === 'ready';
         box.classList.toggle('profit-state--error', state === 'error');
