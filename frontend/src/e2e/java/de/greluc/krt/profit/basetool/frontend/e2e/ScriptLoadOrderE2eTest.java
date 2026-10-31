@@ -21,6 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -76,6 +80,9 @@ class ScriptLoadOrderE2eTest {
       }
       """;
 
+  /** The name Playwright gives the WebKit engine. */
+  private static final String WEBKIT = "webkit";
+
   private static Playwright playwright;
   private static Browser browser;
   private static Path storageState;
@@ -101,6 +108,39 @@ class ScriptLoadOrderE2eTest {
   }
 
   /**
+   * Whether a beacon is the {@code style-src-attr} violation WebKit 27 reports for the user-agent
+   * shadow tree of every native {@code <select>}: no source file, nothing the page wrote. A real
+   * inline {@code style} attribute in a template still fails the Chromium and Firefox runs.
+   *
+   * @param payload the beacon's JSON body
+   * @return {@code true} for exactly that violation
+   */
+  private static boolean isWebkitSelectShadowViolation(String payload) {
+    JsonObject beacon;
+    try {
+      beacon = JsonParser.parseString(payload).getAsJsonObject();
+    } catch (JsonParseException | IllegalStateException _) {
+      return false;
+    }
+    return "csp_violation".equals(text(beacon, "kind"))
+        && "style-src-attr".equals(text(beacon, "message"))
+        && "inline".equals(text(beacon, "source"))
+        && "inline".equals(text(beacon, "codeOrigin"));
+  }
+
+  /**
+   * Reads one string member of a beacon.
+   *
+   * @param beacon the parsed beacon
+   * @param name the member name
+   * @return the member's text, or {@code null} when it is absent or not a string
+   */
+  private static String text(JsonObject beacon, String name) {
+    JsonElement value = beacon.get(name);
+    return value != null && value.isJsonPrimitive() ? value.getAsString() : null;
+  }
+
+  /**
    * Loads one page route and asserts the deferred scripts installed everything and nothing failed.
    *
    * @param path the app-relative path of the page to load
@@ -117,9 +157,12 @@ class ScriptLoadOrderE2eTest {
       List<String> pageErrors = new CopyOnWriteArrayList<>();
       List<String> beacons = new CopyOnWriteArrayList<>();
       page.onPageError(pageErrors::add);
+      boolean webkit = WEBKIT.equals(browser.browserType().name());
       page.onRequest(request -> {
-        if (request.url().contains("/internal/client-error")) {
-          beacons.add(String.valueOf(request.postData()));
+        String payload = String.valueOf(request.postData());
+        if (request.url().contains("/internal/client-error")
+            && !(webkit && isWebkitSelectShadowViolation(payload))) {
+          beacons.add(payload);
         }
       });
       try {

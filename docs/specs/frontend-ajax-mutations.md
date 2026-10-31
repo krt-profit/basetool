@@ -2275,7 +2275,9 @@ compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
 - [x] No inline page script makes a top-level call other than element look-ups, listener and
   `krtEvents` registrations, and no inline page script is an immediately invoked function.
 - [x] On every core page, after load, the shared globals exist, the `krtEvents` stub is replaced, no
-  script threw and no client-error beacon was sent.
+  script threw and no client-error beacon was sent. On WebKit the one `style-src-attr` violation
+  with no source file is tolerated: WebKit 27 reports it for the user-agent shadow tree of every native
+  `<select>`, not for anything the page wrote; Chromium and Firefox still fail on any beacon.
 
 **Enforced by:** `InlineScriptLoadOrderTest` (the first two), `ScriptLoadOrderE2eTest` (the third,
 over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `kernel/fragments/head.html`, `event-delegation.js`,
