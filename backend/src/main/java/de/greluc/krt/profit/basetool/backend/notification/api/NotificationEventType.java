@@ -324,6 +324,12 @@ public enum NotificationEventType {
   INVENTORY_POOL_CHANGED_BY_OTHER,
 
   /**
+   * A minimum stock level of a unit's pool turned low (REQ-NOTIF-030). The default rule notifies
+   * the direct Logisticians and the seat holders of the unit.
+   */
+  INVENTORY_STOCK_LEVEL_LOW,
+
+  /**
    * The responsible holder approved an over-limit booking request, so it is ready to be confirmed
    * (REQ-BANK-057). The default rule notifies the bank employees granted on the account, the bank
    * management and the requester.

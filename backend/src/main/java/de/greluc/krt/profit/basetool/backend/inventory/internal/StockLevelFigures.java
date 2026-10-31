@@ -77,7 +77,7 @@ public class StockLevelFigures {
     if (levels.isEmpty()) {
       return List.of();
     }
-    Map<UUID, Fill> fills = allocate(levels);
+    Map<UUID, Fill> fills = fillsOf(levels);
     Map<PoolKey, List<Request>> requests = requestsOf(levels);
     Map<UUID, Boolean> editable = new HashMap<>();
     return levels.stream()
@@ -100,7 +100,7 @@ public class StockLevelFigures {
   public @NotNull StockLevelDto toDto(@NotNull StockLevel level) {
     List<StockLevel> siblings =
         stockLevelRepository.findByUnitAndSubject(level.getOrgUnit().getId(), level.subjectId());
-    Map<UUID, Fill> fills = allocate(siblings);
+    Map<UUID, Fill> fills = fillsOf(siblings);
     return dtoOf(
         level,
         fills,
@@ -108,7 +108,17 @@ public class StockLevelFigures {
         accessPolicy.canMaintainStockLevelsOf(level.getOrgUnit().getId()));
   }
 
-  private @NotNull Map<UUID, Fill> allocate(@NotNull List<StockLevel> levels) {
+  /**
+   * Allocates the pool stock to the levels, without the requested amounts. Every level of a
+   * material in a unit must be passed together, since the allocation runs over all of them.
+   *
+   * @param levels the levels, units and catalogue entries loaded
+   * @return the figures by level id
+   */
+  public @NotNull Map<UUID, Fill> fillsOf(@NotNull List<StockLevel> levels) {
+    if (levels.isEmpty()) {
+      return Map.of();
+    }
     Set<UUID> units = levels.stream().map(l -> l.getOrgUnit().getId()).collect(Collectors.toSet());
     Set<UUID> subjects = levels.stream().map(StockLevel::subjectId).collect(Collectors.toSet());
     Map<PoolKey, List<Lot>> lots =

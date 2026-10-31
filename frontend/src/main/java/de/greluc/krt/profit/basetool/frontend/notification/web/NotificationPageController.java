@@ -107,7 +107,7 @@ public class NotificationPageController {
 
   /** Render parameters that carry an amount and are shown with thousands separators. */
   private static final Set<String> AMOUNT_PARAMETERS =
-      Set.of("amount", "fee", "balance", "total", "open", "donation");
+      Set.of("amount", "fee", "balance", "total", "open", "donation", "minimum");
 
   /**
    * A plain, locale-free decimal as the backend stores it, e.g. {@code 1500000} or {@code 12.50}.

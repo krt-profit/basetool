@@ -287,6 +287,29 @@ class StockLevelTabRenderTest {
 
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
+  void aLowGameItemRowOffersBothShortcutsWithTheItemAndTheShortfall() throws Exception {
+    StockLevelDto low = itemLevel("Gatling S2", 1.0);
+    supplyOn = true;
+    supplyUnits = List.of(supplyUnit(true, true));
+
+    String html = render(List.of(low), List.of(ARGON), "");
+
+    assertThat(html)
+        .contains("data-testid=\"stock-level-order\"")
+        .contains("/orders/create?gameItemId=" + low.gameItem().id())
+        .contains("gameItemName=Gatling%20S2")
+        .contains("amount=3.0")
+        .contains("requestingOrgUnitId=" + ARGON.id())
+        .doesNotContain("materialId=")
+        .contains("data-testid=\"stock-level-need\"")
+        .contains("/supply/needs?needUnit=" + ARGON.id())
+        .contains("needItem=" + low.gameItem().id())
+        .doesNotContain("needMaterial=")
+        .doesNotContain("needTier=");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
   void aRowThatIsNotLowOrNotEditableOffersNoShortcut() throws Exception {
     supplyOn = true;
     supplyUnits = List.of(supplyUnit(true, true));
