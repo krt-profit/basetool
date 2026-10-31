@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.promotion.web;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.OfficerSurfaceGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
@@ -276,15 +276,15 @@ public class PromotionPageController {
   }
 
   /**
-   * Renders the evaluation management page for ADMIN and OFFICER, including each member's promotion
-   * eligibility.
+   * Renders the evaluation management page for callers with promotion management, including each
+   * member's promotion eligibility.
    *
    * <p>Also provides {@code categoriesByTopic} and {@code categoryCountByTopic} for the two-row
    * header; the order of {@code topics} matches the column order of {@code allCategories}.
    */
   @NotNull
   @GetMapping("/manage")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public String manage(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
@@ -364,7 +364,7 @@ public class PromotionPageController {
    */
   @NotNull
   @GetMapping("/admin/topics")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public String adminTopics(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
@@ -403,7 +403,7 @@ public class PromotionPageController {
    */
   @NotNull
   @GetMapping("/admin/rank-requirements")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public String adminRankRequirements(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,

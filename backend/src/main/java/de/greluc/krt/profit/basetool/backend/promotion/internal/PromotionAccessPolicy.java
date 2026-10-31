@@ -19,16 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 /**
  * The promotion module's access policy (plan §5.4, ADR-0236): the per-Staffel feature flag and the
- * read gate every Beförderung read and write consults, built on the scope kernel.
+ * read gate every Beförderung read and write consults, and the officer-reach checks of its writes
+ * (REQ-SEC-015), built on the scope kernel.
  */
 @Component("promotionAccessPolicy")
 @RequiredArgsConstructor
@@ -36,6 +40,7 @@ public class PromotionAccessPolicy {
 
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelper;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
    * Whether the per-squadron promotion feature flag is on for the caller's scope: the flag of the
@@ -68,6 +73,39 @@ public class PromotionAccessPolicy {
       throw new AccessDeniedException(
           "Promotion feature is disabled for the caller's squadron; ask an administrator to"
               + " re-enable it.");
+    }
+  }
+
+  /**
+   * Refuses the call unless the caller holds officer reach in the squadron that owns the promotion
+   * data being written; admins pass.
+   *
+   * @param squadronId the owning squadron of the topic, category, level content or requirement
+   * @throws AccessDeniedException if the caller holds no officer reach in {@code squadronId}
+   */
+  public void assertOfficerIn(@NotNull UUID squadronId) {
+    if (!ownerScopeService.canActAsOfficerIn(squadronId)) {
+      throw new AccessDeniedException("Caller holds no officer reach in the owning squadron");
+    }
+  }
+
+  /**
+   * Refuses the call unless the caller may act on the member as an officer: admins pass, others
+   * need officer reach in at least one of the member's Staffeln (REQ-ORG-017).
+   *
+   * @param userId the {@code app_user.id} of the member being evaluated; never {@code null}
+   * @throws AccessDeniedException if the caller holds officer reach in none of the member's
+   *     Staffeln
+   */
+  public void assertOfficerOverMember(@NotNull UUID userId) {
+    if (authHelper.isAdmin()) {
+      return;
+    }
+    boolean reaches =
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId).stream()
+            .anyMatch(ownerScopeService::canActAsOfficerIn);
+    if (!reaches) {
+      throw new AccessDeniedException("Caller holds no officer reach over this member");
     }
   }
 }

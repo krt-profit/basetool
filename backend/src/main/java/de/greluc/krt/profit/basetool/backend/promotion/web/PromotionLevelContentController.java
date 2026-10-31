@@ -130,15 +130,17 @@ public class PromotionLevelContentController {
   /**
    * Persists a new {@link
    * de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContent}, binding the
-   * expectations of a single rank level to the referenced category. Restricted to ADMIN or OFFICER
-   * callers.
+   * expectations of a single rank level to the referenced category. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param request validated payload describing the new level content
    * @return the persisted level content in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new level content. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new level content. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Level content created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -160,7 +162,8 @@ public class PromotionLevelContentController {
    * @return the updated level content in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a level content. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Update a level content. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Level content updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -175,14 +178,15 @@ public class PromotionLevelContentController {
   }
 
   /**
-   * Permanently removes the level content identified by {@code id}. Restricted to ADMIN or OFFICER
-   * callers.
+   * Permanently removes the level content identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the level content to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a level content. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Delete a level content. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")

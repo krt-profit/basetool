@@ -157,14 +157,18 @@ public class PromotionCategoryController {
   /**
    * Persists a new {@link
    * de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategory} attached to the
-   * topic referenced by the request. Restricted to ADMIN or OFFICER callers.
+   * topic referenced by the request. Restricted to admins and callers with officer reach in the
+   * owning squadron.
    *
    * @param request validated payload describing the new category
    * @return the persisted category in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new promotion category. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new promotion category. Requires ADMIN or officer reach in the owning"
+              + " squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Category created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -187,7 +191,9 @@ public class PromotionCategoryController {
    * @return the updated category in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a promotion category. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Update a promotion category. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Category updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -202,14 +208,16 @@ public class PromotionCategoryController {
   }
 
   /**
-   * Permanently removes the promotion category identified by {@code id}. Restricted to ADMIN or
-   * OFFICER callers.
+   * Permanently removes the promotion category identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the category to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a promotion category. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Delete a promotion category. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Category deleted."),
     @ApiResponse(responseCode = "404", description = "Category not found.")

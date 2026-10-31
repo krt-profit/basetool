@@ -212,6 +212,16 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canActAsOfficerAnywhere()}: whether the caller holds
+   * officer reach in at least one unit.
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in any unit
+   */
+  public boolean canActAsOfficerAnywhere() {
+    return accessGateService.canActAsOfficerAnywhere();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#canActAsOfficerInActiveContext()}: whether the caller
    * holds officer reach in the pinned unit, or in any unit when nothing is pinned.
    *

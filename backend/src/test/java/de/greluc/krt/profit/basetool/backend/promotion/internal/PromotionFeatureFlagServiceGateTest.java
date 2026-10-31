@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationReposit
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -130,7 +131,9 @@ class PromotionFeatureFlagServiceGateTest {
             requestScopeResolver,
             mock(AccessGateService.class),
             mock(OrgUnitStampingService.class));
-    policy = new PromotionAccessPolicy(ownerScopeService, authHelper);
+    policy =
+        new PromotionAccessPolicy(
+            ownerScopeService, authHelper, mock(OrgUnitMembershipQueryService.class));
   }
 
   @Test

@@ -451,9 +451,9 @@ GET /api/v1/promotion/categories/{id} | PromotionCategoryController#get | pre=is
 PUT /api/v1/promotion/categories/{id} | PromotionCategoryController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/eligibility/my | PromotionEligibilityController#myEligibility | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/eligibility/my/by-ranks | PromotionEligibilityController#myEligibilityForRanks | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/eligibility/user/{userId} | PromotionEligibilityController#eligibilityForUser | pre=hasAnyRole('ADMIN','OFFICER') | url=anyRequest -> authenticated
+GET /api/v1/promotion/eligibility/user/{userId} | PromotionEligibilityController#eligibilityForUser | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
 GET /api/v1/promotion/evaluations/all | MemberEvaluationController#listAll | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/evaluations/members | MemberEvaluationController#listEvaluatableMembers | pre=hasAnyRole('ADMIN','OFFICER') | url=anyRequest -> authenticated
+GET /api/v1/promotion/evaluations/members | MemberEvaluationController#listEvaluatableMembers | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
 GET /api/v1/promotion/evaluations/my | MemberEvaluationController#listMy | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/evaluations/my/paged | MemberEvaluationController#listMyPaged | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/promotion/evaluations/user/{userId}/category/{categoryId} | MemberEvaluationController#upsert | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -643,6 +643,7 @@ DELETE /api/v1/users/{id} | AccountRemovalController#deleteUser | pre=hasRole('A
 GET /api/v1/users/{id} | UserProfileController#getUserById | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER') | url=GET /api/v1/users/* -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_OFFICER)
 PUT /api/v1/users/{id}/attributes | UserProfileController#updateUserAttributes | pre=hasRole('ADMIN') | url=PUT /api/v1/users/*/attributes -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/users/{id}/consolidate | AccountRemovalController#consolidateAccount | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/users/{id}/rank-range | UserController#getUserRankRange | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/{id}/rsi-handle | UserController#getUserRsiHandle | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
 GET /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
@@ -654,21 +655,21 @@ GET /v3/api-docs | OpenApiWebMvcResource#openapiJson | pre=none | url=/v3/api-do
 GET /v3/api-docs.yaml | OpenApiWebMvcResource#openapiYaml | pre=none | url=/v3/api-docs* -> hasAnyAuthority(ROLE_ADMIN)
 
 [service-gates]
-MemberEvaluationService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
-MemberEvaluationService#listAll(1) | pre=hasAnyRole('ADMIN','OFFICER')
-MemberEvaluationService#upsert(3) | pre=hasAnyRole('ADMIN','OFFICER')
+MemberEvaluationService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+MemberEvaluationService#listAll(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+MemberEvaluationService#upsert(3) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MissionFinanceEntryService#deleteEntry(2) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
 MissionFinanceEntryService#updateEntry(3) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
-PromotionCategoryService#create(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionCategoryService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionCategoryService#update(2) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionEligibilityService#evaluateAllForUserAsAdmin(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionLevelContentService#create(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionLevelContentService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionLevelContentService#update(2) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionTopicService#create(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionTopicService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
-PromotionTopicService#update(2) | pre=hasAnyRole('ADMIN','OFFICER')
-RankRequirementService#create(1) | pre=hasAnyRole('ADMIN','OFFICER')
-RankRequirementService#delete(1) | pre=hasAnyRole('ADMIN','OFFICER')
-RankRequirementService#update(2) | pre=hasAnyRole('ADMIN','OFFICER')
+PromotionCategoryService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionCategoryService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionCategoryService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionEligibilityService#evaluateAllForUserAsAdmin(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionLevelContentService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionLevelContentService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionLevelContentService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionTopicService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionTopicService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionTopicService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+RankRequirementService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+RankRequirementService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+RankRequirementService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()

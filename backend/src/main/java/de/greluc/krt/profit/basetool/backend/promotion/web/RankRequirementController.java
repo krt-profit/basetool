@@ -129,15 +129,17 @@ public class RankRequirementController {
 
   /**
    * Persists a new {@link de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement}
-   * describing the minimum score and conditions for a rank transition. Restricted to ADMIN or
-   * OFFICER callers.
+   * describing the minimum score and conditions for a rank transition. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param request validated payload describing the new rank requirement
    * @return the persisted rank requirement in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new rank requirement. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new rank requirement. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Rank requirement created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -157,7 +159,9 @@ public class RankRequirementController {
    * @return the updated rank requirement in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a rank requirement. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Update a rank requirement. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Rank requirement updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -172,14 +176,16 @@ public class RankRequirementController {
   }
 
   /**
-   * Permanently removes the rank requirement identified by {@code id}. Restricted to ADMIN or
-   * OFFICER callers.
+   * Permanently removes the rank requirement identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the rank requirement to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a rank requirement. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Delete a rank requirement. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")

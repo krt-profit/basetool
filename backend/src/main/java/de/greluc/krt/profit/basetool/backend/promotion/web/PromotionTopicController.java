@@ -125,14 +125,16 @@ public class PromotionTopicController {
 
   /**
    * Persists a new {@link de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic}.
-   * Restricted to ADMIN or OFFICER callers.
+   * Restricted to admins and callers with officer reach in the owning squadron.
    *
    * @param request validated payload describing the new topic
    * @return the persisted topic in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new promotion topic. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new promotion topic. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Topic created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -152,7 +154,8 @@ public class PromotionTopicController {
    * @return the updated topic in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a promotion topic. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Update a promotion topic. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Topic updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -167,13 +170,14 @@ public class PromotionTopicController {
 
   /**
    * Permanently removes the promotion topic identified by {@code id}, also cascading deletes to the
-   * topic's categories. Restricted to ADMIN or OFFICER callers.
+   * topic's categories. Restricted to admins and callers with officer reach in the owning squadron.
    *
    * @param id identifier of the topic to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a promotion topic. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Delete a promotion topic. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Topic deleted."),
     @ApiResponse(responseCode = "404", description = "Topic not found.")

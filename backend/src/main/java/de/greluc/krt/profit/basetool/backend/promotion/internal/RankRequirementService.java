@@ -124,7 +124,7 @@ public class RankRequirementService {
    *     topic/category belongs to a different squadron
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public RankRequirementResponse create(@NotNull RankRequirementWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
@@ -141,6 +141,7 @@ public class RankRequirementService {
                     "No active squadron context — admins in 'all squadrons' mode must focus a"
                         + " squadron via the sidebar switcher before creating a rank"
                         + " requirement."));
+    promotionAccessPolicy.assertOfficerIn(squadron.getId());
     RankRequirement entity = mapper.toEntity(request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
@@ -174,7 +175,7 @@ public class RankRequirementService {
    * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
@@ -200,14 +201,14 @@ public class RankRequirementService {
   }
 
   /**
-   * Permanently removes the rank requirement identified by {@code id}. Restricted to ADMIN or
-   * OFFICER callers.
+   * Permanently removes the rank requirement identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the rank requirement to delete
    * @throws NotFoundException if no rank requirement exists for that id
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public void delete(@NotNull UUID id) {
     promotionAccessPolicy.assertFeatureEnabled();
     RankRequirement entity = load(id);
@@ -254,10 +255,7 @@ public class RankRequirementService {
     if (entity.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canEditSquadron(entity.getOwningSquadron().getId())) {
-      throw new AccessDeniedException(
-          "Caller's squadron context does not allow editing this rank requirement");
-    }
+    promotionAccessPolicy.assertOfficerIn(entity.getOwningSquadron().getId());
   }
 
   /**

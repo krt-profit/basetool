@@ -263,7 +263,6 @@ class RankRequirementServiceTest {
     var request =
         new RankRequirementWriteRequest(20, 19, null, null, PromotionLevel.LEVEL_A, 3, null, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(true);
 
     assertThrows(ObjectOptimisticLockingFailureException.class, () -> service.update(id, request));
   }
@@ -292,7 +291,6 @@ class RankRequirementServiceTest {
             .build();
     entity.setOwningSquadron(squadron(SQUADRON_ID));
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(true);
 
     service.delete(id);
 
@@ -318,7 +316,9 @@ class RankRequirementServiceTest {
             .build();
     entity.setOwningSquadron(squadron(SQUADRON_ID));
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(false);
+    doThrow(new AccessDeniedException("no reach"))
+        .when(promotionAccessPolicy)
+        .assertOfficerIn(SQUADRON_ID);
 
     assertThrows(AccessDeniedException.class, () -> service.delete(id));
     verify(repository, never()).delete(any());

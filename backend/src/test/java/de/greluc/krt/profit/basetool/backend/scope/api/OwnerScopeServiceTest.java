@@ -2366,6 +2366,34 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void officerAnywhere_isTrueForAnySeatWithKrtMember() {
+      stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN));
+
+      assertTrue(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
+    void officerAnywhere_isFalseForAPlainMember() {
+      stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID));
+
+      assertFalse(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
+    void officerAnywhere_isFalseForASeatWithoutKrtMember() {
+      stubCaller(false, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
+
+      assertFalse(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
+    void officerAnywhere_isTrueForAnAdmin() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
     void activeContext_pinnedUnitWithReach_isOfficer() {
       stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))

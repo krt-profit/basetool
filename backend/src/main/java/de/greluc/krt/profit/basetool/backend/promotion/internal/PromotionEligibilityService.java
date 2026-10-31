@@ -149,14 +149,16 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * Evaluates every configured rank transition for any user; restricted to ADMIN or OFFICER.
+   * Evaluates every configured rank transition for any user; restricted to an admin and to a caller
+   * with officer reach over the member.
    *
    * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
    */
   @NotNull
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public List<PromotionEligibilityResponse> evaluateAllForUserAsAdmin(@NotNull UUID userId) {
+    promotionAccessPolicy.assertOfficerOverMember(userId);
     return evaluateAllForUser(userId);
   }
 

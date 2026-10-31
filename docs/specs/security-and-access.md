@@ -1221,8 +1221,9 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
 
 **Live ahead of the cut:** the reach computation and the appointment precondition. The scope
 kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes),
-`#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`; no gate reads them yet, and
-every `OFFICER` gate keeps its behaviour until the cut.
+`#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`; the promotion services (`ADMIN_OR_OFFICER_REACH` in front of
+`PromotionAccessPolicy#assertOfficerIn` / `#assertOfficerOverMember`) and the member-rank range read
+them, every other `OFFICER` gate keeps its behaviour until the cut.
 
 **Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
@@ -3774,7 +3775,9 @@ layer directly.
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`;
 the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
 pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
-(fail-closed `false`, admin `true`); no template reads them yet.
+(fail-closed `false`, admin `true`). The promotion and Leitung pages and proxies and the
+Spezialkommando members page gate on `canManagePromotions`, `canOpenLeitung` and `hasOfficerReach`
+through the frontend `OfficerSurfaceGate`.
 
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
 carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit

@@ -27,8 +27,6 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.Optional;
@@ -58,10 +56,6 @@ class MemberEvaluationServiceTest {
 
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
-
-  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
-
-  @Mock private AuthHelperService authHelperService;
 
   @Mock private AuditService auditService;
 
@@ -139,7 +133,6 @@ class MemberEvaluationServiceTest {
     when(repository.findByUserIdAndCategoryId(userId, categoryId)).thenReturn(Optional.empty());
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
-    when(authHelperService.isAdmin()).thenReturn(true);
 
     MemberEvaluationResponse result = service.upsert(userId, categoryId, request);
 
@@ -186,7 +179,6 @@ class MemberEvaluationServiceTest {
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(repository.findByUserIdAndCategoryId(userId, categoryId))
         .thenReturn(Optional.of(existing));
-    when(authHelperService.isAdmin()).thenReturn(true);
     when(repository.save(existing)).thenReturn(existing);
     when(mapper.toResponse(existing)).thenReturn(response);
 
@@ -221,7 +213,6 @@ class MemberEvaluationServiceTest {
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(repository.findByUserIdAndCategoryId(userId, categoryId))
         .thenReturn(Optional.of(existing));
-    when(authHelperService.isAdmin()).thenReturn(true);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -243,20 +234,18 @@ class MemberEvaluationServiceTest {
   }
 
   @Test
-  void upsert_shouldDenyOfficer_evaluatingForeignSquadronMember() {
+  void upsert_shouldDeny_whenPolicyRefusesReachOverTheMember() {
     UUID foreignMemberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
-    UUID foreignStaffelId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     MemberEvaluationUpdateRequest request =
         new MemberEvaluationUpdateRequest(null, PromotionLevel.LEVEL_B);
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(foreignMemberId))
-        .thenReturn(java.util.List.of(foreignStaffelId));
-    when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
+    doThrow(new AccessDeniedException("no reach"))
+        .when(promotionAccessPolicy)
+        .assertOfficerOverMember(foreignMemberId);
 
     assertThrows(
         AccessDeniedException.class, () -> service.upsert(foreignMemberId, categoryId, request));
@@ -264,10 +253,9 @@ class MemberEvaluationServiceTest {
   }
 
   @Test
-  void upsert_shouldAllowOfficer_evaluatingOwnSquadronMember() {
+  void upsert_shouldAllow_whenPolicyAcceptsReachOverTheMember() {
     UUID memberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
-    UUID ownStaffelId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     MemberEvaluationUpdateRequest request =
@@ -292,10 +280,6 @@ class MemberEvaluationServiceTest {
             null);
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(memberId))
-        .thenReturn(java.util.List.of(ownStaffelId));
-    when(ownerScopeService.canEditSquadron(ownStaffelId)).thenReturn(true);
     when(repository.findByUserIdAndCategoryId(memberId, categoryId)).thenReturn(Optional.empty());
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
@@ -312,7 +296,6 @@ class MemberEvaluationServiceTest {
     MemberEvaluation entity =
         MemberEvaluation.builder().userId(USER_A).assignedLevel(PromotionLevel.LEVEL_A).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(authHelperService.isAdmin()).thenReturn(true);
 
     service.delete(id);
 

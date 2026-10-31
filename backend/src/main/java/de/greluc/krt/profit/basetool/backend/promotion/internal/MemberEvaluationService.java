@@ -25,8 +25,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.Set;
@@ -37,7 +35,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,9 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Domain service for {@link MemberEvaluation}.
  *
- * <p>Writes are limited to ADMIN and OFFICER; a non-admin must pass both {@link
- * #assertCallerMayEditCategory} and {@link #assertCallerMayEvaluateUser}. Personal reads are
- * filtered by the caller's user id.
+ * <p>Writes are limited to an admin and to officer reach: a non-admin needs reach in the category's
+ * owning squadron and over the member (REQ-SEC-015). Personal reads are filtered by the caller's
+ * user id.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,8 +61,6 @@ public class MemberEvaluationService {
   private final MemberEvaluationMapper mapper;
   private final OwnerScopeService ownerScopeService;
   private final PromotionAccessPolicy promotionAccessPolicy;
-  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
-  private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -96,7 +91,7 @@ public class MemberEvaluationService {
   }
 
   /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
     if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
         || !promotionAccessPolicy.hasReadAccess()) {
@@ -107,11 +102,11 @@ public class MemberEvaluationService {
   }
 
   /**
-   * Upserts (create or update) an evaluation for a user/category combination. ADMIN or OFFICER of
-   * the category's owning squadron.
+   * Upserts (create or update) an evaluation for a user/category combination. Restricted to an
+   * admin, or a caller with officer reach in the category's owning squadron and over the member.
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public MemberEvaluationResponse upsert(
       @NotNull UUID userId,
       @NotNull UUID categoryId,
@@ -122,7 +117,7 @@ public class MemberEvaluationService {
             categoryRepository.findById(categoryId),
             () -> "PromotionCategory not found: " + categoryId);
     assertCallerMayEditCategory(category);
-    assertCallerMayEvaluateUser(userId);
+    promotionAccessPolicy.assertOfficerOverMember(userId);
 
     MemberEvaluation entity =
         repository
@@ -155,13 +150,13 @@ public class MemberEvaluationService {
 
   /** Deletes an evaluation entry (removes the assigned level). */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public void delete(@NotNull UUID id) {
     promotionAccessPolicy.assertFeatureEnabled();
     MemberEvaluation entity =
         Entities.require(repository.findById(id), () -> "MemberEvaluation not found: " + id);
     assertCallerMayEditCategory(entity.getCategory());
-    assertCallerMayEvaluateUser(entity.getUserId());
+    promotionAccessPolicy.assertOfficerOverMember(entity.getUserId());
     PromotionCategory category = entity.getCategory();
     UUID subjectId = category != null ? category.getId() : null;
     String label = categoryLabel(category);
@@ -193,26 +188,6 @@ public class MemberEvaluationService {
         || category.getTopic().getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
-      throw new AccessDeniedException(
-          "Caller's squadron context does not allow editing evaluations of this scope");
-    }
-  }
-
-  /**
-   * Asserts that the caller may evaluate the given member: admins pass, others must be able to edit
-   * at least one of the member's Staffeln (REQ-ORG-017). Fails closed on a malformed id.
-   *
-   * @param userId the {@code app_user.id} of the member being evaluated; never {@code null}.
-   */
-  private void assertCallerMayEvaluateUser(@NotNull UUID userId) {
-    if (authHelperService.isAdmin()) {
-      return;
-    }
-    List<UUID> staffelIds = orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
-    if (staffelIds.stream().noneMatch(ownerScopeService::canEditSquadron)) {
-      throw new AccessDeniedException(
-          "Caller's squadron context does not allow evaluating this member");
-    }
+    promotionAccessPolicy.assertOfficerIn(category.getTopic().getOwningSquadron().getId());
   }
 }
