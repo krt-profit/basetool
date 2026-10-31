@@ -149,6 +149,48 @@ class StockLevelIntegrationTest {
   }
 
   @Test
+  void aLogisticianOfOneUnitWhoIsMemberOfAnotherMaintainsOnlyTheFirst() throws Exception {
+    joins(logistician, otherUnit);
+    UUID foreign = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO inventory_stock_level (id, version, org_unit_id, material_id,"
+            + " minimum_amount, target_amount) VALUES (?, 0, ?, ?, 1, 1)",
+        foreign,
+        otherUnit,
+        material);
+    RequestPostProcessor auth = logisticianOf(logistician, unit);
+
+    mockMvc
+        .perform(
+            post(PATH)
+                .with(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        new StockLevelCreateRequest(otherUnit, material, null, null, 2.0, null))))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            put(PATH + "/" + foreign)
+                .with(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(new StockLevelUpdateRequest(null, 3.0, null, 0L))))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(delete(PATH + "/" + foreign).param("version", "0").with(auth))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(get(PATH + "/units").with(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(unit.toString()));
+    mockMvc
+        .perform(get(PATH).with(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].editable").value(false));
+  }
+
+  @Test
   void aPoolViewerReadsTheLevelAndAnOutsiderDoesNot() throws Exception {
     createdId(null, 2.0, null);
 

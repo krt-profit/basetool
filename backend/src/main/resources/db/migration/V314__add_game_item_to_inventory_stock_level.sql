@@ -19,3 +19,4 @@ CREATE UNIQUE INDEX uq_inventory_stock_level_game_item
     ON inventory_stock_level (org_unit_id, game_item_id)
     WHERE game_item_id IS NOT NULL;
 CREATE INDEX idx_inventory_stock_level_game_item ON inventory_stock_level (game_item_id);
+CREATE INDEX idx_inventory_stock_level_org_unit ON inventory_stock_level (org_unit_id);
