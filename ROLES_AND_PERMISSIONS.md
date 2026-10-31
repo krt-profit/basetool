@@ -408,7 +408,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Change the org unit of a selection of own ships (`POST /hangar/ships/bulk-org-unit`, `HANGAR_READ`/`HANGAR_WRITE` + Owner of every ship, REQ-HANGAR-010) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Manage other members' ships (`hasRole('ADMIN')`; page `/admin/members/{id}/hangar`, linked from the member edit page, REQ-HANGAR-011) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Change the org unit of one or several of a member's ships to one of the member's direct units or none (`PUT /hangar/admin/users/{userId}/ships/{shipId}/org-unit`, `POST /hangar/admin/users/{userId}/ships/bulk-org-unit`, `hasRole('ADMIN')`; the member is notified, REQ-HANGAR-012) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                           |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
+| `resetAllFittedStatus` (`canResetFitted`: officer reach in the active context, limited to the units reached)                                          |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | Read the unit tab „Org-Einheit" of the hangar (`/hangar/squadron`, `HANGAR_READ`)                  |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Live updates of the unit tab: a unit's room `hangar-unit:{orgUnitId}` (the unit-overview scope, `GET /hangar/units/{orgUnitId}/overview-access`) and the data-free `hangar-units` room (signed in), REQ-HANGAR-013 |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Live updates of another member's hangar on the web (`hangar:{userId}` room, `ROLE_ADMIN`; the app bridge keeps it self-only, ADR-0260) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -422,7 +422,7 @@ Every hangar mutation in this table — by the owner, by an admin on another mem
 
 ³ Backend only: the one UI control that calls it (`/ship-data`, „Alle unfitted") is `hasRole('ADMIN')` in the frontend, so an Officer has no button for it.
 
-² The unit tab „Org-Einheit <Kürzel>" of the hangar (a page of its own called „Org-Einheitsübersicht" until 2026-10-03, „Staffelübersicht" before that) spans **all** visible org units: without an actively pinned unit a Member sees the ships of all their own Staffeln and SKs, a Bereichsleitung additionally those of the subordinate units of their Bereich (REQ-ORG-015), and an OL member **every** ship in the system — including the ownerless ships of members entirely without an org unit (`owningOrgUnit == null`); this OL extension is read-only and limited to this one overview (ADR-0048). With a pinned unit the overview shows only that unit for every caller. The per-ship breakdown (owner/location/fitted, the chevron that opens a ship type's owner rows) stays ADMIN/OFFICER-only — Member/BL/OL see only the counters and the readiness bar.
+² The unit tab „Org-Einheit <Kürzel>" of the hangar (a page of its own called „Org-Einheitsübersicht" until 2026-10-03, „Staffelübersicht" before that) spans **all** visible org units: without an actively pinned unit a Member sees the ships of all their own Staffeln and SKs, a Bereichsleitung additionally those of the subordinate units of their Bereich (REQ-ORG-015), and an OL member **every** ship in the system — including the ownerless ships of members entirely without an org unit (`owningOrgUnit == null`); this OL extension is read-only and limited to this one overview (ADR-0048). With a pinned unit the overview shows only that unit for every caller. The per-ship breakdown (owner/location/fitted, the chevron that opens a ship type's owner rows) needs officer reach in the ship's owning unit (REQ-SEC-015; Admin sees all) — a caller without it sees only the counters and the readiness bar.
 
 ### 3.2a Data protection: export, erasure, name search (REQ-SEC-058/060/061/062)
 
@@ -570,8 +570,9 @@ caller below `Member` on this surface: an account whose realm roles map to nothi
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
-³ Mission-Manager/Officer additionally only within their own Staffel scope
-(`canEditMission`). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
+³ Mission-Manager additionally only within their own Staffel scope (`canEditMission`); an
+Officer's owner change needs officer reach in the mission's owning unit (`canChangeOwner`,
+REQ-SEC-065). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
 does not (§1.3). Which missions are in scope is `canSeeMission` — own Staffel, or any non-internal
 mission organisation-wide. The finance ledger stays member-or-above on its own endpoints.
 ⁵ The owning-org-unit reassignment shares the
@@ -620,12 +621,12 @@ of the manage row above.
 | Read finances / finance-summary (`canSeeOperationLedger` — **scope only**, ADR-0150)      |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
 | Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])               |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
 | **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)           |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| **Revoke** paid-out (additionally `hasAnyRole('ADMIN','OFFICER')`)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| **Revoke** paid-out (additionally `canClearPayout`: officer reach in the operation's unit)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
 | **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 > Payout asymmetry: every Mission-Manager may set `paidOut=true`,
-> but only Officer/Admin may reset a confirmed paid-out back to
-> `false`.
+> but only a caller with officer reach in the operation's owning unit, or an Admin, may reset a
+> confirmed paid-out back to `false`.
 >
 > **Visibility (`canSeeOperation`) has three paths since #500/#501** (one suffices):
 > **(1)** the normal Staffel scope (operation of one's own org unit);
@@ -652,12 +653,12 @@ of the manage row above.
 |:------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read a mission's finance entries, sum and summary (`isMemberOrAbove` + `canSeeMission`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** finance entry (`isMemberOrAbove` + `canCreateFinanceEntry`)        |   ✅¹   |  ✅¹  | ✅³ |   ✅³    |   ✅   |
-| Edit/delete finance entry (service-level `canEditFinanceEntry`: the entry's own participant **or** an Officer in scope **or** Admin) |   ✅¹   |  ✅¹  | ✅¹ |   ✅²   |   ✅   |
+| Edit/delete finance entry (service-level `canEditFinanceEntry`: the entry's own participant **or** officer reach in the mission's owning unit **or** Admin) |   ✅¹   |  ✅¹  | ✅¹ |   ✅²   |   ✅   |
 | Read profit calculation (`hasAnyRole('KRT_MEMBER','ADMIN')`)                  |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ¹ Only one's own entry and only while still a participant of the mission.
-² Only for a mission inside the officer's owning-OrgUnit scope (`canEditMission`, security audit
-H1); outside it an Officer is back to ¹.
+² Only for a mission whose owning unit the caller reaches as officer (leadership seat, REQ-SEC-015,
+security audit H1); outside it the caller is back to ¹. A mission without an owning unit is Admin-only.
 ³ For any participant of the mission, but only within their own owning-OrgUnit scope
 (`canManageMission`); the mission owner and its co-managers pass the same way. **Creating** is a
 write and therefore no longer rides the read-level `canSeeMission`, whose cross-squadron public

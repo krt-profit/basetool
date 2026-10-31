@@ -217,9 +217,9 @@ public class MissionAccessPolicy {
   }
 
   /**
-   * Authorizes editing or deleting a mission finance entry: ADMIN always, an OFFICER within the
-   * mission's org-unit scope, otherwise the entry's own user while still a participant of the
-   * mission.
+   * Authorizes editing or deleting a mission finance entry: ADMIN always, a caller with officer
+   * reach in the mission's owning unit, otherwise the entry's own user while still a participant of
+   * the mission (REQ-SEC-065).
    *
    * @param entryId finance entry id
    * @param authentication current Spring Security authentication
@@ -245,9 +245,7 @@ public class MissionAccessPolicy {
       return true;
     }
 
-    boolean isOfficer =
-        reachable.stream().anyMatch(a -> Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
-    if (isOfficer && canEditMission(entry.getMission().getId())) {
+    if (hasOfficerReachInOwningUnit(entry.getMission())) {
       return true;
     }
 
@@ -264,8 +262,8 @@ public class MissionAccessPolicy {
   }
 
   /**
-   * Authorizes management actions on a mission: elevated authorities (ADMIN, OFFICER,
-   * MISSION_MANAGER) or the mission's owner or a co-manager.
+   * Authorizes management actions on a mission: elevated authorities (ADMIN, MISSION_MANAGER) or
+   * the mission's owner or a co-manager.
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -299,8 +297,9 @@ public class MissionAccessPolicy {
   }
 
   /**
-   * Authorizes changing a mission's owner: only the current owner, {@code ROLE_ADMIN} or {@code
-   * ROLE_OFFICER}; co-managers and {@code ROLE_MISSION_MANAGER} may not.
+   * Authorizes changing a mission's owner: only the current owner, {@code ROLE_ADMIN} or a caller
+   * with officer reach in the mission's owning unit; co-managers and {@code ROLE_MISSION_MANAGER}
+   * may not (REQ-SEC-065).
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -321,21 +320,18 @@ public class MissionAccessPolicy {
     if (isAdmin) {
       return true;
     }
-    boolean isOfficer =
-        reachable.stream().anyMatch(a -> Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
-    if (isOfficer && canEditMission(missionId)) {
+    Mission mission = missionRepository.findByIdForAuthorization(missionId).orElse(null);
+    if (mission == null) {
+      return false;
+    }
+    if (hasOfficerReachInOwningUnit(mission)) {
       return true;
     }
 
     UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
-    if (userId == null) {
-      return false;
-    }
-    return missionRepository
-        .findByIdForAuthorization(missionId)
-        .map(Mission::getOwner)
-        .map(owner -> owner.getId().equals(userId))
-        .orElse(false);
+    return userId != null
+        && mission.getOwner() != null
+        && mission.getOwner().getId().equals(userId);
   }
 
   /**
@@ -392,8 +388,16 @@ public class MissionAccessPolicy {
         .anyMatch(a ->
             Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
                 || Roles.MISSION_MANAGER.equals(a.getAuthority())
-                || Permissions.MISSION_MANAGE.equals(a.getAuthority())
-                || Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
+                || Permissions.MISSION_MANAGE.equals(a.getAuthority()));
+  }
+
+  /**
+   * Whether the caller holds officer reach in the unit that owns {@code mission}; an ownerless
+   * mission is reserved to admins.
+   */
+  private boolean hasOfficerReachInOwningUnit(@NotNull Mission mission) {
+    return ownerScopeService.canActAsOfficerInOwner(
+        mission.getOwningOrgUnit() == null ? null : mission.getOwningOrgUnit().getId());
   }
 
   private boolean canSeeMissionChain(@NotNull Mission mission) {
