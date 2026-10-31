@@ -212,6 +212,17 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canActAsOfficerInOwner(UUID)}: officer reach in the
+   * target's owning unit, where a target without a unit is reserved to admins.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds officer reach in {@code orgUnitId}
+   */
+  public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
+    return accessGateService.canActAsOfficerInOwner(orgUnitId);
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#canActAsOfficerInActiveContext()}: whether the caller
    * holds officer reach in the pinned unit, or in any unit when nothing is pinned.
    *

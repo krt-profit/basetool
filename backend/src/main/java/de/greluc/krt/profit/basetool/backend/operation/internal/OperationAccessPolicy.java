@@ -118,6 +118,23 @@ public class OperationAccessPolicy {
         .orElse(false);
   }
 
+  /**
+   * Checks whether the caller may clear a participant's paid-out flag on operation {@code
+   * operationId}: officer reach in the operation's owning unit; an ownerless operation is reserved
+   * to admins (REQ-SEC-065).
+   *
+   * @param operationId operation to inspect; never {@code null}
+   * @return {@code true} iff the caller is an admin or holds officer reach in the owning unit
+   */
+  public boolean canClearPayout(@NotNull UUID operationId) {
+    return operationRepository
+        .findById(operationId)
+        .map(o ->
+            ownerScopeService.canActAsOfficerInOwner(
+                o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
+        .orElse(false);
+  }
+
   private boolean participatedInOperation(@NotNull UUID operationId) {
     return authHelper
         .currentUserId()

@@ -45,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.mission.model.FinanceType;
@@ -57,6 +58,7 @@ import de.greluc.krt.profit.basetool.frontend.operation.model.OperationMissionFi
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -910,9 +912,15 @@ class OperationPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
-  void updatePayoutStatus_missionManager_isForbiddenFromSetting_paidOutFalse() throws Exception {
+  void updatePayoutStatus_clearRefusedByTheBackend_isMirroredAs403() throws Exception {
     UUID opId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
+            any(),
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
+        .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     mockMvc
         .perform(
@@ -925,7 +933,7 @@ class OperationPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
-  void updatePayoutStatus_officer_canClear_paidOutFalse() throws Exception {
+  void updatePayoutStatus_clearAccepted_isForwardedToTheBackend() throws Exception {
     UUID opId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
@@ -1029,8 +1037,10 @@ class OperationPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
-  void operationDetail_missionManager_rendersCanUnsetPaidOutFalse() throws Exception {
+  void operationDetail_withoutOfficerReach_rendersCanUnsetPaidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(false));
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null, null, null));
 
@@ -1042,8 +1052,10 @@ class OperationPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
-  void operationDetail_officer_rendersCanUnsetPaidOutTrue() throws Exception {
+  void operationDetail_withOfficerReach_rendersCanUnsetPaidOutTrue() throws Exception {
     UUID opId = UUID.randomUUID();
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null, null, null));
 
