@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -48,6 +49,35 @@ public interface SupplyNeedRepository
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT n FROM SupplyNeed n WHERE n.id = :id")
   Optional<SupplyNeed> findByIdForUpdate(@Param("id") UUID id);
+
+  /**
+   * Loads the open material needs linked to a job order whose unit was not yet told that the order
+   * covers them, with their material and tier, for the covered-order notice (REQ-SUP-024).
+   *
+   * @param open the open state
+   * @return the candidates, oldest first
+   */
+  @Query(
+      """
+      SELECT n FROM SupplyNeed n JOIN FETCH n.material JOIN FETCH n.qualityTier
+      WHERE n.status = :open AND n.jobOrderId IS NOT NULL AND n.orderCoveredNotifiedAt IS NULL
+      ORDER BY n.createdAt, n.id
+      """)
+  List<SupplyNeed> findOrderCoverageCandidates(@Param("open") NeedStatus open);
+
+  /**
+   * Marks a need as announced, atomically and without touching its version: the one caller whose
+   * update changes the row is the one that announces it.
+   *
+   * @param id the need
+   * @param now the announcement time
+   * @return {@code 1} when this call marked the need, {@code 0} when it was marked already
+   */
+  @Modifying
+  @Query(
+      "UPDATE SupplyNeed n SET n.orderCoveredNotifiedAt = :now"
+          + " WHERE n.id = :id AND n.orderCoveredNotifiedAt IS NULL")
+  int markOrderCoveredNotified(@Param("id") UUID id, @Param("now") Instant now);
 
   /**
    * Adds a covered amount to an open or paused need in one statement, without touching the need's

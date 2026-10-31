@@ -505,6 +505,18 @@ public enum NotificationEventType {
   SUPPLY_DONATION_WITHDRAWN,
 
   /**
+   * The job order linked to an open need has stock covering the need's bucket (REQ-SUP-024). The
+   * default rule notifies the lead and the Logisticians of the raising unit.
+   */
+  SUPPLY_NEED_ORDER_COVERED,
+
+  /**
+   * A need was fulfilled or withdrawn (REQ-SUP-024). Creates no notification; clears the
+   * covered-order notices.
+   */
+  SUPPLY_NEED_CLOSED,
+
+  /**
    * A need was released for purchase (REQ-PUR-024). The default rule notifies every active
    * delegate.
    */

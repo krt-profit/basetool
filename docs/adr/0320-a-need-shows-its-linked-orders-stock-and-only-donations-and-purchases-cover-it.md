@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-31
 - **Deciders:** @greluc
-- **Related:** REQ-SUP-003 · REQ-SUP-005 · REQ-SUP-023 · REQ-ORDERS-034 · spec
+- **Related:** REQ-SUP-003 · REQ-SUP-005 · REQ-SUP-023 · REQ-SUP-024 · REQ-ORDERS-034 · spec
   [`supply.md`](../specs/supply.md)
 
 ## Context
@@ -31,6 +31,10 @@ unlinked one set through the API.
    allocator, batched per page.
 3. **The coverage never counts toward the need.** The need's progress, its `FULFILLED` transition,
    the donation statistics and the audit trail stay driven by donations and purchases only.
+4. **The unit is told once when the linked order is covered.** A timed producer raises
+   `SUPPLY_NEED_ORDER_COVERED` to the unit's lead and Logisticians while the need is still open, marks
+   the need so it fires once per link, and the need's fulfilment or withdrawal clears the notice
+   (REQ-SUP-024). The notice asks the unit to act; it does not act on the need.
 
 ## Consequences
 

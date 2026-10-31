@@ -40,6 +40,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -131,6 +132,12 @@ public class SupplyNeed extends AbstractEntity<UUID> {
   @Column(name = "job_order_id")
   @Nullable
   private UUID jobOrderId;
+
+  /** When the unit was told that the linked order covers the need's bucket (REQ-SUP-024). */
+  @OptimisticLock(excluded = true)
+  @Column(name = "order_covered_notified_at")
+  @Nullable
+  private Instant orderCoveredNotifiedAt;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)

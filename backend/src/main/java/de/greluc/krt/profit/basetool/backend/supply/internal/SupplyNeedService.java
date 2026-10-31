@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
+import de.greluc.krt.profit.basetool.backend.supply.api.events.SupplyNotices;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.criteria.JoinType;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -94,6 +96,7 @@ public class SupplyNeedService {
   private final AuthHelperService authHelperService;
   private final MeterRegistry meterRegistry;
   private final ObjectProvider<NeedLifecycleObserver> lifecycleObservers;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Pages over the needs the caller may see: everyone sees the open ones, the managers of a unit
@@ -266,6 +269,7 @@ public class SupplyNeedService {
     SupplyNeed saved = needRepository.saveAndFlush(need);
     auditRecorder.record(AuditEventType.NEED_WITHDRAWN, saved.getId(), label(saved), null, null);
     lifecycleObservers.orderedStream().forEach(observer -> observer.onWithdrawn(saved.getId()));
+    eventPublisher.publishEvent(SupplyNotices.needClosed(saved.getId()));
     count("withdrawn");
     return mapper.toDto(saved, mapper.needContext(List.of(saved)));
   }
@@ -360,6 +364,7 @@ public class SupplyNeedService {
         null,
         AuditDetails.of("amount", need.getAmount()));
     lifecycleObservers.orderedStream().forEach(observer -> observer.onFulfilled(need.getId()));
+    eventPublisher.publishEvent(SupplyNotices.needClosed(need.getId()));
   }
 
   private void releasedForPurchase(@NotNull SupplyNeed need) {
@@ -471,11 +476,13 @@ public class SupplyNeedService {
   private void applyJobOrder(@NotNull SupplyNeed need, @Nullable UUID jobOrderId) {
     if (jobOrderId == null) {
       need.setJobOrderId(null);
+      need.setOrderCoveredNotifiedAt(null);
       return;
     }
     if (jobOrderId.equals(need.getJobOrderId())) {
       return;
     }
+    need.setOrderCoveredNotifiedAt(null);
     JobOrder order =
         Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
     if (order.getResponsibleOrgUnit() == null

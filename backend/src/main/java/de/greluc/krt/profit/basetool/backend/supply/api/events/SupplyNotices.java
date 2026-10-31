@@ -42,6 +42,9 @@ public final class SupplyNotices {
   /** Loose entity-type tag of the notices about one donation; the entity id is the donation. */
   public static final String DONATION_ENTITY_TYPE = "SUPPLY_DONATION";
 
+  /** Loose entity-type tag of the notices about one need; the entity id is the need. */
+  public static final String NEED_ENTITY_TYPE = "SUPPLY_NEED";
+
   private static final Set<NotificationType> PLEDGE_NOTICES =
       Set.of(NotificationType.SUPPLY_DONATION_PLEDGED);
 
@@ -153,6 +156,56 @@ public final class SupplyNotices {
         .contextRecipientUserId(donorId)
         .renderParams(params)
         .resolvesNotificationTypes(PLEDGE_NOTICES)
+        .build();
+  }
+
+  /**
+   * The job order linked to an open need has stock covering the need's bucket; the raising unit's
+   * lead and Logisticians are told (REQ-SUP-024).
+   *
+   * @param needId the need
+   * @param unitId the raising unit
+   * @param unitKind the raising unit's kind
+   * @param unitName the raising unit's name
+   * @param entry the material name
+   * @param orderNumber the linked order's number
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent orderCovered(
+      @NotNull UUID needId,
+      @NotNull UUID unitId,
+      @NotNull OrgUnitKind unitKind,
+      @NotNull String unitName,
+      @NotNull String entry,
+      @NotNull String orderNumber) {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("unit", unitName);
+    params.put("entry", entry);
+    params.put("order", orderNumber);
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.SUPPLY_NEED_ORDER_COVERED)
+        .entityType(NEED_ENTITY_TYPE)
+        .entityId(needId)
+        .contextOrgUnits(
+            Map.of(NotificationContextRole.RESPONSIBLE, new OrgUnitRef(unitId, unitKind)))
+        .renderParams(params)
+        .build();
+  }
+
+  /**
+   * A need was fulfilled or withdrawn; its covered-order notices go (REQ-SUP-024).
+   *
+   * @param needId the need
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent needClosed(@NotNull UUID needId) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.SUPPLY_NEED_CLOSED)
+        .entityType(NEED_ENTITY_TYPE)
+        .entityId(needId)
+        .resolvesNotificationTypes(Set.of(NotificationType.SUPPLY_NEED_ORDER_COVERED))
         .build();
   }
 
