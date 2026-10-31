@@ -441,8 +441,8 @@ scope; a target without a unit is reserved to admins), the list decision is
 `currentLogisticianScope()`. It governs the Lager rows of other members (allocation, note,
 delivered, stolen, book-out, personal rebook, the stock viewer's `canEdit`), the job-order writes
 and handover reports (the responsible unit, SK-queue orders included), the earmarks, the squadron a
-material claim is made for, and the refinery order read, edit, delete, store, the user order list
-and the mission order list (own orders plus those of the Logistician units).
+material claim is made for, and the refinery order read, edit, delete, store, creation for another member (the stamped unit),
+the user order list and the mission order list (own orders plus those of the Logistician units).
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
 per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
 MUST `POST /api/v1/refinery-orders/users/{userId}`, which reads the target from the path. `POST

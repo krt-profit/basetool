@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -449,7 +450,9 @@ class RefineryOrderServiceLifecycleTest {
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
           .thenReturn(unitB);
-      when(ownerScopeService.canActAsLogisticianInOwner(unitB.getId())).thenReturn(false);
+      doThrow(new AccessDeniedException("no"))
+          .when(ownerScopeService)
+          .requireLogisticianInOwner(unitB);
 
       assertThrows(
           AccessDeniedException.class,
@@ -463,7 +466,9 @@ class RefineryOrderServiceLifecycleTest {
     void onBehalf_ownerlessStampForANonAdmin_isRefused() {
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, null)).thenReturn(null);
-      when(ownerScopeService.canActAsLogisticianInOwner(null)).thenReturn(false);
+      doThrow(new AccessDeniedException("no"))
+          .when(ownerScopeService)
+          .requireLogisticianInOwner(null);
 
       assertThrows(
           AccessDeniedException.class,
@@ -482,7 +487,6 @@ class RefineryOrderServiceLifecycleTest {
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitA.getId()))
           .thenReturn(unitA);
-      when(ownerScopeService.canActAsLogisticianInOwner(unitA.getId())).thenReturn(true);
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -491,6 +495,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertSame(unitA, result.getOwningOrgUnit());
     }
+
     @Test
     void locationWithCityRefinery_isAccepted() {
       Location cityLoc = new Location();

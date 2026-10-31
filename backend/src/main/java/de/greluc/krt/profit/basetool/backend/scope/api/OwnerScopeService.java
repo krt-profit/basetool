@@ -30,6 +30,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -253,6 +254,18 @@ public class OwnerScopeService implements SquadronVisibility {
   @NotNull
   public Set<UUID> currentLogisticianOrgUnitIds() {
     return accessGateService.currentLogisticianOrgUnitIds();
+  }
+
+  /**
+   * Refuses the caller unless they act as Logistician in the unit that owns the target.
+   *
+   * @param orgUnit the target's owning org unit, or {@code null} when it has none (admin only)
+   * @throws AccessDeniedException when the caller is no Logistician of {@code orgUnit}
+   */
+  public void requireLogisticianInOwner(@Nullable OrgUnit orgUnit) {
+    if (!canActAsLogisticianInOwner(orgUnit == null ? null : orgUnit.getId())) {
+      throw new AccessDeniedException("Access denied: not a Logistician of the target's org unit");
+    }
   }
 
   /**
