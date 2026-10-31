@@ -1356,10 +1356,6 @@
       },
       {
         "description": "E2E test role",
-        "name": "Officer"
-      },
-      {
-        "description": "E2E test role",
         "name": "Logistician"
       },
       {
@@ -1473,7 +1469,6 @@
       "realmRoles": [
         "default-roles-basetool",
         "Admin",
-        "Officer",
         "KRT Member"
       ],
       "username": "sandbox-admin"

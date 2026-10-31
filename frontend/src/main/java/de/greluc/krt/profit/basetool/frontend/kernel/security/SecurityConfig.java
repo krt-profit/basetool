@@ -106,7 +106,7 @@ public class SecurityConfig {
 
   /**
    * Declares the Keycloak-role inheritance: {@code ADMIN} inherits {@code LOGISTICIAN} and {@code
-   * MISSION_MANAGER}; {@code OFFICER} inherits {@code LOGISTICIAN} and {@code MISSION_MANAGER}.
+   * MISSION_MANAGER}.
    * Mirrored from {@code ROLES_AND_PERMISSIONS.md} - keep both in sync.
    */
   @Bean
@@ -114,9 +114,7 @@ public class SecurityConfig {
     return RoleHierarchyImpl.fromHierarchy(
         """
         ROLE_ADMIN > ROLE_LOGISTICIAN
-        ROLE_OFFICER > ROLE_LOGISTICIAN
         ROLE_ADMIN > ROLE_MISSION_MANAGER
-        ROLE_OFFICER > ROLE_MISSION_MANAGER
         ROLE_ADMIN > ROLE_BANK_MANAGEMENT
         ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
         """);

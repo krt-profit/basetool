@@ -38,7 +38,6 @@ public final class Roles {
   public static final String ROLE_PREFIX = "ROLE_";
 
   public static final String ADMIN = "ADMIN";
-  public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
@@ -64,14 +63,7 @@ public final class Roles {
   public static final Set<String> MEMBER_AUTHORITIES =
       Set.of(
           authority(ADMIN),
-          authority(OFFICER),
           authority(MISSION_MANAGER),
           authority(LOGISTICIAN),
           authority(KRT_MEMBER));
-
-  /**
-   * {@code @PreAuthorize} expression for the "admin or officer" gate; a compile-time constant
-   * usable as an annotation value.
-   */
-  public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
 }

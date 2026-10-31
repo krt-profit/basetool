@@ -16,7 +16,6 @@ SELECT u.id, r.id
 FROM (VALUES ('5a4d0000-0000-4000-8000-000000000001'::uuid, 'KRT_MEMBER'),
              ('5a4d0000-0000-4000-8000-000000000002'::uuid, 'KRT_MEMBER'),
              ('5a4d0000-0000-4000-8000-000000000003'::uuid, 'KRT_MEMBER'),
-             ('5a4d0000-0000-4000-8000-000000000003'::uuid, 'OFFICER'),
              ('5a4d0000-0000-4000-8000-000000000003'::uuid, 'ADMIN')) AS u (id, code)
 JOIN role r ON r.code = u.code
 ON CONFLICT DO NOTHING;

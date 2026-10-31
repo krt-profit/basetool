@@ -163,9 +163,7 @@ final class NotificationTargets {
           Map.entry(
               "ORG_LEADERSHIP_ROLE_MISMATCH",
               forViewer(Viewer::admin, item("ORG_UNIT_MEMBER", "/members/", "/edit", null))),
-          Map.entry(
-              "ORG_MEMBER_DEPARTED",
-              forViewer(Viewer::adminOrOfficer, page("/organisation/leitung"))),
+          Map.entry("ORG_MEMBER_DEPARTED", page("/organisation/leitung")),
           Map.entry("HANGAR_SHIP_ASSIGNED", page(HANGAR)),
           Map.entry("HANGAR_FITTED_RESET", page(HANGAR)),
           Map.entry("HANGAR_CHANGED_BY_ADMIN", page(HANGAR)),
@@ -330,10 +328,9 @@ final class NotificationTargets {
    * The roles of the member looking at a notification that decide which pages they can open.
    *
    * @param admin whether the member is an admin
-   * @param officer whether the member is an officer
    * @param bankStaff whether the member is a bank employee or above
    */
-  record Viewer(boolean admin, boolean officer, boolean bankStaff) {
+  record Viewer(boolean admin, boolean bankStaff) {
 
     /**
      * Derives the viewer from the member's reachable authorities, the role hierarchy applied.
@@ -348,17 +345,7 @@ final class NotificationTargets {
               .collect(Collectors.toUnmodifiableSet());
       return new Viewer(
           names.contains(Roles.authority(Roles.ADMIN)),
-          names.contains(Roles.authority(Roles.OFFICER)),
           names.contains(Roles.authority(Roles.BANK_EMPLOYEE)));
-    }
-
-    /**
-     * Whether the member is an admin or an officer.
-     *
-     * @return {@code true} for an admin or an officer
-     */
-    boolean adminOrOfficer() {
-      return admin || officer;
     }
   }
 }

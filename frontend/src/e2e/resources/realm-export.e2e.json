@@ -1296,10 +1296,6 @@
       },
       {
         "description": "E2E test role",
-        "name": "Officer"
-      },
-      {
-        "description": "E2E test role",
         "name": "Logistician"
       },
       {
@@ -1375,7 +1371,6 @@
       "enabled": true,
       "realmRoles": [
         "Admin",
-        "Officer",
         "KRT Member"
       ],
       "username": "test-admin"
@@ -1392,7 +1387,6 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "Officer",
         "KRT Member"
       ],
       "username": "test-officer"
