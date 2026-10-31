@@ -201,6 +201,17 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentOversightScopeIgnoringPin()}: the cascading
+   * oversight scope over the caller's whole reach, ignoring the active-org-unit pin.
+   *
+   * @return a never-null, pin-free cascading oversight scope.
+   */
+  @NotNull
+  public ScopePredicate currentOversightScopeIgnoringPin() {
+    return requestScopeResolver.currentOversightScopeIgnoringPin();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentUserIsOlMember()}: whether the caller holds an
    * {@code OL_MEMBER} seat.
    *
