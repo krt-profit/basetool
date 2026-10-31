@@ -43,7 +43,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -151,7 +153,9 @@ class LogisticianPerUnitSurfacesTest {
       when(resolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
           .thenReturn(
               pin == null
-                  ? caller.grants()
+                  ? caller.grants().stream()
+                      .filter(caller.scope().memberOrgUnitIds()::contains)
+                      .collect(Collectors.toUnmodifiableSet())
                   : (caller.grants().contains(pin) ? Set.of(pin) : Set.of()));
       when(resolver.canViewJobOrders()).thenReturn(true);
       ownerScopeService =
