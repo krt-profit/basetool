@@ -306,7 +306,6 @@ public class SupplyMapper {
     return new NeedOrderDto(
         order.id(),
         order.displayId(),
-        order.handle(),
         order.status(),
         bucket == null ? null : bucket.requiredAmount(),
         bucket == null ? null : bucket.bookedAmount());

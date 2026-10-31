@@ -28,7 +28,5 @@ import org.jetbrains.annotations.Nullable;
  * @param id the job order
  * @param orgUnitId the responsible unit, the only unit whose needs may link the order
  * @param displayId the order's number
- * @param handle the order's short name, or {@code null}
  */
-public record NeedJobOrderOptionDto(
-    UUID id, UUID orgUnitId, @Nullable Integer displayId, @Nullable String handle) {}
+public record NeedJobOrderOptionDto(UUID id, UUID orgUnitId, @Nullable Integer displayId) {}

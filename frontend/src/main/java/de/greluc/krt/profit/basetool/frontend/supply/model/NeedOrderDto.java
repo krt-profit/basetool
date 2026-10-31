@@ -29,7 +29,6 @@ import java.util.UUID;
  *
  * @param id the job order
  * @param displayId the order's number, or {@code null}
- * @param handle the order's short name, or {@code null}
  * @param status the order's status
  * @param requiredAmount the order's outstanding requirement for the need's material and tier, or
  *     {@code null} when the order is closed or does not require them
@@ -39,7 +38,6 @@ import java.util.UUID;
 public record NeedOrderDto(
     UUID id,
     Integer displayId,
-    String handle,
     @BackendEnumAsString String status,
     Double requiredAmount,
     Double bookedAmount) {

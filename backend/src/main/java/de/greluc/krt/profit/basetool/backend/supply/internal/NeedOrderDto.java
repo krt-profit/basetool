@@ -29,7 +29,6 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param id the job order
  * @param displayId the order's number
- * @param handle the order's short name, or {@code null}
  * @param status the order's status
  * @param requiredAmount the order's outstanding requirement for the need's material and tier, or
  *     {@code null} when the order is closed or does not require them
@@ -39,7 +38,6 @@ import org.jetbrains.annotations.Nullable;
 public record NeedOrderDto(
     UUID id,
     @Nullable Integer displayId,
-    @Nullable String handle,
     JobOrderStatus status,
     @Nullable Double requiredAmount,
     @Nullable Double bookedAmount) {}

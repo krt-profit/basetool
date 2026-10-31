@@ -127,7 +127,6 @@ class SupplyMapperTest {
         new OrderCoverage(
             orderId,
             42,
-            "Stileron",
             JobOrderStatus.IN_PROGRESS,
             List.of(new BucketCoverage(material.getId(), good.getId(), 12.4, 12.4)));
 
@@ -135,8 +134,7 @@ class SupplyMapperTest {
         mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
 
     assertThat(dto.jobOrder())
-        .isEqualTo(
-            new NeedOrderDto(orderId, 42, "Stileron", JobOrderStatus.IN_PROGRESS, 12.4, 12.4));
+        .isEqualTo(new NeedOrderDto(orderId, 42, JobOrderStatus.IN_PROGRESS, 12.4, 12.4));
   }
 
   @Test
@@ -144,7 +142,7 @@ class SupplyMapperTest {
     QualityTier good = new QualityTier();
     good.setId(UUID.randomUUID());
     UUID orderId = UUID.randomUUID();
-    OrderCoverage order = new OrderCoverage(orderId, 42, null, JobOrderStatus.OPEN, List.of());
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
 
     NeedDto dto =
         mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
@@ -159,7 +157,7 @@ class SupplyMapperTest {
     QualityTier good = new QualityTier();
     good.setId(UUID.randomUUID());
     UUID orderId = UUID.randomUUID();
-    OrderCoverage order = new OrderCoverage(orderId, 42, null, JobOrderStatus.OPEN, List.of());
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
     SupplyNeed fulfilled = linkedNeed(orderId, good);
     fulfilled.setStatus(NeedStatus.FULFILLED);
 

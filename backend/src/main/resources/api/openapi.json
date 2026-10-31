@@ -85336,9 +85336,6 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "handle" : {
-            "type" : "string"
-          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
@@ -85359,9 +85356,6 @@
           "displayId" : {
             "type" : "integer",
             "format" : "int32"
-          },
-          "handle" : {
-            "type" : "string"
           },
           "id" : {
             "type" : "string",

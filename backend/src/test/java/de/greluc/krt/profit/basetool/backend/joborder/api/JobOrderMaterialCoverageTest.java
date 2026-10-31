@@ -87,7 +87,6 @@ class JobOrderMaterialCoverageTest {
     JobOrder order = new JobOrder();
     order.setId(UUID.randomUUID());
     order.setDisplayId(7);
-    order.setHandle("Stileron run");
     order.setStatus(status);
     return order;
   }
@@ -119,7 +118,6 @@ class JobOrderMaterialCoverageTest {
 
     OrderCoverage read = result.get(order.getId());
     assertThat(read.displayId()).isEqualTo(7);
-    assertThat(read.handle()).isEqualTo("Stileron run");
     assertThat(read.bucket(stileron.id(), GOOD.id()))
         .isEqualTo(new BucketCoverage(stileron.id(), GOOD.id(), 12.4, 12.4));
     assertThat(read.bucket(stileron.id(), NONE.id()))

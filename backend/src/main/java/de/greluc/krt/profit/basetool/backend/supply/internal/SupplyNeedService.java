@@ -513,10 +513,7 @@ public class SupplyNeedService {
         .map(
             order ->
                 new NeedJobOrderOptionDto(
-                    order.getId(),
-                    order.getResponsibleOrgUnit().getId(),
-                    order.getDisplayId(),
-                    order.getHandle()))
+                    order.getId(), order.getResponsibleOrgUnit().getId(), order.getDisplayId()))
         .toList();
   }
 

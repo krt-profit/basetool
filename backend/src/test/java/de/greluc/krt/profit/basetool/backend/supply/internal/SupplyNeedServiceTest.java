@@ -589,7 +589,7 @@ class SupplyNeedServiceTest {
         .thenReturn(List.of(order));
 
     assertThat(service.jobOrderOptions())
-        .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42, "Stileron"));
+        .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42));
   }
 
   @Test

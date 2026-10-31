@@ -28,7 +28,6 @@ import java.util.UUID;
  * @param id the job order
  * @param orgUnitId the responsible unit, the only unit whose needs may link the order
  * @param displayId the order's number, or {@code null}
- * @param handle the order's short name, or {@code null}
  */
 @DtoMirror
-public record NeedJobOrderOptionDto(UUID id, UUID orgUnitId, Integer displayId, String handle) {}
+public record NeedJobOrderOptionDto(UUID id, UUID orgUnitId, Integer displayId) {}

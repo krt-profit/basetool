@@ -88,8 +88,7 @@ public class JobOrderMaterialCoverage {
               : List.of();
       result.put(
           order.getId(),
-          new OrderCoverage(
-              order.getId(), order.getDisplayId(), order.getHandle(), order.getStatus(), buckets));
+          new OrderCoverage(order.getId(), order.getDisplayId(), order.getStatus(), buckets));
     }
     return Map.copyOf(result);
   }
@@ -164,14 +163,12 @@ public class JobOrderMaterialCoverage {
    *
    * @param id the order
    * @param displayId the order's number
-   * @param handle the order's short name, or {@code null}
    * @param status the order's status
    * @param buckets the order's buckets; empty for a terminal order
    */
   public record OrderCoverage(
       @NotNull UUID id,
       @Nullable Integer displayId,
-      @Nullable String handle,
       @NotNull JobOrderStatus status,
       @NotNull @Unmodifiable List<BucketCoverage> buckets) {
 

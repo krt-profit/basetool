@@ -188,7 +188,7 @@
                         <select id="supply-need-job-order" data-testid="supply-need-job-order">
                             <option value="" th:text="#{supply.need.jobOrder.none}">Kein Auftrag</option>
                             <option th:each="o : ${needJobOrders}" th:value="${o.id()}" th:data-unit-id="${o.orgUnitId()}"
-                                    th:text="${o.handle() != null ? '#' + #strings.toString(o.displayId()) + ' · ' + o.handle() : '#' + #strings.toString(o.displayId())}">#42 · Stileron</option>
+                                    th:text="${'#' + #strings.toString(o.displayId())}">#42</option>
                         </select>
                         <p class="form-hint" th:text="#{supply.need.jobOrder.hint}">Der Bestand des Auftrags z&auml;hlt nicht als Spende.</p>
                     </div>

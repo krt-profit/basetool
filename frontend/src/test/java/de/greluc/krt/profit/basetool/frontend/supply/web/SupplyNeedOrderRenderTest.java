@@ -130,7 +130,7 @@ class SupplyNeedOrderRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void aCoveredLinkedOrderShowsItsStockAndTheCoveredChip() throws Exception {
-    needsAre(linkedNeed(new NeedOrderDto(ORDER, 42, "Stileron", "IN_PROGRESS", 12.4, 12.4)));
+    needsAre(linkedNeed(new NeedOrderDto(ORDER, 42, "IN_PROGRESS", 12.4, 12.4)));
 
     String html = render("/supply/needs?fragment=results");
 
@@ -145,7 +145,7 @@ class SupplyNeedOrderRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void aLinkedOrderWithoutTheBucketNamesTheOrderOnly() throws Exception {
-    needsAre(linkedNeed(new NeedOrderDto(ORDER, 42, null, "OPEN", null, null)));
+    needsAre(linkedNeed(new NeedOrderDto(ORDER, 42, "OPEN", null, null)));
 
     String html = render("/supply/needs?fragment=results");
 
@@ -171,13 +171,13 @@ class SupplyNeedOrderRenderTest {
   void theNeedFormOffersTheOrdersOfTheManagedUnits() throws Exception {
     needsAre(linkedNeed(null));
     when(backendApiClient.get(eq("/api/v1/supply/needs/job-orders"), anyTypeRef()))
-        .thenReturn(List.of(new NeedJobOrderOptionDto(ORDER, UNIT, 42, "Stileron")));
+        .thenReturn(List.of(new NeedJobOrderOptionDto(ORDER, UNIT, 42)));
 
     String html = render("/supply/needs");
 
     assertThat(html)
         .containsPattern(
-            "<option value=\"" + ORDER + "\" data-unit-id=\"" + UNIT + "\">#42 · Stileron</option>")
+            "<option value=\"" + ORDER + "\" data-unit-id=\"" + UNIT + "\">#42</option>")
         .contains("Kein Auftrag");
   }
 }
