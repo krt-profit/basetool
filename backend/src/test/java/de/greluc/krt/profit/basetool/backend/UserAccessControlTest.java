@@ -102,12 +102,12 @@ public class UserAccessControlTest {
   }
 
   @Test
-  void testSearchUsersForBank_Officer_Allowed() throws Exception {
+  void testSearchUsersForBank_KrtMember_Allowed() throws Exception {
     mockMvc
         .perform(
             get("/api/v1/bank/members/search")
                 .param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 

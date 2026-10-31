@@ -33,6 +33,7 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
 
   /**
    * Lists the levels of the active units in the caller's Lager scope, catalogue entries loaded.
+   * Levels of a catalogue entry that the catalogue no longer lists stay stored but are left out.
    *
    * @param isAdminAllScope whether the caller is an admin without a pinned unit
    * @param activeOrgUnitId the pinned unit, or {@code null}
@@ -44,16 +45,23 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
       """
       SELECT l FROM StockLevel l
       JOIN FETCH l.orgUnit u
-      JOIN FETCH l.material m
+      LEFT JOIN FETCH l.material m
+      LEFT JOIN FETCH l.gameItem g
       LEFT JOIN FETCH l.qualityTier t
       WHERE u.active = true
+        AND m.scwikiDeletedAt IS NULL
+        AND (
+          (g.scwikiDeletedAt IS NULL AND g.uexDeletedAt IS NULL)
+          OR (g.scwikiSyncedAt IS NOT NULL AND g.scwikiDeletedAt IS NULL)
+          OR (g.uexItemId IS NOT NULL AND g.uexDeletedAt IS NULL)
+        )
         AND (:orgUnitId IS NULL OR u.id = :orgUnitId)
         AND (
           :isAdminAllScope = true
           OR (:activeOrgUnitId IS NOT NULL AND u.id = :activeOrgUnitId)
           OR (:activeOrgUnitId IS NULL AND u.id IN :memberOrgUnitIds)
         )
-      ORDER BY u.name, m.name, t.minQuality DESC NULLS LAST
+      ORDER BY u.name, COALESCE(m.name, g.name), t.minQuality DESC NULLS LAST
       """)
   List<StockLevel> findVisible(
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -62,20 +70,50 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
       @Param("orgUnitId") @Nullable UUID orgUnitId);
 
   /**
-   * Lists every level of one material in one unit, for the allocation of a single changed level.
+   * Lists every level of one catalogue entry in one unit, for the allocation of a single changed
+   * level.
    *
    * @param orgUnitId the unit
-   * @param materialId the material
+   * @param subjectId the material or the game item
    * @return the levels, tiers loaded
    */
   @Query(
       """
       SELECT l FROM StockLevel l LEFT JOIN FETCH l.qualityTier
-      JOIN FETCH l.material JOIN FETCH l.orgUnit
-      WHERE l.orgUnit.id = :orgUnitId AND l.material.id = :materialId
+      LEFT JOIN FETCH l.material m LEFT JOIN FETCH l.gameItem g JOIN FETCH l.orgUnit
+      WHERE l.orgUnit.id = :orgUnitId AND (m.id = :subjectId OR g.id = :subjectId)
       """)
-  List<StockLevel> findByUnitAndMaterial(
-      @Param("orgUnitId") UUID orgUnitId, @Param("materialId") UUID materialId);
+  List<StockLevel> findByUnitAndSubject(
+      @Param("orgUnitId") UUID orgUnitId, @Param("subjectId") UUID subjectId);
+
+  /**
+   * Lists every level of a material, units and tiers loaded, for the removal with the material.
+   *
+   * @param materialId the material
+   * @return the material's levels in every unit
+   */
+  @Query(
+      """
+      SELECT l FROM StockLevel l JOIN FETCH l.orgUnit JOIN FETCH l.material
+      LEFT JOIN FETCH l.qualityTier
+      WHERE l.material.id = :materialId
+      """)
+  List<StockLevel> findByMaterial(@Param("materialId") UUID materialId);
+
+  /**
+   * Finds the level of a unit and game item.
+   *
+   * @param orgUnitId the unit
+   * @param gameItemId the game item
+   * @return the level, or empty
+   */
+  @Query(
+      """
+      SELECT l FROM StockLevel l
+      WHERE l.orgUnit.id = :orgUnitId AND l.gameItem.id = :gameItemId
+      """)
+  Optional<StockLevel> findByItemKey(
+      @Param("orgUnitId") UUID orgUnitId, @Param("gameItemId") UUID gameItemId);
 
   /**
    * Finds the level of a unit, material and tier, the untiered one for a {@code null} tier.
@@ -97,17 +135,18 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
       @Param("qualityTierId") @Nullable UUID qualityTierId);
 
   /**
-   * Sums the pool stock of the given units and materials by quality, personal and stolen marker,
-   * with the job-order, mission and donation earmarks on it, over every location.
+   * Sums the pool stock of the given units and catalogue entries by quality, personal and stolen
+   * marker, with the job-order, mission and donation earmarks on it, over every location.
    *
    * @param units the units; never empty
-   * @param materials the materials; never empty
-   * @return one row per unit, material, quality and markers
+   * @param subjects the materials and game items; never empty
+   * @return one row per unit, catalogue entry, quality and markers
    */
   @Query(
       value =
           """
-          SELECT i.owning_org_unit_id AS unitId, i.material_id AS materialId,
+          SELECT i.owning_org_unit_id AS unitId,
+                 COALESCE(i.material_id, i.game_item_id) AS subjectId,
                  COALESCE(i.quality, 0) AS quality, i.personal AS personal, i.stolen AS stolen,
                  SUM(i.amount) AS amount,
                  SUM(COALESCE(jo.amount, 0) + COALESCE(mi.amount, 0) + COALESCE(dn.amount, 0))
@@ -122,15 +161,16 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
           LEFT JOIN LATERAL (SELECT SUM(a.amount) AS amount
                              FROM inventory_item_donation_allocation a
                              WHERE a.inventory_item_id = i.id) dn ON TRUE
-          WHERE i.owning_org_unit_id IN (:units) AND i.material_id IN (:materials)
-          GROUP BY i.owning_org_unit_id, i.material_id, COALESCE(i.quality, 0), i.personal,
-                   i.stolen
+          WHERE i.owning_org_unit_id IN (:units)
+            AND COALESCE(i.material_id, i.game_item_id) IN (:subjects)
+          GROUP BY i.owning_org_unit_id, COALESCE(i.material_id, i.game_item_id),
+                   COALESCE(i.quality, 0), i.personal, i.stolen
           """,
       nativeQuery = true)
   List<PoolStockRow> sumPoolStock(
-      @Param("units") Collection<UUID> units, @Param("materials") Collection<UUID> materials);
+      @Param("units") Collection<UUID> units, @Param("subjects") Collection<UUID> subjects);
 
-  /** One summed slice of a unit's pool stock of a material. */
+  /** One summed slice of a unit's pool stock of a material or game item. */
   interface PoolStockRow {
 
     /**
@@ -141,11 +181,11 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
     UUID getUnitId();
 
     /**
-     * The material.
+     * The material or game item.
      *
-     * @return the material id
+     * @return the catalogue entry id
      */
-    UUID getMaterialId();
+    UUID getSubjectId();
 
     /**
      * The stock quality, {@code 0} for rows without one.

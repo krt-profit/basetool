@@ -817,10 +817,9 @@ materialize an operation's whole finance / refinery ledger under a held Hikari c
   only within the last 3 months (by `createdAt`), and the mission-detail controller fetches it only on
   a full render (not on fragment refetches) — the operation analogue of the mission
   `findAllActiveReference` bound.
-- **Job-order detail gates its uncached users read.** `JobOrderPageController.viewOrderDetail` fetches
-  `/api/v1/users?size=1000` only on the full page (the assignee picker lives in the full-page-only
-  `assigneesSection`), not on any in-place section swap — pre-empting the same read-amplification once
-  order live-sync lands.
+- **Job-order detail reads no user list.** The assignee picker searches its candidates on demand
+  (`GET /api/v1/orders/{id}/assignee-candidates`, at most 20 hits, REQ-ORDERS-047), so neither the
+  full page nor an in-place section swap loads the members.
 
 **Acceptance**: `OperationFinanceServiceTest` (grouped per-mission totals; lazy per-mission detail;
 404 for a foreign mission); `MissionFinanceEntryRepositoryIntegrationTest` (the grouped finance /

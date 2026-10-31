@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPriceOverviewDto;
@@ -61,6 +62,7 @@ public class MaterialService {
   private final MaterialPriceRepository materialPriceRepository;
   private final MaterialCategoryRepository materialCategoryRepository;
   private final MaterialMapper materialMapper;
+  private final MaterialDeletionObserver materialDeletionObserver;
 
   /**
    * Returns the cached page of all materials, including hidden ones.
@@ -350,8 +352,9 @@ public class MaterialService {
   }
 
   /**
-   * Deletes a material. Backend rejects the delete when any inventory item or price row still
-   * references it (FK constraint surfaces as 409 via the global handler).
+   * Deletes a material together with its minimum stock levels. Backend rejects the delete when any
+   * inventory item or price row still references it (FK constraint surfaces as 409 via the global
+   * handler).
    *
    * @param id material primary key
    */
@@ -359,6 +362,7 @@ public class MaterialService {
   @EvictAllMaterialCaches
   public void deleteMaterial(@NotNull UUID id) {
     Material material = requireMaterial(id);
+    materialDeletionObserver.beforeMaterialDelete(id);
     materialRepository.delete(material);
   }
 }

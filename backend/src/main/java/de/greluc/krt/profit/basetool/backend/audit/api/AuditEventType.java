@@ -159,6 +159,9 @@ public enum AuditEventType {
   /** A minimum stock level was removed (REQ-INV-068). */
   MIN_STOCK_LEVEL_REMOVED(AuditDomain.INVENTORY),
 
+  /** A minimum stock level was removed together with its deleted catalogue entry (REQ-INV-068). */
+  MIN_STOCK_LEVEL_REMOVED_BY_CASCADE(AuditDomain.INVENTORY),
+
   /**
    * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
    *
@@ -223,6 +226,18 @@ public enum AuditEventType {
 
   /** An assignee's free-text note was cleared. */
   JOB_ORDER_ASSIGNEE_NOTE_CLEARED(AuditDomain.JOB_ORDER),
+
+  /**
+   * A user who is not a direct member of the order's processing unit was added as an assignee,
+   * which grants them read visibility of the order (REQ-ORDERS-047).
+   */
+  JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED(AuditDomain.JOB_ORDER),
+
+  /**
+   * A user who is not a direct member of the order's processing unit was removed as an assignee,
+   * ending the read visibility the entry granted (REQ-ORDERS-047).
+   */
+  JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED(AuditDomain.JOB_ORDER),
 
   /** A material requirement bucket was unlinked from a job order. */
   JOB_ORDER_MATERIAL_UNLINKED(AuditDomain.JOB_ORDER),

@@ -796,8 +796,8 @@ interface DocumentEventMap {
     'krt:inventory-changed': CustomEvent<null>;
 }
 
-/** Fetches combobox options on demand for a query. */
-type KrtComboboxRemoteSource = (query: string) => Promise<any[]>;
+/** Fetches combobox options on demand for a query, given the select it serves. */
+type KrtComboboxRemoteSource = (query: string, select?: HTMLElement) => Promise<any[]>;
 
 /** Overrides for one combobox instance; each text key has a `data-combobox-*` fallback. */
 interface KrtComboboxConfig {

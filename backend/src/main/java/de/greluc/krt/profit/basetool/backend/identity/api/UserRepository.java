@@ -286,6 +286,31 @@ public interface UserRepository
       Pageable pageable);
 
   /**
+   * Unscoped substring search over the active accounts (approved, present and enabled in Keycloak),
+   * projected to {@link UserReferenceDto}: the {@code preferredIds} first, then by username.
+   *
+   * @param query the LIKE-escaped substring to match against username or display name
+   * @param preferredIds the users to list first; never empty, pass a placeholder for none
+   * @param pageable the result window; its sort is ignored
+   * @return the matching active accounts, preferred users first
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto(u.id,
+      u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+      '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
+      (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
+      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND
+      u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+      AND u.inKeycloak = true AND u.enabledInKeycloak = true
+      ORDER BY CASE WHEN u.id IN :preferredIds THEN 0 ELSE 1 END, LOWER(u.username)
+      """)
+  List<UserReferenceDto> searchActiveReferences(
+      @Param("query") String query,
+      @Param("preferredIds") Collection<UUID> preferredIds,
+      Pageable pageable);
+
+  /**
    * Loads a user by id with {@code roles} and {@code roles.permissions} fetched in the same query —
    * for the authentication path and the caller's own {@code /users/me}, which assemble authorities
    * from both. A caller that only needs the user as a foreign-key target or reads a scalar uses the

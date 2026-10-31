@@ -301,7 +301,7 @@ public class JobOrderPageReader {
       @NotNull UUID id, @NotNull OrderCaller caller, @Nullable String fragment) {
     JobOrderDto order = jobOrderClient.order(id);
     boolean requesterView = order.redacted();
-    boolean canAssign = !requesterView && caller.logistician();
+    boolean canAssign = !requesterView && caller.logistician() && order.callerMayEdit();
     boolean itemOrder = TYPE_ITEM.equals(order.type());
     Optional<UUID> currentUserId = currentUserId(caller);
     DetailCatalogs catalogs = detailCatalogs(requesterView, canAssign);

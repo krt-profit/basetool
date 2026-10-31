@@ -135,9 +135,11 @@ class JobOrderReferenceNeedsTest {
             squadronMapper,
             jobOrderItemService,
             stockProjectionService,
-            requirementResolver);
+            requirementResolver,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
     when(jobOrderItemService.requiredGameItemIds(any(JobOrder.class))).thenReturn(Set.of());
   }
