@@ -245,7 +245,7 @@ public class JobOrderController {
           + Roles.LOGISTICIAN
           + "', '"
           + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,
@@ -284,7 +284,7 @@ public class JobOrderController {
           + Roles.LOGISTICIAN
           + "', '"
           + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,

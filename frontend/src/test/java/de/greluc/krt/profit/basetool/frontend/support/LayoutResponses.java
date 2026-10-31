@@ -77,6 +77,7 @@ public final class LayoutResponses {
             false,
             false,
             false,
+            false,
             false),
         0L);
   }
@@ -100,6 +101,7 @@ public final class LayoutResponses {
         canViewJobOrders,
         canViewOwnJobOrders,
         false,
+        false,
         canMarkStolen,
         false,
         false,
@@ -107,6 +109,17 @@ public final class LayoutResponses {
         false,
         false,
         false);
+  }
+
+  /**
+   * Capability flags with only the Mission Manager flag set, as the backend's capabilities endpoint
+   * answers a caller holding that grant in the active context.
+   *
+   * @return the capability flags
+   */
+  public static CapabilitiesResponse missionManager() {
+    return new CapabilitiesResponse(
+        false, false, false, false, true, false, false, false, false, false, false, false);
   }
 
   /**
@@ -121,6 +134,7 @@ public final class LayoutResponses {
         null,
         List.of(),
         new CapabilitiesResponse(
+            false,
             false,
             false,
             false,

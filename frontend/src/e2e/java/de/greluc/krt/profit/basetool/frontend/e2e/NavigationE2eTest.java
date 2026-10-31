@@ -230,7 +230,7 @@ class NavigationE2eTest {
         page -> {
           E2eSupport.navigate(page, STACK.baseUrl() + "/admin");
           page.locator("#hamburger").click();
-          assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\bis-admin-mode\b"));
+          assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\\bis-admin-mode\\b"));
           assertThat(page.getByTestId("nav-admin-dashboard")).isVisible();
           assertThat(page.locator("#sidebar .nav-mode-admin .nav-group-head")).hasCount(3);
           for (Locator head : page.locator("#sidebar .nav-mode-admin .nav-group-head").all()) {

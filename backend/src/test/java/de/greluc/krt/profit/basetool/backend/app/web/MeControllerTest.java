@@ -136,15 +136,17 @@ class MeControllerTest {
   }
 
   @Test
-  void getCapabilities_missionManagerFlagResolvesThroughTheHierarchy() {
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)))
-        .thenReturn(false);
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(false);
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)))
-        .thenReturn(true);
+  void getCapabilities_missionManagerFlagFollowsTheGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsMissionManagerInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isMissionManagerOrAbove());
+  }
+
+  @Test
+  void getCapabilities_missionManagerFlagIsFalseWithoutAGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsMissionManagerInActiveContext()).thenReturn(false);
+
+    assertFalse(controller.getCapabilities().isMissionManagerOrAbove());
   }
 
   @Test

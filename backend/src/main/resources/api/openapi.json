@@ -40019,6 +40019,7 @@
         "x-domain" : "operation"
       },
       "post" : {
+        "description" : "Requires the MISSION_MANAGER grant in the unit that will own the operation; without a unit, in an Organisationsleitung or Bereich unit.",
         "operationId" : "createOperation",
         "requestBody" : {
           "content" : {

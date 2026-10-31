@@ -95,6 +95,24 @@ public class RefineryAccessPolicy {
   }
 
   /**
+   * Checks whether the caller handles refinery order {@code orderId} as Logistician: a Logistician
+   * grant in the order's owning unit inside the active scope, or an admin. An order without a unit
+   * is reserved to admins (REQ-SEC-005).
+   *
+   * @param orderId refinery order to inspect; never {@code null}
+   * @return {@code true} iff the caller may act on the order as Logistician; {@code false} for an
+   *     unknown order
+   */
+  public boolean isLogisticianOfOrder(@NotNull UUID orderId) {
+    return refineryOrderRepository
+        .findById(orderId)
+        .map(o ->
+            ownerScopeService.canActAsLogisticianInOwner(
+                o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
+        .orElse(false);
+  }
+
+  /**
    * Coarse pre-check for reading a member's refinery orders: admin, the member themselves, or a
    * caller whose read scope covers any of the member's memberships.
    *
