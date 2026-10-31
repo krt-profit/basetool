@@ -177,6 +177,29 @@ public class MemberManagementController {
   }
 
   /**
+   * Renders the Export tab of a member's detail with the data-export downloads.
+   *
+   * @param id the member's id
+   * @param model Thymeleaf model populated with the member
+   * @param redirectAttributes flash attributes carrier
+   * @return the {@code identity/member-export} view, or a redirect to {@code /members} on a backend
+   *     failure
+   */
+  @NotNull
+  @GetMapping("/{id}/export")
+  public String memberExport(
+      @PathVariable @NotNull UUID id, Model model, RedirectAttributes redirectAttributes) {
+    try {
+      model.addAttribute("user", identityClient.user(id));
+      return "identity/member-export";
+    } catch (BackendServiceException e) {
+      log.error("Could not fetch member details", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.member.details.load");
+      return "redirect:/members";
+    }
+  }
+
+  /**
    * Renders the member edit page; a form already in the model from a failed validation is kept.
    *
    * @param id user id

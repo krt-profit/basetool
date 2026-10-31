@@ -67,7 +67,7 @@ class NavigationRegistryTest {
   void groupKeysAreUnique() {
     List<String> keys = registry.groups().stream().map(NavigationGroup::key).toList();
 
-    assertThat(keys).doesNotHaveDuplicates().contains("missions", "personal", "admin-system");
+    assertThat(keys).doesNotHaveDuplicates().contains("missions", "personal", "admin-operations");
   }
 
   /** The phone tab bar holds today's four tabs, each naming registered entries. */
@@ -85,6 +85,30 @@ class NavigationRegistryTest {
         .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
     assertThat(registry.tabs().get(2).entryKeys())
         .containsExactly("orders.list", "orders.own", "orders.create");
+  }
+
+  /** Admin mode has the hub and exactly 13 menu links in three groups that start collapsed. */
+  @Test
+  void adminModeHasThirteenLinksInThreeCollapsedGroups() {
+    assertThat(registry.admin())
+        .extracting(NavigationGroup::key)
+        .containsExactly("admin-members", "admin-masterdata", "admin-operations");
+    assertThat(registry.admin()).allSatisfy(group -> assertThat(group.collapsed()).isTrue());
+    assertThat(registry.admin().stream().flatMap(group -> group.entries().stream()))
+        .filteredOn(entry -> !entry.paletteOnly())
+        .hasSize(13);
+    assertThat(registry.adminTop().entries())
+        .extracting(NavigationEntry::href)
+        .containsExactly("/admin");
+  }
+
+  /** Every tab bar names registered, quick-access-only or linked entries, and no key twice. */
+  @Test
+  void pageTabsNameRegisteredEntries() {
+    assertThat(registry.pageTabs())
+        .flatExtracting(tabs -> tabs.entryKeys())
+        .doesNotHaveDuplicates()
+        .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
   }
 
   /** A key lookup finds the entry with its path; an unknown key finds nothing. */

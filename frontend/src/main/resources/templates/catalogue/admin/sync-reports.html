@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.syncReports.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.syncreports', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.syncReports.title},
         count=${totalElements}, countId='sync-count', countFor='sync-results', actions=~{::sync-actions})}">
         <th:block th:ref="sync-actions">
             <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='sync-menu', items=~{::sync-menu-items})}">

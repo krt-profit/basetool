@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.locations.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.locations', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.locations.title},
         count=${locationsPage.totalElements()}, countId='locations-count', countFor='locations-results', actions=null)}"></th:block>
 
     <th:block th:replace="~{kernel/fragments/components :: alert('danger', ${error}, null)}"></th:block>

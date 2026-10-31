@@ -93,14 +93,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const href = link.getAttribute('href');
                 if (!href || href.charAt(0) !== '/') return;
                 const linkPath = href.split('?')[0].split('#')[0];
-                const isMatch =
-                    linkPath === '/'
-                        ? here === '/'
-                        : here === linkPath || here.indexOf(`${linkPath}/`) === 0;
-                if (isMatch && linkPath.length > activeLen) {
-                    activeLink = link;
-                    activeLen = linkPath.length;
-                }
+                const areaPaths = (link.getAttribute('data-nav-paths') || '')
+                    .split(' ')
+                    .filter((path) => path.length > 0);
+                [linkPath, ...areaPaths].forEach((path) => {
+                    const isMatch =
+                        path === '/'
+                            ? here === '/'
+                            : here === path || here.indexOf(`${path}/`) === 0;
+                    if (isMatch && path.length > activeLen) {
+                        activeLink = link;
+                        activeLen = path.length;
+                    }
+                });
             });
     }
     const currentLink = /** @type {HTMLAnchorElement | null} */ (activeLink);
@@ -136,11 +141,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const initGroups = function () {
         groups.forEach((group) => {
             const key = group.getAttribute('data-group-key');
+            const collapsedByDefault = group.getAttribute('data-collapsed') === 'true';
             let open;
             if (phone.matches) {
                 open = group === activeGroup;
             } else {
-                open = group === activeGroup || readState(`krt.sidebar.${key}`) !== 'closed';
+                const stored = readState(`krt.sidebar.${key}`);
+                open =
+                    group === activeGroup ||
+                    (stored === null ? !collapsedByDefault : stored !== 'closed');
             }
             groupOpen.set(group, open);
             if (!query) renderGroup(group, open);
@@ -339,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (sidebarEl && adminModeEl) {
         adminMode =
+            window.location.pathname === '/admin' ||
             window.location.pathname.indexOf('/admin/') === 0 ||
             (!!currentLink && adminModeEl.contains(currentLink));
     }
@@ -457,7 +467,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    if (window.location.pathname.indexOf('/admin/') === 0) {
+    if (
+        window.location.pathname === '/admin' ||
+        window.location.pathname.indexOf('/admin/') === 0
+    ) {
         document.body.classList.add('admin-mode');
     }
 

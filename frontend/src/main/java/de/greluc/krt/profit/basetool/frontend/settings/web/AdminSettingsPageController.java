@@ -22,23 +22,17 @@ package de.greluc.krt.profit.basetool.frontend.settings.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient.SystemSetting;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingUpdateDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
@@ -62,7 +56,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Controller for the admin system-settings page ({@code /admin/settings}): job-order age
  * thresholds, refinery rounding mode and the in-game transfer-fee rate, each with its own
- * optimistic-lock version, plus the per-Staffel and per-Spezialkommando toggles.
+ * optimistic-lock version.
  *
  * <p>The transfer fee is stored as a fraction ({@code 0.005}) and shown as a percentage ({@code
  * 0.5}).
@@ -85,7 +79,7 @@ public class AdminSettingsPageController {
    */
   private static final BigDecimal DEFAULT_TRANSFER_FEE_PERCENT = new BigDecimal("0.5");
 
-  /** Reads and writes the settings and the toggle lists. */
+  /** Reads and writes the settings. */
   private final SettingsBackendClient settingsClient;
 
   /** Clears the catalogue caches after a settings write. */
@@ -139,64 +133,8 @@ public class AdminSettingsPageController {
     model.addAttribute("refineryRoundingVersion", rounding.version());
     model.addAttribute("transferFeePercent", transferFee.value().toPlainString());
     model.addAttribute("transferFeeVersion", transferFee.version());
-    CompleteCatalog<SquadronDto> squadronCatalog = fetchSquadronsForPromotionToggle();
-    model.addAttribute("squadrons", squadronCatalog.items());
-    CompleteCatalog<SpecialCommandDto> specialCommandCatalog =
-        fetchSpecialCommandsForProfitToggle();
-    model.addAttribute("specialCommands", specialCommandCatalog.items());
-
-    model.addAttribute(
-        "catalogTruncated", squadronCatalog.truncated() || specialCommandCatalog.truncated());
 
     return "settings/admin-settings";
-  }
-
-  /**
-   * Loads every active squadron, sorted by name, for the per-squadron promotion toggle
-   * (REQ-ADMIN-001). A backend failure yields an empty catalogue.
-   *
-   * @return active squadrons sorted by name plus the truncation flag, never {@code null}.
-   */
-  private CompleteCatalog<SquadronDto> fetchSquadronsForPromotionToggle() {
-    return SectionFallback.load(
-        log,
-        "promotion-toggle-squadrons",
-        () -> {
-          CompleteCatalog<SquadronDto> catalog =
-              CatalogPages.fetchAll(settingsClient::squadronPage);
-          List<SquadronDto> sorted =
-              catalog.items().stream()
-                  .sorted(
-                      Comparator.comparing(
-                          s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-                  .toList();
-          return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
-        },
-        CompleteCatalog.empty());
-  }
-
-  /**
-   * Loads every active Spezialkommando, sorted by name, for the per-SK profit-eligibility toggle
-   * (REQ-ADMIN-001). A backend failure yields an empty catalogue.
-   *
-   * @return active Spezialkommandos sorted by name plus the truncation flag, never {@code null}.
-   */
-  private CompleteCatalog<SpecialCommandDto> fetchSpecialCommandsForProfitToggle() {
-    return SectionFallback.load(
-        log,
-        "profit-toggle-special-commands",
-        () -> {
-          CompleteCatalog<SpecialCommandDto> catalog =
-              CatalogPages.fetchAll(settingsClient::specialCommandPage);
-          List<SpecialCommandDto> sorted =
-              catalog.items().stream()
-                  .sorted(
-                      Comparator.comparing(
-                          s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-                  .toList();
-          return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
-        },
-        CompleteCatalog.empty());
   }
 
   /**

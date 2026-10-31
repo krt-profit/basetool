@@ -128,13 +128,46 @@ class NavigationMenuTest {
 
     assertThat(menu.palettePages())
         .extracting(NavigationEntry::key)
-        .containsExactly(
+        .contains(
             "hangar.unit",
             "storage.my",
             "storage.all",
             "admin.syncreports.uex",
             "admin.syncreports.scwiki");
     assertThat(keys(menu, "logistics")).doesNotContain("hangar.unit", "storage.my");
+  }
+
+  /**
+   * An administrator gets the hub, 13 links and the merged pages' tab bars with the current tab.
+   */
+  @Test
+  void administratorGetsTheHubTheLinksAndTheTabBars() {
+    NavigationMenu menu = resolve(Set.of("ADMIN"), Set.of());
+
+    assertThat(menu.adminTop().links())
+        .extracting(NavigationEntry::key)
+        .containsExactly("admin.dashboard");
+    assertThat(menu.admin().stream().mapToInt(group -> group.links().size()).sum()).isEqualTo(13);
+    assertThat(menu.pageTabs("admin.terms", "/admin/terms"))
+        .extracting(tab -> tab.entry().key() + ":" + tab.current())
+        .containsExactly(
+            "admin.members.list:false", "admin.discordregistrations:false", "admin.terms:true");
+    assertThat(menu.pageTabs("admin.dangerzone", "/admin/settings/danger-zone?x=1"))
+        .filteredOn(NavigationMenu.PageTab::current)
+        .extracting(tab -> tab.entry().key())
+        .containsExactly("admin.dangerzone");
+    assertThat(menu.areaPaths(registry.entry("admin.privacy").orElseThrow()))
+        .isEqualTo("/admin/deletion-requests");
+    assertThat(menu.pageTabs("missions.list", "/missions")).isEmpty();
+  }
+
+  /** A member gets neither the hub, the admin links nor an admin tab bar. */
+  @Test
+  void memberGetsNoAdminHubOrTabs() {
+    NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of());
+
+    assertThat(menu.adminTop().links()).isEmpty();
+    assertThat(menu.pageTabs("admin.terms", "/admin/terms")).isEmpty();
   }
 
   /** The language action offers only the language the page is not shown in. */

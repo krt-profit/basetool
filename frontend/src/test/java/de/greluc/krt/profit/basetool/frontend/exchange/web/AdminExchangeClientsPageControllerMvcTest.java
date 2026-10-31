@@ -260,7 +260,7 @@ class AdminExchangeClientsPageControllerMvcTest {
         html.substring(
             html.indexOf("data-testid=\"page-head\""), html.indexOf("id=\"xc-registry-host\""));
     assertThat(head)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Betrieb<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"xc-registry-host\"")
         .contains("data-xc-new");

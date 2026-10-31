@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="#{nav.admin.dashboard} + ' - ' + ${appTitle}">Admin-Dashboard - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/navigation/admin-hub.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.administration', titleText=#{nav.admin.dashboard})}"></th:block>
+
+    <div class="grid-auto-cards" data-testid="admin-hub">
+        <section class="card" th:each="item : ${navigation.admin()}" th:data-testid="|admin-hub-${item.group().key()}|">
+            <div class="card-head">
+                <h2 class="card-title" th:text="#{${item.group().labelKey()}}">Gruppe</h2>
+            </div>
+            <ul class="admin-hub-links">
+                <li th:each="entry : ${item.links()}">
+                    <a th:href="@{${entry.href()}}" th:data-entry-key="${entry.key()}" th:text="#{${entry.labelKey()}}">Link</a>
+                </li>
+            </ul>
+        </section>
+        <section class="card" data-testid="admin-hub-info">
+            <div class="card-head">
+                <h2 class="card-title" th:text="#{info.title}">Information</h2>
+            </div>
+            <ul class="admin-hub-links">
+                <li><a th:href="@{/admin/announcement}" data-entry-key="admin.announcement" th:text="#{info.edit.title}">Information bearbeiten</a></li>
+            </ul>
+        </section>
+    </div>
+</main>
+</th:block>
+</body>
+</html>

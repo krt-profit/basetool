@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
 import java.util.Locale;
@@ -83,19 +82,10 @@ class AdminMissionDataPageControllerMvcTest {
   }
 
   /**
-   * Stubs the three backend catalogue calls (squadrons / job-types / frequency-types) with one row
-   * each, so every section table renders.
+   * Stubs the two backend catalogue calls (job-types / frequency-types) with one row each, so every
+   * section table renders.
    */
-  private void stubAllThree() {
-    PageResponse<SquadronDto> squadrons =
-        new PageResponse<>(
-            List.of(
-                new SquadronDto(UUID.randomUUID(), "Frag SQ", "FSQ", "d", true, true, false, 0L)),
-            0,
-            1000,
-            1L,
-            1,
-            List.of());
+  private void stubBoth() {
     PageResponse<JobTypeDto> jobTypes =
         new PageResponse<>(
             List.of(
@@ -114,8 +104,6 @@ class AdminMissionDataPageControllerMvcTest {
             1L,
             1,
             List.of());
-    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef(), any(Object[].class)))
-        .thenReturn(squadrons);
     when(backendApiClient.get(contains("/api/v1/job-types"), anyTypeRef(), any(Object[].class)))
         .thenReturn(jobTypes);
     when(backendApiClient.get(
@@ -161,14 +149,13 @@ class AdminMissionDataPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
-  void list_fullPage_rendersAllThreeSwapWrappers() throws Exception {
-    stubAllThree();
+  void list_fullPage_rendersBothSwapWrappers() throws Exception {
+    stubBoth();
 
     mockMvc
         .perform(get("/admin/mission-data"))
         .andExpect(status().isOk())
         .andExpect(view().name("catalogue/admin/mission-data"))
-        .andExpect(content().string(containsString("id=\"squadrons-results\"")))
         .andExpect(content().string(containsString("id=\"jobtypes-results\"")))
         .andExpect(content().string(containsString("id=\"freqtypes-results\"")));
   }
@@ -181,7 +168,7 @@ class AdminMissionDataPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersThePatternBasics() throws Exception {
-    stubAllThree();
+    stubBoth();
 
     String html =
         mockMvc
@@ -190,15 +177,13 @@ class AdminMissionDataPageControllerMvcTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    String main = html.substring(html.indexOf("<main"), html.indexOf("id=\"squadron-modal\""));
+    String main = html.substring(html.indexOf("<main"), html.indexOf("id=\"jobtype-modal\""));
 
     assertThat(html)
         .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
         .doesNotContain("class=\"page-actions\"")
-        .contains("id=\"add-squadron-btn\" class=\"btn btn--cta\"")
         .contains("id=\"add-jobtype-btn\" class=\"btn btn--cta\"")
         .contains("id=\"add-freqtype-btn\" class=\"btn btn--cta\"")
-        .contains("class=\"krt-switch\" for=\"includeInactiveSquadrons\"")
         .contains("class=\"krt-switch\" for=\"includeInactiveJobTypes\"")
         .contains("class=\"krt-switch\" for=\"includeInactiveFrequencyTypes\"")
         .contains(">Einsatz<")
@@ -210,23 +195,22 @@ class AdminMissionDataPageControllerMvcTest {
     assertThat(main)
         .contains("class=\"master-detail md-md\"")
         .containsPattern(
-            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-squadrons\"")
-        .containsPattern("data-list-count-for=\"squadrons-results\"\\s*>1<")
-        .containsPattern("id=\"squadrons-box\"[^>]*role=\"tabpanel\"[^>]*>")
-        .containsPattern("id=\"jobtypes-box\"[^>]*hidden")
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-jobtypes\"")
+        .containsPattern("data-list-count-for=\"jobtypes-results\"\\s*>1<")
+        .containsPattern("id=\"jobtypes-box\"[^>]*role=\"tabpanel\"[^>]*>")
         .containsPattern("id=\"freqtypes-box\"[^>]*hidden")
-        .doesNotContainPattern("id=\"squadrons-box\"[^>]*hidden")
+        .doesNotContainPattern("id=\"jobtypes-box\"[^>]*hidden")
         .contains("data-list-total=\"1\"")
         .doesNotContain("krtm-");
-    assertThat(main.split("btn--cta", -1)).hasSize(4);
-    assertThat(main.split("data-table data-table--stack", -1)).hasSize(4);
+    assertThat(main.split("btn--cta", -1)).hasSize(3);
+    assertThat(main.split("data-table data-table--stack", -1)).hasSize(3);
   }
 
   /** The {@code kind} parameter opens that data kind's pane, an unknown value the first. */
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_kindParameter_selectsThePane() throws Exception {
-    stubAllThree();
+    stubBoth();
 
     String freq =
         mockMvc
@@ -246,17 +230,17 @@ class AdminMissionDataPageControllerMvcTest {
     assertThat(freq)
         .contains(
             "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-freqtypes\"")
-        .containsPattern("id=\"squadrons-box\"[^>]*hidden")
+        .containsPattern("id=\"jobtypes-box\"[^>]*hidden")
         .doesNotContainPattern("id=\"freqtypes-box\"[^>]*hidden");
     assertThat(unknown)
         .contains(
-            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-squadrons\"");
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-jobtypes\"");
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
-    stubAllThree();
+    stubBoth();
 
     mockMvc
         .perform(get("/admin/mission-data"))
@@ -269,25 +253,8 @@ class AdminMissionDataPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
-  void list_fragmentSquadrons_rendersOnlySquadronTable() throws Exception {
-    stubAllThree();
-
-    mockMvc
-        .perform(get("/admin/mission-data").param("fragment", "squadrons-results"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("catalogue/admin/mission-data :: squadrons-results"))
-        .andExpect(content().string(containsString("Frag SQ")))
-        .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
-        .andExpect(content().string(not(containsString("id=\"jobtypes-results\""))))
-        .andExpect(content().string(not(containsString("id=\"freqtypes-results\""))))
-        .andExpect(content().string(not(containsString("id=\"squadron-modal\""))))
-        .andExpect(content().string(not(containsString("id=\"add-squadron-btn\""))));
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
   void list_fragmentJobtypes_rendersOnlyJobTable() throws Exception {
-    stubAllThree();
+    stubBoth();
 
     mockMvc
         .perform(get("/admin/mission-data").param("fragment", "jobtypes-results"))
@@ -295,7 +262,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(view().name("catalogue/admin/mission-data :: jobtypes-results"))
         .andExpect(content().string(containsString("Frag JT")))
         .andExpect(content().string(not(containsString("id=\"jobtypes-results\""))))
-        .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
         .andExpect(content().string(not(containsString("id=\"jobtype-modal\""))))
         .andExpect(content().string(not(containsString("id=\"add-jobtype-btn\""))));
   }
@@ -303,7 +269,7 @@ class AdminMissionDataPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentFreqtypes_rendersOnlyFreqTable() throws Exception {
-    stubAllThree();
+    stubBoth();
 
     mockMvc
         .perform(get("/admin/mission-data").param("fragment", "freqtypes-results"))
@@ -312,26 +278,8 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(containsString("Frag FT")))
         .andExpect(content().string(containsString("class=\"draggable-row")))
         .andExpect(content().string(not(containsString("id=\"freqtypes-results\""))))
-        .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
         .andExpect(content().string(not(containsString("id=\"frequency-type-modal\""))))
         .andExpect(content().string(not(containsString("id=\"add-freqtype-btn\""))));
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void createSquadronAjax_withHeader_returns200() throws Exception {
-    when(backendApiClient.post(contains("/squadrons"), any(), eq(Void.class))).thenReturn(null);
-
-    mockMvc
-        .perform(
-            post("/admin/mission-data/squadrons")
-                .header("X-Requested-With", "XMLHttpRequest")
-                .with(csrf())
-                .param("name", "Frag SQ")
-                .param("shorthand", "FSQ")
-                .param("description", "d")
-                .param("version", "0"))
-        .andExpect(status().isOk());
   }
 
   @Test
@@ -347,41 +295,5 @@ class AdminMissionDataPageControllerMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .with(csrf()))
         .andExpect(status().isOk());
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void createSquadronAjax_backendConflict_relays409() throws Exception {
-    when(backendApiClient.post(contains("/squadrons"), any(), eq(Void.class)))
-        .thenThrow(
-            new BackendServiceException(
-                "duplicate", null, 409, "DUPLICATE", null, java.util.List.of(), "duplicate"));
-
-    mockMvc
-        .perform(
-            post("/admin/mission-data/squadrons")
-                .header("X-Requested-With", "XMLHttpRequest")
-                .with(csrf())
-                .param("name", "Frag SQ")
-                .param("shorthand", "FSQ")
-                .param("description", "d")
-                .param("version", "0"))
-        .andExpect(status().isConflict());
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void createSquadron_withoutHeader_redirects() throws Exception {
-    when(backendApiClient.post(contains("/squadrons"), any(), eq(Void.class))).thenReturn(null);
-
-    mockMvc
-        .perform(
-            post("/admin/mission-data/squadrons")
-                .with(csrf())
-                .param("name", "Frag SQ")
-                .param("shorthand", "FSQ")
-                .param("description", "d")
-                .param("version", "0"))
-        .andExpect(status().is3xxRedirection());
   }
 }

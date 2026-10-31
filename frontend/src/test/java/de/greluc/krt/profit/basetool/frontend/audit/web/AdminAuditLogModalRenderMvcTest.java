@@ -193,7 +193,7 @@ class AdminAuditLogModalRenderMvcTest {
         html.substring(
             html.indexOf("data-testid=\"page-head\""), html.indexOf("id=\"audit-results\""));
     assertThat(head)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Betrieb<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"audit-results\"")
         .contains("data-overflow-menu")
