@@ -68,7 +68,7 @@ class StockLevelBackendClientTest {
     backend.answerJson("{}");
     backend.answerEmpty();
 
-    client.create(new StockLevelCreateRequest(UNIT, MATERIAL, null, 5.0, null));
+    client.create(new StockLevelCreateRequest(UNIT, MATERIAL, null, null, 5.0, null));
     client.update(ID, new StockLevelUpdateRequest(null, 6.0, 8.0, 2L));
     client.delete(ID, 3L);
 
@@ -79,7 +79,7 @@ class StockLevelBackendClientTest {
             + UNIT
             + "\",\"materialId\":\""
             + MATERIAL
-            + "\",\"qualityTierId\":null,\"minimum\":5.0,\"target\":null}");
+            + "\",\"gameItemId\":null,\"qualityTierId\":null,\"minimum\":5.0,\"target\":null}");
     backend.expect(
         "PUT",
         "/api/v1/inventory/stock-levels/" + ID,

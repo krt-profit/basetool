@@ -207,6 +207,7 @@ class OwnerScopeServiceTest {
     jobOrderPolicy =
         new JobOrderAccessPolicy(
             service,
+            authHelper,
             jobOrderRepository,
             jobOrderHandoverRepository,
             jobOrderItemHandoverRepository);

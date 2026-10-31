@@ -1,8 +1,8 @@
 # ADR-0302 — Minimum stock levels allocate free stock exclusively, top tier down
 
-- **Status:** Accepted — partly implemented: the table, material levels, the allocation, the API
-  and the „Mindestbestände“ tab are built; game items, the requested amount, the lifecycle, the
-  notification and the gauge are pending.
+- **Status:** Accepted — partly implemented: the table, material and game-item levels, the
+  allocation, the requested amount, the lifecycle, the API and the „Mindestbestände“ tab are built;
+  the badge, the shortcuts, the notification and the gauge are pending.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** REQ-INV-067 · REQ-INV-068 · REQ-NOTIF-030 · spec [`supply.md`](../specs/supply.md)
@@ -36,8 +36,11 @@ donations, and open supply needs and job orders ask for more that has not arrive
 6. **A low-stock notification fires once** when a level drops below its minimum and re-arms only
    after it has reached its target again; it goes to the unit's direct Logisticians and direct
    leadership seats, without cascade, and can be switched off.
-7. **Lifecycle:** a level is deleted with its catalogue entry or its unit, with an audit event; a
-   deactivated tier leaves the level in place, flagged „Stufe inaktiv". None of these notifies.
+7. **Lifecycle:** a level is deleted with its material, with an audit event per level. Units are
+   only ever deactivated and catalogue entries only soft-deleted, so the levels of an inactive unit
+   or a delisted entry stay stored and hidden, raise no notice and do not count in the gauge; they
+   return with the unit or the entry. A deactivated tier leaves the level in place, flagged „Stufe
+   inaktiv". None of these notifies.
 
 ## Consequences
 

@@ -132,8 +132,10 @@ class LogisticianPerUnitSurfacesTest {
 
     final OwnerScopeService ownerScopeService;
 
+    final AuthHelperService authHelper;
+
     Chain(Caller caller) {
-      AuthHelperService authHelper = mock(AuthHelperService.class);
+      authHelper = mock(AuthHelperService.class);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
       List<GrantedAuthority> authorities =
           caller.grants().stream()
@@ -207,9 +209,11 @@ class LogisticianPerUnitSurfacesTest {
   @MethodSource("callers")
   void jobOrdersOfAUnitNeedALogisticianGrantInTheResponsibleUnit(Caller caller) {
     JobOrderRepository orders = mock(JobOrderRepository.class);
+    Chain chain = new Chain(caller);
     JobOrderAccessPolicy policy =
         new JobOrderAccessPolicy(
-            new Chain(caller).ownerScopeService,
+            chain.ownerScopeService,
+            chain.authHelper,
             orders,
             mock(JobOrderHandoverRepository.class),
             mock(JobOrderItemHandoverRepository.class));

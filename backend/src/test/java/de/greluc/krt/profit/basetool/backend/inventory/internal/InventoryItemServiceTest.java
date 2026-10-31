@@ -95,6 +95,7 @@ class InventoryItemServiceTest {
 
   @Mock private JobOrderItemService jobOrderItemService;
 
+  @Mock private StockLevelService stockLevelService;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
@@ -113,7 +114,8 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             materialMapper,
             ownerScopeService,
-            null);
+            null,
+            stockLevelService);
     realCheckoutService =
         new InventoryCheckoutService(
             inventoryItemRepository,

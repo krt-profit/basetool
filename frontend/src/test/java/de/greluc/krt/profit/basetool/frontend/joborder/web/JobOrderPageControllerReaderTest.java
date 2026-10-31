@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -83,6 +84,7 @@ class JobOrderPageControllerReaderTest {
         List.of(),
         Instant.now(),
         1L,
+        null,
         null,
         redacted);
   }
@@ -153,7 +155,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.of(null)));
     Model model = new ExtendedModelMap();
 
-    assertThat(controller.viewOrderDetail(ID, true, false, model, null, null))
+    assertThat(controller.viewOrderDetail(ID, model, null, null))
         .isEqualTo("joborder/orders-detail");
 
     assertThat(model.asMap())
@@ -187,7 +189,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent()));
 
-    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, "items"))
+    assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "items"))
         .isEqualTo("joborder/orders-detail :: itemsSection");
 
     verify(reader).readOrderDetail(eq(ID), any(), eq("items"));
@@ -197,7 +199,7 @@ class JobOrderPageControllerReaderTest {
   void aFailedDetailReadSendsTheUserBackToTheList() {
     when(reader.readOrderDetail(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
 
-    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, null))
+    assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, null))
         .isEqualTo("redirect:/orders");
   }
 
@@ -205,7 +207,7 @@ class JobOrderPageControllerReaderTest {
   void aFailedDetailFragmentReadAnswersTheErrorFragment() {
     when(reader.readOrderDetail(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
 
-    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, "kpi"))
+    assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "kpi"))
         .isEqualTo("joborder/orders-detail :: fragmentError");
   }
 
@@ -216,7 +218,8 @@ class JobOrderPageControllerReaderTest {
         .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), false, List.of(), options));
     Model model = new ExtendedModelMap();
 
-    assertThat(controller.viewCreateForm(null, model)).isEqualTo("joborder/orders-create");
+    assertThat(controller.viewCreateForm(null, new JobOrderPrefill(null, null, null, null), model))
+        .isEqualTo("joborder/orders-create");
 
     assertThat(model.asMap())
         .containsEntry("hasOrderableItems", false)
@@ -230,7 +233,7 @@ class JobOrderPageControllerReaderTest {
         .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), true, List.of(), List.of()));
     Model model = new ExtendedModelMap();
 
-    controller.viewCreateForm(null, model);
+    controller.viewCreateForm(null, new JobOrderPrefill(null, null, null, null), model);
 
     assertThat(model.asMap())
         .containsEntry("materials", List.of())
@@ -306,8 +309,7 @@ class JobOrderPageControllerReaderTest {
         .thenThrow(
             new ReauthenticationRequiredException("lost", new IllegalStateException("expired")));
 
-    assertThatThrownBy(
-            () -> controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, null))
+    assertThatThrownBy(() -> controller.viewOrderDetail(ID, new ExtendedModelMap(), null, null))
         .isInstanceOf(ReauthenticationRequiredException.class);
   }
 }

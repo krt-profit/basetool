@@ -1190,8 +1190,9 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
   through the rule engine (REQ-NOTIF-007). The notice links to the unit's „Mindestbestände" tab.
 - **Switchable.** The type is mutable (REQ-NOTIF-027) and appears in the profile's
   „Benachrichtigungen" card under the Lager area.
-- **Silent lifecycle.** Deleting a level, its catalogue entry or its unit, and deactivating its
-  tier, send no notice (REQ-INV-068).
+- **Silent lifecycle.** Deleting a level or its material, and deactivating its tier, send no
+  notice; a level of an inactive unit or catalogue entry raises none while it is hidden
+  (REQ-INV-068).
 - **Payload.** The unit, the material or item and the tier as ids and coded parameters, the minimum
   and the allocated amount; no member name.
 - **Observable.** `basetool_notification_created_total{notification_type}` and
@@ -1205,8 +1206,8 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
 - [ ] Stock rising above the minimum but below the target and falling again sends nothing; reaching
   the target and falling low again sends a second notice.
 - [ ] A member who muted the type gets nothing.
-- [ ] Deleting the level or its catalogue entry, dissolving the unit and deactivating the tier send
-  nothing.
+- [ ] Deleting the level or its material, deactivating the unit or the catalogue entry, and
+  deactivating the tier send nothing.
 - [ ] A Logistician's edit of a level does not 409 against the producer's marker.
 
 **Enforced by (to be added):** `StockLevelNoticeProducerTest`, `StockLevelNoticeIntegrationTest`,

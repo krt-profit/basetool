@@ -297,7 +297,9 @@ class JobOrderAccessPolicyDifferentialTest {
       scopeHub =
           new ScopeHubJobOrderGates(
               accessGateService, resolver, repository, handovers, itemHandovers);
-      policy = new JobOrderAccessPolicy(ownerScopeService, repository, handovers, itemHandovers);
+      policy =
+          new JobOrderAccessPolicy(
+              ownerScopeService, authHelper, repository, handovers, itemHandovers);
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {

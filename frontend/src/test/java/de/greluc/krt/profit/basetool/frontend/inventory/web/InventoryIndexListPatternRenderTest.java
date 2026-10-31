@@ -116,6 +116,16 @@ class InventoryIndexListPatternRenderTest {
    * @return the row
    */
   private static @NotNull AggregatedInventoryDto materialRow() {
+    return materialRow(false);
+  }
+
+  /**
+   * A material row in SCU.
+   *
+   * @param lowStock whether a level of the material is low
+   * @return the row
+   */
+  private static @NotNull AggregatedInventoryDto materialRow(boolean lowStock) {
     MaterialDto material =
         new MaterialDto(
             MATERIAL_ID,
@@ -133,7 +143,7 @@ class InventoryIndexListPatternRenderTest {
             false,
             true,
             0L);
-    return new AggregatedInventoryDto(material, null, 512.0, 700.0, 12.5);
+    return new AggregatedInventoryDto(material, null, 512.0, 700.0, 12.5, lowStock);
   }
 
   /** The material view renders on the pattern: head, tabs, row link, numeric cells, foot. */
@@ -167,6 +177,16 @@ class InventoryIndexListPatternRenderTest {
         .contains(">12,500 SCU<")
         .contains("data-list-total=\"1\"")
         .doesNotContain("data-testid=\"empty-state\"");
+  }
+
+  /** A material with a low minimum stock level carries the „Niedrig" badge (REQ-INV-068). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aMaterialWithALowLevelIsMarked() throws Exception {
+    assertThat(render(pageOf(materialRow(true)), ""))
+        .containsPattern("data-testid=\"inventory-low-stock\"[^>]*>Niedrig<");
+    assertThat(render(pageOf(materialRow(false)), ""))
+        .doesNotContain("data-testid=\"inventory-low-stock\"");
   }
 
   /** An empty material view renders the empty state with its action and no table. */

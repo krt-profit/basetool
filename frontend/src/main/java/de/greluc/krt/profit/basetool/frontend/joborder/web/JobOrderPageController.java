@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -265,8 +266,9 @@ public class JobOrderPageController {
 
   /**
    * Renders the order detail page ({@code /orders/{id}}). Loads the order plus the auxiliary
-   * material-status and assignee lists and exposes the role-derived edit flags so the template
-   * stays free of inline expression checks.
+   * material-status and assignee lists and exposes the per-order edit flags so the template stays
+   * free of inline expression checks. The backend decides per order who may read it, an assignee
+   * outside the order's unit included (REQ-ORDERS-047); a refused read redirects to the list.
    *
    * @return the {@code order-detail} view name
    */
@@ -274,18 +276,9 @@ public class JobOrderPageController {
   @GetMapping("/{id}")
   public String viewOrderDetail(
       @PathVariable UUID id,
-      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       Model model,
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
-    boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
-    if (!canViewJobOrders && !canViewOwnJobOrders) {
-      return fragment != null
-          ? "joborder/orders-detail :: fragmentError"
-          : "redirect:/orders/create";
-    }
-    model.addAttribute("requesterView", requesterView);
     if (!SectionFallback.run(
         log, "job-order-detail", () -> addOrderDetail(id, model, principal, fragment))) {
       if (fragment != null) {
@@ -336,6 +329,7 @@ public class JobOrderPageController {
 
     boolean canAssign = detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
+    model.addAttribute("canManageAssignees", !requesterView && order.callerMayManageAssignees());
     if (requesterView || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }
@@ -408,15 +402,18 @@ public class JobOrderPageController {
    * catalogs and both owner-pickers (ADR-0149).
    *
    * @param source optional origin marker for the post-save redirect
+   * @param prefill optional material line and requesting unit to start the form with
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
   @NotNull
   @GetMapping("/create")
-  public String viewCreateForm(@RequestParam(required = false) String source, Model model) {
+  public String viewCreateForm(
+      @RequestParam(required = false) String source, JobOrderPrefill prefill, Model model) {
     if (!model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = new JobOrderForm();
       form.setSource(source);
+      prefill.applyTo(form);
       model.addAttribute("jobOrderForm", form);
     } else {
       JobOrderForm form = (JobOrderForm) model.getAttribute("jobOrderForm");

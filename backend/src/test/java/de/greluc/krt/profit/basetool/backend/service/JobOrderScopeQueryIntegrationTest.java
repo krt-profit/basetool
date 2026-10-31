@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -57,11 +60,13 @@ class JobOrderScopeQueryIntegrationTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private OrgUnitRepository orgUnitRepository;
+  @Autowired private UserRepository userRepository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private DataSource dataSource;
 
   private static final List<JobOrderStatus> ALL_STATUSES = List.of(JobOrderStatus.values());
   private static final PageRequest ALL_ROWS = PageRequest.of(0, 10_000);
+  private static final UUID NIL = new UUID(0L, 0L);
 
   private UUID squadronAId;
   private UUID squadronBId;
@@ -123,6 +128,7 @@ class JobOrderScopeQueryIntegrationTest {
                 true,
                 null,
                 Set.of(),
+                new UUID(0L, 0L),
                 ALL_ROWS)
             .stream()
             .map(JobOrder::getId)
@@ -213,7 +219,70 @@ class JobOrderScopeQueryIntegrationTest {
     assertThat(visibleIds(new ScopePredicate(true, null, Set.of()))).contains(ids[1]);
   }
 
+  @Test
+  void assigneeGrant_inAllNotInToProcess() {
+    UUID assigneeId = assignNewUser(orderRespB);
+    ScopePredicate memberOfA = new ScopePredicate(false, null, Set.of(squadronAId));
+
+    assertThat(visibleIds(memberOfA, assigneeId)).contains(orderRespB);
+    assertThat(processingIds(memberOfA, Set.of(squadronAId, squadronBId), assigneeId))
+        .doesNotContain(orderRespB);
+  }
+
+  @Test
+  void assigneeGrant_opensTheOrderWithoutAnyMembership() {
+    UUID assigneeId = assignNewUser(orderRespB);
+
+    assertThat(visibleIds(new ScopePredicate(false, null, Set.of()), assigneeId))
+        .contains(orderRespB)
+        .doesNotContain(orderRespA);
+  }
+
+  @Test
+  void assigneeGrant_isPersonal() {
+    assignNewUser(orderRespB);
+    UUID unitMateId = newUser().getId();
+
+    assertThat(visibleIds(new ScopePredicate(false, null, Set.of(squadronAId)), unitMateId))
+        .doesNotContain(orderRespB);
+  }
+
+  @Test
+  void assigneeGrant_endsWithTheEntry() {
+    UUID assigneeId = assignNewUser(orderRespB);
+    transactionTemplate.executeWithoutResult(_ -> {
+      JobOrder order = jobOrderRepository.findById(orderRespB).orElseThrow();
+      order.getAssignees().clear();
+      jobOrderRepository.saveAndFlush(order);
+    });
+
+    assertThat(visibleIds(new ScopePredicate(false, null, Set.of(squadronAId)), assigneeId))
+        .doesNotContain(orderRespB);
+  }
+
+  private UUID assignNewUser(UUID orderId) {
+    User user = newUser();
+    transactionTemplate.executeWithoutResult(_ -> {
+      JobOrder order = jobOrderRepository.findById(orderId).orElseThrow();
+      order.addAssignee(JobOrderAssignee.builder().user(user).build());
+      jobOrderRepository.saveAndFlush(order);
+    });
+    return user.getId();
+  }
+
+  private User newUser() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("scope-assignee-" + UUID.randomUUID().toString().substring(0, 8));
+    return userRepository.save(user);
+  }
+
   private Set<UUID> processingIds(ScopePredicate scope, Set<UUID> processingOrgUnitIds) {
+    return processingIds(scope, processingOrgUnitIds, NIL);
+  }
+
+  private Set<UUID> processingIds(
+      ScopePredicate scope, Set<UUID> processingOrgUnitIds, UUID callerId) {
     return jobOrderRepository
         .findScopedJobOrders(
             ALL_STATUSES,
@@ -224,6 +293,7 @@ class JobOrderScopeQueryIntegrationTest {
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
+            callerId,
             ALL_ROWS)
         .stream()
         .map(JobOrder::getId)
@@ -231,6 +301,10 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   private Set<UUID> visibleIds(ScopePredicate scope) {
+    return visibleIds(scope, NIL);
+  }
+
+  private Set<UUID> visibleIds(ScopePredicate scope, UUID callerId) {
     return jobOrderRepository
         .findScopedJobOrders(
             ALL_STATUSES,
@@ -241,6 +315,7 @@ class JobOrderScopeQueryIntegrationTest {
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
+            callerId,
             ALL_ROWS)
         .stream()
         .map(JobOrder::getId)
