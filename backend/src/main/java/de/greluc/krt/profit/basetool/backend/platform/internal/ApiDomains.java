@@ -147,6 +147,7 @@ public final class ApiDomains {
           Map.entry("SquadronMembershipController", "orgunit"),
           Map.entry("SquadronRoleController", "orgunit"),
           Map.entry("StarSystemController", "catalogue"),
+          Map.entry("StockLevelController", "inventory"),
           Map.entry("PurchasingAdminController", "purchasing"),
           Map.entry("PurchasingDealController", "purchasing"),
           Map.entry("PurchasingDelegateController", "purchasing"),

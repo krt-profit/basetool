@@ -201,7 +201,7 @@ public class InventoryPoolChangeService {
     }
     OrgUnit target = Entities.require(orgUnitRepository.findById(targetId), "Org unit not found");
     double moved = amount == null ? amountOf(item) : amount;
-    InventoryItem result = moveInto(item, orgUnitRef(source), target, moved);
+    InventoryItem result = moveInto(item, InventoryAuditLabels.orgUnitRef(source), target, moved);
     if (!holderId.equals(actorId)) {
       eventPublisher.publishEvent(
           InventoryNotices.poolChangedByOther(
@@ -265,7 +265,7 @@ public class InventoryPoolChangeService {
         InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("fromOrgUnit", from)
-            .with("toOrgUnit", orgUnitRef(target))
+            .with("toOrgUnit", InventoryAuditLabels.orgUnitRef(target))
             .with("amount", amount)
             .with("split", !whole)
             .with("newRow", whole ? "-" : result.getId()));
@@ -386,16 +386,6 @@ public class InventoryPoolChangeService {
    */
   private static @NotNull String unitName(@NotNull OrgUnit unit) {
     return Objects.requireNonNullElse(StringNormalization.trimToNull(unit.getName()), UNKNOWN_NAME);
-  }
-
-  /**
-   * Formats an org unit for an audit payload as {@code kind:id}.
-   *
-   * @param unit the unit
-   * @return the bounded reference
-   */
-  private static @NotNull String orgUnitRef(@NotNull OrgUnit unit) {
-    return unit.getKind() + ":" + unit.getId();
   }
 
   /**

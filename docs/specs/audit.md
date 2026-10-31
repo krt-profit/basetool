@@ -98,6 +98,10 @@ web, naming its client (REQ-AUDIT-005):
   the undo of a client's org-stock writes (`INVENTORY_ITEM_RESTORED` per shared row it removed,
   recreated or set back, with the amount afterwards and whether it was removed; an entry already as
   restored records nothing, REQ-XCH-046) /
+  a unit's minimum stock levels (REQ-INV-068: `MIN_STOCK_LEVEL_SET` on create,
+  `MIN_STOCK_LEVEL_CHANGED` only when minimum, target or tier changed, with from / to of all three,
+  `MIN_STOCK_LEVEL_REMOVED` on delete; the subject is the level, labelled by the material name, the
+  details carry the unit as `kind:id`, the material id, tier codes and amounts) /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover — material handover **and** item delivery consuming the order's earmarked item
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
@@ -431,11 +435,10 @@ per-domain emission assertions in the service tests (for the external assignee
 
 The coverage list gains:
 
-- **Lager** — minimum stock levels (REQ-INV-068): `MIN_STOCK_LEVEL_SET`, `MIN_STOCK_LEVEL_CHANGED`
-  (only when a field changed), `MIN_STOCK_LEVEL_REMOVED` and `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE`
-  (one per level a catalogue deletion or unit dissolution removed). The subject is the level,
-  labelled by the material or item name; the details carry ids, the unit as `kind:id`, tier codes
-  and amounts.
+- **Lager** — minimum stock levels (REQ-INV-068): `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE` (one per
+  level a catalogue deletion removed), and the write events above for game-item levels. The subject
+  is the level, labelled by the material or item name; the details carry ids, the unit as
+  `kind:id`, tier codes and amounts.
 - **Bank trail** (`bank_audit_event`) — the removal of the `GLOBAL_ROLE OFFICER` view-grant bucket
   on special accounts (REQ-BANK-037, ADR-0300) writes one `GRANT_REVOKED` per removed grant, with
   the system as actor.
