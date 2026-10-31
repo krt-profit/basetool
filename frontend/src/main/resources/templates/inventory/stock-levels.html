@@ -65,6 +65,15 @@
                             </td>
                             <td class="cell-actions">
                                 <div class="stock-level-actions" th:if="${l.editable()}">
+                                    <th:block th:if="${l.low()}">
+                                        <a class="btn btn-outline btn-xs" data-testid="stock-level-order"
+                                           th:href="@{/orders/create(materialId=${l.material().id()},minQuality=${l.qualityTier() != null ? l.qualityTier().minQuality() : 0},amount=${l.shortfall()},requestingOrgUnitId=${l.orgUnit().id()})}"
+                                           th:text="#{inventory.stockLevels.action.order}">Auftrag anlegen</a>
+                                        <a class="btn btn-outline btn-xs" data-testid="stock-level-need"
+                                           th:if="${needRaisingUnitIds.contains(l.orgUnit().id())}"
+                                           th:href="@{/supply/needs(needUnit=${l.orgUnit().id()},needMaterial=${l.material().id()},needTier=${l.qualityTier() != null ? l.qualityTier().id() : ''},needAmount=${l.shortfall()})}"
+                                           th:text="#{inventory.stockLevels.action.need}">Bedarf anlegen</a>
+                                    </th:block>
                                     <button type="button" class="btn btn-ghost btn-icon" data-trigger="stock-level-edit" data-testid="stock-level-edit"
                                             th:data-level-id="${l.id()}" th:data-version="${l.version()}"
                                             th:data-tier-id="${l.qualityTier() != null ? l.qualityTier().id() : ''}"

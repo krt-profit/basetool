@@ -21580,7 +21580,7 @@
     },
     "/api/v1/inventory/stock-levels" : {
       "get" : {
-        "description" : "Lists the minimum stock levels of the active units in the caller's Lager scope with their allocated free stock, shortfall, fill ratio and low flag.",
+        "description" : "Lists the minimum stock levels of the active units in the caller's Lager scope with their allocated free stock, shortfall, fill ratio and low flag. With lowOnly it returns the low levels sorted by fill ratio, empty first, capped by limit.",
         "operationId" : "listStockLevels",
         "parameters" : [ {
           "in" : "query",
@@ -21589,6 +21589,22 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "lowOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         } ],
         "responses" : {
@@ -79161,6 +79177,9 @@
           "gameItem" : {
             "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
           },
+          "lowStock" : {
+            "type" : "boolean"
+          },
           "material" : {
             "$ref" : "#/components/schemas/MaterialDto"
           },
@@ -83018,6 +83037,9 @@
           },
           "gameItem" : {
             "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
+          },
+          "lowStock" : {
+            "type" : "boolean"
           },
           "material" : {
             "$ref" : "#/components/schemas/MaterialReferenceDto"
