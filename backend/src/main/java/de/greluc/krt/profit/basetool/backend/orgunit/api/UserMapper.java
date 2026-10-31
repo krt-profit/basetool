@@ -151,6 +151,12 @@ public abstract class UserMapper {
         : callerUserProjection.forCaller(full);
   }
 
+  /**
+   * Maps a {@link User} to its unredacted reference; only {@link #toReferenceDto} calls it.
+   *
+   * @param user the user to reference
+   * @return the full reference
+   */
   @Named(FULL)
   protected abstract UserReferenceDto toFullReferenceDto(User user);
 

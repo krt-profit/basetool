@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.identity.api.CallerUserProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
@@ -89,6 +90,7 @@ class UserServiceAttributesTest {
   @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
   @Mock private AuditRecorder auditRecorder;
+  @Mock private CallerUserProjection callerUserProjection;
 
   @InjectMocks private UserService userService;
 
@@ -461,6 +463,7 @@ class UserServiceAttributesTest {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
       when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
+      when(callerUserProjection.forCaller(dto)).thenReturn(dto);
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
@@ -482,6 +485,7 @@ class UserServiceAttributesTest {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
       when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(scopeSet);
       when(userRepository.findAllReferenceScoped(scopeSet)).thenReturn(List.of(dto));
+      when(callerUserProjection.forCaller(dto)).thenReturn(dto);
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
