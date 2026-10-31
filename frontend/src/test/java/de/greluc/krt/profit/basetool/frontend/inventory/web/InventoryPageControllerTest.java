@@ -41,7 +41,6 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
@@ -82,8 +81,7 @@ class InventoryPageControllerTest {
     backendApiClient = mock(BackendApiClient.class);
     InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
     controller =
-        new InventoryPageController(
-            inventoryClient, PARALLEL, mock(LogisticianGate.class), mock(ItemPickerLabels.class));
+        new InventoryPageController(inventoryClient, PARALLEL, mock(ItemPickerLabels.class));
     writeController = new InventoryWriteController(inventoryClient, controller);
   }
 

@@ -91,7 +91,6 @@ class LogisticianPinAwareSurfacesMvcTest {
     mockMvc
         .perform(get("/inventory/my"))
         .andExpect(status().isOk())
-        .andExpect(model().attribute("canEditForeignNotes", false))
         .andExpect(model().attribute("isLogisticianOrAbove", false));
   }
 
@@ -103,7 +102,6 @@ class LogisticianPinAwareSurfacesMvcTest {
     mockMvc
         .perform(get("/inventory/my"))
         .andExpect(status().isOk())
-        .andExpect(model().attribute("canEditForeignNotes", true))
         .andExpect(model().attribute("isLogisticianOrAbove", true));
   }
 

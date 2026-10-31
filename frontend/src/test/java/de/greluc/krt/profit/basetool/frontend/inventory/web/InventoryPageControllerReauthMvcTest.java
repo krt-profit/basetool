@@ -29,7 +29,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ItemPickerLabels;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
@@ -51,8 +50,7 @@ class InventoryPageControllerReauthMvcTest {
   void setUp() {
     mockMvc =
         ReauthPageMvc.standalone(
-            new InventoryPageController(
-                client, PARALLEL, mock(LogisticianGate.class), mock(ItemPickerLabels.class)));
+            new InventoryPageController(client, PARALLEL, mock(ItemPickerLabels.class)));
     ReauthPageMvc.signInMember();
   }
 

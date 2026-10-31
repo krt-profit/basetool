@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNee
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.ItemPickerOption;
@@ -119,9 +118,6 @@ public class InventoryPageController {
   private static final ObjectMapper NEEDS_MAPPER = JsonMapper.builder().build();
 
   private final ParallelPageLoader parallelPageLoader;
-
-  /** Answers the pin-aware Logistician capability of the active context. */
-  private final LogisticianGate logisticianGate;
 
   /** Labels the item picker's search results with size, grade and class (REQ-INV-064). */
   private final ItemPickerLabels itemPickerLabels;
@@ -466,7 +462,6 @@ public class InventoryPageController {
       model.addAttribute("selectedPersonalOnly", query.personalOnly());
       model.addAttribute("selectedNonPersonalOnly", query.nonPersonalOnly());
       model.addAttribute("authUserId", currentAuthName());
-      model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
       if (fragment) {
         return "inventory/inventory-my :: inventoryTableFragment";
       }
@@ -497,7 +492,6 @@ public class InventoryPageController {
     model.addAttribute("selectedPersonalOnly", query.personalOnly());
     model.addAttribute("selectedNonPersonalOnly", query.nonPersonalOnly());
     model.addAttribute("authUserId", currentAuthName());
-    model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
 
     if (fragment) {
       return "inventory/inventory-my :: inventoryTableFragment";
@@ -684,7 +678,6 @@ public class InventoryPageController {
           query,
           fragment);
       model.addAttribute("authUserId", currentAuthName());
-      model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
       if (fragment) {
         return "inventory/inventory-admin :: inventoryTableFragment";
       }
@@ -712,7 +705,6 @@ public class InventoryPageController {
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("authUserId", currentAuthName());
-    model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
 
     if (fragment) {
       return "inventory/inventory-admin :: inventoryTableFragment";
