@@ -1,59 +1,43 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
-> **Owner area:** ORG · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-31.
+> **Owner area:** ORG · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md), [ADR-0300](../adr/0300-officer-reach-is-derived-per-org-unit-and-the-keycloak-officer-role-is-retired.md)
 
 # Organisation notifications
 
 ## Context & goal
 
 Issue #2414 tells the right people about two organisational facts that were visible only on a page: a
-leadership change that leaves a member's `OFFICER` role out of step with their seats, and a member who
-left the organisation. `OFFICER` is granted by hand in Keycloak next to a seat, so the
-two drift. Both notices are published after the commit, carry only a member's display name, a unit's
+leadership seat holder without the Keycloak role `KRT Member`, which every seat requires, and a member
+who left the organisation. Both notices are published after the commit, carry only a member's display name, a unit's
 name and coded words, and have a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 
 ## Requirements
 
-### REQ-ORG-029 — A leadership change that does not fit the OFFICER role tells the admins
+### REQ-ORG-029 — A leadership seat holder without KRT Member tells the admins
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+Every leadership seat requires the Keycloak role `KRT Member` (REQ-ROLE-002), and a seat confers
+officer reach only while its holder has it (ADR-0300). A member **holds a seat** when any of their
+memberships is not a plain member (`OrgUnitMembershipRepository#existsLeadershipSeat`). The admin
+notice reports the one inconsistency that can still drift: a seat holder without `KRT Member`. An
+admin is judged like everyone else; the `OFFICER` role plays no part.
 
-`OrgUnitMembershipService` calls `OrgUnitSeatNotifier#seatChanged` after `assignSquadronRank`,
-`removeSquadronRank`, `addBereichLeader`, `removeBereichLeader`, `addOlMember`, `removeOlMember` and
-`toggleLead`. A member **holds a seat** when any of their memberships is not a plain member
-(`OrgUnitMembershipRepository#existsLeadershipSeat`). The roles disagree when the member holds a seat
-and neither `OFFICER` nor `ADMIN`, or holds `OFFICER` without a seat and without `ADMIN`.
-
-- A disagreement publishes `ORG_LEADERSHIP_ROLE_MISMATCH`; the default rule notifies every admin
-  (`ROLE` `ADMIN`, the actor included) with the member, the unit, the coded seat change (`seatCode`:
-  `APPOINTED` / `REMOVED`), the seat (`rankCode`) and the coded `mismatchCode` (`MISSING_OFFICER` /
-  `SURPLUS_OFFICER`). A second mismatch of the same member replaces the first.
-- When the roles fit after the change, `ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED` clears an earlier
-  notice. So does a role reconciliation that makes them fit: `UserReconciliationService` tells the
-  identity-owned `RolesChangedObserver` (implemented by `OrgUnitSeatNotifier#onRolesChanged`)
-  whenever it replaces a member's roles.
-
-#### Planned amendment (ADR-0300)
-
-The notice is repurposed to **a leadership seat holder without `KRT Member`**. `OFFICER` is retired
-(REQ-SEC-004), so a seat can no longer disagree with it; what can still drift is the Keycloak role
-`KRT Member`, which every seat requires (REQ-ROLE-002).
-
-- **When it fires.** An appointment of a member without `KRT Member` is refused, so the mismatch
-  arises when a seat holder loses the role later: `OrgUnitSeatNotifier#onRolesChanged` sees a member
-  who holds a seat and no `KRT Member`. The seat stays in the org chart and confers no reach. The
-  seat-change calls stay, so that removing the last seat clears an open notice.
-- **What it says.** `ORG_LEADERSHIP_ROLE_MISMATCH` and its default rule (every admin) stay; the only
-  `mismatchCode` is `MISSING_KRT_MEMBER`. `MISSING_OFFICER` and `SURPLUS_OFFICER` go. The payload
-  stays the member, the unit, the seat (`rankCode`) and coded words.
+- **When it fires.** `OrgUnitMembershipService` calls `OrgUnitSeatNotifier#seatChanged` after
+  `assignSquadronRank`, `removeSquadronRank`, `addBereichLeader`, `removeBereichLeader`,
+  `addOlMember`, `removeOlMember` and `toggleLead`; a member who still holds a seat and no `KRT
+  Member` afterwards is reported (`seatCode` `APPOINTED` / `REMOVED`). A role reconciliation is the
+  usual trigger: `UserReconciliationService` tells the identity-owned `RolesChangedObserver`
+  (implemented by `OrgUnitSeatNotifier#onRolesChanged`) whenever it replaces a member's roles, and a
+  seat holder whose new roles lack `KRT Member` is reported with one of their seats (`seatCode`
+  `ROLES_RECONCILED`, no actor). The seat stays in the org chart.
+- **What it says.** `ORG_LEADERSHIP_ROLE_MISMATCH`; the default rule notifies every admin (`ROLE`
+  `ADMIN`, the actor included) with the member, the unit, the coded seat change (`seatCode`), the
+  seat (`rankCode`) and the only `mismatchCode`, `MISSING_KRT_MEMBER`. A second notice of the same
+  member replaces the first. Notices stored with the retired codes `MISSING_OFFICER` /
+  `SURPLUS_OFFICER` keep their labels.
 - **When it clears.** `ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED` clears the notice once the member holds
-  `KRT Member` again or holds no seat any more.
-- **Before the cut.** A report of every seat holder without `KRT Member` precedes the release that
-  retires `OFFICER`; the release ships only when that report is empty (REQ-SEC-004).
-
-**Enforced by (to be added):** `OrgUnitSeatNotifierTest` (a seat holder who loses `KRT Member`, a
-regained role, a removed last seat), `OrgNoticeIntegrationTest`, `UserReconciliationServiceTest`
-· **Related:** REQ-ROLE-002, REQ-SEC-004, ADR-0300
+  `KRT Member` again or holds no seat any more, after a seat change or a reconciliation.
+- **Before the cut.** `scripts/officer-cut-report.sql` reports every seat holder without `KRT
+  Member` read-only; the release that retires `OFFICER` ships only when that report is empty
+  (REQ-SEC-004).
 
 ### REQ-ORG-030 — A departed member tells the leadership of their units
 
@@ -66,15 +50,20 @@ Bereich's leadership is told as well, once per Bereich. The departed member is n
 
 **Acceptance**
 
-- [x] A seat without `OFFICER`, `OFFICER` without a seat, a fitting set and an admin are judged as above.
-- [x] The mismatch reaches the admins, is replaced by a newer one and goes when the roles fit.
+- [x] A seat holder without `KRT Member` is reported after a seat change and after a reconciliation that
+  took the role away; an admin is judged alike.
+- [x] The notice reaches the admins, is replaced by a newer one and goes when the member holds `KRT
+  Member` again or no seat any more.
+- [x] The pre-cut report lists every seat holder without `KRT Member` and the rows the `OFFICER` cut
+  touches, read-only and without names.
 - [x] A departure reaches the leadership of the member's units and the parent Bereich of a vacated seat, never the member.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
-**Enforced by:** `OrgNoticeIntegrationTest`, `OrgUnitSeatNotifierTest`, `OrgUnitDepartureNotifierTest`,
+**Enforced by:** `OrgNoticeIntegrationTest`, `OrgUnitSeatNotifierTest`, `OfficerCutReportIntegrationTest`, `OrgUnitDepartureNotifierTest`,
 `OrgUnitMembershipServiceTest`, `UserReconciliationServiceTest`, `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `orgunit/api/events/OrgNotices`,
 `orgunit/api/OrgUnitSeatNotifier`, `orgunit/internal/OrgUnitDepartureNotifier`, `orgunit/api/OrgUnitMembershipService`,
 `identity/api/UserReconciliationService`, `identity/api/RolesChangedObserver`, `orgunit/api/OrgUnitMembershipRepository#existsLeadershipSeat`,
-`identity/api/UserRepository#hasAnyRoleCode`, `V279__seed_organisation_notification_rules.sql` ·
-**Issues:** #2414
+`identity/api/UserRepository#hasAnyRoleCode`, `V279__seed_organisation_notification_rules.sql`,
+`scripts/officer-cut-report.sql` ·
+**Issues:** #2414, #2841
