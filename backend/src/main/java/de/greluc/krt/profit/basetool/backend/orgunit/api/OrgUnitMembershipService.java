@@ -77,6 +77,7 @@ public class OrgUnitMembershipService {
   private final MembershipChangeObserver membershipChangeObserver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
   private final OrgUnitSeatNotifier seatNotifier;
+  private final OrgUnitSeatEligibility seatEligibility;
 
   /**
    * Lazily resolved seam that audits changes to the accounts' responsible holders around each
@@ -166,6 +167,7 @@ public class OrgUnitMembershipService {
    * @param role the Bereichsleitung role to set; never {@code null}.
    * @return the persisted membership row.
    * @throws NotFoundException if the Bereich or the user does not exist.
+   * @throws LeadershipSeatRequiresKrtMemberException if the user does not hold {@code KRT Member}.
    * @throws BadRequestException if {@code bereichId} is not a Bereich, or the user belongs to a
    *     Staffel.
    */
@@ -177,7 +179,8 @@ public class OrgUnitMembershipService {
       throw new BadRequestException("Org unit " + bereichId + " is not a Bereich");
     }
     final User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    if (userHoldsStaffelMembership(userId)) {
+    seatEligibility.requireKrtMember(userId);
+    if (seatEligibility.holdsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be a Bereichsleitung member — remove the Staffel"
               + " membership first (REQ-ORG-017)");
@@ -251,6 +254,7 @@ public class OrgUnitMembershipService {
    * @param userId the user to add; never {@code null}.
    * @return the persisted membership row.
    * @throws NotFoundException if the OL or the user does not exist.
+   * @throws LeadershipSeatRequiresKrtMemberException if the user does not hold {@code KRT Member}.
    * @throws BadRequestException if the id is not the OL, or the user belongs to a Staffel.
    * @throws DuplicateEntityException if the user is already an OL member.
    */
@@ -264,7 +268,8 @@ public class OrgUnitMembershipService {
           "Org unit " + organisationsleitungId + " is not the Organisationsleitung");
     }
     final User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    if (userHoldsStaffelMembership(userId)) {
+    seatEligibility.requireKrtMember(userId);
+    if (seatEligibility.holdsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be an Organisationsleitung member — remove the"
               + " Staffel membership first (REQ-ORG-017)");
@@ -344,13 +349,15 @@ public class OrgUnitMembershipService {
    * @param organisationsleitungId the OL org unit; never {@code null}.
    * @param userId the user to designate; never {@code null}.
    * @throws NotFoundException if the OL or the user does not exist.
+   * @throws LeadershipSeatRequiresKrtMemberException if the user does not hold {@code KRT Member}.
    * @throws BadRequestException if the id is not the Organisationsleitung, or the user belongs to a
    *     Staffel.
    */
   @Transactional
   public void setGrandAdmiral(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
-    Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
+    final Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
     Entities.require(userRepository.findPlainById(userId), "User not found");
+    seatEligibility.requireKrtMember(userId);
     if (!membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
       addOlMember(organisationsleitungId, userId);
     }
@@ -575,7 +582,7 @@ public class OrgUnitMembershipService {
     if (distinctIds.size() > 2) {
       throw new BadRequestException("A user may belong to at most two Staffeln (REQ-ORG-017)");
     }
-    if (!desired.isEmpty() && userHoldsLeadershipRole(user.getId())) {
+    if (!desired.isEmpty() && seatEligibility.holdsSiloLeaderRank(user.getId())) {
       throw new BadRequestException(
           "User holds a leadership role (SK-Lead/Bereichsleitung/OL) and cannot be assigned to a"
               + " Staffel — remove the leadership role first (REQ-ORG-017)");
@@ -675,6 +682,7 @@ public class OrgUnitMembershipService {
    * @param request toggle payload; never {@code null}.
    * @return the persisted membership row.
    * @throws NotFoundException if no SK matches the given id, or the user is not a member.
+   * @throws LeadershipSeatRequiresKrtMemberException if the user does not hold {@code KRT Member}.
    * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
    */
   @Transactional
@@ -684,10 +692,13 @@ public class OrgUnitMembershipService {
       @NotNull MembershipLeadToggleRequest request) {
     OrgUnitMembership m = loadMembership(specialCommandId, userId);
     assertVersionMatches(m, request.version());
-    if (request.isLead() && userHoldsStaffelMembership(userId)) {
-      throw new BadRequestException(
-          "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
-              + " first (REQ-ORG-017)");
+    if (request.isLead()) {
+      seatEligibility.requireKrtMember(userId);
+      if (seatEligibility.holdsStaffelMembership(userId)) {
+        throw new BadRequestException(
+            "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel"
+                + " membership first (REQ-ORG-017)");
+      }
     }
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(specialCommandId);
@@ -724,6 +735,7 @@ public class OrgUnitMembershipService {
    * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
    * @return the persisted membership row with the bumped version.
    * @throws NotFoundException if the user is not a member of this Staffel, or the group is unknown.
+   * @throws LeadershipSeatRequiresKrtMemberException if the user does not hold {@code KRT Member}.
    * @throws BadRequestException on a non-squadron rank, a bad group pairing, or a cardinality
    *     breach.
    * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
@@ -746,6 +758,7 @@ public class OrgUnitMembershipService {
       throw new BadRequestException("Org unit " + squadronId + " is not a Staffel");
     }
     assertVersionMatches(m, version);
+    seatEligibility.requireKrtMember(userId);
 
     KommandoGroup group = resolveKommandoGroupForRank(squadronId, rank, kommandoGroupId);
     assertSquadronRankCardinality(squadronId, userId, rank, group);
@@ -1046,30 +1059,6 @@ public class OrgUnitMembershipService {
    */
   private void assertVersionMatches(@NotNull OrgUnitMembership m, @Nullable Long version) {
     OptimisticLock.check(m.getVersion(), version, OrgUnitMembership.class, null);
-  }
-
-  /**
-   * {@code true} iff the user holds at least one Staffel ({@code SQUADRON}) membership. Backs the
-   * REQ-ORG-017 guard that an SK-Leiter must belong to no Staffel.
-   *
-   * @param userId the user to check; never {@code null}.
-   * @return {@code true} when the user has a Staffel membership row.
-   */
-  private boolean userHoldsStaffelMembership(@NotNull UUID userId) {
-    return !membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON).isEmpty();
-  }
-
-  /**
-   * Answers whether the user holds a silo-leader rank: {@link MembershipRole#SK_LEAD}, a
-   * Bereichsleitung rank or the OL ({@link MembershipRole#isAreaOrOl()}). Squadron ranks do not
-   * count.
-   *
-   * @param userId the user to check; never {@code null}.
-   * @return {@code true} when any of the user's membership rows carries a silo-leader rank.
-   */
-  private boolean userHoldsLeadershipRole(@NotNull UUID userId) {
-    return membershipRepository.findAllByIdUserId(userId).stream()
-        .anyMatch(m -> m.getRole() == MembershipRole.SK_LEAD || m.getRole().isAreaOrOl());
   }
 
   /**

@@ -1275,7 +1275,8 @@ backend serves every member) but no control that writes.
   own; a bank manager who also holds a leadership seat has reach there like anyone else.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
   whose holder loses it stays in the org chart and confers no reach. Membership rights rest on
-  `KRT Member` alone.
+  `KRT Member` alone. The refusal and the reach computation are live already; until the cut the
+  gates in the tables above still read the `OFFICER` role.
 - An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
   at least one unit (REQ-ROLE-007). The bank's global
   `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).

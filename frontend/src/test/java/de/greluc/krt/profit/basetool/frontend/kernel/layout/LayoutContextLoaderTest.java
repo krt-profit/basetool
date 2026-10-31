@@ -73,7 +73,7 @@ class LayoutContextLoaderTest {
             new MeLayoutResponse(
                 home,
                 List.of(new OrgUnitMembershipOptionDto(home, "ALPHA", "ALP", "SQUADRON", true)),
-                new CapabilitiesResponse(true, true, false, false),
+                LayoutResponses.caps(true, true, false, false),
                 3L));
     LayoutContextLoader loader = loader();
     MockHttpServletRequest request = new MockHttpServletRequest();

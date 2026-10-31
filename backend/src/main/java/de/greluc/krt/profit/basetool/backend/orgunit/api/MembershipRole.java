@@ -154,4 +154,14 @@ public enum MembershipRole {
   public boolean cascadesDownward() {
     return isAreaRank() || this == OL_MEMBER;
   }
+
+  /**
+   * Whether this rank confers officer reach over its own org unit without cascade (REQ-ROLE-002);
+   * area and OL ranks reach their units through the cascade instead.
+   *
+   * @return {@code true} for {@link #SK_LEAD} and the four squadron ranks; {@code false} otherwise
+   */
+  public boolean confersOwnUnitOfficerReach() {
+    return this == SK_LEAD || isSquadronRank();
+  }
 }

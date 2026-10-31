@@ -150,15 +150,19 @@ the officer standing they stood next to is no longer a Keycloak role.
 
 **Acceptance (planned)**
 
-- [ ] A Staffelleiter has officer reach in their Staffel and none in a second Staffel they are a
+- [x] A Staffelleiter has officer reach in their Staffel and none in a second Staffel they are a
   plain member of.
-- [ ] A Bereichskoordinator reaches the Bereich and its direct children; an OL member reaches every
+- [x] A Bereichskoordinator reaches the Bereich and its direct children; an OL member reaches every
   unit; a bank manager without a seat reaches none.
-- [ ] An appointment of a member without `KRT Member` is refused; a seat holder who loses the role
+- [x] An appointment of a member without `KRT Member` is refused; a seat holder who loses the role
   keeps the seat and loses the reach.
+- [ ] Every officer gate reads that reach in the target's owning unit, and nothing reads `OFFICER`.
 
-**Enforced by (to be added):** `OwnerScopeServiceTest` (officer reach per seat kind),
-`OrgUnitCascadeServiceTest`, `OrgUnitMembershipServiceTest` (appointment without `KRT Member`),
+The first three hold for the reach computation the scope kernel answers
+(`OwnerScopeService#canActAsOfficerIn`, REQ-SEC-015); the gates still read `OFFICER` until the cut.
+
+**Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`), `OrgUnitCascadeServiceTest`,
+`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`) · **Enforced by (to be added):**
 `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER`), `PurchasingAccessPolicyTest`
 (`leadsUnit` by reach) · **Related:** REQ-SEC-004, REQ-SEC-015, REQ-ORG-029, ADR-0300
 
