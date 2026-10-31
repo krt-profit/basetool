@@ -9,9 +9,16 @@
                     <input type="hidden" id="supply-lager-source-id">
                     <p class="supply-pledge-need" id="supply-lager-label"></p>
                     <div class="form-group">
+                        <label for="supply-lager-need" th:text="#{supply.lager.need}">F&uuml;r Bedarf</label>
+                        <select id="supply-lager-need" data-testid="supply-lager-need">
+                            <option value="" th:text="#{supply.lager.need.none}">Ohne Bedarf</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="supply-lager-unit-row">
                         <label for="supply-lager-unit" th:text="#{supply.pledge.unit}">Annehmende Einheit</label>
                         <select id="supply-lager-unit" required></select>
                     </div>
+                    <p class="form-hint" th:text="#{supply.pledge.source.hint}">Der Bestand bleibt bei dir und wird erst umgebucht, wenn die Einheit die Spende annimmt.</p>
                     <div class="form-group">
                         <label for="supply-lager-amount" th:text="#{supply.need.amount}">Menge</label>
                         <input type="text" data-number-input id="supply-lager-amount" min="0.001" step="any" inputmode="decimal" required>

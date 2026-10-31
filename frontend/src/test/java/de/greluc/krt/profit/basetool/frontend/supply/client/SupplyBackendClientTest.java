@@ -81,6 +81,15 @@ class SupplyBackendClientTest {
   }
 
   @Test
+  void donationTargetsNameTheRow() {
+    backend.answerJson("[]");
+
+    assertThat(client.donationTargets(ID)).isEmpty();
+
+    backend.expect("GET", "/api/v1/supply/me/donation-targets?rowId=" + ID);
+  }
+
+  @Test
   void donationSourcesCarryOnlyThePresentFilters() {
     backend.answerJson("[]");
     backend.answerJson("[]");

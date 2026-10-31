@@ -319,6 +319,25 @@ location, quality and free amount (`GET /api/v1/supply/me/donation-sources`).
 `inventory/api/StockReads#donatableRows`, `supply/fragments/pledge-modal.html`,
 `static/js/supply/supply-common.js`
 
+### REQ-SUP-026 — A Lager rebook can become a pledge for a need
+
+The Umbuchen dialog of „Mein Lager" offers a third mode, „Als Spende für einen Bedarf", while the
+supply surface is on and the row can be pledged (it is not marked stolen). Choosing it rebooks nothing:
+it closes the Umbuchen dialog and opens the Lager's donation dialog for the same row (REQ-SUP-008).
+
+- That dialog offers „Für Bedarf": the open needs of the row's material or game item whose tier the
+  row's quality reaches, of units that accept donations, oldest first, each labelled with the unit,
+  the tier and the open amount (`GET /api/v1/supply/me/donation-targets?rowId=`). A chosen need sets
+  the receiving unit; „Ohne Bedarf" keeps the unit choice.
+- The pledge earmarks the row and credits the chosen need; the stock moves only when the unit
+  receives the donation (REQ-SUP-009), and only then counts toward the need.
+- The read needs the caller's own unstolen row and changes nothing.
+
+**Enforced by:** `SupplyDonationServiceTest`, `InventorySupplyRenderTest`,
+`SupplyPledgeSourceRenderTest`, `SupplyBackendClientTest` · **Code:**
+`supply/internal/SupplyDonationService#targets`, `supply/fragments/lager-pledge-modal.html`,
+`static/js/supply/supply-lager.js`, `inventory/inventory-my.html`, `static/js/inventory/inventory-my.js`
+
 ## Out of scope
 
 Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; any `/exchange/v1`

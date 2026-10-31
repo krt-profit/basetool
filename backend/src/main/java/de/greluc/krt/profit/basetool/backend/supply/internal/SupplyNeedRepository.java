@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -49,6 +50,29 @@ public interface SupplyNeedRepository
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT n FROM SupplyNeed n WHERE n.id = :id")
   Optional<SupplyNeed> findByIdForUpdate(@Param("id") UUID id);
+
+  /**
+   * Loads the needs of one material or game item in a state, with their catalogue entry and tier,
+   * for the need picker of a pledge from a Lager row (REQ-SUP-026).
+   *
+   * @param status the state
+   * @param materialId the material, or {@code null} for a game item
+   * @param gameItemId the game item, or {@code null} for a material
+   * @return the needs, oldest first
+   */
+  @Query(
+      """
+      SELECT n FROM SupplyNeed n
+      LEFT JOIN FETCH n.material LEFT JOIN FETCH n.gameItem LEFT JOIN FETCH n.qualityTier
+      WHERE n.status = :status
+        AND ((:materialId IS NOT NULL AND n.material.id = :materialId)
+          OR (:gameItemId IS NOT NULL AND n.gameItem.id = :gameItemId))
+      ORDER BY n.createdAt, n.id
+      """)
+  List<SupplyNeed> findByStatusAndEntry(
+      @Param("status") NeedStatus status,
+      @Param("materialId") @Nullable UUID materialId,
+      @Param("gameItemId") @Nullable UUID gameItemId);
 
   /**
    * Loads the open material needs linked to a job order whose unit was not yet told that the order

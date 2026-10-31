@@ -583,6 +583,7 @@ POST /api/v1/supply/donations/{id}/decline | SupplyDonationController#decline | 
 POST /api/v1/supply/donations/{id}/receive | SupplyDonationController#receive | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 POST /api/v1/supply/donations/{id}/withdraw | SupplyDonationController#withdraw | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/me/donation-sources | SupplyDonationController#mySources | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+GET /api/v1/supply/me/donation-targets | SupplyDonationController#myTargets | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/me/donations | SupplyDonationController#listMine | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/me/donations/stats | SupplyDonationController#myStats | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/needs | SupplyNeedController#list | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated

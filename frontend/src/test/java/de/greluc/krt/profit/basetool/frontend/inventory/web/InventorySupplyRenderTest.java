@@ -181,4 +181,31 @@ class InventorySupplyRenderTest {
 
     renderEntries().andExpect(content().string(not(containsString(DONATE_ACTION))));
   }
+
+  /** The Umbuchen dialog offers the donation mode, and the donation dialog its need picker. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void switchOn_theRebookDialogOffersTheDonationMode() throws Exception {
+    supplySwitch(true);
+    stubEntries(entry(List.of()));
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"umbuchen-mode-donation\"")))
+        .andExpect(content().string(containsString("data-testid=\"supply-lager-need\"")));
+  }
+
+  /** Without the supply surface the Umbuchen dialog has no donation mode. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void switchOff_theRebookDialogHasNoDonationMode() throws Exception {
+    supplySwitch(false);
+    stubEntries(entry(List.of()));
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("umbuchen-mode-donation"))));
+  }
 }

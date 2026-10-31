@@ -507,6 +507,9 @@
                     <label class="flex-gap-sm cursor-pointer" id="umbuchenModePersonalLabel">
                         <input type="radio" name="umbuchenMode" value="PERSONAL" data-trigger="inv-my-toggle-umbuchen-mode" class="m-0"> <span id="umbuchenModePersonalText" th:text="#{inventory.rebook.mode.personalize}">Als pers&ouml;nlich umbuchen</span>
                     </label>
+                    <label class="flex-gap-sm cursor-pointer" id="umbuchenModeDonationLabel" th:if="${supplyEnabled == true}" hidden>
+                        <input type="radio" name="umbuchenMode" value="DONATION" data-trigger="inv-my-toggle-umbuchen-mode" data-testid="umbuchen-mode-donation" class="m-0"> <span th:text="#{inventory.rebook.mode.donation}">Als Spende f&uuml;r einen Bedarf</span>
+                    </label>
                 </div>
             </div>
 

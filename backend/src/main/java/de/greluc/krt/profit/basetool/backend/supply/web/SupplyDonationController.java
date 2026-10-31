@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.supply.internal.DeclineDonationRequ
 import de.greluc.krt.profit.basetool.backend.supply.internal.DonationDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.DonationSourceDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.MyDonationStatsDto;
+import de.greluc.krt.profit.basetool.backend.supply.internal.NeedDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.PledgeRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.ReceiveDonationRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.RecordDonationRequest;
@@ -205,6 +206,20 @@ public class SupplyDonationController {
       @RequestParam(required = false) UUID materialId,
       @RequestParam(required = false) UUID gameItemId) {
     return donationService.sources(needId, materialId, gameItemId);
+  }
+
+  /**
+   * Lists the open needs a pledge from one of the caller's Lager rows can credit, for the need
+   * picker of the Lager's donation dialog.
+   *
+   * @param rowId the caller's Lager row
+   * @return the fitting open needs, oldest first
+   */
+  @Operation(
+      summary = "List the open needs a pledge from one of the caller's Lager rows can credit")
+  @GetMapping("/me/donation-targets")
+  public List<NeedDto> myTargets(@RequestParam UUID rowId) {
+    return donationService.targets(rowId);
   }
 
   private static @NotNull Pageable pageable(Integer page, Integer size, String sort) {

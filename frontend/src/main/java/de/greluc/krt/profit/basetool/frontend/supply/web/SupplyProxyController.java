@@ -96,6 +96,19 @@ public class SupplyProxyController {
   }
 
   /**
+   * Reads the open needs a pledge from one of the caller's Lager rows can credit, for the need
+   * picker of the Lager's donation dialog (REQ-SUP-026).
+   *
+   * @param rowId the caller's Lager row
+   * @return the fitting open needs
+   */
+  @GetMapping("/me/donation-targets")
+  public List<NeedDto> donationTargets(@RequestParam UUID rowId) {
+    List<NeedDto> targets = supplyClient.donationTargets(rowId);
+    return targets == null ? List.of() : targets;
+  }
+
+  /**
    * Forwards a new need.
    *
    * @param request the need
