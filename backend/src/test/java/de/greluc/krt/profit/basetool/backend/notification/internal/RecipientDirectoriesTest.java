@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrant;
@@ -105,13 +106,22 @@ class RecipientDirectoriesTest {
   }
 
   @Test
-  void anOrgRelativeOfficerIsAnOfficerRoleHolderInThatOrgUnit() {
-    when(userRepository.findUserIdsByRoleCodeAndOrgUnitMembership(
-            RecipientResolutionService.ROLE_OFFICER, ORG_UNIT))
+  void anOrgRelativeOfficerIsTheSeatHoldersDirectlyInThatOrgUnit() {
+    when(orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(ORG_UNIT))
         .thenReturn(Set.of(BOB));
 
     assertThat(resolution.resolveOrgRelative(OrgRelativeRole.OFFICER, ORG_UNIT))
         .containsExactly(BOB);
+    verifyNoInteractions(userRepository);
+  }
+
+  @Test
+  void theGlobalOfficerRoleIsEverySeatHolderAndNeverReadsTheRoleMirror() {
+    when(orgUnitMembershipRepository.findAllLeadershipUserIds()).thenReturn(Set.of(ALICE, BOB));
+
+    assertThat(resolution.resolveByRole("OFFICER")).containsExactlyInAnyOrder(ALICE, BOB);
+    assertThat(resolution.resolveSeatHolders()).containsExactlyInAnyOrder(ALICE, BOB);
+    verifyNoInteractions(userRepository);
   }
 
   @Test
