@@ -70,7 +70,7 @@ class LiveSyncSectionKeysTest {
     assertThat(keys)
         .containsEntry(
             "MISSION", "crew,finance,frequencies,mgmt,objectives,organisation,overview,steps");
-    assertThat(keys).containsEntry("INVENTORY_ALL", "stock");
+    assertThat(keys).containsEntry("INVENTORY_ALL", "stock,stock-levels");
   }
 
   @Test

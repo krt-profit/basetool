@@ -323,6 +323,10 @@
 /inventory/my/game-item-stack/entries GET -> InventoryPageController#viewMyGameItemStackEntries gate=class:isAuthenticated() layout=yes
 /inventory/my/stack/entries GET -> InventoryPageController#viewMyStackEntries gate=class:isAuthenticated() layout=yes
 /inventory/order-needs GET headers=[X-Requested-With=XMLHttpRequest] -> InventoryPageController#orderNeedsAjax gate=class:isAuthenticated() layout=yes
+/inventory/stock-levels GET -> StockLevelPageController#view gate=class:isAuthenticated() layout=yes
+/inventory/stock-levels POST -> StockLevelProxyController#create gate=class:isAuthenticated() layout=no
+/inventory/stock-levels/{id} DELETE -> StockLevelProxyController#delete gate=class:isAuthenticated() layout=no
+/inventory/stock-levels/{id} PUT -> StockLevelProxyController#update gate=class:isAuthenticated() layout=no
 /inventory/{id}/allocation DELETE -> InventoryWriteController#removeAllocation gate=class:isAuthenticated() layout=yes
 /inventory/{id}/allocation PATCH -> InventoryWriteController#changeAllocation gate=class:isAuthenticated() layout=yes
 /inventory/{id}/allocation POST -> InventoryWriteController#addAllocation gate=class:isAuthenticated() layout=yes

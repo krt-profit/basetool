@@ -44,6 +44,7 @@ inventory_item inventory
 inventory_item_donation_allocation inventory
 inventory_item_job_order_allocation inventory
 inventory_item_mission_allocation inventory
+inventory_stock_level inventory
 job_order joborder
 job_order_assignees joborder
 job_order_handover joborder
