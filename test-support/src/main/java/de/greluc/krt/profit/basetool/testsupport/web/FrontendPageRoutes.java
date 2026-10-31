@@ -118,6 +118,7 @@ public final class FrontendPageRoutes {
           "/admin/mission-data",
           "/admin/notification-rules",
           "/admin/org-structure",
+          "/admin/org-structure/squadrons",
           "/admin/announcement",
           "/admin/personal-inventory",
           "/admin/personal-blueprints",

@@ -407,6 +407,11 @@ public class NavigationRegistry {
                         "/admin/org-structure",
                         "nav.admin.tab.structure")
                     .with(PALETTE_ONLY),
+                of(
+                        "admin.squadrons",
+                        "/admin/org-structure/squadrons",
+                        "admin.mission_data.squadrons")
+                    .with(PALETTE_ONLY),
                 of("admin.specialcommands", "/admin/special-commands", "nav.admin.specialcommands")
                     .with(PALETTE_ONLY),
                 of("admin.personsearch", "/admin/person-search", "nav.admin.personSearch")
@@ -416,17 +421,7 @@ public class NavigationRegistry {
                         "/admin/deletion-requests",
                         "nav.admin.deletionRequests")
                     .with(PALETTE_ONLY),
-                of("admin.announcement", "/admin/announcement", "info.title").with(PALETTE_ONLY),
-                of(
-                        "admin.personalinventory",
-                        "/admin/personal-inventory",
-                        "admin.personalInventory.menu")
-                    .with(PALETTE_ONLY),
-                of(
-                        "admin.personalblueprints",
-                        "/admin/personal-blueprints",
-                        "admin.personalInventory.blueprints.menu")
-                    .with(PALETTE_ONLY))
+                of("admin.announcement", "/admin/announcement", "info.title").with(PALETTE_ONLY))
             .gate(adminOnly)
             .startCollapsed(),
         NavigationGroup.of(
@@ -498,7 +493,8 @@ public class NavigationRegistry {
   private static List<NavigationPageTabs> buildPageTabs() {
     return List.of(
         NavigationPageTabs.of("admin.members.list", "admin.discordregistrations", "admin.terms"),
-        NavigationPageTabs.of("admin.orgstructure.structure", "admin.specialcommands"),
+        NavigationPageTabs.of(
+            "admin.orgstructure.structure", "admin.squadrons", "admin.specialcommands"),
         NavigationPageTabs.of("admin.personsearch", "admin.deletionrequests"),
         NavigationPageTabs.of("admin.locations", "admin.uex"),
         NavigationPageTabs.of("admin.materials", "admin.materialaliases", "admin.qualitytiers"),

@@ -109,11 +109,6 @@ class AdminBankPageControllerTest {
   }
 
   @Test
-  void bankAdmin_returnsView() {
-    assertEquals("bank/admin/bank", controller.dangerZone());
-  }
-
-  @Test
   void wipeReset_emptyBackendBody_treatedAsNoop() {
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     when(backendApiClient.post(

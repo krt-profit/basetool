@@ -40,9 +40,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Controller for the admin-only danger-zone tab of the system settings ({@code
- * /admin/settings/danger-zone}) with the bank wipe reset (REQ-BANK-013); bank management has no
- * access (REQ-BANK-010). The wipe reset is a form post guarded by a type-to-confirm step.
+ * Controller for the admin-only bank wipe reset (REQ-BANK-013), whose card sits on the danger-zone
+ * tab of the system settings; bank management has no access (REQ-BANK-010). The wipe reset is a
+ * form post guarded by a type-to-confirm step.
  */
 @Controller
 @UsesLayoutModel
@@ -56,29 +56,6 @@ public class AdminBankPageController {
 
   /** The bank domain's backend calls. */
   private final BankBackendClient bankClient;
-
-  /**
-   * Renders the wipe-reset danger card. The page is static except for the PRG flash attributes,
-   * which Spring exposes to the template without a model parameter.
-   *
-   * @return the {@code bank/admin/bank} view name
-   */
-  @NotNull
-  @GetMapping(DANGER_ZONE)
-  public String dangerZone() {
-    return "bank/admin/bank";
-  }
-
-  /**
-   * Redirects the former {@code /admin/bank} page to the danger-zone tab of the system settings.
-   *
-   * @return a redirect to the danger-zone tab
-   */
-  @NotNull
-  @GetMapping("/admin/bank")
-  public String bankRedirect() {
-    return "redirect:" + DANGER_ZONE;
-  }
 
   /**
    * Redirects {@code /admin/bank-audit} to the unified audit-log page with the bank tab selected.

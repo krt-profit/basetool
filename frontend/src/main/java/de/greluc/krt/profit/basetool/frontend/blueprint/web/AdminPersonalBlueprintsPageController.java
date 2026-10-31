@@ -86,12 +86,13 @@ public class AdminPersonalBlueprintsPageController {
   private final BlueprintBackendClient blueprintClient;
 
   /**
-   * Renders the admin Blueprints page: a user picker and, once a user is selected, their owned
-   * blueprints with the add and import controls.
+   * Renders the Blueprints tab of a member's detail: the owned blueprints of {@code userSub} with
+   * the add and import controls.
    *
-   * <p>A {@code userSub} that is not a UUID selects no member (REQ-SEC-051).
+   * <p>A {@code userSub} that is not a UUID selects no member and redirects to the member list
+   * (REQ-SEC-051).
    *
-   * @param userSub target user's Keycloak {@code sub}, or {@code null} for the bare picker
+   * @param userSub target user's Keycloak {@code sub}
    * @param q optional case-insensitive product-name filter
    * @param fragment {@code "results"} to render only the owned-blueprint table (REQ-FE-002)
    * @param model Thymeleaf model populated with the selection and the blueprint list
@@ -106,20 +107,19 @@ public class AdminPersonalBlueprintsPageController {
       Model model) {
     boolean isFragment = "results".equals(fragment);
     UUID selectedSub = RelayParams.uuidOrNull(userSub);
-    if (!isFragment && selectedSub != null) {
+    if (selectedSub == null) {
+      return "redirect:/members";
+    }
+    if (!isFragment) {
       model.addAttribute("selectedUser", fetchUser(selectedSub));
     }
     model.addAttribute("selectedUserSub", selectedSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
 
-    if (selectedSub != null) {
-      PageResponse<PersonalBlueprintDto> blueprints = fetchOwned(selectedSub, q);
-      model.addAttribute(
-          "blueprints", blueprints != null ? blueprints.content() : Collections.emptyList());
-    } else {
-      model.addAttribute("blueprints", Collections.emptyList());
-    }
+    PageResponse<PersonalBlueprintDto> blueprints = fetchOwned(selectedSub, q);
+    model.addAttribute(
+        "blueprints", blueprints != null ? blueprints.content() : Collections.emptyList());
     return isFragment
         ? "blueprint/admin/personal-blueprints :: results"
         : "blueprint/admin/personal-blueprints";

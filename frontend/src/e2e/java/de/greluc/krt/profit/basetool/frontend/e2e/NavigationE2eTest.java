@@ -218,6 +218,56 @@ class NavigationE2eTest {
   }
 
   /**
+   * The administration groups start collapsed, the hub link leads to the hub page, and opening a
+   * group shows its links.
+   */
+  @Test
+  void adminGroupsStartCollapsedBehindTheHubLink() {
+    run(
+        1440,
+        900,
+        "nav-admin-collapsed",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/admin");
+          page.locator("#hamburger").click();
+          assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\bis-admin-mode\b"));
+          assertThat(page.getByTestId("nav-admin-dashboard")).isVisible();
+          assertThat(page.locator("#sidebar .nav-mode-admin .nav-group-head")).hasCount(3);
+          for (Locator head : page.locator("#sidebar .nav-mode-admin .nav-group-head").all()) {
+            assertThat(head).hasAttribute("aria-expanded", "false");
+          }
+          assertThat(page.getByTestId("nav-admin-audit-log")).isHidden();
+
+          page.locator(
+                  "#sidebar .nav-mode-admin [data-group-key='admin-operations'] .nav-group-head")
+              .click();
+          assertThat(page.getByTestId("nav-admin-audit-log")).isVisible();
+          assertThat(page.getByTestId("admin-hub")).isVisible();
+        });
+  }
+
+  /** A merged admin page shows the tab bar of its siblings and the tabs lead to them. */
+  @Test
+  void mergedAdminPageShowsItsTabBar() {
+    run(
+        1440,
+        900,
+        "nav-admin-tabs",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/admin/settings");
+          assertThat(page.getByTestId("page-tabs")).isVisible();
+          assertThat(page.getByTestId("page-tab-admin.settings.general"))
+              .hasAttribute("aria-current", "page");
+          page.getByTestId("page-tab-admin.dangerzone").click();
+          page.waitForURL(Pattern.compile(".*/admin/settings/danger-zone$"));
+          assertThat(page.getByTestId("page-tab-admin.dangerzone"))
+              .hasAttribute("aria-current", "page");
+          assertThat(page.getByTestId("bank-wipe-card")).isVisible();
+          assertThat(page.getByTestId("bp-purge-card")).isVisible();
+        });
+  }
+
+  /**
    * On a phone the tab bar marks the current area, the footer gives way to it, and the menu tab
    * opens the sheet with the user row.
    */

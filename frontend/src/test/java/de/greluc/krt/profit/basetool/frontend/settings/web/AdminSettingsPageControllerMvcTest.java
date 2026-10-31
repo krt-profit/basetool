@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -36,16 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
-import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,8 +56,6 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class AdminSettingsPageControllerMvcTest {
-
-  private static final Pattern SK_TOGGLE = Pattern.compile("<input[^>]*sk-profit-toggle[^>]*>");
 
   private MockMvc mockMvc;
 
@@ -165,40 +155,6 @@ class AdminSettingsPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
-  void viewSettings_rendersOneProfitTogglePerActiveSpecialCommandSortedByName() throws Exception {
-    UUID zuluId = UUID.randomUUID();
-    UUID alphaId = UUID.randomUUID();
-    SpecialCommandDto zulu =
-        new SpecialCommandDto(zuluId, "Zulu-Kommando", "ZK", "", true, true, 3L);
-    SpecialCommandDto alpha =
-        new SpecialCommandDto(alphaId, "Alpha-Kommando", "AK", "", true, false, 1L);
-    when(backendApiClient.get(
-            eq("/api/v1/special-commands?size=1000&sort=name,asc&page={page}"),
-            anyTypeRef(),
-            eq(0)))
-        .thenReturn(new PageResponse<>(List.of(zulu, alpha), 0, 1000, 2, 1, List.of()));
-
-    String html =
-        mockMvc
-            .perform(get("/admin/settings"))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    Matcher toggles = SK_TOGGLE.matcher(html);
-    assertThat(toggles.find()).as("first SK toggle").isTrue();
-    String first = toggles.group();
-    assertThat(toggles.find()).as("second SK toggle").isTrue();
-    String second = toggles.group();
-    assertThat(toggles.find()).as("exactly one toggle per SK").isFalse();
-    assertThat(first).contains("data-sk-id=\"" + alphaId + "\"").doesNotContain("checked");
-    assertThat(second).contains("data-sk-id=\"" + zuluId + "\"").contains("checked");
-    assertThat(html).contains("Alpha-Kommando", "Zulu-Kommando");
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
   void updateSettingsAjax_partialSaveFailure_stillEvictsStaticCache() throws Exception {
     stubAllPuts();
     when(backendApiClient.put(
@@ -247,20 +203,15 @@ class AdminSettingsPageControllerMvcTest {
   }
 
   /**
-   * Renders the settings page in German with the refinery rounding stored as {@code DOWN} and one
-   * squadron in the picker catalogue.
+   * Renders the settings page in German with the refinery rounding stored as {@code DOWN}.
    *
-   * @param squadrons the squadrons the catalogue answers with
    * @return the rendered page
    * @throws Exception if the request fails
    */
-  private String renderPage(List<SquadronDto> squadrons) throws Exception {
+  private String renderPage() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
         .thenReturn(new SystemSettingDto("refinery.rounding.mode", "DOWN", 4L));
-    when(backendApiClient.get(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc&page={page}"), anyTypeRef(), eq(0)))
-        .thenReturn(new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of()));
     return mockMvc
         .perform(get("/admin/settings").locale(Locale.GERMAN))
         .andExpect(status().isOk())
@@ -272,16 +223,12 @@ class AdminSettingsPageControllerMvcTest {
   /**
    * The page renders on the form pattern: a page head under the "Betrieb" eyebrow, the three saved
    * settings as numbered sections of one form card with a single sticky primary action, the
-   * rounding mode as a segment carrying the stored value, and the per-unit flags as switches in
-   * their own numbered sections that save on change.
+   * rounding mode as a segment carrying the stored value, and no per-unit switches.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
   void thePageRendersTheFormPattern() throws Exception {
-    SquadronDto alpha =
-        new SquadronDto(UUID.randomUUID(), "ALPHA", "ALP", "", true, true, false, 0L);
-
-    String html = renderPage(List.of(alpha));
+    String html = renderPage();
 
     assertThat(html)
         .contains("data-testid=\"page-head\"")
@@ -291,7 +238,7 @@ class AdminSettingsPageControllerMvcTest {
         .doesNotContain("hud-box");
     String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
     assertThat(main.split("btn--cta", -1)).hasSize(2);
-    assertThat(main.split("class=\"form-section\"", -1)).hasSize(7);
+    assertThat(main.split("class=\"form-section\"", -1)).hasSize(4);
     assertThat(main)
         .doesNotContain("krtm-")
         .doesNotContain("krt-table")
@@ -306,28 +253,8 @@ class AdminSettingsPageControllerMvcTest {
         .contains("class=\"krt-segmented krt-segmented--block\"")
         .containsPattern("name=\"refineryRoundingMode\" value=\"DOWN\" checked")
         .doesNotContain("value=\"UP\" checked")
-        .contains("4 \u00b7 Bef\u00f6rderungssystem pro Staffel</span>")
-        .contains("\u00b7 speichert sofort")
-        .contains("class=\"data-table data-table--stack\"")
-        .contains("<label class=\"krt-switch\">")
-        .containsPattern("class=\"squadron-promotion-toggle\"[^>]*checked")
-        .containsPattern(
-            "class=\"squadron-profit-toggle\"[^>]*aria-label=\"Auftragsbearbeitung: ALP\"")
-        .contains("class=\"cell-title\">ALP<");
-  }
-
-  /** Without squadrons the per-squadron sections show the empty state instead of a table. */
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void noSquadronsRenderTheEmptyState() throws Exception {
-    String html = renderPage(List.of());
-
-    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
-    assertThat(main)
-        .contains("data-testid=\"empty-state\"")
-        .contains("Keine Staffeln gefunden.")
-        .contains("Sobald es Staffeln gibt, erscheinen sie hier.")
         .doesNotContain("squadron-promotion-toggle")
-        .doesNotContain("squadron-profit-toggle");
+        .doesNotContain("squadron-profit-toggle")
+        .doesNotContain("sk-profit-toggle");
   }
 }
