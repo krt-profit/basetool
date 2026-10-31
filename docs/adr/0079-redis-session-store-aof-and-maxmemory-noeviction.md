@@ -66,7 +66,7 @@ indicator (it becomes functional once `maxmemory > 0`), and `RedisEvictions` is 
 ## Consequences
 
 - Worst-case session-loss window on a crash drops from ≤5 min to ~1 s at ~1 fsync/s — negligible I/O for
-  this tiny data set. AOF and RDB both land on the `/var/iri/redis` bind mount (unchanged; still excluded
+  this tiny data set. AOF and RDB both land on the `/var/lib/basetool/redis` bind mount (unchanged; still excluded
   from off-site backups per REQ-OPS-010 — sessions transparently re-login).
 - Memory behaviour is now defined and observable: the kernel OOM-kill path is replaced by a graceful
   write-refusal at 192 mb, and `RedisMemoryHigh` warns 10 min before that boundary.

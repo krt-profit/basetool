@@ -235,7 +235,7 @@ The amendments above assumed that a client requesting `offline_access` gets an o
 does so only when the member holds the `offline_access` realm role within the client's scope, and
 every exchange client has `fullScopeAllowed` off. Production's default role lacked the role
 (hardening step 10), so SC Extractor 2.10.0's first device login on production was refused `400
-not_allowed`. Owner decision (2026-09-28): `default-roles-iri` carries `offline_access` and the
+not_allowed`. Owner decision (2026-09-28): `default-roles-basetool` carries `offline_access` and the
 `offline_access` client scope maps it, as in the sandbox and E2E realms; the provisioner converges
 both and never removes them ([ADR-0202 amendment 5](0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md#amendment-5--2026-09-28-every-member-may-hold-an-offline-session),
 which also lists which other clients could now issue an offline token). Nothing about the exchange

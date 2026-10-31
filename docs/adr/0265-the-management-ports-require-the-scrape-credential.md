@@ -69,7 +69,7 @@ while no scrape identity is configured.**
   health status.
 - **The prod `.env` and the Prometheus secret must agree before this is promoted.**
   `MONITORING_SCRAPE_USER` must be `monitoring` and `MONITORING_SCRAPE_PASSWORD` must equal the
-  content of `/var/iri/monitoring/secrets/scrape_password`. Since ADR-0134 nothing has used the pair,
+  content of `/etc/basetool/monitoring/secrets/scrape_password`. Since ADR-0134 nothing has used the pair,
   so a mismatch would have gone unnoticed. If they disagree, the three scrape jobs answer `401`, the
   targets go `down` and the existing target-down alerts fire. The containers stay healthy and keep
   serving.

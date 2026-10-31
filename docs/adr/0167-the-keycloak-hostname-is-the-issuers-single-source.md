@@ -18,8 +18,8 @@ fallback defaults, `.env.example`, and some twenty more in documentation and the
 
 **Nothing compared any two of them.** `.env.example` stated the invariant as an instruction to the
 reader — "SET BOTH OR NEITHER", the two values "must agree" — which is a comment, not a check. Two
-variables existed where one fact does: `IRI_KEYCLOAK_HOSTNAME` (Keycloak's `KC_HOSTNAME`) and
-`IRI_KEYCLOAK_ISSUER_URI` (validated by backend, frontend and ingest), each independently settable
+variables existed where one fact does: `BASETOOL_KEYCLOAK_HOSTNAME` (Keycloak's `KC_HOSTNAME`) and
+`BASETOOL_KEYCLOAK_ISSUER_URI` (validated by backend, frontend and ingest), each independently settable
 and each independently wrong.
 
 The failure that combination invites is the one [ADR-0166](0166-identity-moves-onto-the-app-origin.md)
@@ -33,7 +33,7 @@ measured on the pinned Keycloak 26.7 image. Keycloak's advertised base URL comes
 
 The first row is silent in every place anyone would look. Keycloak answers on `/auth`, its discovery
 document parses, and the container reports **healthy** — while backend, frontend and ingest each die
-at start-up on `The Issuer "…/realms/iri" did not match the requested issuer "…/auth/realms/iri"`.
+at start-up on `The Issuer "…/realms/basetool" did not match the requested issuer "…/auth/realms/basetool"`.
 That reads as a backend fault, and it is a failed deploy. A first draft of ADR-0166 specified exactly
 that combination, on the strength of the upstream reverse-proxy guide's wording; only running the
 smoke stack caught it, and the root cause was a *second* file — `docker-compose.e2e.yml` — overriding
@@ -46,17 +46,17 @@ moved through in ADR-0166 that **needed no edit at all**.
 
 ## Decision
 
-**`IRI_KEYCLOAK_HOSTNAME` is the single source, and the issuer is composed from it.** The three
+**`BASETOOL_KEYCLOAK_HOSTNAME` is the single source, and the issuer is composed from it.** The three
 service templates in `docker-compose.yml` read:
 
 ```yaml
-KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
+KEYCLOAK_ISSUER_URI: ${BASETOOL_KEYCLOAK_ISSUER_URI:-${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/basetool}
 ```
 
 An operator moving the deployment to another domain sets one value, with its `/auth` path, and the
 issuer follows at all three services. The pair can no longer be half-set, because there is no pair.
 
-`IRI_KEYCLOAK_ISSUER_URI` is kept as an override rather than deleted: a deployment whose advertised
+`BASETOOL_KEYCLOAK_ISSUER_URI` is kept as an override rather than deleted: a deployment whose advertised
 issuer genuinely differs from `KC_HOSTNAME` — one behind a rewriting proxy, say — has no other way to
 say so, and keeping it means no existing `.env` changes behaviour. Setting it wins over the
 derivation, and thereby opts that deployment out of the agreement check below; that is stated in
@@ -64,7 +64,7 @@ derivation, and thereby opts that deployment out of the agreement check below; t
 
 **The shape constraint is part of the contract.** The hostname carries the `/auth` path, because
 Keycloak's `KC_HTTP_RELATIVE_PATH` and the hostname's path component have to agree (the table above).
-So the composition is `${IRI_KEYCLOAK_HOSTNAME}/realms/iri` and not an origin plus a path assembled
+So the composition is `${BASETOOL_KEYCLOAK_HOSTNAME}/realms/basetool` and not an origin plus a path assembled
 here.
 
 **And the invariant is gated rather than documented.** `scripts/check-keycloak-issuer.py` runs in
@@ -86,8 +86,7 @@ here.
 **The monitoring stack derives from the same variable.** Grafana's `generic_oauth` has no discovery
 option, so `docker-compose.monitoring.yml` names the authorize, token and userinfo URLs one at a
 time — the realm base appeared three times, in three places that could each drift alone. All three
-now share one `${IRI_KEYCLOAK_HOSTNAME:-…}` expansion. That works because both compose projects run
-with the same `--project-directory` (`/var/iri/code`) and compose reads `.env` from there, so one
+now share one `${BASETOOL_KEYCLOAK_HOSTNAME:-…}` expansion. That works because both stacks read the same host env file (`/etc/basetool/basetool.env`), so one
 value feeds the app stack and the monitoring stack alike. A monitoring stack started from elsewhere
 gets the production default, exactly as before. Rendered output with the variable unset is
 byte-identical to what shipped.
@@ -110,7 +109,7 @@ itself. This is `check-edge-nginx.sh`'s principle applied one layer up: render t
 then hand it to the real tool.
 
 Rendering is also what makes the *derivation* testable at all. The `prod-hostname-override` scenario
-sets `IRI_KEYCLOAK_HOSTNAME` alone and requires all three apps to move with it. Restore the issuer to
+sets `BASETOOL_KEYCLOAK_HOSTNAME` alone and requires all three apps to move with it. Restore the issuer to
 a second independent literal and every other check still passes — today's two values agree — while
 that one scenario fails immediately. Its regression suite,
 `scripts/check-keycloak-issuer.test.sh`, breaks the configuration each way in turn and requires the
@@ -158,7 +157,7 @@ no OIDC discovery option. One expansion shared by all three is as far as that pr
 ## Consequences
 
 **A domain move is one edit and a green gate**, instead of a hand-audited sweep across 19 files.
-`IRI_KEYCLOAK_HOSTNAME` now feeds the three app issuers and Grafana's three OIDC endpoints; the
+`BASETOOL_KEYCLOAK_HOSTNAME` now feeds the three app issuers and Grafana's three OIDC endpoints; the
 `application*.yml` fallbacks and the four Prometheus targets cannot follow a variable, and are
 compared against it instead. Every place where something has to agree with the issuer Keycloak
 advertises is now either derived from it or checked against it.

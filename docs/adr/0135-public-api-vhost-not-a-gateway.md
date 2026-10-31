@@ -72,7 +72,7 @@ together they are what makes the connector safe to put a proxy in front of.
 
 **The audience flip is a release gate, not a later hardening step.** The vhost must not go live
 against a backend that still accepts audience-less tokens from arbitrary realm clients
-(`IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, plan item D5). The `aud` mapper on the mobile
+(`BASETOOL_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, plan item D5). The `aud` mapper on the mobile
 client exists for this and shipped with ADR-0131's provisioning.
 
 **Separate switchability is the point of a separate host.** Rate budgets, the `/actuator` deny,

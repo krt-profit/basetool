@@ -3,13 +3,13 @@
 - **Status:** Accepted
 - **Date:** 2026-06-29
 - **Deciders:** @greluc
-- **Related:** spec [REQ-OPS-001..006](../specs/deployment-delivery.md) · runbook [`docs/deployment.md`](../deployment.md) · builds on the pull-only deploy loop (`scripts/deploy.sh`, `scripts/iri-deploy.{service,timer}`)
+- **Related:** spec [REQ-OPS-001..006](../specs/deployment-delivery.md) · runbook [`docs/deployment.md`](../deployment.md) · builds on the pull-only deploy loop (`scripts/deploy.sh`, `scripts/basetool-deploy.{service,timer}`)
 
 ## Context
 
 Production runs a deliberately one-directional deploy loop (`docs/deployment.md`): GitHub
 Actions build + sign the app images and push them to GHCR; `promote.yml` re-tags a chosen
-version to `:stable`; the host's `iri-deploy.timer` polls `:stable`, and `deploy.sh` resolves
+version to `:stable`; the host's `basetool-deploy.timer` polls `:stable`, and `deploy.sh` resolves
 it to immutable digests, pins them in a compose override, applies with a health gate, and
 rolls back on failure. The host holds **only** a read-only GHCR pull token — no inbound SSH
 *for the deploy* (corrected 2026-09-16: the operator's administrative SSH exists and stays;
@@ -19,7 +19,7 @@ whole design.
 
 The compose file and its sibling host config (the NPM maintenance page under
 `docker/maintenance/`, the Keycloak login theme under `keycloak-theme/`) were **outside** this
-loop. They reached the host only by a manual `sudo cp docker-compose.yml /var/iri/code/`
+loop. They reached the host only by a manual `sudo cp docker-compose.yml /opt/basetool/`
 (see the bootstrap and Keycloak-HTTPS sections of the runbook). Two consequences followed,
 both confirmed in `scripts/deploy.sh`:
 
@@ -57,7 +57,7 @@ through the **exact** channel the app images already use.
   that digest into the idempotence marker as a **fourth field**, and — only when it moved —
   extracts the bundle into a staging dir with `docker create` + `docker cp`, re-asserts it
   carries no secrets, snapshots the live config tree as a rollback anchor, and copies the
-  allowlisted paths into `/var/iri/code` (compose file replaced atomically; the asset trees
+  allowlisted paths into `/opt/basetool` (compose file replaced atomically; the asset trees
   mirrored within their own subtree only). The health-gated `up -d --wait` then recreates the
   changed containers, and a failure restores **both** the previous digest pin and the previous
   config tree.
@@ -82,7 +82,7 @@ can never overwrite the running deployer; they stay a manual bootstrap concern.
   rides a release promotion rather than going out independently — acceptable, since promotion
   is the deliberate gate by design.
 - New operational surface: the `basetool-config` package in GHCR, three new state paths under
-  `/var/lib/iri`, and the stateful-infra carve-out the operator must understand
+  `/var/lib/basetool/deploy`, and the stateful-infra carve-out the operator must understand
   (`docs/deployment.md`). The health gate for infra is shallow (`redis-cli ping` /
   `pg_isready` do not exercise the app workload), documented as a residual risk.
 

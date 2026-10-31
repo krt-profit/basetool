@@ -40,8 +40,8 @@ host's own public address as their source, so the edge cannot tell them apart fr
 
 **One optional setting, `app.security.keycloak-backchannel.uri`, moves the frontend's
 server-to-server Keycloak calls and both Keycloak health probes onto the internal connector.** It
-holds the realm base on that connector (`https://keycloak:18443/auth/realms/iri`), reaches both
-applications as `KEYCLOAK_BACKCHANNEL_URI` from the host's `IRI_KEYCLOAK_BACKCHANNEL_URI`, and is
+holds the realm base on that connector (`https://keycloak:18443/auth/realms/basetool`), reaches both
+applications as `KEYCLOAK_BACKCHANNEL_URI` from the host's `BASETOOL_KEYCLOAK_BACKCHANNEL_URI`, and is
 empty by default.
 
 When it is set:
@@ -73,7 +73,7 @@ the public probe.
   `KC_HOSTNAME` into every token whichever connector issued it.
 - The edge's token rate limit (`krt_token_perip`) now sees browser traffic only. The frontend's
   token calls are bounded by its own pool (20 connections) instead.
-- A new realm path would have to change the derived endpoints as well as `IRI_KEYCLOAK_HOSTNAME`;
+- A new realm path would have to change the derived endpoints as well as `BASETOOL_KEYCLOAK_HOSTNAME`;
   that is the price of not running discovery, and the realm name is already a constant of this
   deployment.
 

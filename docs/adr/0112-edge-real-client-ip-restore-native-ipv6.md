@@ -65,7 +65,7 @@ Because it edits the `networks:` block, it ships through the existing config bun
 alternatives — the `/admin` allow-list is untouched (the IPv4 tunnel hairpin still SNATs to
 `172.28.3.1`).
 
-Sequencing is strict and gated: keep `iri-deploy.timer` stopped during the window; leave
+Sequencing is strict and gated: keep `basetool-deploy.timer` stopped during the window; leave
 `limit_conn 10000` in place until real IPs are **confirmed** from an external dual-stack host (the
 `[Client …]` access-log grep shows real GUAs / IPv4, and `ip6tables -t nat -S DOCKER | grep 443`
 is non-empty); only **then**, in a **separate** bundle change (touching only `docker/maintenance`,

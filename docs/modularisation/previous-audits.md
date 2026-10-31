@@ -235,10 +235,10 @@ Ordered by area, then by the audit's priority.
 | OPS-SEC-07 | Operations | P1 → closed | Prometheus lifecycle API enabled, nobody uses it | DONE | CONFIRMED | Flag removed. | `quadlet/systemd/prometheus.container:22` |
 | OPS-MOD-01 | Operations | P2 → closed | Generator uses raw podman flags instead of Quadlet keys | DONE | CONFIRMED | Quadlet keys wherever podman offers one. | `scripts/generate-quadlet.py:750` |
 | OPS-SEC-06 | Operations | P2 → closed | Host Alloy and node_exporter are never updated | DONE | CONFIRMED | The conformance check compares host agent versions with the compose pins. | `scripts/check-conformance.py:1290-1330` |
-| OPS-SEC-08 | Operations | P2 → P3 | sudoers comment overstates the boundary between `deploy` and `iri` | DONE | REPRIORITISED | The statement is corrected in the docs; the optional sudo wrapper is low urgency. **Closed 2026-10-04 (#2387):** sudoers allowlist of the 15 sub-commands the scripts run, kept in step by `check-deploy-podman-allowlist.py`; host rollout is the owner's. | #1992; `ansible/README.md:43` |
+| OPS-SEC-08 | Operations | P2 → P3 | sudoers comment overstates the boundary between `deploy` and `basetool` | DONE | REPRIORITISED | The statement is corrected in the docs; the optional sudo wrapper is low urgency. **Closed 2026-10-04 (#2387):** sudoers allowlist of the 15 sub-commands the scripts run, kept in step by `check-deploy-podman-allowlist.py`; host rollout is the owner's. | #1992; `ansible/README.md:43` |
 | OPS-SIMP-01 | Operations | P2 → closed | The Docker half of the runtime seam is dead code after the cutover | DONE | CONFIRMED | No Docker branch left (ADR-0203). | #2001; `scripts/lib/container-runtime.sh` |
 | OPS-SIMP-02 | Operations | P2 → closed | Docker and NPM leftovers in compose, rules, `docker/` and alert texts | DONE | CONFIRMED | cAdvisor and NPM leftovers gone (ADR-0203). | `monitoring/prometheus/alerts/containers-runtime.yml` |
-| OPS-SIMP-03 | Operations | P2 → closed | Four operations units repeat 60 lines of hardening — and drift | DONE | CONFIRMED | One sandbox drop-in, drill paths narrowed; no host run evidenced. | #2001; `scripts/iri-deploy-account-sandbox.conf` |
+| OPS-SIMP-03 | Operations | P2 → closed | Four operations units repeat 60 lines of hardening — and drift | DONE | CONFIRMED | One sandbox drop-in, drill paths narrowed; no host run evidenced. | #2001; `scripts/basetool-deploy-account-sandbox.conf` |
 | OPS-SIMP-04 | Operations | P2 → closed | Shell helpers four times, eight hand-written textfile writers | DONE | CONFIRMED | One shared library for four scripts. | `scripts/lib/common.sh` |
 | OPS-SEC-05 | Operations | P3 → closed | Database and Redis networks allow internet egress | DONE | CONFIRMED | `Internal=true` on the five data networks; the testing rollout is pending per the knowledge base. | `quadlet/systemd/net-db-backend.network:6` |
 
@@ -489,7 +489,7 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   from the Gradle project graph before the Phase 5 extraction, and every reuse gate stays (PSB-05).
 - **OPS-SEC-08** (Operations · DONE · REPRIORITISED · P2 → P3). #1992 replaced the false sudoers
   comment and, after the ADR-0214 sweep, the plain statement lives in `ansible/README.md:43`:
-  `podman *` as `iri` lets `deploy` run any code as `iri`, not as root. A wrapper that admits only
+  `podman *` as `basetool` lets `deploy` run any code as `basetool`, not as root. A wrapper that admits only
   the podman sub-commands the `rt_*` seam uses is the only way to narrow `deploy` further — worth it
   now that the seam is Podman-only, but not urgent (PSB-14).
 

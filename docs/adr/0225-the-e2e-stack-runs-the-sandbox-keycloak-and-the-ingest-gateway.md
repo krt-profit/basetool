@@ -28,7 +28,7 @@ that Keycloak and generated realm, or keep its own and gain only the missing cli
 1. **One generator, two realms.** `scripts/build-sandbox-realm.py` builds both realms from the
    shared base `scripts/keycloak/test-realm-base.json` (the roles, the two first-party clients and the
    E2E accounts) plus the provisioner's realm settings, login theme, client scopes, ingest gateway
-   client and third-party template. The sandbox realm (`docker/sandbox/keycloak/realm-iri.json`)
+   client and third-party template. The sandbox realm (`docker/sandbox/keycloak/realm-basetool.json`)
    replaces the accounts with the sandbox members; the E2E realm
    (`frontend/src/e2e/resources/realm-export.e2e.json`) keeps the E2E accounts and adds
    `e2e-exchange-client` and the account `test-exchange`. `--check` in `repo-lint.yml` fails when

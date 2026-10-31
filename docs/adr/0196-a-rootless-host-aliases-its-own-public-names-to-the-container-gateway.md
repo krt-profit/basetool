@@ -14,7 +14,7 @@ Several containers dial this deployment's **own public names**:
 
 | container | why |
 | --- | --- |
-| `backend`, `frontend`, `ingest` | they resolve the OIDC issuer at startup — `https://<public>/auth/realms/iri` |
+| `backend`, `frontend`, `ingest` | they resolve the OIDC issuer at startup — `https://<public>/auth/realms/basetool` |
 | `grafana` | its OAuth **token exchange** is a back-channel call to the same origin |
 | `blackbox-exporter` | it probes all four public vhosts |
 
@@ -45,7 +45,7 @@ refusing to start, Grafana answering *"Failed to get token from provider"*, and 
 reporting `probe_success=0` against endpoints that were serving. Each reads as a different outage.
 
 The mechanism already existed and was unused. `generate-quadlet.py` resolves
-`IRI_KEYCLOAK_HOST_ALIAS` to its no-op default at generation time — deliberately, because the units
+`BASETOOL_KEYCLOAK_HOST_ALIAS` to its no-op default at generation time — deliberately, because the units
 are one promotable artifact for every environment — names a systemd drop-in as the host-side
 remedy, says it *"belongs to Ansible"*, and states the failure it prevents: *"a container timing out
 against its own issuer at start-up — which reads as a Keycloak outage and is a missing line."*
@@ -74,7 +74,7 @@ Three consequences follow from making it real rather than notional:
 
 `host-gateway` rather than a literal address: podman resolves it, and the generator already emits
 `AddHost=alloy:host-gateway` for the host-native Alloy. The first entry must still match
-`IRI_KEYCLOAK_HOST_ALIAS` in the host `.env` — `check-conformance.py` fails a host where the two
+`BASETOOL_KEYCLOAK_HOST_ALIAS` in the host `.env` — `check-conformance.py` fails a host where the two
 disagree silently, which is the whole reason that check exists.
 
 ## Amendment 1 — the hairpin was made to work, for IPv6 — 2026-09-22
