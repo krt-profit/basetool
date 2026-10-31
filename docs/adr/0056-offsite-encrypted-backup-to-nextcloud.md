@@ -61,7 +61,7 @@ remote, scheduled by systemd:
   backup; restores are rehearsed weekly; the whole thing is outbound-only and fits the existing
   unprivileged-`deploy`-user + systemd-timer operational model.
 - **Accepted costs:** a brief nightly write-downtime (dump duration only, inside 04:00–05:00); two
-  new host dependencies (`restic`, `rclone`); host-only backup credentials in `/etc/iri/backup.env`
+  new host dependencies (`restic`, `rclone`); host-only backup credentials in `/etc/basetool/deploy/backup.env`
   to provision and rotate; and a hard dependency on the Nextcloud instance being **independent** of
   the prod host (if it is co-located, the off-site property is lost — called out in the runbook).
 - **Follow-up:** wire an `OnFailure=` alert so a failed backup/drill pages the operator rather than

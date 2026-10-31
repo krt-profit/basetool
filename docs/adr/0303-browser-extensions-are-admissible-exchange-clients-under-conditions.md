@@ -105,7 +105,7 @@ conditions (REQ-XCH-027):
 ## Consequences
 
 - An extension can be approved, and the gateway answers it cross-origin. A new Chromium build's
-  fixed extension id is one more entry in `IRI_EXCHANGE_CORS_EXTENSION_ORIGINS` and in the client's Web
+  fixed extension id is one more entry in `BASETOOL_EXCHANGE_CORS_EXTENSION_ORIGINS` and in the client's Web
   Origins; a Firefox build needs neither.
 - `moz-extension://*` admits every Firefox extension's preflight. That opens nothing on its own:
   the gateway never accepts credentials, every exchange request still needs a DPoP-bound token of

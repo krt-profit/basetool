@@ -160,19 +160,14 @@ police itself** — its first install comes through the role, and until then the
 **the role's units, drop-ins, logrotate and tmpfiles files outside `/opt/basetool/scripts` are not
 hashed**. Extending `scripts/host-scripts.list` with their installed paths closes the second.
 
-## 11.5e The layout and realm cutover — planned 2026-10-24
+## 11.5e The layout and realm cutover — closed
 
-The move to the FHS layout, the account rename and the Keycloak realm rename ([ADR-0319](../adr/0319-the-host-follows-the-rhel-fhs-layout-and-the-product-carries-no-legacy-name.md))
-happen in one maintenance window. **What it costs:** the site is down for the window; every browser
-session, refresh token and offline token is void, so every member signs in again; every external exchange
-client must switch to the new issuer or it stops working. **What can go wrong:** the default-role rename
-by id is undocumented upstream (the script reads it back and fails loudly), the rootless Podman store is
-reset and its three named volumes travel as exports, and the migration scripts have no undo phase.
-**The way back is a server snapshot taken immediately before the window** — it loses whatever is written
-after it, which is why the window is a full stop. The rehearsal on the testing host and the exact steps
-are in [`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](../HOST_LAYOUT_MIGRATION_RUNBOOK.md). Closed when the runbook
-is archived; the migration scripts leave the repository once the last pre-migration snapshot has aged out
-of the retention.
+The move to the FHS layout, the account rename and the Keycloak realm rename
+([ADR-0319](../adr/0319-the-host-follows-the-rhel-fhs-layout-and-the-product-carries-no-legacy-name.md))
+has been carried out on both hosts, and the migration tooling is gone from the repository. Its cost
+was a maintenance window, a fresh sign-in for every member and a switch to the new issuer for every
+external exchange client; the way back was a server snapshot taken immediately before. The tag
+`v1.20.2` still carries the tools and the runbook.
 
 ## 11.6 Open follow-ups from the cutover
 

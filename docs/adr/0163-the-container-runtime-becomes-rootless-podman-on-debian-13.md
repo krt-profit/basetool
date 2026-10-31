@@ -166,8 +166,8 @@ The current production server is a Hetzner **CPX42** — 8 shared AMD vCPU, 16 G
 20 TB traffic — in `nbg1-dc3`, which matches the measured 8 vCPU / 15 982 920 kB /
 327 684 194 304 B. An equivalent new host is therefore a second CPX42 in `nbg1`, and Hetzner offers
 a CentOS Stream 10 image. Sizing note from the inventory: of the 116 GB in use on the current host,
-63 GB are two undocumented pre-change copies of `/var/iri` and 35 GB is the containerd image store,
-so the data that actually has to move is **under a gigabyte** plus whatever monitoring history is
+63 GB are two undocumented pre-change copies of the former data tree under `/var` and 35 GB is the
+containerd image store, so the data that actually has to move is **under a gigabyte** plus whatever monitoring history is
 judged worth carrying.
 
 ### Still open after this ruling

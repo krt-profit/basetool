@@ -50,7 +50,7 @@ bad-digest backoff) and **before** the first `pull` / `docker create` / `docker 
   pre-flight rather than falling back to trusting an unverified image. cosign is added to the manual
   host bootstrap (it rides the same manual channel as `deploy.sh` and the systemd units, which are
   deliberately not auto-delivered — the self-update hazard of REQ-OPS out-of-scope).
-- **Break-glass.** `IRI_COSIGN_VERIFY=false` disables the gate for a tick, logged loudly on every
+- **Break-glass.** `BASETOOL_COSIGN_VERIFY=false` disables the gate for a tick, logged loudly on every
   skipped verification, for the sole purpose of riding out a Sigstore public-good outage.
 - **Alarming.** A verification failure records a deploy-failure metric, so the existing
   `DeployFailed` alert fires — a moved `:stable` is a supply-chain incident, not a silent skip.

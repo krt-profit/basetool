@@ -18,7 +18,7 @@
 
 ## Context
 
-The production realm `iri` was built by hand over four months: the ingest runbook's steps 1–9, the
+The production realm `basetool` was built by hand over four months: the ingest runbook's steps 1–9, the
 mobile provisioner, the WP-K2 hardening. Delivery keeps images, units and the provider JAR in
 lock-step across production and testing (`REQ-OPS-022`), but the realm lives in each host's
 `db-keycloak` and no artifact carries it. Nothing rebuilt the production shape anywhere else.
@@ -181,7 +181,7 @@ SC Extractor 2.10.0 could not sign in on production: its device-token poll was a
 not_allowed` — „Offline tokens not allowed for the user or client". Keycloak issues an offline token
 only when the member holds the `offline_access` realm role within the client's scope.
 `basetool-sc-extractor` has `fullScopeAllowed` off and requests `offline_access` (#2179,
-`REQ-XCH-005`), and production's `default-roles-iri` held `KRT Member`, `uma_authorization` and the
+`REQ-XCH-005`), and production's `default-roles-basetool` held `KRT Member`, `uma_authorization` and the
 `account` roles but not `offline_access`: hardening step 10 (`KEYCLOAK_HARDENING_RUNBOOK.md`, done by
 2026-09-09) had removed it so that no account could mint an offline token. The `offline_access`
 client scope already mapped the role; the sanitized reference did not show it because the
@@ -207,7 +207,7 @@ write. This narrows decision 8 by exactly these two built-in objects and reverse
 - `basetool-android` is not offered it (decision 4, ADR-0131) and omits it from its request.
 
 Tokens of a client with full scope now also list `offline_access` in `realm_access.roles`, beside
-`uma_authorization` and `default-roles-iri`. The frontend maps it to an authority at login and its
+`uma_authorization` and `default-roles-basetool`. The frontend maps it to an authority at login and its
 sync with the backend drops it again, as it drops every realm role without a catalog entry
 (`REQ-SEC-013`); nothing is gated on it.
 

@@ -8,7 +8,7 @@
 ## Context
 
 The operational scripts (`deploy.sh`, `backup.sh`, `lib/*.sh`, `render-env-d.py`, the collectors) run
-as root-owned files under `/var/iri/code/scripts` and change only through the Ansible role
+as root-owned files under `/opt/basetool/scripts` and change only through the Ansible role
 (`--tags deploy,scripts`). That is deliberate (ADR-0188): the deploy account runs them and cannot
 rewrite them, and a deployer that replaces itself mid-run is a self-update hazard. The config bundle
 therefore carries no script.
@@ -30,7 +30,7 @@ We will make a stale host script **visible on every tick and a refusal where it 
 manual comparison **mandatory**.
 
 - **The release carries a manifest.** `scripts/host-scripts.list` names the files the role installs
-  under `/var/iri/code/scripts`. `release-images.yml` runs `scripts/host-scripts-manifest.sh generate`
+  under `/opt/basetool/scripts`. `release-images.yml` runs `scripts/host-scripts-manifest.sh generate`
   at build time and the config image ships the result as `/config/host-scripts.sha256` (`sha256sum`
   format). A repo self-test keeps the list equal to what the role installs.
 - **The host compares on every tick that stages no bundle.** `deploy.sh` hashes the listed files in its own directory
@@ -43,7 +43,7 @@ manual comparison **mandatory**.
   compares the **incoming** release's manifest too. When `deploy.sh`, `lib/common.sh`,
   `lib/container-runtime.sh` or `render-env-d.py` — the files that apply a release — differ, it exits
   with a `HOST SCRIPTS:` FATAL naming the files and the fix, stamps a failed deploy and records **no
-  backoff and no state**. Other stale scripts only warn. `--force` and `IRI_REQUIRE_CURRENT_SCRIPTS=false`
+  backoff and no state**. Other stale scripts only warn. `--force` and `BASETOOL_REQUIRE_CURRENT_SCRIPTS=false`
   bypass it.
 - **The manual comparison is a mandatory pre-promotion step** in `docs/deployment.md`, with a
   byte-exact command, and a mismatch blocks the promotion until the role has been run from the
@@ -77,7 +77,7 @@ ignores the manifest. Three consequences are accepted and written down:
   is refused the same way and needs `--force`. The testing host, which follows `main`, will warn
   whenever a release touched a script the role has not re-installed.
 - **Not covered:** the units, drop-ins, logrotate and tmpfiles the role installs outside
-  `/var/iri/code/scripts`; a follow-up can extend the list with their installed paths.
+  `/opt/basetool/scripts`; a follow-up can extend the list with their installed paths.
 - **Costs:** about 14 small hashes per tick; one new file in the config bundle.
 
 ## Alternatives considered

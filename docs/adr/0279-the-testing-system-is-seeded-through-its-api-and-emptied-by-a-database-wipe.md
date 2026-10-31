@@ -41,7 +41,7 @@ is dropped to empty it again.**
    `$SEED_CLIENT_SECRET` on the workstation that runs the seed; it goes into no host `.env`. A later
    run without the flag reports the client and keeps it (ADR-0202).
 2. **The testing backend accepts it by configuration.** The testing host's `.env` sets
-   `IRI_BACKEND_ACCEPTED_CLIENT_IDS=basetool-frontend,basetool-ingest-gateway,basetool-seed`.
+   `BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS=basetool-frontend,basetool-ingest-gateway,basetool-seed`.
    Production keeps the default; the release changes no default.
 3. **The seed works through the API only.** `scripts/seed-briefing.py seed` creates the Keycloak
    accounts with the service account, signs in as each of them, approves the pending registrations

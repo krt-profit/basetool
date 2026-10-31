@@ -99,7 +99,7 @@ on the AppCDS training run of every image in the same change.**
   conditions" caveat, one section after the first. That is the cost of changing a variable that the
   measured derivation depends on, and the alternative — changing the layout and the limits together
   — is exactly the mistake ADR-0175 had to correct.
-- **A rollback is a flag, but it costs CDS.** `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` is
+- **A rollback is a flag, but it costs CDS.** `BASETOOL_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` is
   appended after the base options and the last setting of a boolean `-XX` flag wins (verified), so
   an operator can turn the layout off without a deploy. The baked archive then mismatches and the
   service starts without CDS until the image is rebuilt. Slower startup, correct behaviour — an

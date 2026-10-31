@@ -8,7 +8,7 @@
 
 ## Context
 
-The `discord` identity provider in the `iri` realm runs with `syncMode` **IMPORT**. Keycloak takes
+The `discord` identity provider in the `basetool` realm runs with `syncMode` **IMPORT**. Keycloak takes
 the username and e-mail from the Discord profile once, at the first broker login. Afterwards it
 refreshes only the stored token and the identity-provider mappers that run with `syncMode` FORCE:
 `discord_user_id` and `discord_guild_nickname`. A broker login is matched on the Discord user id, so

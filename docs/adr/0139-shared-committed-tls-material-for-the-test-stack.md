@@ -49,7 +49,7 @@ published material can do exactly one thing: impersonate the names in the leaf's
 `host.docker.internal`, `127.0.0.1`, `10.0.2.2` — to builds that are `debuggable`.
 
 The test stack binds the file by a **hardcoded path** rather than through
-`IRI_KEYSTORE_HOST_PATH`. That variable still selects the *production* keystore in the base
+`BASETOOL_KEYSTORE_HOST_PATH`. That variable still selects the *production* keystore in the base
 compose file, and a test stack must not be one typo away from mounting it.
 
 ## Consequences

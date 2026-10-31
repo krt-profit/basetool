@@ -62,10 +62,10 @@ blackbox exporter — trusts. Two things follow.
   a name a peer dials fails that peer's handshake — loudly, at restart, and the frontend's readiness
   follows the same switch so the failure is a failed restart rather than a quiet 502 later.
 - Rotation cost is unchanged (everything at once), and the CA's expiry is the one date to watch;
-  `iri-cert-expiry` already reads `basetool-ca.crt`, which becomes the CA.
+  `basetool-cert-expiry` already reads `basetool-ca.crt`, which becomes the CA.
 - The Keycloak SPI precheck's hand-built truststore and the Android dev build's bundled test anchor
   follow the new CA; both are listed in the rollout and in ADR-0139's amendment.
-- `/var/iri/secrets/tls` is one more directory in the backup, captured best-effort like the keystore.
+- `/etc/basetool/secrets/tls` is one more directory in the backup, captured best-effort like the keystore.
 
 ## Alternatives considered
 

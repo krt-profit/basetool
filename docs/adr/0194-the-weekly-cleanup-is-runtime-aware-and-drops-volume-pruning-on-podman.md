@@ -21,7 +21,7 @@ Measured on the migration target on 2026-09-21:
 | checked | result |
 | --- | --- |
 | `command -v docker` | **nothing** — the role installs `podman`, not `podman-docker` |
-| `systemctl is-enabled iri-docker-cleanup.timer` | **enabled** |
+| `systemctl is-enabled` on the weekly docker-cleanup timer | **enabled** |
 | a `docker_cleanup` series in any textfile | **none** |
 
 So on the post-cutover host the weekly run fails at its first command, nothing is reclaimed, and
@@ -110,10 +110,9 @@ The job stopped being runtime-aware the day after this ADR: every Docker arm lef
 scripts ([ADR-0203](0203-compose-stays-the-source-of-the-units-and-the-scripts-speak-podman-only.md)),
 so `container-cleanup.sh` now runs the three Podman steps and nothing else. The two Docker-only steps
 — `builder prune` and the anonymous-only `volume prune` — are gone from the script rather than
-skipped, together with `IRI_CLEANUP_BUILDER_UNTIL`, `IRI_CLEANUP_PRUNE_VOLUMES` and the unit's
+skipped, together with the build-cache age and volume-prune switches and the unit's
 `DOCKER_CONFIG`. The decision above stands unchanged: **nothing prunes volumes**.
 
 The removal condition of the transitional double name was met — both Rocky hosts have run the role,
 and the retired Docker host never will again — so `basetool_docker_cleanup_*` left the alert
-expression and `iri-docker-cleanup.log` left Alloy's path list the same day (arc42 §11.1). The role
-still removes the old units wherever it finds them.
+expression and the old docker-cleanup log path left Alloy's path list the same day (arc42 §11.1).

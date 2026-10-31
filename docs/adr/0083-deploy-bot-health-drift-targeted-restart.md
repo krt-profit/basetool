@@ -7,9 +7,9 @@
 
 ## Context
 
-`deploy.sh` runs every ~5 minutes from `iri-deploy.timer`. It resolves `:stable` to digests, and
+`deploy.sh` runs every ~5 minutes from `basetool-deploy.timer`. It resolves `:stable` to digests, and
 when the running stack does not match the last-deployed target it treats that as **drift** and
-re-applies via `docker compose up --wait`; if the health gate fails within `IRI_HEALTH_TIMEOUT` it
+re-applies via `docker compose up --wait`; if the health gate fails within `BASETOOL_HEALTH_TIMEOUT` it
 **rolls back** to the previous digest pin and writes `basetool_deploy_last_rollback_timestamp`,
 which trips the `DeployRolledBack` alert.
 
@@ -47,8 +47,8 @@ new **targeted-restart** path instead of the apply/rollback path:
 - It restarts **only** the affected service(s) with `docker compose up -d --no-deps
   --force-recreate --wait <svc>` — no re-pull, no cosign re-verify (the image is already the
   verified, running target), no full-stack recreate, and **no release rollback**.
-- It is bounded by its own short exponential backoff (`IRI_HEALTH_RESTART_BASE=300s`,
-  `IRI_HEALTH_RESTART_MAX=3600s`, state in `/var/lib/iri/health-restart.digests`) so a container
+- It is bounded by its own short exponential backoff (`BASETOOL_HEALTH_RESTART_BASE=300s`,
+  `BASETOOL_HEALTH_RESTART_MAX=3600s`, state in `/var/lib/basetool/deploy/health-restart.digests`) so a container
   that will not recover is not force-recreated every tick.
 - It writes a **distinct** signal to `deploy-health.prom`, never a deploy `rollback`/`failure`:
   `basetool_deploy_last_stack_healthy_timestamp` (a heartbeat stamped on every healthy tick and on a
@@ -216,7 +216,7 @@ retry the release at once.
    throttles the timer, and an operator asking now has chosen to spend the restart window now.
    Deleting the marker is no longer documented as a way to re-apply.
 2. **A failed re-apply — drift or `--reapply` — backs off with the self-heal's durations**
-   (`IRI_HEALTH_RESTART_BASE` 300 s doubling to `IRI_HEALTH_RESTART_MAX` 1 h), from **its own**
+   (`BASETOOL_HEALTH_RESTART_BASE` 300 s doubling to `BASETOOL_HEALTH_RESTART_MAX` 1 h), from **its own**
    record, `reapply-failed.digests`. Still not the heal's record, for the reason given above; and no
    longer `failed.digests`, which keeps the release backoff (600 s doubling to 6 h) for releases only
    and is left untouched by any re-apply.

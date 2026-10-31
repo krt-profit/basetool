@@ -37,7 +37,7 @@ It also had a shape nobody had decided on. A token whose realm roles mapped to n
 was assigned the seeded `GUEST` role, whose authority set is empty — so "we could not resolve this
 account's roles" and "this person is a guest" were the same state, and that state was granted the
 anonymous read surface. The roster sync could produce it by accident: it reads *directly-assigned*
-realm roles, and the realm grants `KRT Member` through the `default-roles-iri` composite, so a
+realm roles, and the realm grants `KRT Member` through the `default-roles-basetool` composite, so a
 member who holds membership only that way came back with nothing.
 
 Three defects found while closing it are the argument for closing it, better than any of the above:

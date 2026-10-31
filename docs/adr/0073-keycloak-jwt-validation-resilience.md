@@ -10,7 +10,7 @@
 The backend is a JWT resource server: it validates every incoming access token against Keycloak's
 JWKS (public signing keys). Spring Boot's auto-configured decoder derives the JWKS URL from
 `spring.security.oauth2.resourceserver.jwt.issuer-uri`, which is the **public** issuer
-(`https://keycloak.profit-base.online/realms/iri`). Internal, service-to-service token validation
+(`https://keycloak.profit-base.online/realms/basetool`). Internal, service-to-service token validation
 therefore **hairpins out through the public edge** (nginx-proxy-manager) and back to Keycloak.
 
 A production incident made the cost concrete. When Keycloak was briefly slow / unreachable (JWKS

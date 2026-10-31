@@ -26,9 +26,8 @@ disaster recovery: [`backup.md`](backup.md). The monitoring plane:
 [ADR-0194](adr/0194-the-weekly-cleanup-is-runtime-aware-and-drops-volume-pruning-on-podman.md) (cleanup),
 [ADR-0196](adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md) (host aliases).
 
-The one-time move of a host from the former account and directory names to this layout, with the
-realm rename: [`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](HOST_LAYOUT_MIGRATION_RUNBOOK.md)
-([ADR-0319](adr/0319-the-host-follows-the-rhel-fhs-layout-and-the-product-carries-no-legacy-name.md)).
+The layout and the realm name are decided in
+[ADR-0319](adr/0319-the-host-follows-the-rhel-fhs-layout-and-the-product-carries-no-legacy-name.md).
 
 > [!danger] For AI agents: reading the production host is free, writing to it is gated
 > Every command below that changes the host — a restart, a file edit, a role run, a deploy — is a

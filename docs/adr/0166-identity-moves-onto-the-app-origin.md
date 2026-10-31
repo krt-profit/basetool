@@ -103,7 +103,7 @@ request, so the heuristic above has no reason to cover it at all.
   states it is ignored once a hostname is configured. It stays so that clearing `KC_HOSTNAME` in
   some future environment cannot silently re-enable header-derived hostnames.
 
-- The issuer becomes `https://<web host>/auth/realms/iri` everywhere it is configured: backend,
+- The issuer becomes `https://<web host>/auth/realms/basetool` everywhere it is configured: backend,
   frontend, ingest, Grafana's OIDC login, the blackbox discovery probes and the Android app.
 
 **The old `keycloak.` host is retired outright — there is no second path.** Owner decision: the
@@ -119,7 +119,7 @@ the same closing `deny all` — the control is unchanged, only its address.
 ## Consequences
 
 **What this fixes.** Every navigation of both flows is now same-origin: `/oauth2/authorization/…` →
-`/auth/realms/iri/protocol/openid-connect/auth` → the login form → `/login/oauth2/code/keycloak`, and
+`/auth/realms/basetool/protocol/openid-connect/auth` → the login form → `/login/oauth2/code/keycloak`, and
 the logout equivalent. All of it is inside `scope: "/"`, so an installed app stays in its own window
 throughout. `REQ-UI-020`'s open question is closed by construction rather than by a device report.
 
@@ -147,8 +147,8 @@ sequence, and the fact that the Android app must ship the matching build, are in
 
 > **Correction (2026-09-25):** *"Every navigation of both flows is now same-origin"* is true of the
 > credential login and the logout, **not of the Discord login.** Brokering through Discord goes
-> `/auth/realms/iri/broker/discord/login` → `discord.com/…/oauth2/authorize` → back to
-> `/auth/realms/iri/broker/discord/endpoint`, and the middle hop leaves the origin by necessity — no
+> `/auth/realms/basetool/broker/discord/login` → `discord.com/…/oauth2/authorize` → back to
+> `/auth/realms/basetool/broker/discord/endpoint`, and the middle hop leaves the origin by necessity — no
 > edge route can put Discord's authorize page on our host. So an installed app on iOS still depends
 > on Apple's OAuth heuristic for that one hop, and Discord itself may finish its authorization in the
 > Discord app or another browser. Whenever the callback lands in a browser context that does not

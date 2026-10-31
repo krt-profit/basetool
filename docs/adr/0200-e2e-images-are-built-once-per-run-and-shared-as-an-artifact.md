@@ -29,7 +29,7 @@ store were evicted before the next run could read them.
 
 - A `build-stack` job builds the two images **once per run** (`docker build` with the Dockerfiles
   and context `docker-compose.build.yml` uses, tagged with the names compose resolves for
-  `IRI_BASETOOL_VERSION=e2e-local`), saves them with `docker save | zstd` and uploads them as a
+  `BASETOOL_VERSION=e2e-local`), saves them with `docker save | zstd` and uploads them as a
   **run-scoped artifact** kept for one day.
 - The matrix job `needs: build-stack`, downloads and `docker load`s the archive, and runs the suite
   with `-Pe2e.prebuilt=true`. `E2eStackExtension` then boots the stack with `up --no-build` and,

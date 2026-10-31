@@ -11,7 +11,7 @@
   [ADR-0088](0088-two-tier-session-idle-timeout.md) (the 720-hour window the half-written hash
   inherits), [ADR-0079](0079-redis-session-store-aof-and-maxmemory-noeviction.md) (the store and its
   AOF settings), REQ-OBS-006 (the bounded tag)
-- **Source:** read-only production log triage, 2026-09-16 — `/var/iri/frontend/log`, and
+- **Source:** read-only production log triage, 2026-09-16 — `/var/log/basetool/frontend`, and
   `docker inspect redis`
 
 ## Context

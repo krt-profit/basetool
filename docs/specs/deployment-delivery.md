@@ -2411,9 +2411,8 @@ there.
 - **Environment-specific values are arguments** (`--public-origin`, `--grafana-origin`). No
   production hostname is written into another realm.
 - **The realm is named `basetool`**, default role `default-roles-basetool`, in every environment.
-  Production is renamed from its former name at the host-layout cutover (ADR-0319, runbook
-  `HOST_LAYOUT_MIGRATION_RUNBOOK.md`) by `scripts/rename-keycloak-realm.py`, which renames the realm, then the default role by id, then the
-  frontend client's labels, verifies the result by reading it back, and does nothing on a second run.
+  Production was renamed from its former name at the host-layout cutover (ADR-0319); no rename tool
+  remains in the repository.
 - **Dry run by default.** `--apply` writes, then re-plans; the apply fails unless the second plan is
   empty. A realm in shape produces no write at all.
 - **Additive.** An object only the target realm has is reported and left alone. The exceptions are

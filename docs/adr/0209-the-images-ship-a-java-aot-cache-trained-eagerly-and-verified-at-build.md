@@ -76,7 +76,7 @@ refuse to start, instead of warning and carrying on.
    with every `JAVA_TOOL_OPTIONS` in the compose files and `quadlet/env.d`; at build time, decision 3;
    at run time, the Loki rule **`JvmStartupCacheRejected`** (warning) fires on the JVM's
    `Unable to use AOT cache` / `Loading static archive failed` lines in the `<svc>-stdout` streams —
-   which is what the ADR-0180 rollback lever `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders`
+   which is what the ADR-0180 rollback lever `BASETOOL_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders`
    produces on purpose. `scripts/check-loki-rule-signatures.py` holds the rule to the verbatim lines.
 5. The garbage collector is **not** part of the invariant: a cache trained under G1 is accepted by
    the ingest's Serial collector (verified), so the training run names no collector.
