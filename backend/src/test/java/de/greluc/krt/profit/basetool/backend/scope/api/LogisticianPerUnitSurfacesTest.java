@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -43,7 +44,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -146,6 +146,13 @@ class LogisticianPerUnitSurfacesTest {
               Optional.of(new UsernamePasswordAuthenticationToken("caller", "n/a", authorities)));
       RequestScopeResolver resolver = mock(RequestScopeResolver.class);
       when(resolver.currentScopePredicate()).thenReturn(caller.scope());
+      UUID pin = caller.scope().activeOrgUnitId();
+      when(resolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(caller.grants());
+      when(resolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
+          .thenReturn(
+              pin == null
+                  ? caller.grants()
+                  : (caller.grants().contains(pin) ? Set.of(pin) : Set.of()));
       when(resolver.canViewJobOrders()).thenReturn(true);
       ownerScopeService =
           new OwnerScopeService(
@@ -252,18 +259,5 @@ class LogisticianPerUnitSurfacesTest {
       assertThat(listScope.activeOrgUnitId()).isNull();
       assertThat(listScope.memberOrgUnitIds()).isEqualTo(caller.reachable());
     }
-  }
-
-  @Test
-  void aGrantOutsideTheScopeIsNotListed() {
-    Caller caller =
-        new Caller(
-            "grant in B, scope A only",
-            false,
-            Set.of(UNIT_B),
-            new ScopePredicate(false, null, Set.of(UNIT_A)),
-            Set.of());
-
-    assertThat(new Chain(caller).ownerScopeService.currentLogisticianOrgUnitIds()).isEmpty();
   }
 }

@@ -543,6 +543,18 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentGrantedOrgUnitIds(String)}: the org units in
+   * which the caller holds the contextual role, cascade included.
+   *
+   * @param roleName the contextual role, e.g. {@code "LOGISTICIAN"}; never {@code null}.
+   * @return the org-unit ids of the caller's grants; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<UUID> currentGrantedOrgUnitIds(@NotNull String roleName) {
+    return requestScopeResolver.currentGrantedOrgUnitIds(roleName);
+  }
+
+  /**
    * Delegates to {@link AccessGateService#permitsOwnedRow}: the scope kernel's per-row gate over a
    * row's per-user owner and owning org unit, for the module access policies (plan §5.4).
    *

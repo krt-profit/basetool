@@ -432,9 +432,21 @@ management branch to `canManageMission` rather than short-circuiting on the bare
 authority. (Unlinked **guest** participants stay openly editable per REQ-SEC-009; this scope gate
 applies only to *user-linked* participants.)
 
+**Logistician and Mission Manager grants cascade down the org tree**, like officer reach: a grant
+(own flag, rank or seat-derived) in a Bereich covers the Bereich and the Staffeln and
+Spezialkommandos below it, a grant in the Organisationsleitung covers every unit, a grant in a Staffel
+or Spezialkommando covers that unit alone. The cascade is resolved once, for direct flags and seats
+alike, by `OrgUnitCascadeService#unitsBelow` behind
+`RequestScopeResolver#currentGrantedOrgUnitIds(role)`; every per-unit gate and list scope reads that
+set (`hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`,
+`canManageMissionsOf`, the supply and purchasing managed units, the exchange's
+`findLogisticianOrgUnitIds`), never the raw contextual authorities. A pin must lie in the covered
+set; a pin outside it covers nothing. Admins are unrestricted. **Enforced by:** `GrantCascadeTest`,
+`OrgUnitCascadeServiceTest`, `LogisticianPerUnitSurfacesTest`.
+
 Mission Manager powers apply **per unit**: a grant in unit A (own flag, an officer rank, or the
-cascaded reach of a Bereich or Organisationsleitung seat) manages A's missions and operations only,
-pinned or not. A mission or operation **without an owning unit** is managed only by a caller with a
+cascaded reach of a Bereich or Organisationsleitung grant) manages A's missions and operations and
+those of the units below A, and nothing else. A mission or operation **without an owning unit** is managed only by a caller with a
 Mission Manager grant in an Organisationsleitung or Bereich unit (or an admin); a squadron Mission
 Manager does not manage it. Creating an operation requires the grant in the unit the operation is
 stamped to. Finance edits and the owner change of an ownerless mission stay admin-only (REQ-SEC-065).
@@ -446,10 +458,10 @@ through `MissionManagerGate`. **Enforced by:** `OwnerScopeServiceTest.MissionMan
 **A Logistician grant is per unit.** A contextual `LOGISTICIAN@unit` authority (own membership flag,
 lead or seat-derived reach) gives reads, lists and actions of **that unit** only; a plain membership
 of another unit never adds Logistician powers there, and grants in A and C give exactly A and C
-(unpinned: their union; pinned: the pinned unit only if it is one of them). The flat
+(unpinned: their union; pinned: the pinned unit only if it lies in them, cascade included). The flat
 `ROLE_LOGISTICIAN` stays a coarse gate and decides nothing on a target by itself. The per-target
-decision is `AccessGateService.canActAsLogisticianIn(unit)` (`hasRoleInOrgUnit` inside the active
-scope; a target without a unit is reserved to admins), the list decision is
+decision is `AccessGateService.canActAsLogisticianIn(unit)` (the Logistician grant set of the active
+context contains the unit; a target without a unit is reserved to admins), the list decision is
 `currentLogisticianScope()`. It governs the Lager rows of other members (allocation, note,
 delivered, stolen, book-out, personal rebook, the stock viewer's `canEdit`), the job-order writes
 and handover reports (the responsible unit, SK-queue orders included), the earmarks, the squadron a

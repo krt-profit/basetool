@@ -436,6 +436,21 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   @Test
+  void flagOnlyBereichLogistician_isMintedForTheBereichAloneAndTheCascadeIsLeftToTheScopeLayer() {
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    OrgUnitMembership flagged = membership(BEREICH_ID, OrgUnitKind.BEREICH);
+    flagged.setLogistician(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(flagged));
+    when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", BEREICH_ID)));
+    assertFalse(
+        authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", DESCENDANT_STAFFEL_ID)));
+  }
+
+  @Test
   void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
