@@ -545,6 +545,155 @@ class StockLevelIntegrationTest {
         tier);
   }
 
+  @Test
+  void theLowOnlyReadListsLowLevelsEmptyFirstAcrossTheUnitsInScope() throws Exception {
+    UUID filled = material();
+    UUID empty = material();
+    UUID sufficient = material();
+    joins(member, otherUnit);
+    stockOf(sufficient, 2.0);
+    stockOf(material, 5.0);
+    createIn(unit, material, 10.0);
+    createIn(unit, sufficient, 2.0);
+    createIn(otherUnit, empty, 4.0);
+    createIn(otherUnit, filled, 8.0);
+    stockOf(filled, 6.0, otherUnit);
+
+    mockMvc
+        .perform(get(PATH).param("lowOnly", "true").with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(3))
+        .andExpect(jsonPath("$[0].material.id").value(empty.toString()))
+        .andExpect(jsonPath("$[0].fillRatio").value(0.0))
+        .andExpect(jsonPath("$[0].orgUnit.id").value(otherUnit.toString()))
+        .andExpect(jsonPath("$[1].material.id").value(material.toString()))
+        .andExpect(jsonPath("$[1].fillRatio").value(0.5))
+        .andExpect(jsonPath("$[1].orgUnit.id").value(unit.toString()))
+        .andExpect(jsonPath("$[2].material.id").value(filled.toString()))
+        .andExpect(jsonPath("$[2].fillRatio").value(0.75));
+    mockMvc
+        .perform(
+            get(PATH)
+                .param("lowOnly", "true")
+                .param("limit", "2")
+                .param("orgUnitId", otherUnit.toString())
+                .with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[0].material.id").value(empty.toString()));
+  }
+
+  @Test
+  void aLogisticianInOneUnitAndMemberOfAnotherMaintainsOnlyTheFirstInTheLowOnlyRead()
+      throws Exception {
+    joins(logistician, otherUnit);
+    UUID other = material();
+    createIn(unit, material, 4.0);
+    createIn(otherUnit, other, 4.0);
+
+    mockMvc
+        .perform(get(PATH).param("lowOnly", "true").with(logisticianOf(logistician, unit)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[?(@.orgUnit.id == '" + unit + "')].editable").value(true))
+        .andExpect(jsonPath("$[?(@.orgUnit.id == '" + otherUnit + "')].editable").value(false));
+    mockMvc
+        .perform(
+            delete(PATH + "/" + createdIdIn(otherUnit, other))
+                .param("version", "0")
+                .with(logisticianOf(logistician, unit)))
+        .andExpect(status().isForbidden());
+  }
+
+  private @NotNull UUID createdIdIn(@NotNull UUID orgUnit, @NotNull UUID materialId) {
+    return jdbc.queryForObject(
+        "SELECT id FROM inventory_stock_level WHERE org_unit_id = ? AND material_id = ?",
+        UUID.class,
+        orgUnit,
+        materialId);
+  }
+
+  @Test
+  void theLowOnlyReadAllocatesOverEveryLevelBeforeItFilters() throws Exception {
+    stock(member, 700, 6.0, false, false);
+    createIn(unit, material, GOOD_TIER, 6.0);
+    createIn(unit, material, null, 3.0);
+
+    mockMvc
+        .perform(get(PATH).param("lowOnly", "true").with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].qualityTier").doesNotExist())
+        .andExpect(jsonPath("$[0].allocated").value(0.0));
+  }
+
+  @Test
+  void aLimitBelowOneIsRefused() throws Exception {
+    mockMvc
+        .perform(get(PATH).param("lowOnly", "true").param("limit", "0").with(memberOf(member)))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void theAggregatedLagerMarksAMaterialWhileOneOfItsLevelsIsLow() throws Exception {
+    stock(member, 500, 5.0, false, false);
+    UUID id = createdId(null, 10.0, null);
+
+    mockMvc
+        .perform(get("/api/v1/inventory/aggregated").with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.content[?(@.material.id == '" + material + "')].lowStock").value(true));
+    mockMvc
+        .perform(get("/api/v1/inventory/all/grouped").with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.material.id == '" + material + "')].lowStock").value(true));
+
+    update(logistician, id, new StockLevelUpdateRequest(null, 5.0, null, 0L))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/inventory/all/grouped").with(memberOf(member)))
+        .andExpect(jsonPath("$[?(@.material.id == '" + material + "')].lowStock").value(false));
+  }
+
+  private void createIn(@NotNull UUID orgUnit, @NotNull UUID materialId, double minimum)
+      throws Exception {
+    createIn(orgUnit, materialId, null, minimum);
+  }
+
+  private void createIn(
+      @NotNull UUID orgUnit, @NotNull UUID materialId, @Nullable UUID tier, double minimum)
+      throws Exception {
+    mockMvc
+        .perform(
+            post(PATH)
+                .with(logisticianOf(logistician, orgUnit))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        new StockLevelCreateRequest(orgUnit, materialId, tier, minimum, null))))
+        .andExpect(status().isCreated());
+  }
+
+  private void stockOf(@NotNull UUID materialId, double amount) {
+    stockOf(materialId, amount, unit);
+  }
+
+  private void stockOf(@NotNull UUID materialId, double amount, @NotNull UUID owningUnit) {
+    jdbc.update(
+        """
+        INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,
+                                    personal, stolen, owning_org_unit_id, version)
+        VALUES (?, ?, ?, ?, 500, ?, false, false, ?, 0)
+        """,
+        UUID.randomUUID(),
+        member,
+        materialId,
+        location,
+        amount,
+        owningUnit);
+  }
+
   private ResultActions create(
       @NotNull UUID caller, @Nullable UUID tier, double minimum, @Nullable Double target)
       throws Exception {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,10 +37,14 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyStateDto;
+import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
+import de.greluc.krt.profit.basetool.frontend.supply.web.SupplyFeatureState;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -85,12 +90,27 @@ class StockLevelTabRenderTest {
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
+  @Autowired private SupplyFeatureState supplyFeatureState;
+
+  private boolean supplyOn;
+  private List<SupplyUnitDto> supplyUnits = List.of();
+
+  @BeforeEach
+  void resetSupply() {
+    supplyOn = false;
+    supplyUnits = List.of();
+    supplyFeatureState.evict();
+  }
+
   private @NotNull String render(
       @NotNull List<StockLevelDto> levels, @NotNull List<OrgUnitReferenceDto> units, String query)
       throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
     when(backendApiClient.get(eq(LEVELS), anyTypeRef())).thenReturn(levels);
     when(backendApiClient.get(eq(UNITS), anyTypeRef())).thenReturn(units);
+    when(backendApiClient.get(eq("/api/v1/supply/state"), anyClass()))
+        .thenReturn(new SupplyStateDto(supplyOn));
+    when(backendApiClient.get(eq("/api/v1/supply/units"), anyTypeRef())).thenReturn(supplyUnits);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(List.of());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
@@ -204,5 +224,114 @@ class StockLevelTabRenderTest {
         .contains("data-testid=\"empty-state\"")
         .doesNotContain("<html")
         .doesNotContain("stock-levels.js");
+  }
+
+  private static @NotNull SupplyUnitDto supplyUnit(boolean mayRaiseNeeds, boolean canManage) {
+    return new SupplyUnitDto(
+        ARGON.id(), ARGON.name(), "ARG", "SPECIAL_COMMAND", mayRaiseNeeds, false, canManage, 0L);
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void aLowRowOffersTheOrderShortcutPrefilledWithTheShortfall() throws Exception {
+    StockLevelDto low = level("Quantanium", INACTIVE_TIER, 6.0, true, true);
+
+    String html = render(List.of(low), List.of(ARGON), "");
+
+    assertThat(html)
+        .contains("data-testid=\"stock-level-order\"")
+        .contains("/orders/create?materialId=" + low.material().id())
+        .contains("minQuality=500")
+        .contains("amount=14.0")
+        .contains("requestingOrgUnitId=" + ARGON.id())
+        .doesNotContain("data-testid=\"stock-level-need\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void theNeedShortcutNeedsSupplyOnAndAUnitThatMayRaiseNeeds() throws Exception {
+    StockLevelDto low = level("Quantanium", INACTIVE_TIER, 6.0, true, true);
+    supplyOn = true;
+    supplyUnits = List.of(supplyUnit(true, true));
+
+    String html = render(List.of(low), List.of(ARGON), "");
+
+    assertThat(html)
+        .contains("data-testid=\"stock-level-need\"")
+        .contains("/supply/needs?needUnit=" + ARGON.id())
+        .contains("needMaterial=" + low.material().id())
+        .contains("needTier=" + INACTIVE_TIER.id())
+        .contains("needAmount=14.0");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void theNeedShortcutIsHiddenWhileSupplyIsOffOrTheUnitMayNotRaiseNeeds() throws Exception {
+    StockLevelDto low = level("Quantanium", INACTIVE_TIER, 6.0, true, true);
+    supplyUnits = List.of(supplyUnit(true, true));
+    assertThat(render(List.of(low), List.of(ARGON), ""))
+        .contains("data-testid=\"stock-level-order\"")
+        .doesNotContain("data-testid=\"stock-level-need\"");
+
+    supplyFeatureState.evict();
+    supplyOn = true;
+    supplyUnits = List.of(supplyUnit(false, true));
+    assertThat(render(List.of(low), List.of(ARGON), ""))
+        .doesNotContain("data-testid=\"stock-level-need\"");
+
+    supplyFeatureState.evict();
+    supplyUnits = List.of(supplyUnit(true, false));
+    assertThat(render(List.of(low), List.of(ARGON), ""))
+        .doesNotContain("data-testid=\"stock-level-need\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void aRowThatIsNotLowOrNotEditableOffersNoShortcut() throws Exception {
+    supplyOn = true;
+    supplyUnits = List.of(supplyUnit(true, true));
+
+    String html =
+        render(
+            List.of(
+                level("Laranite", null, 12.0, false, true),
+                level("Quantanium", INACTIVE_TIER, 6.0, true, false)),
+            List.of(ARGON),
+            "");
+
+    assertThat(html)
+        .doesNotContain("data-testid=\"stock-level-order\"")
+        .doesNotContain("data-testid=\"stock-level-need\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void aLogisticianOfOneUnitGetsShortcutsOnlyOnThatUnitsLowRows() throws Exception {
+    OrgUnitReferenceDto bravo =
+        new OrgUnitReferenceDto(
+            UUID.fromString("00000000-0000-0000-0000-0000000000b2"), "Staffel B", "B", "SQUADRON");
+    StockLevelDto own = level("Quantanium", null, 6.0, true, true);
+    StockLevelDto foreign =
+        new StockLevelDto(
+            UUID.randomUUID(),
+            1L,
+            bravo,
+            new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU"),
+            null,
+            10.0,
+            20.0,
+            2.0,
+            18.0,
+            0.2,
+            true,
+            false);
+    supplyOn = true;
+    supplyUnits = List.of(supplyUnit(true, true));
+
+    String html = render(List.of(own, foreign), List.of(ARGON), "");
+
+    assertThat(html).contains("requestingOrgUnitId=" + ARGON.id());
+    assertThat(html).doesNotContain("requestingOrgUnitId=" + bravo.id());
+    assertThat(html).doesNotContain("needUnit=" + bravo.id());
   }
 }

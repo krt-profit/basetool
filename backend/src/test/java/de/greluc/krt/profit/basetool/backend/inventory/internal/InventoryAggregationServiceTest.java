@@ -88,6 +88,7 @@ class InventoryAggregationServiceTest {
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private InventoryItemViewRepository inventoryItemViewRepository;
+  @Mock private StockLevelService stockLevelService;
 
   @InjectMocks private InventoryAggregationService service;
 

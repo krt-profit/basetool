@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -408,15 +409,18 @@ public class JobOrderPageController {
    * catalogs and both owner-pickers (ADR-0149).
    *
    * @param source optional origin marker for the post-save redirect
+   * @param prefill optional material line and requesting unit to start the form with
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
   @NotNull
   @GetMapping("/create")
-  public String viewCreateForm(@RequestParam(required = false) String source, Model model) {
+  public String viewCreateForm(
+      @RequestParam(required = false) String source, JobOrderPrefill prefill, Model model) {
     if (!model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = new JobOrderForm();
       form.setSource(source);
+      prefill.applyTo(form);
       model.addAttribute("jobOrderForm", form);
     } else {
       JobOrderForm form = (JobOrderForm) model.getAttribute("jobOrderForm");

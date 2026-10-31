@@ -28,11 +28,16 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
+import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
+import de.greluc.krt.profit.basetool.frontend.supply.web.SupplyFeatureState;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -63,6 +68,8 @@ public class StockLevelPageController {
   private final StockLevelBackendClient stockLevelClient;
   private final InventoryBackendClient inventoryClient;
   private final QualityTierCatalog qualityTierCatalog;
+  private final SupplyBackendClient supplyClient;
+  private final SupplyFeatureState supplyFeatureState;
 
   /**
    * The levels of one unit, in the order the backend lists them.
@@ -88,6 +95,7 @@ public class StockLevelPageController {
         SectionFallback.load(log, "stock-levels", stockLevelClient::levels, null);
     model.addAttribute("stockLevelsFailed", levels == null);
     model.addAttribute("unitLevels", byUnit(levels == null ? List.of() : levels));
+    model.addAttribute("needRaisingUnitIds", needRaisingUnitIds());
     if (RESULTS_FRAGMENT.equalsIgnoreCase(fragment)) {
       return "inventory/stock-levels :: stockLevelResults";
     }
@@ -101,6 +109,24 @@ public class StockLevelPageController {
       model.addAttribute("tiers", activeTiers());
     }
     return "inventory/stock-levels";
+  }
+
+  /**
+   * The units for which the „Bedarf anlegen" shortcut is offered: none while the supply surface is
+   * off, otherwise the units the caller manages that may raise needs (REQ-INV-068).
+   */
+  private @NotNull Set<UUID> needRaisingUnitIds() {
+    if (!supplyFeatureState.enabled()) {
+      return Set.of();
+    }
+    List<SupplyUnitDto> units =
+        SectionFallback.load(log, "stock-level-supply-units", supplyClient::units, List.of());
+    return units == null
+        ? Set.of()
+        : units.stream()
+            .filter(unit -> unit.canManage() && unit.mayRaiseNeeds())
+            .map(SupplyUnitDto::orgUnitId)
+            .collect(Collectors.toUnmodifiableSet());
   }
 
   private @NotNull List<QualityTierDto> activeTiers() {

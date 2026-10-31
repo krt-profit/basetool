@@ -1773,18 +1773,19 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 
 ### REQ-INV-068 — Minimum stock levels: maintenance, API, the „Mindestbestände" tab and the widget
 
-> Maintenance of material and game-item levels, the API without `lowOnly` / `limit`, the tab, the
-> audit events, the live update and the lifecycle are built. Still planned (ADR-0302): the low-only
-> read and its order, the „niedrig" badge and the shortcuts (#2853), the widget and the notice
-> (#2854).
+> Maintenance of material and game-item levels, the API with `lowOnly` / `limit`, the tab, the „niedrig" badge,
+> the shortcuts, the audit events, the live update and the lifecycle are built. Still planned
+> (ADR-0302): the widget and the notice (#2854).
 
 - **Who maintains.** A Logistician of the unit, the lead included (`hasRoleInOrgUnit(unit,
   LOGISTICIAN)`, an admin passes); any other write answers `403`. **Who sees:** everyone who can see
   the unit's pool, through the Lager's `ScopePredicate`. Levels of an inactive unit are not shown.
 - **API.** `GET /api/v1/inventory/stock-levels?orgUnitId=&lowOnly=&limit=` returns the levels in the
   caller's scope with the figures of REQ-INV-067, sorted by fill ratio, empty levels first; without
-  `orgUnitId` it spans every unit in scope and names each level's unit. Until the low-only read
-  ships, it lists by unit, material and tier floor descending. `GET /stock-levels/units` lists the
+  `orgUnitId` it spans every unit in scope and names each level's unit. `lowOnly=true` keeps only
+  the low levels, after the allocation has run over every level of a material, and `limit` (at
+  least 1) caps the list; without `lowOnly` the list is by unit, material and tier floor
+  descending. `GET /stock-levels/units` lists the
   active units in scope whose levels the caller maintains. `POST` creates a level;
   `PUT /{id}` changes minimum, target and tier; `DELETE /{id}?version=` removes it. The unit and the
   catalogue entry of a level are fixed. A second level for the same unit and material-and-tier
@@ -1796,13 +1797,16 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   levels", REQ-UI-026); the page has only these two tabs, and „Mein Lager" / „Globales Lager" are a
   switch inside the „Lager" tab. The tab shows one list per unit: material or item, tier, minimum,
   target, free, requested, fill ratio and status. Logisticians edit inline through `krtFetch`
-  without a reload (REQ-FE-001). The aggregated Lager view marks a material with a „niedrig" badge
-  while one of its levels is low.
-- **Shortcuts.** For a Logistician a low row offers „Bedarf anlegen" and „Auftrag anlegen", both
-  prefilled with the material or item, the tier and the shortfall. „Auftrag anlegen" opens the
-  normal job-order form with the unit as requesting unit; the responsible unit is chosen as usual.
-  „Bedarf anlegen" appears only while the supply surface is on and the unit `may_raise_needs`
-  (REQ-SUP-001, REQ-SUP-002).
+  without a reload (REQ-FE-001). The aggregated Lager (`GET /inventory/aggregated` and
+  `GET /inventory/all/grouped`) marks a material with a „niedrig" badge (`lowStock`) while one of
+  its levels is low in the caller's scope.
+- **Shortcuts.** For a Logistician of the unit a low row offers „Bedarf anlegen" and „Auftrag
+  anlegen", both prefilled with the material or item, the tier and the shortfall. „Auftrag anlegen"
+  opens the normal job-order form (`/orders/create?materialId=&minQuality=&amount=&requestingOrgUnitId=`)
+  with the unit as requesting unit; the responsible unit is chosen as usual. „Bedarf anlegen"
+  appears only while the supply surface is on and the unit `may_raise_needs` (REQ-SUP-001,
+  REQ-SUP-002); it opens the need form on `/supply/needs`
+  (`?needUnit=&needMaterial=&needTier=&needAmount=`) prefilled.
 - **Widget „Bestand niedrig"** (REQ-UI-034). Option „Einheit": follows the active context by default
   and shows the union, each row labelled with its unit, when nothing is pinned; it can be fixed to
   one unit. A row-count option; sorted by fill ratio, empty levels first; „alle anzeigen" opens the
@@ -1837,8 +1841,13 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   *`StockLevelIntegrationTest`.*
 - [x] The tab edits without a reload and a peer's level write appears without a reload.
   *`StockLevelTabRenderTest`, `LiveSyncSectionMapParityTest`.*
-- [ ] „Bedarf anlegen" is hidden while supply is off or the unit may not raise needs; both shortcuts
-  prefill the shortfall.
+- [x] „Bedarf anlegen" is hidden while supply is off or the unit may not raise needs; both shortcuts
+  prefill the shortfall. *`StockLevelTabRenderTest`, `JobOrderPrefillTest`,
+  `JobOrderPageControllerCreateFormAuthMvcTest`.*
+- [x] `lowOnly` lists the low levels of every unit in scope, emptiest first, capped by `limit`, and
+  the aggregated Lager marks a material while one of its levels is low.
+  *`StockLevelIntegrationTest`, `InventoryIndexListPatternRenderTest`,
+  `InventoryLowStockMarkerRenderTest`.*
 - [ ] The widget follows the active context, shows the union with unit labels when nothing is
   pinned, and honours a pinned unit and the row count.
 
