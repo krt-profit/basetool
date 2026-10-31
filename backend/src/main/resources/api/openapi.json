@@ -15975,7 +15975,7 @@
     },
     "/api/v1/game-items" : {
       "get" : {
-        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
+        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
         "operationId" : "getGameItems",
         "parameters" : [ {
           "in" : "query",

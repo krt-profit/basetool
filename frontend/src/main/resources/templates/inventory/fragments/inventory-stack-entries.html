@@ -460,7 +460,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
                                       role="button" tabindex="0"
@@ -508,7 +508,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -529,7 +529,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission"
                                       role="button" tabindex="0"
@@ -577,7 +577,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission">
                                     <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
@@ -683,7 +683,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              data-piece="true">
-                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
                                       role="button" tabindex="0"
@@ -731,7 +731,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·

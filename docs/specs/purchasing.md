@@ -195,7 +195,8 @@ update that leaves its version alone.
 
 ### REQ-PUR-019 — Pause
 
-The raising unit's lead, the governing leadership and an admin pause and resume purchasing for the whole
+The raising unit's lead (officer reach in that unit, REQ-SEC-015, or its SK lead), the governing
+leadership and an admin pause and resume purchasing for the whole
 organisation or for one raising unit with a reason code. While paused no tranche is requested (so no
 deal is submitted); deliveries, acceptance and settlement go on. A pause is audited and noticed (N6).
 
