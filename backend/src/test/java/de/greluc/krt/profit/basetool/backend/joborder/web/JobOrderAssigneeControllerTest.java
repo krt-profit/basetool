@@ -89,6 +89,7 @@ class JobOrderAssigneeControllerTest {
         Instant.parse("2026-01-01T00:00:00Z"),
         1L,
         null,
+        null,
         false);
   }
 
@@ -104,18 +105,18 @@ class JobOrderAssigneeControllerTest {
   }
 
   @Test
-  void addAssignee_self_doesNotConsultRoleHelper() {
+  void addAssignee_self_isAllowedWithoutTheManageRight() {
     Jwt jwt = jwt("alice-sub");
     UUID callerId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
     JobOrderDto persisted = jobOrderDto(jobOrderId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(jobOrderAccessPolicy.canManageAssignees(jobOrderId)).thenReturn(false);
     when(jobOrderService.addAssignee(jobOrderId, callerId)).thenReturn(persisted);
 
     JobOrderDto result = controller.addAssignee(jobOrderId, callerId, jwt);
 
-    assertThat(result).isSameAs(persisted);
-    verify(jobOrderAccessPolicy, never()).canManageAssignees(any());
+    assertThat(result).isEqualTo(persisted.withCanManageAssignees(false));
   }
 
   @Test
@@ -131,7 +132,7 @@ class JobOrderAssigneeControllerTest {
 
     JobOrderDto result = controller.addAssignee(jobOrderId, targetUserId, jwt);
 
-    assertThat(result).isSameAs(persisted);
+    assertThat(result).isEqualTo(persisted.withCanManageAssignees(true));
   }
 
   @Test
@@ -149,18 +150,18 @@ class JobOrderAssigneeControllerTest {
   }
 
   @Test
-  void removeAssignee_self_doesNotConsultRoleHelper() {
+  void removeAssignee_self_isAllowedWithoutTheManageRight() {
     Jwt jwt = jwt("alice-sub");
     UUID callerId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
     JobOrderDto persisted = jobOrderDto(jobOrderId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(jobOrderAccessPolicy.canManageAssignees(jobOrderId)).thenReturn(false);
     when(jobOrderService.removeAssignee(jobOrderId, callerId)).thenReturn(persisted);
 
     JobOrderDto result = controller.removeAssignee(jobOrderId, callerId, jwt);
 
-    assertThat(result).isSameAs(persisted);
-    verify(jobOrderAccessPolicy, never()).canManageAssignees(any());
+    assertThat(result).isEqualTo(persisted.withCanManageAssignees(false));
   }
 
   @Test
@@ -176,7 +177,7 @@ class JobOrderAssigneeControllerTest {
 
     JobOrderDto result = controller.removeAssignee(jobOrderId, targetUserId, jwt);
 
-    assertThat(result).isSameAs(persisted);
+    assertThat(result).isEqualTo(persisted.withCanManageAssignees(true));
   }
 
   @Test
@@ -194,7 +195,7 @@ class JobOrderAssigneeControllerTest {
   }
 
   @Test
-  void setAssigneeNote_self_doesNotConsultRoleHelper() {
+  void setAssigneeNote_self_isAllowedWithoutTheManageRight() {
     Jwt jwt = jwt("alice-sub");
     UUID callerId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
@@ -202,13 +203,13 @@ class JobOrderAssigneeControllerTest {
     JobOrderAssigneeController.AssigneeNoteRequest body =
         new JobOrderAssigneeController.AssigneeNoteRequest("works Friday", 2L);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(jobOrderAccessPolicy.canManageAssignees(jobOrderId)).thenReturn(false);
     when(jobOrderService.updateAssigneeNote(jobOrderId, callerId, "works Friday", 2L))
         .thenReturn(persisted);
 
     JobOrderDto result = controller.setAssigneeNote(jobOrderId, callerId, body, jwt);
 
-    assertThat(result).isSameAs(persisted);
-    verify(jobOrderAccessPolicy, never()).canManageAssignees(any());
+    assertThat(result).isEqualTo(persisted.withCanManageAssignees(false));
   }
 
   @Test
@@ -227,7 +228,7 @@ class JobOrderAssigneeControllerTest {
 
     JobOrderDto result = controller.setAssigneeNote(jobOrderId, targetUserId, body, jwt);
 
-    assertThat(result).isSameAs(persisted);
+    assertThat(result).isEqualTo(persisted.withCanManageAssignees(true));
   }
 
   @Test

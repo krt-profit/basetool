@@ -127,6 +127,7 @@ class JobOrderControllerTest {
         Instant.parse("2026-01-01T00:00:00Z"),
         1L,
         null,
+        null,
         false);
   }
 
@@ -270,10 +271,12 @@ class JobOrderControllerTest {
     UUID id = UUID.randomUUID();
     JobOrderDto dto = jobOrderDto(id);
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(dto);
+    when(jobOrderAccessPolicy.canManageAssignees(id)).thenReturn(true);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
-    assertThat(result.withAssignees(dto.assignees())).isEqualTo(dto);
+    assertThat(result.canManageAssignees()).isTrue();
+    assertThat(result.withAssignees(dto.assignees()).withCanManageAssignees(null)).isEqualTo(dto);
     if (dto.assignees() != null) {
       for (int i = 0; i < dto.assignees().size(); i++) {
         de.greluc.krt.profit.basetool.backend.identity.api.UserDto shaped =
@@ -325,6 +328,7 @@ class JobOrderControllerTest {
             java.util.Collections.singletonList(null),
             Instant.parse("2026-01-01T00:00:00Z"),
             9L,
+            null,
             null,
             true);
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(full);

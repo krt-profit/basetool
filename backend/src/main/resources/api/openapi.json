@@ -83790,6 +83790,9 @@
           "canEdit" : {
             "type" : "boolean"
           },
+          "canManageAssignees" : {
+            "type" : "boolean"
+          },
           "comment" : {
             "type" : "string"
           },

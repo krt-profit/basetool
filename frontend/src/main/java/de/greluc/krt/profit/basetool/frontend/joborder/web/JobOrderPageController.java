@@ -328,6 +328,7 @@ public class JobOrderPageController {
 
     boolean canAssign = detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
+    model.addAttribute("canManageAssignees", !requesterView && order.callerMayManageAssignees());
     if (requesterView || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }

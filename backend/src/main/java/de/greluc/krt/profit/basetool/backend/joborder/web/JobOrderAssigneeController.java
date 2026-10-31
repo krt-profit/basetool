@@ -81,7 +81,7 @@ public class JobOrderAssigneeController {
   public JobOrderDto addAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, id, userId);
-    return jobOrderService.addAssignee(id, userId);
+    return withManageFlag(id, jobOrderService.addAssignee(id, userId));
   }
 
   /**
@@ -120,7 +120,7 @@ public class JobOrderAssigneeController {
   public JobOrderDto removeAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, id, userId);
-    return jobOrderService.removeAssignee(id, userId);
+    return withManageFlag(id, jobOrderService.removeAssignee(id, userId));
   }
 
   /**
@@ -144,7 +144,8 @@ public class JobOrderAssigneeController {
       @RequestBody @Valid AssigneeNoteRequest body,
       @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, id, userId);
-    return jobOrderService.updateAssigneeNote(id, userId, body.note(), body.version());
+    return withManageFlag(
+        id, jobOrderService.updateAssigneeNote(id, userId, body.note(), body.version()));
   }
 
   /**
@@ -169,7 +170,7 @@ public class JobOrderAssigneeController {
       @RequestParam(required = false) Long version,
       @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, id, userId);
-    return jobOrderService.deleteAssigneeNote(id, userId, version);
+    return withManageFlag(id, jobOrderService.deleteAssigneeNote(id, userId, version));
   }
 
   /**
@@ -187,6 +188,18 @@ public class JobOrderAssigneeController {
         && !jobOrderAccessPolicy.canManageAssignees(jobOrderId)) {
       throw new AccessDeniedException("Not allowed to modify other users' assignments");
     }
+  }
+
+  /**
+   * Stamps the caller's assignee-management flag on a mutated order, so the re-rendered assignee
+   * section offers exactly the controls the caller may use.
+   *
+   * @param jobOrderId the order
+   * @param dto the mutated order
+   * @return the order with {@code canManageAssignees} resolved
+   */
+  private JobOrderDto withManageFlag(UUID jobOrderId, JobOrderDto dto) {
+    return dto.withCanManageAssignees(jobOrderAccessPolicy.canManageAssignees(jobOrderId));
   }
 
   /**

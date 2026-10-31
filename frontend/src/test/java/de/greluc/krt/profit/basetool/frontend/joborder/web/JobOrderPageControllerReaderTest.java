@@ -84,6 +84,7 @@ class JobOrderPageControllerReaderTest {
         Instant.now(),
         1L,
         null,
+        null,
         redacted);
   }
 

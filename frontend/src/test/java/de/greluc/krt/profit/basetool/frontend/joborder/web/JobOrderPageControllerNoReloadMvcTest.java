@@ -105,6 +105,15 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   private static JobOrderDto materialOrder(
       UUID id, long version, List<JobOrderAssigneeDto> assignees) {
+    return materialOrder(id, version, assignees, null, null);
+  }
+
+  private static JobOrderDto materialOrder(
+      UUID id,
+      long version,
+      List<JobOrderAssigneeDto> assignees,
+      Boolean canEdit,
+      Boolean canManageAssignees) {
     return new JobOrderDto(
         id,
         7,
@@ -124,7 +133,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         List.of(),
         Instant.now(),
         version,
-        null,
+        canEdit,
+        canManageAssignees,
         false);
   }
 
@@ -730,6 +740,65 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
     assertThat(html)
         .as("another entry offers no control")
         .doesNotContain("data-user-id=\"" + otherId + "\"");
+  }
+
+  @Test
+  void viewOrderDetail_LogisticianOfAnotherUnit_GetsNoPickerAndNoControlOnOtherEntries()
+      throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID otherId = UUID.randomUUID();
+    JobOrderDto order =
+        materialOrder(
+            orderId,
+            1L,
+            List.of(assignee(userId, "Self"), assignee(otherId, "Other")),
+            true,
+            false);
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(JobOrderPageStubs.detail(order).currentUserId(userId).build());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "assignees")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).doesNotContain("od-assignee-add");
+    assertThat(html)
+        .containsPattern("data-trigger=\"oa-remove-assignee\"\\s+data-user-id=\"" + userId);
+    assertThat(html).doesNotContain("data-user-id=\"" + otherId + "\"");
+  }
+
+  @Test
+  void viewOrderDetail_LogisticianOfTheOrdersUnit_GetsThePickerAndControlsOnEveryEntry()
+      throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID otherId = UUID.randomUUID();
+    JobOrderDto order = materialOrder(orderId, 1L, List.of(assignee(otherId, "Other")), true, true);
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(JobOrderPageStubs.detail(order).currentUserId(userId).build());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "assignees")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("od-assignee-add").contains("assignee-candidates");
+    assertThat(html)
+        .containsPattern("data-trigger=\"oa-remove-assignee\"\\s+data-user-id=\"" + otherId);
   }
 
   private static JobOrderAssigneeDto assignee(UUID id, String name) {

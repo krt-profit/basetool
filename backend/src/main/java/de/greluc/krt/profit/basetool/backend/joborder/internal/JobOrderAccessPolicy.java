@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -185,23 +186,35 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
 
   /**
    * Checks whether the caller may add, remove or annotate other users' assignee entries of job
-   * order {@code jobOrderId}: a Logistician of the order, i.e. a Logistician-or-above within its
-   * edit scope (REQ-ORDERS-014), the same rule as the order's {@code canEdit} row flag. The
-   * assignee grant alone never qualifies (REQ-ORDERS-047).
+   * order {@code jobOrderId}: a Logistician of the order's processing unit (the contextual
+   * Logistician grant of that unit, admins always) within its edit scope (REQ-ORDERS-014). A
+   * Logistician grant in another unit never qualifies, nor does the assignee grant
+   * (REQ-ORDERS-047).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may manage the order's assignees
    */
   public boolean canManageAssignees(@NotNull UUID jobOrderId) {
-    return isLogisticianOfOrder(jobOrderId);
+    return jobOrderRepository.findById(jobOrderId).map(this::canManageAssignees).orElse(false);
+  }
+
+  /**
+   * Entity overload of {@link #canManageAssignees(UUID)} for callers that already hold the order.
+   *
+   * @param order the order to inspect; never {@code null}
+   * @return {@code true} iff the caller may manage the order's assignees
+   */
+  public boolean canManageAssignees(@NotNull JobOrder order) {
+    OrgUnit responsible = order.getResponsibleOrgUnit();
+    return authHelper.isLogisticianOrAbove()
+        && canEditJobOrderRow(order)
+        && (responsible == null
+            ? authHelper.isAdmin()
+            : ownerScopeService.hasRoleInOrgUnit(responsible.getId(), Roles.LOGISTICIAN));
   }
 
   @Override
   public boolean mayEditJobOrderEarmarks(@NotNull UUID jobOrderId) {
-    return isLogisticianOfOrder(jobOrderId);
-  }
-
-  private boolean isLogisticianOfOrder(@NotNull UUID jobOrderId) {
     return authHelper.isLogisticianOrAbove() && canEditJobOrder(jobOrderId);
   }
 

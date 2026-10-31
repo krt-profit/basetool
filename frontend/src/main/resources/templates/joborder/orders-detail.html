@@ -533,7 +533,7 @@
                         data-trigger="oa-add-me" th:data-user-id="${currentUserId}"
                         th:text="#{orders.detail.assignees.addMe}">Mich eintragen</button>
 
-                <div th:if="${isLogistician}" class="cluster gap-2 od-assignee-add">
+                <div th:if="${canManageAssignees}" class="cluster gap-2 od-assignee-add">
                     <select class="od-assignee-select" id="assignee-add-select" data-krt-combobox="remote-user-candidates" th:data-combobox-source-url="@{/orders/{id}/assignee-candidates(id=${order.id})}" th:aria-label="#{orders.detail.assignees.addUser}">
                         <option value="" disabled selected th:text="#{orders.detail.assignees.selectUser}">-- Nutzer wählen --</option>
                     </select>
@@ -544,7 +544,7 @@
             <th:block th:if="${order.assignees == null or order.assignees.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.assignees.empty.title', textKey='orders.detail.assignees.empty')}"></th:block></th:block>
             <ul class="od-assignee-list" th:unless="${order.assignees == null or order.assignees.isEmpty()}">
                 <li class="od-assignee" th:each="assignee : ${order.assignees}"
-                    th:with="canEdit=${(currentUserId != null and assignee.user != null and currentUserId.equals(assignee.user.id)) or isLogistician}">
+                    th:with="canEdit=${(currentUserId != null and assignee.user != null and currentUserId.equals(assignee.user.id)) or canManageAssignees}">
                     <div class="split od-assignee__head">
                         <span class="od-assignee__name" th:text="${assignee.user.effectiveName}">Name</span>
                         <div class="cluster gap-1">

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -152,11 +153,25 @@ class JobOrderAccessPolicyTest {
   }
 
   @Test
-  void canManageAssignees_aLogisticianInTheEditScopeMayManage() {
+  void canManageAssignees_aLogisticianOfTheOrdersUnitMayManage() {
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(ownerScopeService.canEditSquadron(foreignUnitId)).thenReturn(true);
+    when(ownerScopeService.hasRoleInOrgUnit(foreignUnitId, Roles.LOGISTICIAN)).thenReturn(true);
 
     assertThat(policy.canManageAssignees(order.getId())).isTrue();
+  }
+
+  @Test
+  void canManageAssignees_aLogisticianOfAnotherUnitWhoIsAMemberOfTheOrdersUnitMayNot() {
+    UUID unitA = UUID.randomUUID();
+    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(ownerScopeService.canSeeSquadron(foreignUnitId)).thenReturn(true);
+    when(ownerScopeService.canEditSquadron(foreignUnitId)).thenReturn(true);
+    when(ownerScopeService.hasRoleInOrgUnit(unitA, Roles.LOGISTICIAN)).thenReturn(true);
+    when(ownerScopeService.hasRoleInOrgUnit(foreignUnitId, Roles.LOGISTICIAN)).thenReturn(false);
+
+    assertThat(policy.canSeeJobOrder(order.getId())).isTrue();
+    assertThat(policy.canManageAssignees(order.getId())).isFalse();
   }
 
   @Test

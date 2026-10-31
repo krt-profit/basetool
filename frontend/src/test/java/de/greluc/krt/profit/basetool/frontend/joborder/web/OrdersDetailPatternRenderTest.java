@@ -300,6 +300,7 @@ class OrdersDetailPatternRenderTest {
         Instant.now(),
         1L,
         !redacted,
+        null,
         redacted);
   }
 

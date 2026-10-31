@@ -46,9 +46,10 @@ the `JobOrderService` facade), `JobOrderAssigneeController.setAssigneeNote` / `d
 ### REQ-ORDERS-014 — Who may change an assignee note
 
 A user may create, edit, or delete the note **only on their own assignee entry**. A
-**Logistician of the order** — a Logistician-or-above (the role hierarchy promotes Officer and
-Admin into Logistician) within the order's edit scope, the rule the order's `canEdit` row flag
-carries — may change the note on **any** entry; an Admin reaches every order. This is the same
+**Logistician of the order** — a caller holding the Logistician grant of the order's processing
+unit (own or seat-derived; an Admin always) within the order's edit scope — may change the note on
+**any** entry. A Logistician grant in another unit never qualifies, also not for a member of the
+order's unit. The order detail and the assignee writes carry the answer as `canManageAssignees`. This is the same
 self-or-logistician rule that gates adding and removing assignees
 (`verifyAssigneeAccess` on `@jobOrderAccessPolicy.canManageAssignees`, behind
 `@jobOrderAccessPolicy.canSeeJobOrder`) — no new permission concept. Reading an order only through
@@ -64,6 +65,8 @@ in the controller, not the service, so business logic stays free of `SecurityCon
 - [ ] A logistician of the order editing another user's note succeeds.
 - [x] A Logistician who reads the order only as its assignee editing another user's entry is
   rejected (HTTP 403).
+- [x] A Logistician of unit A who is a plain member of the order's unit B assigns nobody else and
+  gets no picker (HTTP 403).
 
 **Enforced by:** `JobOrderAssigneeControllerTest` (set/deleteAssigneeNote auth tests),
 `JobOrderAccessPolicyTest` (`canManageAssignees_*`), `JobOrderAssigneeGrantIntegrationTest`
@@ -125,7 +128,7 @@ visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, A
 **Enforced by:** `JobOrderAccessPolicyTest` (`assigneeGrant_*`, `canManageAssignees_*`),
 `JobOrderAssigneeGrantIntegrationTest`, `JobOrderScopeQueryIntegrationTest` (`assigneeGrant_*`),
 `JobOrderServiceAssigneeAndListTest` (`externalAssignee_*`, inactive accounts),
-`JobOrderPageReaderTest`, `JobOrderPageControllerNoReloadMvcTest` (grant-only assignee),
+`JobOrderPageReaderTest`, `JobOrderPageControllerNoReloadMvcTest` (grant-only assignee, Logistician of another unit),
 `AuthorizationMatrixTest`, `AdminAuditLogPageControllerTest` · **Code:**
 `JobOrderAccessPolicy.canSeeJobOrder` / `canSeeJobOrderInScope` / `canManageAssignees`,
 `JobOrderRepository.findScopedJobOrders`, `JobOrderAssigneeService`,

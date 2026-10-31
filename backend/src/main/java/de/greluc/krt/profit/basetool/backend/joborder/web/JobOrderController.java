@@ -393,6 +393,7 @@ public class JobOrderController {
         dto.createdAt(),
         dto.version(),
         dto.canEdit(),
+        false,
         true);
   }
 
@@ -548,7 +549,10 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     JobOrderDto dto = jobOrderQueryService.getJobOrderById(id);
-    JobOrderDto tiered = dto.redacted() ? cleanupJobOrderForRequester(dto) : dto;
+    JobOrderDto tiered =
+        dto.redacted()
+            ? cleanupJobOrderForRequester(dto)
+            : dto.withCanManageAssignees(jobOrderAccessPolicy.canManageAssignees(id));
     return tiered.withAssignees(toPeerShapedAssignees(tiered.assignees()));
   }
 

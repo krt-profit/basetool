@@ -160,6 +160,7 @@ class JobOrderServicePriorityAndStatusTest {
               null,
               o.getVersion(),
               null,
+              null,
               false);
         });
 

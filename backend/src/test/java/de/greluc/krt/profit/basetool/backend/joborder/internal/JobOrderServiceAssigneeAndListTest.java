@@ -199,6 +199,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               o.getVersion(),
               null,
+              null,
               false);
         });
     lenient().when(orderLinkedStockRows.materialStockOfOrders(any())).thenReturn(List.of());
@@ -1041,6 +1042,7 @@ class JobOrderServiceAssigneeAndListTest {
         List.of(),
         null,
         order.getVersion(),
+        null,
         null,
         false);
   }

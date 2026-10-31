@@ -120,6 +120,7 @@ class JobOrderPageReaderTest {
         Instant.now(),
         1L,
         canEdit,
+        null,
         redacted);
   }
 

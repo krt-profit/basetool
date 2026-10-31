@@ -37,12 +37,16 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +55,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -80,6 +85,7 @@ class JobOrderAssigneeGrantIntegrationTest {
 
   private MockMvc mockMvc;
   private UUID orderId;
+  private UUID unitAId;
   private UUID unitBId;
   private UUID assigneeId;
   private UUID unitMateId;
@@ -95,6 +101,7 @@ class JobOrderAssigneeGrantIntegrationTest {
       tag = UUID.randomUUID().toString().substring(0, 8);
       Squadron unitA = newSquadron("Grant-A-" + tag, "GA" + tag, true);
       Squadron unitB = newSquadron("Grant-B-" + tag, "GB" + tag, false);
+      unitAId = unitA.getId();
       unitBId = unitB.getId();
       User assignee = newUser("grant-assignee-" + tag);
       User unitMate = newUser("grant-mate-" + tag);
@@ -212,14 +219,43 @@ class JobOrderAssigneeGrantIntegrationTest {
         .andExpect(status().isOk());
   }
 
+  @Test
+  void aLogisticianOfAnotherUnitWhoIsAMemberOfTheOrdersUnitMayNotAssignOthers() throws Exception {
+    GrantedAuthority logisticianOfB = new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitBId);
+
+    as(post(ORDERS + orderId + "/assignees/" + unitMateId), unitAMemberId, logisticianOfB)
+        .andExpect(status().isForbidden());
+    as(get(ORDERS + orderId + "/assignee-candidates"), unitAMemberId, logisticianOfB)
+        .andExpect(status().isForbidden());
+    as(post(ORDERS + orderId + "/assignees/" + unitAMemberId), unitAMemberId, logisticianOfB)
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void aLogisticianOfTheOrdersUnitAssignsOthers() throws Exception {
+    as(
+            post(ORDERS + orderId + "/assignees/" + unitMateId),
+            unitAMemberId,
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitAId))
+        .andExpect(status().isOk());
+  }
+
   private ResultActions as(MockHttpServletRequestBuilder request, UUID userId, String role)
       throws Exception {
+    return as(request, userId, new SimpleGrantedAuthority(role));
+  }
+
+  private ResultActions as(
+      MockHttpServletRequestBuilder request, UUID userId, GrantedAuthority contextual)
+      throws Exception {
+    List<GrantedAuthority> authorities = new ArrayList<>();
+    authorities.add(contextual);
+    if (contextual instanceof OrgUnitContextualAuthority) {
+      authorities.add(new SimpleGrantedAuthority("ROLE_" + Roles.LOGISTICIAN));
+    }
     return mockMvc.perform(
         request
-            .with(
-                jwt()
-                    .jwt(token -> token.subject(userId.toString()))
-                    .authorities(new SimpleGrantedAuthority(role)))
+            .with(jwt().jwt(token -> token.subject(userId.toString())).authorities(authorities))
             .accept(MediaType.APPLICATION_JSON));
   }
 
