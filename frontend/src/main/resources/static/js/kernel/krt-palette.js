@@ -21,13 +21,23 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtSearchFind, krtSearchFold } from '/js/kernel/krt-search.js';
+import {
+    KRT_SEARCH_PREFIXES,
+    krtSearchFind,
+    krtSearchFold,
+    krtSearchParse,
+    krtSearchRank,
+} from '/js/kernel/krt-search.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
     const RECENT_MAX = 4;
     const PAGE_MAX = 8;
     const SVG_NS = 'http://www.w3.org/2000/svg';
+    const SEARCH_DEBOUNCE_MS = 250;
+    const SEARCH_MIN_LENGTH = 2;
+    const LOCAL_KINDS = ['action', 'page'];
+    const CRUMB_SEPARATOR = ' · ';
 
     const dialog = document.getElementById('nav-palette');
     const root = dialog ? dialog.querySelector('.palette') : null;
@@ -49,6 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * @property {string} foldRest the folded breadcrumb and search terms the search matches second
      * @property {string} [href] the page it opens; absent for an action
      * @property {() => void} [run] what an action does
+     * @property {string} [fill] the query a prefix-help row puts into the input
+     * @property {boolean} [fromServer] whether it is an entity hit of the backend search, which
+     *     never enters the recently visited pages
      */
 
     /**
@@ -64,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * A palette row with its folded search text.
      *
-     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, run?: () => void }} spec
+     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
      *     what the row shows and does
      * @returns {PaletteItem} the row
      */
@@ -79,6 +92,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         if (spec.href) item.href = spec.href;
         if (spec.run) item.run = spec.run;
+        if (spec.fill) item.fill = spec.fill;
+        if (spec.fromServer) item.fromServer = true;
         return item;
     };
 
@@ -272,28 +287,70 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     recordVisit();
 
+    const uiGerman = (document.documentElement.lang || '').toLowerCase().startsWith('de');
+
     /**
-     * Whether an item matches the folded query, and how well.
+     * The prefix help: one row per prefix, which puts the prefix into the input.
      *
-     * @param {PaletteItem} item the row
-     * @param {string} q the folded query
-     * @returns {number} 0 for a label hit, 1 for a breadcrumb or search-term hit, -1 for none
+     * @returns {PaletteItem[]} the rows in the order of the prefix table
      */
-    const rankOf = function (item, q) {
-        if (item.foldLabel.includes(q)) return 0;
-        return item.foldRest.includes(q) ? 1 : -1;
+    const buildHelp = function () {
+        return KRT_SEARCH_PREFIXES.map((p) => {
+            const holder = paletteRoot.querySelector(
+                `.palette-source-prefixes [data-prefix-kind="${p.kind}"]`,
+            );
+            const words = p.words.map((w) => {
+                return `${w}:`;
+            });
+            const tokens = p.symbol ? [p.symbol].concat(words) : words;
+            const word = uiGerman ? words[0] : words[words.length - 1];
+            return makeItem({
+                label: textOf(holder),
+                crumb: tokens.join(CRUMB_SEPARATOR),
+                icon: 'search',
+                keywords: '',
+                fill: `${p.symbol || word} `,
+            });
+        });
+    };
+
+    const help = buildHelp();
+
+    /** @type {PaletteItem[]} */
+    let entityHits = [];
+    let entityQuery = '';
+
+    /**
+     * The identity of a query for the backend search: the same kind and term ask the same.
+     *
+     * @param {{ kind: string | null, term: string }} parsed the parsed query
+     * @returns {string} the key
+     */
+    const searchKeyOf = function (parsed) {
+        return `${parsed.kind || ''}|${parsed.term}`;
     };
 
     /**
-     * The groups shown for a query: recent pages and actions when it is empty, matching pages and
-     * actions otherwise.
+     * The groups shown for a query: recent pages and actions when it is empty, the prefix help
+     * for `?`, otherwise the matching pages and entity hits in one ranked list, then the matching
+     * actions, each narrowed by the query's prefix.
      *
-     * @param {string} q the folded, trimmed query
+     * @param {{ kind: string | null, term: string, help: boolean }} parsed the parsed query
      * @returns {{ label: string, items: PaletteItem[] }[]} the non-empty groups in display order
      */
-    const groupsFor = function (q) {
+    const groupsFor = function (parsed) {
         /** @type {{ label: string, items: PaletteItem[] }[]} */
         const groups = [];
+        if (parsed.help) {
+            groups.push({ label: krtI18nText(data.help, 'data-help'), items: help });
+            return groups;
+        }
+        const q = krtSearchFold(parsed.term);
+        if (!q && parsed.kind === 'action') {
+            groups.push({ label: krtI18nText(data.actions, 'data-actions'), items: actions });
+            return groups;
+        }
+        if (!q && parsed.kind) return groups;
         if (!q) {
             /** @type {PaletteItem[]} */
             const recent = [];
@@ -317,25 +374,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return groups;
         }
-        const pages = index
-            .map((e, i) => {
-                return { e, rank: rankOf(e, q), i };
-            })
-            .filter((x) => {
-                return x.rank >= 0;
-            })
-            .sort((a, b) => {
-                return a.rank - b.rank || a.i - b.i;
-            })
-            .slice(0, PAGE_MAX)
-            .map((x) => {
-                return x.e;
-            });
-        const acts = actions.filter((a) => {
-            return rankOf(a, q) >= 0;
-        });
-        if (pages.length) {
-            groups.push({ label: krtI18nText(data.pages, 'data-pages'), items: pages });
+        const pages =
+            !parsed.kind || parsed.kind === 'page'
+                ? krtSearchRank(index, q).slice(0, PAGE_MAX)
+                : [];
+        const hits = entityQuery === searchKeyOf(parsed) ? entityHits : [];
+        const mixed = krtSearchRank(pages.concat(hits), q);
+        const acts = !parsed.kind || parsed.kind === 'action' ? krtSearchRank(actions, q) : [];
+        if (mixed.length) {
+            groups.push({ label: krtI18nText(data.results, 'data-results'), items: mixed });
         }
         if (acts.length) {
             groups.push({ label: krtI18nText(data.actions, 'data-actions'), items: acts });
@@ -415,25 +462,44 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {PaletteItem} item the chosen row
      */
     const choose = function (item) {
+        if (item.fill) {
+            paletteInput.value = item.fill;
+            paletteInput.focus();
+            update();
+            return;
+        }
         krtModal.close(dialog);
         if (item.run) {
             item.run();
         } else if (item.href) {
-            remember(item);
+            if (!item.fromServer) remember(item);
             window.location.assign(item.href);
         }
     };
 
     /**
+     * The identity of a row across renders.
+     *
+     * @param {PaletteItem} item the row's item
+     * @returns {string} its target, or its label for an action
+     */
+    const rowKey = function (item) {
+        return item.href || `${item.crumb}|${item.label}`;
+    };
+
+    /**
      * Shows the rows for the current query.
      *
-     * @param {number} [keep] the row index to select instead of the first
+     * @param {boolean} [keepSelection] whether the highlighted row stays highlighted when it is
+     *     still shown, wherever it moved; otherwise the first row is highlighted
      */
-    const render = function (keep) {
-        const q = krtSearchFold(paletteInput.value.trim());
+    const render = function (keepSelection) {
+        const previous = keepSelection && rows[selected] ? rowKey(rows[selected].item) : null;
+        const parsed = krtSearchParse(paletteInput.value);
+        const q = krtSearchFold(parsed.term);
         resultsEl.textContent = '';
         rows = [];
-        groupsFor(q).forEach((group) => {
+        groupsFor(parsed).forEach((group) => {
             const wrap = document.createElement('div');
             wrap.setAttribute('role', 'group');
             wrap.setAttribute('aria-label', group.label);
@@ -476,8 +542,118 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             resultsEl.appendChild(wrap);
         });
-        if (emptyEl instanceof HTMLElement) emptyEl.hidden = rows.length > 0;
-        select(keep || 0);
+        if (emptyEl instanceof HTMLElement) {
+            emptyEl.hidden = rows.length > 0 || searchTimer !== 0 || searchAbort !== null;
+        }
+        const kept =
+            previous === null
+                ? -1
+                : rows.findIndex((r) => {
+                      return rowKey(r.item) === previous;
+                  });
+        select(Math.max(kept, 0));
+    };
+
+    /** @type {AbortController | null} */
+    let searchAbort = null;
+    let searchTimer = 0;
+
+    /**
+     * Turns one answer of the backend search into a row, or null for a malformed one.
+     *
+     * @param {any} e the answer's element
+     * @returns {PaletteItem | null} the row
+     */
+    const toHit = function (e) {
+        if (!e || typeof e.href !== 'string' || e.href.charAt(0) !== '/') return null;
+        if (typeof e.label !== 'string' || !e.label) return null;
+        const date = typeof e.date === 'string' ? new Date(e.date) : null;
+        const crumb = [
+            typeof e.crumb === 'string' ? e.crumb : '',
+            typeof e.status === 'string' ? e.status : '',
+            date && !Number.isNaN(date.getTime())
+                ? date.toLocaleDateString(document.documentElement.lang || undefined)
+                : '',
+        ]
+            .filter(Boolean)
+            .join(CRUMB_SEPARATOR);
+        return makeItem({
+            href: e.href,
+            label: e.label,
+            crumb,
+            icon: typeof e.icon === 'string' && e.icon ? e.icon : 'list',
+            keywords: '',
+            fromServer: true,
+        });
+    };
+
+    /** Drops the entity hits and stops the search still pending or in flight. */
+    const cancelSearch = function () {
+        window.clearTimeout(searchTimer);
+        searchTimer = 0;
+        if (searchAbort) searchAbort.abort();
+        searchAbort = null;
+        entityHits = [];
+        entityQuery = '';
+    };
+
+    /**
+     * Asks the backend for the entities matching a query and shows them when the query is still
+     * the one typed.
+     *
+     * @param {{ kind: string | null, term: string }} parsed the parsed query
+     */
+    const runSearch = function (parsed) {
+        const key = searchKeyOf(parsed);
+        const params = new URLSearchParams({ q: parsed.term });
+        if (parsed.kind) params.append('kind', parsed.kind);
+        const controller = new AbortController();
+        searchAbort = controller;
+        krtFetch
+            .getJson(`${data.entitySearchUrl}?${params.toString()}`, { signal: controller.signal })
+            .then((list) => {
+                if (searchAbort !== controller) return;
+                entityHits = Array.isArray(list)
+                    ? list.map(toHit).filter((h) => {
+                          return h !== null;
+                      })
+                    : [];
+                entityQuery = key;
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (searchAbort !== controller) return;
+                searchAbort = null;
+                if (krtModal.isOpen(dialog)) render(true);
+            });
+    };
+
+    /**
+     * Debounces the backend search for the current query; a query of a local kind, the help or a
+     * term shorter than two characters asks nothing.
+     */
+    const scheduleSearch = function () {
+        const parsed = krtSearchParse(paletteInput.value);
+        if (searchKeyOf(parsed) === entityQuery) return;
+        cancelSearch();
+        if (
+            !data.entitySearchUrl ||
+            parsed.help ||
+            (parsed.kind !== null && LOCAL_KINDS.includes(parsed.kind)) ||
+            parsed.term.length < SEARCH_MIN_LENGTH
+        ) {
+            return;
+        }
+        searchTimer = window.setTimeout(() => {
+            searchTimer = 0;
+            runSearch(parsed);
+        }, SEARCH_DEBOUNCE_MS);
+    };
+
+    /** Shows the rows for the edited query and searches the backend for it. */
+    const update = function () {
+        scheduleSearch();
+        render();
     };
 
     let extraRequested = false;
@@ -502,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const keywords = typeof e.keywords === 'string' ? e.keywords : '';
                     if (addPage(e.href, e.label, crumb, iconName, keywords)) added = true;
                 });
-                if (added && krtModal.isOpen(dialog)) render(selected);
+                if (added && krtModal.isOpen(dialog)) render(true);
             })
             .catch(() => {});
     };
@@ -514,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const open = function (prefill) {
         paletteInput.value = prefill || '';
-        render();
+        update();
         krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
         paletteInput.setSelectionRange(end, end);
@@ -524,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
     krtChrome.palette = { open };
 
     paletteInput.addEventListener('input', () => {
-        render();
+        update();
     });
     paletteInput.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
@@ -549,6 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dialog.addEventListener('close', () => {
         paletteInput.value = '';
+        cancelSearch();
     });
 
     document.querySelectorAll('[data-palette-open]').forEach((trigger) => {

@@ -8,7 +8,7 @@
 </th:block>
 <th:block th:fragment="palette-body">
     <div class="palette"
-         th:attr="data-recent=#{palette.recent},data-pages=#{palette.pages},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries}">
+         th:attr="data-recent=#{palette.recent},data-results=#{palette.results},data-help=#{palette.help},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries},data-entity-search-url=@{/quick-access/search}">
         <div class="palette-input-row">
             <svg class="krt-icon palette-input-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
             <input type="text" id="palette-input" class="palette-input" data-testid="palette-input" autofocus
@@ -23,8 +23,21 @@
             <span class="palette-hint"><span class="nav-kbd">&uarr; &darr;</span><span th:text="#{palette.hint.navigate}">Navigieren</span></span>
             <span class="palette-hint"><span class="nav-kbd">&crarr;</span><span th:text="#{palette.hint.open}">Öffnen</span></span>
             <span class="palette-hint"><span class="nav-kbd">ESC</span><span th:text="#{palette.hint.close}">Schließen</span></span>
+            <span class="palette-hint"><span class="nav-kbd">?</span><span th:text="#{palette.hint.prefixes}">Präfixe</span></span>
         </div>
         <div class="palette-source" hidden>
+            <div class="palette-source-prefixes" data-testid="palette-source-prefixes">
+                <span data-prefix-kind="action" th:text="#{palette.prefix.action}">Nur Aktionen</span>
+                <span data-prefix-kind="page" th:text="#{palette.prefix.page}">Nur Seiten und Tabs</span>
+                <span data-prefix-kind="job_order" th:text="#{palette.prefix.order}">Nur Aufträge nach Nummer</span>
+                <span data-prefix-kind="member" th:text="#{palette.prefix.member}">Nur Mitglieder</span>
+                <span data-prefix-kind="mission" th:text="#{palette.prefix.mission}">Nur Missionen</span>
+                <span data-prefix-kind="operation" th:text="#{palette.prefix.operation}">Nur Operationen</span>
+                <span data-prefix-kind="material" th:text="#{palette.prefix.material}">Nur Material</span>
+                <span data-prefix-kind="blueprint" th:text="#{palette.prefix.blueprint}">Nur Blueprints</span>
+                <span data-prefix-kind="ship" th:text="#{palette.prefix.ship}">Nur Schiffe</span>
+                <span data-prefix-kind="org_unit" th:text="#{palette.prefix.unit}">Nur Org-Einheiten</span>
+            </div>
             <div class="palette-source-pages" data-testid="palette-source-pages">
                 <th:block th:each="item : ${navigation.main()}">
                     <th:block th:each="entry : ${item.palettePages()}">
