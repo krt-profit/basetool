@@ -1723,10 +1723,22 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   removes both.
 - **No data, nothing mutates.** Every action navigates or opens the drawer; the org-unit switch
   and logout keep their existing forms, so no live-update wiring, audit event or metric changes.
+- **One entry registry.** The drawer (top links, groups, personal panel, admin groups, legal
+  links), the phone tab bar and the quick access's own pages and actions are rendered from one
+  frontend registry, never from links written into the fragments. Each entry carries a stable
+  **entry key**, its path, label, search terms and its gate (roles, of which one is needed, read
+  through the role hierarchy, plus the capability and feature flags it requires or excludes);
+  every rendered link names its key in `data-entry-key`. A tab-bar slot names candidate entries
+  and opens the first one the member may see. **Key format:** two or more dot-separated segments,
+  each a lower-case letter followed by lower-case letters or digits, at most 64 characters
+  (e.g. `missions.list`, `storage.my`, `admin.syncreports.uex`); a key never encodes the path.
 
 **Enforced by:** `NavigationRenderMvcTest` (header, drawer zones and groups, admin mode only for
 administrators, the quick-access metadata, search terms on menu links, the quick access's own pages
 and actions per role, no „Rechtliches" group, nothing of it for a signed-out visitor) ·
+`NavigationEntryKeyRenderMvcTest` (every rendered link names a registered entry key) ·
+`NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
+`NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
 `PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
 `:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
@@ -1736,7 +1748,8 @@ mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access foll
 chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
 `kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
 `static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
-`kernel/layout/QuickAccessContributor.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
+`kernel/layout/QuickAccessContributor.java`, `kernel/fragments/nav-entries.html`,
+`navigation/web/NavigationRegistry.java`, `navigation/web/NavigationAdvice.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
 ADR-0282
 
 #### Planned amendment (ADR-0297)
@@ -2238,8 +2251,8 @@ page use it; positions there count the reorderable rows of the rendered page.
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
 **Entry keys.** Every page and every tab of a tabbed page — the personal pages included — has a
-stable entry key (e.g. `missions.list`, `orders.demand`) from a frontend-side entry registry,
-never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
+stable entry key (e.g. `missions.list`, `orders.demand`) from the frontend entry registry and in
+its key format (REQ-UI-026, „One entry registry"), never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
 the „Lager" tab with that switch selected (REQ-UI-026), keyed and handled like a tab. The backend
 checks the key's format only. A renamed page keeps its key or gets an explicit key remap; an
 unknown key from a new release (entry or group) is placed after its default predecessor, with no

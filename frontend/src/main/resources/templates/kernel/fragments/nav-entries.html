@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<a th:fragment="link(entry, linkClass, crumb, icon, filterOnly)" th:href="${entry.external()} ? ${entry.href()} : @{${entry.href()}}" th:data-nav-group="${crumb}" th:data-nav-icon="${icon}" th:data-nav-keywords="${entry.keywordsKey() != null} ? #{${entry.keywordsKey()}} : null" th:class="${linkClass}" th:data-testid="${filterOnly} ? null : ${entry.testId()}" th:data-nav-skip="${filterOnly or entry.notIndexed()} ? 'true' : null" th:target="${entry.external()} ? '_blank' : null" th:rel="${entry.external()} ? 'noopener noreferrer' : null" th:data-entry-key="${entry.key()}"><th:block th:if="${entry.unreadBadge()}"><span class="nav-top-label" th:text="#{${entry.labelKey()}}">Notifications</span>
+        <span class="nav-count-pill" data-notif-badge
+              th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
+              th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span></th:block><th:block th:if="${entry.labelWithIcon()}"><span th:text="#{${entry.labelKey()}}">Login</span>
+        <svg class="krt-icon" aria-hidden="true" focusable="false"><use th:href="|#krt-icon-${entry.icon()}|"/></svg></th:block><th:block th:unless="${entry.unreadBadge() or entry.labelWithIcon()}" th:text="#{${entry.labelKey()}}">Label</th:block></a>
+<section th:fragment="group(item, crumb, filterOnly)" class="nav-group"
+         th:classappend="${filterOnly} ? 'nav-group-filter-only'"
+         th:data-group-key="${item.group().key()}" th:data-nav-icon="${item.group().icon()}"
+         th:data-nav-group="${crumb}" th:hidden="${filterOnly}">
+    <button type="button" class="nav-group-head" aria-expanded="true"
+            th:aria-controls="|nav-group-${item.group().key()}|" th:tabindex="${filterOnly} ? '-1' : null">
+        <svg class="krt-icon nav-group-icon" aria-hidden="true"><use th:href="|#krt-icon-${item.group().icon()}|"></use></svg>
+        <span class="nav-group-label" th:text="#{${item.group().labelKey()}}">Group</span>
+        <span class="nav-group-count"></span>
+        <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+    </button>
+    <div class="nav-group-links" th:id="|nav-group-${item.group().key()}|">
+        <th:block th:each="entry : ${item.links()}">
+            <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, ${filterOnly})}" />
+        </th:block>
+    </div>
+</section>
+</body>
+</html>

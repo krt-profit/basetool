@@ -285,7 +285,10 @@ Two binding rules shape every UI change:
   palette's own source lists, so the server alone decides which pages a member is offered; tabs
   whose visibility needs a backend read come from domain `QuickAccessContributor`s through
   `GET /quick-access/entries` on the first opening (REQ-UI-026, ADR-0240, ADR-0282,
-  `NavigationRenderMvcTest`, `NavigationE2eTest`).
+  `NavigationRenderMvcTest`, `NavigationE2eTest`). The drawer, the phone tab bar and the quick
+  access's own pages and actions are rendered from one entry registry (`navigation.web
+  .NavigationRegistry`), every link under its stable entry key (`data-entry-key`), so a change of
+  the navigation edits the registry, not the fragments (`NavigationEntryKeyRenderMvcTest`).
 - **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
   overview of the home page (B) or a form (C): one page head with at most one primary action and an
   overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on
