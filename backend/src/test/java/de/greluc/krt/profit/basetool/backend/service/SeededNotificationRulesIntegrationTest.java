@@ -295,6 +295,12 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.INVENTORY_STOCK_LEVEL_LOW,
+            NotificationType.INVENTORY_STOCK_LEVEL_LOW,
+            false,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
             NotificationEventType.SUPPLY_NEED_ORDER_COVERED,
             NotificationType.SUPPLY_NEED_ORDER_COVERED,
             true,

@@ -1774,8 +1774,8 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 ### REQ-INV-068 — Minimum stock levels: maintenance, API, the „Mindestbestände" tab and the widget
 
 > Maintenance of material and game-item levels, the API with `lowOnly` / `limit`, the tab, the „niedrig" badge,
-> the shortcuts, the audit events, the live update and the lifecycle are built. Still planned
-> (ADR-0302): the widget and the notice (#2854).
+> the shortcuts, the audit events, the live update, the lifecycle and the notice are built. Still
+> planned (ADR-0302): the widget.
 
 - **Who maintains.** A Logistician of the unit, the lead included (`hasRoleInOrgUnit(unit,
   LOGISTICIAN)`, an admin passes); any other write answers `403`. **Who sees:** everyone who can see
@@ -1798,15 +1798,20 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   switch inside the „Lager" tab. The tab shows one list per unit: material or item, tier, minimum,
   target, free, requested, fill ratio and status. Logisticians edit inline through `krtFetch`
   without a reload (REQ-FE-001). The aggregated Lager (`GET /inventory/aggregated` and
-  `GET /inventory/all/grouped`) marks a material with a „niedrig" badge (`lowStock`) while one of
-  its levels is low in the caller's scope.
+  `GET /inventory/all/grouped`, in the material and in the item catalog) marks a material or game
+  item with a „niedrig" badge (`lowStock`) while one of its levels is low in the caller's scope.
 - **Shortcuts.** For a Logistician of the unit a low row offers „Bedarf anlegen" and „Auftrag
   anlegen", both prefilled with the material or item, the tier and the shortfall. „Auftrag anlegen"
-  opens the normal job-order form (`/orders/create?materialId=&minQuality=&amount=&requestingOrgUnitId=`)
-  with the unit as requesting unit; the responsible unit is chosen as usual. „Bedarf anlegen"
+  opens the normal job-order form with the unit as requesting unit; the responsible unit is chosen
+  as usual. A material level opens the material order
+  (`/orders/create?materialId=&minQuality=&amount=&requestingOrgUnitId=`), a game-item level the
+  item order with the item as its first line, the shortfall as a whole-unit amount and the blueprint
+  chosen as in any item order
+  (`/orders/create?gameItemId=&gameItemName=&amount=&requestingOrgUnitId=`). „Bedarf anlegen"
   appears only while the supply surface is on and the unit `may_raise_needs` (REQ-SUP-001,
-  REQ-SUP-002); it opens the need form on `/supply/needs`
-  (`?needUnit=&needMaterial=&needTier=&needAmount=`) prefilled.
+  REQ-SUP-002); it opens the need form on `/supply/needs` prefilled
+  (`?needUnit=&needMaterial=&needTier=&needAmount=` for a material,
+  `?needUnit=&needItem=&needAmount=` for a game item).
 - **Widget „Bestand niedrig"** (REQ-UI-034). Option „Einheit": follows the active context by default
   and shows the union, each row labelled with its unit, when nothing is pinned; it can be fixed to
   one unit. A row-count option; sorted by fill ratio, empty levels first; „alle anzeigen" opens the
@@ -1826,7 +1831,8 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   deletion of its material removed. The subject is the level, labelled by the material
   or item name; the details carry ids, the unit as `kind:id`, tier codes and amounts, no free text
   and no personal data.
-- **Notice.** A level falling below its minimum notifies as REQ-NOTIF-030 states.
+- **Notice.** A level falling below its minimum notifies as REQ-NOTIF-030 states; a level of an
+  inactive unit or catalogue entry raises none while it is hidden.
 
 **Acceptance**
 
@@ -1842,10 +1848,10 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 - [x] The tab edits without a reload and a peer's level write appears without a reload.
   *`StockLevelTabRenderTest`, `LiveSyncSectionMapParityTest`.*
 - [x] „Bedarf anlegen" is hidden while supply is off or the unit may not raise needs; both shortcuts
-  prefill the shortfall. *`StockLevelTabRenderTest`, `JobOrderPrefillTest`,
-  `JobOrderPageControllerCreateFormAuthMvcTest`.*
+  prefill the shortfall, for a game-item level with the item. *`StockLevelTabRenderTest`,
+  `JobOrderPrefillTest`, `JobOrderPageControllerCreateFormAuthMvcTest`.*
 - [x] `lowOnly` lists the low levels of every unit in scope, emptiest first, capped by `limit`, and
-  the aggregated Lager marks a material while one of its levels is low.
+  the aggregated Lager marks a material or game item while one of its levels is low.
   *`StockLevelIntegrationTest`, `InventoryIndexListPatternRenderTest`,
   `InventoryLowStockMarkerRenderTest`.*
 - [ ] The widget follows the active context, shows the union with unit labels when nothing is

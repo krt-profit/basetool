@@ -57,6 +57,7 @@ final class NotificationTargets {
   private static final String BANK_REQUEST_QUEUE = "/bank/requests";
   private static final String CONNECTED_APPS = "/connected-apps";
   private static final String MY_LAGER = "/inventory/my";
+  private static final String STOCK_LEVELS = "/inventory/stock-levels";
   private static final String HANGAR = "/hangar";
   private static final String BLUEPRINTS = "/personal-inventory/blueprints";
   private static final String MY_DONATIONS = "/supply/donations/mine";
@@ -146,6 +147,7 @@ final class NotificationTargets {
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", page(MY_LAGER)),
           Map.entry("INVENTORY_POOL_CHANGED_BY_OTHER", page(MY_LAGER)),
+          Map.entry("INVENTORY_STOCK_LEVEL_LOW", page(STOCK_LEVELS)),
           Map.entry("MISSION_RESCHEDULED", detail(MISSION, MISSIONS)),
           Map.entry("MISSION_CANCELLED", detail(MISSION, MISSIONS)),
           Map.entry("MISSION_PARTICIPANT_REMOVED_BY_OTHER", detail(MISSION, MISSIONS)),
