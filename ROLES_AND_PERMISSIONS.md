@@ -886,6 +886,7 @@ officer of one's own Staffel or lead of one's own Spezialkommando (oversight sco
 | Function (gate)                                                                                                                | Member | Off./Lead | Bank Empl. | Bank Mgmt. | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------|:------:|:---------:|:----------:|:----------:|:-----:|
 | View **only the balance** of one's own OrgUnit account (`GET /api/v1/bank/org-units/balances`, oversight scope)                |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| View the org-unit accounts one may view, with balance and trend (`GET /api/v1/bank/org-units/accounts/visible`, REQ-BANK-064)  |   ✅    |     ✅     |     ✅      |     ✅      |   ✅   |
 | Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/bank/org-units/requests/**`) |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
 | **Confirm** a request (books it, records holders) / **reject** it (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + account flag) |   ❌    |     ❌     | ✅ per flag |     ✅      |   ✅   |
 

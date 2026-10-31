@@ -1,6 +1,6 @@
-# ADR-0214 — Code carries no comments besides Javadoc
+# ADR-0214 — Code carries documentation comments and short technical comments, no history
 
-- **Status:** Accepted — amended 2026-10-02 (`_` for an empty catch, see below)
+- **Status:** Accepted — amended 2026-10-02 (`_` for an empty catch), amended 2026-10-31 (short technical comments allowed again, see below)
 - **Date:** 2026-09-25
 - **Deciders:** @greluc (owner)
 - **Related:** REQ-OPS-020 (amended) · ADR-0125 (JSDoc types) · `CLAUDE.md` → *Documentation*
@@ -78,3 +78,38 @@ Applied to `main` on 2026-10-10 (backend, frontend, ingest, logging-support): 11
 Names that state why the value is unused stay (`notFound`, `absent`, `race`, `malformed`,
 `notAnId`, `userGone`, `alreadyRegistered` and the like). Test sources follow when their files are
 touched.
+
+## Amendment — 2026-10-31: short technical comments are allowed next to the documentation comment
+
+Owner decision: the owner's global comment rule was relaxed on 2026-10-27, and this repository
+follows it. The "no comments" decision above is replaced by the following; the rest of this ADR
+(context, the `_` amendment, out-of-scope files) stands.
+
+**Allowed.** The language's documentation comment (Javadoc, JSDoc, Python docstrings, PowerShell
+comment-based help), unchanged in form, and **short technical comments** — `//`, `/* */`, `#`, `--`,
+and `<!--/* … */-->` in templates — where they document what the code cannot say itself: a
+non-obvious invariant, a format or protocol detail, a unit, a coordinate convention, why an
+algorithm is shaped the way it is, or the spec section it implements. A technical comment is a line
+or two, states only what is true now, and sits next to the code it describes.
+
+**Still forbidden**, in a documentation comment and in a technical comment alike: history of any kind
+(dates, PR or issue numbers, "previously" / "now" / "used to" / "was changed", migration or incident
+stories), comments that restate the code, commented-out code or config, `TODO` / `FIXME` notes (a
+follow-up issue instead), and long prose. The story of a change stays in the commit message and the
+PR body; decisions go into ADRs, specs and runbooks.
+
+**Unchanged.** Licence headers and tool directives stay. An empty block that a linter wants
+justified is named or configured, not commented (`_` / `ignored` / `expected` for a catch variable).
+Applied Flyway migrations, generated and vendored files, Markdown and test fixtures remain out of
+scope. A rendered Thymeleaf template still never emits a plain `<!-- -->` (REQ-UI-023,
+`TemplateCommentHygieneTest`): a technical comment there is a parser-level `<!--/* … */-->` block,
+which the engine drops at parse time.
+
+**Gates.** No gate is relaxed or added: Checkstyle `TodoComment` keeps failing `TODO` / `FIXME`,
+`EmptyCatchBlock` keeps its variable-name form, and the stylesheet and script linters carry no rule
+against comments. Existing code is not swept; the rule applies to what is written or touched. Review
+enforces the rest.
+
+**Consequences.** A comment that records a fact the code cannot show is welcome again; one that
+records history or repeats the code is rejected in review. The earlier consequence "nothing enforces
+the rule mechanically outside the two gates" still holds.

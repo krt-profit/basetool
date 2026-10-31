@@ -385,6 +385,36 @@ public class RequestScopeResolver {
     if (authHelper.isAdmin()) {
       return currentScopePredicate();
     }
+    Set<UUID> oversightOrgUnitIds = currentOversightOrgUnitIds();
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
+      return new ScopePredicate(false, pinned.get(), Set.of());
+    }
+    return new ScopePredicate(false, null, oversightOrgUnitIds);
+  }
+
+  /**
+   * The {@link #currentOversightScope()} without the active-org-unit pin: an admin gets {@code
+   * adminAllScope}, everyone else the whole set of org units they oversee (REQ-BANK-064).
+   *
+   * @return a never-null, pin-free cascading oversight scope.
+   */
+  @NotNull
+  public ScopePredicate currentOversightScopeIgnoringPin() {
+    if (authHelper.isAdmin()) {
+      return new ScopePredicate(true, null, Set.of());
+    }
+    return new ScopePredicate(false, null, currentOversightOrgUnitIds());
+  }
+
+  /**
+   * The org units a non-admin caller oversees: the Staffeln of an officer, every unit with an SK
+   * lead or functional-rank seat, and the cascaded leadership reach.
+   *
+   * @return the overseen org-unit ids, never {@code null}.
+   */
+  @NotNull
+  private Set<UUID> currentOversightOrgUnitIds() {
     Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
     List<OrgUnitMembership> memberships = currentCallerMemberships();
     if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
@@ -395,11 +425,7 @@ public class RequestScopeResolver {
       }
     }
     oversightOrgUnitIds.addAll(seatReach(memberships));
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), Set.of());
-    }
-    return new ScopePredicate(false, null, oversightOrgUnitIds);
+    return oversightOrgUnitIds;
   }
 
   /**

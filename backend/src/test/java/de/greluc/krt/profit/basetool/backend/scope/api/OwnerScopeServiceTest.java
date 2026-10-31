@@ -2243,6 +2243,40 @@ class OwnerScopeServiceTest {
       assertFalse(scope.adminAllScope());
       assertEquals(Set.of(bereichId, childStaffelId), scope.memberOrgUnitIds());
     }
+
+    @Test
+    void ignoringPin_pinWithinOversight_keepsWholeOversightSet() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setRole(MembershipRole.SK_LEAD);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+      lenient()
+          .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      ScopePredicate scope = service.currentOversightScopeIgnoringPin();
+
+      assertFalse(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+      assertEquals(Set.of(SQUADRON_A_ID, skId), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void ignoringPin_adminWithPin_allScope() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      lenient()
+          .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      ScopePredicate scope = service.currentOversightScopeIgnoringPin();
+
+      assertTrue(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+    }
   }
 
   /**
