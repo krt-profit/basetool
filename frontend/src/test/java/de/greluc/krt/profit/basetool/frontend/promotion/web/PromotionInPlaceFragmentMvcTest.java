@@ -88,7 +88,7 @@ class PromotionInPlaceFragmentMvcTest {
         new PromotionLevelContentDto(
             UUID.randomUUID(), 0L, catId, "Trading", "LEVEL_A", "x", null, null);
 
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(cat));
@@ -119,7 +119,7 @@ class PromotionInPlaceFragmentMvcTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(req), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of());
     when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -169,7 +169,7 @@ class PromotionInPlaceFragmentMvcTest {
     PromotionEligibilityDto elig =
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(cat));

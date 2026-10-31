@@ -172,8 +172,8 @@ public interface UserRepository
 
   /**
    * Paged squadron-scoped listing of the ordinary members the promotion system evaluates; users
-   * holding {@code ADMIN} or {@code OFFICER} and users without a squadron membership are excluded.
-   * Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
+   * holding {@code ADMIN} or a leadership seat and users without a squadron membership are
+   * excluded. Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
    *
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
    * @param pageable paging and sorting
@@ -184,7 +184,9 @@ public interface UserRepository
       SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id =
       u.id AND ms.kind = de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON
       AND (:scopeSquadronIds IS NULL OR ms.id.orgUnitId IN :scopeSquadronIds)) AND NOT
-      EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))
+      EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) = 'ADMIN') AND NOT EXISTS (SELECT 1 FROM
+      OrgUnitMembership seat WHERE seat.user.id = u.id AND seat.role <>
+      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER)
       """)
   Page<User> findEvaluatableMembers(
       @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);

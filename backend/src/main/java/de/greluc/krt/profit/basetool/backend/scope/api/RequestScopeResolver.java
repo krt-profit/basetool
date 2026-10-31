@@ -437,6 +437,28 @@ public class RequestScopeResolver {
   }
 
   /**
+   * The org units whose officer-surface data the caller may read (REQ-ROLE-007): an admin sees
+   * every unit, or the pinned one; any other caller sees the units of {@link
+   * #currentOfficerOrgUnitIds()}, narrowed to the pinned unit when it is one of them and to nothing
+   * when it is not.
+   *
+   * @return the readable org-unit ids; empty for a caller without reach; {@code null} for the
+   *     unrestricted admin scope
+   */
+  @Nullable
+  public Set<UUID> currentOfficerReadScope() {
+    Optional<UUID> pin = readActiveSquadronFromHeader();
+    if (authHelper.isAdmin()) {
+      return pin.<Set<UUID>>map(Set::of).orElse(null);
+    }
+    Set<UUID> reach = currentOfficerOrgUnitIds();
+    if (pin.isEmpty()) {
+      return reach;
+    }
+    return reach.contains(pin.get()) ? Set.of(pin.get()) : Set.of();
+  }
+
+  /**
    * Whether the caller holds officer reach in the active context: in the pinned unit when one is
    * pinned, in at least one unit otherwise. Admins always pass. Drives visibility only, never a
    * write (REQ-SEC-047).

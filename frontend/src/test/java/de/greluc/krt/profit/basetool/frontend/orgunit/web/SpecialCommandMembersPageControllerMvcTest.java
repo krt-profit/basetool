@@ -42,9 +42,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -98,6 +100,12 @@ class SpecialCommandMembersPageControllerMvcTest {
         .thenReturn(sc);
     when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
         .thenReturn(List.of(member));
+  }
+
+  /** Stubs the backend layout so the caller holds officer reach, which the page gate reads. */
+  private void stubOfficerReach() {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
   }
 
   @Test
@@ -195,8 +203,9 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void detail_officer_rendersWithoutLeadToggleAndBackToLeitung() throws Exception {
+    stubOfficerReach();
     stubSpecialCommandWithOneMember();
 
     mockMvc
@@ -221,8 +230,9 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void detail_backendRefuses_returns403Page() throws Exception {
+    stubOfficerReach();
     when(backendApiClient.get(
             eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
@@ -233,8 +243,9 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void detail_backendFails_redirectsToBackUrlWithError() throws Exception {
+    stubOfficerReach();
     when(backendApiClient.get(
             eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
         .thenThrow(new BackendServiceException("backend down", null, 503));
@@ -259,8 +270,9 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void addMemberAjax_officer_returns200WithoutEviction() throws Exception {
+    stubOfficerReach();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.post(
             eq("/api/v1/special-commands/{id}/members/{userId}"),
@@ -282,8 +294,9 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void removeMemberAjax_backendRefuses_relays403() throws Exception {
+    stubOfficerReach();
     when(backendApiClient.delete(
             eq("/api/v1/special-commands/{id}/members/{userId}"),
             eq(Void.class),
@@ -300,8 +313,9 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void patchMemberFlags_classic_redirectsToMemberPage() throws Exception {
+    stubOfficerReach();
     when(backendApiClient.patch(contains("/members/" + memberId), any(), eq(Void.class)))
         .thenReturn(null);
 

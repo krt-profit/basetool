@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.web;
 import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicWriteRequest;
@@ -69,6 +70,8 @@ public class PromotionTopicController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of promotion topics
    */
   @GetMapping
@@ -80,7 +83,8 @@ public class PromotionTopicController {
   public PageResponse<PromotionTopicResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -88,13 +92,15 @@ public class PromotionTopicController {
             sort,
             PromotionTopicService.SORTABLE_FIELDS,
             PromotionTopicService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.list(pageable));
+    return PageResponse.of(service.list(pageable, view));
   }
 
   /**
    * Returns every {@link PromotionTopicResponse} ordered by {@code sortOrder}, used by the
    * promotion UI to render the full topic list without pagination.
    *
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return every topic in display order
    */
   @GetMapping("/all")
@@ -102,8 +108,9 @@ public class PromotionTopicController {
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "All topics ordered by sortOrder.")
   })
-  public List<PromotionTopicResponse> listAll() {
-    return service.listAll();
+  public List<PromotionTopicResponse> listAll(
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
+    return service.listAll(view);
   }
 
   /**
@@ -125,14 +132,16 @@ public class PromotionTopicController {
 
   /**
    * Persists a new {@link de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic}.
-   * Restricted to ADMIN or OFFICER callers.
+   * Restricted to admins and callers with officer reach in the owning squadron.
    *
    * @param request validated payload describing the new topic
    * @return the persisted topic in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new promotion topic. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new promotion topic. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Topic created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -152,7 +161,8 @@ public class PromotionTopicController {
    * @return the updated topic in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a promotion topic. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Update a promotion topic. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Topic updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -167,13 +177,14 @@ public class PromotionTopicController {
 
   /**
    * Permanently removes the promotion topic identified by {@code id}, also cascading deletes to the
-   * topic's categories. Restricted to ADMIN or OFFICER callers.
+   * topic's categories. Restricted to admins and callers with officer reach in the owning squadron.
    *
    * @param id identifier of the topic to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a promotion topic. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Delete a promotion topic. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Topic deleted."),
     @ApiResponse(responseCode = "404", description = "Topic not found.")

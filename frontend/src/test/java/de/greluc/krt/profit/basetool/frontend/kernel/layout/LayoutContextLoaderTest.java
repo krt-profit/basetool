@@ -151,6 +151,42 @@ class LayoutContextLoaderTest {
   }
 
   @Test
+  void capabilitiesForAModelHandlerShareTheMemoisedLayoutRead() throws Exception {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+    LayoutContextLoader loader = loader();
+    MockHttpServletRequest request = requestFor("view");
+
+    assertThat(loader.capabilities(request).hasOfficerReach()).isTrue();
+    assertThat(loader.load(request).capabilities().canManagePromotions()).isTrue();
+
+    verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
+  }
+
+  @Test
+  void capabilitiesForABodyWritingHandlerAreReadOncePerRequestIntoTheirOwnMemo() throws Exception {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+    LayoutContextLoader loader = loader();
+    MockHttpServletRequest request = requestFor("json");
+
+    assertThat(loader.capabilities(request).canOpenLeitung()).isTrue();
+    assertThat(loader.capabilities(request).canManagePromotions()).isTrue();
+
+    verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
+  }
+
+  @Test
+  void capabilitiesForAnAnonymousCallerOfABodyWritingHandlerAreNoneWithoutACall() throws Exception {
+    when(authHelper.isAuthenticated()).thenReturn(false);
+
+    assertThat(loader().capabilities(requestFor("json"))).isEqualTo(CapabilitiesResponse.NONE);
+    verifyNoInteractions(backendApiClient);
+  }
+
+  @Test
   void theHandlerTestDistinguishesEveryShapeThatWritesItsOwnBody() throws Exception {
     assertThat(LayoutContextLoader.needsLayoutModel(requestFor("json"))).isFalse();
     assertThat(LayoutContextLoader.needsLayoutModel(requestFor("entity"))).isFalse();

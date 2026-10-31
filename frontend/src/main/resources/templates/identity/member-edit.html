@@ -46,11 +46,9 @@
                                     th:selected="${i == memberEditForm.rank}">
                             </option>
                         </select>
-                        <th:block th:with="officer=${user.roles != null and user.roles.contains(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)},
-                                           member=${user.roles != null and user.roles.contains(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER)}">
-                            <p class="form-hint" data-testid="member-rank-role-hint" th:if="${officer or member}"
-                               th:text="${officer} ? #{members.edit.rank.hint.officer} : #{members.edit.rank.hint.member}">Erlaubte R&auml;nge</p>
-                        </th:block>
+                        <p class="form-hint" data-testid="member-rank-role-hint"
+                           th:if="${memberRankRange != null and memberRankRange.basis != null}"
+                           th:text="#{|members.edit.rank.hint.${memberRankRange.basis}|}">Erlaubte R&auml;nge</p>
                         <div class="field-error" data-error-for="rank"
                              th:text="${#fields.hasErrors('rank') ? #fields.errors('rank')[0] : ''}"></div>
                     </div>

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.web;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RankRange;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
@@ -187,6 +188,36 @@ public class UserController {
   public UserRsiHandleResponse getUserRsiHandle(@PathVariable @NotNull UUID id) {
     return new UserRsiHandleResponse(userService.findById(id).getRsiHandle());
   }
+
+  /**
+   * Returns the member-rank range of a member for the admin member page (REQ-ROLE-007).
+   *
+   * @param id the member
+   * @return the basis and bounds of the range; no basis when the member is not range-checked
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member is
+   *     unknown
+   */
+  @NotNull
+  @GetMapping("/users/{id}/rank-range")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Transactional(readOnly = true)
+  public UserRankRangeResponse getUserRankRange(@PathVariable @NotNull UUID id) {
+    return userService
+        .findRankRange(id)
+        .map(range -> new UserRankRangeResponse(range.basis(), range.minRank(), range.maxRank()))
+        .orElseGet(
+            () -> new UserRankRangeResponse(null, RankRange.LOWEST_RANK, RankRange.HIGHEST_RANK));
+  }
+
+  /**
+   * Response for {@link #getUserRankRange}: what a member's rank range follows from and its bounds.
+   *
+   * @param basis the standing the range follows from, or {@code null} when the member is not
+   *     range-checked.
+   * @param minRank the lowest permitted rank.
+   * @param maxRank the highest permitted rank.
+   */
+  public record UserRankRangeResponse(@Nullable RankRange.Basis basis, int minRank, int maxRank) {}
 
   /**
    * Response for {@link #getMyRsiHandle} / {@link #updateMyRsiHandle}: the member's own RSI handle

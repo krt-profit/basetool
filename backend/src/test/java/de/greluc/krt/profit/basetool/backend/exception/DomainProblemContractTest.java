@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
+import de.greluc.krt.profit.basetool.backend.identity.api.RankRange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.AppException;
@@ -165,22 +166,22 @@ class DomainProblemContractTest {
             null,
             Map.of()),
         new Expected(
-            RankOutsideRoleRangeException.officer(),
+            RankOutsideRoleRangeException.outside(RankRange.leadershipSeat()),
             HttpStatus.BAD_REQUEST,
             "RANK_OUTSIDE_ROLE_RANGE",
             "rank-outside-role-range",
             "problem.rank_outside_role_range",
-            "problem.rank_outside_role_range.officer.detail",
+            "problem.rank_outside_role_range.leadership_seat.detail",
             "Rank outside role range",
-            Map.of("role", "OFFICER"),
-            Map.of("role", "OFFICER", "minRank", 1, "maxRank", 12)),
+            Map.of("role", "LEADERSHIP_SEAT"),
+            Map.of("role", "LEADERSHIP_SEAT", "minRank", 1, "maxRank", 12)),
         new Expected(
-            RankOutsideRoleRangeException.member(),
+            RankOutsideRoleRangeException.outside(RankRange.krtMember()),
             HttpStatus.BAD_REQUEST,
             "RANK_OUTSIDE_ROLE_RANGE",
             "rank-outside-role-range",
             "problem.rank_outside_role_range",
-            "problem.rank_outside_role_range.member.detail",
+            "problem.rank_outside_role_range.krt_member.detail",
             "Rank outside role range",
             Map.of("role", "KRT_MEMBER"),
             Map.of("role", "KRT_MEMBER", "minRank", 13, "maxRank", 20)),

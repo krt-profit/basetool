@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDt
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionReadView;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
@@ -63,6 +64,30 @@ class PromotionBackendClientTest {
   }
 
   @Test
+  void managementReadsSelectTheManagementView() {
+    backend.answerJson("[]");
+    backend.answerJson("[]");
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson("[]");
+    backend.answerJson(EMPTY_PAGE);
+
+    assertThat(client.topics(PromotionReadView.MANAGEMENT)).isEmpty();
+    assertThat(client.categoriesByTopic(TOPIC.toString(), PromotionReadView.MANAGEMENT)).isEmpty();
+    assertThat(client.allCategories(PromotionReadView.MANAGEMENT)).isNotNull();
+    assertThat(client.levelContents(CATEGORY.toString(), PromotionReadView.MANAGEMENT)).isEmpty();
+    assertThat(client.rankRequirements(PromotionReadView.MANAGEMENT)).isNotNull();
+
+    backend.expect("GET", "/api/v1/promotion/topics/all?view=MANAGEMENT");
+    backend.expect(
+        "GET", "/api/v1/promotion/categories/by-topic/" + TOPIC + "/all?view=MANAGEMENT");
+    backend.expect("GET", "/api/v1/promotion/categories?size=1000&view=MANAGEMENT");
+    backend.expect(
+        "GET", "/api/v1/promotion/level-contents/by-category/" + CATEGORY + "?view=MANAGEMENT");
+    backend.expect(
+        "GET", "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank&view=MANAGEMENT");
+  }
+
+  @Test
   void pageReads() {
     backend.answerJson("[]");
     backend.answerJson("[]");
@@ -76,11 +101,11 @@ class PromotionBackendClientTest {
     backend.answerJson("[]");
     backend.answerJson("[]");
 
-    assertThat(client.topics()).isEmpty();
-    assertThat(client.categoriesByTopic(TOPIC.toString())).isEmpty();
-    assertThat(client.allCategories()).isNotNull();
-    assertThat(client.levelContents(CATEGORY.toString())).isEmpty();
-    assertThat(client.rankRequirements()).isNotNull();
+    assertThat(client.topics(PromotionReadView.MEMBER)).isEmpty();
+    assertThat(client.categoriesByTopic(TOPIC.toString(), PromotionReadView.MEMBER)).isEmpty();
+    assertThat(client.allCategories(PromotionReadView.MEMBER)).isNotNull();
+    assertThat(client.levelContents(CATEGORY.toString(), PromotionReadView.MEMBER)).isEmpty();
+    assertThat(client.rankRequirements(PromotionReadView.MEMBER)).isNotNull();
     assertThat(client.currentUser().rank()).isEqualTo(17);
     assertThat(client.myEvaluations()).isEmpty();
     assertThat(client.allEvaluations(1000, 2)).isNotNull();

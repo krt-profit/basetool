@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.web;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.OfficerSurfaceGate;
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
@@ -46,8 +46,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Same-origin proxy through which the promotion admin pages reach the backend's {@code
- * /api/v1/promotion/...} endpoints via {@link PromotionBackendClient}; restricted to ADMIN and
- * OFFICER.
+ * /api/v1/promotion/...} endpoints via {@link PromotionBackendClient}; restricted to the callers
+ * the backend offers promotion management ({@link OfficerSurfaceGate#canManagePromotions()}).
  */
 @RestController
 @RequestMapping("/api/proxy/promotion")
@@ -64,7 +64,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created topic representation
    */
   @PostMapping("/topics")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public PromotionTopicDto createTopic(@RequestBody @NotNull PromotionTopicWriteRequest body) {
     return promotionClient.createTopic(body);
   }
@@ -77,7 +77,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated topic
    */
   @PutMapping("/topics/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public PromotionTopicDto updateTopic(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull PromotionTopicWriteRequest body) {
     return promotionClient.updateTopic(id, body);
@@ -90,7 +90,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/topics/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public ResponseEntity<Void> deleteTopic(@PathVariable @NotNull UUID id) {
     promotionClient.deleteTopic(id);
     return ResponseEntity.noContent().build();
@@ -103,7 +103,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created category representation
    */
   @PostMapping("/categories")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public PromotionCategoryDto createCategory(
       @RequestBody @NotNull PromotionCategoryWriteRequest body) {
     return promotionClient.createCategory(body);
@@ -117,7 +117,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated category
    */
   @PutMapping("/categories/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public PromotionCategoryDto updateCategory(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull PromotionCategoryWriteRequest body) {
     return promotionClient.updateCategory(id, body);
@@ -130,7 +130,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/categories/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public ResponseEntity<Void> deleteCategory(@PathVariable @NotNull UUID id) {
     promotionClient.deleteCategory(id);
     return ResponseEntity.noContent().build();
@@ -143,7 +143,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created requirement representation
    */
   @PostMapping("/rank-requirements")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public RankRequirementDto createRankRequirement(
       @RequestBody @NotNull RankRequirementWriteRequest body) {
     return promotionClient.createRankRequirement(body);
@@ -157,7 +157,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated requirement
    */
   @PutMapping("/rank-requirements/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public RankRequirementDto updateRankRequirement(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull RankRequirementWriteRequest body) {
     return promotionClient.updateRankRequirement(id, body);
@@ -170,7 +170,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/rank-requirements/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public ResponseEntity<Void> deleteRankRequirement(@PathVariable @NotNull UUID id) {
     promotionClient.deleteRankRequirement(id);
     return ResponseEntity.noContent().build();
@@ -183,7 +183,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created entry representation
    */
   @PostMapping("/level-contents")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public PromotionLevelContentDto createLevelContent(
       @RequestBody @NotNull PromotionLevelContentWriteRequest body) {
     return promotionClient.createLevelContent(body);
@@ -197,7 +197,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated entry
    */
   @PutMapping("/level-contents/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public PromotionLevelContentDto updateLevelContent(
       @PathVariable @NotNull UUID id,
       @RequestBody @NotNull PromotionLevelContentWriteRequest body) {
@@ -211,7 +211,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/level-contents/{id}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public ResponseEntity<Void> deleteLevelContent(@PathVariable @NotNull UUID id) {
     promotionClient.deleteLevelContent(id);
     return ResponseEntity.noContent().build();
@@ -226,7 +226,7 @@ public class PromotionProxyController {
    * @return the backend's response for the upserted evaluation
    */
   @PutMapping("/evaluations/user/{userId}/category/{categoryId}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_MANAGE_PROMOTIONS)
   public MemberEvaluationDto updateEvaluation(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID categoryId,

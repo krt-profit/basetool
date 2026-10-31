@@ -33,11 +33,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungMemberDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungViewDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,9 +88,16 @@ class LeitungPageControllerMvcTest {
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of()));
   }
 
+  /** Stubs the backend layout so the caller holds officer reach, which the page gate reads. */
+  private void stubOfficerReach() {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+  }
+
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_officer_returns200() throws Exception {
+    stubOfficerReach();
     stubEmptyView();
 
     mockMvc.perform(get("/organisation/leitung")).andExpect(status().isOk());
@@ -127,8 +136,9 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_skLead_managesRosterInPlaceWithoutLeadToggle() throws Exception {
+    stubOfficerReach();
     UUID skId = UUID.randomUUID();
     stubSpecialCommandView(skId, false, true);
 
@@ -144,8 +154,9 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_bereichsleiter_keepsLeadToggleWithoutMemberPageLink() throws Exception {
+    stubOfficerReach();
     UUID skId = UUID.randomUUID();
     stubSpecialCommandView(skId, true, false);
 
@@ -208,8 +219,9 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_staffelleiter_seesOwnSeatAsStaffelleiterReadOnly() throws Exception {
+    stubOfficerReach();
     stubSquadronView(
         false,
         false,
@@ -234,8 +246,9 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_bereichsleiter_seesLowerRanksReadOnlyAndMayAppointStaffelleiter() throws Exception {
+    stubOfficerReach();
     stubSquadronView(
         false,
         true,
@@ -258,8 +271,9 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_readOnlyViewer_getsNoRankControls() throws Exception {
+    stubOfficerReach();
     stubSquadronView(
         false,
         false,
@@ -310,8 +324,9 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void assignSquadronRank_officer_returns200() throws Exception {
+    stubOfficerReach();
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.put(

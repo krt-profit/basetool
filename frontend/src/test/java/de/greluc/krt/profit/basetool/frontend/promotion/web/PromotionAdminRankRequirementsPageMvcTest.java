@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
@@ -73,9 +74,16 @@ class PromotionAdminRankRequirementsPageMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  /** Stubs the backend layout so the caller holds officer reach, which the page gate reads. */
+  private void stubOfficerReach() {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+  }
+
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  @WithMockUser(roles = "KRT_MEMBER")
   void adminRankRequirements_rendersCreateButtonAndInlineScript_forOfficer() throws Exception {
+    stubOfficerReach();
     UUID topicId = UUID.randomUUID();
     UUID catId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -113,11 +121,11 @@ class PromotionAdminRankRequirementsPageMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(squadronPage);
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
-        .thenReturn(LayoutResponses.activeOrgUnit(squadronId));
+        .thenReturn(LayoutResponses.officerReachIn(squadronId));
 
     when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(req), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),

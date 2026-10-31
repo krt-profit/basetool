@@ -84,6 +84,14 @@ public final class Roles {
   public static final String HAS_ROLE_ADMIN = "hasRole('" + ADMIN + "')";
 
   /**
+   * Compile-time {@code @PreAuthorize} SpEL expression for the coarse officer-reach gate: an admin,
+   * or a caller with officer reach in at least one unit (REQ-SEC-015). The target's owning unit is
+   * checked afterwards with {@code OwnerScopeService#canActAsOfficerIn}.
+   */
+  public static final String ADMIN_OR_OFFICER_REACH =
+      HAS_ROLE_ADMIN + " or @ownerScopeService.canActAsOfficerAnywhere()";
+
+  /**
    * Single-role {@code hasRole('BANK_MANAGEMENT')} gate; a compile-time constant like {@link
    * #HAS_ROLE_ADMIN}.
    */
