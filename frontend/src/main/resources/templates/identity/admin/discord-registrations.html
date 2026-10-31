@@ -40,7 +40,7 @@
                         </tr>
                     </thead>
                     <tbody id="registrationsBody">
-                        <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}"
+                        <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}" th:data-focus-id="${reg.id}"
                             th:attr="data-id=${reg.id},data-version=${reg.version}">
                             <td>
                                 <span class="cell-title" th:text="${reg.username}">Nutzer</span>

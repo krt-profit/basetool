@@ -121,6 +121,7 @@
       "kernel/krt-fetch.js",
       "kernel/krt-filter-chips.js",
       "kernel/krt-filter-panel.js",
+      "kernel/krt-focus.js",
       "kernel/krt-hooks.js",
       "kernel/krt-html.js",
       "kernel/krt-i18n.js",

@@ -33,7 +33,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="d : ${delegates}" data-testid="purchasing-delegate-row" th:data-delegate-id="${d.id()}">
+                    <tr th:each="d : ${delegates}" data-testid="purchasing-delegate-row" th:data-delegate-id="${d.id()}" th:data-focus-id="${d.id()}">
                         <td th:text="${d.displayName() != null ? d.displayName() : '&ndash;'}">Name</td>
                         <td th:attr="data-label=#{purchasing.delegate.appointed}">
                             <span th:text="${#temporals.format(d.appointedAt(), 'dd.MM.yyyy')}">01.01.2026</span>

@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,7 +90,8 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -116,7 +118,8 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -144,7 +147,8 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -174,7 +178,8 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -231,7 +236,8 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            registry);
+            registry,
+            SecurityConfig.roleHierarchy());
     controller.registerRelayGauge();
 
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -276,7 +282,8 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry()) {
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy()) {
           @Override
           protected SseEmitter newEmitter() {
             return mockEmitter;
@@ -369,7 +376,8 @@ class NotificationPageControllerStreamTest {
             mock(MessageSource.class),
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry()) {
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy()) {
           @Override
           protected SseEmitter newEmitter() {
             return emitter;

@@ -38,7 +38,7 @@
                 th:classappend="${n.read} ? 'is-read' : ''"
                 th:attr="data-notif-id=${n.id},data-notif-read=${n.read}">
                 <div class="notification-item-body">
-                    <a th:if="${n.href != null}" class="row-link" data-testid="row-link" th:href="@{${n.href}}"
+                    <a th:if="${n.href != null}" class="row-link" data-testid="row-link" data-notif-open th:href="@{${n.href}}"
                        ><span class="notification-item-text" th:text="${n.text}">Notification text</span></a>
                     <p th:if="${n.href == null}" class="notification-item-text" th:text="${n.text}">Notification text</p>
                     <span class="notification-item-time" th:text="${n.createdAtDisplay}">2026-01-01 00:00 UTC</span>

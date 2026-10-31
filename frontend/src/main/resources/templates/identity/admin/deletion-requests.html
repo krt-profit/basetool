@@ -33,7 +33,7 @@
                     </tr>
                 </thead>
                 <tbody id="deletionRequestsBody">
-                    <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
+                    <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}" th:data-focus-id="${req.userId}"
                         th:with="reqHandle=${@handles.display(req.handle)}"
                         th:attr="data-id=${req.id},data-handle=${reqHandle},data-version=${req.version}">
                         <td>

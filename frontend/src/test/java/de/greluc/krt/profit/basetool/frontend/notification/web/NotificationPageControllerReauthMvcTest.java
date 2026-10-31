@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -55,7 +56,8 @@ class NotificationPageControllerReauthMvcTest {
                 mock(MessageSource.class),
                 mock(BackendSideChannels.class),
                 mock(OAuth2AuthorizedClientManager.class),
-                new SimpleMeterRegistry()));
+                new SimpleMeterRegistry(),
+                SecurityConfig.roleHierarchy()));
     ReauthPageMvc.signInMember();
   }
 

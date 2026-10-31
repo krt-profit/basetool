@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.LinkedHashMap;
@@ -49,7 +50,8 @@ class NotificationRenderAmountsTest {
         messages,
         new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
-        new SimpleMeterRegistry());
+        new SimpleMeterRegistry(),
+        SecurityConfig.roleHierarchy());
   }
 
   @Test
@@ -76,7 +78,8 @@ class NotificationRenderAmountsTest {
             messages,
             new BackendSideChannels(mock(WebClient.class), null),
             mock(OAuth2AuthorizedClientManager.class),
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy());
     Map<String, String> params = new LinkedHashMap<>();
     params.put("actor", "Ada");
     params.put("amount", "3000000");

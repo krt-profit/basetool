@@ -49,7 +49,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="d : ${donations}" data-testid="supply-donation-row" th:data-donation-id="${d.id()}">
+                        <tr th:each="d : ${donations}" data-testid="supply-donation-row" th:data-donation-id="${d.id()}" th:data-focus-id="${d.id()}">
                             <td>
                                 <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
                                 <span class="cell-sub">

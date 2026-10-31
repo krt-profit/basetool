@@ -893,28 +893,15 @@ Alle" (`name=filter`, default „Ungelesen") hides read rows client-side — `da
 („Alle geladenen Benachrichtigungen sind gelesen"); the load-more control stays, because older pages
 may still hold unread rows.
 
-Every row whose subject has a page is a link to it. `NotificationViewDto` carries an `href`, set by
-`NotificationPageController.targetOf(type, entityType, entityId)`:
+Every row whose subject has a page the viewer can open is a link to it, and opening it marks the
+row read (REQ-NOTIF-032). „Alle als gelesen markieren" is a ghost action in the page head,
+„Gelesene löschen" a danger entry of the overflow menu.
 
-| Notification types | Link |
-| --- | --- |
-| `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER` | `/orders/{id}` |
-| `MATERIAL_EXCHANGE_INTEREST_REGISTERED`, `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `/materialboerse` |
-| `EXCHANGE_INSTALLATION_CONNECTED`, `EXCHANGE_BULK_UNDO_APPLIED` | `/connected-apps` |
-| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER` | `/inventory/my` |
-| `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile` |
-| `ACCOUNT_DELETION_REQUESTED` | `/admin/deletion-requests` |
-| `DISCORD_REGISTRATION_PENDING` | `/admin/discord-registrations` |
-| bank booking types | none — a recipient may lack access to the request queue |
-
-The link passes `safeSameOriginUrl` before it is rendered; following it does not mark the row read.
-„Alle als gelesen markieren" is a ghost action in the page head, „Gelesene löschen" a danger entry of
-the overflow menu. The bell dropdown keeps its rows without links.
-
-**Enforced by:** `NotificationPageRenderMvcTest`, `NotificationPageControllerTest` (`targetOf`,
-`href` on `/page-items`) · `NotificationCenterE2eTest` · **Code:** `notification/notifications.html`,
-`static/js/notification/notifications-page.js`, `static/js/notification/notifications.js` (`buildItem(item, linkable)`),
-`NotificationPageController`, `NotificationViewDto` · **Related:** REQ-NOTIF-019, REQ-UI-027
+**Enforced by:** `NotificationPageRenderMvcTest`, `NotificationPageControllerTest` (`href` on
+`/page-items`) · `NotificationCenterE2eTest` · **Code:** `notification/notifications.html`,
+`static/js/notification/notifications-page.js`, `static/js/notification/notifications.js` (`buildItem`),
+`NotificationPageController`, `NotificationViewDto` · **Related:** REQ-NOTIF-019, REQ-NOTIF-032,
+REQ-UI-027
 
 ### REQ-NOTIF-023 — Reconciling a notice for named members
 
@@ -1234,6 +1221,88 @@ stored, and so does a value that is not a plain decimal. Lists the producer pre-
 
 **Enforced by:** `NotificationRenderAmountsTest` · **Code:** `NotificationPageController#render`,
 `NotificationPageController#groupAmount` · **Related:** REQ-NOTIF-028, REQ-BANK-059
+
+### REQ-NOTIF-032 — A click on a notification opens its subject and marks it read
+
+Every notification row, in the bell dropdown and on the `/notifications` page, links to the subject
+it is about when the viewer can open it. `NotificationViewDto.href` is set by
+`NotificationTargets.targetOf(type, entityType, entityId, viewer)`; the link passes
+`safeSameOriginUrl` before it is rendered.
+
+- **Open and mark read in one click.** A click on an unread row's link sends the existing
+  `POST /notifications/{id}/read` through `krtFetch`, patches every rendered row of that notification
+  and refreshes the badge. A plain activation (mouse or keyboard) waits for the write, at most
+  1.5 seconds, then navigates; a modifier click or a middle click opens the link in a new tab or
+  window as the browser does and marks read in the background. A failed write leaves the row unread
+  and shows no toast. Opening the link from the browser's context menu does not mark read. Loading the
+  link itself changes nothing (ADR-0321).
+- **The subject, not its list.** The link opens the subject's detail page, on the tab that shows
+  what the notice is about, or the list page with the subject brought into view: `?focus=<id>` makes
+  `kernel/krt-focus.js` scroll to the element carrying `data-focus-id="<id>"` and mark it
+  `krt-focus-target`. An id the page does not show (another page of a paginated list, a filtered or
+  removed row) leaves the plain list.
+- **Only what the viewer can open.** A target the viewer's roles do not reach renders no link: booking
+  requests open the request queue for bank staff (`BANK_EMPLOYEE` and above) and the org-unit bank page
+  for everyone else; the admin pages link only for admins, the leadership page only for admins and
+  officers.
+- **Every type is decided.** Each `NotificationType` is either in `NotificationTargets.TARGETS` or in
+  `UNLINKED_TYPES`; a type added without a decision fails the build.
+
+| Notification types | Link |
+| --- | --- |
+| `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER`, `JOB_ORDER_REASSIGNED`, `JOB_ORDER_FINISHED` | `/orders/{id}`; none for a deleted order (`JOB_ORDER_DELETED`) |
+| `JOB_ORDER_ASSIGNED` / `JOB_ORDER_CLAIM_WITHDRAWN` | `/orders/{id}?tab=assignees` / `?tab=materials` |
+| `MISSION_RESCHEDULED`, `MISSION_CANCELLED`, `MISSION_PARTICIPANT_REMOVED_BY_OTHER`, `MISSION_RESPONSIBILITY_ASSIGNED` | `/missions/{id}` |
+| `MISSION_REMINDER`, `MISSION_CHECKIN_OPEN`, `MISSION_PARTICIPANT_ADDED_BY_OTHER`, `MISSION_PARTICIPANT_LEFT`, `HANGAR_SHIP_REMOVED_FROM_UNIT` | `/missions/{id}?tab=crew` |
+| `MISSION_NEVER_ENDED` | `/missions/{id}?tab=verw` |
+| `OPERATION_COMPLETED`, `OPERATION_PAYOUT_PAID_OUT` | `/operations/{id}?tab=payout` |
+| `REFINERY_ORDER_READY`, `REFINERY_ORDER_CHANGED_BY_OTHER` | `/refinery-orders/{id}` |
+| `BANK_BOOKING_REQUEST_CREATED`, `BANK_BOOKING_REQUEST_UPDATED` | staff: `/bank/requests?focus={id}`; others: `/org-unit-bank?focus={id}#tab=fremde` |
+| `BANK_BOOKING_REQUEST_APPROVED` | staff: `/bank/requests?focus={id}`; others: `/org-unit-bank?focus={id}#tab=antraege` |
+| `BANK_BOOKING_REQUEST_CONFIRMED`, `BANK_BOOKING_REQUEST_REJECTED` | `/org-unit-bank?focus={id}#tab=antraege` |
+| `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED`, `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | `/org-unit-bank?focus={id}#tab=fremde` |
+| `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | `/org-unit-bank/accounts/{id}` |
+| `BANK_GRANT_CHANGED` | `/bank/accounts/{id}` |
+| `BANK_ACCOUNT_DEBITED` | `/org-unit-bank` (the notice names the transaction, not the account) |
+| `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | `/bank/holders/{id}` |
+| `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | `/materialboerse?view=offers&scope=mine&selected={id}` |
+| `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `/materialboerse?view=requests&scope=mine&selected={id}` |
+| `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` / `MATERIAL_REQUEST_UNAVAILABLE` | `/materialboerse` / `/materialboerse?view=requests` |
+| `SUPPLY_DONATION_PLEDGED` | `/supply/donations/incoming?focus={id}` |
+| `SUPPLY_DONATION_RECEIVED`, `SUPPLY_DONATION_DECLINED` | `/supply/donations/mine?focus={id}` |
+| `SUPPLY_NEED_ORDER_COVERED` | `/supply/needs?focus={id}` |
+| `PURCHASING_DELIVERY_RECORDED`, `PURCHASING_DELIVERY_DECIDED`, `PURCHASING_SETTLEMENT_OVERDUE` | `/purchasing/deals/{id}` |
+| `PURCHASING_NEED_RELEASED`, `PURCHASING_PAUSED`, `PURCHASING_RESUMED` | `/purchasing/deals` |
+| `PURCHASING_DELEGATE_APPOINTED`, `PURCHASING_DELEGATE_REVOKED` | `/purchasing/delegates?focus={id}` |
+| `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
+| `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
+| `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
+| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory/my` (the notice names a source row, not the recipient's) |
+| `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |
+| `BLUEPRINT_CHANGED_BY_ADMIN`, `BLUEPRINT_PURGED_BY_ADMIN` | `/personal-inventory/blueprints` |
+| `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile#profile-deletion-host` |
+| `ACCOUNT_DELETION_REQUESTED` | admins: `/admin/deletion-requests?focus={member id}` |
+| `DISCORD_REGISTRATION_PENDING` | admins: `/admin/discord-registrations?focus={member id}` |
+| `ORG_LEADERSHIP_ROLE_MISMATCH` | admins: `/members/{id}/edit` |
+| `ORG_MEMBER_DEPARTED` | admins and officers: `/organisation/leitung` |
+| `MISSION_DELETED`, `BANK_GRANT_REVOKED` | none — the subject is gone |
+| `BANK_PAYOUT_RECEIVED`, `BANK_HOLDER_TRANSFER_RECEIVED` | none — no page shows a member their holder |
+
+**Acceptance**
+
+- [x] A click on a `REFINERY_ORDER_READY` notification in the bell dropdown opens that refinery order
+  and the notification is read afterwards; the badge drops by one without a reload.
+- [x] The same holds on the `/notifications` page and for every type with a target.
+- [x] A modifier or middle click opens the subject in a new tab and marks the row read in place.
+- [x] A list target scrolls to and highlights the subject; an id the page does not show leaves the
+  plain list.
+- [x] A type with no entry in `TARGETS` or `UNLINKED_TYPES` fails the build.
+
+**Enforced by:** `NotificationTargetsTest`, `NotificationPageControllerTest` (`href` on
+`/page-items`), `NotificationCenterE2eTest#opensANotificationsSubjectFromTheBellAndMarksItRead` ·
+**Code:** `NotificationTargets`, `NotificationPageController`, `static/js/notification/notifications.js`
+(`openNotification`), `static/js/kernel/krt-focus.js` · **Related:** REQ-NOTIF-005, REQ-NOTIF-022,
+REQ-FE-001 · **Decision:** ADR-0321
 
 ## Out of scope (v1)
 

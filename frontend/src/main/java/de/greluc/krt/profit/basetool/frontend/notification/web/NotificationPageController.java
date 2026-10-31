@@ -47,6 +47,7 @@ import java.text.DecimalFormatSymbols;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,15 +57,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
@@ -99,65 +102,6 @@ public class NotificationPageController {
   private static final int PAGE_LIMIT = 50;
   private static final int DROPDOWN_LIMIT = 10;
 
-  /** The detail page of the record a notification is about, by the notification's entity type. */
-  private static final Map<String, String> ENTITY_PAGES =
-      Map.of(
-          "MISSION",
-          "/missions/",
-          "OPERATION",
-          "/operations/",
-          "JOB_ORDER",
-          "/orders/",
-          "REFINERY_ORDER",
-          "/refinery-orders/",
-          "BANK_ACCOUNT_GRANT",
-          "/bank/accounts/",
-          "BANK_HOLDER",
-          "/bank/holders/",
-          "PURCHASING_DEAL",
-          "/purchasing/deals/");
-
-  /** The types whose record is gone, so the row has nothing to link to. */
-  private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED", "BANK_GRANT_REVOKED");
-
-  /** The page each notification type links to when its subject is a page rather than a record. */
-  private static final Map<String, String> PAGE_TARGETS =
-      Map.ofEntries(
-          Map.entry("MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse"),
-          Map.entry("MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse"),
-          Map.entry("MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "/materialboerse"),
-          Map.entry("MATERIAL_REQUEST_UNAVAILABLE", "/materialboerse"),
-          Map.entry("EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps"),
-          Map.entry("EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps"),
-          Map.entry("INVENTORY_TRANSFERRED_TO_USER", "/inventory/my"),
-          Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
-          Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
-          Map.entry("INVENTORY_POOL_CHANGED_BY_OTHER", "/inventory/my"),
-          Map.entry("BANK_BOOKING_REQUEST_APPROVED", "/bank/requests"),
-          Map.entry("EXCHANGE_CLIENT_SUSPENDED", "/connected-apps"),
-          Map.entry("EXCHANGE_CLIENT_ACTIVATED", "/connected-apps"),
-          Map.entry("EXCHANGE_CLIENT_UPDATE_REQUIRED", "/connected-apps"),
-          Map.entry("EXCHANGE_CLIENT_CAPABILITY_REMOVED", "/connected-apps"),
-          Map.entry("EXCHANGE_SWITCHED_OFF", "/connected-apps"),
-          Map.entry("SUPPLY_DONATION_PLEDGED", "/supply/donations/incoming"),
-          Map.entry("SUPPLY_DONATION_RECEIVED", "/supply/donations/mine"),
-          Map.entry("SUPPLY_DONATION_DECLINED", "/supply/donations/mine"),
-          Map.entry("SUPPLY_NEED_ORDER_COVERED", "/supply/needs"),
-          Map.entry("PURCHASING_NEED_RELEASED", "/purchasing/deals"),
-          Map.entry("PURCHASING_PAUSED", "/purchasing/deals"),
-          Map.entry("PURCHASING_RESUMED", "/purchasing/deals"),
-          Map.entry("PURCHASING_DELEGATE_APPOINTED", "/purchasing/deals"),
-          Map.entry("PURCHASING_DELEGATE_REVOKED", "/purchasing/deals"),
-          Map.entry("HANGAR_SHIP_ASSIGNED", "/hangar"),
-          Map.entry("HANGAR_FITTED_RESET", "/hangar"),
-          Map.entry("HANGAR_CHANGED_BY_ADMIN", "/hangar"),
-          Map.entry("HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "/hangar"),
-          Map.entry("BLUEPRINT_CHANGED_BY_ADMIN", "/personal-inventory/blueprints"),
-          Map.entry("BLUEPRINT_PURGED_BY_ADMIN", "/personal-inventory/blueprints"),
-          Map.entry("ACCOUNT_DELETION_REQUEST_DECLINED", "/profile"),
-          Map.entry("ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests"),
-          Map.entry("DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations"));
-
   /** The suffix that marks a render parameter as a code with a localized word (REQ-NOTIF-028). */
   private static final String CODE_SUFFIX = "Code";
 
@@ -185,6 +129,9 @@ public class NotificationPageController {
   private final BackendSideChannels backendSideChannels;
   private final OAuth2AuthorizedClientManager authorizedClientManager;
   private final MeterRegistry meterRegistry;
+
+  /** Applies the role inheritance before a notification's target is chosen for the viewer. */
+  private final RoleHierarchy roleHierarchy;
 
   /** Live browser-to-backend SSE relays open on this instance (relay-connections gauge source). */
   private final AtomicInteger relayConnections = new AtomicInteger();
@@ -417,7 +364,20 @@ public class NotificationPageController {
       return List.of();
     }
     Locale locale = LocaleContextHolder.getLocale();
-    return dtos.stream().map(dto -> toView(dto, locale)).toList();
+    NotificationTargets.Viewer viewer = currentViewer();
+    return dtos.stream().map(dto -> toView(dto, locale, viewer)).toList();
+  }
+
+  /**
+   * The roles of the signed-in member that decide which notification targets they can open.
+   *
+   * @return the viewer, with no roles when the request carries no authentication
+   */
+  private NotificationTargets.Viewer currentViewer() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    Collection<? extends GrantedAuthority> authorities =
+        authentication == null ? List.of() : authentication.getAuthorities();
+    return NotificationTargets.Viewer.of(roleHierarchy.getReachableGrantedAuthorities(authorities));
   }
 
   /**
@@ -441,7 +401,8 @@ public class NotificationPageController {
       return List.of();
     }
     Locale locale = LocaleContextHolder.getLocale();
-    return result.content().stream().map(dto -> toView(dto, locale)).toList();
+    NotificationTargets.Viewer viewer = currentViewer();
+    return result.content().stream().map(dto -> toView(dto, locale, viewer)).toList();
   }
 
   /**
@@ -456,7 +417,9 @@ public class NotificationPageController {
 
   @org.jetbrains.annotations.NotNull
   private NotificationViewDto toView(
-      @org.jetbrains.annotations.NotNull NotificationDto dto, Locale locale) {
+      @org.jetbrains.annotations.NotNull NotificationDto dto,
+      Locale locale,
+      NotificationTargets.@org.jetbrains.annotations.NotNull Viewer viewer) {
     return new NotificationViewDto(
         dto.id(),
         render(dto.type(), dto.params(), locale),
@@ -464,29 +427,7 @@ public class NotificationPageController {
         dto.createdAt() == null ? "" : DISPLAY_FORMAT.format(dto.createdAt()),
         dto.entityType(),
         dto.entityId(),
-        targetOf(dto.type(), dto.entityType(), dto.entityId()));
-  }
-
-  /**
-   * Resolves the page a notification is about, for the inbox row link.
-   *
-   * @param type the notification type
-   * @param entityType the originating aggregate's type tag
-   * @param entityId the originating aggregate's id
-   * @return a same-origin path, or {@code null} when the web app has no page for the type that its
-   *     seeded recipients can open
-   */
-  static @Nullable String targetOf(
-      @Nullable String type, @Nullable String entityType, @Nullable UUID entityId) {
-    if (type == null) {
-      return null;
-    }
-    String fixed = PAGE_TARGETS.get(type);
-    if (fixed != null || UNLINKED_TYPES.contains(type)) {
-      return fixed;
-    }
-    String prefix = entityType == null ? null : ENTITY_PAGES.get(entityType);
-    return prefix != null && entityId != null ? prefix + entityId : null;
+        NotificationTargets.targetOf(dto.type(), dto.entityType(), dto.entityId(), viewer));
   }
 
   /**
