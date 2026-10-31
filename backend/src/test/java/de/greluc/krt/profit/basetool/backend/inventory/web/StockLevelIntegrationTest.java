@@ -671,7 +671,8 @@ class StockLevelIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json.writeValueAsString(
-                        new StockLevelCreateRequest(orgUnit, materialId, tier, minimum, null))))
+                        new StockLevelCreateRequest(
+                            orgUnit, materialId, null, tier, minimum, null))))
         .andExpect(status().isCreated());
   }
 

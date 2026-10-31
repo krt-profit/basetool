@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
@@ -118,7 +119,9 @@ public class StockLevelService {
   @Transactional(readOnly = true)
   public @NotNull Set<UUID> lowMaterialIds() {
     return list(null, true, null).stream()
-        .map(level -> level.material().id())
+        .map(StockLevelDto::material)
+        .filter(Objects::nonNull)
+        .map(MaterialReferenceDto::id)
         .collect(Collectors.toUnmodifiableSet());
   }
 

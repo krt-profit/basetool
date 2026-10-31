@@ -318,12 +318,14 @@ class StockLevelTabRenderTest {
             bravo,
             new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU"),
             null,
+            null,
             10.0,
             20.0,
             2.0,
             18.0,
             0.2,
             true,
+            0.0,
             false);
     supplyOn = true;
     supplyUnits = List.of(supplyUnit(true, true));
