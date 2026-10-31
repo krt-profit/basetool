@@ -38,7 +38,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -92,7 +91,7 @@ public class InventoryAggregationService {
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    Set<UUID> lowMaterials = stockLevelService.lowMaterialIds();
+    LowStockSubjects low = stockLevelService.lowSubjects();
     return inventoryItemRepository
         .getAggregatedInventory(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
@@ -104,7 +103,7 @@ public class InventoryAggregationService {
               obj[1] != null ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0 : 0.0,
               obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
               obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0,
-              lowMaterials.contains(material.getId()));
+              low.lowMaterial(material.getId()));
         });
   }
 
@@ -117,6 +116,7 @@ public class InventoryAggregationService {
    */
   public Page<AggregatedInventoryDto> getAggregatedItemInventory(Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    LowStockSubjects low = stockLevelService.lowSubjects();
     return inventoryItemRepository
         .getAggregatedItemInventory(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
@@ -126,7 +126,8 @@ public class InventoryAggregationService {
                 inventoryItemMapper.gameItemToReferenceDto((GameItem) obj[0]),
                 null,
                 null,
-                obj[1] != null ? ((Number) obj[1]).doubleValue() : 0.0));
+                obj[1] != null ? ((Number) obj[1]).doubleValue() : 0.0,
+                low.lowGameItem(((GameItem) obj[0]).getId())));
   }
 
   /**
@@ -335,11 +336,11 @@ public class InventoryAggregationService {
             filter.stolenOnly(),
             filter.nonStolenOnly());
 
-    Set<UUID> lowMaterials = stockLevelService.lowMaterialIds();
+    LowStockSubjects low = stockLevelService.lowSubjects();
     return buildGroupedFromStacks(stacks).stream()
         .map(group ->
             group.withLowStock(
-                group.material() != null && lowMaterials.contains(group.material().id())))
+                low.lowMaterial(group.material() == null ? null : group.material().id())))
         .toList();
   }
 
@@ -494,7 +495,12 @@ public class InventoryAggregationService {
             attributes.gradesOrNull(),
             attributes.hasItemClasses(),
             attributes.itemClassesOrNull());
-    return buildGroupedFromItemStacks(stacks);
+    LowStockSubjects low = stockLevelService.lowSubjects();
+    return buildGroupedFromItemStacks(stacks).stream()
+        .map(group ->
+            group.withLowStock(
+                low.lowGameItem(group.gameItem() == null ? null : group.gameItem().id())))
+        .toList();
   }
 
   /**

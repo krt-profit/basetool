@@ -20,10 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -105,6 +108,68 @@ public class AccessGateService {
   }
 
   /**
+   * Checks whether the caller acts as Logistician in {@code orgUnitId}, the unit that owns the
+   * target: the contextual {@code LOGISTICIAN} grant of that unit, inside the active scope (a pin
+   * to another unit refuses it); admins pass within their own scope (REQ-SEC-005).
+   *
+   * @param orgUnitId the target's owning org unit; never {@code null}
+   * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active scope
+   */
+  public boolean canActAsLogisticianIn(@NotNull UUID orgUnitId) {
+    return hasRoleInOrgUnit(orgUnitId, Roles.LOGISTICIAN) && canEditSquadron(orgUnitId);
+  }
+
+  /**
+   * {@link #canActAsLogisticianIn(UUID)} for a target that may have no owning unit: such a target
+   * is reserved to admins.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or Logistician of {@code orgUnitId}
+   */
+  public boolean canActAsLogisticianInOwner(@Nullable UUID orgUnitId) {
+    return orgUnitId == null ? authHelper.isAdmin() : canActAsLogisticianIn(orgUnitId);
+  }
+
+  /**
+   * Returns the org units whose data the caller handles as Logistician: the units of the caller's
+   * contextual {@code LOGISTICIAN} grants inside the active scope. An admin holds no grants, so the
+   * set is empty for them; callers branch on {@link AuthHelperService#isAdmin()} first.
+   *
+   * @return the Logistician org-unit ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> currentLogisticianOrgUnitIds() {
+    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
+    Set<UUID> ids = new LinkedHashSet<>();
+    authHelper
+        .currentAuthentication()
+        .ifPresent(authentication -> {
+          for (GrantedAuthority a : authentication.getAuthorities()) {
+            if (a instanceof OrgUnitContextualAuthority ctx
+                && Roles.LOGISTICIAN.equals(ctx.roleName())
+                && scope.permits(ctx.orgUnitId())) {
+              ids.add(ctx.orgUnitId());
+            }
+          }
+        });
+    return ids;
+  }
+
+  /**
+   * Returns the scope vector of the data the caller handles as Logistician, for list queries: the
+   * admin's own scope for an admin, otherwise exactly the {@link #currentLogisticianOrgUnitIds()}
+   * (empty set: nothing).
+   *
+   * @return a never-null scope vector limited to the caller's Logistician units
+   */
+  @NotNull
+  public ScopePredicate currentLogisticianScope() {
+    return authHelper.isAdmin()
+        ? requestScopeResolver.currentScopePredicate()
+        : new ScopePredicate(false, null, currentLogisticianOrgUnitIds());
+  }
+
+  /**
    * Checks whether the caller holds officer reach in {@code orgUnitId}, the unit that owns the
    * target (REQ-SEC-015, ADR-0300); admins always pass.
    *
@@ -139,6 +204,21 @@ public class AccessGateService {
    */
   public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
     return orgUnitId == null ? authHelper.isAdmin() : canActAsOfficerIn(orgUnitId);
+  }
+
+  /**
+   * Checks whether the caller may manage the missions and operations of {@code orgUnitId}: a
+   * Mission Manager grant in that unit. A target without a unit is managed by a grant in an
+   * Organisationsleitung or Bereich unit only; admins always pass (REQ-SEC-065).
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds the matching Mission Manager grant
+   */
+  public boolean canManageMissionsOf(@Nullable UUID orgUnitId) {
+    if (orgUnitId != null) {
+      return hasRoleInOrgUnit(orgUnitId, Roles.MISSION_MANAGER);
+    }
+    return authHelper.isAdmin() || requestScopeResolver.holdsLeadershipMissionManagerGrant();
   }
 
   /**

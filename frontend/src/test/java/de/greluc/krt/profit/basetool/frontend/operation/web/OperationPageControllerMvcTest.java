@@ -101,6 +101,12 @@ class OperationPageControllerMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    when(backendApiClient.get(
+            "/api/v1/me/capabilities",
+            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
+                .CapabilitiesResponse.class))
+        .thenReturn(
+            de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager());
   }
 
   @Test
@@ -357,6 +363,13 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void operationDetail_readOnlyUser_seesNoEditDialogAndNoActions() throws Exception {
     UUID opId = UUID.randomUUID();
+    when(backendApiClient.get(
+            "/api/v1/me/capabilities",
+            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
+                .CapabilitiesResponse.class))
+        .thenReturn(
+            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
+                .CapabilitiesResponse.NONE);
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L, null, null, null));
 

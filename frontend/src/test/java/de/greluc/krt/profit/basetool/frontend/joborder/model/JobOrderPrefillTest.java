@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -28,13 +29,14 @@ import org.junit.jupiter.api.Test;
 class JobOrderPrefillTest {
 
   private static final UUID MATERIAL = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+  private static final UUID ITEM = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
   private static final UUID UNIT = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
 
   @Test
   void theMaterialLineAndTheRequestingUnitAreFilled() {
     JobOrderForm form = new JobOrderForm();
 
-    new JobOrderPrefill(MATERIAL, 650, 4.5, UNIT).applyTo(form);
+    new JobOrderPrefill(MATERIAL, 650, 4.5, UNIT, null, null).applyTo(form);
 
     JobOrderForm.JobOrderMaterialForm line = form.getMaterials().getFirst();
     assertThat(line.getMaterialId()).isEqualTo(MATERIAL);
@@ -47,7 +49,7 @@ class JobOrderPrefillTest {
   void aMissingFloorKeepsTheLineDefault() {
     JobOrderForm form = new JobOrderForm();
 
-    new JobOrderPrefill(MATERIAL, null, 2.0, null).applyTo(form);
+    new JobOrderPrefill(MATERIAL, null, 2.0, null, null, null).applyTo(form);
 
     assertThat(form.getMaterials().getFirst().getMinQuality()).isEqualTo(650);
     assertThat(form.getRequestingOrgUnitId()).isNull();
@@ -57,9 +59,43 @@ class JobOrderPrefillTest {
   void withoutAMaterialTheFormStaysEmpty() {
     JobOrderForm form = new JobOrderForm();
 
-    new JobOrderPrefill(null, 650, 4.5, null).applyTo(form);
+    new JobOrderPrefill(null, 650, 4.5, null, null, null).applyTo(form);
 
     assertThat(form.getMaterials().getFirst().getMaterialId()).isNull();
     assertThat(form.getMaterials().getFirst().getAmount()).isNull();
+  }
+
+  @Test
+  void anItemWithoutAMaterialStartsAnItemOrderWithAWholeUnitLine() {
+    JobOrderPrefill prefill = new JobOrderPrefill(null, null, 3.2, UNIT, ITEM, "Gatling S2");
+
+    assertThat(prefill.itemOrder()).isTrue();
+    assertThat(prefill.itemLine())
+        .containsEntry("gameItemId", ITEM.toString())
+        .containsEntry("gameItemName", "Gatling S2")
+        .containsEntry("amount", 4);
+  }
+
+  @Test
+  void aMissingAmountOrdersOneItem() {
+    assertThat(new JobOrderPrefill(null, null, null, null, ITEM, null).itemLine())
+        .containsEntry("amount", 1);
+  }
+
+  @Test
+  void aMaterialWinsOverAnItemAndAnItemLessPrefillIsNoItemOrder() {
+    assertThat(new JobOrderPrefill(MATERIAL, null, 1.0, null, ITEM, null).itemOrder()).isFalse();
+    assertThat(new JobOrderPrefill(null, null, 1.0, null, null, null).itemOrder()).isFalse();
+    assertThatThrownBy(() -> new JobOrderPrefill(null, null, 1.0, null, null, null).itemLine())
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void theRequestingUnitPrefillsTheItemForm() {
+    JobOrderItemForm form = new JobOrderItemForm();
+
+    new JobOrderPrefill(null, null, 2.0, UNIT, ITEM, null).applyTo(form);
+
+    assertThat(form.getRequestingOrgUnitId()).isEqualTo(UNIT);
   }
 }

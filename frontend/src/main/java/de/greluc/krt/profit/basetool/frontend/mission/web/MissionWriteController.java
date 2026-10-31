@@ -1127,7 +1127,7 @@ public class MissionWriteController {
    */
   @NotNull
   @PostMapping("/{id}/frequencies")
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public String addOrUpdateFrequency(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull UUID frequencyTypeId,
@@ -1150,7 +1150,7 @@ public class MissionWriteController {
    */
   @NotNull
   @PostMapping("/{id}/frequencies/{frequencyId}/delete")
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public String deleteFrequency(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
@@ -1173,7 +1173,7 @@ public class MissionWriteController {
    */
   @PutMapping(value = "/{id}/frequencies/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public ResponseEntity<Object> addOrUpdateFrequencyAjax(
       @PathVariable @NotNull UUID id, @RequestBody AddFrequencyRequest body) {
     return relay(
@@ -1193,7 +1193,7 @@ public class MissionWriteController {
       value = "/{id}/frequencies/{frequencyId}/ajax",
       produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public ResponseEntity<Object> deleteFrequencyAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
     return relay(
@@ -1214,7 +1214,7 @@ public class MissionWriteController {
    */
   @PostMapping(value = "/{id}/frequencies/custom/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public ResponseEntity<Object> addCustomFrequencyAjax(
       @PathVariable @NotNull UUID id, @RequestBody AddCustomFrequencyRequest body) {
     return relay(
@@ -1239,7 +1239,7 @@ public class MissionWriteController {
       value = "/{id}/frequencies/custom/{frequencyId}/ajax",
       produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public ResponseEntity<Object> updateCustomFrequencyAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,

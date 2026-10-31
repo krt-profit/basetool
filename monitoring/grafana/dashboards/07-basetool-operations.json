@@ -4338,6 +4338,55 @@
         }
       ],
       "description": "Notifications raised by the one-minute time-based producer (REQ-NOTIF-026), by producer kind."
+    },
+    {
+      "id": 91,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 312
+      },
+      "type": "timeseries",
+      "title": "Minimum stock levels below their minimum",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "basetool_inventory_minimum_levels_below",
+          "refId": "A",
+          "legendFormat": "low levels",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Minimum stock levels whose allocated free stock is below the minimum right now (REQ-INV-067, REQ-OBS-011). A trend for the Logisticians, not an alert."
     }
   ]
 }

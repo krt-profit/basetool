@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -43,6 +44,7 @@ import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -106,6 +108,10 @@ public class RequestScopeResolver {
   /** Request-memo key for {@link #currentOfficerOrgUnitIds()}. */
   private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_OFFICER_ORG_UNIT_IDS =
       RequestMemo.Key.of(RequestScopeResolver.class, "officerOrgUnitIds");
+
+  /** Request-memo key for {@link #currentMissionManagerOrgUnitIds()}. */
+  private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_MISSION_MANAGER_ORG_UNIT_IDS =
+      RequestMemo.Key.of(RequestScopeResolver.class, "missionManagerOrgUnitIds");
 
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -510,6 +516,64 @@ public class RequestScopeResolver {
       return false;
     }
     return readActiveSquadronFromHeader().map(reach::contains).orElse(true);
+  }
+
+  /**
+   * Returns the org units in which the caller holds a Mission Manager grant, own or seat-derived:
+   * the contextual {@code MISSION_MANAGER} authorities, never the flat role. An admin's pass is not
+   * part of the set. Memoised per request.
+   *
+   * @return the caller's Mission Manager org-unit ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> currentMissionManagerOrgUnitIds() {
+    return RequestMemo.get(
+        request,
+        CACHE_KEY_MISSION_MANAGER_ORG_UNIT_IDS,
+        () -> {
+          Set<UUID> grants = new LinkedHashSet<>();
+          authHelper
+              .currentAuthentication()
+              .ifPresent(a -> {
+                for (GrantedAuthority authority : a.getAuthorities()) {
+                  if (authority instanceof OrgUnitContextualAuthority ctx
+                      && Roles.MISSION_MANAGER.equals(ctx.roleName())) {
+                    grants.add(ctx.orgUnitId());
+                  }
+                }
+              });
+          return Collections.unmodifiableSet(grants);
+        });
+  }
+
+  /**
+   * Whether the caller holds a Mission Manager grant in an Organisationsleitung or Bereich unit,
+   * which is what manages a mission without an owning unit (REQ-SEC-065). An admin's pass is not
+   * part of this check.
+   *
+   * @return {@code true} iff one of {@link #currentMissionManagerOrgUnitIds()} is a leadership unit
+   */
+  public boolean holdsLeadershipMissionManagerGrant() {
+    Set<UUID> grants = currentMissionManagerOrgUnitIds();
+    return !grants.isEmpty() && !orgUnitRepository.findLeadershipOrgUnitIdsAmong(grants).isEmpty();
+  }
+
+  /**
+   * Whether the caller holds a Mission Manager grant in the active context: in the pinned unit when
+   * one is pinned, in at least one unit otherwise. Admins always pass. Drives visibility only,
+   * never a write.
+   *
+   * @return {@code true} iff the caller is an admin or holds a grant in the active context
+   */
+  public boolean canActAsMissionManagerInActiveContext() {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    Set<UUID> grants = currentMissionManagerOrgUnitIds();
+    if (grants.isEmpty()) {
+      return false;
+    }
+    return readActiveSquadronFromHeader().map(grants::contains).orElse(true);
   }
 
   /**

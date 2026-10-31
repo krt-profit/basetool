@@ -88,6 +88,19 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   List<UUID> findAllOrgUnitIds();
 
   /**
+   * Narrows {@code ids} to the leadership units among them: the Organisationsleitung and every
+   * Bereich.
+   *
+   * @param ids the candidate org-unit ids; never {@code null}
+   * @return the ids of {@code ids} that name an Organisationsleitung or a Bereich; never {@code
+   *     null}, possibly empty
+   */
+  @Query(
+      "SELECT o.id FROM OrgUnit o WHERE o.id IN :ids AND TYPE(o) IN (Bereich,"
+          + " Organisationsleitung)")
+  List<UUID> findLeadershipOrgUnitIdsAmong(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich} for the
    * org chart's Bereich tiers (REQ-ORG-026).
    *

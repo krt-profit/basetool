@@ -580,7 +580,8 @@ caller below `Member` on this surface: an account whose realm roles map to nothi
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
-³ Mission-Manager additionally only within their own Staffel scope (`canEditMission`); an
+³ A Mission-Manager grant counts only for the unit that owns the mission (`canEditMission`); an
+ownerless mission needs a grant in an Organisationsleitung or Bereich unit. An
 Officer's owner change needs officer reach in the mission's owning unit (`canChangeOwner`,
 REQ-SEC-065). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
 does not (§1.3). Which missions are in scope is `canSeeMission` — own Staffel, or any non-internal
@@ -629,8 +630,8 @@ of the manage row above.
 | Read operation (list/detail) (`isAuthenticated()` [+ `canSeeOperation`])                  |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read payout breakdown (`canSeeOperation`; escape-only caller sees **only their own row**) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read finances / finance-summary (`canSeeOperationLedger` — **scope only**, ADR-0150)      |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
-| Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])               |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)           |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| Create/edit operation (Mission Manager grant in the owning unit: `canEditOperation`) |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Mark payout as paid-out** (`canEditOperation`)                                          |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
 | **Revoke** paid-out (additionally `canClearPayout`: officer reach in the operation's unit)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
 | **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
@@ -652,10 +653,11 @@ of the manage row above.
 > (`canSeeOperationLedger`), and `/payouts` reduces an escape-only caller to their own row. Before
 > 2026-08-30 that caller received every participant's callsign, percentage, expenses, share,
 > donation, transfer fee, net payout and confirming officer.
-> Creating an ownerless operation is open to any Mission-Manager **without**
-> org unit (Bereichsleitung); editing it is allowed for any Mission-Manager,
-> deleting it for any admin (`canEditOperation` is a no-op for ownerless
-> operations, the endpoint's role gate carries the restriction).
+> Mission Manager powers apply **per unit**: a grant in unit A (own flag, officer rank or the cascaded
+> reach of a Bereich or Organisationsleitung seat) creates, edits and marks payouts for A's operations
+> only; creating stamps the pinned or picked unit and needs the grant there. An ownerless
+> (Bereichsleitung) operation or mission is managed only with a Mission Manager grant in an
+> Organisationsleitung or Bereich unit — a squadron Mission Manager does not — and deleted by admins.
 
 ### 3.7 Mission finances & profit
 
@@ -1246,7 +1248,7 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
 |:-------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------|:-------------------------------------------------------------------------------|
 | Home, Notifications, Profile (`/`, `/notifications`, `/profile`, `/profile/deletion-request`, `/profile/notification-preferences`, `/me/**`)                              | `isAuthenticated()` (`/` is public, §1)                                 | always                                                                         |
-| Missions, Operations (`/missions/**`, `/operations/**`), mission finance (`/missions/{id}/finance-entries`)                          | `isAuthenticated()`; mission delete `ADMIN`; operation create/edit/payout `MISSION_MANAGER`, delete `ADMIN`; frequency writes `MISSION_MANAGER` | always                                                                         |
+| Missions, Operations (`/missions/**`, `/operations/**`), mission finance (`/missions/{id}/finance-entries`)                          | `isAuthenticated()`; mission delete `ADMIN`; operation create/edit/payout `MISSION_MANAGER` grant in the owning unit, delete `ADMIN`; frequency writes `MISSION_MANAGER` (pin-aware flag) | always                                                                         |
 | Hangar, both tabs „Meine Schiffe" · „Org-Einheit" (`/hangar`, `/hangar/squadron`), Lager (`/inventory/**`), Raffinerie (`/refinery-orders/**`) | `isAuthenticated()`; Lager wipe `ADMIN`                                 | always                                                                         |
 | Materialbörse (`/materialboerse`)                                                                                                    | `hasRole('KRT_MEMBER')`                                                 | `KRT_MEMBER`                                                                   |
 | Aufträge (`/orders/**`, `/orders/material-demand`, item / material collection)                                                      | `isAuthenticated()`; order edit/claims `LOGISTICIAN`, handovers/unlink Logistician+ | „Aufträge" + „Materialbedarf" if `canViewJobOrders`, else „Meine Aufträge" if `canViewOwnJobOrders`, else „Auftrag anlegen" |
@@ -1306,9 +1308,8 @@ The assignee grant itself is built (§3.3, footnote ⁶). Still planned:
 ### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 
 **Shipped for materials and game items:** setting, changing and removing a unit's levels and the
-„Mindestbestände“ tab, the shortcuts and the „niedrig“ badge follow the rows below
-(`StockLevelAccessPolicy`, the Lager `ScopePredicate`). The widget and the notification are still
-planned.
+„Mindestbestände“ tab, the shortcuts, the „niedrig“ badge and the notification follow the rows
+below (`StockLevelAccessPolicy`, the Lager `ScopePredicate`). The widget is still planned.
 
 | Function | Who |
 | --- | --- |
