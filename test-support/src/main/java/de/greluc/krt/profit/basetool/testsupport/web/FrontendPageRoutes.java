@@ -59,6 +59,7 @@ public final class FrontendPageRoutes {
           "/inventory/all",
           "/inventory/my",
           "/inventory/input",
+          "/inventory/stock-levels",
           "/bank",
           "/bank/requests",
           "/bank/grants",

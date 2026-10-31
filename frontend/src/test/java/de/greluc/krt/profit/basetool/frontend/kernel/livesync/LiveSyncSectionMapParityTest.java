@@ -50,6 +50,9 @@ class LiveSyncSectionMapParityTest {
   private static final Pattern SEAM_ENTRY =
       Pattern.compile("(?:'([\\w-]+)'|\"([\\w-]+)\"|([\\w-]+))\\s*:\\s*\\{\\s*container");
 
+  /** The one {@code inventory_all} section the Lager pages render; the levels tab adds its own. */
+  private static final String LAGER_STOCK_SECTION = "stock";
+
   @Test
   void missionSeamMap_matchesTheMissionTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/mission/mission-detail.js", "sections");
@@ -294,13 +297,21 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void stockLevelSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/stock-levels.js", "sections");
+    assertThat(jsKeys)
+        .as("sections keys in stock-levels.js vs LiveSyncTopicClass.INVENTORY_ALL")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-admin.js", "sections", 0);
     assertThat(jsKeys)
         .as(
             "sections keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
                 + " whitelist")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -308,7 +319,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-my.js", "sections", 0);
     assertThat(jsKeys)
         .as("sections keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -316,7 +327,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-index.js", "sections");
     assertThat(jsKeys)
         .as("sections keys in inventory-index.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -324,7 +335,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-material.js", "sections");
     assertThat(jsKeys)
         .as("sections keys in inventory-material.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -332,7 +343,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-game-item.js", "sections");
     assertThat(jsKeys)
         .as("sections keys in inventory-game-item.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test

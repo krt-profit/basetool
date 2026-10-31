@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
@@ -77,6 +78,7 @@ class SecurityExpressionRulesTest {
           Map.entry("connectedAppsGate", 1),
           Map.entry("jobOrderAccessPolicy", 20),
           Map.entry("inventoryAccessPolicy", 9),
+          Map.entry("stockLevelAccessPolicy", 3),
           Map.entry("hangarAccessPolicy", 2),
           Map.entry("blueprintAccessPolicy", 1));
 
@@ -98,6 +100,7 @@ class SecurityExpressionRulesTest {
           Map.entry("connectedAppsGate", ConnectedAppsGate.class),
           Map.entry("jobOrderAccessPolicy", JobOrderAccessPolicy.class),
           Map.entry("inventoryAccessPolicy", InventoryAccessPolicy.class),
+          Map.entry("stockLevelAccessPolicy", StockLevelAccessPolicy.class),
           Map.entry("hangarAccessPolicy", HangarAccessPolicy.class),
           Map.entry("blueprintAccessPolicy", BlueprintAccessPolicy.class));
 
