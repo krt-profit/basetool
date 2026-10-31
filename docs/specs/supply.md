@@ -106,8 +106,8 @@ from the response, not null-filled by the client.
 
 Any member pledges a donation of a material or a game item, a quality and an amount above zero to a
 unit with `accepts_donations`, optionally credited to one of that unit's open needs and optionally from
-one of the member's own Lager rows. A pledge credited to a need takes the unit and the catalogue entry
-from the need and must satisfy its tier.
+one of the member's own Lager rows, picked in the dialog (REQ-SUP-025). A pledge credited to a need
+takes the unit and the catalogue entry from the need and must satisfy its tier.
 
 **Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService#pledge`
 
@@ -299,6 +299,25 @@ der Bedarf ist noch offen". It links to the needs page.
 `SeededNotificationRulesIntegrationTest`, `NotificationTypeMessageCoverageTest` · **Code:**
 `supply/internal/SupplyOrderCoveredNoticeProducer`, `supply/api/events/SupplyNotices`,
 `V312__add_supply_need_order_covered_marker.sql`
+
+### REQ-SUP-025 — The pledge dialog picks the stock from the member's Lager
+
+The „Spende anmelden" dialog, for a need and for a free pledge, offers „Aus meinem Lager": the caller's
+own Lager rows of the need's entry at the need's tier, or of the chosen material or game item, that are
+not marked stolen and still have an amount not pledged yet, best quality first, each labelled with its
+location, quality and free amount (`GET /api/v1/supply/me/donation-sources`).
+
+- Choosing a row pledges from it (REQ-SUP-008): the quality comes from the row, the dialog shows the
+  free amount, and the stock moves only when the unit receives the donation (REQ-SUP-009).
+  „Nicht aus dem Lager" keeps the free pledge.
+- The picker reloads when the material, the item or the kind changes; an answer a later change has
+  overtaken is dropped.
+- The read returns only the caller's own rows and changes nothing.
+
+**Enforced by:** `SupplyDonationServiceTest`, `SupplyPledgeSourceRenderTest`,
+`SupplyBackendClientTest` · **Code:** `supply/internal/SupplyDonationService#sources`,
+`inventory/api/StockReads#donatableRows`, `supply/fragments/pledge-modal.html`,
+`static/js/supply/supply-common.js`
 
 ## Out of scope
 

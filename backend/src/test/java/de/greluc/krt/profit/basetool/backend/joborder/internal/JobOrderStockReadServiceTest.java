@@ -63,7 +63,7 @@ class JobOrderStockReadServiceTest {
   void setUp() {
     service =
         new JobOrderStockReadService(
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null),
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             jobOrderRepository);
   }
 

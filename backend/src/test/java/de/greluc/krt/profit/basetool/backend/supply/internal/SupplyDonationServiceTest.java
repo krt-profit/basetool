@@ -55,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -557,5 +558,56 @@ class SupplyDonationServiceTest {
 
     assertThatThrownBy(() -> service.listForUnit(unit.getId(), Set.of(), Pageable.unpaged()))
         .isInstanceOf(AccessDeniedException.class);
+  }
+
+  private StockRow ownRow(int quality, double amount, double pledged) {
+    StockRow row = org.mockito.Mockito.mock(StockRow.class);
+    when(row.getId()).thenReturn(UUID.randomUUID());
+    when(row.getMaterial()).thenReturn(material);
+    when(row.getLocation()).thenReturn(location);
+    when(row.getQuality()).thenReturn(quality);
+    when(row.getAmount()).thenReturn(amount);
+    when(row.donationReserved()).thenReturn(pledged);
+    return row;
+  }
+
+  @Test
+  void theSourcesOfANeedAreTheCallersRowsAtItsTierWithAFreeAmount() {
+    SupplyNeed need = openNeed(650);
+    callerIs(DONOR);
+    when(needRepository.findById(need.getId())).thenReturn(Optional.of(need));
+    StockRow good = ownRow(700, 12.4, 2.4);
+    StockRow tooLow = org.mockito.Mockito.mock(StockRow.class);
+    when(tooLow.getQuality()).thenReturn(400);
+    StockRow pledgedOut = org.mockito.Mockito.mock(StockRow.class);
+    when(pledgedOut.getQuality()).thenReturn(900);
+    when(pledgedOut.getAmount()).thenReturn(5.0);
+    when(pledgedOut.donationReserved()).thenReturn(5.0);
+    when(stockReads.donatableRows(DONOR, material.getId(), null))
+        .thenReturn(List.of(good, tooLow, pledgedOut));
+
+    assertThat(service.sources(need.getId(), null, null))
+        .containsExactly(new DonationSourceDto(good.getId(), "Lorville", 700, 10.0, "SCU"));
+  }
+
+  @Test
+  void theSourcesOfAFreePledgeAreTheCallersRowsOfTheNamedMaterial() {
+    callerIs(DONOR);
+    StockRow any = ownRow(100, 3.0, 0.0);
+    when(stockReads.donatableRows(DONOR, material.getId(), null)).thenReturn(List.of(any));
+
+    assertThat(service.sources(null, material.getId(), null))
+        .containsExactly(new DonationSourceDto(any.getId(), "Lorville", 100, 3.0, "SCU"));
+  }
+
+  @Test
+  void sourcesNeedANeedOrExactlyOneCatalogueEntry() {
+    callerIs(DONOR);
+
+    assertThatThrownBy(() -> service.sources(null, null, null))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> service.sources(null, material.getId(), UUID.randomUUID()))
+        .isInstanceOf(BadRequestException.class);
+    verify(stockReads, never()).donatableRows(any(), any(), any());
   }
 }

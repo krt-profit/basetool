@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.events.SupplyNotices;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.criteria.JoinType;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -518,6 +519,53 @@ public class SupplyDonationService {
     if (!accessPolicy.canManageUnit(unitId)) {
       throw new AccessDeniedException("The caller does not manage this unit's donations");
     }
+  }
+
+  /**
+   * Lists the caller's own Lager rows a pledge can be made from: rows of the need's entry at the
+   * need's tier, or of the named material or game item, that are not marked stolen and still have
+   * an amount not pledged yet (REQ-SUP-025).
+   *
+   * @param needId the need the pledge credits, or {@code null}
+   * @param materialId the material of a free pledge, or {@code null}
+   * @param gameItemId the game item of a free pledge, or {@code null}
+   * @return the rows, best quality first
+   * @throws BadRequestException when neither a need nor exactly one catalogue entry is named
+   */
+  @Transactional(readOnly = true)
+  public @NotNull List<DonationSourceDto> sources(
+      @Nullable UUID needId, @Nullable UUID materialId, @Nullable UUID gameItemId) {
+    settingsService.requireEnabled();
+    UUID donor = requireCaller();
+    SupplyNeed need = needId == null ? null : loadOpenNeed(needId);
+    UUID material =
+        need != null ? need.getMaterial() == null ? null : need.getMaterial().getId() : materialId;
+    UUID item =
+        need != null ? need.getGameItem() == null ? null : need.getGameItem().getId() : gameItemId;
+    if ((material == null) == (item == null)) {
+      throw new BadRequestException("Name a need or exactly one of material and game item");
+    }
+    List<DonationSourceDto> sources = new ArrayList<>();
+    for (StockRow row : stockReads.donatableRows(donor, material, item)) {
+      if (need != null
+          && material != null
+          && need.getQualityTier() != null
+          && !need.getQualityTier().isSatisfiedBy(row.getQuality())) {
+        continue;
+      }
+      double free = ScuAmounts.roundToScuScale(row.getAmount() - row.donationReserved());
+      if (free <= 0) {
+        continue;
+      }
+      sources.add(
+          new DonationSourceDto(
+              row.getId(),
+              row.getLocation().getName(),
+              row.getGameItem() == null ? row.getQuality() : null,
+              free,
+              SupplyMapper.quantityType(row.getMaterial())));
+    }
+    return sources;
   }
 
   private static void requireFitsNeed(

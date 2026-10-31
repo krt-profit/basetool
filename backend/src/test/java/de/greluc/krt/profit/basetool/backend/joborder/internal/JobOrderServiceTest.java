@@ -144,7 +144,7 @@ class JobOrderServiceTest {
         new JobOrderService(
             jobOrderRepository,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null),
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             new InventoryStockCommands(
                 inventoryItemRepository, null, null, null, null, null, null, null),
             null,
@@ -171,7 +171,7 @@ class JobOrderServiceTest {
         new JobOrderQueryService(
             jobOrderRepository,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null),
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             ownerScopeService,
             jobOrderAccessPolicy,
             jobOrderMapper,

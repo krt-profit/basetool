@@ -215,4 +215,17 @@ public interface StockReads {
       boolean includeMaterial,
       boolean includeItem,
       int limit);
+
+  /**
+   * Returns the member's own rows of one material or game item that are not marked stolen, with
+   * their donation slices loaded, for the stock picker of a pledge (REQ-SUP-025).
+   *
+   * @param userId the member
+   * @param materialId the material, or {@code null} for a game item
+   * @param gameItemId the game item, or {@code null} for a material
+   * @return the rows, best quality first
+   */
+  @NotNull
+  List<StockRow> donatableRows(
+      @NotNull UUID userId, @Nullable UUID materialId, @Nullable UUID gameItemId);
 }

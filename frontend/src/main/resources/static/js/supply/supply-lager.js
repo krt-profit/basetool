@@ -19,12 +19,18 @@
 
 /* global supplyI18n */
 
-import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { field, numberOrNull, select, sendWrite, textOrNull } from '/js/supply/supply-common.js';
+import {
+    field,
+    formatAmount,
+    numberOrNull,
+    select,
+    sendWrite,
+    textOrNull,
+} from '/js/supply/supply-common.js';
 
 /**
  * @typedef {object} LagerUnit
@@ -65,20 +71,6 @@ function fillUnits(target, units) {
         option.textContent = unit.name;
         target.appendChild(option);
     }
-}
-
-/**
- * Formats a number for the hint under the amount field.
- *
- * @param {number} value the amount
- * @param {string} quantityType `PIECE`, `ITEM` or `SCU`
- * @returns {string} the formatted amount
- */
-function formatAmount(value, quantityType) {
-    const whole = quantityType === 'PIECE' || quantityType === 'ITEM';
-    return whole
-        ? formatNumber(Math.round(value), 0, document.documentElement.lang)
-        : formatNumber(value, 3, document.documentElement.lang);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

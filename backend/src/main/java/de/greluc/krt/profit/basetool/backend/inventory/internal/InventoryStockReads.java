@@ -64,6 +64,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   private final InventoryItemRepository inventoryRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryStockSplitRepository splitRepository;
+  private final InventoryDonationSourceRepository donationSourceRepository;
 
   @Override
   public @NotNull List<ExchangeStockLotRow> exchangeLots(
@@ -271,6 +272,13 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
     return new ArrayList<StockRow>(
         inventoryRepository.findReleasableForUser(
             userId, query, includeMaterial, includeItem, PageRequest.of(0, limit)));
+  }
+
+  @Override
+  public @NotNull List<StockRow> donatableRows(
+      @NotNull UUID userId, @Nullable UUID materialId, @Nullable UUID gameItemId) {
+    return new ArrayList<StockRow>(
+        donationSourceRepository.findDonatableForUser(userId, materialId, gameItemId));
   }
 
   /**

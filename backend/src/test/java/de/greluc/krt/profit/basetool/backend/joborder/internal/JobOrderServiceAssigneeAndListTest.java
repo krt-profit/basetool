@@ -126,7 +126,7 @@ class JobOrderServiceAssigneeAndListTest {
         new JobOrderService(
             jobOrderRepository,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null),
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             new InventoryStockCommands(
                 inventoryItemRepository, null, null, null, null, null, null, null),
             jobOrderAssigneeService,
@@ -154,7 +154,7 @@ class JobOrderServiceAssigneeAndListTest {
         new JobOrderQueryService(
             jobOrderRepository,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null),
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             ownerScopeService,
             jobOrderAccessPolicy,
             jobOrderMapper,

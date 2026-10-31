@@ -7,7 +7,6 @@
             <form id="supply-pledge-form" class="no-track" novalidate>
                 <div class="krt-modal-body">
                     <input type="hidden" id="supply-pledge-need-id">
-                    <input type="hidden" id="supply-pledge-source-id">
                     <p class="supply-pledge-need" id="supply-pledge-need-label" hidden></p>
                     <div class="form-group" id="supply-pledge-unit-row">
                         <label for="supply-pledge-unit" th:text="#{supply.pledge.unit}">Annehmende Einheit</label>
@@ -40,9 +39,17 @@
                             <input type="text" data-number-input id="supply-pledge-quality" min="0" max="1000" step="1" inputmode="numeric" value="0">
                         </div>
                     </div>
+                    <div class="form-group" id="supply-pledge-source-row">
+                        <label for="supply-pledge-source" th:text="#{supply.pledge.source}">Aus meinem Lager</label>
+                        <select id="supply-pledge-source" data-testid="supply-pledge-source">
+                            <option value="" th:text="#{supply.pledge.source.none}">Nicht aus dem Lager</option>
+                        </select>
+                        <small class="form-hint" th:text="#{supply.pledge.source.hint}">Der Bestand bleibt bei dir und wird erst umgebucht, wenn die Einheit die Spende annimmt.</small>
+                    </div>
                     <div class="form-group">
                         <label for="supply-pledge-amount" th:text="#{supply.need.amount}">Menge</label>
                         <input type="text" data-number-input id="supply-pledge-amount" min="0.001" step="any" inputmode="decimal" required>
+                        <small id="supply-pledge-free" class="form-hint" hidden></small>
                     </div>
                 </div>
                 <div class="krt-modal-foot">

@@ -1529,6 +1529,10 @@ event with a `StockBookingReason` (`DONATION`, `PURCHASE`):
 - `releaseDonationEarmark(donationId)` removes the donation's slices from every row; records
   `INVENTORY_ALLOCATION_REMOVED`.
 
+`inventory.api.StockReads#donatableRows(userId, materialId, gameItemId)` reads a member's own rows of
+one entry that are not marked stolen, with their donation slices, for the pledge dialog's stock picker
+(REQ-SUP-025); it writes nothing.
+
 A pool is not a table: it is a shared row held by a member and stamped with `owning_org_unit_id`. The
 caller authorises the action; the commands do not read the donation.
 
