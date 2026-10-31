@@ -121,7 +121,7 @@ public class InventoryPageController {
 
   private final ParallelPageLoader parallelPageLoader;
 
-  /** Resolves ADMIN/OFFICER onto LOGISTICIAN so the gate is asked, not enumerated. */
+  /** Resolves ADMIN onto LOGISTICIAN so the gate is asked, not enumerated. */
   private final RoleHierarchy roleHierarchy;
 
   /** Labels the item picker's search results with size, grade and class (REQ-INV-064). */

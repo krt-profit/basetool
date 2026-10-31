@@ -110,8 +110,7 @@ public class JobOrderWriteController {
 
   /**
    * Role hierarchy consulted by the duplicated {@link #isLogistician} check so implied authorities
-   * (ADMIN/OFFICER reaching LOGISTICIAN) gate the assignee-section rendering exactly as on the read
-   * side.
+   * (ADMIN reaching LOGISTICIAN) gate the assignee-section rendering exactly as on the read side.
    */
   private final RoleHierarchy roleHierarchy;
 
@@ -807,14 +806,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/handovers")
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
   public String createHandover(
       @PathVariable UUID id,
       @ModelAttribute("handoverForm") JobOrderHandoverForm form,
@@ -890,14 +882,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/item-handovers")
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
   public String createItemHandover(
       @PathVariable UUID id,
       @ModelAttribute("itemHandoverForm") JobOrderItemHandoverForm form,
@@ -987,14 +972,7 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> createHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderHandoverForm form) {
@@ -1039,14 +1017,7 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/item-handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> createItemHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderItemHandoverForm form) {
@@ -1084,14 +1055,7 @@ public class JobOrderWriteController {
   @PostMapping(
       value = "/{id}/items/{itemId}/production",
       consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> bookProductionAjax(
       @PathVariable UUID id,
@@ -1116,8 +1080,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/materials/unlink")
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
   public String unlinkMaterial(
       @PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
     try {
@@ -1141,8 +1104,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
   public String unlinkInventoryItem(
       @PathVariable UUID id,
       @PathVariable UUID inventoryItemId,
@@ -1171,8 +1133,7 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @DeleteMapping("/{id}/inventory/{inventoryItemId}/unlink/ajax")
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> unlinkInventoryItemAjax(
       @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
@@ -1322,10 +1283,10 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Checks whether the caller reaches LOGISTICIAN, ADMIN or OFFICER through the role hierarchy.
+   * Checks whether the caller reaches LOGISTICIAN or ADMIN through the role hierarchy.
    *
    * @param principal the authenticated caller, or {@code null} for a guest
-   * @return {@code true} when the caller holds one of the three authorities
+   * @return {@code true} when the caller holds one of the two authorities
    */
   private boolean isLogistician(OidcUser principal) {
     if (principal == null) {
@@ -1347,8 +1308,7 @@ public class JobOrderWriteController {
         reachableAuthorities.stream()
             .anyMatch(a ->
                 a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
     log.debug("JobOrder: Is logistician: {}", result);
     return result;
   }

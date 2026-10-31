@@ -97,6 +97,7 @@ public class RuleEvaluationService {
       case MISSION_PARTICIPANTS -> resolveMissionParticipants(event);
       case MISSION_LEADERSHIP -> resolveMissionLeadership(event);
       case EXCHANGE_CLIENT_HOLDERS -> resolveExchangeClientHolders(event);
+      case SEAT_HOLDERS -> recipientResolutionService.resolveSeatHolders();
     };
   }
 

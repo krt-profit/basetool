@@ -336,7 +336,7 @@ class PurchasingAccessPolicyTest {
   @Test
   void theLeadOfAUnitPausesOnlyThatUnitAndNotTheWholeOrganisation() {
     noLeadership();
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "OFFICER")).thenReturn(false);
+    when(ownerScopeService.canActAsOfficerIn(UNIT)).thenReturn(false);
     when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(true);
 
     assertThat(policy.canPause(UNIT)).isTrue();
@@ -346,7 +346,7 @@ class PurchasingAccessPolicyTest {
   @Test
   void aMemberWhoLeadsNothingPausesNothing() {
     noLeadership();
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "OFFICER")).thenReturn(false);
+    when(ownerScopeService.canActAsOfficerIn(UNIT)).thenReturn(false);
     when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(false);
 
     assertThat(policy.canPause(UNIT)).isFalse();
@@ -354,9 +354,20 @@ class PurchasingAccessPolicyTest {
 
   @Test
   void aStaffelleiterLeadsHisUnit() {
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "OFFICER")).thenReturn(true);
+    when(ownerScopeService.canActAsOfficerIn(UNIT)).thenReturn(true);
 
     assertThat(policy.leadsUnit(UNIT)).isTrue();
+  }
+
+  @Test
+  void aSeatInOneUnitDoesNotLeadAnotherUnit() {
+    UUID other = UUID.randomUUID();
+    when(ownerScopeService.canActAsOfficerIn(UNIT)).thenReturn(true);
+    when(ownerScopeService.canActAsOfficerIn(other)).thenReturn(false);
+    when(ownerScopeService.hasRoleInOrgUnit(other, "LEAD")).thenReturn(false);
+
+    assertThat(policy.leadsUnit(UNIT)).isTrue();
+    assertThat(policy.leadsUnit(other)).isFalse();
   }
 
   @Test

@@ -15975,7 +15975,7 @@
     },
     "/api/v1/game-items" : {
       "get" : {
-        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
+        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
         "operationId" : "getGameItems",
         "parameters" : [ {
           "in" : "query",
@@ -86718,7 +86718,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS", "SEAT_HOLDERS" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
@@ -86742,7 +86742,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS", "SEAT_HOLDERS" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
