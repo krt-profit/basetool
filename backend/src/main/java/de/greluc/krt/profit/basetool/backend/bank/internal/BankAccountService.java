@@ -101,10 +101,8 @@ public class BankAccountService {
             : accountRepository.findGrantedToFiltered(userId, pattern, statuses, types, pageable);
     Map<UUID, BigDecimal> balances =
         balancesFor(page.getContent().stream().map(BankAccount::getId).toList());
-    return page.map(
-        account ->
-            bankAccountMapper.toDto(
-                account, balances.getOrDefault(account.getId(), BigDecimal.ZERO)));
+    return page.map(account ->
+        bankAccountMapper.toDto(account, balances.getOrDefault(account.getId(), BigDecimal.ZERO)));
   }
 
   /**

@@ -87,15 +87,14 @@ class DataExportIntegrationTest {
    */
   @AfterEach
   void cleanUp() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          personalInventoryItemRepository.deleteAllById(seededItems);
-          auditEventRepository.deleteAllById(seededAuditEvents);
-          userRepository.deleteAllById(seededUsers);
-          seededItems.clear();
-          seededAuditEvents.clear();
-          seededUsers.clear();
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      personalInventoryItemRepository.deleteAllById(seededItems);
+      auditEventRepository.deleteAllById(seededAuditEvents);
+      userRepository.deleteAllById(seededUsers);
+      seededItems.clear();
+      seededAuditEvents.clear();
+      seededUsers.clear();
+    });
   }
 
   /**
@@ -106,13 +105,12 @@ class DataExportIntegrationTest {
    */
   private UUID user(String username) {
     UUID id = UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User u = new User();
-          u.setId(id);
-          u.setUsername(username);
-          userRepository.save(u);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User u = new User();
+      u.setId(id);
+      u.setUsername(username);
+      userRepository.save(u);
+    });
     seededUsers.add(id);
     return id;
   }
@@ -124,18 +122,17 @@ class DataExportIntegrationTest {
    * @param note the note, which the export scrubs
    */
   private void personalItem(UUID owner, String note) {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          PersonalInventoryItem item = new PersonalInventoryItem();
-          item.setOwnerUserId(owner);
-          item.setName("Probe");
-          item.setQuantity(1);
-          item.setNote(note);
-          item.setLocationUexId(1);
-          item.setLocationType(PersonalInventoryLocationType.values()[0]);
-          item.setLocationNameSnapshot("Testort");
-          seededItems.add(personalInventoryItemRepository.save(item).getId());
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      PersonalInventoryItem item = new PersonalInventoryItem();
+      item.setOwnerUserId(owner);
+      item.setName("Probe");
+      item.setQuantity(1);
+      item.setNote(note);
+      item.setLocationUexId(1);
+      item.setLocationType(PersonalInventoryLocationType.values()[0]);
+      item.setLocationNameSnapshot("Testort");
+      seededItems.add(personalInventoryItemRepository.save(item).getId());
+    });
   }
 
   /**
@@ -146,20 +143,19 @@ class DataExportIntegrationTest {
    * @param subjectLabel the subject label to snapshot
    */
   private void auditEvent(UUID actor, UUID target, String subjectLabel) {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          AuditEvent event =
-              AuditEvent.builder()
-                  .occurredAt(Instant.now())
-                  .domain(AuditEventType.JOB_ORDER_CREATED.domain())
-                  .eventType(AuditEventType.JOB_ORDER_CREATED)
-                  .actorUserId(actor)
-                  .actorHandle("ZzzActorZzz")
-                  .subjectLabel(subjectLabel)
-                  .targetUserId(target)
-                  .build();
-          seededAuditEvents.add(auditEventRepository.save(event).getId());
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      AuditEvent event =
+          AuditEvent.builder()
+              .occurredAt(Instant.now())
+              .domain(AuditEventType.JOB_ORDER_CREATED.domain())
+              .eventType(AuditEventType.JOB_ORDER_CREATED)
+              .actorUserId(actor)
+              .actorHandle("ZzzActorZzz")
+              .subjectLabel(subjectLabel)
+              .targetUserId(target)
+              .build();
+      seededAuditEvents.add(auditEventRepository.save(event).getId());
+    });
   }
 
   /**
@@ -215,10 +211,8 @@ class DataExportIntegrationTest {
     DataExportService.DataExport export = dataExportService.export(subject);
 
     assertThat(export.sections())
-        .allSatisfy(
-            s ->
-                assertThat(s.legalBasis())
-                    .isIn(LegalBasis.ART_15.name(), LegalBasis.ART_15_20.name()));
+        .allSatisfy(s ->
+            assertThat(s.legalBasis()).isIn(LegalBasis.ART_15.name(), LegalBasis.ART_15_20.name()));
     assertThat(export.sections().stream().map(DataExportService.ExportSection::key).toList())
         .containsExactlyElementsOf(
             ExportSectionDeclarations.inReadingOrder().stream().map(Section::key).toList());

@@ -372,10 +372,9 @@ public class OrgUnitBankRequestService {
   public List<BankAccountRefDto> listTransferTargetAccounts() {
     return bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
         .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
-        .map(
-            account ->
-                new BankAccountRefDto(
-                    account.getId(), account.getAccountNo(), account.getName(), account.getType()))
+        .map(account ->
+            new BankAccountRefDto(
+                account.getId(), account.getAccountNo(), account.getName(), account.getType()))
         .toList();
   }
 

@@ -205,9 +205,8 @@ class ExchangeStockWriteConcurrencyIntegrationTest {
     assertThat(undo.restored()).isZero();
     assertThat(undo.skipped())
         .singleElement()
-        .satisfies(
-            skipped ->
-                assertThat(skipped.reason()).isEqualTo(ExchangeUndoService.CHANGED_AFTERWARDS));
+        .satisfies(skipped ->
+            assertThat(skipped.reason()).isEqualTo(ExchangeUndoService.CHANGED_AFTERWARDS));
     assertThat(lot(1)).isEqualByComparingTo("7");
   }
 

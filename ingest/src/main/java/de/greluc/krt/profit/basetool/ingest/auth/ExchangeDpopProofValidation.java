@@ -67,23 +67,22 @@ public final class ExchangeDpopProofValidation {
       @NotNull ExchangeDpopNonces nonces, @NotNull DpopProofReplayStores proofs) {
     OAuth2TokenValidator<Jwt> nonce = nonceValidator(nonces);
     DPoPProofJwtDecoderFactory factory = new DPoPProofJwtDecoderFactory();
-    factory.setJwtValidatorFactory(
-        context -> {
-          boolean exchange = isExchange(context);
-          DpopProofReplayStore.MemberView view =
-              (exchange ? proofs.exchange() : proofs.other()).forMember(subjectOf(context));
-          DPoPProofReplayValidator replay = new DPoPProofReplayValidator(view);
-          OAuth2TokenValidator<Jwt> defaults =
-              DPoPProofJwtDecoderFactory.createDefaultJwtValidatorFactory(List.of(replay))
-                  .apply(context);
-          if (!exchange) {
-            return defaults;
-          }
-          DelegatingOAuth2TokenValidator<Jwt> withNonce =
-              new DelegatingOAuth2TokenValidator<>(nonce, capRefusals(defaults, view));
-          withNonce.setFailOnError(true);
-          return withNonce;
-        });
+    factory.setJwtValidatorFactory(context -> {
+      boolean exchange = isExchange(context);
+      DpopProofReplayStore.MemberView view =
+          (exchange ? proofs.exchange() : proofs.other()).forMember(subjectOf(context));
+      DPoPProofReplayValidator replay = new DPoPProofReplayValidator(view);
+      OAuth2TokenValidator<Jwt> defaults =
+          DPoPProofJwtDecoderFactory.createDefaultJwtValidatorFactory(List.of(replay))
+              .apply(context);
+      if (!exchange) {
+        return defaults;
+      }
+      DelegatingOAuth2TokenValidator<Jwt> withNonce =
+          new DelegatingOAuth2TokenValidator<>(nonce, capRefusals(defaults, view));
+      withNonce.setFailOnError(true);
+      return withNonce;
+    });
     return factory;
   }
 

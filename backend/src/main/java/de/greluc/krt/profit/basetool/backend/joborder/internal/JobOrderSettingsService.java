@@ -61,16 +61,15 @@ public class JobOrderSettingsService {
   private int days(@NotNull String key, int fallback) {
     return systemSettings
         .getSettingValue(key)
-        .map(
-            raw -> {
-              try {
-                int parsed = Integer.parseInt(raw.strip());
-                return parsed >= 0 ? parsed : fallback;
-              } catch (NumberFormatException _) {
-                log.warn("Setting {} is not an integer, using {}", key, fallback);
-                return fallback;
-              }
-            })
+        .map(raw -> {
+          try {
+            int parsed = Integer.parseInt(raw.strip());
+            return parsed >= 0 ? parsed : fallback;
+          } catch (NumberFormatException _) {
+            log.warn("Setting {} is not an integer, using {}", key, fallback);
+            return fallback;
+          }
+        })
         .orElse(fallback);
   }
 }

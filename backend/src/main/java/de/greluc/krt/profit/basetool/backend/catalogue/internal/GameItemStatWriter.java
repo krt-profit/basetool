@@ -78,16 +78,15 @@ public class GameItemStatWriter {
         stored.put(stat.getProperty(), stat);
       }
     }
-    values.forEach(
-        (property, value) -> {
-          if (!stored.containsKey(property)) {
-            GameItemStat stat = new GameItemStat();
-            stat.setGameItem(item);
-            stat.setProperty(property);
-            stat.setBaseValue(value);
-            gameItemStatRepository.save(stat);
-          }
-        });
+    values.forEach((property, value) -> {
+      if (!stored.containsKey(property)) {
+        GameItemStat stat = new GameItemStat();
+        stat.setGameItem(item);
+        stat.setProperty(property);
+        stat.setBaseValue(value);
+        gameItemStatRepository.save(stat);
+      }
+    });
     return true;
   }
 }

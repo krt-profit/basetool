@@ -368,12 +368,11 @@ class BackendApiClientProblemJsonTest {
           "the transport failure must not be logged as an UNKNOWN backend client error");
       assertTrue(
           appender.list.stream()
-              .anyMatch(
-                  event ->
-                      event.getLevel() == Level.WARN
-                          && event
-                              .getFormattedMessage()
-                              .contains("Backend timeout / connection failure")),
+              .anyMatch(event ->
+                  event.getLevel() == Level.WARN
+                      && event
+                          .getFormattedMessage()
+                          .contains("Backend timeout / connection failure")),
           "it is reported once, as what it is");
     } finally {
       logger.detachAppender(appender);

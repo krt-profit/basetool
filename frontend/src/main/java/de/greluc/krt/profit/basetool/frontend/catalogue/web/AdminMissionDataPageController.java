@@ -125,32 +125,29 @@ public class AdminMissionDataPageController {
     CompletableFuture<CompleteCatalog<JobTypeDto>> jobTypesFuture =
         parallelPageLoader
             .loadAsync(() -> fetchJobTypes(includeInactiveJobTypes))
-            .exceptionally(
-                e -> {
-                  logFragmentLoadFailure("job types", e);
-                  anyFailure.set(true);
-                  return null;
-                });
+            .exceptionally(e -> {
+              logFragmentLoadFailure("job types", e);
+              anyFailure.set(true);
+              return null;
+            });
 
     CompletableFuture<CompleteCatalog<SquadronDto>> squadronsFuture =
         parallelPageLoader
             .loadAsync(() -> fetchSquadrons(includeInactiveSquadrons))
-            .exceptionally(
-                e -> {
-                  logFragmentLoadFailure("squadrons", e);
-                  anyFailure.set(true);
-                  return null;
-                });
+            .exceptionally(e -> {
+              logFragmentLoadFailure("squadrons", e);
+              anyFailure.set(true);
+              return null;
+            });
 
     CompletableFuture<CompleteCatalog<FrequencyTypeDto>> freqsFuture =
         parallelPageLoader
             .loadAsync(() -> fetchFrequencyTypes(includeInactiveFrequencyTypes))
-            .exceptionally(
-                e -> {
-                  logFragmentLoadFailure("frequency types", e);
-                  anyFailure.set(true);
-                  return null;
-                });
+            .exceptionally(e -> {
+              logFragmentLoadFailure("frequency types", e);
+              anyFailure.set(true);
+              return null;
+            });
 
     CompletableFuture.allOf(jobTypesFuture, squadronsFuture, freqsFuture).join();
 
@@ -204,18 +201,17 @@ public class AdminMissionDataPageController {
         CatalogPages.fetchAll(page -> catalogueClient.jobTypePage(includeInactive, page));
     List<JobTypeDto> jobTypes =
         catalog.items().stream()
-            .map(
-                j ->
-                    new JobTypeDto(
-                        j.id(),
-                        j.name(),
-                        j.description(),
-                        j.archetype(),
-                        j.parentId(),
-                        Boolean.TRUE.equals(j.active()),
-                        Boolean.TRUE.equals(j.isLeadershipRole()),
-                        Boolean.TRUE.equals(j.isMissionLead()),
-                        versionOrZero(j.version())))
+            .map(j ->
+                new JobTypeDto(
+                    j.id(),
+                    j.name(),
+                    j.description(),
+                    j.archetype(),
+                    j.parentId(),
+                    Boolean.TRUE.equals(j.active()),
+                    Boolean.TRUE.equals(j.isLeadershipRole()),
+                    Boolean.TRUE.equals(j.isMissionLead()),
+                    versionOrZero(j.version())))
             .collect(Collectors.toCollection(ArrayList::new));
     jobTypes.sort(
         Comparator.comparing(j -> j.name() == null ? "" : j.name(), String.CASE_INSENSITIVE_ORDER));
@@ -232,17 +228,16 @@ public class AdminMissionDataPageController {
         CatalogPages.fetchAll(page -> catalogueClient.squadronPage(includeInactive, page));
     List<SquadronDto> squadrons =
         catalog.items().stream()
-            .map(
-                s ->
-                    new SquadronDto(
-                        s.id(),
-                        s.name(),
-                        s.shorthand(),
-                        s.description(),
-                        Boolean.TRUE.equals(s.active()),
-                        Boolean.TRUE.equals(s.isPromotionEnabled()),
-                        Boolean.TRUE.equals(s.isProfitEligible()),
-                        versionOrZero(s.version())))
+            .map(s ->
+                new SquadronDto(
+                    s.id(),
+                    s.name(),
+                    s.shorthand(),
+                    s.description(),
+                    Boolean.TRUE.equals(s.active()),
+                    Boolean.TRUE.equals(s.isPromotionEnabled()),
+                    Boolean.TRUE.equals(s.isProfitEligible()),
+                    versionOrZero(s.version())))
             .collect(Collectors.toCollection(ArrayList::new));
     squadrons.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
@@ -747,19 +742,18 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () ->
-            catalogueClient.createJobType(
-                new JobTypeDto(
-                    null,
-                    form.name(),
-                    form.description(),
-                    form.archetype(),
-                    null,
-                    true,
-                    form.isLeadershipRole(),
-                    form.isMissionLead(),
-                    0L)));
+    return okOrRelay(() ->
+        catalogueClient.createJobType(
+            new JobTypeDto(
+                null,
+                form.name(),
+                form.description(),
+                form.archetype(),
+                null,
+                true,
+                form.isLeadershipRole(),
+                form.isMissionLead(),
+                0L)));
   }
 
   /**
@@ -780,20 +774,19 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () ->
-            catalogueClient.updateJobType(
+    return okOrRelay(() ->
+        catalogueClient.updateJobType(
+            id,
+            new JobTypeDto(
                 id,
-                new JobTypeDto(
-                    id,
-                    form.name(),
-                    form.description(),
-                    form.archetype(),
-                    null,
-                    true,
-                    form.isLeadershipRole(),
-                    form.isMissionLead(),
-                    form.version())));
+                form.name(),
+                form.description(),
+                form.archetype(),
+                null,
+                true,
+                form.isLeadershipRole(),
+                form.isMissionLead(),
+                form.version())));
   }
 
   /**
@@ -836,18 +829,10 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () ->
-            catalogueClient.createSquadron(
-                new SquadronDto(
-                    null,
-                    form.name(),
-                    form.shorthand(),
-                    form.description(),
-                    true,
-                    true,
-                    false,
-                    0L)));
+    return okOrRelay(() ->
+        catalogueClient.createSquadron(
+            new SquadronDto(
+                null, form.name(), form.shorthand(), form.description(), true, true, false, 0L)));
   }
 
   /**
@@ -868,19 +853,18 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () ->
-            catalogueClient.updateSquadron(
+    return okOrRelay(() ->
+        catalogueClient.updateSquadron(
+            id,
+            new SquadronDto(
                 id,
-                new SquadronDto(
-                    id,
-                    form.name(),
-                    form.shorthand(),
-                    form.description(),
-                    true,
-                    true,
-                    false,
-                    form.version())));
+                form.name(),
+                form.shorthand(),
+                form.description(),
+                true,
+                true,
+                false,
+                form.version())));
   }
 
   /**
@@ -924,10 +908,9 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () ->
-            catalogueClient.createFrequencyType(
-                new FrequencyTypeDto(null, form.name(), form.description(), true, null, null)));
+    return okOrRelay(() ->
+        catalogueClient.createFrequencyType(
+            new FrequencyTypeDto(null, form.name(), form.description(), true, null, null)));
   }
 
   /**
@@ -950,17 +933,16 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () ->
-            catalogueClient.updateFrequencyType(
-                id,
-                new FrequencyTypeDto(
-                    null,
-                    form.name(),
-                    form.description(),
-                    active != null ? active : true,
-                    null,
-                    form.version())));
+    return okOrRelay(() ->
+        catalogueClient.updateFrequencyType(
+            id,
+            new FrequencyTypeDto(
+                null,
+                form.name(),
+                form.description(),
+                active != null ? active : true,
+                null,
+                form.version())));
   }
 
   /**

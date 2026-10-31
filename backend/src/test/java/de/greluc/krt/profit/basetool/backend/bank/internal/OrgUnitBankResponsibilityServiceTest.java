@@ -338,13 +338,11 @@ class OrgUnitBankResponsibilityServiceTest {
         .filteredOn(BankBookingRequestNoticesReconciledEvent.class::isInstance)
         .map(BankBookingRequestNoticesReconciledEvent.class::cast)
         .hasSize(3)
-        .allSatisfy(
-            event -> {
-              assertThat(event.reconcileRecipients())
-                  .containsExactlyInAnyOrder(newLeiter, oldLeiter);
-              assertThat(event.accountId()).isEqualTo(accountId);
-              assertThat(event.accountNo()).isEqualTo("KB-0001");
-            })
+        .allSatisfy(event -> {
+          assertThat(event.reconcileRecipients()).containsExactlyInAnyOrder(newLeiter, oldLeiter);
+          assertThat(event.accountId()).isEqualTo(accountId);
+          assertThat(event.accountNo()).isEqualTo("KB-0001");
+        })
         .extracting(BankBookingRequestNoticesReconciledEvent::requestId)
         .containsExactly(awaitingHolder.getId(), awaitingManagement.getId(), approved.getId());
   }

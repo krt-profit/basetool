@@ -178,10 +178,9 @@ class BackendRoleSyncFilterTest {
 
       assertThat(appender.list).noneMatch(e -> e.getLevel() == Level.ERROR);
       assertThat(appender.list)
-          .anyMatch(
-              e ->
-                  e.getLevel() == Level.DEBUG
-                      && e.getFormattedMessage().contains("Backend role sync deferred"));
+          .anyMatch(e ->
+              e.getLevel() == Level.DEBUG
+                  && e.getFormattedMessage().contains("Backend role sync deferred"));
       verify(session, never()).setAttribute(eq(ROLES_SYNCED_AT_FLAG), any());
       verify(chain).doFilter(request, response);
     } finally {
@@ -208,11 +207,10 @@ class BackendRoleSyncFilterTest {
       String hash = Integer.toHexString(name.hashCode());
       assertThat(appender.list).isNotEmpty();
       assertThat(appender.list)
-          .allSatisfy(
-              e -> {
-                assertThat(e.getFormattedMessage()).doesNotContain(name);
-                assertThat(e.getFormattedMessage()).doesNotContain(hash);
-              });
+          .allSatisfy(e -> {
+            assertThat(e.getFormattedMessage()).doesNotContain(name);
+            assertThat(e.getFormattedMessage()).doesNotContain(hash);
+          });
     } finally {
       logger.detachAppender(appender);
       logger.setLevel(original);

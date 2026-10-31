@@ -158,12 +158,11 @@ public class UexCommodityService {
           dtos.size());
     } else {
       int cleared =
-          chunkWriter.inNewTransaction(
-              () ->
-                  StalePriceSweep.clearStale(
-                      materialPriceRepository.findIdsWithLivePrices(),
-                      seenPriceIds,
-                      materialPriceRepository::clearPricesByIds));
+          chunkWriter.inNewTransaction(() ->
+              StalePriceSweep.clearStale(
+                  materialPriceRepository.findIdsWithLivePrices(),
+                  seenPriceIds,
+                  materialPriceRepository::clearPricesByIds));
       if (cleared > 0) {
         log.info("Cleared prices on {} material_price row(s) no longer returned by UEX.", cleared);
       }
@@ -192,30 +191,27 @@ public class UexCommodityService {
     Material material =
         materialRepository
             .findByIdCommodity(dto.id())
-            .orElseGet(
-                () ->
-                    materialRepository
-                        .findByName(dto.name())
-                        .map(
-                            m -> {
-                              m.setIdCommodity(dto.id());
-                              if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
-                                log.info(
-                                    "Manual material '{}' is now linked to UEX commodity id={}",
-                                    m.getName(),
-                                    dto.id());
-                                m.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
-                              }
-                              promoteOnUexAdoption(m);
-                              return m;
-                            })
-                        .orElseGet(
-                            () -> {
-                              Material newMaterial = new Material();
-                              newMaterial.setIdCommodity(dto.id());
-                              newMaterial.setName(dto.name());
-                              return newMaterial;
-                            }));
+            .orElseGet(() ->
+                materialRepository
+                    .findByName(dto.name())
+                    .map(m -> {
+                      m.setIdCommodity(dto.id());
+                      if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
+                        log.info(
+                            "Manual material '{}' is now linked to UEX commodity id={}",
+                            m.getName(),
+                            dto.id());
+                        m.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
+                      }
+                      promoteOnUexAdoption(m);
+                      return m;
+                    })
+                    .orElseGet(() -> {
+                      Material newMaterial = new Material();
+                      newMaterial.setIdCommodity(dto.id());
+                      newMaterial.setName(dto.name());
+                      return newMaterial;
+                    }));
 
     material.setType(determineMaterialType(dto));
     material.setCode(dto.code());
@@ -372,27 +368,24 @@ public class UexCommodityService {
   private UUID resolveOrCreateMaterial(@NotNull UexCommodityPriceDto dto) {
     return materialRepository
         .findByIdCommodity(dto.idCommodity())
-        .orElseGet(
-            () ->
-                materialRepository
-                    .findByName(dto.commodityName())
-                    .map(
-                        m -> {
-                          m.setIdCommodity(dto.idCommodity());
-                          promoteOnUexAdoption(m);
-                          return materialRepository.save(m);
-                        })
-                    .orElseGet(
-                        () -> {
-                          Material newMaterial = new Material();
-                          newMaterial.setIdCommodity(dto.idCommodity());
-                          newMaterial.setName(
-                              dto.commodityName() != null
-                                  ? dto.commodityName()
-                                  : "Unknown-" + dto.idCommodity());
-                          newMaterial.setType(MaterialType.NO_REFINE);
-                          return materialRepository.save(newMaterial);
-                        }))
+        .orElseGet(() ->
+            materialRepository
+                .findByName(dto.commodityName())
+                .map(m -> {
+                  m.setIdCommodity(dto.idCommodity());
+                  promoteOnUexAdoption(m);
+                  return materialRepository.save(m);
+                })
+                .orElseGet(() -> {
+                  Material newMaterial = new Material();
+                  newMaterial.setIdCommodity(dto.idCommodity());
+                  newMaterial.setName(
+                      dto.commodityName() != null
+                          ? dto.commodityName()
+                          : "Unknown-" + dto.idCommodity());
+                  newMaterial.setType(MaterialType.NO_REFINE);
+                  return materialRepository.save(newMaterial);
+                }))
         .getId();
   }
 

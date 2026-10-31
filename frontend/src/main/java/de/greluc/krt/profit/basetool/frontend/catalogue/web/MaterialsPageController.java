@@ -207,11 +207,10 @@ public class MaterialsPageController {
     }
     materialsByKind
         .values()
-        .forEach(
-            list ->
-                list.sort(
-                    Comparator.comparing(
-                        MaterialPriceOverviewDto::name, String.CASE_INSENSITIVE_ORDER)));
+        .forEach(list ->
+            list.sort(
+                Comparator.comparing(
+                    MaterialPriceOverviewDto::name, String.CASE_INSENSITIVE_ORDER)));
 
     model.addAttribute("materials", materials);
     model.addAttribute("materialsByKind", materialsByKind);
@@ -444,11 +443,10 @@ public class MaterialsPageController {
     }
     rowsByKind
         .values()
-        .forEach(
-            list ->
-                list.sort(
-                    Comparator.comparing(
-                        MatrixGridDto.Row::materialName, String.CASE_INSENSITIVE_ORDER)));
+        .forEach(list ->
+            list.sort(
+                Comparator.comparing(
+                    MatrixGridDto.Row::materialName, String.CASE_INSENSITIVE_ORDER)));
 
     List<MatrixGridDto.Group> groups = new ArrayList<>(rowsByKind.size());
     for (Map.Entry<String, List<MatrixGridDto.Row>> entry : rowsByKind.entrySet()) {

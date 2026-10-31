@@ -177,10 +177,9 @@ class AdminNotificationRuleOptionListsTest {
         OPENAPI_CANDIDATES.stream()
             .filter(Files::isRegularFile)
             .findFirst()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "openapi.json not found; looked at " + OPENAPI_CANDIDATES));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "openapi.json not found; looked at " + OPENAPI_CANDIDATES));
     return new ObjectMapper().readTree(path.toFile()).path("components").path("schemas");
   }
 

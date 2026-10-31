@@ -184,11 +184,10 @@ public class OssLicenseCatalog {
       }
     }
     List<OssLicenseGroup> result = new ArrayList<>();
-    componentsByKey.forEach(
-        (key, members) -> {
-          members.sort(BY_NAME_THEN_VERSION);
-          result.add(new OssLicenseGroup(licenseByKey.get(key), members));
-        });
+    componentsByKey.forEach((key, members) -> {
+      members.sort(BY_NAME_THEN_VERSION);
+      result.add(new OssLicenseGroup(licenseByKey.get(key), members));
+    });
     result.sort(BY_LICENSE_NAME);
     return List.copyOf(result);
   }

@@ -231,12 +231,11 @@ class UserRsiHandleIntegrationTest {
     String handle = handle();
     jdbc.update("UPDATE app_user SET rsi_handle = ? WHERE id = ?", handle, first);
 
-    assertThatThrownBy(
-            () ->
-                jdbc.update(
-                    "UPDATE app_user SET rsi_handle = ? WHERE id = ?",
-                    handle.toLowerCase(Locale.ROOT),
-                    second))
+    assertThatThrownBy(() ->
+            jdbc.update(
+                "UPDATE app_user SET rsi_handle = ? WHERE id = ?",
+                handle.toLowerCase(Locale.ROOT),
+                second))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 

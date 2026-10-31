@@ -205,20 +205,19 @@ public final class OpenApiDocumentAssertions {
    */
   private static void checkFloor(
       Map<String, Integer> floor, Map<String, Integer> perDomain, List<String> problems) {
-    floor.forEach(
-        (domain, minimum) -> {
-          int count = perDomain.getOrDefault(domain, 0);
-          if (count < minimum) {
-            problems.add(
-                "domain "
-                    + domain
-                    + " has "
-                    + count
-                    + " operations, below its floor of "
-                    + minimum
-                    + "; lower the floor in the same change if they moved deliberately");
-          }
-        });
+    floor.forEach((domain, minimum) -> {
+      int count = perDomain.getOrDefault(domain, 0);
+      if (count < minimum) {
+        problems.add(
+            "domain "
+                + domain
+                + " has "
+                + count
+                + " operations, below its floor of "
+                + minimum
+                + "; lower the floor in the same change if they moved deliberately");
+      }
+    });
   }
 
   /**

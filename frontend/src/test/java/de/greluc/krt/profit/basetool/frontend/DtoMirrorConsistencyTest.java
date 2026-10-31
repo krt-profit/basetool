@@ -160,11 +160,10 @@ class DtoMirrorConsistencyTest {
             .getParent();
     try (Stream<Path> children = Files.list(repository)) {
       return children
-          .filter(
-              dir -> {
-                String name = dir.getFileName().toString();
-                return name.equals("backend") || name.startsWith("backend-");
-              })
+          .filter(dir -> {
+            String name = dir.getFileName().toString();
+            return name.equals("backend") || name.startsWith("backend-");
+          })
           .sorted()
           .map(dir -> dir.resolve("src/main/java"))
           .filter(Files::isDirectory)
@@ -207,26 +206,25 @@ class DtoMirrorConsistencyTest {
     List<String> softWarnings = new ArrayList<>();
     pairing
         .pairs()
-        .forEach(
-            (name, pair) -> {
-              Set<String> missingOnFrontend = new LinkedHashSet<>(pair.backend());
-              missingOnFrontend.removeAll(pair.frontend());
-              missingOnFrontend.removeAll(ALLOWED_BACKEND_ONLY_FIELDS.getOrDefault(name, Set.of()));
-              if (!missingOnFrontend.isEmpty()) {
-                drifts.add(
-                    name
-                        + " — backend record has components the frontend mirror is missing: "
-                        + missingOnFrontend
-                        + ". A Thymeleaf template that references any of these will 500 at render"
-                        + " time. Add them to the frontend record (preferred) or, if intentional,"
-                        + " list them in ALLOWED_BACKEND_ONLY_FIELDS with a rationale.");
-              }
-              Set<String> extraOnFrontend = new LinkedHashSet<>(pair.frontend());
-              extraOnFrontend.removeAll(pair.backend());
-              if (!extraOnFrontend.isEmpty()) {
-                softWarnings.add(name + " — frontend-only record components: " + extraOnFrontend);
-              }
-            });
+        .forEach((name, pair) -> {
+          Set<String> missingOnFrontend = new LinkedHashSet<>(pair.backend());
+          missingOnFrontend.removeAll(pair.frontend());
+          missingOnFrontend.removeAll(ALLOWED_BACKEND_ONLY_FIELDS.getOrDefault(name, Set.of()));
+          if (!missingOnFrontend.isEmpty()) {
+            drifts.add(
+                name
+                    + " — backend record has components the frontend mirror is missing: "
+                    + missingOnFrontend
+                    + ". A Thymeleaf template that references any of these will 500 at render"
+                    + " time. Add them to the frontend record (preferred) or, if intentional,"
+                    + " list them in ALLOWED_BACKEND_ONLY_FIELDS with a rationale.");
+          }
+          Set<String> extraOnFrontend = new LinkedHashSet<>(pair.frontend());
+          extraOnFrontend.removeAll(pair.backend());
+          if (!extraOnFrontend.isEmpty()) {
+            softWarnings.add(name + " — frontend-only record components: " + extraOnFrontend);
+          }
+        });
 
     if (!softWarnings.isEmpty()) {
       System.out.println("DTO mirror soft warnings (frontend-only fields):");
@@ -405,17 +403,14 @@ class DtoMirrorConsistencyTest {
     renamed.keySet().stream()
         .filter(name -> !frontendRecords.contains(name))
         .sorted()
-        .forEach(
-            name ->
-                listErrors.add(
-                    "RENAMED_TWINS names " + name + ", which is no frontend DTO record"));
+        .forEach(name ->
+            listErrors.add("RENAMED_TWINS names " + name + ", which is no frontend DTO record"));
     unpairedByDesign.keySet().stream()
         .filter(name -> !frontendRecords.contains(name))
         .sorted()
-        .forEach(
-            name ->
-                listErrors.add(
-                    "UNPAIRED_BY_DESIGN lists " + name + ", which is no frontend DTO record"));
+        .forEach(name ->
+            listErrors.add(
+                "UNPAIRED_BY_DESIGN lists " + name + ", which is no frontend DTO record"));
     unpaired.sort(String::compareTo);
     return new Pairing(pairs, unpaired, listErrors);
   }

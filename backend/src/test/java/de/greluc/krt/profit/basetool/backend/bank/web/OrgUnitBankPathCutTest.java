@@ -84,19 +84,18 @@ class OrgUnitBankPathCutTest {
     Set<String> underOldPrefix = new TreeSet<>();
     mapping
         .getHandlerMethods()
-        .forEach(
-            (info, handler) -> {
-              for (String verb : verbs(info)) {
-                for (String pattern : patterns(info)) {
-                  if (OrgUnitBankController.class.equals(beanType(handler))) {
-                    served.add(verb + " " + pattern);
-                  }
-                  if (pattern.startsWith(OLD_PREFIX)) {
-                    underOldPrefix.add(verb + " " + pattern);
-                  }
-                }
+        .forEach((info, handler) -> {
+          for (String verb : verbs(info)) {
+            for (String pattern : patterns(info)) {
+              if (OrgUnitBankController.class.equals(beanType(handler))) {
+                served.add(verb + " " + pattern);
               }
-            });
+              if (pattern.startsWith(OLD_PREFIX)) {
+                underOldPrefix.add(verb + " " + pattern);
+              }
+            }
+          }
+        });
 
     Set<String> expected = new TreeSet<>();
     moved.forEach(m -> expected.add(m.verb() + " " + m.newPath()));

@@ -257,12 +257,11 @@ public class InventoryPageController {
         .map(MaterialReferenceDto::name)
         .filter(Objects::nonNull)
         .findFirst()
-        .or(
-            () ->
-                materials.stream()
-                    .filter(m -> materialId.equals(m.id()))
-                    .map(MaterialReferenceDto::name)
-                    .findFirst())
+        .or(() ->
+            materials.stream()
+                .filter(m -> materialId.equals(m.id()))
+                .map(MaterialReferenceDto::name)
+                .findFirst())
         .orElse(null);
   }
 

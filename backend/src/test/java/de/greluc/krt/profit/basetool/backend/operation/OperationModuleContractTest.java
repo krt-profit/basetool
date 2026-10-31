@@ -289,10 +289,9 @@ class OperationModuleContractTest {
     TransactionTemplate withoutTransaction = new TransactionTemplate(transactionManager);
     withoutTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
 
-    assertThatThrownBy(
-            () ->
-                withoutTransaction.executeWithoutResult(
-                    _ -> missionCommands.detachFromOperation(UUID.randomUUID())))
+    assertThatThrownBy(() ->
+            withoutTransaction.executeWithoutResult(
+                _ -> missionCommands.detachFromOperation(UUID.randomUUID())))
         .isInstanceOf(IllegalTransactionStateException.class);
   }
 

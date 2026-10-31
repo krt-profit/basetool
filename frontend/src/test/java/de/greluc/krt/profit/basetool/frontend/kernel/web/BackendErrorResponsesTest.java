@@ -149,14 +149,13 @@ class BackendErrorResponsesTest {
     ReauthenticationRequiredException signal =
         new ReauthenticationRequiredException("token unusable", null);
 
-    assertThatThrownBy(
-            () ->
-                BackendErrorResponses.relay(
-                    log,
-                    "risky thing",
-                    () -> {
-                      throw signal;
-                    }))
+    assertThatThrownBy(() ->
+            BackendErrorResponses.relay(
+                log,
+                "risky thing",
+                () -> {
+                  throw signal;
+                }))
         .isSameAs(signal);
     verifyNoInteractions(log);
   }
@@ -167,12 +166,10 @@ class BackendErrorResponsesTest {
     BackendServiceException refusal =
         new BackendServiceException("conflict", null, 409, "CONFLICT", null, List.of(), null);
 
-    assertThatThrownBy(
-            () ->
-                BackendErrorResponses.withBackendStatus(
-                    () -> {
-                      throw refusal;
-                    }))
+    assertThatThrownBy(() ->
+            BackendErrorResponses.withBackendStatus(() -> {
+              throw refusal;
+            }))
         .isInstanceOfSatisfying(
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode().value()).isEqualTo(409))
@@ -186,12 +183,10 @@ class BackendErrorResponsesTest {
     ReauthenticationRequiredException signal =
         new ReauthenticationRequiredException("token unusable", null);
 
-    assertThatThrownBy(
-            () ->
-                BackendErrorResponses.withBackendStatus(
-                    () -> {
-                      throw signal;
-                    }))
+    assertThatThrownBy(() ->
+            BackendErrorResponses.withBackendStatus(() -> {
+              throw signal;
+            }))
         .isSameAs(signal);
   }
 }

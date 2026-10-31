@@ -106,13 +106,12 @@ class BroadCatchRatchetTest {
   private static Map<String, String> grown(
       Map<String, Integer> actual, Map<String, Integer> frozen) {
     Map<String, String> grown = new TreeMap<>();
-    actual.forEach(
-        (file, count) -> {
-          int allowed = frozen.getOrDefault(file, 0);
-          if (count > allowed) {
-            grown.put(file, count + " > " + allowed);
-          }
-        });
+    actual.forEach((file, count) -> {
+      int allowed = frozen.getOrDefault(file, 0);
+      if (count > allowed) {
+        grown.put(file, count + " > " + allowed);
+      }
+    });
     return grown;
   }
 
@@ -126,13 +125,12 @@ class BroadCatchRatchetTest {
   private static Map<String, String> shrunk(
       Map<String, Integer> actual, Map<String, Integer> frozen) {
     Map<String, String> shrunk = new TreeMap<>();
-    frozen.forEach(
-        (file, allowed) -> {
-          int count = actual.getOrDefault(file, 0);
-          if (count < allowed) {
-            shrunk.put(file, count + " < " + allowed);
-          }
-        });
+    frozen.forEach((file, allowed) -> {
+      int count = actual.getOrDefault(file, 0);
+      if (count < allowed) {
+        shrunk.put(file, count + " < " + allowed);
+      }
+    });
     return shrunk;
   }
 
@@ -173,17 +171,16 @@ class BroadCatchRatchetTest {
     try (Stream<Path> files = Files.walk(root)) {
       files
           .filter(Files::isRegularFile)
-          .forEach(
-              file -> {
-                String relative = root.relativize(file).toString().replace('\\', '/');
-                if (!isWebSource(relative)) {
-                  return;
-                }
-                int count = countBroadClauses(read(file));
-                if (count > 0) {
-                  counts.put(relative, count);
-                }
-              });
+          .forEach(file -> {
+            String relative = root.relativize(file).toString().replace('\\', '/');
+            if (!isWebSource(relative)) {
+              return;
+            }
+            int count = countBroadClauses(read(file));
+            if (count > 0) {
+              counts.put(relative, count);
+            }
+          });
     }
     return counts;
   }

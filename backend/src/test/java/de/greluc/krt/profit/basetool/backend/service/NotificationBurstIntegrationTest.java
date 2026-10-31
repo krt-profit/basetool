@@ -81,13 +81,12 @@ class NotificationBurstIntegrationTest {
         meterRegistry.counter(MetricNames.NOTIFICATION_EXECUTOR_REJECTED).count();
 
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            _ -> {
-              for (int i = 0; i < BURST; i++) {
-                eventPublisher.publishEvent(
-                    RefineryNotices.ready(UUID.randomUUID(), OWNER, "Hub", "1 SCU Ore"));
-              }
-            });
+        .executeWithoutResult(_ -> {
+          for (int i = 0; i < BURST; i++) {
+            eventPublisher.publishEvent(
+                RefineryNotices.ready(UUID.randomUUID(), OWNER, "Hub", "1 SCU Ore"));
+          }
+        });
 
     long deadline = System.nanoTime() + Duration.ofSeconds(120).toNanos();
     long created = notificationRepository.countByRecipientUserIdAndReadFalse(OWNER);

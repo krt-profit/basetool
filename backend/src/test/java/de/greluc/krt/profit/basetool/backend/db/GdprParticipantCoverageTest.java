@@ -471,17 +471,16 @@ class GdprParticipantCoverageTest {
 
   private static Set<String> erasureGaps(Map<String, Character> references) {
     Set<String> gaps = new TreeSet<>();
-    references.forEach(
-        (column, action) -> {
-          boolean handled =
-              action == null
-                  ? RETAINED_AFTER_ERASURE.containsKey(column)
-                  : ERASED_BY_THE_DATABASE.contains(action)
-                      || ERASED_BY_THE_DELETION_SERVICE.containsKey(column);
-          if (!handled) {
-            gaps.add(column);
-          }
-        });
+    references.forEach((column, action) -> {
+      boolean handled =
+          action == null
+              ? RETAINED_AFTER_ERASURE.containsKey(column)
+              : ERASED_BY_THE_DATABASE.contains(action)
+                  || ERASED_BY_THE_DELETION_SERVICE.containsKey(column);
+      if (!handled) {
+        gaps.add(column);
+      }
+    });
     return gaps;
   }
 
@@ -496,12 +495,11 @@ class GdprParticipantCoverageTest {
       }
     }
     Set<String> missing = new TreeSet<>();
-    steps.forEach(
-        (column, step) -> {
-          if (!calls.contains(step.type().getName() + "#" + step.member())) {
-            missing.add(column);
-          }
-        });
+    steps.forEach((column, step) -> {
+      if (!calls.contains(step.type().getName() + "#" + step.member())) {
+        missing.add(column);
+      }
+    });
     return missing;
   }
 

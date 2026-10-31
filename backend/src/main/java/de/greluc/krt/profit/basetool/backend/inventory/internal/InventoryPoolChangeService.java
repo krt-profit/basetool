@@ -156,10 +156,9 @@ public class InventoryPoolChangeService {
             .filter(id -> ownerScopeService.hasRoleInOrgUnit(id, LOGISTICIAN))
             .toList();
     return orgUnitRepository.findAllById(candidates).stream()
-        .map(
-            unit ->
-                new OrgUnitReferenceDto(
-                    unit.getId(), unit.getName(), unit.getShorthand(), unit.getKind()))
+        .map(unit ->
+            new OrgUnitReferenceDto(
+                unit.getId(), unit.getName(), unit.getShorthand(), unit.getKind()))
         .sorted(
             Comparator.comparing(
                 OrgUnitReferenceDto::name, Comparator.nullsLast(String::compareTo)))

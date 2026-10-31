@@ -467,20 +467,17 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_catalogItem_rejectsMinQualityAndMissionIds() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyGroupedInventory(
-                    jwt,
-                    LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyGroupedInventory(
+                jwt, LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build()))
         .isInstanceOf(BadRequestException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyGroupedInventory(
-                    jwt,
-                    LagerFilter.builder()
-                        .missionIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyGroupedInventory(
+                jwt,
+                LagerFilter.builder()
+                    .missionIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build()))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
@@ -489,14 +486,13 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_catalogItem_rejectsMaterialIds() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyGroupedInventory(
-                    jwt,
-                    LagerFilter.builder()
-                        .materialIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyGroupedInventory(
+                jwt,
+                LagerFilter.builder()
+                    .materialIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("materialIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -506,14 +502,13 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_catalogMaterial_rejectsGameItemIds() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyGroupedInventory(
-                    jwt,
-                    LagerFilter.builder()
-                        .gameItemIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyGroupedInventory(
+                jwt,
+                LagerFilter.builder()
+                    .gameItemIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("gameItemIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -643,20 +638,17 @@ class InventoryItemControllerTest {
   void getMyEntryIds_catalogItem_rejectsMaterialOnlyFilters() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyEntryIds(
-                    jwt,
-                    LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyEntryIds(
+                jwt, LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build()))
         .isInstanceOf(BadRequestException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyEntryIds(
-                    jwt,
-                    LagerFilter.builder()
-                        .materialIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyEntryIds(
+                jwt,
+                LagerFilter.builder()
+                    .materialIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("materialIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -666,14 +658,13 @@ class InventoryItemControllerTest {
   void getMyEntryIds_catalogMaterial_rejectsGameItemIds() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyEntryIds(
-                    jwt,
-                    LagerFilter.builder()
-                        .gameItemIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyEntryIds(
+                jwt,
+                LagerFilter.builder()
+                    .gameItemIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("gameItemIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -681,40 +672,37 @@ class InventoryItemControllerTest {
 
   @Test
   void getAllInventory_catalogItem_rejectsMinQualityAndMissionIds() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllInventory(
-                    LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build(),
-                    0,
-                    20,
-                    null))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllInventory(
+                LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build(),
+                0,
+                20,
+                null))
         .isInstanceOf(BadRequestException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllInventory(
-                    LagerFilter.builder()
-                        .missionIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build(),
-                    0,
-                    20,
-                    null))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllInventory(
+                LagerFilter.builder()
+                    .missionIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build(),
+                0,
+                20,
+                null))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
   @Test
   void getAllInventory_catalogItem_rejectsMaterialIds() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllInventory(
-                    LagerFilter.builder()
-                        .materialIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build(),
-                    0,
-                    20,
-                    null))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllInventory(
+                LagerFilter.builder()
+                    .materialIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build(),
+                0,
+                20,
+                null))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("materialIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -722,16 +710,15 @@ class InventoryItemControllerTest {
 
   @Test
   void getAllInventory_catalogMaterial_rejectsGameItemIds() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllInventory(
-                    LagerFilter.builder()
-                        .gameItemIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build(),
-                    0,
-                    20,
-                    null))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllInventory(
+                LagerFilter.builder()
+                    .gameItemIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build(),
+                0,
+                20,
+                null))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("gameItemIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -767,31 +754,28 @@ class InventoryItemControllerTest {
 
   @Test
   void getAllGroupedInventory_catalogItem_rejectsMinQualityAndMissionIds() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllGroupedInventory(
-                    LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllGroupedInventory(
+                LagerFilter.builder().minQuality(700).catalog(InventoryCatalog.ITEM).build()))
         .isInstanceOf(BadRequestException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllGroupedInventory(
-                    LagerFilter.builder()
-                        .missionIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllGroupedInventory(
+                LagerFilter.builder()
+                    .missionIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build()))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
   @Test
   void getAllGroupedInventory_catalogItem_rejectsMaterialIds() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllGroupedInventory(
-                    LagerFilter.builder()
-                        .materialIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.ITEM)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllGroupedInventory(
+                LagerFilter.builder()
+                    .materialIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.ITEM)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("materialIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -799,13 +783,12 @@ class InventoryItemControllerTest {
 
   @Test
   void getAllGroupedInventory_catalogMaterial_rejectsGameItemIds() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllGroupedInventory(
-                    LagerFilter.builder()
-                        .gameItemIds(List.of(UUID.randomUUID()))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllGroupedInventory(
+                LagerFilter.builder()
+                    .gameItemIds(List.of(UUID.randomUUID()))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("gameItemIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -964,14 +947,13 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_catalogMaterial_rejectsTheClassFilter() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyGroupedInventory(
-                    jwt,
-                    LagerFilter.builder()
-                        .itemClasses(List.of(ShipComponentClass.MILITARY))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyGroupedInventory(
+                jwt,
+                LagerFilter.builder()
+                    .itemClasses(List.of(ShipComponentClass.MILITARY))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("itemClasses");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -981,14 +963,13 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_catalogMaterial_rejectsTheAttributeFilters() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyGroupedInventory(
-                    jwt,
-                    LagerFilter.builder()
-                        .kinds(List.of(GameItemKind.VEHICLE_ITEM))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyGroupedInventory(
+                jwt,
+                LagerFilter.builder()
+                    .kinds(List.of(GameItemKind.VEHICLE_ITEM))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("catalog=MATERIAL");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -998,14 +979,13 @@ class InventoryItemControllerTest {
   void getMyEntryIds_catalogMaterial_rejectsTheAttributeFilters() {
     Jwt jwt = jwt("alice-sub");
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyEntryIds(
-                    jwt,
-                    LagerFilter.builder()
-                        .componentTypes(List.of(ShipComponentType.COOLER))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyEntryIds(
+                jwt,
+                LagerFilter.builder()
+                    .componentTypes(List.of(ShipComponentType.COOLER))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("componentTypes");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -1013,14 +993,13 @@ class InventoryItemControllerTest {
 
   @Test
   void getAllGroupedInventory_catalogMaterial_rejectsTheAttributeFilters() {
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllGroupedInventory(
-                    LagerFilter.builder()
-                        .sizes(List.of(3))
-                        .grades(List.of("B"))
-                        .catalog(InventoryCatalog.MATERIAL)
-                        .build()))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllGroupedInventory(
+                LagerFilter.builder()
+                    .sizes(List.of(3))
+                    .grades(List.of("B"))
+                    .catalog(InventoryCatalog.MATERIAL)
+                    .build()))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("sizes");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
@@ -1031,35 +1010,33 @@ class InventoryItemControllerTest {
     Jwt jwt = jwt("owner-sub");
     UUID locationId = UUID.randomUUID();
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyStackEntries(
-                    jwt,
-                    null,
-                    null,
-                    locationId,
-                    null,
-                    false,
-                    false,
-                    null,
-                    InventoryCatalog.ITEM,
-                    0,
-                    20))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyStackEntries(
+                jwt,
+                null,
+                null,
+                locationId,
+                null,
+                false,
+                false,
+                null,
+                InventoryCatalog.ITEM,
+                0,
+                20))
         .isInstanceOf(BadRequestException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getMyStackEntries(
-                    jwt,
-                    null,
-                    UUID.randomUUID(),
-                    locationId,
-                    800,
-                    false,
-                    false,
-                    null,
-                    InventoryCatalog.ITEM,
-                    0,
-                    20))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getMyStackEntries(
+                jwt,
+                null,
+                UUID.randomUUID(),
+                locationId,
+                800,
+                false,
+                false,
+                null,
+                InventoryCatalog.ITEM,
+                0,
+                20))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
@@ -1126,19 +1103,18 @@ class InventoryItemControllerTest {
             null);
 
     assertThat(result.content()).containsExactly(dto);
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.getAllStackEntries(
-                    null,
-                    gameItemId,
-                    userId,
-                    locationId,
-                    800,
-                    false,
-                    null,
-                    InventoryCatalog.ITEM,
-                    null,
-                    null))
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.getAllStackEntries(
+                null,
+                gameItemId,
+                userId,
+                locationId,
+                800,
+                false,
+                null,
+                InventoryCatalog.ITEM,
+                null,
+                null))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(inventoryItemService);
   }

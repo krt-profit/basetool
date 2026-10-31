@@ -191,19 +191,17 @@ class LogisticianRoleTest {
         "An SK lead must get the flat ROLE_MISSION_MANAGER.");
     assertTrue(
         authorities.stream()
-            .anyMatch(
-                a ->
-                    a instanceof OrgUnitContextualAuthority c
-                        && "LOGISTICIAN".equals(c.roleName())
-                        && skId.equals(c.orgUnitId())),
+            .anyMatch(a ->
+                a instanceof OrgUnitContextualAuthority c
+                    && "LOGISTICIAN".equals(c.roleName())
+                    && skId.equals(c.orgUnitId())),
         "An SK lead must get the contextual LOGISTICIAN authority on that SK.");
     assertTrue(
         authorities.stream()
-            .anyMatch(
-                a ->
-                    a instanceof OrgUnitContextualAuthority c
-                        && "MISSION_MANAGER".equals(c.roleName())
-                        && skId.equals(c.orgUnitId())),
+            .anyMatch(a ->
+                a instanceof OrgUnitContextualAuthority c
+                    && "MISSION_MANAGER".equals(c.roleName())
+                    && skId.equals(c.orgUnitId())),
         "An SK lead must get the contextual MISSION_MANAGER authority on that SK.");
   }
 
@@ -249,10 +247,9 @@ class LogisticianRoleTest {
             get("/api/v1/inventory/aggregated")
                 .with(
                     jwt()
-                        .jwt(
-                            j ->
-                                j.subject(userId.toString())
-                                    .claim("preferred_username", "test_logistician"))
+                        .jwt(j ->
+                            j.subject(userId.toString())
+                                .claim("preferred_username", "test_logistician"))
                         .authorities(converter)))
         .andDo(print())
         .andExpect(status().isOk());

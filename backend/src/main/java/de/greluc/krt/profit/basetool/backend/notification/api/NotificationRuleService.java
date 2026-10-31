@@ -182,10 +182,9 @@ public class NotificationRuleService {
         }
         return roleRecipientDirectory
             .catalogueRoleCode(roleCode)
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "ROLE selector names an unknown roleCode: " + roleCode));
+            .orElseThrow(() ->
+                new IllegalArgumentException(
+                    "ROLE selector names an unknown roleCode: " + roleCode));
       }
       case ORG_RELATIVE_ROLE -> {
         if (selector.orgRelativeRole() == null || selector.contextRole() == null) {

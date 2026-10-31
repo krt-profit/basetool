@@ -133,12 +133,11 @@ public class UserReconciliationService {
     final boolean created = existingUser.isEmpty();
 
     User user =
-        existingUser.orElseGet(
-            () -> {
-              User u = new User();
-              u.setId(finalUserId);
-              return u;
-            });
+        existingUser.orElseGet(() -> {
+          User u = new User();
+          u.setId(finalUserId);
+          return u;
+        });
 
     boolean changed = false;
 
@@ -241,12 +240,11 @@ public class UserReconciliationService {
     Optional<User> existingUser = userRepository.findById(dto.id());
     final boolean created = existingUser.isEmpty();
     User user =
-        existingUser.orElseGet(
-            () -> {
-              User u = new User();
-              u.setId(dto.id());
-              return u;
-            });
+        existingUser.orElseGet(() -> {
+          User u = new User();
+          u.setId(dto.id());
+          return u;
+        });
 
     boolean changed = false;
     final boolean wasActive =
@@ -376,10 +374,9 @@ public class UserReconciliationService {
     }
     java.util.List<UUID> departing = userRepository.findIdsMissingFrom(currentIds);
     int flagged = userRepository.markMissingUsers(currentIds, Instant.now());
-    departing.forEach(
-        id ->
-            eventPublisher.publishEvent(
-                new MemberDepartedEvent(id, MemberDepartedEvent.REASON_REMOVED)));
+    departing.forEach(id ->
+        eventPublisher.publishEvent(
+            new MemberDepartedEvent(id, MemberDepartedEvent.REASON_REMOVED)));
     return flagged;
   }
 

@@ -115,11 +115,10 @@ class SecurityProblemResponseHandlerTest {
   private static HandlerExceptionResolver resolverCapturingUserId(AtomicReference<String> seen) {
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any()))
-        .thenAnswer(
-            invocation -> {
-              seen.set(MDC.get("userId"));
-              return new ModelAndView();
-            });
+        .thenAnswer(invocation -> {
+          seen.set(MDC.get("userId"));
+          return new ModelAndView();
+        });
     return resolver;
   }
 

@@ -110,10 +110,8 @@ class ExchangeMirrorSeamParityTest {
   @Test
   void theRevocationEntriesUseTheSeamsKeysAndEpochSeconds() {
     assertRevocationKeys(ExchangeSeam.denyKey("thumb"), ExchangeSeam.revokedKey("vk", MEMBER));
-    assertThatThrownBy(
-            () ->
-                assertRevocationKeys(
-                    "exchange:denied:thumb", ExchangeSeam.revokedKey("vk", MEMBER)))
+    assertThatThrownBy(() ->
+            assertRevocationKeys("exchange:denied:thumb", ExchangeSeam.revokedKey("vk", MEMBER)))
         .isInstanceOf(AssertionError.class);
   }
 
@@ -183,11 +181,10 @@ class ExchangeMirrorSeamParityTest {
 
     List<String> read = new ArrayList<>();
     when(values.get(anyString()))
-        .thenAnswer(
-            invocation -> {
-              read.add(invocation.getArgument(0));
-              return null;
-            });
+        .thenAnswer(invocation -> {
+          read.add(invocation.getArgument(0));
+          return null;
+        });
     mirror.isDenied("thumb");
     mirror.revokedAt("vk", UUID.fromString(MEMBER));
     assertThat(read).containsExactly(denyKey, revokedKey);

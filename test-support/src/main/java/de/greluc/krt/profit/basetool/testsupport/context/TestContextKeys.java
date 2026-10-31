@@ -111,16 +111,14 @@ public final class TestContextKeys {
     Map<MergedContextConfiguration, List<Class<?>>> sorted = new LinkedHashMap<>();
     groups.entrySet().stream()
         .sorted(
-            Comparator.comparing(
-                    (Map.Entry<MergedContextConfiguration, List<Class<?>>> e) ->
-                        e.getValue().size())
+            Comparator.comparing((Map.Entry<MergedContextConfiguration, List<Class<?>>> e) ->
+                    e.getValue().size())
                 .reversed()
                 .thenComparing(e -> e.getValue().getFirst().getName()))
-        .forEach(
-            e ->
-                sorted.put(
-                    e.getKey(),
-                    e.getValue().stream().sorted(Comparator.comparing(Class::getName)).toList()));
+        .forEach(e ->
+            sorted.put(
+                e.getKey(),
+                e.getValue().stream().sorted(Comparator.comparing(Class::getName)).toList()));
     return Collections.unmodifiableMap(sorted);
   }
 
@@ -213,12 +211,11 @@ public final class TestContextKeys {
       }
       MergedAnnotations.from(c, SearchStrategy.TYPE_HIERARCHY).stream()
           .filter(a -> TYPE_LEVEL_OVERRIDES.contains(a.getType().getSimpleName()))
-          .forEach(
-              a -> {
-                for (Class<?> type : a.getClassArray("types")) {
-                  entries.add(a.getType().getSimpleName() + " " + type.getSimpleName() + " -");
-                }
-              });
+          .forEach(a -> {
+            for (Class<?> type : a.getClassArray("types")) {
+              entries.add(a.getType().getSimpleName() + " " + type.getSimpleName() + " -");
+            }
+          });
       if (Modifier.isStatic(c.getModifiers())) {
         break;
       }
@@ -264,10 +261,9 @@ public final class TestContextKeys {
         .stream(EXTEND_WITH)
         .map(MergedAnnotation::asAnnotationAttributes)
         .flatMap(attributes -> Arrays.stream((Object[]) attributes.get("value")))
-        .anyMatch(
-            extension ->
-                extension instanceof Class<?> type && SPRING_EXTENSION.equals(type.getName())
-                    || SPRING_EXTENSION.equals(extension));
+        .anyMatch(extension ->
+            extension instanceof Class<?> type && SPRING_EXTENSION.equals(type.getName())
+                || SPRING_EXTENSION.equals(extension));
   }
 
   /**

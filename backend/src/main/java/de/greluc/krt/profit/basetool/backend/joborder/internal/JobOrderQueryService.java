@@ -211,21 +211,20 @@ public class JobOrderQueryService {
     Map<UUID, Map<UUID, Double>> itemStockByOrder =
         needIds.isEmpty() ? Map.of() : loadItemStockIndex(needIds);
     return visible.stream()
-        .map(
-            o ->
-                new JobOrderReferenceDto(
-                    o.getId(),
-                    o.getDisplayId(),
-                    o.getHandle(),
-                    o.getStatus(),
-                    squadronMapper.orgUnitToReferenceDto(o.getRequestingOrgUnit()),
-                    o.getMaterials() != null
-                        ? o.getMaterials().stream().map(jobOrderMapper::toDto).toList()
-                        : List.of(),
-                    List.copyOf(jobOrderItemService.requiredMaterialIds(o)),
-                    List.copyOf(jobOrderItemService.requiredGameItemIds(o)),
-                    withNeeds ? materialNeedsOf(o, stockIndex) : List.of(),
-                    withNeeds ? gameItemNeedsOf(o, itemStockByOrder) : List.of()))
+        .map(o ->
+            new JobOrderReferenceDto(
+                o.getId(),
+                o.getDisplayId(),
+                o.getHandle(),
+                o.getStatus(),
+                squadronMapper.orgUnitToReferenceDto(o.getRequestingOrgUnit()),
+                o.getMaterials() != null
+                    ? o.getMaterials().stream().map(jobOrderMapper::toDto).toList()
+                    : List.of(),
+                List.copyOf(jobOrderItemService.requiredMaterialIds(o)),
+                List.copyOf(jobOrderItemService.requiredGameItemIds(o)),
+                withNeeds ? materialNeedsOf(o, stockIndex) : List.of(),
+                withNeeds ? gameItemNeedsOf(o, itemStockByOrder) : List.of()))
         .toList();
   }
 
@@ -311,19 +310,18 @@ public class JobOrderQueryService {
     }
     Map<UUID, Double> earmarked = itemStockByOrder.getOrDefault(order.getId(), Map.of());
     List<JobOrderGameItemNeedDto> needs = new ArrayList<>();
-    lineTotals.forEach(
-        (gameItemId, totals) -> {
-          int ordered = totals[0];
-          int delivered = totals[1];
-          int allocated = (int) Math.round(earmarked.getOrDefault(gameItemId, 0.0));
-          needs.add(
-              new JobOrderGameItemNeedDto(
-                  gameItemId,
-                  ordered,
-                  delivered,
-                  allocated,
-                  Math.max(0, ordered - delivered - allocated)));
-        });
+    lineTotals.forEach((gameItemId, totals) -> {
+      int ordered = totals[0];
+      int delivered = totals[1];
+      int allocated = (int) Math.round(earmarked.getOrDefault(gameItemId, 0.0));
+      needs.add(
+          new JobOrderGameItemNeedDto(
+              gameItemId,
+              ordered,
+              delivered,
+              allocated,
+              Math.max(0, ordered - delivered - allocated)));
+    });
     return needs;
   }
 

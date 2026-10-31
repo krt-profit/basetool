@@ -189,11 +189,10 @@ public class MaterialExchangeService {
     ResolvedProduct product =
         blueprintProductService
             .resolveByGameItem(Objects.requireNonNull(item.getGameItem()).getId())
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "This item is not produced by any active blueprint and cannot be"
-                            + " offered."));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "This item is not produced by any active blueprint and cannot be"
+                        + " offered."));
 
     MaterialExchangeOffer offer =
         offerRepository

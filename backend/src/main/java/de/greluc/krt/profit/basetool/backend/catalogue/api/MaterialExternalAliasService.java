@@ -190,17 +190,16 @@ public class MaterialExternalAliasService {
     repository
         .findBySourceSystemAndExternalNameIgnoreCase(source, externalName)
         .filter(existing -> excludeId == null || !existing.getId().equals(excludeId))
-        .ifPresent(
-            existing -> {
-              throw new DuplicateEntityException(
-                  "Alias '"
-                      + externalName
-                      + "' already exists for source "
-                      + source
-                      + " (case-insensitive match: '"
-                      + existing.getExternalName()
-                      + "').");
-            });
+        .ifPresent(existing -> {
+          throw new DuplicateEntityException(
+              "Alias '"
+                  + externalName
+                  + "' already exists for source "
+                  + source
+                  + " (case-insensitive match: '"
+                  + existing.getExternalName()
+                  + "').");
+        });
   }
 
   /**

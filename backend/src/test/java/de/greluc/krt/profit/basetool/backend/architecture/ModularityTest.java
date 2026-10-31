@@ -133,39 +133,38 @@ class ModularityTest {
   @Test
   void everyDeclaredModulePublishesItsWholeApiTreeAsItsOnlyNamedInterface() {
     JavaClasses classes = ModuleSubjects.importBackendMainClasses();
-    BACKEND.forEach(
-        module -> {
-          String id = module.getIdentifier().toString();
-          if (BASE_PACKAGE_MODULES.contains(id)) {
-            assertBasePackageIsTheOnlyInterface(module, classes);
-            return;
-          }
-          if (INTERNAL_ONLY_MODULES.contains(id)) {
-            assertModulePublishesNothing(module, classes);
-            return;
-          }
-          String apiPackage = module.getBasePackage().getName() + "." + API;
-          Set<String> named =
-              module.getNamedInterfaces().stream()
-                  .filter(NamedInterface::isNamed)
-                  .map(NamedInterface::getName)
-                  .collect(Collectors.toUnmodifiableSet());
-          Set<String> published =
-              module.getNamedInterfaces().getByName(API).stream()
-                  .flatMap(NamedInterface::asJavaClasses)
-                  .map(JavaClass::getName)
-                  .collect(Collectors.toUnmodifiableSet());
-          List<String> apiTree =
-              ModuleSubjects.topLevelClasses(classes)
-                  .map(JavaClass::getName)
-                  .filter(name -> name.startsWith(apiPackage + "."))
-                  .toList();
+    BACKEND.forEach(module -> {
+      String id = module.getIdentifier().toString();
+      if (BASE_PACKAGE_MODULES.contains(id)) {
+        assertBasePackageIsTheOnlyInterface(module, classes);
+        return;
+      }
+      if (INTERNAL_ONLY_MODULES.contains(id)) {
+        assertModulePublishesNothing(module, classes);
+        return;
+      }
+      String apiPackage = module.getBasePackage().getName() + "." + API;
+      Set<String> named =
+          module.getNamedInterfaces().stream()
+              .filter(NamedInterface::isNamed)
+              .map(NamedInterface::getName)
+              .collect(Collectors.toUnmodifiableSet());
+      Set<String> published =
+          module.getNamedInterfaces().getByName(API).stream()
+              .flatMap(NamedInterface::asJavaClasses)
+              .map(JavaClass::getName)
+              .collect(Collectors.toUnmodifiableSet());
+      List<String> apiTree =
+          ModuleSubjects.topLevelClasses(classes)
+              .map(JavaClass::getName)
+              .filter(name -> name.startsWith(apiPackage + "."))
+              .toList();
 
-          assertThat(named).as(id).containsExactly(API);
-          assertThat(apiTree).as(id).isNotEmpty();
-          assertThat(published).as(id).containsAll(apiTree);
-          assertThat(published).as(id).allMatch(name -> name.startsWith(apiPackage + "."));
-        });
+      assertThat(named).as(id).containsExactly(API);
+      assertThat(apiTree).as(id).isNotEmpty();
+      assertThat(published).as(id).containsAll(apiTree);
+      assertThat(published).as(id).allMatch(name -> name.startsWith(apiPackage + "."));
+    });
   }
 
   private static void assertBasePackageIsTheOnlyInterface(
@@ -209,10 +208,9 @@ class ModularityTest {
     assertThat(moduleTree).as(id).isNotEmpty();
     assertThat(moduleTree)
         .as(id + " keeps every type below its base package and outside an api package")
-        .allMatch(
-            name ->
-                !name.substring(0, name.lastIndexOf('.')).equals(basePackage)
-                    && !name.startsWith(basePackage + "." + API + "."));
+        .allMatch(name ->
+            !name.substring(0, name.lastIndexOf('.')).equals(basePackage)
+                && !name.startsWith(basePackage + "." + API + "."));
   }
 
   @Test

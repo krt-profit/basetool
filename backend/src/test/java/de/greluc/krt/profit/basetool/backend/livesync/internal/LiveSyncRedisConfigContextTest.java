@@ -57,26 +57,23 @@ class LiveSyncRedisConfigContextTest {
   @DisplayName("the enabled configuration wires the Redis publisher and no listener container")
   void enabledWiresThePublisherOnly() {
     runner(true)
-        .run(
-            context ->
-                assertThat(context)
-                    .hasNotFailed()
-                    .hasSingleBean(RedisLiveSyncFanout.class)
-                    .doesNotHaveBean(
-                        org.springframework.data.redis.listener.RedisMessageListenerContainer
-                            .class));
+        .run(context ->
+            assertThat(context)
+                .hasNotFailed()
+                .hasSingleBean(RedisLiveSyncFanout.class)
+                .doesNotHaveBean(
+                    org.springframework.data.redis.listener.RedisMessageListenerContainer.class));
   }
 
   @Test
   @DisplayName("the disabled configuration falls back to the local no-op, so the backend starts")
   void disabledFallsBackToTheLocalNoop() {
     runner(false)
-        .run(
-            context ->
-                assertThat(context)
-                    .hasNotFailed()
-                    .doesNotHaveBean(RedisLiveSyncFanout.class)
-                    .getBean(LiveSyncFanout.class)
-                    .isInstanceOf(LocalLiveSyncFanout.class));
+        .run(context ->
+            assertThat(context)
+                .hasNotFailed()
+                .doesNotHaveBean(RedisLiveSyncFanout.class)
+                .getBean(LiveSyncFanout.class)
+                .isInstanceOf(LocalLiveSyncFanout.class));
   }
 }

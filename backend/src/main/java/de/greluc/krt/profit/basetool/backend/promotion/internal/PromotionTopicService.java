@@ -132,12 +132,11 @@ public class PromotionTopicService {
     Squadron squadron =
         ownerScopeService
             .currentSquadron()
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "No active squadron context — admins in 'all squadrons' mode must focus a"
-                            + " squadron via the sidebar switcher before creating a promotion"
-                            + " topic."));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "No active squadron context — admins in 'all squadrons' mode must focus a"
+                        + " squadron via the sidebar switcher before creating a promotion"
+                        + " topic."));
     PromotionTopic entity = mapper.toEntity(request);
     entity.setOwningSquadron(squadron);
     PromotionTopic saved = repository.save(entity);

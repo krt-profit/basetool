@@ -96,12 +96,11 @@ class CatalogueBackendClientTest {
     client.materialPricePage(ID, 1);
     assertThat(client.terminalCatalogue().content())
         .singleElement()
-        .satisfies(
-            row -> {
-              assertThat(row.id()).isEqualTo(OTHER);
-              assertThat(row.starSystemName()).isEqualTo("Stanton");
-              assertThat(row.uexSyncedAt()).isEqualTo(Instant.parse("2026-10-03T11:30:00Z"));
-            });
+        .satisfies(row -> {
+          assertThat(row.id()).isEqualTo(OTHER);
+          assertThat(row.starSystemName()).isEqualTo("Stanton");
+          assertThat(row.uexSyncedAt()).isEqualTo(Instant.parse("2026-10-03T11:30:00Z"));
+        });
     client.shipTypesSorted();
 
     backend.expect("GET", "/api/v1/materials/prices-overview?size=10000&sort=name,asc");

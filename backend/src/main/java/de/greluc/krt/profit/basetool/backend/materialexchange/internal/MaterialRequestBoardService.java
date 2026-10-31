@@ -155,16 +155,15 @@ public class MaterialRequestBoardService {
         exchangeItemReferences.byProductKey(itemProductKeysOf(requests.getContent()));
 
     Page<MaterialRequestDto> dtos =
-        requests.map(
-            request ->
-                toDto(
-                    request,
-                    gameItemOf(request, gameItems),
-                    viewerId,
-                    badges.getOrDefault(ownerIdOf(request), List.of()),
-                    counts.getOrDefault(request.getId(), 0L).intValue(),
-                    interested.contains(request.getId()),
-                    null));
+        requests.map(request ->
+            toDto(
+                request,
+                gameItemOf(request, gameItems),
+                viewerId,
+                badges.getOrDefault(ownerIdOf(request), List.of()),
+                counts.getOrDefault(request.getId(), 0L).intValue(),
+                interested.contains(request.getId()),
+                null));
     return PageResponse.of(dtos);
   }
 
@@ -374,19 +373,17 @@ public class MaterialRequestBoardService {
     Map<UUID, List<OrgUnitReferenceDto>> byOwner = new HashMap<>();
     rows.stream()
         .collect(Collectors.groupingBy(row -> row.getId().getUserId()))
-        .forEach(
-            (ownerId, ownerRows) ->
-                byOwner.put(
-                    ownerId,
-                    ownerRows.stream()
-                        .map(row -> orgUnitsById.get(row.getId().getOrgUnitId()))
-                        .filter(Objects::nonNull)
-                        .sorted(ORG_UNIT_BADGE_ORDER)
-                        .map(
-                            ou ->
-                                new OrgUnitReferenceDto(
-                                    ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
-                        .toList()));
+        .forEach((ownerId, ownerRows) ->
+            byOwner.put(
+                ownerId,
+                ownerRows.stream()
+                    .map(row -> orgUnitsById.get(row.getId().getOrgUnitId()))
+                    .filter(Objects::nonNull)
+                    .sorted(ORG_UNIT_BADGE_ORDER)
+                    .map(ou ->
+                        new OrgUnitReferenceDto(
+                            ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
+                    .toList()));
     return byOwner;
   }
 

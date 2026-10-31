@@ -110,13 +110,12 @@ class EndpointEnumerationTest {
   @DisplayName("every declared verb of a mapping becomes its own call")
   void everyVerbIsExpanded() throws Exception {
     StaticWebApplicationContext context =
-        registryWith(
-            register ->
-                register.accept(
-                    RequestMappingInfo.paths("/api/v1/missions/{id}")
-                        .methods(RequestMethod.GET, RequestMethod.DELETE)
-                        .options(parsedPatterns())
-                        .build()));
+        registryWith(register ->
+            register.accept(
+                RequestMappingInfo.paths("/api/v1/missions/{id}")
+                    .methods(RequestMethod.GET, RequestMethod.DELETE)
+                    .options(parsedPatterns())
+                    .build()));
 
     assertThat(EndpointEnumeration.mappings(context))
         .containsExactly(
@@ -128,10 +127,8 @@ class EndpointEnumerationTest {
   @DisplayName("a mapping that declares no verb is swept as GET")
   void verblessMappingBecomesGet() throws Exception {
     StaticWebApplicationContext context =
-        registryWith(
-            register ->
-                register.accept(
-                    RequestMappingInfo.paths("/error").options(parsedPatterns()).build()));
+        registryWith(register ->
+            register.accept(RequestMappingInfo.paths("/error").options(parsedPatterns()).build()));
 
     assertThat(EndpointEnumeration.mappings(context))
         .containsExactly(new Call(HttpMethod.GET, "/error"));
@@ -141,24 +138,23 @@ class EndpointEnumerationTest {
   @DisplayName("two mappings that substitute to one path are swept once, and the order is stable")
   void resultIsDeduplicatedAndStablySorted() throws Exception {
     StaticWebApplicationContext context =
-        registryWith(
-            register -> {
-              register.accept(
-                  RequestMappingInfo.paths("/zebra")
-                      .methods(RequestMethod.GET)
-                      .options(parsedPatterns())
-                      .build());
-              register.accept(
-                  RequestMappingInfo.paths("/alpha/{id}")
-                      .methods(RequestMethod.POST)
-                      .options(parsedPatterns())
-                      .build());
-              register.accept(
-                  RequestMappingInfo.paths("/alpha/{missionId}")
-                      .methods(RequestMethod.POST)
-                      .options(parsedPatterns())
-                      .build());
-            });
+        registryWith(register -> {
+          register.accept(
+              RequestMappingInfo.paths("/zebra")
+                  .methods(RequestMethod.GET)
+                  .options(parsedPatterns())
+                  .build());
+          register.accept(
+              RequestMappingInfo.paths("/alpha/{id}")
+                  .methods(RequestMethod.POST)
+                  .options(parsedPatterns())
+                  .build());
+          register.accept(
+              RequestMappingInfo.paths("/alpha/{missionId}")
+                  .methods(RequestMethod.POST)
+                  .options(parsedPatterns())
+                  .build());
+        });
 
     assertThat(EndpointEnumeration.mappings(context))
         .as(
@@ -174,19 +170,18 @@ class EndpointEnumerationTest {
   @DisplayName("a pattern that cannot be made concrete contributes nothing")
   void unroutableMappingsAreNotSwept() throws Exception {
     StaticWebApplicationContext context =
-        registryWith(
-            register -> {
-              register.accept(
-                  RequestMappingInfo.paths("/assets/**")
-                      .methods(RequestMethod.GET)
-                      .options(parsedPatterns())
-                      .build());
-              register.accept(
-                  RequestMappingInfo.paths("/ok")
-                      .methods(RequestMethod.GET)
-                      .options(parsedPatterns())
-                      .build());
-            });
+        registryWith(register -> {
+          register.accept(
+              RequestMappingInfo.paths("/assets/**")
+                  .methods(RequestMethod.GET)
+                  .options(parsedPatterns())
+                  .build());
+          register.accept(
+              RequestMappingInfo.paths("/ok")
+                  .methods(RequestMethod.GET)
+                  .options(parsedPatterns())
+                  .build());
+        });
 
     assertThat(EndpointEnumeration.mappings(context))
         .containsExactly(new Call(HttpMethod.GET, "/ok"));

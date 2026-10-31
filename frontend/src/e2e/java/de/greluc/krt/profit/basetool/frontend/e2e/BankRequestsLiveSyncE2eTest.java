@@ -136,12 +136,11 @@ class BankRequestsLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().length > 0)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
         pageA.locator(rejectBtn).click(new Locator.ClickOptions().setTimeout(20_000));
         pageA.locator("[data-testid='bank-reject-reason']").fill("E2E live-sync rejection");

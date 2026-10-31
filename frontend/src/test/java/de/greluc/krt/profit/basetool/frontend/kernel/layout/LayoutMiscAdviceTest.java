@@ -138,11 +138,10 @@ class LayoutMiscAdviceTest {
    */
   private void stubEchoMessages() {
     when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
-        .thenAnswer(
-            inv -> {
-              String code = inv.getArgument(0);
-              Object[] args = inv.getArgument(1);
-              return args != null && args.length > 0 ? code + ":" + args[0] : code;
-            });
+        .thenAnswer(inv -> {
+          String code = inv.getArgument(0);
+          Object[] args = inv.getArgument(1);
+          return args != null && args.length > 0 ? code + ":" + args[0] : code;
+        });
   }
 }

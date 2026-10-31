@@ -84,12 +84,11 @@ class SectionFallbackTest {
     assertThat(result).isEmpty();
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.getLevel()).isEqualTo(Level.WARN);
-              assertThat(event.getFormattedMessage()).isEqualTo("Page section 'rows' unavailable");
-              assertThat(event.getThrowableProxy().getMessage()).isEqualTo("boom");
-            });
+        .satisfies(event -> {
+          assertThat(event.getLevel()).isEqualTo(Level.WARN);
+          assertThat(event.getFormattedMessage()).isEqualTo("Page section 'rows' unavailable");
+          assertThat(event.getThrowableProxy().getMessage()).isEqualTo("boom");
+        });
   }
 
   @Test
@@ -129,15 +128,14 @@ class SectionFallbackTest {
   void loadRethrowsReauthentication() {
     ReauthenticationRequiredException reauth = reauth();
 
-    assertThatThrownBy(
-            () ->
-                SectionFallback.load(
-                    log,
-                    "rows",
-                    () -> {
-                      throw reauth;
-                    },
-                    List.of()))
+    assertThatThrownBy(() ->
+            SectionFallback.load(
+                log,
+                "rows",
+                () -> {
+                  throw reauth;
+                },
+                List.of()))
         .isSameAs(reauth);
     assertThat(appender.list).isEmpty();
   }
@@ -146,15 +144,14 @@ class SectionFallbackTest {
   void loadUnwrapsReauthenticationFromAJoinedFuture() {
     ReauthenticationRequiredException reauth = reauth();
 
-    assertThatThrownBy(
-            () ->
-                SectionFallback.load(
-                    log,
-                    "rows",
-                    () -> {
-                      throw new CompletionException(reauth);
-                    },
-                    List.of()))
+    assertThatThrownBy(() ->
+            SectionFallback.load(
+                log,
+                "rows",
+                () -> {
+                  throw new CompletionException(reauth);
+                },
+                List.of()))
         .isSameAs(reauth);
   }
 
@@ -162,15 +159,14 @@ class SectionFallbackTest {
   void loadTurnsABareClientAuthorizationFailureIntoReauthentication() {
     ClientAuthorizationException signal = clientAuthorizationFailure();
 
-    assertThatThrownBy(
-            () ->
-                SectionFallback.load(
-                    log,
-                    "rows",
-                    () -> {
-                      throw new IllegalStateException(signal);
-                    },
-                    List.of()))
+    assertThatThrownBy(() ->
+            SectionFallback.load(
+                log,
+                "rows",
+                () -> {
+                  throw new IllegalStateException(signal);
+                },
+                List.of()))
         .isInstanceOf(ReauthenticationRequiredException.class)
         .hasRootCause(signal);
   }
@@ -199,14 +195,13 @@ class SectionFallbackTest {
   void runRethrowsReauthentication() {
     ReauthenticationRequiredException reauth = reauth();
 
-    assertThatThrownBy(
-            () ->
-                SectionFallback.run(
-                    log,
-                    "stats",
-                    () -> {
-                      throw reauth;
-                    }))
+    assertThatThrownBy(() ->
+            SectionFallback.run(
+                log,
+                "stats",
+                () -> {
+                  throw reauth;
+                }))
         .isSameAs(reauth);
   }
 

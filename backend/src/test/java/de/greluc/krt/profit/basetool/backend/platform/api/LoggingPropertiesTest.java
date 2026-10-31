@@ -48,16 +48,15 @@ class LoggingPropertiesTest {
 
   @Test
   void defaults_ShouldMatchLogbackPatternExpectations() {
-    runner.run(
-        context -> {
-          LoggingProperties props = context.getBean(LoggingProperties.class);
+    runner.run(context -> {
+      LoggingProperties props = context.getBean(LoggingProperties.class);
 
-          assertThat(props.correlationIdHeader()).isEqualTo("X-Correlation-Id");
-          assertThat(props.correlationIdMdcKey()).isEqualTo("correlationId");
-          assertThat(props.userIdMdcKey()).isEqualTo("userId");
-          assertThat(props.slowRequestThresholdMs()).isEqualTo(2000L);
-          assertThat(props.structuredEnabled()).isFalse();
-        });
+      assertThat(props.correlationIdHeader()).isEqualTo("X-Correlation-Id");
+      assertThat(props.correlationIdMdcKey()).isEqualTo("correlationId");
+      assertThat(props.userIdMdcKey()).isEqualTo("userId");
+      assertThat(props.slowRequestThresholdMs()).isEqualTo(2000L);
+      assertThat(props.structuredEnabled()).isFalse();
+    });
   }
 
   @Test
@@ -81,13 +80,12 @@ class LoggingPropertiesTest {
             "app.logging.correlation-id-header=X-Trace-Id",
             "app.logging.slow-request-threshold-ms=5000",
             "app.logging.structured-enabled=true")
-        .run(
-            context -> {
-              LoggingProperties p = context.getBean(LoggingProperties.class);
-              assertThat(p.correlationIdHeader()).isEqualTo("X-Trace-Id");
-              assertThat(p.slowRequestThresholdMs()).isEqualTo(5000L);
-              assertThat(p.structuredEnabled()).isTrue();
-            });
+        .run(context -> {
+          LoggingProperties p = context.getBean(LoggingProperties.class);
+          assertThat(p.correlationIdHeader()).isEqualTo("X-Trace-Id");
+          assertThat(p.slowRequestThresholdMs()).isEqualTo(5000L);
+          assertThat(p.structuredEnabled()).isTrue();
+        });
   }
 
   @Test

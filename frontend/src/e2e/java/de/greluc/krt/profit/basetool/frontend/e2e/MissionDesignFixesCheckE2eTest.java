@@ -82,17 +82,11 @@ class MissionDesignFixesCheckE2eTest {
                 .setViewportSize(1880, 1200))) {
       Page page = context.newPage();
       StringBuilder consoleLog = new StringBuilder();
-      page.onConsoleMessage(
-          msg -> {
-            if ("error".equals(msg.type())) {
-              consoleLog
-                  .append('[')
-                  .append(msg.type())
-                  .append("] ")
-                  .append(msg.text())
-                  .append('\n');
-            }
-          });
+      page.onConsoleMessage(msg -> {
+        if ("error".equals(msg.type())) {
+          consoleLog.append('[').append(msg.type()).append("] ").append(msg.text()).append('\n');
+        }
+      });
       page.onPageError(err -> consoleLog.append("[pageerror] ").append(err).append('\n'));
 
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");

@@ -63,20 +63,19 @@ public class JobOrderStockReadService {
   public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
     Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
     return stockReads.materialRowsOfOrder(jobOrderId).stream()
-        .map(
-            row ->
-                new MaterialCollectionEntryDto(
-                    row.id(),
-                    row.version(),
-                    row.ownerName(),
-                    row.ownerId(),
-                    row.locationName(),
-                    row.locationId(),
-                    row.materialName(),
-                    row.quality() != null ? row.quality().doubleValue() : null,
-                    row.amount(),
-                    row.allocatedAmount(),
-                    row.delivered()))
+        .map(row ->
+            new MaterialCollectionEntryDto(
+                row.id(),
+                row.version(),
+                row.ownerName(),
+                row.ownerId(),
+                row.locationName(),
+                row.locationId(),
+                row.materialName(),
+                row.quality() != null ? row.quality().doubleValue() : null,
+                row.amount(),
+                row.allocatedAmount(),
+                row.delivered()))
         .toList();
   }
 
@@ -114,30 +113,29 @@ public class JobOrderStockReadService {
     }
 
     List<JobOrderItemStockGroupDto> groups = new ArrayList<>();
-    byGameItem.forEach(
-        (gameItemId, rows) -> {
-          List<JobOrderItemStockEntryDto> entries = new ArrayList<>();
-          long allocatedTotal = 0L;
-          for (LinkedStockRow row : rows) {
-            long allocatedQuantity = Math.round(row.allocatedAmount());
-            allocatedTotal += allocatedQuantity;
-            entries.add(
-                new JobOrderItemStockEntryDto(
-                    row.id(),
-                    row.version(),
-                    row.ownerName(),
-                    row.ownerId(),
-                    row.locationName(),
-                    row.locationId(),
-                    Math.round(row.amount()),
-                    allocatedQuantity,
-                    row.delivered()));
-          }
-          int[] totals = lineTotals.getOrDefault(gameItemId, new int[2]);
-          groups.add(
-              new JobOrderItemStockGroupDto(
-                  rows.getFirst().gameItem(), totals[0], totals[1], allocatedTotal, entries));
-        });
+    byGameItem.forEach((gameItemId, rows) -> {
+      List<JobOrderItemStockEntryDto> entries = new ArrayList<>();
+      long allocatedTotal = 0L;
+      for (LinkedStockRow row : rows) {
+        long allocatedQuantity = Math.round(row.allocatedAmount());
+        allocatedTotal += allocatedQuantity;
+        entries.add(
+            new JobOrderItemStockEntryDto(
+                row.id(),
+                row.version(),
+                row.ownerName(),
+                row.ownerId(),
+                row.locationName(),
+                row.locationId(),
+                Math.round(row.amount()),
+                allocatedQuantity,
+                row.delivered()));
+      }
+      int[] totals = lineTotals.getOrDefault(gameItemId, new int[2]);
+      groups.add(
+          new JobOrderItemStockGroupDto(
+              rows.getFirst().gameItem(), totals[0], totals[1], allocatedTotal, entries));
+    });
     groups.sort(
         Comparator.<JobOrderItemStockGroupDto, String>comparing(
                 g -> g.gameItem() != null && g.gameItem().name() != null ? g.gameItem().name() : "",

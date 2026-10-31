@@ -171,10 +171,9 @@ public class JobOrderHandoverService {
       String code = tierCode.trim().toUpperCase(Locale.ROOT);
       boolean lineExists =
           jobOrder.getMaterials().stream()
-              .anyMatch(
-                  mat ->
-                      mat.getMaterial().getId().equals(materialId)
-                          && mat.getQualityTier().getCode().equals(code));
+              .anyMatch(mat ->
+                  mat.getMaterial().getId().equals(materialId)
+                      && mat.getQualityTier().getCode().equals(code));
       if (!lineExists) {
         throw new BadRequestException(ERROR_QUALITY_TIER_NOT_ON_ORDER);
       }
@@ -241,17 +240,16 @@ public class JobOrderHandoverService {
         jobOrder.getResponsibleOrgUnit() != null ? jobOrder.getResponsibleOrgUnit().getId() : null;
     userService
         .getCurrentUser()
-        .ifPresent(
-            current -> {
-              handover.setExecutingUser(current);
-              orgUnitMembershipQueryService
-                  .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
-                  .flatMap(orgUnitRepository::findById)
-                  .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-                  .filter(Squadron.class::isInstance)
-                  .map(Squadron.class::cast)
-                  .ifPresent(handover::setExecutingSquadron);
-            });
+        .ifPresent(current -> {
+          handover.setExecutingUser(current);
+          orgUnitMembershipQueryService
+              .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
+              .flatMap(orgUnitRepository::findById)
+              .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+              .filter(Squadron.class::isInstance)
+              .map(Squadron.class::cast)
+              .ifPresent(handover::setExecutingSquadron);
+        });
 
     Set<UUID> materialsToUnlink = new HashSet<>();
     Set<UUID> touchedMaterials = new LinkedHashSet<>();

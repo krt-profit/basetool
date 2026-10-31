@@ -92,12 +92,11 @@ public class SystemSettingService implements SystemSettings {
     SystemSetting setting =
         systemSettingRepository
             .findById(key)
-            .orElseGet(
-                () -> {
-                  SystemSetting created = new SystemSetting();
-                  created.setId(key);
-                  return created;
-                });
+            .orElseGet(() -> {
+              SystemSetting created = new SystemSetting();
+              created.setId(key);
+              return created;
+            });
     setting.setValue(value);
     systemSettingRepository.save(setting);
   }

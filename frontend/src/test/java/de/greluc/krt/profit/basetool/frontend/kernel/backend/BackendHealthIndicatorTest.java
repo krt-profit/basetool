@@ -197,12 +197,11 @@ class BackendHealthIndicatorTest {
     X509Certificate[] chain = new X509Certificate[0];
 
     assertNotNull(tm.getAcceptedIssuers(), "accepted issuers must come from the pinned delegate");
-    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
-        () -> {
-          tm.checkServerTrusted(chain, "RSA");
-          tm.checkServerTrusted(chain, "RSA", (Socket) null);
-          tm.checkServerTrusted(chain, "RSA", (SSLEngine) null);
-        });
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      tm.checkServerTrusted(chain, "RSA");
+      tm.checkServerTrusted(chain, "RSA", (Socket) null);
+      tm.checkServerTrusted(chain, "RSA", (SSLEngine) null);
+    });
 
     assertEquals(
         3,

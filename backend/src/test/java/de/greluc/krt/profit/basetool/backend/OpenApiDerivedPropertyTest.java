@@ -117,16 +117,15 @@ class OpenApiDerivedPropertyTest {
 
     List<String> offenders = new ArrayList<>();
     schemas()
-        .forEach(
-            (name, schema) -> {
-              Object properties = ((Map<?, ?>) schema).get("properties");
-              if (properties instanceof Map<?, ?> propertyMap) {
-                propertyMap.keySet().stream()
-                    .map(String::valueOf)
-                    .filter(derived::contains)
-                    .forEach(property -> offenders.add(name + "." + property));
-              }
-            });
+        .forEach((name, schema) -> {
+          Object properties = ((Map<?, ?>) schema).get("properties");
+          if (properties instanceof Map<?, ?> propertyMap) {
+            propertyMap.keySet().stream()
+                .map(String::valueOf)
+                .filter(derived::contains)
+                .forEach(property -> offenders.add(name + "." + property));
+          }
+        });
 
     assertTrue(
         offenders.isEmpty(),

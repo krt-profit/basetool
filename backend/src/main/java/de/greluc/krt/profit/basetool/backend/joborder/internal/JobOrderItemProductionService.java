@@ -363,10 +363,8 @@ public class JobOrderItemProductionService {
             ? Entities.require(userRepository.findById(bookIn.ownerUserId()), "User not found")
             : userService
                 .getCurrentUser()
-                .orElseThrow(
-                    () ->
-                        new BadRequestException(
-                            "No acting user to book the produced stock in for"));
+                .orElseThrow(() ->
+                    new BadRequestException("No acting user to book the produced stock in for"));
     final Location location =
         Entities.require(locationRepository.findById(bookIn.locationId()), "Location not found");
     final OrgUnit owningOrgUnit =

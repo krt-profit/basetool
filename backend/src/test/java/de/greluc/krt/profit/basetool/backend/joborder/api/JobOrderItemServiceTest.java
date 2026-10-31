@@ -86,20 +86,16 @@ class JobOrderItemServiceTest {
             Mappers.getMapper(QualityTierMapper.class));
     lenient()
         .when(qualityTierService.defaultForIngredient(any()))
-        .thenAnswer(
-            inv -> {
-              Integer q = inv.getArgument(0);
-              return q != null && q >= 650
-                  ? QualityTierFixtures.good()
-                  : QualityTierFixtures.none();
-            });
+        .thenAnswer(inv -> {
+          Integer q = inv.getArgument(0);
+          return q != null && q >= 650 ? QualityTierFixtures.good() : QualityTierFixtures.none();
+        });
     lenient()
         .when(qualityTierService.resolveForRequirement(any(), any(), any()))
-        .thenAnswer(
-            inv ->
-                "GOOD".equals(inv.getArgument(0))
-                    ? QualityTierFixtures.good()
-                    : QualityTierFixtures.none());
+        .thenAnswer(inv ->
+            "GOOD".equals(inv.getArgument(0))
+                ? QualityTierFixtures.good()
+                : QualityTierFixtures.none());
   }
 
   @Test

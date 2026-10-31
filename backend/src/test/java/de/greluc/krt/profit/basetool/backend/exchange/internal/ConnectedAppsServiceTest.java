@@ -137,11 +137,10 @@ class ConnectedAppsServiceTest {
   void theRevocationTimeIsReadAfterTheSessionsEnded() {
     AtomicReference<Instant> ended = new AtomicReference<>();
     when(keycloakService.endSessionsHeldOnlyBy(MEMBER, CLIENT_ID))
-        .thenAnswer(
-            invocation -> {
-              ended.set(Instant.now());
-              return 1;
-            });
+        .thenAnswer(invocation -> {
+          ended.set(Instant.now());
+          return 1;
+        });
 
     service.disconnectClient(MEMBER, CLIENT_ID);
 

@@ -16,7 +16,6 @@ script is named. "Dependabot #N" is the repository's Dependabot alert number.
 | Entry | Value | Reason | Revisit when |
 |---|---|---|---|
 | `springBoot` | 4.1.2 | The only newer builds are 4.2.0 pre-releases. Several other rows move with the Boot BOM (Lombok, OpenTelemetry, the Jackson overrides, JUnit). | 4.2.0 goes GA. |
-| `googleJavaFormat` | 1.36.1 | 2.0.0 runs under Spotless 8.10.4 but lays out every lambda argument differently, so taking it reformats the whole code base; it moves in a change of its own, not inside a dependency sweep. | That change lands. |
 | `plexusUtils` | 3.6.1 | 4.x moved `org.codehaus.plexus.util.xml` into `plexus-xml`; licensee's maven-model-builder 3.9 still needs it there (`NoClassDefFoundError: org/codehaus/plexus/util/xml/pull/XmlPullParserException` from `:backend:licensee` and `:frontend:licensee` with 4.1.0, 2026-10-31). Also a security floor, see below. | `licensee` moves to Maven 4's model builder. |
 | `mapstruct` | 1.6.3 | The only newer builds are 1.7.0 betas (Beta1, Beta2); stay on the 1.6.x stable line. | 1.7.0 final is released. |
 
@@ -57,7 +56,7 @@ A floor only has to clear its advisory: stay on the lines above rather than taki
 | `junit` (keycloak-spi only) | 6.1.3 | keycloak-spi is deliberately no Spring Boot module and has no BOM to supply JUnit. Boot 4.1.2 manages 6.0.3, so the repository runs two JUnit lines; harmless, as keycloak-spi shares no classpath with the others. | Restore the lockstep, or drop the pin, once the Boot BOM moves to 6.1.x. |
 | `mockito` (keycloak-spi only) | 5.24.0 | Same reason as `junit`; backend, frontend and ingest keep Boot's managed Mockito. Kept in the catalog, not the build script, so refreshVersions can see it. The module's tests set `net.bytebuddy.experimental=true` because Byte Buddy does not yet officially support the JDK 25 toolchain. | Drop the Byte Buddy flag once Mockito's Byte Buddy officially supports JDK 25. |
 | `test-support`, `logging-support` | Boot BOM | Both import the Spring Boot BOM without the Boot plugin and pin nothing of their own; the root script's BOM property overrides reach them through the dependency-management plugin, so they compile against what the applications run. No `platform(libs.junit.bom)` on top (removed 2026-09-22: it put a second JUnit line into one module). | — |
-| `googleJavaFormat` | 1.36.1 (≥ 1.35.0) | Older google-java-format reflects on a javac method whose return type changed in JDK 25 and fails every file with `NoSuchMethodError`. | Keep ≥ 1.35.0. |
+| `googleJavaFormat` | 2.0.0 (≥ 1.35.0) | Older google-java-format reflects on a javac method whose return type changed in JDK 25 and fails every file with `NoSuchMethodError`. | Keep ≥ 1.35.0. |
 | `node` | 26.13.0 | The Node.js runtime the node-gradle plugin downloads; not a Maven artifact, so refreshVersions cannot track it. Regenerate the `win-x64` and `linux-x64` verification entries on a bump (see CONTRIBUTING → *Dependency verification*). | Bump by hand against the active Node LTS line (26, "Lithium"); the exchange-docs workflow's `setup-node` major moves with it. |
 | pitest `addJUnitPlatformLauncher` (`build-logic`, `basetool.mutation-conventions`) | `false` | The plugin's launcher probe resolves a detached copy of `testImplementation` without the Boot BOM and its overrides. Nothing from it reaches a classpath, but the dependency-submission graph records it: in the backend it resolved tools.jackson 3.2.1 (json-schema-validator 3.0.7 asks for it), which raised Dependabot #40–#46 although every real configuration resolves 3.1.7. The pitest classpath includes the test runtime classpath, which already carries the Boot-managed `junit-platform-launcher` (declared `testRuntimeOnly` in backend and ingest, through `spring-boot-starter-test` in the frontend). | A pitest module's test runtime classpath loses the launcher. |
 | refreshVersions plugin (`settings.gradle.kts`) | 0.60.6 | Declared `apply false` so it still resolves, stays pinned and stays in the dependency verification metadata; applied only with `-PrefreshVersions` because it is not configuration-cache compatible. | Bump by hand. |
@@ -85,7 +84,7 @@ The 2026-10-19 sweep (#2772) took `flyway` 13.10.0 → 13.10.3 and `axeCorePlayw
 
 The 2026-10-31 sweep took every stable release of the catalog, the Gradle wrapper, the actions, the
 images, the Node.js LTS line and the npm and pip tooling, majors included, except the entries in
-the table below. Boot 4.1.2 manages Tomcat 11.0.27 and Netty 4.2.19.Final, so the `tomcat.version`
+the table below; google-java-format 2.0.0 followed in a change of its own, which reformatted the code base. Boot 4.1.2 manages Tomcat 11.0.27 and Netty 4.2.19.Final, so the `tomcat.version`
 and `netty.version` overrides are gone, and Lombok 1.18.48, so the keycloak-spi pin moved with it.
 refreshVersions does not report every catalog entry (it missed `springBoot`, the plugin versions,
 `googleJavaFormat`, `handlebars`, `kotlinGradlePlugin` and the Jackson keys); a sweep checks the
@@ -96,6 +95,5 @@ catalog against Maven Central and the plugin portal directly.
 | `springBoot` | 4.2.0 pre-releases | Not GA. |
 | `mapstruct` | 1.7.0.Beta1, 1.7.0.Beta2 | Betas only. |
 | `springModulith` | 2.2.0-M1, 2.2.0-M2, 2.2.0-RC1 | Pre-releases only, for Boot 4.2; test scope plus the `compileOnly` `spring-modulith-api` (REQ-MOD-006). |
-| `googleJavaFormat` | 2.0.0 | Reformats the code base; see *Held behind upstream*. |
 | `plexusUtils` | 4.0.0 … 4.1.0 | Breaks licensee; see *Held behind upstream*. |
 | `protobuf3` | 4.0.0-rc-1 … 4.36.2 | grpc-protobuf is still 1.65.0, built for the 3.x line; 3.25.9 is still the newest 3.25 patch. |

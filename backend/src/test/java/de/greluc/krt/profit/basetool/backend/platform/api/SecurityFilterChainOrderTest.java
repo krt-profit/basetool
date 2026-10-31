@@ -109,15 +109,14 @@ class SecurityFilterChainOrderTest {
     List<String> documentPaths = new ArrayList<>();
     mapping
         .getHandlerMethods()
-        .forEach(
-            (info, handler) -> {
-              if (!rendersDocument(handler) || info.getPathPatternsCondition() == null) {
-                return;
-              }
-              info.getPathPatternsCondition().getPatternValues().stream()
-                  .filter(pattern -> pattern.startsWith("/api/"))
-                  .forEach(documentPaths::add);
-            });
+        .forEach((info, handler) -> {
+          if (!rendersDocument(handler) || info.getPathPatternsCondition() == null) {
+            return;
+          }
+          info.getPathPatternsCondition().getPatternValues().stream()
+              .filter(pattern -> pattern.startsWith("/api/"))
+              .forEach(documentPaths::add);
+        });
 
     assertThat(documentPaths)
         .as(
@@ -125,13 +124,12 @@ class SecurityFilterChainOrderTest {
                 + " asserts nothing")
         .hasSizeGreaterThanOrEqualTo(10);
     assertThat(documentPaths)
-        .allSatisfy(
-            pattern ->
-                assertThat(
-                        SubjectRateLimitingFilter.isExportPath(
-                            PathContainer.parsePath(pattern.replaceAll("\\{[^}]+}", "x"))))
-                    .as(pattern + " renders a document but is not under the export budget")
-                    .isTrue());
+        .allSatisfy(pattern ->
+            assertThat(
+                    SubjectRateLimitingFilter.isExportPath(
+                        PathContainer.parsePath(pattern.replaceAll("\\{[^}]+}", "x"))))
+                .as(pattern + " renders a document but is not under the export budget")
+                .isTrue());
   }
 
   /**

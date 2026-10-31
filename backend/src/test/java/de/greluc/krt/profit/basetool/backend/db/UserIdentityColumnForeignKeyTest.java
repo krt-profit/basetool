@@ -115,14 +115,13 @@ class UserIdentityColumnForeignKeyTest {
             the way the audit trail does, say so in a COMMENT ON COLUMN and list it in \
             EXEMPT_COLUMNS.\
             """)
-        .allSatisfy(
-            column ->
-                assertThat(
-                        withAppUserFk.contains(column)
-                            || EXEMPT_COLUMNS.contains(column)
-                            || FOREIGN_SYSTEM_ID_COLUMNS.contains(column))
-                    .as("%s has a foreign key to app_user(id), or is a recorded exemption", column)
-                    .isTrue());
+        .allSatisfy(column ->
+            assertThat(
+                    withAppUserFk.contains(column)
+                        || EXEMPT_COLUMNS.contains(column)
+                        || FOREIGN_SYSTEM_ID_COLUMNS.contains(column))
+                .as("%s has a foreign key to app_user(id), or is a recorded exemption", column)
+                .isTrue());
   }
 
   /** Verifies the five V235 foreign keys by name and that each uses {@code ON DELETE CASCADE}. */

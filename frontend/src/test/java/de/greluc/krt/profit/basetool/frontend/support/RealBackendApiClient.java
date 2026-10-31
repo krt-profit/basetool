@@ -55,13 +55,12 @@ public final class RealBackendApiClient {
     BackendApiClient real = over(webClient);
     BackendApiClient mock = Mockito.mock(BackendApiClient.class);
     Mockito.when(mock.execute(any(), any(), any(), any()))
-        .thenAnswer(
-            invocation ->
-                real.execute(
-                    invocation.getArgument(0),
-                    invocation.getArgument(1),
-                    invocation.getArgument(2),
-                    invocation.getArgument(3)));
+        .thenAnswer(invocation ->
+            real.execute(
+                invocation.getArgument(0),
+                invocation.getArgument(1),
+                invocation.getArgument(2),
+                invocation.getArgument(3)));
     return mock;
   }
 

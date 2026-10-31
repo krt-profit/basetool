@@ -161,11 +161,10 @@ public class FrequencyTypeService {
       int index = i;
       frequencyTypeRepository
           .findById(ids.get(i))
-          .ifPresent(
-              freq -> {
-                freq.setSortIndex(index);
-                frequencyTypeRepository.save(freq);
-              });
+          .ifPresent(freq -> {
+            freq.setSortIndex(index);
+            frequencyTypeRepository.save(freq);
+          });
     }
   }
 }

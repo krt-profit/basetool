@@ -199,10 +199,9 @@ class BrowserSuppliedIdBindingMvcTest {
 
   private void assertNoBackendCallMentions(String fragment) {
     assertThat(Mockito.mockingDetails(backendApiClient).getInvocations())
-        .noneMatch(
-            invocation ->
-                invocation.getArguments().length > 0
-                    && invocation.getArguments()[0] instanceof String uri
-                    && uri.contains(fragment));
+        .noneMatch(invocation ->
+            invocation.getArguments().length > 0
+                && invocation.getArguments()[0] instanceof String uri
+                && uri.contains(fragment));
   }
 }

@@ -128,11 +128,10 @@ class UserDeletionServiceTest {
         .when(responsibleHolderTracker.snapshotResponsibleHoldersForUser(any()))
         .thenReturn(Map.of());
     lenient()
-        .doAnswer(
-            _ -> {
-              calls.add("delete user");
-              return null;
-            })
+        .doAnswer(_ -> {
+          calls.add("delete user");
+          return null;
+        })
         .when(userRepository)
         .delete(any());
 
@@ -235,56 +234,51 @@ class UserDeletionServiceTest {
             isNull(),
             isNull(),
             eq(userId),
-            argThat(
-                d ->
-                    d != null
-                        && d.toString()
-                            .equals(
-                                "reason=user-deletion inventoryRows=3 ships=7 fromUser="
-                                    + userId)));
+            argThat(d ->
+                d != null
+                    && d.toString()
+                        .equals(
+                            "reason=user-deletion inventoryRows=3 ships=7 fromUser=" + userId)));
     verify(auditService)
         .record(
             eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION),
             isNull(),
             isNull(),
             eq(userId),
-            argThat(
-                d ->
-                    d != null
-                        && d.toString()
-                            .equals(
-                                "reason=user-deletion personalInventory=0 blueprints=8"
-                                    + " notifications=0 ruleSelectors=0 evaluations=0")));
+            argThat(d ->
+                d != null
+                    && d.toString()
+                        .equals(
+                            "reason=user-deletion personalInventory=0 blueprints=8"
+                                + " notifications=0 ruleSelectors=0 evaluations=0")));
     verify(auditService)
         .record(
             eq(AuditEventType.REFINERY_ORDERS_REASSIGNED),
             isNull(),
             isNull(),
             eq(userId),
-            argThat(
-                d ->
-                    d != null
-                        && d.toString()
-                            .equals(
-                                "reason=user-deletion rows=2 fromUser="
-                                    + userId
-                                    + " toAdmin="
-                                    + adminId)));
+            argThat(d ->
+                d != null
+                    && d.toString()
+                        .equals(
+                            "reason=user-deletion rows=2 fromUser="
+                                + userId
+                                + " toAdmin="
+                                + adminId)));
     verify(auditService)
         .record(
             eq(AuditEventType.USER_DELETED),
             isNull(),
             isNull(),
             eq(userId),
-            argThat(
-                d ->
-                    d != null
-                        && d.toString()
-                            .equals(
-                                "inventoryRows=3 ships=7 personalInventory=0 blueprints=8"
-                                    + " notifications=0 ruleSelectors=0 evaluations=0"
-                                    + " refineryOrdersReassignedTo="
-                                    + adminId)));
+            argThat(d ->
+                d != null
+                    && d.toString()
+                        .equals(
+                            "inventoryRows=3 ships=7 personalInventory=0 blueprints=8"
+                                + " notifications=0 ruleSelectors=0 evaluations=0"
+                                + " refineryOrdersReassignedTo="
+                                + adminId)));
   }
 
   @Test

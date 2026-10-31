@@ -77,16 +77,15 @@ class ExchangeJournalServiceIntegrationTest {
   void aWriteIsJournaledWithItsStatesAndTransaction() {
     UUID batch = UUID.randomUUID();
 
-    inTransaction(
-        () ->
-            journalService.record(
-                caller,
-                batch,
-                ExchangeJournalAction.BLUEPRINT_REMOVE,
-                "arrowhead",
-                true,
-                Map.of("productKey", "arrowhead", "note", "from Orison"),
-                null));
+    inTransaction(() ->
+        journalService.record(
+            caller,
+            batch,
+            ExchangeJournalAction.BLUEPRINT_REMOVE,
+            "arrowhead",
+            true,
+            Map.of("productKey", "arrowhead", "note", "from Orison"),
+            null));
 
     ExchangeJournalEntry entry = entries().getFirst();
     assertThat(entry.getResource()).isEqualTo(ExchangeResource.BLUEPRINT);
@@ -103,40 +102,37 @@ class ExchangeJournalServiceIntegrationTest {
   @Test
   void theJournalRollsBackWithTheWrite() {
     TransactionTemplate template = new TransactionTemplate(transactionManager);
-    template.executeWithoutResult(
-        status -> {
-          add("rolled-back");
-          status.setRollbackOnly();
-        });
+    template.executeWithoutResult(status -> {
+      add("rolled-back");
+      status.setRollbackOnly();
+    });
 
     assertThat(entries()).isEmpty();
   }
 
   @Test
   void aJournalEntryOutsideAWriteIsRefused() {
-    assertThatThrownBy(
-            () ->
-                journalService.record(
-                    caller,
-                    UUID.randomUUID(),
-                    ExchangeJournalAction.BLUEPRINT_ADD,
-                    "x",
-                    false,
-                    null,
-                    Map.of()))
+    assertThatThrownBy(() ->
+            journalService.record(
+                caller,
+                UUID.randomUUID(),
+                ExchangeJournalAction.BLUEPRINT_ADD,
+                "x",
+                false,
+                null,
+                Map.of()))
         .isInstanceOf(IllegalTransactionStateException.class);
   }
 
   @Test
   void onlyTheClientsLiveRemovalsWithinTheWindowCount() {
-    inTransaction(
-        () -> {
-          remove("one");
-          remove("two");
-          remove("undone");
-          remove("old");
-          add("added");
-        });
+    inTransaction(() -> {
+      remove("one");
+      remove("two");
+      remove("undone");
+      remove("old");
+      add("added");
+    });
     jdbc.update(
         "UPDATE exchange_journal SET undone_at = now() WHERE user_id = ? AND entity_key = 'undone'",
         caller.member());
@@ -177,11 +173,10 @@ class ExchangeJournalServiceIntegrationTest {
 
   @Test
   void writesPastTheRetentionArePurged() {
-    inTransaction(
-        () -> {
-          add("kept");
-          add("expired");
-        });
+    inTransaction(() -> {
+      add("kept");
+      add("expired");
+    });
     jdbc.update(
         "UPDATE exchange_journal SET recorded_at = now() - interval '100 days'"
             + " WHERE user_id = ? AND entity_key = 'expired'",

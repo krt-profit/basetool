@@ -109,11 +109,10 @@ class ExchangeNameWithholdingControllerTest {
     assertThat(repository.findById(MEMBER))
         .hasValueSatisfying(r -> assertThat(r.isWithholdName()).isTrue());
     assertThat(auditEventRepository.findAll())
-        .anyMatch(
-            e ->
-                e.getDomain() == AuditDomain.CONNECTED_APPS
-                    && e.getEventType() == AuditEventType.EXCHANGE_NAME_WITHHOLDING_CHANGED
-                    && MEMBER.equals(e.getTargetUserId()));
+        .anyMatch(e ->
+            e.getDomain() == AuditDomain.CONNECTED_APPS
+                && e.getEventType() == AuditEventType.EXCHANGE_NAME_WITHHOLDING_CHANGED
+                && MEMBER.equals(e.getTargetUserId()));
   }
 
   @Test

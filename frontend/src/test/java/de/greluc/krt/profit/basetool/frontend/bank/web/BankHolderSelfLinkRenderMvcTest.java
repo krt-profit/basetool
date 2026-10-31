@@ -96,9 +96,8 @@ class BankHolderSelfLinkRenderMvcTest {
                 .with(
                     oidcLogin()
                         .authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))
-                        .idToken(
-                            token ->
-                                token.subject(sub).claim("preferred_username", "self-username"))))
+                        .idToken(token ->
+                            token.subject(sub).claim("preferred_username", "self-username"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("/bank/holders/" + ownHolderId)))
         .andExpect(content().string(containsString("data-testid=\"bank-holder-history-link\"")))

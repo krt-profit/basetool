@@ -123,11 +123,10 @@ public class JobOrderHandoverReportProxyController {
       String userTimeZone,
       @NotNull String filename) {
     byte[] pdf =
-        withBackendStatus(
-            () ->
-                itemHandover
-                    ? jobOrderClient.itemHandoverReport(jobOrderId, handoverId, userTimeZone)
-                    : jobOrderClient.handoverReport(jobOrderId, handoverId, userTimeZone));
+        withBackendStatus(() ->
+            itemHandover
+                ? jobOrderClient.itemHandoverReport(jobOrderId, handoverId, userTimeZone)
+                : jobOrderClient.handoverReport(jobOrderId, handoverId, userTimeZone));
     return attachment(pdf, filename);
   }
 

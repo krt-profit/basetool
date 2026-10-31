@@ -529,11 +529,10 @@ class ExchangeShipWriteControllerTest {
     assertThat(audit("MISSION_UNIT_UPDATED", mission)).isEqualTo(1);
     assertThat(journalRepository.findAllByUserIdOrderByRecordedAtAsc(member))
         .singleElement()
-        .satisfies(
-            e -> {
-              assertThat(e.getAction().name()).isEqualTo("SHIP_REMOVE");
-              assertThat(e.isRemoval()).isTrue();
-            });
+        .satisfies(e -> {
+          assertThat(e.getAction().name()).isEqualTo("SHIP_REMOVE");
+          assertThat(e.isRemoval()).isTrue();
+        });
   }
 
   @Test
@@ -596,19 +595,17 @@ class ExchangeShipWriteControllerTest {
     CountDownLatch locked = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     Thread owner =
-        new Thread(
-            () ->
-                new TransactionTemplate(transactionManager)
-                    .executeWithoutResult(
-                        status -> {
-                          jdbc.queryForList("SELECT id FROM ship WHERE id = ? FOR UPDATE", theirs);
-                          locked.countDown();
-                          try {
-                            release.await(30, TimeUnit.SECONDS);
-                          } catch (InterruptedException interrupted) {
-                            Thread.currentThread().interrupt();
-                          }
-                        }));
+        new Thread(() ->
+            new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> {
+                  jdbc.queryForList("SELECT id FROM ship WHERE id = ? FOR UPDATE", theirs);
+                  locked.countDown();
+                  try {
+                    release.await(30, TimeUnit.SECONDS);
+                  } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                  }
+                }));
     owner.start();
     try {
       assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();

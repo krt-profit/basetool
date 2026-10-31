@@ -276,12 +276,11 @@ class SupplyDonationServiceTest {
     when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
     when(userRepository.findById(DONOR)).thenReturn(Optional.of(donor));
     when(donationRepository.save(any(SupplyDonation.class)))
-        .thenAnswer(
-            invocation -> {
-              SupplyDonation saved = invocation.getArgument(0);
-              saved.setId(UUID.randomUUID());
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          SupplyDonation saved = invocation.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
 
     service.pledge(plainPledge(null, 4.0, 700));
 
@@ -309,10 +308,9 @@ class SupplyDonationServiceTest {
     when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
     when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
 
-    assertThatThrownBy(
-            () ->
-                service.receive(
-                    donation.getId(), new ReceiveDonationRequest(5.0, location.getId(), 2L)))
+    assertThatThrownBy(() ->
+            service.receive(
+                donation.getId(), new ReceiveDonationRequest(5.0, location.getId(), 2L)))
         .isInstanceOf(BadRequestException.class);
 
     verify(stockCommands, never()).bookIntoPool(any(), any(), any(), anyDouble(), any());
@@ -325,10 +323,9 @@ class SupplyDonationServiceTest {
     when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
     when(accessPolicy.canManageUnit(unit.getId())).thenReturn(false);
 
-    assertThatThrownBy(
-            () ->
-                service.receive(
-                    donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L)))
+    assertThatThrownBy(() ->
+            service.receive(
+                donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L)))
         .isInstanceOf(AccessDeniedException.class);
   }
 
@@ -338,10 +335,9 @@ class SupplyDonationServiceTest {
     callerIs(HOLDER);
     when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
 
-    assertThatThrownBy(
-            () ->
-                service.receive(
-                    donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 1L)))
+    assertThatThrownBy(() ->
+            service.receive(
+                donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 1L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
   }
 
@@ -352,10 +348,9 @@ class SupplyDonationServiceTest {
     callerIs(HOLDER);
     when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
 
-    assertThatThrownBy(
-            () ->
-                service.receive(
-                    donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L)))
+    assertThatThrownBy(() ->
+            service.receive(
+                donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L)))
         .isInstanceOfSatisfying(
             SupplyProblemException.class,
             e ->
@@ -501,12 +496,11 @@ class SupplyDonationServiceTest {
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
     when(donationRepository.save(any(SupplyDonation.class)))
-        .thenAnswer(
-            invocation -> {
-              SupplyDonation saved = invocation.getArgument(0);
-              saved.setId(UUID.randomUUID());
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          SupplyDonation saved = invocation.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
 
     service.record(
         new RecordDonationRequest(
@@ -534,18 +528,10 @@ class SupplyDonationServiceTest {
     callerIs(HOLDER);
     when(accessPolicy.canManageUnit(unit.getId())).thenReturn(false);
 
-    assertThatThrownBy(
-            () ->
-                service.record(
-                    new RecordDonationRequest(
-                        unit.getId(),
-                        null,
-                        material.getId(),
-                        null,
-                        500,
-                        3.0,
-                        null,
-                        location.getId())))
+    assertThatThrownBy(() ->
+            service.record(
+                new RecordDonationRequest(
+                    unit.getId(), null, material.getId(), null, 500, 3.0, null, location.getId())))
         .isInstanceOf(AccessDeniedException.class);
 
     verify(stockCommands, never()).bookIntoPool(any(), any(), any(), anyDouble(), any());

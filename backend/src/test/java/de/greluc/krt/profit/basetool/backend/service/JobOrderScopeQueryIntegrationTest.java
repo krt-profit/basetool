@@ -72,20 +72,19 @@ class JobOrderScopeQueryIntegrationTest {
 
   @BeforeEach
   void seed() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          Squadron sqA = newSquadron("Scope-A-" + tag, "A" + tag);
-          Squadron sqB = newSquadron("Scope-B-" + tag, "B" + tag);
-          SpecialCommand sk = newSpecialCommand("Scope-SK-" + tag, "S" + tag);
-          squadronAId = sqA.getId();
-          squadronBId = sqB.getId();
-          skId = sk.getId();
+    transactionTemplate.executeWithoutResult(status -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      Squadron sqA = newSquadron("Scope-A-" + tag, "A" + tag);
+      Squadron sqB = newSquadron("Scope-B-" + tag, "B" + tag);
+      SpecialCommand sk = newSpecialCommand("Scope-SK-" + tag, "S" + tag);
+      squadronAId = sqA.getId();
+      squadronBId = sqB.getId();
+      skId = sk.getId();
 
-          orderRespA = newOrder(sqA, sqA).getId();
-          orderRespB = newOrder(sqB, sqA).getId();
-          orderRespSk = newOrder(sk, sqA).getId();
-        });
+      orderRespA = newOrder(sqA, sqA).getId();
+      orderRespB = newOrder(sqB, sqA).getId();
+      orderRespSk = newOrder(sk, sqA).getId();
+    });
   }
 
   @Test
@@ -199,15 +198,14 @@ class JobOrderScopeQueryIntegrationTest {
   @Test
   void processingFilter_dropsOrdersOfANonProfitEligibleUnit() {
     UUID[] ids = new UUID[2];
-    transactionTemplate.executeWithoutResult(
-        _ -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          Squadron nonProfit = newSquadron("Scope-N-" + tag, "N" + tag);
-          nonProfit.setProfitEligible(false);
-          squadronRepository.save(nonProfit);
-          ids[0] = nonProfit.getId();
-          ids[1] = newOrder(nonProfit, nonProfit).getId();
-        });
+    transactionTemplate.executeWithoutResult(_ -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      Squadron nonProfit = newSquadron("Scope-N-" + tag, "N" + tag);
+      nonProfit.setProfitEligible(false);
+      squadronRepository.save(nonProfit);
+      ids[0] = nonProfit.getId();
+      ids[1] = newOrder(nonProfit, nonProfit).getId();
+    });
 
     Set<UUID> visible = processingIds(new ScopePredicate(true, null, Set.of()), Set.of(ids[0]));
 

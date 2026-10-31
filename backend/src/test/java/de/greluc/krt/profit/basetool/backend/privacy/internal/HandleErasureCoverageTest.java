@@ -82,20 +82,19 @@ class HandleErasureCoverageTest {
   @Test
   void everyDispositionStatesAReason() {
     assertThat(HandleErasureCoverage.COVERAGE)
-        .allSatisfy(
-            (column, coverage) -> {
-              String reason = coverage.reason();
-              assertThat(reason)
-                  .as("reason for " + column)
-                  .isNotBlank()
-                  .doesNotContainIgnoringCase("todo")
-                  .doesNotContainIgnoringCase("tbd");
-              if (!reason.startsWith("See ")) {
-                assertThat(reason)
-                    .as("reason for " + column + " is not a cross-reference, so it must explain")
-                    .hasSizeGreaterThan(25);
-              }
-            });
+        .allSatisfy((column, coverage) -> {
+          String reason = coverage.reason();
+          assertThat(reason)
+              .as("reason for " + column)
+              .isNotBlank()
+              .doesNotContainIgnoringCase("todo")
+              .doesNotContainIgnoringCase("tbd");
+          if (!reason.startsWith("See ")) {
+            assertThat(reason)
+                .as("reason for " + column + " is not a cross-reference, so it must explain")
+                .hasSizeGreaterThan(25);
+          }
+        });
   }
 
   @Test

@@ -238,18 +238,17 @@ class JobOrderAccessPolicyDifferentialTest {
 
       OrgUnitCascadeService cascade = mock(OrgUnitCascadeService.class);
       when(cascade.expandWithDescendants(anyCollection()))
-          .thenAnswer(
-              invocation -> {
-                Collection<OrgUnitMembership> given = invocation.getArgument(0);
-                Set<UUID> ids = new LinkedHashSet<>();
-                for (OrgUnitMembership row : given) {
-                  ids.add(row.getId().getOrgUnitId());
-                  if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
-                    ids.add(CHILD_C);
-                  }
-                }
-                return ids;
-              });
+          .thenAnswer(invocation -> {
+            Collection<OrgUnitMembership> given = invocation.getArgument(0);
+            Set<UUID> ids = new LinkedHashSet<>();
+            for (OrgUnitMembership row : given) {
+              ids.add(row.getId().getOrgUnitId());
+              if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
+                ids.add(CHILD_C);
+              }
+            }
+            return ids;
+          });
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
       when(orgUnits.countProfitEligibleByIdIn(anyCollection()))
           .thenReturn(caller.profitEligible() ? 1L : 0L);
@@ -376,11 +375,10 @@ class JobOrderAccessPolicyDifferentialTest {
     boolean canEditJobOrderAsRequester(UUID id) {
       return orders
           .findById(id)
-          .map(
-              o ->
-                  requester(o)
-                      && !(handovers.existsByJobOrderId(o.getId())
-                          || itemHandovers.existsByJobOrderId(o.getId())))
+          .map(o ->
+              requester(o)
+                  && !(handovers.existsByJobOrderId(o.getId())
+                      || itemHandovers.existsByJobOrderId(o.getId())))
           .orElse(false);
     }
 

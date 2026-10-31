@@ -171,15 +171,14 @@ public class BankRequestQueuePageController {
     List<Map<String, Object>> options =
         new ArrayList<>(
             COUNTED_SEGMENTS.stream()
-                .map(
-                    s ->
-                        Map.<String, Object>of(
-                            "value",
-                            s,
-                            "labelKey",
-                            "bank.request.status." + s,
-                            "count",
-                            counts.getOrDefault(s, 0L)))
+                .map(s ->
+                    Map.<String, Object>of(
+                        "value",
+                        s,
+                        "labelKey",
+                        "bank.request.status." + s,
+                        "count",
+                        counts.getOrDefault(s, 0L)))
                 .toList());
     options.add(Map.of("value", ALL_SEGMENT, "labelKey", "filter.all"));
     return List.copyOf(options);

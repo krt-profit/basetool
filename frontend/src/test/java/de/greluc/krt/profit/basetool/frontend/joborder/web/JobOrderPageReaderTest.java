@@ -438,10 +438,8 @@ class JobOrderPageReaderTest {
     when(client.order(ID)).thenReturn(order("MATERIAL", false, List.of()));
     when(client.currentUser()).thenThrow(lostSession());
 
-    assertThatThrownBy(
-            () ->
-                reader.readOrderDetail(
-                    ID, new JobOrderPageReader.OrderCaller(true, null, false), null))
+    assertThatThrownBy(() ->
+            reader.readOrderDetail(ID, new JobOrderPageReader.OrderCaller(true, null, false), null))
         .isInstanceOf(ReauthenticationRequiredException.class);
   }
 

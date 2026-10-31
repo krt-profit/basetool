@@ -109,10 +109,9 @@ public final class CredentialFieldRule {
    */
   private static boolean declaresOwnToString(@NotNull JavaClass type) {
     return type.getMethods().stream()
-        .anyMatch(
-            m ->
-                m.getName().equals("toString")
-                    && m.getRawParameterTypes().isEmpty()
-                    && !m.isAnnotatedWith("lombok.Generated"));
+        .anyMatch(m ->
+            m.getName().equals("toString")
+                && m.getRawParameterTypes().isEmpty()
+                && !m.isAnnotatedWith("lombok.Generated"));
   }
 }

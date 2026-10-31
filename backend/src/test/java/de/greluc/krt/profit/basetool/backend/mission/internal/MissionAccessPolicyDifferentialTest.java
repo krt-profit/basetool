@@ -194,18 +194,17 @@ class MissionAccessPolicyDifferentialTest {
 
       OrgUnitCascadeService cascade = mock(OrgUnitCascadeService.class);
       when(cascade.expandWithDescendants(anyCollection()))
-          .thenAnswer(
-              invocation -> {
-                Collection<OrgUnitMembership> given = invocation.getArgument(0);
-                Set<UUID> ids = new LinkedHashSet<>();
-                for (OrgUnitMembership row : given) {
-                  ids.add(row.getId().getOrgUnitId());
-                  if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
-                    ids.add(CHILD_C);
-                  }
-                }
-                return ids;
-              });
+          .thenAnswer(invocation -> {
+            Collection<OrgUnitMembership> given = invocation.getArgument(0);
+            Set<UUID> ids = new LinkedHashSet<>();
+            for (OrgUnitMembership row : given) {
+              ids.add(row.getId().getOrgUnitId());
+              if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
+                ids.add(CHILD_C);
+              }
+            }
+            return ids;
+          });
 
       MissionRepository repository = mock(MissionRepository.class);
       when(repository.findByIdForAuthorization(any())).thenReturn(Optional.empty());
@@ -301,25 +300,23 @@ class MissionAccessPolicyDifferentialTest {
     boolean canSeeMission(UUID missionId) {
       return missions
           .findByIdForAuthorization(missionId)
-          .map(
-              m -> {
-                for (Mission ancestor = m; ancestor != null; ancestor = ancestor.getParent()) {
-                  if (!row(ancestor)) {
-                    return false;
-                  }
-                }
-                return true;
-              })
+          .map(m -> {
+            for (Mission ancestor = m; ancestor != null; ancestor = ancestor.getParent()) {
+              if (!row(ancestor)) {
+                return false;
+              }
+            }
+            return true;
+          })
           .orElse(false);
     }
 
     boolean canEditMission(UUID missionId) {
       return missions
           .findByIdForAuthorization(missionId)
-          .map(
-              m ->
-                  m.getOwningOrgUnit() == null
-                      || accessGateService.canEditSquadron(m.getOwningOrgUnit().getId()))
+          .map(m ->
+              m.getOwningOrgUnit() == null
+                  || accessGateService.canEditSquadron(m.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 

@@ -95,15 +95,14 @@ public class SupplySettingsService {
         .getSettingValue(GOVERNING_AREA_KEY)
         .map(String::strip)
         .filter(v -> !v.isEmpty())
-        .flatMap(
-            raw -> {
-              try {
-                return Optional.of(UUID.fromString(raw));
-              } catch (IllegalArgumentException _) {
-                log.warn("Setting {} is not an id, ignoring it", GOVERNING_AREA_KEY);
-                return Optional.empty();
-              }
-            });
+        .flatMap(raw -> {
+          try {
+            return Optional.of(UUID.fromString(raw));
+          } catch (IllegalArgumentException _) {
+            log.warn("Setting {} is not an id, ignoring it", GOVERNING_AREA_KEY);
+            return Optional.empty();
+          }
+        });
   }
 
   /**

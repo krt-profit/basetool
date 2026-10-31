@@ -201,14 +201,13 @@ class InventoryEarmarkReadNoNPlusOneTest {
       assertThat(manyRows).as(read.getKey() + " rows for the large Lager").hasSize(MANY);
       assertThat(manyRows)
           .as(read.getKey() + " carries every earmark's name and number")
-          .allSatisfy(
-              dto -> {
-                assertThat(dto.missionAllocations()).hasSize(2);
-                assertThat(dto.missionAllocations())
-                    .allSatisfy(m -> assertThat(m.missionName()).isNotBlank());
-                assertThat(dto.jobOrderAllocations()).hasSize(1);
-                assertThat(dto.jobOrderAllocations().getFirst().jobOrderDisplayId()).isNotNull();
-              });
+          .allSatisfy(dto -> {
+            assertThat(dto.missionAllocations()).hasSize(2);
+            assertThat(dto.missionAllocations())
+                .allSatisfy(m -> assertThat(m.missionName()).isNotBlank());
+            assertThat(dto.jobOrderAllocations()).hasSize(1);
+            assertThat(dto.jobOrderAllocations().getFirst().jobOrderDisplayId()).isNotNull();
+          });
       assertThat(manyStatements)
           .as(read.getKey() + " statements for " + MANY + " rows against " + FEW + " (N+1)")
           .isEqualTo(fewStatements)

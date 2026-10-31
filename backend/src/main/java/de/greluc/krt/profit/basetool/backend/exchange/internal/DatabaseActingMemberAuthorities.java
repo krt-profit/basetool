@@ -91,9 +91,8 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
     boolean gated =
         stored.stream()
             .map(GrantedAuthority::getAuthority)
-            .anyMatch(
-                authority ->
-                    PENDING_APPROVAL.equals(authority) || Roles.NO_ROLE_MARKER.equals(authority));
+            .anyMatch(authority ->
+                PENDING_APPROVAL.equals(authority) || Roles.NO_ROLE_MARKER.equals(authority));
     if (gated) {
       return stored;
     }

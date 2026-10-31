@@ -381,12 +381,11 @@ class InventoryOperationsE2eTest {
           assertThat(blankAmount).hasAttribute("aria-invalid", "true");
 
           java.util.List<String> posts = new java.util.ArrayList<>();
-          page.onRequest(
-              request -> {
-                if ("POST".equals(request.method()) && request.url().contains("/inventory/input")) {
-                  posts.add(request.url());
-                }
-              });
+          page.onRequest(request -> {
+            if ("POST".equals(request.method()) && request.url().contains("/inventory/input")) {
+              posts.add(request.url());
+            }
+          });
           page.evaluate(
               "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                   + " 'none'; } }");
@@ -781,12 +780,11 @@ class InventoryOperationsE2eTest {
           openUmbuchenModal(page, sameLocMatId, sameLocItemId);
           page.locator("#umbuchenAmount").fill("10");
           java.util.List<String> posts = new java.util.ArrayList<>();
-          page.onRequest(
-              request -> {
-                if ("POST".equals(request.method()) && request.url().contains("/transfer")) {
-                  posts.add(request.url());
-                }
-              });
+          page.onRequest(request -> {
+            if ("POST".equals(request.method()) && request.url().contains("/transfer")) {
+              posts.add(request.url());
+            }
+          });
           page.evaluate(
               "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                   + " 'none'; } }");
@@ -1324,14 +1322,13 @@ class InventoryOperationsE2eTest {
    */
   private static java.util.Set<String> owningUnitIdsOf(JsonArray stacks) {
     java.util.Set<String> ids = new java.util.HashSet<>();
-    stacks.forEach(
-        s -> {
-          com.google.gson.JsonElement unit = s.getAsJsonObject().get("owningSquadron");
-          ids.add(
-              unit == null || unit.isJsonNull()
-                  ? "none"
-                  : unit.getAsJsonObject().get("id").getAsString());
-        });
+    stacks.forEach(s -> {
+      com.google.gson.JsonElement unit = s.getAsJsonObject().get("owningSquadron");
+      ids.add(
+          unit == null || unit.isJsonNull()
+              ? "none"
+              : unit.getAsJsonObject().get("id").getAsString());
+    });
     return ids;
   }
 

@@ -215,12 +215,11 @@ public class ExchangeBulkUndoService {
       clientNames.put(client.getId(), client.getDisplayName());
     }
     Set<UUID> admins = new HashSet<>();
-    runs.forEach(
-        r -> {
-          if (r.getRequestedBy() != null) {
-            admins.add(r.getRequestedBy());
-          }
-        });
+    runs.forEach(r -> {
+      if (r.getRequestedBy() != null) {
+        admins.add(r.getRequestedBy());
+      }
+    });
     Map<UUID, String> adminNames = names(admins);
     return runs.stream()
         .map(r -> toDto(r, clientNames.get(r.getExchangeClientId()), adminNames))
@@ -260,13 +259,12 @@ public class ExchangeBulkUndoService {
     Map<UUID, String> labels = entryLabels.label(entries);
     List<ExchangeBulkUndoRunDetailDto.SkippedEntry> skipped =
         skips.stream()
-            .map(
-                s ->
-                    new ExchangeBulkUndoRunDetailDto.SkippedEntry(
-                        names.get(s.getUserId()),
-                        s.getResource() == null ? null : s.getResource().name(),
-                        s.getJournalEntryId() == null ? null : labels.get(s.getJournalEntryId()),
-                        s.getReason()))
+            .map(s ->
+                new ExchangeBulkUndoRunDetailDto.SkippedEntry(
+                    names.get(s.getUserId()),
+                    s.getResource() == null ? null : s.getResource().name(),
+                    s.getJournalEntryId() == null ? null : labels.get(s.getJournalEntryId()),
+                    s.getReason()))
             .toList();
     return new ExchangeBulkUndoRunDetailDto(
         toDto(run, clientName, names), skipped, skipRepository.countByRunId(runId));

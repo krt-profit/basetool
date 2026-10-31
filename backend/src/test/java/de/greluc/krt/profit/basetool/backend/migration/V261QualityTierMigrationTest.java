@@ -63,29 +63,26 @@ class V261QualityTierMigrationTest {
 
   @Test
   void refusesAFloorAbove1000() {
-    assertThatThrownBy(
-            () ->
-                jdbcTemplate.update(
-                    "INSERT INTO quality_tier (id, code, min_quality, label_de, label_en)"
-                        + " VALUES (gen_random_uuid(), 'TOOHIGH', 1001, 'x', 'x')"))
+    assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "INSERT INTO quality_tier (id, code, min_quality, label_de, label_en)"
+                    + " VALUES (gen_random_uuid(), 'TOOHIGH', 1001, 'x', 'x')"))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
   void refusesASecondTierWithTheSameFloor() {
-    assertThatThrownBy(
-            () ->
-                jdbcTemplate.update(
-                    "INSERT INTO quality_tier (id, code, min_quality, label_de, label_en)"
-                        + " VALUES (gen_random_uuid(), 'TWIN', 650, 'x', 'x')"))
+    assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "INSERT INTO quality_tier (id, code, min_quality, label_de, label_en)"
+                    + " VALUES (gen_random_uuid(), 'TWIN', 650, 'x', 'x')"))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
   void refusesAnInactiveBaseTier() {
-    assertThatThrownBy(
-            () ->
-                jdbcTemplate.update("UPDATE quality_tier SET active = FALSE WHERE min_quality = 0"))
+    assertThatThrownBy(() ->
+            jdbcTemplate.update("UPDATE quality_tier SET active = FALSE WHERE min_quality = 0"))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 

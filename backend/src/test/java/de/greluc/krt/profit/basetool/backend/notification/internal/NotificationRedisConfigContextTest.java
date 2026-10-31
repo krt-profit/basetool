@@ -57,11 +57,8 @@ class NotificationRedisConfigContextTest {
         .withBean(
             "noAutoStart", BeanPostProcessor.class, NotificationRedisConfigContextTest::noAutoStart)
         .withUserConfiguration(NotificationRedisConfig.class)
-        .run(
-            context ->
-                assertThat(context)
-                    .hasNotFailed()
-                    .hasSingleBean(RedisMessageListenerContainer.class));
+        .run(context ->
+            assertThat(context).hasNotFailed().hasSingleBean(RedisMessageListenerContainer.class));
   }
 
   /**
@@ -103,10 +100,7 @@ class NotificationRedisConfigContextTest {
             () -> new NotificationFanoutProperties(true, "basetool:notify:published"))
         .withBean(RedisConnectionFactory.class, () -> refusing)
         .withUserConfiguration(NotificationRedisConfig.class)
-        .run(
-            context ->
-                assertThat(context)
-                    .hasNotFailed()
-                    .hasSingleBean(RedisMessageListenerContainer.class));
+        .run(context ->
+            assertThat(context).hasNotFailed().hasSingleBean(RedisMessageListenerContainer.class));
   }
 }

@@ -90,13 +90,12 @@ class ActiveSquadronRelayFilterTest {
         .isNull();
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
-              assertThat(event.getFormattedMessage())
-                  .contains(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER)
-                  .contains("/api/v1/ping");
-            });
+        .satisfies(event -> {
+          assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+          assertThat(event.getFormattedMessage())
+              .contains(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER)
+              .contains("/api/v1/ping");
+        });
   }
 
   /** The query string may carry user-typed search terms, so it must not reach the log line. */

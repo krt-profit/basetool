@@ -244,12 +244,11 @@ class ExchangeGoldenAnswerTest {
     when(stagingService.stagedBytes(any(), anyString())).thenReturn(222L);
     when(stagingService.stageDraft(
             eq(ExchangeTestSupport.CLIENT), eq(MEMBER), any(), anyString(), anyInt()))
-        .thenAnswer(
-            invocation ->
-                new HandoffStagingService.Staged(
-                    "hid-" + invocation.getArgument(2, HandoffKind.class).name().toLowerCase(),
-                    "ingest:handoff:golden",
-                    222L));
+        .thenAnswer(invocation ->
+            new HandoffStagingService.Staged(
+                "hid-" + invocation.getArgument(2, HandoffKind.class).name().toLowerCase(),
+                "ingest:handoff:golden",
+                222L));
     when(stagingService.stageMassChange(
             eq(ExchangeTestSupport.CLIENT), eq(MEMBER), anyString(), anyLong()))
         .thenReturn(new HandoffStagingService.Staged("hid-mass", "ingest:handoff:golden", 321L));

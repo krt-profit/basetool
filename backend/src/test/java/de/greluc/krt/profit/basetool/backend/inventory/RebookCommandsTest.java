@@ -163,11 +163,10 @@ class RebookCommandsTest {
     assertThat(outcome.changes())
         .filteredOn(change -> change.before() == null)
         .extracting(RebookedRow::after)
-        .allSatisfy(
-            after -> {
-              assertThat(Objects.requireNonNull(after).personal()).isFalse();
-              assertThat(after.orgUnitId()).isEqualTo(target);
-            })
+        .allSatisfy(after -> {
+          assertThat(Objects.requireNonNull(after).personal()).isFalse();
+          assertThat(after.orgUnitId()).isEqualTo(target);
+        })
         .extracting(after -> Objects.requireNonNull(after).amount())
         .containsExactlyInAnyOrder(2.0, 3.0, 2.0);
   }
@@ -191,11 +190,10 @@ class RebookCommandsTest {
     assertThat(outcome.changes())
         .filteredOn(change -> change.before() == null)
         .extracting(RebookedRow::after)
-        .allSatisfy(
-            after -> {
-              assertThat(Objects.requireNonNull(after).personal()).isFalse();
-              assertThat(after.orgUnitId()).isEqualTo(target);
-            });
+        .allSatisfy(after -> {
+          assertThat(Objects.requireNonNull(after).personal()).isFalse();
+          assertThat(after.orgUnitId()).isEqualTo(target);
+        });
   }
 
   @Test
@@ -248,12 +246,11 @@ class RebookCommandsTest {
                 String.class,
                 unitless))
         .singleElement()
-        .satisfies(
-            details ->
-                assertThat(details)
-                    .contains("fromOrgUnit")
-                    .contains(target.toString())
-                    .doesNotContain("rebook-member-"));
+        .satisfies(details ->
+            assertThat(details)
+                .contains("fromOrgUnit")
+                .contains(target.toString())
+                .doesNotContain("rebook-member-"));
   }
 
   @Test
@@ -263,13 +260,12 @@ class RebookCommandsTest {
     UUID second = row(member, material, 1.5, true, otherUnit, 600, true, 200);
 
     RebookOutcome outcome =
-        transaction(
-            () -> {
-              StockLot lot = lot(material, 600, true);
-              stockCommands.lockLots(member, List.of(lot.key()));
-              return rebookCommands.rebook(
-                  new Rebook(member, lot, target, RebookDirection.TO_POOL, 5.5), false);
-            });
+        transaction(() -> {
+          StockLot lot = lot(material, 600, true);
+          stockCommands.lockLots(member, List.of(lot.key()));
+          return rebookCommands.rebook(
+              new Rebook(member, lot, target, RebookDirection.TO_POOL, 5.5), false);
+        });
 
     assertThat(outcome.refusal()).isNull();
     assertThat(amountOf(first)).isNull();
@@ -326,13 +322,12 @@ class RebookCommandsTest {
     UUID personal = row(member, 3.0, true, null, 100);
 
     RebookOutcome outcome =
-        transaction(
-            () -> {
-              StockLot lot = lot(material, 500, false);
-              stockCommands.lockLots(member, List.of(lot.key()));
-              return rebookCommands.rebook(
-                  new Rebook(member, lot, foreignUnit, RebookDirection.TO_POOL, 1.0), false);
-            });
+        transaction(() -> {
+          StockLot lot = lot(material, 500, false);
+          stockCommands.lockLots(member, List.of(lot.key()));
+          return rebookCommands.rebook(
+              new Rebook(member, lot, foreignUnit, RebookDirection.TO_POOL, 1.0), false);
+        });
 
     assertThat(outcome.refusal()).isEqualTo(RebookRefusal.NOT_A_MEMBER);
     assertThat(outcome.changes()).isEmpty();
@@ -397,19 +392,18 @@ class RebookCommandsTest {
         location);
 
     RebookOutcome outcome =
-        transaction(
-            () -> {
-              StockLot lot =
-                  new StockLot(
-                      null,
-                      gameItemRepository.findById(item).orElseThrow(),
-                      locationRepository.findById(location).orElseThrow(),
-                      null,
-                      false);
-              stockCommands.lockLots(member, List.of(lot.key()));
-              return rebookCommands.rebook(
-                  new Rebook(member, lot, target, RebookDirection.TO_POOL, 1.5), false);
-            });
+        transaction(() -> {
+          StockLot lot =
+              new StockLot(
+                  null,
+                  gameItemRepository.findById(item).orElseThrow(),
+                  locationRepository.findById(location).orElseThrow(),
+                  null,
+                  false);
+          stockCommands.lockLots(member, List.of(lot.key()));
+          return rebookCommands.rebook(
+              new Rebook(member, lot, target, RebookDirection.TO_POOL, 1.5), false);
+        });
 
     assertThat(outcome.refusal()).isEqualTo(RebookRefusal.UNIT_MISMATCH);
     assertThat(amountOf(row)).isEqualTo(3.0);
@@ -448,23 +442,21 @@ class RebookCommandsTest {
     assertThat(outcome.changes())
         .filteredOn(change -> change.before() != null && change.after() != null)
         .singleElement()
-        .satisfies(
-            (RebookedRow change) -> {
-              assertThat(Objects.requireNonNull(change.before()).id()).isEqualTo(personal);
-              assertThat(change.before().amount()).isEqualTo(3.0);
-              assertThat(Objects.requireNonNull(change.after()).amount()).isEqualTo(2.0);
-              assertThat(change.after().version()).isGreaterThan(change.before().version());
-            });
+        .satisfies((RebookedRow change) -> {
+          assertThat(Objects.requireNonNull(change.before()).id()).isEqualTo(personal);
+          assertThat(change.before().amount()).isEqualTo(3.0);
+          assertThat(Objects.requireNonNull(change.after()).amount()).isEqualTo(2.0);
+          assertThat(change.after().version()).isGreaterThan(change.before().version());
+        });
     assertThat(outcome.changes()).hasSize(2);
   }
 
   private RebookOutcome rebook(RebookDirection direction, double amount, boolean dryRun) {
-    return transaction(
-        () -> {
-          StockLot lot = lot(material, 500, false);
-          stockCommands.lockLots(member, List.of(lot.key()));
-          return rebookCommands.rebook(new Rebook(member, lot, target, direction, amount), dryRun);
-        });
+    return transaction(() -> {
+      StockLot lot = lot(material, 500, false);
+      stockCommands.lockLots(member, List.of(lot.key()));
+      return rebookCommands.rebook(new Rebook(member, lot, target, direction, amount), dryRun);
+    });
   }
 
   private <T> T transaction(@NotNull Supplier<T> work) {

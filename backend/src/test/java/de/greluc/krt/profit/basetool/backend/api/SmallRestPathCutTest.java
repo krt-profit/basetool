@@ -95,14 +95,13 @@ class SmallRestPathCutTest {
     mapping
         .getHandlerMethods()
         .keySet()
-        .forEach(
-            info -> {
-              for (String verb : verbs(info)) {
-                for (String pattern : patterns(info)) {
-                  served.add(verb + " " + pattern);
-                }
-              }
-            });
+        .forEach(info -> {
+          for (String verb : verbs(info)) {
+            for (String pattern : patterns(info)) {
+              served.add(verb + " " + pattern);
+            }
+          }
+        });
 
     Set<String> expectedNew = new TreeSet<>();
     Set<String> expectedOld = new TreeSet<>();

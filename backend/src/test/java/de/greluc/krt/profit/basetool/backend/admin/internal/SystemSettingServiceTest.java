@@ -146,8 +146,7 @@ class SystemSettingServiceTest {
 
     verify(systemSettingRepository)
         .save(
-            argThat(
-                (SystemSetting saved) ->
-                    "new_key".equals(saved.getId()) && "true".equals(saved.getValue())));
+            argThat((SystemSetting saved) ->
+                "new_key".equals(saved.getId()) && "true".equals(saved.getValue())));
   }
 }

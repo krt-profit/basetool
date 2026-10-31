@@ -292,29 +292,25 @@ class ExchangeDemandServiceTest {
             l -> assertThat(l.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("9")));
     assertThat(demand.orders())
         .singleElement()
-        .satisfies(
-            o -> {
-              assertThat(o.id()).isEqualTo(mine.getId());
-              assertThat(o.number()).isEqualTo(17);
-              assertThat(o.type()).isEqualTo("MATERIAL");
-              assertThat(o.status()).isEqualTo("OPEN");
-              assertThat(o.priority()).isEqualTo(2);
-              assertThat(o.unit()).isEqualTo(new ExchangeDemandUnitDto(UNIT, "Alpha"));
-              assertThat(o.requestingUnit())
-                  .isEqualTo(new ExchangeDemandUnitDto(requesting, "Bravo"));
-              assertThat(o.handle()).isEqualTo("Requester#1");
-              assertThat(o.comment()).isEqualTo("Bring it to Lorville");
-              assertThat(o.items()).isEmpty();
-              assertThat(o.materials())
-                  .singleElement()
-                  .satisfies(
-                      m -> {
-                        assertThat(m.material().bt()).isEqualTo(quantanium.getId().toString());
-                        assertThat(m.minQuality()).isEqualTo(650);
-                        assertThat(m.openQuantity().amount())
-                            .isEqualByComparingTo(new BigDecimal("6"));
-                      });
-            });
+        .satisfies(o -> {
+          assertThat(o.id()).isEqualTo(mine.getId());
+          assertThat(o.number()).isEqualTo(17);
+          assertThat(o.type()).isEqualTo("MATERIAL");
+          assertThat(o.status()).isEqualTo("OPEN");
+          assertThat(o.priority()).isEqualTo(2);
+          assertThat(o.unit()).isEqualTo(new ExchangeDemandUnitDto(UNIT, "Alpha"));
+          assertThat(o.requestingUnit()).isEqualTo(new ExchangeDemandUnitDto(requesting, "Bravo"));
+          assertThat(o.handle()).isEqualTo("Requester#1");
+          assertThat(o.comment()).isEqualTo("Bring it to Lorville");
+          assertThat(o.items()).isEmpty();
+          assertThat(o.materials())
+              .singleElement()
+              .satisfies(m -> {
+                assertThat(m.material().bt()).isEqualTo(quantanium.getId().toString());
+                assertThat(m.minQuality()).isEqualTo(650);
+                assertThat(m.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("6"));
+              });
+        });
   }
 
   @Test
@@ -343,12 +339,11 @@ class ExchangeDemandServiceTest {
             m -> assertThat(m.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("2")));
     assertThat(demand.orders().get(1).items())
         .singleElement()
-        .satisfies(
-            i -> {
-              assertThat(i.item().bt()).isEqualTo(helmet.getId().toString());
-              assertThat(i.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("2"));
-              assertThat(i.openQuantity().unit()).isEqualTo("PIECE");
-            });
+        .satisfies(i -> {
+          assertThat(i.item().bt()).isEqualTo(helmet.getId().toString());
+          assertThat(i.openQuantity().amount()).isEqualByComparingTo(new BigDecimal("2"));
+          assertThat(i.openQuantity().unit()).isEqualTo("PIECE");
+        });
   }
 
   @Test

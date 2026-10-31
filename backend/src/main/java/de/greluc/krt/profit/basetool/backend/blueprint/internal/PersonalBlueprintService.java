@@ -298,10 +298,9 @@ public class PersonalBlueprintService {
     PersonalBlueprint entity = loadOwn(ownerUserId, id);
     return blueprintProductService
         .resolveRecipe(entity.getProductKey())
-        .orElseGet(
-            () ->
-                new PersonalBlueprintRecipeResponse(
-                    entity.getProductName(), 0, List.of(), List.of(), List.of()));
+        .orElseGet(() ->
+            new PersonalBlueprintRecipeResponse(
+                entity.getProductName(), 0, List.of(), List.of(), List.of()));
   }
 
   /**
@@ -600,11 +599,9 @@ public class PersonalBlueprintService {
   private PersonalBlueprint loadOwn(@NotNull UUID ownerUserId, @NotNull UUID id) {
     return repository
         .findByIdAndOwnerUserId(id, ownerUserId)
-        .orElseThrow(
-            () -> {
-              log.warn(
-                  "Access denied or not found: ownerUserId={} requested id={}", ownerUserId, id);
-              return new NotFoundException("PersonalBlueprint not found: " + id);
-            });
+        .orElseThrow(() -> {
+          log.warn("Access denied or not found: ownerUserId={} requested id={}", ownerUserId, id);
+          return new NotFoundException("PersonalBlueprint not found: " + id);
+        });
   }
 }

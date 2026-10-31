@@ -104,14 +104,13 @@ class NotificationCreationServiceTest {
     List<Notification> saved = captor.getValue();
     assertThat(saved).hasSize(2);
     assertThat(saved)
-        .allSatisfy(
-            n -> {
-              assertThat(n.getType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
-              assertThat(n.getEntityType()).isEqualTo("JOB_ORDER");
-              assertThat(n.getEntityId()).isEqualTo(event.entityId());
-              assertThat(n.getParams()).isEqualTo("{\"displayId\":\"9\"}");
-              assertThat(n.isRead()).isFalse();
-            });
+        .allSatisfy(n -> {
+          assertThat(n.getType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
+          assertThat(n.getEntityType()).isEqualTo("JOB_ORDER");
+          assertThat(n.getEntityId()).isEqualTo(event.entityId());
+          assertThat(n.getParams()).isEqualTo("{\"displayId\":\"9\"}");
+          assertThat(n.isRead()).isFalse();
+        });
     assertThat(saved).extracting(Notification::getRecipientUserId).containsExactlyInAnyOrder(A, B);
     assertThat(
             meterRegistry
@@ -175,11 +174,10 @@ class NotificationCreationServiceTest {
     verify(notificationRepository).saveAll(captor.capture());
     assertThat(captor.getValue())
         .singleElement()
-        .satisfies(
-            n -> {
-              assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED);
-              assertThat(n.getRecipientUserId()).isEqualTo(requester);
-            });
+        .satisfies(n -> {
+          assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED);
+          assertThat(n.getRecipientUserId()).isEqualTo(requester);
+        });
   }
 
   @Test
@@ -268,12 +266,11 @@ class NotificationCreationServiceTest {
     verify(notificationRepository).saveAll(captor.capture());
     assertThat(captor.getValue())
         .singleElement()
-        .satisfies(
-            n -> {
-              assertThat(n.getRecipientUserId()).isEqualTo(newHolder);
-              assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CREATED);
-              assertThat(n.getEntityId()).isEqualTo(event.entityId());
-            });
+        .satisfies(n -> {
+          assertThat(n.getRecipientUserId()).isEqualTo(newHolder);
+          assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+          assertThat(n.getEntityId()).isEqualTo(event.entityId());
+        });
   }
 
   @Test

@@ -114,14 +114,13 @@ public final class AllocationReductions {
    */
   public static void applyPlan(
       InventoryItem item, @NotNull Map<UUID, Double> plan, boolean jobOrderDimension) {
-    plan.forEach(
-        (targetId, scu) -> {
-          if (jobOrderDimension) {
-            InventoryAllocations.reduceJobOrder(item, targetId, scu);
-          } else {
-            InventoryAllocations.reduceMission(item, targetId, scu);
-          }
-        });
+    plan.forEach((targetId, scu) -> {
+      if (jobOrderDimension) {
+        InventoryAllocations.reduceJobOrder(item, targetId, scu);
+      } else {
+        InventoryAllocations.reduceMission(item, targetId, scu);
+      }
+    });
   }
 
   /**

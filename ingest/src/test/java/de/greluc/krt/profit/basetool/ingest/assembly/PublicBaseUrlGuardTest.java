@@ -64,15 +64,13 @@ class PublicBaseUrlGuardTest {
 
   @Test
   void devAndTestKeepTheRequestDerivedOrigin() {
-    assertThatCode(
-            () ->
-                new PublicBaseUrlGuard(environment("dev"), TestProperties.ingest())
-                    .afterPropertiesSet())
+    assertThatCode(() ->
+            new PublicBaseUrlGuard(environment("dev"), TestProperties.ingest())
+                .afterPropertiesSet())
         .doesNotThrowAnyException();
-    assertThatCode(
-            () ->
-                new PublicBaseUrlGuard(environment("test"), TestProperties.ingest())
-                    .afterPropertiesSet())
+    assertThatCode(() ->
+            new PublicBaseUrlGuard(environment("test"), TestProperties.ingest())
+                .afterPropertiesSet())
         .doesNotThrowAnyException();
   }
 }

@@ -293,18 +293,16 @@ public class QualityTierService {
     qualityTierRepository
         .findByCode(dto.code())
         .filter(other -> !other.getId().equals(selfId))
-        .ifPresent(
-            _ -> {
-              throw new DuplicateEntityException("Quality tier code already used: " + dto.code());
-            });
+        .ifPresent(_ -> {
+          throw new DuplicateEntityException("Quality tier code already used: " + dto.code());
+        });
     qualityTierRepository
         .findByMinQuality(dto.minQuality())
         .filter(other -> !other.getId().equals(selfId))
-        .ifPresent(
-            _ -> {
-              throw new DuplicateEntityException(
-                  "Quality tier floor already used: " + dto.minQuality());
-            });
+        .ifPresent(_ -> {
+          throw new DuplicateEntityException(
+              "Quality tier floor already used: " + dto.minQuality());
+        });
   }
 
   /**

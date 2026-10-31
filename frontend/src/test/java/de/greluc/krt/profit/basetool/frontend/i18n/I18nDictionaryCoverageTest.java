@@ -254,13 +254,12 @@ class I18nDictionaryCoverageTest {
     Map<Path, String> templates = readTemplates();
 
     TreeSet<String> problems = new TreeSet<>();
-    keys.forEach(
-        (key, script) -> {
-          String problem = problem(key, templates);
-          if (problem != null) {
-            problems.add(script + ": " + key + " -> " + problem);
-          }
-        });
+    keys.forEach((key, script) -> {
+      String problem = problem(key, templates);
+      if (problem != null) {
+        problems.add(script + ": " + key + " -> " + problem);
+      }
+    });
 
     assertThat(keys).as("the scan must find the migrated call sites").hasSizeGreaterThan(100);
     assertThat(problems).as("localized strings no page provides").isEmpty();

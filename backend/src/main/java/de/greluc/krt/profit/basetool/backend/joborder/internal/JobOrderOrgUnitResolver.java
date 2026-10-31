@@ -56,11 +56,10 @@ public class JobOrderOrgUnitResolver {
     OrgUnit orgUnit =
         orgUnitRepository
             .findById(responsibleOrgUnitId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "responsibleOrgUnitId does not resolve to a known org unit: "
-                            + responsibleOrgUnitId));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "responsibleOrgUnitId does not resolve to a known org unit: "
+                        + responsibleOrgUnitId));
     if (!orgUnit.isProfitEligible()) {
       throw new BadRequestException(
           "The selected responsible org unit is not profit-eligible and cannot process orders: "
@@ -84,10 +83,9 @@ public class JobOrderOrgUnitResolver {
     }
     return orgUnitRepository
         .findById(requestingOrgUnitId)
-        .orElseThrow(
-            () ->
-                new BadRequestException(
-                    "requestingOrgUnitId does not resolve to a known org unit: "
-                        + requestingOrgUnitId));
+        .orElseThrow(() ->
+            new BadRequestException(
+                "requestingOrgUnitId does not resolve to a known org unit: "
+                    + requestingOrgUnitId));
   }
 }

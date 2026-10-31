@@ -110,10 +110,9 @@ public class OrgUnitStampingService {
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
         .filter(Squadron.class::isInstance)
         .map(Squadron.class::cast)
-        .orElseThrow(
-            () ->
-                new BadRequestException(
-                    "Spezialkommando ownership of this aggregate is not yet supported"));
+        .orElseThrow(() ->
+            new BadRequestException(
+                "Spezialkommando ownership of this aggregate is not yet supported"));
   }
 
   /**
@@ -332,9 +331,7 @@ public class OrgUnitStampingService {
     return orgUnitRepository
         .findById(stampedOrgUnitId)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-        .orElseThrow(
-            () ->
-                new BadRequestException(
-                    "Picked owner org unit no longer resolves — repository miss"));
+        .orElseThrow(() ->
+            new BadRequestException("Picked owner org unit no longer resolves — repository miss"));
   }
 }

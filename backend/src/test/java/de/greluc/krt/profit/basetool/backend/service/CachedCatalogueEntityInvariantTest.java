@@ -237,13 +237,12 @@ class CachedCatalogueEntityInvariantTest {
         .isEqualTo(mutatorsOfCachedServices());
 
     Map<String, List<String>> violations = new TreeMap<>();
-    cases.forEach(
-        (name, setup) -> {
-          List<String> changes = changesMadeBy(setup.get());
-          if (!changes.isEmpty()) {
-            violations.put(name, changes);
-          }
-        });
+    cases.forEach((name, setup) -> {
+      List<String> changes = changesMadeBy(setup.get());
+      if (!changes.isEmpty()) {
+        violations.put(name, changes);
+      }
+    });
     assertThat(violations)
         .as(
             """

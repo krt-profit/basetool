@@ -110,13 +110,12 @@ class KeycloakServiceTest {
     when(bundle.getStores()).thenReturn(stores);
     when(sslBundles.getBundle("keycloak-trust")).thenReturn(bundle);
 
-    assertDoesNotThrow(
-        () ->
-            new KeycloakService(
-                BoundProperties.defaults(KeycloakSyncProperties.class),
-                observedBuilder(),
-                sslBundles,
-                meterRegistry));
+    assertDoesNotThrow(() ->
+        new KeycloakService(
+            BoundProperties.defaults(KeycloakSyncProperties.class),
+            observedBuilder(),
+            sslBundles,
+            meterRegistry));
     verify(sslBundles).getBundle("keycloak-trust");
   }
 

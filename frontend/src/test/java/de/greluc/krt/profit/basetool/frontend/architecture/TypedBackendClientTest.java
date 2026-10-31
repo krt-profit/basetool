@@ -91,13 +91,10 @@ class TypedBackendClientTest {
 
     assertThat(clients).hasSizeGreaterThanOrEqualTo(CLIENT_FLOOR);
     assertThat(clients)
-        .allSatisfy(
-            c -> {
-              assertThat(c.getSimpleName()).endsWith("BackendClient");
-              assertThat(c.isAnnotatedWith(Service.class))
-                  .as(c.getName() + " is a @Service")
-                  .isTrue();
-            });
+        .allSatisfy(c -> {
+          assertThat(c.getSimpleName()).endsWith("BackendClient");
+          assertThat(c.isAnnotatedWith(Service.class)).as(c.getName() + " is a @Service").isTrue();
+        });
   }
 
   @Test

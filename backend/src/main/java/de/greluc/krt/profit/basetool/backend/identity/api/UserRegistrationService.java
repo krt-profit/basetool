@@ -349,10 +349,9 @@ public class UserRegistrationService {
     return keycloakService
         .readDiscordLink(pending.getId())
         .or(() -> localDiscordLink(pending))
-        .orElseThrow(
-            () ->
-                new BusinessConflictException(
-                    "The pending registration has no Discord identity to link"));
+        .orElseThrow(() ->
+            new BusinessConflictException(
+                "The pending registration has no Discord identity to link"));
   }
 
   /**
@@ -401,13 +400,12 @@ public class UserRegistrationService {
       @NotNull UUID adminId) {
     userRepository
         .findById(pendingId)
-        .ifPresent(
-            pending -> {
-              pending.setInKeycloak(false);
-              userRepository.saveAndFlush(pending);
-              accountErasure.deleteAccount(
-                  pendingId, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
-            });
+        .ifPresent(pending -> {
+          pending.setInKeycloak(false);
+          userRepository.saveAndFlush(pending);
+          accountErasure.deleteAccount(
+              pendingId, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+        });
 
     User target =
         Entities.require(userRepository.findById(targetUserId), "Target account not found");

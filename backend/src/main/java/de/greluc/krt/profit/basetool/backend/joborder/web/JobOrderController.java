@@ -430,18 +430,17 @@ public class JobOrderController {
       return Collections.emptyList();
     }
     return materials.stream()
-        .map(
-            m ->
-                new JobOrderMaterialDto(
-                    m.id(),
-                    m.material(),
-                    m.minQuality(),
-                    m.qualityTier(),
-                    m.amount(),
-                    null,
-                    Collections.emptyList(),
-                    null,
-                    m.version()))
+        .map(m ->
+            new JobOrderMaterialDto(
+                m.id(),
+                m.material(),
+                m.minQuality(),
+                m.qualityTier(),
+                m.amount(),
+                null,
+                Collections.emptyList(),
+                null,
+                m.version()))
         .toList();
   }
 
@@ -1088,10 +1087,8 @@ public class JobOrderController {
       return null;
     }
     return assignees.stream()
-        .map(
-            a ->
-                new JobOrderAssigneeDto(
-                    UserDtoRedaction.toPeerShape(a.user()), a.note(), a.version()))
+        .map(a ->
+            new JobOrderAssigneeDto(UserDtoRedaction.toPeerShape(a.user()), a.note(), a.version()))
         .toList();
   }
 }

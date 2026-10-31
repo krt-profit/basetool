@@ -103,14 +103,13 @@ public final class ExchangeFence {
     List<String> otherPaths = new ArrayList<>();
     full.path("paths")
         .propertyNames()
-        .forEach(
-            path -> {
-              if (isRelayPath(path)) {
-                relayPaths.add(path);
-              } else {
-                otherPaths.add(path);
-              }
-            });
+        .forEach(path -> {
+          if (isRelayPath(path)) {
+            relayPaths.add(path);
+          } else {
+            otherPaths.add(path);
+          }
+        });
     pathsOf(published).remove(relayPaths);
     pathsOf(relay).remove(otherPaths);
 

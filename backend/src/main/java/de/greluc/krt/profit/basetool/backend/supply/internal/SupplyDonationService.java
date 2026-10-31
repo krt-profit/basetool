@@ -603,11 +603,10 @@ public class SupplyDonationService {
     List<SupplyNeed> fitting =
         candidates.stream()
             .filter(need -> accepting.contains(need.getOrgUnitId()))
-            .filter(
-                need ->
-                    material == null
-                        || need.getQualityTier() == null
-                        || need.getQualityTier().isSatisfiedBy(row.getQuality()))
+            .filter(need ->
+                material == null
+                    || need.getQualityTier() == null
+                    || need.getQualityTier().isSatisfiedBy(row.getQuality()))
             .toList();
     SupplyMapper.NeedContext context = mapper.needContext(fitting);
     return fitting.stream().map(need -> mapper.toDto(need, context)).toList();

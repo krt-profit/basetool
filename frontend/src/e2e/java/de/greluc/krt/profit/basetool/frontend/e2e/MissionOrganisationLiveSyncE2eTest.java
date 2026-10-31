@@ -111,14 +111,13 @@ class MissionOrganisationLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
-                            + missionId
-                            + "') !== -1)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
+                        + missionId
+                        + "') !== -1)")));
 
         pageA.locator("#party-lead-search-input").fill(GUEST_LEAD_NAME);
         pageA.locator("#party-lead-form button[type='submit']").click();

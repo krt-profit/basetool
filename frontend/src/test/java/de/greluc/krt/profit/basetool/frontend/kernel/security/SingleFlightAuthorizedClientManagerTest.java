@@ -163,11 +163,10 @@ class SingleFlightAuthorizedClientManagerTest {
     OAuth2AuthorizedClientManager delegate = mock(OAuth2AuthorizedClientManager.class);
     AtomicInteger delegateCalls = new AtomicInteger();
     when(delegate.authorize(any()))
-        .thenAnswer(
-            invocation -> {
-              delegateCalls.incrementAndGet();
-              return clientExpiringIn(300);
-            });
+        .thenAnswer(invocation -> {
+          delegateCalls.incrementAndGet();
+          return clientExpiringIn(300);
+        });
     SingleFlightAuthorizedClientManager manager = new SingleFlightAuthorizedClientManager(delegate);
 
     int threads = 16;
@@ -175,17 +174,16 @@ class SingleFlightAuthorizedClientManagerTest {
     CountDownLatch start = new CountDownLatch(1);
     CountDownLatch done = new CountDownLatch(threads);
     for (int i = 0; i < threads; i++) {
-      pool.submit(
-          () -> {
-            try {
-              start.await();
-              manager.authorize(requestForSession("sess-burst"));
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-            } finally {
-              done.countDown();
-            }
-          });
+      pool.submit(() -> {
+        try {
+          start.await();
+          manager.authorize(requestForSession("sess-burst"));
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } finally {
+          done.countDown();
+        }
+      });
     }
     start.countDown();
     done.await(5, TimeUnit.SECONDS);

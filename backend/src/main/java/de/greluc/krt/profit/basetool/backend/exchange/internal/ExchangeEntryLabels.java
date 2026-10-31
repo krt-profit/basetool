@@ -128,13 +128,12 @@ public class ExchangeEntryLabels {
     put(labels, materialOf, materials);
     put(labels, itemOf, items);
     put(labels, shipTypeOf, types);
-    shipOf.forEach(
-        (entry, ship) -> {
-          String name = types.get(typeOfShip.get(ship));
-          if (name != null) {
-            labels.put(entry, name);
-          }
-        });
+    shipOf.forEach((entry, ship) -> {
+      String name = types.get(typeOfShip.get(ship));
+      if (name != null) {
+        labels.put(entry, name);
+      }
+    });
     return labels;
   }
 
@@ -149,13 +148,12 @@ public class ExchangeEntryLabels {
       @NotNull Map<UUID, String> labels,
       @NotNull Map<UUID, UUID> target,
       @NotNull Map<UUID, String> names) {
-    target.forEach(
-        (entry, id) -> {
-          String name = names.get(id);
-          if (name != null) {
-            labels.put(entry, name);
-          }
-        });
+    target.forEach((entry, id) -> {
+      String name = names.get(id);
+      if (name != null) {
+        labels.put(entry, name);
+      }
+    });
   }
 
   /**

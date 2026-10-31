@@ -131,13 +131,12 @@ public class JobOrderItemBlueprintOwnersService {
 
     List<JobOrderRequiredBlueprintDto> requiredBlueprints =
         requiredByFamily.entrySet().stream()
-            .map(
-                e ->
-                    new JobOrderRequiredBlueprintDto(
-                        e.getKey(),
-                        e.getValue().displayName(),
-                        ownersByFamily.getOrDefault(e.getKey(), Set.of()).size(),
-                        e.getValue().variantInclusive()))
+            .map(e ->
+                new JobOrderRequiredBlueprintDto(
+                    e.getKey(),
+                    e.getValue().displayName(),
+                    ownersByFamily.getOrDefault(e.getKey(), Set.of()).size(),
+                    e.getValue().variantInclusive()))
             .sorted(
                 Comparator.comparing(
                         JobOrderRequiredBlueprintDto::productName, String.CASE_INSENSITIVE_ORDER)
@@ -168,12 +167,11 @@ public class JobOrderItemBlueprintOwnersService {
             .collect(Collectors.toMap(User::getId, User::getEffectiveName));
     return ownedNamesByOwnerId.entrySet().stream()
         .filter(e -> nameById.containsKey(e.getKey()))
-        .map(
-            e ->
-                new JobOrderBlueprintOwnerDto(
-                    Objects.requireNonNull(nameById.get(e.getKey())),
-                    e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList(),
-                    memberSubs.contains(e.getKey())))
+        .map(e ->
+            new JobOrderBlueprintOwnerDto(
+                Objects.requireNonNull(nameById.get(e.getKey())),
+                e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList(),
+                memberSubs.contains(e.getKey())))
         .sorted(
             Comparator.comparing(
                 JobOrderBlueprintOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))

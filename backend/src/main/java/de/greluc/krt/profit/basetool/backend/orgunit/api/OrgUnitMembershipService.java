@@ -321,11 +321,10 @@ public class OrgUnitMembershipService {
         .map(u -> Hibernate.unproxy(u, OrgUnit.class))
         .filter(
             u -> u instanceof Organisationsleitung o && userId.equals(o.getGrandAdmiralUserId()))
-        .ifPresent(
-            u -> {
-              ((Organisationsleitung) u).setGrandAdmiralUserId(null);
-              orgUnitRepository.saveAndFlush(u);
-            });
+        .ifPresent(u -> {
+          ((Organisationsleitung) u).setGrandAdmiralUserId(null);
+          orgUnitRepository.saveAndFlush(u);
+        });
     auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         organisationsleitungId,
@@ -1005,11 +1004,10 @@ public class OrgUnitMembershipService {
         UUID groupId = Objects.requireNonNull(group).getId();
         boolean taken =
             roster.stream()
-                .anyMatch(
-                    m ->
-                        m.getRole() == rank
-                            && m.getKommandoGroup() != null
-                            && groupId.equals(m.getKommandoGroup().getId()));
+                .anyMatch(m ->
+                    m.getRole() == rank
+                        && m.getKommandoGroup() != null
+                        && groupId.equals(m.getKommandoGroup().getId()));
         if (taken) {
           throw new BadRequestException("This Kommandogruppe already has a " + rank);
         }

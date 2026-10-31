@@ -75,10 +75,8 @@ class OssBundledComponentsTest {
     List<String> families =
         fontFiles()
             .map(p -> p.getFileName().toString())
-            .map(
-                name ->
-                    name.substring(
-                        0, name.indexOf('-') > 0 ? name.indexOf('-') : name.indexOf('.')))
+            .map(name ->
+                name.substring(0, name.indexOf('-') > 0 ? name.indexOf('-') : name.indexOf('.')))
             .distinct()
             .toList();
 

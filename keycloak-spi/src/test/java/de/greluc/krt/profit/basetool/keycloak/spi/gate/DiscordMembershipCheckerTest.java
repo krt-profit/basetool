@@ -112,15 +112,14 @@ class DiscordMembershipCheckerTest {
   @Test
   void timeout_failsClosed() throws IOException {
     HttpServer server =
-        start(
-            exchange -> {
-              try {
-                Thread.sleep(2000);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-              writeResponse(exchange, 200, "{\"roles\":[\"999\"]}");
-            });
+        start(exchange -> {
+          try {
+            Thread.sleep(2000);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          writeResponse(exchange, 200, "{\"roles\":[\"999\"]}");
+        });
     try (LogCapture log = LogCapture.of(DiscordMembershipChecker.class)) {
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofMillis(300), 0));
       assertTrue(log.logged(Level.WARNING));

@@ -175,15 +175,14 @@ class TouchClassLayoutE2eTest {
   /** {@link #MODAL_SHAPES} as a JS array literal, for the two scripts that need the inner parts. */
   private static final String MODAL_SHAPES_JS =
       MODAL_SHAPES.stream()
-          .map(
-              shape ->
-                  "{root:%s,box:%s,body:%s,foot:%s,openClass:%s}"
-                      .formatted(
-                          asJsString(shape.root()),
-                          asJsString(shape.box()),
-                          asJsString(shape.body()),
-                          asJsString(shape.foot()),
-                          asJsString(shape.openClass())))
+          .map(shape ->
+              "{root:%s,box:%s,body:%s,foot:%s,openClass:%s}"
+                  .formatted(
+                      asJsString(shape.root()),
+                      asJsString(shape.box()),
+                      asJsString(shape.body()),
+                      asJsString(shape.foot()),
+                      asJsString(shape.openClass())))
           .collect(Collectors.joining(",", "[", "]"));
 
   /**
@@ -350,14 +349,13 @@ class TouchClassLayoutE2eTest {
       Map<String, Set<String>> detailsByDevice,
       List<String> uncoveredLists,
       List<String> findings) {
-    measuredByDevice.forEach(
-        (device, measured) ->
-            System.out.printf(
-                "[touch-layout] coverage %-10s %d of %d routes measured, plus %d detail view(s)%n",
-                device,
-                measured.size(),
-                FrontendPageRoutes.PAGES.size(),
-                detailsByDevice.getOrDefault(device, Set.of()).size()));
+    measuredByDevice.forEach((device, measured) ->
+        System.out.printf(
+            "[touch-layout] coverage %-10s %d of %d routes measured, plus %d detail view(s)%n",
+            device,
+            measured.size(),
+            FrontendPageRoutes.PAGES.size(),
+            detailsByDevice.getOrDefault(device, Set.of()).size()));
     uncoveredLists.forEach(line -> System.out.println("[touch-layout] uncovered " + line));
 
     if (measuredByDevice.isEmpty()) {
@@ -381,19 +379,18 @@ class TouchClassLayoutE2eTest {
                   + " the sweep did not run, it skipped",
               widest, FrontendPageRoutes.PAGES.size(), MIN_MEASURED_ROUTES));
     }
-    measuredByDevice.forEach(
-        (device, measured) -> {
-          Set<String> missing = new LinkedHashSet<>(union);
-          missing.removeAll(measured);
-          if (!missing.isEmpty()) {
-            findings.add(
-                String.format(
-                    "coverage gap: %s measured %d routes where the union across classes is %d —"
-                        + " missing %s. A class going quiet mid-sweep is what an expired session"
-                        + " looks like.",
-                    device, measured.size(), union.size(), missing));
-          }
-        });
+    measuredByDevice.forEach((device, measured) -> {
+      Set<String> missing = new LinkedHashSet<>(union);
+      missing.removeAll(measured);
+      if (!missing.isEmpty()) {
+        findings.add(
+            String.format(
+                "coverage gap: %s measured %d routes where the union across classes is %d —"
+                    + " missing %s. A class going quiet mid-sweep is what an expired session"
+                    + " looks like.",
+                device, measured.size(), union.size(), missing));
+      }
+    });
   }
 
   /**

@@ -287,10 +287,9 @@ public class MissionParticipantService {
           }
           for (MissionUnit ship : mission.getAssignedUnits()) {
             ship.getCrew()
-                .removeIf(
-                    crew ->
-                        crew.getParticipant() != null
-                            && crew.getParticipant().getId().equals(participantId));
+                .removeIf(crew ->
+                    crew.getParticipant() != null
+                        && crew.getParticipant().getId().equals(participantId));
           }
           return MissionEdit.audited(
               AuditEventType.MISSION_PARTICIPANT_REMOVED,
@@ -426,10 +425,9 @@ public class MissionParticipantService {
           }
           boolean clashesWithAnotherGuest =
               mission.getParticipants().stream()
-                  .anyMatch(
-                      other ->
-                          !other.getId().equals(participant.getId())
-                              && candidate.equalsIgnoreCase(other.getGuestName()));
+                  .anyMatch(other ->
+                      !other.getId().equals(participant.getId())
+                          && candidate.equalsIgnoreCase(other.getGuestName()));
           if (clashesWithAnotherGuest) {
             throw new DuplicateEntityException("error.mission.participant.duplicate.guest");
           }
@@ -455,11 +453,10 @@ public class MissionParticipantService {
       if (jt.isMissionLead()) {
         boolean alreadyTaken =
             mission.getParticipants().stream()
-                .anyMatch(
-                    other ->
-                        !other.getId().equals(participant.getId())
-                            && other.getPlannedMissionJobType() != null
-                            && other.getPlannedMissionJobType().isMissionLead());
+                .anyMatch(other ->
+                    !other.getId().equals(participant.getId())
+                        && other.getPlannedMissionJobType() != null
+                        && other.getPlannedMissionJobType().isMissionLead());
         if (alreadyTaken) {
           throw new BusinessConflictException(
               "A mission can have only one Einsatzleiter (mission lead).");

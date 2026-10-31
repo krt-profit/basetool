@@ -364,13 +364,12 @@ public class AdminSpecialCommandsPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () -> {
-          orgUnitClient.createSpecialCommand(
-              new SpecialCommandDto(
-                  null, form.name(), form.shorthand(), form.description(), true, false, 0L));
-          evictOrgUnitCatalogueCache();
-        });
+    return okOrRelay(() -> {
+      orgUnitClient.createSpecialCommand(
+          new SpecialCommandDto(
+              null, form.name(), form.shorthand(), form.description(), true, false, 0L));
+      evictOrgUnitCatalogueCache();
+    });
   }
 
   /**
@@ -391,20 +390,13 @@ public class AdminSpecialCommandsPageController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.status(422).build();
     }
-    return okOrRelay(
-        () -> {
-          orgUnitClient.updateSpecialCommand(
-              id,
-              new SpecialCommandDto(
-                  id,
-                  form.name(),
-                  form.shorthand(),
-                  form.description(),
-                  true,
-                  false,
-                  form.version()));
-          evictOrgUnitCatalogueCache();
-        });
+    return okOrRelay(() -> {
+      orgUnitClient.updateSpecialCommand(
+          id,
+          new SpecialCommandDto(
+              id, form.name(), form.shorthand(), form.description(), true, false, form.version()));
+      evictOrgUnitCatalogueCache();
+    });
   }
 
   /**
@@ -416,11 +408,10 @@ public class AdminSpecialCommandsPageController {
   @ResponseBody
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteSpecialCommandAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(
-        () -> {
-          orgUnitClient.deleteSpecialCommand(id);
-          evictOrgUnitCatalogueCache();
-        });
+    return okOrRelay(() -> {
+      orgUnitClient.deleteSpecialCommand(id);
+      evictOrgUnitCatalogueCache();
+    });
   }
 
   /**
@@ -432,11 +423,10 @@ public class AdminSpecialCommandsPageController {
   @ResponseBody
   @PostMapping(value = "/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> activateSpecialCommandAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(
-        () -> {
-          orgUnitClient.activateSpecialCommand(id);
-          evictOrgUnitCatalogueCache();
-        });
+    return okOrRelay(() -> {
+      orgUnitClient.activateSpecialCommand(id);
+      evictOrgUnitCatalogueCache();
+    });
   }
 
   /**
@@ -455,11 +445,10 @@ public class AdminSpecialCommandsPageController {
       @PathVariable @NotNull UUID userId,
       @RequestParam @NotNull Boolean isLead,
       @RequestParam @NotNull Long version) {
-    return okOrRelay(
-        () -> {
-          orgUnitClient.toggleSpecialCommandLead(
-              id, userId, new MembershipLeadToggleRequest(isLead, version));
-        });
+    return okOrRelay(() -> {
+      orgUnitClient.toggleSpecialCommandLead(
+          id, userId, new MembershipLeadToggleRequest(isLead, version));
+    });
   }
 
   /**

@@ -105,16 +105,14 @@ public class ExchangeOrgStockTargets {
     }
     return jobOrderRepository.findAllActiveWithMaterials().stream()
         .filter(order -> visibleIn(order, unit))
-        .filter(
-            order ->
-                (material
-                        ? jobOrderItemService.requiredMaterialIds(order)
-                        : jobOrderItemService.requiredGameItemIds(order))
-                    .contains(catalogueId))
-        .map(
-            order ->
-                new ExchangeOrgStockTargetsDto.JobOrder(
-                    order.getId(), order.getDisplayId(), order.getStatus().name()))
+        .filter(order ->
+            (material
+                    ? jobOrderItemService.requiredMaterialIds(order)
+                    : jobOrderItemService.requiredGameItemIds(order))
+                .contains(catalogueId))
+        .map(order ->
+            new ExchangeOrgStockTargetsDto.JobOrder(
+                order.getId(), order.getDisplayId(), order.getStatus().name()))
         .toList();
   }
 
@@ -148,10 +146,8 @@ public class ExchangeOrgStockTargets {
             VIEWER_IS_MEMBER,
             OffsetDateTime.now(clock).minusMonths(TERMINAL_MISSION_MONTHS).toInstant())
         .stream()
-        .map(
-            mission ->
-                new ExchangeOrgStockTargetsDto.Mission(
-                    mission.id(), mission.name(), mission.status()))
+        .map(mission ->
+            new ExchangeOrgStockTargetsDto.Mission(mission.id(), mission.name(), mission.status()))
         .toList();
   }
 

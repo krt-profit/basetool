@@ -130,16 +130,15 @@ class PendingRegistrationMailServiceTest {
         .extracting(MailMessage::to)
         .containsExactly("mav@example.test", "ice@example.test");
     assertThat(sent)
-        .allSatisfy(
-            m -> {
-              assertThat(m.subject())
-                  .isEqualTo(
-                      messageSource.getMessage(
-                          "email.pendingRegistration.subject", null, Locale.GERMAN));
-              assertThat(m.body())
-                  .contains("Newbie")
-                  .contains(messageSource.getMessage("email.signoff", null, Locale.GERMAN));
-            });
+        .allSatisfy(m -> {
+          assertThat(m.subject())
+              .isEqualTo(
+                  messageSource.getMessage(
+                      "email.pendingRegistration.subject", null, Locale.GERMAN));
+          assertThat(m.body())
+              .contains("Newbie")
+              .contains(messageSource.getMessage("email.signoff", null, Locale.GERMAN));
+        });
     assertThat(sent.get(0).body()).contains("Maverick");
     assertThat(sent.get(1).body()).contains("Iceman");
   }

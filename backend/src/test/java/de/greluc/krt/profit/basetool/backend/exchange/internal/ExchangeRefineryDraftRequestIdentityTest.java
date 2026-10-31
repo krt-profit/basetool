@@ -184,11 +184,10 @@ class ExchangeRefineryDraftRequestIdentityTest {
   private static <T> @NotNull Set<String> violations(
       @NotNull Set<ConstraintViolation<T>> violations) {
     return violations.stream()
-        .map(
-            v ->
-                v.getPropertyPath()
-                    + ":"
-                    + v.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName())
+        .map(v ->
+            v.getPropertyPath()
+                + ":"
+                + v.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName())
         .collect(Collectors.toCollection(TreeSet::new));
   }
 

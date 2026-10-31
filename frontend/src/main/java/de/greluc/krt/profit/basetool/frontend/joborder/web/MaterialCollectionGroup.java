@@ -58,15 +58,14 @@ public record MaterialCollectionGroup(
       byMaterial.computeIfAbsent(entry.materialName(), _ -> new ArrayList<>()).add(entry);
     }
     return byMaterial.entrySet().stream()
-        .map(
-            group ->
-                new MaterialCollectionGroup(
-                    group.getKey(),
-                    List.copyOf(group.getValue()),
-                    CollectionProgress.of(
-                        group.getValue(),
-                        MaterialCollectionEntryDto::allocatedQuantity,
-                        MaterialCollectionEntryDto::delivered)))
+        .map(group ->
+            new MaterialCollectionGroup(
+                group.getKey(),
+                List.copyOf(group.getValue()),
+                CollectionProgress.of(
+                    group.getValue(),
+                    MaterialCollectionEntryDto::allocatedQuantity,
+                    MaterialCollectionEntryDto::delivered)))
         .toList();
   }
 

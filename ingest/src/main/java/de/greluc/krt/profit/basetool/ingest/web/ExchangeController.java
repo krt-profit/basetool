@@ -1175,10 +1175,9 @@ public class ExchangeController {
     List<ExchangeSchemas.Violation> violations =
         unknown.stream()
             .filter(pointer -> pointer.length() > ExchangeSchemas.MAX_POINTER)
-            .map(
-                pointer ->
-                    new ExchangeSchemas.Violation(
-                        ExchangeSchemas.reportable(pointer), "holds a property name too long"))
+            .map(pointer ->
+                new ExchangeSchemas.Violation(
+                    ExchangeSchemas.reportable(pointer), "holds a property name too long"))
             .distinct()
             .toList();
     return violations.isEmpty() ? null : schemaInvalid(violations);

@@ -101,13 +101,12 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
     assertThat(changes(alice))
         .singleElement()
-        .satisfies(
-            c -> {
-              assertThat(c.getResource()).isEqualTo(ExchangeResource.BLUEPRINT);
-              assertThat(c.getEntityKey()).isEqualTo("laser rifle");
-              assertThat(c.getSourceChannel()).isEqualTo("system");
-              assertThat(c.getSourceClient()).isNull();
-            });
+        .satisfies(c -> {
+          assertThat(c.getResource()).isEqualTo(ExchangeResource.BLUEPRINT);
+          assertThat(c.getEntityKey()).isEqualTo("laser rifle");
+          assertThat(c.getSourceChannel()).isEqualTo("system");
+          assertThat(c.getSourceClient()).isNull();
+        });
   }
 
   @Test
@@ -117,12 +116,11 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
     assertThat(changes(alice))
         .singleElement()
-        .satisfies(
-            c -> {
-              assertThat(c.getSourceChannel()).isEqualTo("client");
-              assertThat(c.getSourceClient()).isEqualTo("versekit");
-              assertThat(c.getSourceKey()).isEqualTo("K".repeat(43));
-            });
+        .satisfies(c -> {
+          assertThat(c.getSourceChannel()).isEqualTo("client");
+          assertThat(c.getSourceClient()).isEqualTo("versekit");
+          assertThat(c.getSourceKey()).isEqualTo("K".repeat(43));
+        });
   }
 
   @Test
@@ -266,12 +264,10 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
     assertThat(changes(alice))
         .singleElement()
-        .satisfies(
-            c -> {
-              assertThat(c.getEntityKey())
-                  .isEqualTo("m:" + material + "|l:" + location + "|q:4|s:0");
-              assertThat(c.getSourceChannel()).isEqualTo("system");
-            });
+        .satisfies(c -> {
+          assertThat(c.getEntityKey()).isEqualTo("m:" + material + "|l:" + location + "|q:4|s:0");
+          assertThat(c.getSourceChannel()).isEqualTo("system");
+        });
   }
 
   @Test

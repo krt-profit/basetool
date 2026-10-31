@@ -1799,11 +1799,10 @@ class MissionPageControllerMvcTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(memberUserId.toString())
-                                    .claim("preferred_username", "member1"))))
+                        .idToken(token ->
+                            token
+                                .subject(memberUserId.toString())
+                                .claim("preferred_username", "member1"))))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -1911,11 +1910,10 @@ class MissionPageControllerMvcTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(loggedInUserId.toString())
-                                    .claim("preferred_username", "member2"))))
+                        .idToken(token ->
+                            token
+                                .subject(loggedInUserId.toString())
+                                .claim("preferred_username", "member2"))))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -2111,11 +2109,10 @@ class MissionPageControllerMvcTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(participantUserId.toString())
-                                    .claim("preferred_username", "pilot1"))))
+                        .idToken(token ->
+                            token
+                                .subject(participantUserId.toString())
+                                .claim("preferred_username", "pilot1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(participantShipId.toString())))
         .andExpect(content().string(not(containsString(outsiderShipId.toString()))));
@@ -2306,11 +2303,10 @@ class MissionPageControllerMvcTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(participantUserId.toString())
-                                    .claim("preferred_username", "pilot1"))))
+                        .idToken(token ->
+                            token
+                                .subject(participantUserId.toString())
+                                .claim("preferred_username", "pilot1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("value=\"" + participantShipId + "\"")))
         .andExpect(content().string(containsString("value=\"" + assignedShipId + "\"")))
@@ -2436,11 +2432,10 @@ class MissionPageControllerMvcTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(UUID.randomUUID().toString())
-                                    .claim("preferred_username", "viewer1"))))
+                        .idToken(token ->
+                            token
+                                .subject(UUID.randomUUID().toString())
+                                .claim("preferred_username", "viewer1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Befehl")))
         .andExpect(content().string(containsString("121,50")))
@@ -2531,11 +2526,10 @@ class MissionPageControllerMvcTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(UUID.randomUUID().toString())
-                                    .claim("preferred_username", "viewer1"))))
+                        .idToken(token ->
+                            token
+                                .subject(UUID.randomUUID().toString())
+                                .claim("preferred_username", "viewer1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString(">Funk<"))))
         .andExpect(content().string(not(containsString("121,50"))));
@@ -2647,11 +2641,10 @@ class MissionPageControllerMvcTest {
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_OFFICER"))
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(UUID.randomUUID().toString())
-                                    .claim("preferred_username", "officer1"))))
+                        .idToken(token ->
+                            token
+                                .subject(UUID.randomUUID().toString())
+                                .claim("preferred_username", "officer1"))))
         .andExpect(status().isOk())
         .andExpect(view().name("mission/mission-detail"))
         .andExpect(content().string(containsString("data-amount=\"1235\"")));

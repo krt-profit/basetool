@@ -214,32 +214,30 @@ public class ExchangeDemandService {
       }
     }
     Map<MaterialLine, Double> open = new LinkedHashMap<>();
-    buckets.forEach(
-        (bucket, totals) -> {
-          MaterialDto material = materials.get(bucket.line().materialId());
-          double required = QuantityTypeRounding.roundForQuantityType(totals[0], material);
-          double booked = QuantityTypeRounding.roundForQuantityType(totals[1], material);
-          double gap =
-              Math.max(0.0, QuantityTypeRounding.roundForQuantityType(required - booked, material));
-          open.merge(bucket.line(), gap, Double::sum);
-        });
+    buckets.forEach((bucket, totals) -> {
+      MaterialDto material = materials.get(bucket.line().materialId());
+      double required = QuantityTypeRounding.roundForQuantityType(totals[0], material);
+      double booked = QuantityTypeRounding.roundForQuantityType(totals[1], material);
+      double gap =
+          Math.max(0.0, QuantityTypeRounding.roundForQuantityType(required - booked, material));
+      open.merge(bucket.line(), gap, Double::sum);
+    });
     Map<UUID, List<ExchangeItemRefDto>> raws = rawRefs(materials.keySet());
     List<ExchangeDemandMaterialDto> lines = new ArrayList<>();
-    open.forEach(
-        (line, amount) -> {
-          MaterialDto material = Objects.requireNonNull(materials.get(line.materialId()));
-          double rounded = QuantityTypeRounding.roundForQuantityType(amount, material);
-          if (rounded <= 0) {
-            return;
-          }
-          lines.add(
-              new ExchangeDemandMaterialDto(
-                  ref(material),
-                  raws.getOrDefault(material.id(), List.of()),
-                  line.minQuality(),
-                  quantity(rounded, material),
-                  line.source()));
-        });
+    open.forEach((line, amount) -> {
+      MaterialDto material = Objects.requireNonNull(materials.get(line.materialId()));
+      double rounded = QuantityTypeRounding.roundForQuantityType(amount, material);
+      if (rounded <= 0) {
+        return;
+      }
+      lines.add(
+          new ExchangeDemandMaterialDto(
+              ref(material),
+              raws.getOrDefault(material.id(), List.of()),
+              line.minQuality(),
+              quantity(rounded, material),
+              line.source()));
+    });
     lines.sort(
         Comparator.comparing((ExchangeDemandMaterialDto l) -> l.openQuantity().unit())
             .reversed()
@@ -340,19 +338,18 @@ public class ExchangeDemandService {
               (gameItemId, open) -> Objects.requireNonNull(lines.get(gameItemId)).open += open);
     }
     List<ExchangeDemandItemDto> result = new ArrayList<>();
-    lines.forEach(
-        (gameItemId, line) -> {
-          if (line.open > 0) {
-            result.add(
-                new ExchangeDemandItemDto(
-                    new ExchangeItemRefDto(gameItemId.toString(), cut(line.item.getName())),
-                    ExchangeComponentDto.of(line.item),
-                    new ExchangeQuantityDto(
-                        ExchangeStockFeedService.amount(line.open, QuantityType.PIECE.name()),
-                        QuantityType.PIECE.name()),
-                    line.craftable));
-          }
-        });
+    lines.forEach((gameItemId, line) -> {
+      if (line.open > 0) {
+        result.add(
+            new ExchangeDemandItemDto(
+                new ExchangeItemRefDto(gameItemId.toString(), cut(line.item.getName())),
+                ExchangeComponentDto.of(line.item),
+                new ExchangeQuantityDto(
+                    ExchangeStockFeedService.amount(line.open, QuantityType.PIECE.name()),
+                    QuantityType.PIECE.name()),
+                line.craftable));
+      }
+    });
     result.sort(Comparator.comparing(l -> l.item().name(), String.CASE_INSENSITIVE_ORDER));
     return result;
   }
@@ -377,9 +374,8 @@ public class ExchangeDemandService {
       ordered.merge(line.getGameItem().getId(), amount - delivered, Integer::sum);
     }
     Map<UUID, Double> marks = earmarked.getOrDefault(order.getId(), Map.of());
-    ordered.replaceAll(
-        (gameItemId, open) ->
-            Math.max(0, open - (int) Math.round(marks.getOrDefault(gameItemId, 0.0))));
+    ordered.replaceAll((gameItemId, open) ->
+        Math.max(0, open - (int) Math.round(marks.getOrDefault(gameItemId, 0.0))));
     return ordered;
   }
 
@@ -447,19 +443,18 @@ public class ExchangeDemandService {
       sum[1] += requirementNeed.booked();
     }
     List<ExchangeDemandOrderMaterialDto> lines = new ArrayList<>();
-    totals.forEach(
-        (line, sum) -> {
-          MaterialDto material = Objects.requireNonNull(materials.get(line.materialId()));
-          double required = QuantityTypeRounding.roundForQuantityType(sum[0], material);
-          double booked = QuantityTypeRounding.roundForQuantityType(sum[1], material);
-          double gap =
-              Math.max(0.0, QuantityTypeRounding.roundForQuantityType(required - booked, material));
-          if (gap > 0) {
-            lines.add(
-                new ExchangeDemandOrderMaterialDto(
-                    ref(material), line.minQuality(), quantity(gap, material)));
-          }
-        });
+    totals.forEach((line, sum) -> {
+      MaterialDto material = Objects.requireNonNull(materials.get(line.materialId()));
+      double required = QuantityTypeRounding.roundForQuantityType(sum[0], material);
+      double booked = QuantityTypeRounding.roundForQuantityType(sum[1], material);
+      double gap =
+          Math.max(0.0, QuantityTypeRounding.roundForQuantityType(required - booked, material));
+      if (gap > 0) {
+        lines.add(
+            new ExchangeDemandOrderMaterialDto(
+                ref(material), line.minQuality(), quantity(gap, material)));
+      }
+    });
     lines.sort(
         Comparator.comparing((ExchangeDemandOrderMaterialDto l) -> l.openQuantity().unit())
             .reversed()
@@ -488,19 +483,18 @@ public class ExchangeDemandService {
     }
     List<ExchangeDemandOrderItemDto> lines = new ArrayList<>();
     openPieces(order, earmarked)
-        .forEach(
-            (gameItemId, open) -> {
-              if (open > 0) {
-                GameItem gameItem = Objects.requireNonNull(gameItems.get(gameItemId));
-                lines.add(
-                    new ExchangeDemandOrderItemDto(
-                        new ExchangeItemRefDto(gameItemId.toString(), cut(gameItem.getName())),
-                        ExchangeComponentDto.of(gameItem),
-                        new ExchangeQuantityDto(
-                            ExchangeStockFeedService.amount(open, QuantityType.PIECE.name()),
-                            QuantityType.PIECE.name())));
-              }
-            });
+        .forEach((gameItemId, open) -> {
+          if (open > 0) {
+            GameItem gameItem = Objects.requireNonNull(gameItems.get(gameItemId));
+            lines.add(
+                new ExchangeDemandOrderItemDto(
+                    new ExchangeItemRefDto(gameItemId.toString(), cut(gameItem.getName())),
+                    ExchangeComponentDto.of(gameItem),
+                    new ExchangeQuantityDto(
+                        ExchangeStockFeedService.amount(open, QuantityType.PIECE.name()),
+                        QuantityType.PIECE.name())));
+          }
+        });
     lines.sort(Comparator.comparing(l -> l.item().name(), String.CASE_INSENSITIVE_ORDER));
     return lines;
   }

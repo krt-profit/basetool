@@ -190,28 +190,23 @@ public class JobOrderWriteController {
    */
   private static List<CreateJobOrderItemLineDto> buildItemLineDtos(@NotNull JobOrderItemForm form) {
     return form.getItems().stream()
-        .filter(
-            l ->
-                l.getGameItemId() != null
-                    && l.getBlueprintId() != null
-                    && l.getAmount() != null
-                    && l.getAmount() > 0)
-        .map(
-            l ->
-                new CreateJobOrderItemLineDto(
-                    l.getId(),
-                    l.getGameItemId(),
-                    l.getBlueprintId(),
-                    l.getAmount(),
-                    l.getMaterials().stream()
-                        .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
-                        .map(
-                            m ->
-                                new CreateJobOrderItemMaterialDto(
-                                    m.getMaterialId(), m.getQuality()))
-                        .toList(),
-                    l.getClientLineId(),
-                    l.getParentClientLineId()))
+        .filter(l ->
+            l.getGameItemId() != null
+                && l.getBlueprintId() != null
+                && l.getAmount() != null
+                && l.getAmount() > 0)
+        .map(l ->
+            new CreateJobOrderItemLineDto(
+                l.getId(),
+                l.getGameItemId(),
+                l.getBlueprintId(),
+                l.getAmount(),
+                l.getMaterials().stream()
+                    .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                    .map(m -> new CreateJobOrderItemMaterialDto(m.getMaterialId(), m.getQuality()))
+                    .toList(),
+                l.getClientLineId(),
+                l.getParentClientLineId()))
         .toList();
   }
 
@@ -345,10 +340,9 @@ public class JobOrderWriteController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(
-                  m ->
-                      new CreateJobOrderMaterialDto(
-                          m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+              .map(m ->
+                  new CreateJobOrderMaterialDto(
+                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
               .toList();
 
       if (materials.isEmpty()) {
@@ -607,10 +601,9 @@ public class JobOrderWriteController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(
-                  m ->
-                      new CreateJobOrderMaterialDto(
-                          m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+              .map(m ->
+                  new CreateJobOrderMaterialDto(
+                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
               .toList();
 
       if (materials.isEmpty()) {
@@ -654,10 +647,8 @@ public class JobOrderWriteController {
     List<CreateJobOrderMaterialDto> materials =
         form.getMaterials().stream()
             .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(
-                m ->
-                    new CreateJobOrderMaterialDto(
-                        m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+            .map(m ->
+                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
             .toList();
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
@@ -698,10 +689,9 @@ public class JobOrderWriteController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(
-                  m ->
-                      new CreateJobOrderMaterialDto(
-                          m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+              .map(m ->
+                  new CreateJobOrderMaterialDto(
+                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
               .toList();
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -736,10 +726,8 @@ public class JobOrderWriteController {
     List<CreateJobOrderMaterialDto> materials =
         form.getMaterials().stream()
             .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(
-                m ->
-                    new CreateJobOrderMaterialDto(
-                        m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+            .map(m ->
+                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
             .toList();
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
@@ -834,18 +822,16 @@ public class JobOrderWriteController {
     try {
       List<JobOrderHandoverItemCreateDto> items =
           form.getItems().stream()
-              .filter(
-                  item ->
-                      item.getInventoryItemId() != null
-                          && item.getAmount() != null
-                          && item.getAmount() > 0)
-              .map(
-                  item ->
-                      new JobOrderHandoverItemCreateDto(
-                          item.getInventoryItemId(),
-                          item.getAmount(),
-                          item.getMissionReductions(),
-                          item.getQualityRequirement()))
+              .filter(item ->
+                  item.getInventoryItemId() != null
+                      && item.getAmount() != null
+                      && item.getAmount() > 0)
+              .map(item ->
+                  new JobOrderHandoverItemCreateDto(
+                      item.getInventoryItemId(),
+                      item.getAmount(),
+                      item.getMissionReductions(),
+                      item.getQualityRequirement()))
               .toList();
 
       if (items.isEmpty()) {
@@ -1014,18 +1000,16 @@ public class JobOrderWriteController {
       @PathVariable UUID id, @NotNull @RequestBody JobOrderHandoverForm form) {
     List<JobOrderHandoverItemCreateDto> items =
         form.getItems().stream()
-            .filter(
-                item ->
-                    item.getInventoryItemId() != null
-                        && item.getAmount() != null
-                        && item.getAmount() > 0)
-            .map(
-                item ->
-                    new JobOrderHandoverItemCreateDto(
-                        item.getInventoryItemId(),
-                        item.getAmount(),
-                        item.getMissionReductions(),
-                        item.getQualityRequirement()))
+            .filter(item ->
+                item.getInventoryItemId() != null
+                    && item.getAmount() != null
+                    && item.getAmount() > 0)
+            .map(item ->
+                new JobOrderHandoverItemCreateDto(
+                    item.getInventoryItemId(),
+                    item.getAmount(),
+                    item.getMissionReductions(),
+                    item.getQualityRequirement()))
             .toList();
     if (items.isEmpty()) {
       return ResponseEntity.badRequest().build();
@@ -1362,11 +1346,10 @@ public class JobOrderWriteController {
         reachableAuthorities);
     boolean result =
         reachableAuthorities.stream()
-            .anyMatch(
-                a ->
-                    a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                        || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+            .anyMatch(a ->
+                a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
+                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
+                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     log.debug("JobOrder: Is logistician: {}", result);
     return result;
   }

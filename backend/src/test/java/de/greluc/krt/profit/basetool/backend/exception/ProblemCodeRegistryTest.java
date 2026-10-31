@@ -285,15 +285,14 @@ class ProblemCodeRegistryTest {
    */
   private static Set<String> missingKeys(Map<String, Properties> bundles, Set<String> keys) {
     Set<String> missing = new TreeSet<>();
-    bundles.forEach(
-        (name, properties) -> {
-          for (String key : keys) {
-            String value = properties.getProperty(key);
-            if (value == null || value.isBlank()) {
-              missing.add(name + ": " + key);
-            }
-          }
-        });
+    bundles.forEach((name, properties) -> {
+      for (String key : keys) {
+        String value = properties.getProperty(key);
+        if (value == null || value.isBlank()) {
+          missing.add(name + ": " + key);
+        }
+      }
+    });
     return missing;
   }
 
@@ -434,12 +433,11 @@ class ProblemCodeRegistryTest {
    */
   private static Map<String, List<String>> duplicates(Map<String, List<String>> codes) {
     Map<String, List<String>> duplicates = new TreeMap<>();
-    codes.forEach(
-        (code, declarations) -> {
-          if (declarations.size() > 1) {
-            duplicates.put(code, new ArrayList<>(declarations));
-          }
-        });
+    codes.forEach((code, declarations) -> {
+      if (declarations.size() > 1) {
+        duplicates.put(code, new ArrayList<>(declarations));
+      }
+    });
     return duplicates;
   }
 

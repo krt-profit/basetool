@@ -101,23 +101,19 @@ public class UexStarSystemService {
     StarSystem starSystem =
         starSystemRepository
             .findByIdSystem(dto.id())
-            .orElseGet(
-                () ->
-                    starSystemRepository
-                        .findByName(dto.name())
-                        .map(
-                            s -> {
-                              s.setIdSystem(dto.id());
-                              return starSystemRepository.save(s);
-                            })
-                        .orElseGet(
-                            () -> {
-                              StarSystem newSystem = new StarSystem();
-                              newSystem.setIdSystem(dto.id());
-                              newSystem.setName(
-                                  dto.name() != null ? dto.name() : "System-" + dto.id());
-                              return starSystemRepository.save(newSystem);
-                            }));
+            .orElseGet(() ->
+                starSystemRepository
+                    .findByName(dto.name())
+                    .map(s -> {
+                      s.setIdSystem(dto.id());
+                      return starSystemRepository.save(s);
+                    })
+                    .orElseGet(() -> {
+                      StarSystem newSystem = new StarSystem();
+                      newSystem.setIdSystem(dto.id());
+                      newSystem.setName(dto.name() != null ? dto.name() : "System-" + dto.id());
+                      return starSystemRepository.save(newSystem);
+                    }));
 
     boolean updated = false;
     if (dto.name() != null && !dto.name().equals(starSystem.getName())) {

@@ -126,11 +126,10 @@ class NotificationRuleServiceTest {
     verify(notificationRuleRepository).saveAndFlush(persisted);
     assertThat(persisted.getSelectors())
         .singleElement()
-        .satisfies(
-            s -> {
-              assertThat(s.getKind()).isEqualTo(SelectorKind.ROLE);
-              assertThat(s.getRoleCode()).isEqualTo("ADMIN");
-            });
+        .satisfies(s -> {
+          assertThat(s.getKind()).isEqualTo(SelectorKind.ROLE);
+          assertThat(s.getRoleCode()).isEqualTo("ADMIN");
+        });
   }
 
   @Test

@@ -259,60 +259,53 @@ public class SecurityConfig {
         DpopProofReplayStores.of(exchangeLimitProperties, meterRegistry);
     CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
     csrfRepo.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(true));
-    http.csrf(
-            csrf ->
-                csrf.csrfTokenRepository(csrfRepo)
-                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers("/exchange/**"))
+    http.csrf(csrf ->
+            csrf.csrfTokenRepository(csrfRepo)
+                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                .ignoringRequestMatchers("/exchange/**"))
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
-        .headers(
-            headers -> {
-              headers.contentSecurityPolicy(
-                  csp ->
-                      csp.policyDirectives(
-                          "default-src 'none'; frame-ancestors 'none'; base-uri 'none';"
-                              + " form-action 'none'"));
-              headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
-              headers.httpStrictTransportSecurity(
-                  hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
-            })
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/health/**")
-                    .permitAll()
-                    .requestMatchers(
-                        HttpMethod.GET, "/exchange/v1/openapi.json", "/exchange/v1/schemas/*")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated())
-        .exceptionHandling(
-            exceptions ->
-                exceptions
-                    .authenticationEntryPoint(securityProblems)
-                    .accessDeniedHandler(securityProblems))
-        .oauth2ResourceServer(
-            oauth2 ->
-                oauth2
-                    .withObjectPostProcessor(
-                        new ObjectPostProcessor<DPoPAuthenticationProvider>() {
-                          @Override
-                          public <O extends DPoPAuthenticationProvider> O postProcess(O provider) {
-                            provider.setDPoPProofVerifierFactory(
-                                ExchangeDpopProofValidation.factory(exchangeNonces, proofReplay));
-                            return provider;
-                          }
-                        })
-                    .dPoP(
-                        dpop ->
-                            dpop.authenticationConverter(
-                                    new PublicUriDpopAuthenticationConverter(
-                                        ingestProperties.publicBaseUrl()))
-                                .authenticationFailureHandler(
-                                    new org.springframework.security.web.authentication
-                                        .AuthenticationEntryPointFailureHandler(securityProblems)))
-                    .jwt(_ -> {})
-                    .authenticationEntryPoint(securityProblems)
-                    .accessDeniedHandler(securityProblems))
+        .headers(headers -> {
+          headers.contentSecurityPolicy(csp ->
+              csp.policyDirectives(
+                  "default-src 'none'; frame-ancestors 'none'; base-uri 'none';"
+                      + " form-action 'none'"));
+          headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
+          headers.httpStrictTransportSecurity(
+              hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
+        })
+        .authorizeHttpRequests(auth ->
+            auth.requestMatchers("/actuator/health", "/actuator/health/**")
+                .permitAll()
+                .requestMatchers(
+                    HttpMethod.GET, "/exchange/v1/openapi.json", "/exchange/v1/schemas/*")
+                .permitAll()
+                .anyRequest()
+                .authenticated())
+        .exceptionHandling(exceptions ->
+            exceptions
+                .authenticationEntryPoint(securityProblems)
+                .accessDeniedHandler(securityProblems))
+        .oauth2ResourceServer(oauth2 ->
+            oauth2
+                .withObjectPostProcessor(
+                    new ObjectPostProcessor<DPoPAuthenticationProvider>() {
+                      @Override
+                      public <O extends DPoPAuthenticationProvider> O postProcess(O provider) {
+                        provider.setDPoPProofVerifierFactory(
+                            ExchangeDpopProofValidation.factory(exchangeNonces, proofReplay));
+                        return provider;
+                      }
+                    })
+                .dPoP(dpop ->
+                    dpop.authenticationConverter(
+                            new PublicUriDpopAuthenticationConverter(
+                                ingestProperties.publicBaseUrl()))
+                        .authenticationFailureHandler(
+                            new org.springframework.security.web.authentication
+                                .AuthenticationEntryPointFailureHandler(securityProblems)))
+                .jwt(_ -> {})
+                .authenticationEntryPoint(securityProblems)
+                .accessDeniedHandler(securityProblems))
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(objectMapper, meterRegistry, loggingProperties),
             org.springframework.security.oauth2.server.resource.web.authentication

@@ -297,13 +297,12 @@ class ExchangeRegistryMirrorIntegrationTest {
    */
   private void inOuterTransaction(@NotNull Runnable work, boolean rollback) {
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            status -> {
-              work.run();
-              if (rollback) {
-                status.setRollbackOnly();
-              }
-            });
+        .executeWithoutResult(status -> {
+          work.run();
+          if (rollback) {
+            status.setRollbackOnly();
+          }
+        });
   }
 
   /**

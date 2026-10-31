@@ -263,11 +263,9 @@ class RelayedBackendStatusMvcTest {
     WebClient failing =
         WebClient.builder()
             .baseUrl(backend.url("/").toString())
-            .filter(
-                (clientRequest, next) ->
-                    Mono.error(
-                        new ClientAuthorizationException(
-                            new OAuth2Error("invalid_grant"), "keycloak")))
+            .filter((clientRequest, next) ->
+                Mono.error(
+                    new ClientAuthorizationException(new OAuth2Error("invalid_grant"), "keycloak")))
             .build();
 
     MockMvcBuilders.standaloneSetup(controller.apply(failing))
@@ -285,10 +283,9 @@ class RelayedBackendStatusMvcTest {
   void aBackend404OnADownloadNavigationRendersTheErrorPageWith404() throws Exception {
     backend.enqueue(new MockResponse().setResponseCode(404));
 
-    mockMvc(
-            wc ->
-                new DataExportProxyController(
-                    new IdentityBackendClient(RealBackendApiClient.over(wc)), exportTimeouts()))
+    mockMvc(wc ->
+            new DataExportProxyController(
+                new IdentityBackendClient(RealBackendApiClient.over(wc)), exportTimeouts()))
         .perform(get("/api/proxy/me/export/pdf"))
         .andExpect(status().isNotFound());
   }
@@ -297,10 +294,9 @@ class RelayedBackendStatusMvcTest {
   void aBackend503StaysA503AndIsTheOneFaultLoggedAtError() throws Exception {
     backend.enqueue(new MockResponse().setResponseCode(503));
 
-    mockMvc(
-            wc ->
-                new HangarDeleteAllProxyController(
-                    new HangarBackendClient(RealBackendApiClient.over(wc))))
+    mockMvc(wc ->
+            new HangarDeleteAllProxyController(
+                new HangarBackendClient(RealBackendApiClient.over(wc))))
         .perform(delete("/hangar/ships/all").header("X-Requested-With", "XMLHttpRequest"))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
@@ -321,12 +317,11 @@ class RelayedBackendStatusMvcTest {
                     + "\"detail\":\"Die Datei hat eine Formatversion, die das Basetool nicht lesen"
                     + " kann; nur Version 1.x wird gelesen.\"}"));
 
-    mockMvc(
-            wc ->
-                new PersonalBlueprintImportProxyController(
-                    new BlueprintBackendClient(RealBackendApiClient.over(wc)),
-                    mock(IngestHandoffService.class),
-                    new StaticMessageSource()))
+    mockMvc(wc ->
+            new PersonalBlueprintImportProxyController(
+                new BlueprintBackendClient(RealBackendApiClient.over(wc)),
+                mock(IngestHandoffService.class),
+                new StaticMessageSource()))
         .perform(
             multipart("/personal-inventory/blueprints/import/preview")
                 .file(upload())
@@ -350,12 +345,11 @@ class RelayedBackendStatusMvcTest {
             "application/json",
             new byte[(int) PersonalBlueprintImportProxyController.MAX_EXPORT_BYTES + 1]);
 
-    mockMvc(
-            wc ->
-                new PersonalBlueprintImportProxyController(
-                    new BlueprintBackendClient(RealBackendApiClient.over(wc)),
-                    mock(IngestHandoffService.class),
-                    new StaticMessageSource()))
+    mockMvc(wc ->
+            new PersonalBlueprintImportProxyController(
+                new BlueprintBackendClient(RealBackendApiClient.over(wc)),
+                mock(IngestHandoffService.class),
+                new StaticMessageSource()))
         .perform(
             multipart("/personal-inventory/blueprints/import/preview")
                 .file(oversized)

@@ -336,9 +336,8 @@ public class SecurityProblemResponseHandler
     for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
       if (cause instanceof JwtValidationException validation
           && validation.getErrors().stream()
-              .anyMatch(
-                  error ->
-                      ExchangeDpopProofValidation.USE_DPOP_NONCE.equals(error.getErrorCode()))) {
+              .anyMatch(error ->
+                  ExchangeDpopProofValidation.USE_DPOP_NONCE.equals(error.getErrorCode()))) {
         return true;
       }
     }

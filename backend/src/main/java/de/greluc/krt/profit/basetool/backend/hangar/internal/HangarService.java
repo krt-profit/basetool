@@ -274,28 +274,26 @@ public class HangarService {
     Map<UUID, List<Ship>> shipsByType =
         ships.stream().collect(Collectors.groupingBy(s -> s.getShipType().getId()));
 
-    return p.map(
-        obj -> {
-          ShipType type = (ShipType) obj[0];
-          List<SquadronShipDetailDto> details = null;
-          if (includeOwnerDetails) {
-            details =
-                shipsByType.getOrDefault(type.getId(), List.of()).stream()
-                    .map(
-                        s ->
-                            new SquadronShipDetailDto(
-                                s.getOwner() != null ? s.getOwner().getEffectiveName() : "Unknown",
-                                s.getLocation() != null ? s.getLocation().getName() : null,
-                                s.isFitted()))
-                    .toList();
-          }
+    return p.map(obj -> {
+      ShipType type = (ShipType) obj[0];
+      List<SquadronShipDetailDto> details = null;
+      if (includeOwnerDetails) {
+        details =
+            shipsByType.getOrDefault(type.getId(), List.of()).stream()
+                .map(s ->
+                    new SquadronShipDetailDto(
+                        s.getOwner() != null ? s.getOwner().getEffectiveName() : "Unknown",
+                        s.getLocation() != null ? s.getLocation().getName() : null,
+                        s.isFitted()))
+                .toList();
+      }
 
-          return new SquadronShipOverviewDto(
-              shipTypeMapper.toDto(type),
-              ((Number) obj[1]).longValue(),
-              obj[2] != null ? ((Number) obj[2]).longValue() : 0L,
-              details);
-        });
+      return new SquadronShipOverviewDto(
+          shipTypeMapper.toDto(type),
+          ((Number) obj[1]).longValue(),
+          obj[2] != null ? ((Number) obj[2]).longValue() : 0L,
+          details);
+    });
   }
 
   /**

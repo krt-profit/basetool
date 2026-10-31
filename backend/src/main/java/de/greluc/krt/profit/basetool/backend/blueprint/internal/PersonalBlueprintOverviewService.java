@@ -113,17 +113,13 @@ public class PersonalBlueprintOverviewService {
     Set<UUID> matchingOwners = needle == null ? Set.of() : ownersNamed(ownerUserIds, needle);
     List<BlueprintOverviewEntryDto> all =
         byKey.entrySet().stream()
-            .filter(
-                entry ->
-                    needle == null
-                        || entry.getValue().productName.toLowerCase(Locale.ROOT).contains(needle)
-                        || entry.getValue().owners.stream().anyMatch(matchingOwners::contains))
-            .map(
-                entry ->
-                    new BlueprintOverviewEntryDto(
-                        entry.getKey(),
-                        entry.getValue().productName,
-                        entry.getValue().owners.size()))
+            .filter(entry ->
+                needle == null
+                    || entry.getValue().productName.toLowerCase(Locale.ROOT).contains(needle)
+                    || entry.getValue().owners.stream().anyMatch(matchingOwners::contains))
+            .map(entry ->
+                new BlueprintOverviewEntryDto(
+                    entry.getKey(), entry.getValue().productName, entry.getValue().owners.size()))
             .sorted(entryComparator(pageable))
             .toList();
     return paginate(all, pageable);
@@ -169,10 +165,9 @@ public class PersonalBlueprintOverviewService {
       return List.of();
     }
     return userRepository.findAllById(ownerIds).stream()
-        .map(
-            user ->
-                new BlueprintOverviewOwnerDto(
-                    user.getEffectiveName(), adminAll || memberSubs.contains(user.getId())))
+        .map(user ->
+            new BlueprintOverviewOwnerDto(
+                user.getEffectiveName(), adminAll || memberSubs.contains(user.getId())))
         .sorted(
             Comparator.comparing(
                 BlueprintOverviewOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
@@ -191,11 +186,10 @@ public class PersonalBlueprintOverviewService {
   @NotNull
   private Set<UUID> ownersNamed(@NotNull Set<UUID> ownerUserIds, @NotNull String needle) {
     return userRepository.findAllById(ownerUserIds).stream()
-        .filter(
-            user -> {
-              String name = user.getEffectiveName();
-              return name != null && name.toLowerCase(Locale.ROOT).contains(needle);
-            })
+        .filter(user -> {
+          String name = user.getEffectiveName();
+          return name != null && name.toLowerCase(Locale.ROOT).contains(needle);
+        })
         .map(User::getId)
         .collect(Collectors.toSet());
   }

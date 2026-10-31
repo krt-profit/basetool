@@ -485,17 +485,15 @@ class TenancyGuardTest {
         .anySatisfy(v -> assertThat(v).startsWith("FixtureAggregateController#openBranch writes"))
         .anySatisfy(
             v -> assertThat(v).startsWith("FixtureAggregateController#classGateOnly writes"))
-        .anySatisfy(
-            v ->
-                assertThat(v)
-                    .startsWith(
-                        "FixtureAggregateController#serviceUnchecked is listed as service-gated"))
-        .anySatisfy(
-            v ->
-                assertThat(v)
-                    .isEqualTo(
-                        "FixtureAggregateController#read is listed as an exception but is no"
-                            + " selected write handler"));
+        .anySatisfy(v ->
+            assertThat(v)
+                .startsWith(
+                    "FixtureAggregateController#serviceUnchecked is listed as service-gated"))
+        .anySatisfy(v ->
+            assertThat(v)
+                .isEqualTo(
+                    "FixtureAggregateController#read is listed as an exception but is no"
+                        + " selected write handler"));
   }
 
   @Test

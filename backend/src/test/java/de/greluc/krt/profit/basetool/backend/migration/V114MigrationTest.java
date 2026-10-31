@@ -81,13 +81,12 @@ class V114MigrationTest {
   @Test
   void v114IngredientCheck_permitsUnresolvedResourceLine() {
     java.util.UUID bpId = insertBlueprint();
-    assertDoesNotThrow(
-        () ->
-            jdbcTemplate.update(
-                "INSERT INTO blueprint_ingredient "
-                    + "(id, blueprint_id, order_index, kind, quantity_scu) "
-                    + "VALUES (gen_random_uuid(), ?, 0, 'RESOURCE', 1.5)",
-                bpId));
+    assertDoesNotThrow(() ->
+        jdbcTemplate.update(
+            "INSERT INTO blueprint_ingredient "
+                + "(id, blueprint_id, order_index, kind, quantity_scu) "
+                + "VALUES (gen_random_uuid(), ?, 0, 'RESOURCE', 1.5)",
+            bpId));
   }
 
   @Test

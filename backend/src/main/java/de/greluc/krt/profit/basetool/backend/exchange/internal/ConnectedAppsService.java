@@ -136,24 +136,22 @@ public class ConnectedAppsService {
               client.getDisplayName(),
               client.getCapabilities().stream().sorted().map(ExchangeCapability::getScope).toList(),
               installations.stream()
-                  .map(
-                      i ->
-                          new ConnectedInstallationDto(
-                              i.getId(),
-                              i.getLabel(),
-                              i.getFirstSeenAt(),
-                              i.getLastSeenAt(),
-                              unseen.contains(i.getId())))
+                  .map(i ->
+                      new ConnectedInstallationDto(
+                          i.getId(),
+                          i.getLabel(),
+                          i.getFirstSeenAt(),
+                          i.getLastSeenAt(),
+                          unseen.contains(i.getId())))
                   .toList(),
               Objects.requireNonNull(writes.get(client.getClientId())).stream()
-                  .map(
-                      w ->
-                          new ConnectedAppActivityDto(
-                              w.getRecordedAt(),
-                              w.getResource().name(),
-                              w.getAction().name(),
-                              labels.get(w.getId()),
-                              w.getUndoneAt() != null))
+                  .map(w ->
+                      new ConnectedAppActivityDto(
+                          w.getRecordedAt(),
+                          w.getResource().name(),
+                          w.getAction().name(),
+                          labels.get(w.getId()),
+                          w.getUndoneAt() != null))
                   .toList()));
     }
     apps.sort((a, b) -> a.clientId().compareTo(b.clientId()));

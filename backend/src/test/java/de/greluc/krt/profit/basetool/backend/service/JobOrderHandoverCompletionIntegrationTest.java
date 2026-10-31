@@ -73,82 +73,81 @@ class JobOrderHandoverCompletionIntegrationTest {
   private record Fixture(UUID jobOrderId, UUID invItem1Id, UUID invItem2Id) {}
 
   private Fixture prepareFixture() {
-    return transactionTemplate.execute(
-        status -> {
-          User user = new User();
-          user.setId(UUID.randomUUID());
-          user.setUsername("logistiker-" + UUID.randomUUID());
-          userRepository.save(user);
+    return transactionTemplate.execute(status -> {
+      User user = new User();
+      user.setId(UUID.randomUUID());
+      user.setUsername("logistiker-" + UUID.randomUUID());
+      userRepository.save(user);
 
-          Location location = new Location();
-          location.setName("Hub-" + UUID.randomUUID());
-          location = locationRepository.save(location);
+      Location location = new Location();
+      location.setName("Hub-" + UUID.randomUUID());
+      location = locationRepository.save(location);
 
-          Material aslarite = new Material();
-          aslarite.setName("Aslarite-" + UUID.randomUUID());
-          aslarite.setType(MaterialType.RAW);
-          aslarite = materialRepository.save(aslarite);
+      Material aslarite = new Material();
+      aslarite.setName("Aslarite-" + UUID.randomUUID());
+      aslarite.setType(MaterialType.RAW);
+      aslarite = materialRepository.save(aslarite);
 
-          Material ouratite = new Material();
-          ouratite.setName("Ouratite-" + UUID.randomUUID());
-          ouratite.setType(MaterialType.RAW);
-          ouratite = materialRepository.save(ouratite);
+      Material ouratite = new Material();
+      ouratite.setName("Ouratite-" + UUID.randomUUID());
+      ouratite.setType(MaterialType.RAW);
+      ouratite = materialRepository.save(ouratite);
 
-          JobOrder jobOrder =
-              JobOrder.builder()
-                  .responsibleOrgUnit(
-                      squadronRepository
-                          .findById(
-                              de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                          .orElseThrow())
-                  .requestingOrgUnit(
-                      squadronRepository
-                          .findById(
-                              de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                          .orElseThrow())
-                  .handle("requester")
-                  .status(JobOrderStatus.OPEN)
-                  .build();
+      JobOrder jobOrder =
+          JobOrder.builder()
+              .responsibleOrgUnit(
+                  squadronRepository
+                      .findById(
+                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+                      .orElseThrow())
+              .requestingOrgUnit(
+                  squadronRepository
+                      .findById(
+                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+                      .orElseThrow())
+              .handle("requester")
+              .status(JobOrderStatus.OPEN)
+              .build();
 
-          QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
-          JobOrderMaterial m1 =
-              JobOrderMaterial.builder().material(aslarite).qualityTier(good).amount(1.8).build();
-          JobOrderMaterial m2 =
-              JobOrderMaterial.builder().material(ouratite).qualityTier(good).amount(5.7).build();
-          jobOrder.addMaterial(m1);
-          jobOrder.addMaterial(m2);
-          jobOrder = jobOrderRepository.save(jobOrder);
+      QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
+      JobOrderMaterial m1 =
+          JobOrderMaterial.builder().material(aslarite).qualityTier(good).amount(1.8).build();
+      JobOrderMaterial m2 =
+          JobOrderMaterial.builder().material(ouratite).qualityTier(good).amount(5.7).build();
+      jobOrder.addMaterial(m1);
+      jobOrder.addMaterial(m2);
+      jobOrder = jobOrderRepository.save(jobOrder);
 
-          InventoryItem inv1 = new InventoryItem();
+      InventoryItem inv1 = new InventoryItem();
 
-          inv1.setOwningOrgUnit(
-              squadronRepository
-                  .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                  .orElseThrow());
-          inv1.setUser(user);
-          inv1.setLocation(location);
-          inv1.setMaterial(aslarite);
-          inv1.setQuality(800);
-          inv1.setAmount(1.835);
-          InventoryAllocations.addJobOrder(inv1, jobOrder.getId(), inv1.getAmount(), false);
-          inv1 = inventoryItemRepository.save(inv1);
+      inv1.setOwningOrgUnit(
+          squadronRepository
+              .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+              .orElseThrow());
+      inv1.setUser(user);
+      inv1.setLocation(location);
+      inv1.setMaterial(aslarite);
+      inv1.setQuality(800);
+      inv1.setAmount(1.835);
+      InventoryAllocations.addJobOrder(inv1, jobOrder.getId(), inv1.getAmount(), false);
+      inv1 = inventoryItemRepository.save(inv1);
 
-          InventoryItem inv2 = new InventoryItem();
+      InventoryItem inv2 = new InventoryItem();
 
-          inv2.setOwningOrgUnit(
-              squadronRepository
-                  .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                  .orElseThrow());
-          inv2.setUser(user);
-          inv2.setLocation(location);
-          inv2.setMaterial(ouratite);
-          inv2.setQuality(900);
-          inv2.setAmount(5.730999999999999);
-          InventoryAllocations.addJobOrder(inv2, jobOrder.getId(), inv2.getAmount(), false);
-          inv2 = inventoryItemRepository.save(inv2);
+      inv2.setOwningOrgUnit(
+          squadronRepository
+              .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+              .orElseThrow());
+      inv2.setUser(user);
+      inv2.setLocation(location);
+      inv2.setMaterial(ouratite);
+      inv2.setQuality(900);
+      inv2.setAmount(5.730999999999999);
+      InventoryAllocations.addJobOrder(inv2, jobOrder.getId(), inv2.getAmount(), false);
+      inv2 = inventoryItemRepository.save(inv2);
 
-          return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());
-        });
+      return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());
+    });
   }
 
   /**
@@ -173,25 +172,24 @@ class JobOrderHandoverCompletionIntegrationTest {
 
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
-          assertEquals(
-              JobOrderStatus.COMPLETED,
-              reloaded.getStatus(),
-              "JobOrder must be COMPLETED after final handover");
-          for (JobOrderMaterial m : reloaded.getMaterials()) {
-            assertTrue(
-                m.getAmount() <= 0.0001,
-                "All required materials must be fulfilled, but "
-                    + m.getMaterial().getName()
-                    + " is still "
-                    + m.getAmount());
-          }
-          InventoryItem inv1 = inventoryItemRepository.findById(f.invItem1Id()).orElseThrow();
-          InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
-          assertEquals(0.035, inv1.getAmount(), 0.0001);
-          assertEquals(0.030999999999999, inv2.getAmount(), 0.0001);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
+      assertEquals(
+          JobOrderStatus.COMPLETED,
+          reloaded.getStatus(),
+          "JobOrder must be COMPLETED after final handover");
+      for (JobOrderMaterial m : reloaded.getMaterials()) {
+        assertTrue(
+            m.getAmount() <= 0.0001,
+            "All required materials must be fulfilled, but "
+                + m.getMaterial().getName()
+                + " is still "
+                + m.getAmount());
+      }
+      InventoryItem inv1 = inventoryItemRepository.findById(f.invItem1Id()).orElseThrow();
+      InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
+      assertEquals(0.035, inv1.getAmount(), 0.0001);
+      assertEquals(0.030999999999999, inv2.getAmount(), 0.0001);
+    });
   }
 }

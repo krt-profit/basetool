@@ -75,14 +75,13 @@ public class OperationAccessPolicy {
   public boolean canSeeOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(
-            o -> {
-              boolean scopeVisible =
-                  o.getOwningOrgUnit() == null
-                      ? authHelper.isMemberOrAbove()
-                      : ownerScopeService.canSeeSquadron(o.getOwningOrgUnit().getId());
-              return scopeVisible || participatedInOperation(operationId);
-            })
+        .map(o -> {
+          boolean scopeVisible =
+              o.getOwningOrgUnit() == null
+                  ? authHelper.isMemberOrAbove()
+                  : ownerScopeService.canSeeSquadron(o.getOwningOrgUnit().getId());
+          return scopeVisible || participatedInOperation(operationId);
+        })
         .orElse(false);
   }
 
@@ -96,11 +95,10 @@ public class OperationAccessPolicy {
   public boolean canSeeOperationLedger(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(
-            o ->
-                o.getOwningOrgUnit() == null
-                    ? authHelper.isMemberOrAbove()
-                    : ownerScopeService.canSeeSquadron(o.getOwningOrgUnit().getId()))
+        .map(o ->
+            o.getOwningOrgUnit() == null
+                ? authHelper.isMemberOrAbove()
+                : ownerScopeService.canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -114,10 +112,9 @@ public class OperationAccessPolicy {
   public boolean canEditOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(
-            o ->
-                o.getOwningOrgUnit() == null
-                    || ownerScopeService.canEditSquadron(o.getOwningOrgUnit().getId()))
+        .map(o ->
+            o.getOwningOrgUnit() == null
+                || ownerScopeService.canEditSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 

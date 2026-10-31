@@ -326,11 +326,10 @@ class ExchangeRelaySeamParityTest {
     when(template.opsForValue()).thenReturn(values);
     Set<String> read = new HashSet<>();
     when(values.get(anyString()))
-        .thenAnswer(
-            invocation -> {
-              read.add(invocation.getArgument(0));
-              return "1790000000";
-            });
+        .thenAnswer(invocation -> {
+          read.add(invocation.getArgument(0));
+          return "1790000000";
+        });
     ExchangeRevocationReader reader = new ExchangeRevocationReader(template);
 
     assertThat(reader.isDenied("thumb")).isTrue();

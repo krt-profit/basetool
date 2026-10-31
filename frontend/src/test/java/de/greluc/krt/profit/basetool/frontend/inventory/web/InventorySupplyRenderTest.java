@@ -125,14 +125,13 @@ class InventorySupplyRenderTest {
 
   private void stubEntries(InventoryItemDto item) {
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
   }
 
   private org.springframework.test.web.servlet.ResultActions renderEntries() throws Exception {

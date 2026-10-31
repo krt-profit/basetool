@@ -229,13 +229,12 @@ public class KeycloakService {
       List<KeycloakUserDto> page =
           adminClient
               .get()
-              .uri(
-                  uriBuilder ->
-                      uriBuilder
-                          .path("/admin/realms/{realm}/users")
-                          .queryParam("first", currentFirst)
-                          .queryParam("max", pageSize)
-                          .build(properties.realm()))
+              .uri(uriBuilder ->
+                  uriBuilder
+                      .path("/admin/realms/{realm}/users")
+                      .queryParam("first", currentFirst)
+                      .queryParam("max", pageSize)
+                      .build(properties.realm()))
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
               .retrieve()
               .body(new ParameterizedTypeReference<List<KeycloakUserDto>>() {});
@@ -325,13 +324,12 @@ public class KeycloakService {
       List<Map<String, Object>> page =
           adminClient
               .get()
-              .uri(
-                  uriBuilder ->
-                      uriBuilder
-                          .path("/admin/realms/{realm}/roles")
-                          .queryParam("first", currentFirst)
-                          .queryParam("max", pageSize)
-                          .build(properties.realm()))
+              .uri(uriBuilder ->
+                  uriBuilder
+                      .path("/admin/realms/{realm}/roles")
+                      .queryParam("first", currentFirst)
+                      .queryParam("max", pageSize)
+                      .build(properties.realm()))
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
               .retrieve()
               .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
@@ -379,11 +377,10 @@ public class KeycloakService {
       composites =
           adminClient
               .get()
-              .uri(
-                  uriBuilder ->
-                      uriBuilder
-                          .path("/admin/realms/{realm}/roles/{roleName}/composites/realm")
-                          .build(properties.realm(), defaultRoleName()))
+              .uri(uriBuilder ->
+                  uriBuilder
+                      .path("/admin/realms/{realm}/roles/{roleName}/composites/realm")
+                      .build(properties.realm(), defaultRoleName()))
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
               .retrieve()
               .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
@@ -454,13 +451,12 @@ public class KeycloakService {
         page =
             adminClient
                 .get()
-                .uri(
-                    uriBuilder ->
-                        uriBuilder
-                            .path("/admin/realms/{realm}/roles/{roleName}/users")
-                            .queryParam("first", currentFirst)
-                            .queryParam("max", pageSize)
-                            .build(properties.realm(), queryRoleName))
+                .uri(uriBuilder ->
+                    uriBuilder
+                        .path("/admin/realms/{realm}/roles/{roleName}/users")
+                        .queryParam("first", currentFirst)
+                        .queryParam("max", pageSize)
+                        .build(properties.realm(), queryRoleName))
                 .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});

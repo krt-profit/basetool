@@ -140,15 +140,14 @@ public class DiscordGuildNicknameReader {
    */
   static @NotNull Optional<String> extractGuildDisplayName(@Nullable String body) {
     return parseMember(body)
-        .flatMap(
-            member -> {
-              Optional<String> nick = normalizedText(member.get("nick"));
-              if (nick.isPresent()) {
-                return nick;
-              }
-              JsonNode user = member.get("user");
-              return user == null ? Optional.empty() : normalizedText(user.get("global_name"));
-            });
+        .flatMap(member -> {
+          Optional<String> nick = normalizedText(member.get("nick"));
+          if (nick.isPresent()) {
+            return nick;
+          }
+          JsonNode user = member.get("user");
+          return user == null ? Optional.empty() : normalizedText(user.get("global_name"));
+        });
   }
 
   /**

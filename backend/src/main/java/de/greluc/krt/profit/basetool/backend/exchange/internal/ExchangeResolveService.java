@@ -269,12 +269,11 @@ public class ExchangeResolveService {
     if (refs.stream().anyMatch(r -> r.scRecord() != null)) {
       blueprintProductService
           .scwikiKeyToProductKeys()
-          .forEach(
-              (tag, keys) -> {
-                for (String key : keys) {
-                  add(byScRecord, tag, products.get(key));
-                }
-              });
+          .forEach((tag, keys) -> {
+            for (String key : keys) {
+              add(byScRecord, tag, products.get(key));
+            }
+          });
     }
 
     Map<UUID, Set<Entry>> byScGuid = new HashMap<>();

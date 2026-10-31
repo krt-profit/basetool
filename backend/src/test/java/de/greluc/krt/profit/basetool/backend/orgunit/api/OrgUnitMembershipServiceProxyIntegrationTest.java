@@ -52,13 +52,12 @@ class OrgUnitMembershipServiceProxyIntegrationTest {
   private Organisationsleitung organisationsleitung() {
     return organisationsleitungRepository.findAll().stream()
         .findFirst()
-        .orElseGet(
-            () -> {
-              Organisationsleitung ol = new Organisationsleitung();
-              ol.setName("OL proxy probe");
-              ol.setShorthand("OLP");
-              return organisationsleitungRepository.save(ol);
-            });
+        .orElseGet(() -> {
+          Organisationsleitung ol = new Organisationsleitung();
+          ol.setName("OL proxy probe");
+          ol.setShorthand("OLP");
+          return organisationsleitungRepository.save(ol);
+        });
   }
 
   @Test

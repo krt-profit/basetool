@@ -199,12 +199,11 @@ class RedisAclBackendIntegrationTest {
         .as("the presence gossip is the frontend's channel")
         .isInstanceOf(DataAccessException.class);
     try (RedisConnection connection = connectionFactory.getConnection()) {
-      assertThatThrownBy(
-              () ->
-                  connection
-                      .keyCommands()
-                      .scan(org.springframework.data.redis.core.ScanOptions.NONE)
-                      .hasNext())
+      assertThatThrownBy(() ->
+              connection
+                  .keyCommands()
+                  .scan(org.springframework.data.redis.core.ScanOptions.NONE)
+                  .hasNext())
           .isInstanceOf(DataAccessException.class);
     }
   }

@@ -146,13 +146,12 @@ class ExchangeRevocationMirrorIntegrationTest {
   @Test
   void aDisconnectedInstallationIsDeniedBeforeTheCommit() {
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            status -> {
-              connectedAppsService.disconnectInstallation(MEMBER, installation.getId());
-              assertThat(revocationMirror.isDenied(KEY))
-                  .as("denied before the outer transaction commits")
-                  .isTrue();
-            });
+        .executeWithoutResult(status -> {
+          connectedAppsService.disconnectInstallation(MEMBER, installation.getId());
+          assertThat(revocationMirror.isDenied(KEY))
+              .as("denied before the outer transaction commits")
+              .isTrue();
+        });
 
     assertThat(admin().getExpire("exchange:deny:" + KEY)).isPositive();
   }

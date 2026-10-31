@@ -117,12 +117,11 @@ class ScriptLoadOrderE2eTest {
       List<String> pageErrors = new CopyOnWriteArrayList<>();
       List<String> beacons = new CopyOnWriteArrayList<>();
       page.onPageError(pageErrors::add);
-      page.onRequest(
-          request -> {
-            if (request.url().contains("/internal/client-error")) {
-              beacons.add(String.valueOf(request.postData()));
-            }
-          });
+      page.onRequest(request -> {
+        if (request.url().contains("/internal/client-error")) {
+          beacons.add(String.valueOf(request.postData()));
+        }
+      });
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + path);
         page.waitForLoadState();

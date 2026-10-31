@@ -117,14 +117,13 @@ public class JobOrderMaterialCoverage {
       sum.booked += booked[i];
     }
     List<BucketCoverage> buckets = new ArrayList<>();
-    sums.forEach(
-        (key, sum) ->
-            buckets.add(
-                new BucketCoverage(
-                    key.materialId(),
-                    key.tierId(),
-                    QuantityTypeRounding.roundForQuantityType(sum.required, sum.material),
-                    QuantityTypeRounding.roundForQuantityType(sum.booked, sum.material))));
+    sums.forEach((key, sum) ->
+        buckets.add(
+            new BucketCoverage(
+                key.materialId(),
+                key.tierId(),
+                QuantityTypeRounding.roundForQuantityType(sum.required, sum.material),
+                QuantityTypeRounding.roundForQuantityType(sum.booked, sum.material))));
     return List.copyOf(buckets);
   }
 

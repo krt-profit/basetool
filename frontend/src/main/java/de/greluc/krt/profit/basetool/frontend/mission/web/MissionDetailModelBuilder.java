@@ -114,12 +114,11 @@ public final class MissionDetailModelBuilder {
   @NotNull
   private static List<MissionParticipantDto> sortedParticipants(@NotNull MissionDto mission) {
     List<MissionParticipantDto> participants = new ArrayList<>(mission.participants());
-    participants.sort(
-        (p1, p2) -> {
-          String name1 = extractParticipantName(p1);
-          String name2 = extractParticipantName(p2);
-          return name1.compareToIgnoreCase(name2);
-        });
+    participants.sort((p1, p2) -> {
+      String name1 = extractParticipantName(p1);
+      String name2 = extractParticipantName(p2);
+      return name1.compareToIgnoreCase(name2);
+    });
     return participants;
   }
 

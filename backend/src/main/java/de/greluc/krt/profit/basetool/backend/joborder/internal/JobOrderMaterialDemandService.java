@@ -279,11 +279,8 @@ public class JobOrderMaterialDemandService {
    * user finds a material in the same place on both surfaces.
    */
   private static final Comparator<MaterialDemandRowDto> ROW_ORDER =
-      Comparator.<MaterialDemandRowDto, Integer>comparing(
-              r ->
-                  r.material() != null && "SCU".equalsIgnoreCase(r.material().quantityType())
-                      ? 0
-                      : 1)
+      Comparator.<MaterialDemandRowDto, Integer>comparing(r ->
+              r.material() != null && "SCU".equalsIgnoreCase(r.material().quantityType()) ? 0 : 1)
           .thenComparing(
               r -> r.material() != null && r.material().name() != null ? r.material().name() : "",
               String.CASE_INSENSITIVE_ORDER)

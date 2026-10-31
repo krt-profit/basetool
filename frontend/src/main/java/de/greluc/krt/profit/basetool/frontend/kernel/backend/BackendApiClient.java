@@ -213,10 +213,9 @@ public class BackendApiClient {
   private <T> T fetchCompleteCatalog(
       CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
     CatalogPages.CompleteCatalog<Object> walked =
-        CatalogPages.fetchAll(
-            page ->
-                (PageResponse<Object>)
-                    executeGet(webClient, catalog.getUri() + "&page=" + page, responseType));
+        CatalogPages.fetchAll(page ->
+            (PageResponse<Object>)
+                executeGet(webClient, catalog.getUri() + "&page=" + page, responseType));
     if (walked.truncated()) {
       log.warn(
           "Cached catalogue {} hit the page-walk safety cap of {} pages — the cached list is"

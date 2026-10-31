@@ -95,9 +95,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       @NotNull Collection<PoolRelocation> relocations) {
     Set<Long> keys = new TreeSet<>();
     Set<UUID> rows = new TreeSet<>();
-    holderLots.forEach(
-        (holder, lots) ->
-            lots.forEach(lot -> keys.add(InventoryStockCommands.lotLockKey(holder, lot.key()))));
+    holderLots.forEach((holder, lots) ->
+        lots.forEach(lot -> keys.add(InventoryStockCommands.lotLockKey(holder, lot.key()))));
     Set<UUID> entries = new HashSet<>(entryIds);
     relocations.forEach(relocation -> entries.add(relocation.entryId()));
     List<TargetLot> targets = new ArrayList<>();
@@ -843,17 +842,13 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       @NotNull Map<UUID, PoolEntryState> before, @NotNull UUID result) {
     inventoryRepository.flush();
     List<PoolEntryChange> changes = new ArrayList<>();
-    before.forEach(
-        (id, state) -> {
-          PoolEntryState after =
-              inventoryRepository
-                  .findById(id)
-                  .map(InventoryPoolEntryCommands::stateOf)
-                  .orElse(null);
-          if (!state.equals(after)) {
-            changes.add(new PoolEntryChange(state, after));
-          }
-        });
+    before.forEach((id, state) -> {
+      PoolEntryState after =
+          inventoryRepository.findById(id).map(InventoryPoolEntryCommands::stateOf).orElse(null);
+      if (!state.equals(after)) {
+        changes.add(new PoolEntryChange(state, after));
+      }
+    });
     if (!before.containsKey(result)) {
       inventoryRepository
           .findById(result)

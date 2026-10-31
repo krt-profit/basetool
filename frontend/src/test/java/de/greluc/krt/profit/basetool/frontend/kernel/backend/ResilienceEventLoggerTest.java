@@ -69,11 +69,10 @@ class ResilienceEventLoggerTest {
     cb.transitionToOpenState();
 
     assertThat(appender.list)
-        .anyMatch(
-            e ->
-                e.getLevel() == Level.WARN
-                    && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
-                    && e.getFormattedMessage().contains("state transition"));
+        .anyMatch(e ->
+            e.getLevel() == Level.WARN
+                && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
+                && e.getFormattedMessage().contains("state transition"));
   }
 
   @Test
@@ -96,15 +95,12 @@ class ResilienceEventLoggerTest {
     }
 
     assertThat(appender.list)
-        .anyMatch(
-            e ->
-                e.getLevel() == Level.DEBUG
-                    && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
-                    && e.getFormattedMessage().contains("call not permitted"));
+        .anyMatch(e ->
+            e.getLevel() == Level.DEBUG
+                && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
+                && e.getFormattedMessage().contains("call not permitted"));
     assertThat(appender.list)
-        .noneMatch(
-            e ->
-                e.getLevel() == Level.WARN
-                    && e.getFormattedMessage().contains("call not permitted"));
+        .noneMatch(e ->
+            e.getLevel() == Level.WARN && e.getFormattedMessage().contains("call not permitted"));
   }
 }

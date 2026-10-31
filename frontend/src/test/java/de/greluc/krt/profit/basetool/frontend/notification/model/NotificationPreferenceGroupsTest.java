@@ -121,10 +121,9 @@ class NotificationPreferenceGroupsTest {
   void noBackendTypeFallsIntoOtherWithoutADecision() throws IOException {
     assertThat(notificationTypes())
         .as("a type in 'other' means no prefix names its area — add one to the groups")
-        .allSatisfy(
-            type ->
-                assertThat(NotificationPreferenceGroups.groupOf(type))
-                    .isNotEqualTo(NotificationPreferenceGroups.OTHER));
+        .allSatisfy(type ->
+            assertThat(NotificationPreferenceGroups.groupOf(type))
+                .isNotEqualTo(NotificationPreferenceGroups.OTHER));
   }
 
   private static List<String> notificationTypes() throws IOException {

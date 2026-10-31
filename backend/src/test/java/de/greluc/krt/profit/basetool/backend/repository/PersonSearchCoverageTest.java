@@ -104,10 +104,8 @@ class PersonSearchCoverageTest {
         allTextColumns().stream()
             .filter(c -> !searched.contains(c))
             .filter(c -> !MentionSourceDeclarations.exemptColumns().contains(c))
-            .filter(
-                c ->
-                    !MentionSourceDeclarations.exemptTables()
-                        .contains(c.substring(0, c.indexOf('.'))))
+            .filter(c ->
+                !MentionSourceDeclarations.exemptTables().contains(c.substring(0, c.indexOf('.'))))
             .toList();
 
     assertThat(unaccounted)

@@ -313,10 +313,9 @@ public class MissionNotificationPublisher {
     for (MissionUnit unit : mission.getAssignedUnits()) {
       boolean crewed =
           unit.getCrew().stream()
-              .anyMatch(
-                  crew ->
-                      crew.getParticipant() != null
-                          && crew.getParticipant().getId().equals(participant.getId()));
+              .anyMatch(crew ->
+                  crew.getParticipant() != null
+                      && crew.getParticipant().getId().equals(participant.getId()));
       if (crewed && unit.getName() != null) {
         freed.add(unit.getName());
       }

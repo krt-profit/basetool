@@ -56,10 +56,8 @@ class RequestLoggingFilterTest {
 
     assertThat(events)
         .filteredOn(e -> e.getLevel() == Level.INFO)
-        .filteredOn(
-            e ->
-                e.getFormattedMessage()
-                    .contains("POST /exchange/v1/me/drafts/refinery-orders -> 200"))
+        .filteredOn(e ->
+            e.getFormattedMessage().contains("POST /exchange/v1/me/drafts/refinery-orders -> 200"))
         .hasSize(1);
   }
 

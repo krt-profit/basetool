@@ -209,11 +209,10 @@ class MissionBackendClientTest {
     assertThat(client.missionJobTypes().content()).isEmpty();
     assertThat(client.crewJobTypes().content())
         .singleElement()
-        .satisfies(
-            jobType -> {
-              assertThat(jobType.id()).isEqualTo(OTHER);
-              assertThat(jobType.name()).isEqualTo("Pilot");
-            });
+        .satisfies(jobType -> {
+          assertThat(jobType.id()).isEqualTo(OTHER);
+          assertThat(jobType.name()).isEqualTo("Pilot");
+        });
     assertThat(client.activeOrgUnits()).isEmpty();
     assertThat(client.frequencyTypes().content())
         .singleElement()

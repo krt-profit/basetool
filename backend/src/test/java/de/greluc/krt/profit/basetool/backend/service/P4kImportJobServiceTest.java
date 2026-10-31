@@ -91,14 +91,13 @@ class P4kImportJobServiceTest {
    */
   private void stubSaveAssignsId() {
     when(jobRepository.save(any(P4kImportJob.class)))
-        .thenAnswer(
-            invocation -> {
-              P4kImportJob job = invocation.getArgument(0);
-              if (job.getId() == null) {
-                job.setId(UUID.randomUUID());
-              }
-              return job;
-            });
+        .thenAnswer(invocation -> {
+          P4kImportJob job = invocation.getArgument(0);
+          if (job.getId() == null) {
+            job.setId(UUID.randomUUID());
+          }
+          return job;
+        });
   }
 
   private P4kImportJob jobWithId(UUID id, P4kImportJobStatus status) {

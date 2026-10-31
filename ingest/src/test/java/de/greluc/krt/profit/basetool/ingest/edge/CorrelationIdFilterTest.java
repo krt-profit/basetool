@@ -168,12 +168,11 @@ class CorrelationIdFilterTest {
           throw new IllegalStateException("boom");
         };
 
-    assertThatThrownBy(
-            () ->
-                filter.doFilter(
-                    new MockHttpServletRequest("POST", "/exchange/v1/me/drafts/refinery-orders"),
-                    new MockHttpServletResponse(),
-                    exploding))
+    assertThatThrownBy(() ->
+            filter.doFilter(
+                new MockHttpServletRequest("POST", "/exchange/v1/me/drafts/refinery-orders"),
+                new MockHttpServletResponse(),
+                exploding))
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(MDC.get("correlationId")).isNull();

@@ -164,10 +164,9 @@ class LiveSyncPublisherTest {
   void aFanoutFailureIsSwallowed() {
     doThrow(new IllegalStateException("redis down")).when(fanout).publish(any(), anyList());
 
-    assertThatCode(
-            () ->
-                publisher.publish(
-                    LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD), List.of("board")))
+    assertThatCode(() ->
+            publisher.publish(
+                LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD), List.of("board")))
         .as("a write must never fail because an open page missed its refresh")
         .doesNotThrowAnyException();
     assertThat(accepted(LiveSyncTopicClass.MATERIALBOARD)).isZero();

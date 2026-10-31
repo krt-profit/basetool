@@ -195,9 +195,8 @@ class ExchangeStockLookupPlanIntegrationTest {
   private @NotNull String lockStatement(int quality) {
     RecordingInspector.STATEMENTS.clear();
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            status ->
-                inventoryRepository.lockMaterialLot(member, material, location, quality, false));
+        .executeWithoutResult(status ->
+            inventoryRepository.lockMaterialLot(member, material, location, quality, false));
     return RecordingInspector.STATEMENTS.stream()
         .filter(s -> s.contains("inventory_item") && s.contains("for no key update"))
         .findFirst()
@@ -245,13 +244,12 @@ class ExchangeStockLookupPlanIntegrationTest {
   private @NotNull List<UUID> stockIds(int quality) {
     return Objects.requireNonNull(
         new TransactionTemplate(transactionManager)
-            .execute(
-                status ->
-                    inventoryRepository
-                        .lockMaterialLot(member, material, location, quality, false)
-                        .stream()
-                        .map(InventoryItem::getId)
-                        .toList()));
+            .execute(status ->
+                inventoryRepository
+                    .lockMaterialLot(member, material, location, quality, false)
+                    .stream()
+                    .map(InventoryItem::getId)
+                    .toList()));
   }
 
   /**

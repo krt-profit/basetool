@@ -173,12 +173,11 @@ public class SecurityConfig {
 
     http.addFilterBefore(cspNonceFilter, HeaderWriterFilter.class)
         .addFilterBefore(botProtectionFilter, WebAsyncManagerIntegrationFilter.class);
-    sessionDebugFilter.ifAvailable(
-        f ->
-            http.addFilterBefore(
-                f,
-                org.springframework.security.web.context.request.async
-                    .WebAsyncManagerIntegrationFilter.class));
+    sessionDebugFilter.ifAvailable(f ->
+        http.addFilterBefore(
+            f,
+            org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
+                .class));
     http.addFilterBefore(requestLoggingFilter, WebAsyncManagerIntegrationFilter.class)
         .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
         .addFilterAfter(termsAcceptanceGateFilter, BackendRoleSyncFilter.class)
@@ -186,77 +185,65 @@ public class SecurityConfig {
         .csrf(Customizer.withDefaults())
         .headers(
             SecurityHeaders.frontend(keycloakIssuerUri, TrustedTypesMode.parse(trustedTypesMode)))
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/health/**")
-                    .permitAll()
-                    .requestMatchers(
-                        "/",
-                        "/error",
-                        "/error/**",
-                        "/css/**",
-                        "/js/**",
-                        "/images/**",
-                        "/logos/**",
-                        "/fonts/**",
-                        "/impressum",
-                        "/privacy",
-                        "/terms",
-                        "/licenses",
-                        "/robots.txt",
-                        "/manifest.webmanifest",
-                        "/favicon.ico",
-                        "/sm/**",
-                        "/**/*.map")
-                    .permitAll()
-                    .requestMatchers("/ws/sync")
-                    .authenticated()
-                    .anyRequest()
-                    .authenticated())
-        .oauth2Login(
-            oauth2 ->
-                oauth2
-                    .loginPage("/oauth2/authorization/keycloak")
-                    .failureHandler(new LoginFailureMetricsHandler(meterRegistry, "/?error"))
-                    .successHandler(oauth2LoginSuccessHandler)
-                    .tokenEndpoint(
-                        token ->
-                            token.accessTokenResponseClient(
-                                oauthAuthorizationCodeTokenResponseClient))
-                    .authorizationEndpoint(
-                        auth ->
-                            auth.authorizationRequestResolver(
-                                authorizationRequestResolver(clientRegistrationRepository)))
-                    .userInfoEndpoint(
-                        userInfo -> userInfo.userAuthoritiesMapper(userAuthoritiesMapper())))
-        .logout(
-            logout ->
-                logout
-                    .logoutRequestMatcher(
-                        request ->
-                            "POST".equals(request.getMethod())
-                                && request
-                                    .getRequestURI()
-                                    .equals(request.getContextPath() + "/logout"))
-                    .logoutSuccessHandler(oidcLogoutSuccessHandler))
-        .exceptionHandling(
-            ex ->
-                ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint)
-                    .accessDeniedHandler(new CsrfMetricsAccessDeniedHandler(meterRegistry)))
-        .sessionManagement(
-            sm -> {
-              var concurrency =
-                  sm.sessionFixation(
-                          org.springframework.security.config.annotation.web.configurers
-                                  .SessionManagementConfigurer.SessionFixationConfigurer
-                              ::changeSessionId)
-                      .maximumSessions(MAX_CONCURRENT_SESSIONS)
-                      .maxSessionsPreventsLogin(false)
-                      .expiredSessionStrategy(
-                          new SessionEvictionLoggingStrategy(
-                              meterRegistry, MAX_CONCURRENT_SESSIONS));
-              sessionRegistryProvider.ifAvailable(concurrency::sessionRegistry);
-            });
+        .authorizeHttpRequests(auth ->
+            auth.requestMatchers("/actuator/health", "/actuator/health/**")
+                .permitAll()
+                .requestMatchers(
+                    "/",
+                    "/error",
+                    "/error/**",
+                    "/css/**",
+                    "/js/**",
+                    "/images/**",
+                    "/logos/**",
+                    "/fonts/**",
+                    "/impressum",
+                    "/privacy",
+                    "/terms",
+                    "/licenses",
+                    "/robots.txt",
+                    "/manifest.webmanifest",
+                    "/favicon.ico",
+                    "/sm/**",
+                    "/**/*.map")
+                .permitAll()
+                .requestMatchers("/ws/sync")
+                .authenticated()
+                .anyRequest()
+                .authenticated())
+        .oauth2Login(oauth2 ->
+            oauth2
+                .loginPage("/oauth2/authorization/keycloak")
+                .failureHandler(new LoginFailureMetricsHandler(meterRegistry, "/?error"))
+                .successHandler(oauth2LoginSuccessHandler)
+                .tokenEndpoint(token ->
+                    token.accessTokenResponseClient(oauthAuthorizationCodeTokenResponseClient))
+                .authorizationEndpoint(auth ->
+                    auth.authorizationRequestResolver(
+                        authorizationRequestResolver(clientRegistrationRepository)))
+                .userInfoEndpoint(
+                    userInfo -> userInfo.userAuthoritiesMapper(userAuthoritiesMapper())))
+        .logout(logout ->
+            logout
+                .logoutRequestMatcher(request ->
+                    "POST".equals(request.getMethod())
+                        && request.getRequestURI().equals(request.getContextPath() + "/logout"))
+                .logoutSuccessHandler(oidcLogoutSuccessHandler))
+        .exceptionHandling(ex ->
+            ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint)
+                .accessDeniedHandler(new CsrfMetricsAccessDeniedHandler(meterRegistry)))
+        .sessionManagement(sm -> {
+          var concurrency =
+              sm.sessionFixation(
+                      org.springframework.security.config.annotation.web.configurers
+                              .SessionManagementConfigurer.SessionFixationConfigurer
+                          ::changeSessionId)
+                  .maximumSessions(MAX_CONCURRENT_SESSIONS)
+                  .maxSessionsPreventsLogin(false)
+                  .expiredSessionStrategy(
+                      new SessionEvictionLoggingStrategy(meterRegistry, MAX_CONCURRENT_SESSIONS));
+          sessionRegistryProvider.ifAvailable(concurrency::sessionRegistry);
+        });
     return http.build();
   }
 
@@ -287,11 +274,10 @@ public class SecurityConfig {
   @Bean
   public RequestCache navigationRequestCache() {
     HttpSessionRequestCache cache = new HttpSessionRequestCache();
-    cache.setRequestMatcher(
-        request ->
-            HttpMethod.GET.matches(request.getMethod())
-                && isNavigation(request)
-                && !isMonitoringProbe(request));
+    cache.setRequestMatcher(request ->
+        HttpMethod.GET.matches(request.getMethod())
+            && isNavigation(request)
+            && !isMonitoringProbe(request));
     return cache;
   }
 
@@ -406,30 +392,27 @@ public class SecurityConfig {
   @Bean
   @SuppressWarnings("unchecked")
   public GrantedAuthoritiesMapper userAuthoritiesMapper() {
-    return (authorities) -> {
+    return authorities -> {
       Set<GrantedAuthority> mappedAuthorities = new HashSet<>();
 
-      authorities.forEach(
-          authority -> {
-            mappedAuthorities.add(authority);
-            if (authority instanceof OidcUserAuthority oidcUserAuthority) {
-              log.debug(
-                  "OidcUserAuthority attribute keys: {}",
-                  oidcUserAuthority.getAttributes().keySet());
-              Map<String, Object> realmAccess =
-                  (Map<String, Object>) oidcUserAuthority.getAttributes().get("realm_access");
-              if (realmAccess != null && realmAccess.containsKey("roles")) {
-                Collection<String> roles = (Collection<String>) realmAccess.get("roles");
-                log.info("Mapping realm roles from Keycloak: {}", roles);
-                roles.forEach(
-                    role -> {
-                      String mappedRole = "ROLE_" + role.toUpperCase().replace(" ", "_");
-                      log.debug("Mapped role: {}", mappedRole);
-                      mappedAuthorities.add(new SimpleGrantedAuthority(mappedRole));
-                    });
-              }
-            }
-          });
+      authorities.forEach(authority -> {
+        mappedAuthorities.add(authority);
+        if (authority instanceof OidcUserAuthority oidcUserAuthority) {
+          log.debug(
+              "OidcUserAuthority attribute keys: {}", oidcUserAuthority.getAttributes().keySet());
+          Map<String, Object> realmAccess =
+              (Map<String, Object>) oidcUserAuthority.getAttributes().get("realm_access");
+          if (realmAccess != null && realmAccess.containsKey("roles")) {
+            Collection<String> roles = (Collection<String>) realmAccess.get("roles");
+            log.info("Mapping realm roles from Keycloak: {}", roles);
+            roles.forEach(role -> {
+              String mappedRole = "ROLE_" + role.toUpperCase().replace(" ", "_");
+              log.debug("Mapped role: {}", mappedRole);
+              mappedAuthorities.add(new SimpleGrantedAuthority(mappedRole));
+            });
+          }
+        }
+      });
 
       return mappedAuthorities;
     };

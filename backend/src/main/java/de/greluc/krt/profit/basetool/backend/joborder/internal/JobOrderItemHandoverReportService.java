@@ -92,14 +92,12 @@ public class JobOrderItemHandoverReportService {
 
     List<ItemRow> rows =
         handover.getEntries().stream()
-            .map(
-                entry ->
-                    new ItemRow(
-                        entry.getJobOrderItem() != null
-                                && entry.getJobOrderItem().getGameItem() != null
-                            ? entry.getJobOrderItem().getGameItem().getName()
-                            : "-",
-                        entry.getAmount() == null ? 0 : entry.getAmount()))
+            .map(entry ->
+                new ItemRow(
+                    entry.getJobOrderItem() != null && entry.getJobOrderItem().getGameItem() != null
+                        ? entry.getJobOrderItem().getGameItem().getName()
+                        : "-",
+                    entry.getAmount() == null ? 0 : entry.getAmount()))
             .sorted(ITEM_COMPARATOR)
             .toList();
 

@@ -280,11 +280,10 @@ class JobOrderHandoverServiceTest {
     de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover[] persistedHandover =
         new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover[1];
     when(jobOrderHandoverRepository.save(any()))
-        .thenAnswer(
-            i -> {
-              persistedHandover[0] = i.getArgument(0);
-              return persistedHandover[0];
-            });
+        .thenAnswer(i -> {
+          persistedHandover[0] = i.getArgument(0);
+          return persistedHandover[0];
+        });
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
@@ -823,11 +822,10 @@ class JobOrderHandoverServiceTest {
             eq(inventoryId),
             any(),
             any(),
-            argThat(
-                d ->
-                    d != null
-                        && d.toString().contains("depleted=true")
-                        && d.toString().contains("remaining=0.0")));
+            argThat(d ->
+                d != null
+                    && d.toString().contains("depleted=true")
+                    && d.toString().contains("remaining=0.0")));
   }
 
   @Test

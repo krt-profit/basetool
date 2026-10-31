@@ -135,16 +135,14 @@ class LiftedRoleGatesTest {
   @Test
   void everyLiftedHandlerCarriesTheSharedGateConstantOnTheMethod() {
     inventoryGates()
-        .forEach(
-            m ->
-                assertThat(m.getAnnotation(PreAuthorize.class).value())
-                    .as(m.getName())
-                    .isEqualTo(InventoryItemController.INVENTORY_ACCESS));
+        .forEach(m ->
+            assertThat(m.getAnnotation(PreAuthorize.class).value())
+                .as(m.getName())
+                .isEqualTo(InventoryItemController.INVENTORY_ACCESS));
     hangarGates()
-        .forEach(
-            m ->
-                assertThat(m.getAnnotation(PreAuthorize.class).value())
-                    .as(m.getName())
-                    .isEqualTo(HangarController.HANGAR_ACCESS));
+        .forEach(m ->
+            assertThat(m.getAnnotation(PreAuthorize.class).value())
+                .as(m.getName())
+                .isEqualTo(HangarController.HANGAR_ACCESS));
   }
 }

@@ -282,13 +282,12 @@ public class BlueprintProductService implements BlueprintProducts {
       byId.put(blueprint.getId(), blueprint);
     }
     Map<String, Blueprint> resolved = new LinkedHashMap<>();
-    firstId.forEach(
-        (key, id) -> {
-          Blueprint blueprint = byId.get(id);
-          if (blueprint != null) {
-            resolved.put(key, blueprint);
-          }
-        });
+    firstId.forEach((key, id) -> {
+      Blueprint blueprint = byId.get(id);
+      if (blueprint != null) {
+        resolved.put(key, blueprint);
+      }
+    });
     return resolved;
   }
 
@@ -320,12 +319,11 @@ public class BlueprintProductService implements BlueprintProducts {
   public Map<String, String> scwikiKeyToProductKeyIndex() {
     Map<String, String> index = new LinkedHashMap<>();
     scwikiKeyToProductKeys()
-        .forEach(
-            (tagKey, productKeys) -> {
-              if (productKeys.size() == 1) {
-                index.put(tagKey, productKeys.iterator().next());
-              }
-            });
+        .forEach((tagKey, productKeys) -> {
+          if (productKeys.size() == 1) {
+            index.put(tagKey, productKeys.iterator().next());
+          }
+        });
     return index;
   }
 

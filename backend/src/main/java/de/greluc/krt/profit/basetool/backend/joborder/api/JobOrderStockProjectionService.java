@@ -145,13 +145,11 @@ public class JobOrderStockProjectionService {
     for (Supply supply : index.suppliesFor(jobOrder.getId(), materialId)) {
       Map<Integer, Double> byDemand = allocation.byRow().getOrDefault(supply.rowId(), Map.of());
       Map<UUID, Double> byTier = new LinkedHashMap<>();
-      byDemand.forEach(
-          (demandIndex, amount) ->
-              byTier.merge(ofMaterial.get(demandIndex).tier().id(), amount, Double::sum));
+      byDemand.forEach((demandIndex, amount) ->
+          byTier.merge(ofMaterial.get(demandIndex).tier().id(), amount, Double::sum));
       double attributed = byTier.values().stream().mapToDouble(Double::doubleValue).sum();
-      byTier.forEach(
-          (tierId, amount) ->
-              result.add(new LinkedStockAttributionDto(supply.rowId(), tierId, round3(amount))));
+      byTier.forEach((tierId, amount) ->
+          result.add(new LinkedStockAttributionDto(supply.rowId(), tierId, round3(amount))));
       double rest = Math.max(0.0, supply.amount() - attributed);
       if (rest > 1e-9) {
         result.add(new LinkedStockAttributionDto(supply.rowId(), null, round3(rest)));
@@ -202,10 +200,9 @@ public class JobOrderStockProjectionService {
         stockIndex.bookedFor(
             jobOrder.getId(),
             baseMaterials.stream()
-                .map(
-                    m ->
-                        new MaterialRequirement(
-                            m.material(), m.qualityTier(), m.amount() == null ? 0.0 : m.amount()))
+                .map(m ->
+                    new MaterialRequirement(
+                        m.material(), m.qualityTier(), m.amount() == null ? 0.0 : m.amount()))
                 .toList());
     List<JobOrderMaterialDto> updatedMaterials = new ArrayList<>();
     for (int i = 0; i < baseMaterials.size(); i++) {
@@ -276,12 +273,11 @@ public class JobOrderStockProjectionService {
         stockIndex.bookedFor(
             jobOrder.getId(),
             aggregated.stream()
-                .map(
-                    agg ->
-                        new MaterialRequirement(
-                            agg.material(),
-                            agg.qualityTier(),
-                            agg.totalQuantity() == null ? 0.0 : agg.totalQuantity()))
+                .map(agg ->
+                    new MaterialRequirement(
+                        agg.material(),
+                        agg.qualityTier(),
+                        agg.totalQuantity() == null ? 0.0 : agg.totalQuantity()))
                 .toList());
     List<AggregatedMaterialDto> result = new ArrayList<>();
     for (int i = 0; i < aggregated.size(); i++) {
@@ -377,20 +373,18 @@ public class JobOrderStockProjectionService {
             .computeIfAbsent(requirements.get(i).material().id(), _ -> new ArrayList<>())
             .add(i);
       }
-      indexesByMaterial.forEach(
-          (materialId, indexes) -> {
-            List<Demand<Integer>> demands = new ArrayList<>();
-            for (int index : indexes) {
-              MaterialRequirement requirement = requirements.get(index);
-              demands.add(
-                  new Demand<>(
-                      index, requirement.tier().minQuality(), requirement.requiredAmount()));
-            }
-            Allocation<Integer> allocation = allocate(jobOrderId, materialId, demands);
-            for (int index : indexes) {
-              booked[index] = allocation.attributedTo(index);
-            }
-          });
+      indexesByMaterial.forEach((materialId, indexes) -> {
+        List<Demand<Integer>> demands = new ArrayList<>();
+        for (int index : indexes) {
+          MaterialRequirement requirement = requirements.get(index);
+          demands.add(
+              new Demand<>(index, requirement.tier().minQuality(), requirement.requiredAmount()));
+        }
+        Allocation<Integer> allocation = allocate(jobOrderId, materialId, demands);
+        for (int index : indexes) {
+          booked[index] = allocation.attributedTo(index);
+        }
+      });
       return booked;
     }
   }

@@ -137,12 +137,11 @@ class InventoryStolenMarkServiceTest {
   /** Makes save and merge return their argument. */
   private void stubWrites() {
     when(inventoryItemRepository.save(any(InventoryItem.class)))
-        .thenAnswer(
-            inv -> {
-              InventoryItem saved = inv.getArgument(0);
-              saved.setId(UUID.randomUUID());
-              return saved;
-            });
+        .thenAnswer(inv -> {
+          InventoryItem saved = inv.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
     when(inventoryCheckoutService.mergeStockIfRequested(any(InventoryItem.class), eq(false)))
         .thenAnswer(inv -> inv.getArgument(0));
   }
@@ -254,10 +253,9 @@ class InventoryStolenMarkServiceTest {
             item.getId(), MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.of(offer));
 
-    assertThatThrownBy(
-            () ->
-                service.mark(
-                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
+    assertThatThrownBy(() ->
+            service.mark(
+                item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
         .isInstanceOf(BusinessConflictException.class)
         .hasMessage("error.inventory.stolen.belowOffer");
     verify(inventoryItemRepository, never()).save(any());
@@ -291,10 +289,9 @@ class InventoryStolenMarkServiceTest {
             item.getId(), MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                service.mark(
-                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
+    assertThatThrownBy(() ->
+            service.mark(
+                item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
         .isInstanceOf(OverAllocationException.class);
   }
 
@@ -303,10 +300,9 @@ class InventoryStolenMarkServiceTest {
     InventoryItem item = row(10.0, QuantityType.PIECE);
     stubRow(item);
 
-    assertThatThrownBy(
-            () ->
-                service.mark(
-                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 1.5), CALLER, false))
+    assertThatThrownBy(() ->
+            service.mark(
+                item.getId(), new InventoryItemStolenMarkDto(3L, true, 1.5), CALLER, false))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.inventory.stolen.wholeUnits");
   }
@@ -316,10 +312,9 @@ class InventoryStolenMarkServiceTest {
     InventoryItem item = row(10.0, QuantityType.SCU);
     stubRow(item);
 
-    assertThatThrownBy(
-            () ->
-                service.mark(
-                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 11.0), CALLER, false))
+    assertThatThrownBy(() ->
+            service.mark(
+                item.getId(), new InventoryItemStolenMarkDto(3L, true, 11.0), CALLER, false))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.inventory.stolen.amountTooLarge");
   }
@@ -357,10 +352,9 @@ class InventoryStolenMarkServiceTest {
     foreign.setUser(other);
     stubRow(foreign);
 
-    assertThatThrownBy(
-            () ->
-                service.mark(
-                    foreign.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
+    assertThatThrownBy(() ->
+            service.mark(
+                foreign.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
         .isInstanceOf(AccessDeniedException.class);
     assertThat(foreign.getStolen()).isFalse();
     assertThat(foreign.getAmount()).isEqualTo(10.0);
@@ -413,10 +407,9 @@ class InventoryStolenMarkServiceTest {
     when(inventoryItemRepository.findByIdForRebook(any()))
         .thenAnswer(inv -> Optional.of(inv.getArgument(0).equals(own.getId()) ? own : foreign));
 
-    assertThatThrownBy(
-            () ->
-                service.bulkMark(
-                    new BulkStolenMarkRequest(List.of(own.getId(), foreign.getId()), true), CALLER))
+    assertThatThrownBy(() ->
+            service.bulkMark(
+                new BulkStolenMarkRequest(List.of(own.getId(), foreign.getId()), true), CALLER))
         .isInstanceOf(AccessDeniedException.class);
     verify(inventoryItemRepository, never()).saveAndFlush(any());
     verifyNoInteractions(auditService);

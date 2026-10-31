@@ -140,14 +140,13 @@ public class ExchangeRefusals {
   /** Registers every reason at zero, so a first refusal is an increase. */
   @PostConstruct
   void register() {
-    CODES.forEach(
-        code ->
-            meterRegistry.counter(
-                MetricNames.EXCHANGE_REFUSED,
-                MetricNames.TAG_REASON,
-                reason(code),
-                MetricNames.TAG_CLIENT_ID,
-                MetricNames.EXCHANGE_CLIENT_NONE));
+    CODES.forEach(code ->
+        meterRegistry.counter(
+            MetricNames.EXCHANGE_REFUSED,
+            MetricNames.TAG_REASON,
+            reason(code),
+            MetricNames.TAG_CLIENT_ID,
+            MetricNames.EXCHANGE_CLIENT_NONE));
   }
 
   /**

@@ -187,11 +187,10 @@ class ExchangeResolveServiceTest {
     assertThat(response.results()).allMatch(r -> r.status() == Status.RESOLVED);
     assertThat(response.warnings())
         .singleElement()
-        .satisfies(
-            w -> {
-              assertThat(w.pointer()).isEqualTo("/refs/1/locKey");
-              assertThat(w.code()).isEqualTo("LOC_KEY_UNRESOLVED");
-            });
+        .satisfies(w -> {
+          assertThat(w.pointer()).isEqualTo("/refs/1/locKey");
+          assertThat(w.code()).isEqualTo("LOC_KEY_UNRESOLVED");
+        });
   }
 
   @Test

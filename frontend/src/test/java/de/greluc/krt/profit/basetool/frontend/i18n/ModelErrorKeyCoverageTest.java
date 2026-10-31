@@ -73,14 +73,12 @@ class ModelErrorKeyCoverageTest {
     }
 
     List<String> missing = new ArrayList<>();
-    keysBySource.forEach(
-        (key, sources) ->
-            bundleContents.forEach(
-                (bundleName, content) -> {
-                  if (!content.contains("\n" + key + "=") && !content.startsWith(key + "=")) {
-                    missing.add(key + " (" + String.join(", ", sources) + ") -> " + bundleName);
-                  }
-                }));
+    keysBySource.forEach((key, sources) ->
+        bundleContents.forEach((bundleName, content) -> {
+          if (!content.contains("\n" + key + "=") && !content.startsWith(key + "=")) {
+            missing.add(key + " (" + String.join(", ", sources) + ") -> " + bundleName);
+          }
+        }));
 
     assertThat(missing)
         .as(
@@ -107,14 +105,13 @@ class ModelErrorKeyCoverageTest {
     try (Stream<Path> tree = Files.walk(root)) {
       tree.filter(p -> p.toString().endsWith(".java"))
           .sorted()
-          .forEach(
-              source -> {
-                Matcher m = ERROR_ATTRIBUTE.matcher(read(source));
-                while (m.find()) {
-                  out.computeIfAbsent(m.group(2), k -> new ArrayList<>())
-                      .add(source.getFileName().toString());
-                }
-              });
+          .forEach(source -> {
+            Matcher m = ERROR_ATTRIBUTE.matcher(read(source));
+            while (m.find()) {
+              out.computeIfAbsent(m.group(2), k -> new ArrayList<>())
+                  .add(source.getFileName().toString());
+            }
+          });
     }
     return out;
   }

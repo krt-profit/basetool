@@ -114,14 +114,11 @@ public class NotificationCreationService {
     for (Notification notification : created) {
       byType.merge(notification.getType(), 1, Integer::sum);
     }
-    byType.forEach(
-        (type, count) ->
-            meterRegistry
-                .counter(
-                    MetricNames.NOTIFICATION_CREATED,
-                    MetricNames.TAG_NOTIFICATION_TYPE,
-                    type.name())
-                .increment(count));
+    byType.forEach((type, count) ->
+        meterRegistry
+            .counter(
+                MetricNames.NOTIFICATION_CREATED, MetricNames.TAG_NOTIFICATION_TYPE, type.name())
+            .increment(count));
   }
 
   /**

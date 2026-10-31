@@ -126,18 +126,17 @@ class RedisAclFrontendIntegrationTest {
     List<ApplicationEvent> events = new CopyOnWriteArrayList<>();
     CountDownLatch created = new CountDownLatch(1);
     CountDownLatch deleted = new CountDownLatch(1);
-    repository.setApplicationEventPublisher(
-        event -> {
-          if (event instanceof ApplicationEvent applicationEvent) {
-            events.add(applicationEvent);
-          }
-          if (event instanceof SessionCreatedEvent) {
-            created.countDown();
-          }
-          if (event instanceof SessionDeletedEvent) {
-            deleted.countDown();
-          }
-        });
+    repository.setApplicationEventPublisher(event -> {
+      if (event instanceof ApplicationEvent applicationEvent) {
+        events.add(applicationEvent);
+      }
+      if (event instanceof SessionCreatedEvent) {
+        created.countDown();
+      }
+      if (event instanceof SessionDeletedEvent) {
+        deleted.countDown();
+      }
+    });
     RedisMessageListenerContainer listener = listenerContainer(factory);
     listener.addMessageListener(
         repository,
@@ -238,11 +237,9 @@ class RedisAclFrontendIntegrationTest {
   @Test
   void anyOtherFailureOfTheStartupStepStillFailsTheStartup() {
     TolerantKeyspaceNotificationsAction action =
-        new TolerantKeyspaceNotificationsAction(
-            connection -> {
-              throw new RedisSystemException(
-                  "Unable to connect to Redis", new IllegalStateException());
-            });
+        new TolerantKeyspaceNotificationsAction(connection -> {
+          throw new RedisSystemException("Unable to connect to Redis", new IllegalStateException());
+        });
 
     assertThatThrownBy(() -> action.configure(org.mockito.Mockito.mock(RedisConnection.class)))
         .isInstanceOf(DataAccessException.class);

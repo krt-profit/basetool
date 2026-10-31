@@ -714,12 +714,11 @@ public class JobOrderBackendClient {
             webClient
                 .get()
                 .uri(uri, jobOrderId, handoverId)
-                .headers(
-                    h -> {
-                      if (userTimeZone != null && !userTimeZone.isBlank()) {
-                        h.set("X-User-Time-Zone", userTimeZone);
-                      }
-                    }),
+                .headers(h -> {
+                  if (userTimeZone != null && !userTimeZone.isBlank()) {
+                    h.set("X-User-Time-Zone", userTimeZone);
+                  }
+                }),
         spec -> spec.bodyToMono(byte[].class));
   }
 }

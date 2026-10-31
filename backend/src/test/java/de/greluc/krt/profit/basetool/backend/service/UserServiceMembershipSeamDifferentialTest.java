@@ -136,13 +136,12 @@ class UserServiceMembershipSeamDifferentialTest {
   @DisplayName("one delta that changes the Staffeln and two Spezialkommandos in request order")
   void mixedDelta() {
     assertSameOutcome(
-        List.of(
-            (u, v) ->
-                new MembershipDeltaRequest(
-                    List.of(new StaffelChange(u.sqA(), null, true)),
-                    List.of(
-                        new SpecialCommandChange(u.sk1(), Action.ADD, null, true, null),
-                        new SpecialCommandChange(u.sk2(), Action.ADD, true, null, null)))));
+        List.of((u, v) ->
+            new MembershipDeltaRequest(
+                List.of(new StaffelChange(u.sqA(), null, true)),
+                List.of(
+                    new SpecialCommandChange(u.sk1(), Action.ADD, null, true, null),
+                    new SpecialCommandChange(u.sk2(), Action.ADD, true, null, null)))));
   }
 
   @Test
@@ -155,40 +154,34 @@ class UserServiceMembershipSeamDifferentialTest {
   @DisplayName("the same Staffel twice and a third Staffel are refused alike")
   void staffelRefusals() {
     assertSameOutcome(
-        List.of(
-            (u, v) ->
-                new MembershipDeltaRequest(
-                    List.of(
-                        new StaffelChange(u.sqA(), null, null),
-                        new StaffelChange(u.sqA(), null, null)),
-                    null)));
+        List.of((u, v) ->
+            new MembershipDeltaRequest(
+                List.of(
+                    new StaffelChange(u.sqA(), null, null), new StaffelChange(u.sqA(), null, null)),
+                null)));
     assertSameOutcome(
-        List.of(
-            (u, v) ->
-                new MembershipDeltaRequest(
-                    List.of(
-                        new StaffelChange(u.sqA(), null, null),
-                        new StaffelChange(u.sqB(), null, null),
-                        new StaffelChange(u.sqC(), null, null)),
-                    null)));
+        List.of((u, v) ->
+            new MembershipDeltaRequest(
+                List.of(
+                    new StaffelChange(u.sqA(), null, null),
+                    new StaffelChange(u.sqB(), null, null),
+                    new StaffelChange(u.sqC(), null, null)),
+                null)));
   }
 
   @Test
   @DisplayName("an unknown Staffel and an unknown Spezialkommando are refused alike")
   void unknownUnits() {
     assertSameOutcome(
-        List.of(
-            (u, v) ->
-                new MembershipDeltaRequest(
-                    List.of(new StaffelChange(UUID.randomUUID(), null, null)), null)));
+        List.of((u, v) ->
+            new MembershipDeltaRequest(
+                List.of(new StaffelChange(UUID.randomUUID(), null, null)), null)));
     assertSameOutcome(
-        List.of(
-            (u, v) ->
-                new MembershipDeltaRequest(
-                    null,
-                    List.of(
-                        new SpecialCommandChange(
-                            UUID.randomUUID(), Action.ADD, null, null, null)))));
+        List.of((u, v) ->
+            new MembershipDeltaRequest(
+                null,
+                List.of(
+                    new SpecialCommandChange(UUID.randomUUID(), Action.ADD, null, null, null)))));
   }
 
   @Test
@@ -204,11 +197,10 @@ class UserServiceMembershipSeamDifferentialTest {
                     null,
                     List.of(new SpecialCommandChange(u.sk1(), Action.ADD, null, null, null)))));
     assertSameOutcome(
-        List.of(
-            (u, v) ->
-                new MembershipDeltaRequest(
-                    null,
-                    List.of(new SpecialCommandChange(u.sk2(), Action.REMOVE, null, null, null)))));
+        List.of((u, v) ->
+            new MembershipDeltaRequest(
+                null,
+                List.of(new SpecialCommandChange(u.sk2(), Action.REMOVE, null, null, null)))));
     assertSameOutcome(
         List.of(
             (u, v) ->
@@ -263,14 +255,13 @@ class UserServiceMembershipSeamDifferentialTest {
 
   private Observed run(UUID userId, MembershipDeltaRequest delta, boolean viaSeam) {
     String failure =
-        failureOf(
-            () -> {
-              if (viaSeam) {
-                userService.applyMembershipDelta(userId, delta);
-              } else {
-                legacyApply(userId, delta);
-              }
-            });
+        failureOf(() -> {
+          if (viaSeam) {
+            userService.applyMembershipDelta(userId, delta);
+          } else {
+            legacyApply(userId, delta);
+          }
+        });
     List<String> storedRows = storedRows(userId);
     entityManager.flush();
     entityManager.clear();
@@ -386,15 +377,14 @@ class UserServiceMembershipSeamDifferentialTest {
     return auditEventRepository.findAll().stream()
         .filter(e -> userId.equals(e.getTargetUserId()))
         .sorted(Comparator.comparing(AuditEvent::getOccurredAt))
-        .map(
-            e ->
-                e.getDomain()
-                    + "|"
-                    + e.getEventType()
-                    + "|"
-                    + e.getSubjectLabel()
-                    + "|"
-                    + UUID_TEXT.matcher(String.valueOf(e.getDetails())).replaceAll("<id>"))
+        .map(e ->
+            e.getDomain()
+                + "|"
+                + e.getEventType()
+                + "|"
+                + e.getSubjectLabel()
+                + "|"
+                + UUID_TEXT.matcher(String.valueOf(e.getDetails())).replaceAll("<id>"))
         .toList();
   }
 

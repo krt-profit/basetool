@@ -235,11 +235,10 @@ class UexManufacturerServiceTest {
     when(uexClient.getCompanies()).thenReturn(fetched(List.of(duplicate, canonical)));
     Manufacturer[] row = new Manufacturer[1];
     when(manufacturerRepository.save(any()))
-        .thenAnswer(
-            inv -> {
-              row[0] = inv.getArgument(0);
-              return row[0];
-            });
+        .thenAnswer(inv -> {
+          row[0] = inv.getArgument(0);
+          return row[0];
+        });
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("Esperia"))
         .thenAnswer(inv -> Optional.ofNullable(row[0]));
 

@@ -68,14 +68,13 @@ public class AnnouncementService {
    */
   public Announcement getAdminAnnouncement() {
     return getPublicAnnouncement()
-        .orElseGet(
-            () ->
-                announcementRepository.findAll().stream()
-                    .max(
-                        Comparator.comparing(
-                            Announcement::getUpdatedAt,
-                            Comparator.nullsFirst(Comparator.naturalOrder())))
-                    .orElseGet(() -> announcementRepository.save(new Announcement())));
+        .orElseGet(() ->
+            announcementRepository.findAll().stream()
+                .max(
+                    Comparator.comparing(
+                        Announcement::getUpdatedAt,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElseGet(() -> announcementRepository.save(new Announcement())));
   }
 
   /**

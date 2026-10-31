@@ -348,15 +348,14 @@ class ScWikiItemSyncServiceClosureTest {
         .thenAnswer(inv -> itemDto(inv.getArgument(1)));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
-        .thenAnswer(
-            inv -> {
-              GameItem candidate = inv.getArgument(0);
-              if (deadlocked.equals(candidate.getExternalUuid())) {
-                throw new CannotAcquireLockException(
-                    "deadlock detected while updating tuple in relation \"game_item\"");
-              }
-              return candidate;
-            });
+        .thenAnswer(inv -> {
+          GameItem candidate = inv.getArgument(0);
+          if (deadlocked.equals(candidate.getExternalUuid())) {
+            throw new CannotAcquireLockException(
+                "deadlock detected while updating tuple in relation \"game_item\"");
+          }
+          return candidate;
+        });
 
     service.syncItems();
 
@@ -377,14 +376,13 @@ class ScWikiItemSyncServiceClosureTest {
         .thenAnswer(inv -> itemDto(inv.getArgument(1)));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
-        .thenAnswer(
-            inv -> {
-              GameItem candidate = inv.getArgument(0);
-              if (collided.equals(candidate.getExternalUuid())) {
-                throw new ObjectOptimisticLockingFailureException(GameItem.class, collided);
-              }
-              return candidate;
-            });
+        .thenAnswer(inv -> {
+          GameItem candidate = inv.getArgument(0);
+          if (collided.equals(candidate.getExternalUuid())) {
+            throw new ObjectOptimisticLockingFailureException(GameItem.class, collided);
+          }
+          return candidate;
+        });
 
     service.syncItems();
 

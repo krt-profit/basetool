@@ -194,12 +194,10 @@ public abstract class JobOrderMapper {
     return materials.stream()
         .map(this::toDto)
         .sorted(
-            Comparator.<JobOrderMaterialDto, Integer>comparing(
-                    m ->
-                        (m.material() != null
-                                && "SCU".equalsIgnoreCase(m.material().quantityType()))
-                            ? 0
-                            : 1)
+            Comparator.<JobOrderMaterialDto, Integer>comparing(m ->
+                    (m.material() != null && "SCU".equalsIgnoreCase(m.material().quantityType()))
+                        ? 0
+                        : 1)
                 .thenComparing(
                     m ->
                         (m.material() != null && m.material().name() != null)

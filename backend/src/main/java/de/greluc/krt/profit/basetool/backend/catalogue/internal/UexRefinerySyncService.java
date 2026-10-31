@@ -91,14 +91,13 @@ public class UexRefinerySyncService {
     int added = (int) outcome.results().stream().filter(Boolean::booleanValue).count();
     int updated = outcome.results().size() - added;
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
-    chunkWriter.runInNewTransaction(
-        () ->
-            auditRecorder.record(
-                AuditEventType.REFINERY_METHODS_SYNCED,
-                null,
-                null,
-                null,
-                AuditDetails.of("source", "UEX").with("added", added).with("updated", updated)));
+    chunkWriter.runInNewTransaction(() ->
+        auditRecorder.record(
+            AuditEventType.REFINERY_METHODS_SYNCED,
+            null,
+            null,
+            null,
+            AuditDetails.of("source", "UEX").with("added", added).with("updated", updated)));
   }
 
   /**
@@ -116,12 +115,11 @@ public class UexRefinerySyncService {
     RefiningMethod entity =
         refiningMethodRepository
             .findByName(dto.name())
-            .orElseGet(
-                () -> {
-                  RefiningMethod n = new RefiningMethod();
-                  n.setName(dto.name());
-                  return n;
-                });
+            .orElseGet(() -> {
+              RefiningMethod n = new RefiningMethod();
+              n.setName(dto.name());
+              return n;
+            });
     final boolean isNew = entity.getId() == null;
     entity.setCode(dto.code());
     entity.setRatingYield(dto.ratingYield());
@@ -147,12 +145,11 @@ public class UexRefinerySyncService {
     }
 
     UexMatrixLookups lookups =
-        chunkWriter.inNewTransaction(
-            () ->
-                new UexMatrixLookups(
-                    materialRepository.findUexCommodityRefs(),
-                    terminalRepository.findUexTerminalRefs(),
-                    refineryYieldRepository.findYieldKeyRefs()));
+        chunkWriter.inNewTransaction(() ->
+            new UexMatrixLookups(
+                materialRepository.findUexCommodityRefs(),
+                terminalRepository.findUexTerminalRefs(),
+                refineryYieldRepository.findYieldKeyRefs()));
     SyncChunkWriter.Outcome<UUID> outcome =
         chunkWriter.write(
             dtos,
@@ -162,14 +159,13 @@ public class UexRefinerySyncService {
             dto -> "(idCommodity=" + dto.idCommodity() + ", idTerminal=" + dto.idTerminal() + ")");
     int processed = outcome.results().size();
     log.info("Finished UEX Refinery Yields sync: Processed {} yields", processed);
-    chunkWriter.runInNewTransaction(
-        () ->
-            auditRecorder.record(
-                AuditEventType.REFINERY_YIELDS_SYNCED,
-                null,
-                null,
-                null,
-                AuditDetails.of("source", "UEX").with("processed", processed)));
+    chunkWriter.runInNewTransaction(() ->
+        auditRecorder.record(
+            AuditEventType.REFINERY_YIELDS_SYNCED,
+            null,
+            null,
+            null,
+            AuditDetails.of("source", "UEX").with("processed", processed)));
   }
 
   /**

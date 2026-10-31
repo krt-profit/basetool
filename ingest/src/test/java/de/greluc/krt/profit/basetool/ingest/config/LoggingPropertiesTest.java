@@ -47,16 +47,15 @@ class LoggingPropertiesTest {
 
   @Test
   void bindsTheDocumentedDefaultsWhenNothingIsConfigured() {
-    runner.run(
-        context -> {
-          LoggingProperties properties = context.getBean(LoggingProperties.class);
-          assertThat(properties.correlationIdHeader()).isEqualTo("X-Correlation-Id");
-          assertThat(properties.correlationIdMdcKey()).isEqualTo("correlationId");
-          assertThat(properties.userIdMdcKey()).isEqualTo("userId");
-          assertThat(properties.slowRequestThresholdMs()).isEqualTo(2000L);
-          assertThat(properties.slowBackendCallThresholdMs()).isEqualTo(1500L);
-          assertThat(properties.structuredEnabled()).isFalse();
-        });
+    runner.run(context -> {
+      LoggingProperties properties = context.getBean(LoggingProperties.class);
+      assertThat(properties.correlationIdHeader()).isEqualTo("X-Correlation-Id");
+      assertThat(properties.correlationIdMdcKey()).isEqualTo("correlationId");
+      assertThat(properties.userIdMdcKey()).isEqualTo("userId");
+      assertThat(properties.slowRequestThresholdMs()).isEqualTo(2000L);
+      assertThat(properties.slowBackendCallThresholdMs()).isEqualTo(1500L);
+      assertThat(properties.structuredEnabled()).isFalse();
+    });
   }
 
   @Test
@@ -67,14 +66,13 @@ class LoggingPropertiesTest {
             "app.logging.slow-request-threshold-ms=50",
             "app.logging.slow-backend-call-threshold-ms=25",
             "app.logging.structured-enabled=true")
-        .run(
-            context -> {
-              LoggingProperties properties = context.getBean(LoggingProperties.class);
-              assertThat(properties.correlationIdHeader()).isEqualTo("X-Trace");
-              assertThat(properties.slowRequestThresholdMs()).isEqualTo(50L);
-              assertThat(properties.slowBackendCallThresholdMs()).isEqualTo(25L);
-              assertThat(properties.structuredEnabled()).isTrue();
-            });
+        .run(context -> {
+          LoggingProperties properties = context.getBean(LoggingProperties.class);
+          assertThat(properties.correlationIdHeader()).isEqualTo("X-Trace");
+          assertThat(properties.slowRequestThresholdMs()).isEqualTo(50L);
+          assertThat(properties.slowBackendCallThresholdMs()).isEqualTo(25L);
+          assertThat(properties.structuredEnabled()).isTrue();
+        });
   }
 
   @Test
@@ -100,11 +98,10 @@ class LoggingPropertiesTest {
 
   @Test
   void keepsTheMdcKeysInSyncWithTheLogbackPattern() {
-    runner.run(
-        context -> {
-          LoggingProperties properties = context.getBean(LoggingProperties.class);
-          assertThat(properties.correlationIdMdcKey()).isEqualTo("correlationId");
-          assertThat(properties.userIdMdcKey()).isEqualTo("userId");
-        });
+    runner.run(context -> {
+      LoggingProperties properties = context.getBean(LoggingProperties.class);
+      assertThat(properties.correlationIdMdcKey()).isEqualTo("correlationId");
+      assertThat(properties.userIdMdcKey()).isEqualTo("userId");
+    });
   }
 }

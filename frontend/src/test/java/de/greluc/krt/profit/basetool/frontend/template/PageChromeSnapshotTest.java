@@ -160,28 +160,25 @@ class PageChromeSnapshotTest {
 
   @Test
   void aPageWithAnotherStylesheetFails() throws Exception {
-    assertPlantedPageChange(
-        source ->
-            source.replace("/css/pages/settings/admin-settings.css", "/css/pages/planted.css"));
+    assertPlantedPageChange(source ->
+        source.replace("/css/pages/settings/admin-settings.css", "/css/pages/planted.css"));
   }
 
   @Test
   void aLayoutWithTheHeaderBeforeTheSidebarFails() throws Exception {
-    assertPlantedLayoutChange(
-        layout -> {
-          String sidebar = "<th:block th:replace=\"~{kernel/fragments/sidebar :: sidebar}\" />";
-          String header = "<th:block th:replace=\"~{kernel/fragments/header :: header}\" />";
-          return layout.replace(sidebar, "@@").replace(header, sidebar).replace("@@", header);
-        });
+    assertPlantedLayoutChange(layout -> {
+      String sidebar = "<th:block th:replace=\"~{kernel/fragments/sidebar :: sidebar}\" />";
+      String header = "<th:block th:replace=\"~{kernel/fragments/header :: header}\" />";
+      return layout.replace(sidebar, "@@").replace(header, sidebar).replace("@@", header);
+    });
   }
 
   @Test
   void aLayoutWithTheContentAfterTheToastFails() throws Exception {
-    assertPlantedLayoutChange(
-        layout -> {
-          String content = "<th:block th:replace=\"${pageContent}\"></th:block>";
-          return layout.replace(content, "").replace("</body>", content + "\n</body>");
-        });
+    assertPlantedLayoutChange(layout -> {
+      String content = "<th:block th:replace=\"${pageContent}\"></th:block>";
+      return layout.replace(content, "").replace("</body>", content + "\n</body>");
+    });
   }
 
   @Test

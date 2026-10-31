@@ -190,19 +190,18 @@ class RefineryOrderCreateImportRenderTest {
                     containsString(
                         "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
         .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
-        .andExpect(
-            result -> {
-              String html = result.getResponse().getContentAsString();
-              int form = html.indexOf("<form id=\"refineryImportForm\"");
-              int link = html.indexOf("id=\"refineryExtractorLink\"");
-              int formEnd = html.indexOf("</form>", form);
-              assertTrue(
-                  form >= 0 && link > form && link < formEnd,
-                  "extractor link must render inside the import form, which owns the flex row");
-              assertTrue(
-                  html.indexOf("data-testid=\"refinery-import-button\"") < link,
-                  "extractor link must follow the import button it accompanies");
-            });
+        .andExpect(result -> {
+          String html = result.getResponse().getContentAsString();
+          int form = html.indexOf("<form id=\"refineryImportForm\"");
+          int link = html.indexOf("id=\"refineryExtractorLink\"");
+          int formEnd = html.indexOf("</form>", form);
+          assertTrue(
+              form >= 0 && link > form && link < formEnd,
+              "extractor link must render inside the import form, which owns the flex row");
+          assertTrue(
+              html.indexOf("data-testid=\"refinery-import-button\"") < link,
+              "extractor link must follow the import button it accompanies");
+        });
   }
 
   @Test

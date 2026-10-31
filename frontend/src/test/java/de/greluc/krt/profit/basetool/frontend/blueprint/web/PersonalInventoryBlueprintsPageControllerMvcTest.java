@@ -256,13 +256,12 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
                     containsString(
                         "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
         .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
-        .andExpect(
-            result -> {
-              String html = result.getResponse().getContentAsString();
-              assertTrue(
-                  html.indexOf("krt-bp-extractor-link") < html.indexOf("id=\"krt-bp-list\""),
-                  "extractor link must render in the add bar, above the swapped collection list");
-            });
+        .andExpect(result -> {
+          String html = result.getResponse().getContentAsString();
+          assertTrue(
+              html.indexOf("krt-bp-extractor-link") < html.indexOf("id=\"krt-bp-list\""),
+              "extractor link must render in the add bar, above the swapped collection list");
+        });
   }
 
   /**

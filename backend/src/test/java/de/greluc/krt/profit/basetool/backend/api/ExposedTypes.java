@@ -142,12 +142,11 @@ public final class ExposedTypes {
   public static @NotNull Map<String, Set<String>> collisions(
       @NotNull Map<String, Set<String>> bySchemaName) {
     Map<String, Set<String>> collisions = new TreeMap<>();
-    bySchemaName.forEach(
-        (name, classes) -> {
-          if (classes.size() > 1) {
-            collisions.put(name, classes);
-          }
-        });
+    bySchemaName.forEach((name, classes) -> {
+      if (classes.size() > 1) {
+        collisions.put(name, classes);
+      }
+    });
     return collisions;
   }
 

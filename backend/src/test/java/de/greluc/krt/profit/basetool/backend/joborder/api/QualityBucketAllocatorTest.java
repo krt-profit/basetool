@@ -181,11 +181,9 @@ class QualityBucketAllocatorTest {
 
   @Test
   void duplicateKeys_areRejected() {
-    assertThatThrownBy(
-            () ->
-                QualityBucketAllocator.allocate(
-                    List.of(new Demand<>("GOOD", 650, 1.0), new Demand<>("GOOD", 650, 1.0)),
-                    List.of()))
+    assertThatThrownBy(() ->
+            QualityBucketAllocator.allocate(
+                List.of(new Demand<>("GOOD", 650, 1.0), new Demand<>("GOOD", 650, 1.0)), List.of()))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

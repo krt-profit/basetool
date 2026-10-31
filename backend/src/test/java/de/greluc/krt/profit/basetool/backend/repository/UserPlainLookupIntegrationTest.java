@@ -74,19 +74,18 @@ class UserPlainLookupIntegrationTest {
 
   @BeforeEach
   void seed() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          Role role = roleRepository.findAllWithPermissions().getFirst();
-          roleName = role.getName();
-          User user = new User();
-          user.setId(UUID.randomUUID());
-          user.setUsername("plain-lookup-" + UUID.randomUUID());
-          user.getRoles().add(role);
-          userId = userRepository.save(user).getId();
-          ShipType type = new ShipType();
-          type.setName("Plain lookup " + UUID.randomUUID());
-          shipTypeId = shipTypeRepository.save(type).getId();
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      Role role = roleRepository.findAllWithPermissions().getFirst();
+      roleName = role.getName();
+      User user = new User();
+      user.setId(UUID.randomUUID());
+      user.setUsername("plain-lookup-" + UUID.randomUUID());
+      user.getRoles().add(role);
+      userId = userRepository.save(user).getId();
+      ShipType type = new ShipType();
+      type.setName("Plain lookup " + UUID.randomUUID());
+      shipTypeId = shipTypeRepository.save(type).getId();
+    });
   }
 
   @AfterEach

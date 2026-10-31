@@ -173,12 +173,11 @@ class AdminMissionDataCrudE2eTest {
         page.waitForLoadState(LoadState.NETWORKIDLE);
         page.evaluate("() => { window.__krtNoReload = true; }");
         AtomicInteger navigations = new AtomicInteger();
-        page.onRequest(
-            request -> {
-              if (request.isNavigationRequest() && request.frame() == page.mainFrame()) {
-                navigations.incrementAndGet();
-              }
-            });
+        page.onRequest(request -> {
+          if (request.isNavigationRequest() && request.frame() == page.mainFrame()) {
+            navigations.incrementAndGet();
+          }
+        });
 
         for (String[] filter : FILTERS) {
           page.locator("#" + filter[2]).click();

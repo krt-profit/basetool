@@ -131,13 +131,12 @@ class InventorySharedLagerLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics &&"
-                            + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
-                            + " 0)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics &&"
+                        + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
+                        + " 0)")));
 
         addOrderChip(pageA);
 

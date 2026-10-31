@@ -138,11 +138,10 @@ class ExchangeDemandParityTest {
     lenient().when(stockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(stock);
     lenient()
         .when(squadronMapper.orgUnitToReferenceDto(any()))
-        .thenAnswer(
-            a -> {
-              OrgUnit unit = a.getArgument(0);
-              return new SquadronReferenceDto(unit.getId(), unit.getName(), unit.getShorthand());
-            });
+        .thenAnswer(a -> {
+          OrgUnit unit = a.getArgument(0);
+          return new SquadronReferenceDto(unit.getId(), unit.getName(), unit.getShorthand());
+        });
     agricium = material("Agricium");
     beryl = material("Beryl");
   }

@@ -194,9 +194,8 @@ public class BankLedgerService {
     guards.requireActive(named);
     List<UUID> targets =
         squadronIds.stream()
-            .filter(
-                id ->
-                    Objects.requireNonNull(locked.get(id)).getStatus() == BankAccountStatus.ACTIVE)
+            .filter(id ->
+                Objects.requireNonNull(locked.get(id)).getStatus() == BankAccountStatus.ACTIVE)
             .sorted()
             .toList();
     if (targets.isEmpty()) {
@@ -228,9 +227,8 @@ public class BankLedgerService {
     if (namedShare.signum() > 0) {
       writer.persistAccountPosting(tx, named, namedShare, now);
     }
-    shares.forEach(
-        (id, share) ->
-            writer.persistAccountPosting(tx, Objects.requireNonNull(locked.get(id)), share, now));
+    shares.forEach((id, share) ->
+        writer.persistAccountPosting(tx, Objects.requireNonNull(locked.get(id)), share, now));
     writer.persistHolderPosting(tx, holder, gross, now);
     bankAuditService.record(
         BankAuditEventType.DEPOSIT_SPLIT_BOOKED,
@@ -466,11 +464,10 @@ public class BankLedgerService {
           accountRepository
               .findFirstByType(BankAccountType.CARTEL)
               .map(BankAccount::getId)
-              .orElseThrow(
-                  () ->
-                      new BankConflictException(
-                          BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
-                          "The KRT (CARTEL) account that bears the Umbuchung fee does not exist"));
+              .orElseThrow(() ->
+                  new BankConflictException(
+                      BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
+                      "The KRT (CARTEL) account that bears the Umbuchung fee does not exist"));
       cartel = writer.lockAccount(cartelId);
       guards.requireActive(cartel);
       guards.requireAccountCoverage(cartel, fee);
@@ -698,10 +695,9 @@ public class BankLedgerService {
           orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
               .filter(option -> option.orgUnitId().equals(orgUnitId))
               .findFirst()
-              .orElseThrow(
-                  () ->
-                      new BadRequestException(
-                          "The selected org unit is not one of the counterparty's memberships"));
+              .orElseThrow(() ->
+                  new BadRequestException(
+                      "The selected org unit is not one of the counterparty's memberships"));
       return new CounterpartySnapshot(
           user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
     }
@@ -713,10 +709,9 @@ public class BankLedgerService {
         orgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds().stream()
             .filter(option -> option.orgUnitId().equals(orgUnitId))
             .findFirst()
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "The selected counterparty org unit does not exist or is inactive"));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "The selected counterparty org unit does not exist or is inactive"));
     return new CounterpartySnapshot(
         null, externalHandle, orgUnit.orgUnitId(), orgUnit.orgUnitName());
   }

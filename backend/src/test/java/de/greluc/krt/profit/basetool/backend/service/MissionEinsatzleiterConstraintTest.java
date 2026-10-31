@@ -133,20 +133,19 @@ class MissionEinsatzleiterConstraintTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(einsatzleiter.getId())).thenReturn(Optional.of(einsatzleiter));
 
-    assertDoesNotThrow(
-        () ->
-            missionParticipantService.updateParticipantAttributes(
-                missionId,
-                p2.getId(),
-                null,
-                einsatzleiter.getId(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0L,
-                authentication));
+    assertDoesNotThrow(() ->
+        missionParticipantService.updateParticipantAttributes(
+            missionId,
+            p2.getId(),
+            null,
+            einsatzleiter.getId(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0L,
+            authentication));
   }
 }

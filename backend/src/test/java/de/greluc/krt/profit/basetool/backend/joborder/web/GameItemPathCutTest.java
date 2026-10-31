@@ -85,28 +85,26 @@ class GameItemPathCutTest {
     Set<String> byYieldController = new TreeSet<>();
     mapping
         .getHandlerMethods()
-        .forEach(
-            (info, handler) -> {
-              for (String verb : verbs(info)) {
-                for (String pattern : patterns(info)) {
-                  served.add(verb + " " + pattern);
-                  if (GameItemController.class.equals(beanType(handler))) {
-                    byGameItemController.add(verb + " " + pattern);
-                  }
-                  if (RefineryLocationYieldController.class.equals(beanType(handler))) {
-                    byYieldController.add(verb + " " + pattern);
-                  }
-                }
+        .forEach((info, handler) -> {
+          for (String verb : verbs(info)) {
+            for (String pattern : patterns(info)) {
+              served.add(verb + " " + pattern);
+              if (GameItemController.class.equals(beanType(handler))) {
+                byGameItemController.add(verb + " " + pattern);
               }
-            });
+              if (RefineryLocationYieldController.class.equals(beanType(handler))) {
+                byYieldController.add(verb + " " + pattern);
+              }
+            }
+          }
+        });
 
     Set<String> expectedNew = new TreeSet<>();
     Set<String> expectedOld = new TreeSet<>();
-    moved.forEach(
-        m -> {
-          expectedNew.add(m.verb() + " " + m.newPath());
-          expectedOld.add(m.verb() + " " + m.oldPath());
-        });
+    moved.forEach(m -> {
+      expectedNew.add(m.verb() + " " + m.newPath());
+      expectedOld.add(m.verb() + " " + m.oldPath());
+    });
     assertThat(served).containsAll(expectedNew);
     assertThat(served).doesNotContainAnyElementsOf(expectedOld);
     assertThat(byGameItemController)

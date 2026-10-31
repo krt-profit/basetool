@@ -147,14 +147,13 @@ class V228GermanAmmoAliasSeedMigrationTest {
 
     assertThat(seededAliases())
         .singleElement()
-        .satisfies(
-            row -> {
-              assertThat(row.get("external_name")).isEqualTo("V228 S71 Rifle Magazine (30 Schuss)");
-              assertThat(row.get("product_key")).isEqualTo("v228 s71 rifle magazine (30 cap)");
-              assertThat(row.get("product_name")).isEqualTo("V228 S71 Rifle Magazine (30 cap)");
-              assertThat(row.get("source_system")).isEqualTo("SCMDB");
-              assertThat(row.get("created_by")).isEqualTo("system");
-            });
+        .satisfies(row -> {
+          assertThat(row.get("external_name")).isEqualTo("V228 S71 Rifle Magazine (30 Schuss)");
+          assertThat(row.get("product_key")).isEqualTo("v228 s71 rifle magazine (30 cap)");
+          assertThat(row.get("product_name")).isEqualTo("V228 S71 Rifle Magazine (30 cap)");
+          assertThat(row.get("source_system")).isEqualTo("SCMDB");
+          assertThat(row.get("created_by")).isEqualTo("system");
+        });
   }
 
   @Test
@@ -165,10 +164,9 @@ class V228GermanAmmoAliasSeedMigrationTest {
 
     assertThat(seededAliases())
         .singleElement()
-        .satisfies(
-            row ->
-                assertThat(row.get("external_name"))
-                    .isEqualTo("V228 P8-AR Rifle Magazine (15 Schuss)"));
+        .satisfies(row ->
+            assertThat(row.get("external_name"))
+                .isEqualTo("V228 P8-AR Rifle Magazine (15 Schuss)"));
   }
 
   @Test
@@ -217,10 +215,9 @@ class V228GermanAmmoAliasSeedMigrationTest {
 
     assertThat(seededAliases())
         .singleElement()
-        .satisfies(
-            row -> {
-              assertThat(row.get("product_key")).isEqualTo("curated-key");
-              assertThat(row.get("created_by")).isEqualTo("some-user-sub");
-            });
+        .satisfies(row -> {
+          assertThat(row.get("product_key")).isEqualTo("curated-key");
+          assertThat(row.get("created_by")).isEqualTo("some-user-sub");
+        });
   }
 }

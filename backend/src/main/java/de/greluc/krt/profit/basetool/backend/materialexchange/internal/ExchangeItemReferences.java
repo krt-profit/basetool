@@ -79,13 +79,12 @@ public class ExchangeItemReferences {
       byId.put(item.getId(), GameItemReferenceDto.of(item));
     }
     Map<String, GameItemReferenceDto> references = new HashMap<>();
-    itemIds.forEach(
-        (key, id) -> {
-          GameItemReferenceDto reference = byId.get(id);
-          if (reference != null) {
-            references.put(key, reference);
-          }
-        });
+    itemIds.forEach((key, id) -> {
+      GameItemReferenceDto reference = byId.get(id);
+      if (reference != null) {
+        references.put(key, reference);
+      }
+    });
     return references;
   }
 

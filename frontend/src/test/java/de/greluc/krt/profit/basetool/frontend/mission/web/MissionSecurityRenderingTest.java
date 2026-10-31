@@ -369,11 +369,10 @@ class MissionSecurityRenderingTest {
             get("/missions/" + missionId)
                 .with(
                     oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject("11111111-1111-1111-1111-111111111111")
-                                    .claim("preferred_username", "other1"))))
+                        .idToken(token ->
+                            token
+                                .subject("11111111-1111-1111-1111-111111111111")
+                                .claim("preferred_username", "other1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(PAYOUT_SELECT_DISABLED)));
   }
@@ -476,11 +475,10 @@ class MissionSecurityRenderingTest {
             get("/missions/" + missionId)
                 .with(
                     oidcLogin()
-                        .idToken(
-                            token ->
-                                token
-                                    .subject(userId.toString())
-                                    .claim("preferred_username", "member1"))))
+                        .idToken(token ->
+                            token
+                                .subject(userId.toString())
+                                .claim("preferred_username", "member1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(expectedUrl)))
         .andExpect(content().string(not(containsString(PAYOUT_SELECT_DISABLED))));

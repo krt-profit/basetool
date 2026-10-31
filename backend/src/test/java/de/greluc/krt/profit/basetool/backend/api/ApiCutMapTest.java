@@ -241,12 +241,11 @@ class ApiCutMapTest {
           .add(documented.contains(entry.oldKey()));
     }
     Set<Integer> mixed = new TreeSet<>();
-    states.forEach(
-        (wave, state) -> {
-          if (state.size() > 1) {
-            mixed.add(wave);
-          }
-        });
+    states.forEach((wave, state) -> {
+      if (state.size() > 1) {
+        mixed.add(wave);
+      }
+    });
     return mixed;
   }
 

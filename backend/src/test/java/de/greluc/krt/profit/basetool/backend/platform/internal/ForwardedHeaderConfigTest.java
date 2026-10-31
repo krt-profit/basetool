@@ -77,22 +77,20 @@ class ForwardedHeaderConfigTest {
     new ApplicationContextRunner()
         .withBean(RateLimitProperties.class, ForwardedHeaderConfigTest::boundProperties)
         .withUserConfiguration(ForwardedHeaderConfig.class)
-        .run(
-            context ->
-                assertThat(context)
-                    .as(
-                        "registering Spring's ForwardedHeaderFilter hands every downstream"
-                            + " component a client-chosen getRemoteAddr(); the backend builds no"
-                            + " absolute URL from a request, so there is nothing to buy with that"
-                            + " (ADR-0272)")
-                    .hasNotFailed()
-                    .doesNotHaveBean(ForwardedHeaderFilter.class)
-                    .getBeans(FilterRegistrationBean.class)
-                    .values()
-                    .allSatisfy(
-                        registration ->
-                            assertThat(((FilterRegistrationBean<?>) registration).getFilter())
-                                .isNotInstanceOf(ForwardedHeaderFilter.class)));
+        .run(context ->
+            assertThat(context)
+                .as(
+                    "registering Spring's ForwardedHeaderFilter hands every downstream"
+                        + " component a client-chosen getRemoteAddr(); the backend builds no"
+                        + " absolute URL from a request, so there is nothing to buy with that"
+                        + " (ADR-0272)")
+                .hasNotFailed()
+                .doesNotHaveBean(ForwardedHeaderFilter.class)
+                .getBeans(FilterRegistrationBean.class)
+                .values()
+                .allSatisfy(registration ->
+                    assertThat(((FilterRegistrationBean<?>) registration).getFilter())
+                        .isNotInstanceOf(ForwardedHeaderFilter.class)));
   }
 
   @Test
@@ -101,13 +99,12 @@ class ForwardedHeaderConfigTest {
     new ApplicationContextRunner()
         .withBean(RateLimitProperties.class, ForwardedHeaderConfigTest::boundProperties)
         .withUserConfiguration(ForwardedHeaderConfig.class)
-        .run(
-            context -> {
-              List<Filter> filters =
-                  context.getBeansOfType(FilterRegistrationBean.class).values().stream()
-                      .map(registration -> (Filter) registration.getFilter())
-                      .toList();
-              assertThat(filters).singleElement().isInstanceOf(ClientIpContextFilter.class);
-            });
+        .run(context -> {
+          List<Filter> filters =
+              context.getBeansOfType(FilterRegistrationBean.class).values().stream()
+                  .map(registration -> (Filter) registration.getFilter())
+                  .toList();
+          assertThat(filters).singleElement().isInstanceOf(ClientIpContextFilter.class);
+        });
   }
 }

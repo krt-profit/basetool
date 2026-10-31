@@ -143,12 +143,11 @@ class ApiDomainsMatchTheDomainMapTest {
                 + "`");
       }
     }
-    used.forEach(
-        (entry, hit) -> {
-          if (!hit) {
-            out.add(entry + " is listed but no controller needs it");
-          }
-        });
+    used.forEach((entry, hit) -> {
+      if (!hit) {
+        out.add(entry + " is listed but no controller needs it");
+      }
+    });
     return out;
   }
 

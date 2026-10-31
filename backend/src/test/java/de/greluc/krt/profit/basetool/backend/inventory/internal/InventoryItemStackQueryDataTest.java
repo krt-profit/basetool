@@ -478,11 +478,10 @@ class InventoryItemStackQueryDataTest {
 
     List<Object[]> seeded =
         page.getContent().stream()
-            .filter(
-                tuple -> {
-                  UUID id = ((GameItem) tuple[0]).getId();
-                  return id.equals(couplingItem.getId()) || id.equals(shieldItem.getId());
-                })
+            .filter(tuple -> {
+              UUID id = ((GameItem) tuple[0]).getId();
+              return id.equals(couplingItem.getId()) || id.equals(shieldItem.getId());
+            })
             .toList();
     assertThat(seeded)
         .as("each seeded game item must yield exactly one aggregated tuple")

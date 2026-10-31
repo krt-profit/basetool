@@ -45,15 +45,14 @@ class BankActorResolver {
   ActorRef current() {
     return authHelperService
         .currentUserId()
-        .map(
-            id ->
-                new ActorRef(
-                    id,
-                    userRepository
-                        .findById(id)
-                        .map(User::getEffectiveName)
-                        .map(StringNormalization::trimToNull)
-                        .orElse(ActorRef.UNKNOWN_NAME)))
+        .map(id ->
+            new ActorRef(
+                id,
+                userRepository
+                    .findById(id)
+                    .map(User::getEffectiveName)
+                    .map(StringNormalization::trimToNull)
+                    .orElse(ActorRef.UNKNOWN_NAME)))
         .orElseGet(ActorRef::system);
   }
 }

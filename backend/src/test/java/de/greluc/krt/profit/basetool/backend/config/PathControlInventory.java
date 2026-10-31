@@ -282,10 +282,8 @@ public final class PathControlInventory {
   public static List<String> unusedSegments(
       @NotNull Collection<String> segments, @NotNull Collection<Endpoint> endpoints) {
     return segments.stream()
-        .filter(
-            segment ->
-                endpoints.stream()
-                    .noneMatch(e -> List.of(e.pattern().split("/")).contains(segment)))
+        .filter(segment ->
+            endpoints.stream().noneMatch(e -> List.of(e.pattern().split("/")).contains(segment)))
         .sorted()
         .toList();
   }

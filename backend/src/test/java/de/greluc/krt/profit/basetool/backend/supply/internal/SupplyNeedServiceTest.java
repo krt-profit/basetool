@@ -213,9 +213,8 @@ class SupplyNeedServiceTest {
 
     assertThatThrownBy(() -> service.create(createRequest(null, null, 2, false, null)))
         .isInstanceOf(BadRequestException.class);
-    assertThatThrownBy(
-            () ->
-                service.create(createRequest(material.getId(), UUID.randomUUID(), 2, false, null)))
+    assertThatThrownBy(() ->
+            service.create(createRequest(material.getId(), UUID.randomUUID(), 2, false, null)))
         .isInstanceOf(BadRequestException.class);
   }
 
@@ -227,12 +226,11 @@ class SupplyNeedServiceTest {
     when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
     when(needRepository.save(any(SupplyNeed.class)))
-        .thenAnswer(
-            invocation -> {
-              SupplyNeed need = invocation.getArgument(0);
-              need.setId(UUID.randomUUID());
-              return need;
-            });
+        .thenAnswer(invocation -> {
+          SupplyNeed need = invocation.getArgument(0);
+          need.setId(UUID.randomUUID());
+          return need;
+        });
 
     service.create(createRequest(material.getId(), null, 12.5, true, 4000L));
 
@@ -405,12 +403,11 @@ class SupplyNeedServiceTest {
     when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
     when(needRepository.save(any(SupplyNeed.class)))
-        .thenAnswer(
-            invocation -> {
-              SupplyNeed need = invocation.getArgument(0);
-              need.setId(UUID.randomUUID());
-              return need;
-            });
+        .thenAnswer(invocation -> {
+          SupplyNeed need = invocation.getArgument(0);
+          need.setId(UUID.randomUUID());
+          return need;
+        });
 
     service.create(createRequest(material.getId(), null, 5, true, 4000L));
 
@@ -428,12 +425,11 @@ class SupplyNeedServiceTest {
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
     when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
     when(needRepository.save(any(SupplyNeed.class)))
-        .thenAnswer(
-            invocation -> {
-              SupplyNeed need = invocation.getArgument(0);
-              need.setId(UUID.randomUUID());
-              return need;
-            });
+        .thenAnswer(invocation -> {
+          SupplyNeed need = invocation.getArgument(0);
+          need.setId(UUID.randomUUID());
+          return need;
+        });
 
     service.create(createRequest(material.getId(), null, 5, false, null));
 

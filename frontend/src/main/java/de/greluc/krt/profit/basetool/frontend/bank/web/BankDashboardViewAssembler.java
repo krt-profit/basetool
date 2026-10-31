@@ -126,22 +126,21 @@ public final class BankDashboardViewAssembler {
             Comparator.comparing(
                 entry -> bereichNameOf(bereichMeta.get(entry.getKey())),
                 String.CASE_INSENSITIVE_ORDER))
-        .forEach(
-            entry -> {
-              BankDashboardCardView meta = bereichMeta.get(entry.getKey());
-              List<BankDashboardCardView> groupCards = new ArrayList<>(entry.getValue());
-              groupCards.sort(
-                  Comparator.<BankDashboardCardView, Integer>comparing(
-                          card -> "AREA".equals(card.account().type()) ? 0 : 1)
-                      .thenComparing(card -> card.account().name(), String.CASE_INSENSITIVE_ORDER));
-              groups.add(
-                  new BankDashboardGroupView(
-                      "bereich:" + entry.getKey(),
-                      null,
-                      meta.account().bereichName(),
-                      deptClass(meta.account().bereichDepartment()),
-                      groupCards));
-            });
+        .forEach(entry -> {
+          BankDashboardCardView meta = bereichMeta.get(entry.getKey());
+          List<BankDashboardCardView> groupCards = new ArrayList<>(entry.getValue());
+          groupCards.sort(
+              Comparator.<BankDashboardCardView, Integer>comparing(
+                      card -> "AREA".equals(card.account().type()) ? 0 : 1)
+                  .thenComparing(card -> card.account().name(), String.CASE_INSENSITIVE_ORDER));
+          groups.add(
+              new BankDashboardGroupView(
+                  "bereich:" + entry.getKey(),
+                  null,
+                  meta.account().bereichName(),
+                  deptClass(meta.account().bereichDepartment()),
+                  groupCards));
+        });
     if (!special.isEmpty()) {
       groups.add(
           new BankDashboardGroupView(

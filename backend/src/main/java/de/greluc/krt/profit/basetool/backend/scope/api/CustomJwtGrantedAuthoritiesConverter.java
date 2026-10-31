@@ -240,13 +240,12 @@ public class CustomJwtGrantedAuthoritiesConverter
       Map<String, Object> sorted = new TreeMap<>();
       map.forEach((k, v) -> sorted.put(String.valueOf(k), v));
       out.append("m{");
-      sorted.forEach(
-          (k, v) -> {
-            appendCanonical(out, k);
-            out.append('=');
-            appendCanonical(out, v);
-            out.append(';');
-          });
+      sorted.forEach((k, v) -> {
+        appendCanonical(out, k);
+        out.append('=');
+        appendCanonical(out, v);
+        out.append(';');
+      });
       out.append('}');
     } else if (value instanceof Collection<?> collection) {
       out.append("l[");
@@ -341,16 +340,15 @@ public class CustomJwtGrantedAuthoritiesConverter
 
     Collection<GrantedAuthority> authorities =
         roles.stream()
-            .flatMap(
-                role -> {
-                  Stream<GrantedAuthority> roleAuth =
-                      Stream.of(
-                          new SimpleGrantedAuthority(
-                              "ROLE_" + role.getName().toUpperCase(Locale.ROOT).replace(" ", "_")));
-                  Stream<GrantedAuthority> permAuth =
-                      role.getPermissions().stream().map(SimpleGrantedAuthority::new);
-                  return Stream.concat(roleAuth, permAuth);
-                })
+            .flatMap(role -> {
+              Stream<GrantedAuthority> roleAuth =
+                  Stream.of(
+                      new SimpleGrantedAuthority(
+                          "ROLE_" + role.getName().toUpperCase(Locale.ROOT).replace(" ", "_")));
+              Stream<GrantedAuthority> permAuth =
+                  role.getPermissions().stream().map(SimpleGrantedAuthority::new);
+              return Stream.concat(roleAuth, permAuth);
+            })
             .collect(Collectors.toCollection(ArrayList::new));
 
     addMembershipDerivedRoles(user, authorities);

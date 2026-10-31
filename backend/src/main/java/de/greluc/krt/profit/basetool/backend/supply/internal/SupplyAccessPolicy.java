@@ -98,15 +98,14 @@ public class SupplyAccessPolicy {
     Set<UUID> ids = new HashSet<>();
     authHelperService
         .currentAuthentication()
-        .ifPresent(
-            authentication -> {
-              for (GrantedAuthority authority : authentication.getAuthorities()) {
-                if (authority instanceof OrgUnitContextualAuthority contextual
-                    && UNIT_MANAGER_ROLE.equals(contextual.roleName())) {
-                  ids.add(contextual.orgUnitId());
-                }
-              }
-            });
+        .ifPresent(authentication -> {
+          for (GrantedAuthority authority : authentication.getAuthorities()) {
+            if (authority instanceof OrgUnitContextualAuthority contextual
+                && UNIT_MANAGER_ROLE.equals(contextual.roleName())) {
+              ids.add(contextual.orgUnitId());
+            }
+          }
+        });
     return ids;
   }
 

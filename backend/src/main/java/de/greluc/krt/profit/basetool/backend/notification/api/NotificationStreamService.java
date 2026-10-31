@@ -123,11 +123,10 @@ public class NotificationStreamService {
       retireReplaced(old);
     }
     emitter.onCompletion(() -> remove(recipientUserId, emitter));
-    emitter.onTimeout(
-        () -> {
-          remove(recipientUserId, emitter);
-          emitter.complete();
-        });
+    emitter.onTimeout(() -> {
+      remove(recipientUserId, emitter);
+      emitter.complete();
+    });
     emitter.onError(_ -> remove(recipientUserId, emitter));
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));
@@ -167,17 +166,15 @@ public class NotificationStreamService {
    */
   @Scheduled(fixedRateString = "${app.notifications.sse.heartbeat-interval:PT20S}")
   public void heartbeat() {
-    emittersBySub.forEach(
-        (recipientUserId, emitters) ->
-            emitters.forEach(
-                emitter -> {
-                  try {
-                    emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
-                  } catch (IOException | RuntimeException e) {
-                    recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT, recipientUserId, e);
-                    remove(recipientUserId, emitter);
-                  }
-                }));
+    emittersBySub.forEach((recipientUserId, emitters) ->
+        emitters.forEach(emitter -> {
+          try {
+            emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
+          } catch (IOException | RuntimeException e) {
+            recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT, recipientUserId, e);
+            remove(recipientUserId, emitter);
+          }
+        }));
   }
 
   /**

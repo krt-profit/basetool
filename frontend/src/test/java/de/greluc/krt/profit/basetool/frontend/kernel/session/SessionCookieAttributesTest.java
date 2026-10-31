@@ -81,11 +81,10 @@ class SessionCookieAttributesTest {
 
   @Test
   void thePinRejectsTheCookieSpringSessionWritesWithoutTheConfiguredSerializer() {
-    runner.run(
-        context -> {
-          String header = newSessionSetCookie(context);
-          assertThatThrownBy(() -> assertPinned(header)).isInstanceOf(AssertionError.class);
-        });
+    runner.run(context -> {
+      String header = newSessionSetCookie(context);
+      assertThatThrownBy(() -> assertPinned(header)).isInstanceOf(AssertionError.class);
+    });
   }
 
   @Test
@@ -93,12 +92,11 @@ class SessionCookieAttributesTest {
     runner
         .withUserConfiguration(SessionCookieSerializerConfig.class)
         .withPropertyValues("server.servlet.session.cookie.same-site=strict")
-        .run(
-            context -> {
-              String header = newSessionSetCookie(context);
-              assertThat(header).endsWith("; SameSite=Strict");
-              assertThatThrownBy(() -> assertPinned(header)).isInstanceOf(AssertionError.class);
-            });
+        .run(context -> {
+          String header = newSessionSetCookie(context);
+          assertThat(header).endsWith("; SameSite=Strict");
+          assertThatThrownBy(() -> assertPinned(header)).isInstanceOf(AssertionError.class);
+        });
   }
 
   private static void assertPinned(String header) {

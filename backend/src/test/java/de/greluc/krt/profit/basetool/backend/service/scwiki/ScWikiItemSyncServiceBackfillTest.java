@@ -481,14 +481,13 @@ class ScWikiItemSyncServiceBackfillTest {
                 List.of(itemDto(deadlocked, "Bad Rifle"), itemDto(healthy, "Good Rifle"))));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
-        .thenAnswer(
-            inv -> {
-              GameItem candidate = inv.getArgument(0);
-              if (deadlocked.equals(candidate.getExternalUuid())) {
-                throw new ObjectOptimisticLockingFailureException(GameItem.class, deadlocked);
-              }
-              return candidate;
-            });
+        .thenAnswer(inv -> {
+          GameItem candidate = inv.getArgument(0);
+          if (deadlocked.equals(candidate.getExternalUuid())) {
+            throw new ObjectOptimisticLockingFailureException(GameItem.class, deadlocked);
+          }
+          return candidate;
+        });
 
     service.syncItems();
 

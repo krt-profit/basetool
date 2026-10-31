@@ -217,11 +217,10 @@ class JobOrderStockReadServiceTest {
     when(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId))
         .thenReturn(List.of(scopeRow, rifleRowShared, rifleRowPlain));
     when(inventoryItemMapper.gameItemToReferenceDto(any(GameItem.class)))
-        .thenAnswer(
-            inv -> {
-              GameItem gi = inv.getArgument(0);
-              return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
-            });
+        .thenAnswer(inv -> {
+          GameItem gi = inv.getArgument(0);
+          return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
+        });
 
     List<JobOrderItemStockGroupDto> result = service.getItemStockForJobOrder(jobOrderId);
 
@@ -281,11 +280,10 @@ class JobOrderStockReadServiceTest {
     when(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId))
         .thenReturn(List.of(row));
     when(inventoryItemMapper.gameItemToReferenceDto(any(GameItem.class)))
-        .thenAnswer(
-            inv -> {
-              GameItem gi = inv.getArgument(0);
-              return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
-            });
+        .thenAnswer(inv -> {
+          GameItem gi = inv.getArgument(0);
+          return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
+        });
 
     List<JobOrderItemStockGroupDto> result = service.getItemStockForJobOrder(jobOrderId);
 

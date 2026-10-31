@@ -166,9 +166,8 @@ class ExchangeCatalogControllerTest {
             get(PATH)
                 .with(
                     jwt()
-                        .jwt(
-                            token ->
-                                token.subject(MEMBER.toString()).claim("azp", "basetool-frontend"))
+                        .jwt(token ->
+                            token.subject(MEMBER.toString()).claim("azp", "basetool-frontend"))
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isForbidden());
   }
@@ -262,9 +261,8 @@ class ExchangeCatalogControllerTest {
             get(PATH)
                 .with(
                     jwt()
-                        .jwt(
-                            token ->
-                                token.subject(MEMBER.toString()).claim("azp", "basetool-frontend")))
+                        .jwt(token ->
+                            token.subject(MEMBER.toString()).claim("azp", "basetool-frontend")))
                 .header(ActingMemberHeader.EXCHANGE_CONNECTED_AT_HEADER, "1790000000"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("ACTING_MEMBER_REFUSED"));

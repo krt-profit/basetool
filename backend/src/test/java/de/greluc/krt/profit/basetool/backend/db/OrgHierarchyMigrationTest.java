@@ -90,17 +90,14 @@ class OrgHierarchyMigrationTest {
       assertThat(countById(jdbc, bereichId)).isOne();
       assertThat(countById(jdbc, squadronId)).isOne();
 
-      assertThatThrownBy(
-              () ->
-                  insertOrgUnit(
-                      jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", false, squadronId))
+      assertThatThrownBy(() ->
+              insertOrgUnit(jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", false, squadronId))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must have an ORGANISATIONSLEITUNG parent");
 
-      assertThatThrownBy(
-              () ->
-                  insertOrgUnit(
-                      jdbc, rejectedId, "ORGANISATIONSLEITUNG", "TEST_OH_X", "TOHX", false, olId))
+      assertThatThrownBy(() ->
+              insertOrgUnit(
+                  jdbc, rejectedId, "ORGANISATIONSLEITUNG", "TEST_OH_X", "TOHX", false, olId))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must not have a parent");
 
@@ -289,16 +286,14 @@ class OrgHierarchyMigrationTest {
       insertOrgChartPosition(jdbc, cmd1, "COMMAND_LEAD", squadronId, null, "Alpha", groupId);
       assertThat(orgChartPositionCount(jdbc, cmd1)).isOne();
 
-      assertThatThrownBy(
-              () ->
-                  insertOrgChartPosition(
-                      jdbc, cmd2, "COMMAND_LEAD", squadronId, null, "Alpha2", groupId))
+      assertThatThrownBy(() ->
+              insertOrgChartPosition(
+                  jdbc, cmd2, "COMMAND_LEAD", squadronId, null, "Alpha2", groupId))
           .isInstanceOf(DataAccessException.class);
 
-      assertThatThrownBy(
-              () ->
-                  insertOrgChartPosition(
-                      jdbc, lead, "SQUADRON_LEAD", squadronId, userId, null, groupId))
+      assertThatThrownBy(() ->
+              insertOrgChartPosition(
+                  jdbc, lead, "SQUADRON_LEAD", squadronId, userId, null, groupId))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("chk_org_chart_kommando_group_type");
     } finally {

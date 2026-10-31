@@ -121,9 +121,8 @@ class InventoryPoolRestorer {
   private void lock(
       @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores) {
     Set<Long> keys = new TreeSet<>();
-    lots.forEach(
-        (holder, lotKeys) ->
-            lotKeys.forEach(lotKey -> keys.add(InventoryStockCommands.lotLockKey(holder, lotKey))));
+    lots.forEach((holder, lotKeys) ->
+        lotKeys.forEach(lotKey -> keys.add(InventoryStockCommands.lotLockKey(holder, lotKey))));
     Set<UUID> ids = new TreeSet<>();
     restores.forEach(restore -> ids.add(restore.entryId()));
     Set<UUID> present = new TreeSet<>();

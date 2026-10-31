@@ -144,29 +144,28 @@ class TriggerColumnResolutionTest {
     Set<String> unresolved = new TreeSet<>();
     for (SchemaCatalog.Trigger trigger : schema.triggers()) {
       Map<String, String> reached = schema.reachableFunctions(trigger.function());
-      reached.forEach(
-          (function, source) -> {
-            String prefix = trigger.name() + " -> " + function + ": ";
-            Map<String, String> rows =
-                function.equals(trigger.function())
-                    ? Map.of("new", trigger.table(), "old", trigger.table())
-                    : Map.of();
-            for (String candidate : SqlReferences.tableCandidates(source)) {
-              if (!schema.tables().contains(candidate)
-                  && !schema.functions().containsKey(candidate)
-                  && !NOT_TABLES.contains(candidate)) {
-                unresolved.add(prefix + "table " + candidate);
-              }
-            }
-            Set<String> columns =
-                new TreeSet<>(SqlReferences.qualifiedColumns(source, schema.tables(), rows));
-            columns.addAll(SqlReferences.insertedColumns(source, schema.tables()));
-            for (String column : columns) {
-              if (!schema.columns().contains(column)) {
-                unresolved.add(prefix + "column " + column);
-              }
-            }
-          });
+      reached.forEach((function, source) -> {
+        String prefix = trigger.name() + " -> " + function + ": ";
+        Map<String, String> rows =
+            function.equals(trigger.function())
+                ? Map.of("new", trigger.table(), "old", trigger.table())
+                : Map.of();
+        for (String candidate : SqlReferences.tableCandidates(source)) {
+          if (!schema.tables().contains(candidate)
+              && !schema.functions().containsKey(candidate)
+              && !NOT_TABLES.contains(candidate)) {
+            unresolved.add(prefix + "table " + candidate);
+          }
+        }
+        Set<String> columns =
+            new TreeSet<>(SqlReferences.qualifiedColumns(source, schema.tables(), rows));
+        columns.addAll(SqlReferences.insertedColumns(source, schema.tables()));
+        for (String column : columns) {
+          if (!schema.columns().contains(column)) {
+            unresolved.add(prefix + "column " + column);
+          }
+        }
+      });
     }
     return List.copyOf(unresolved);
   }

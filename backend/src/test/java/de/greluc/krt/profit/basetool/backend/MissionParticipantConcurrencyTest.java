@@ -142,30 +142,29 @@ class MissionParticipantConcurrencyTest {
       for (int i = 0; i < THREADS; i++) {
         final UUID userId = userIds.get(i);
         futures.add(
-            pool.submit(
-                () -> {
-                  try {
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrorCount.incrementAndGet();
-                      return;
-                    }
-                    SecurityContextHolder.getContext().setAuthentication(SIGNER);
-                    try {
-                      missionParticipantService.addParticipant(
-                          missionId, userId, null, null, null, null, null);
-                    } finally {
-                      SecurityContextHolder.clearContext();
-                    }
-                    successCount.incrementAndGet();
-                  } catch (ObjectOptimisticLockingFailureException unexpected) {
-                    conflictCount.incrementAndGet();
-                    unexpectedErrors.add(unexpected);
-                  } catch (Throwable t) {
-                    otherErrorCount.incrementAndGet();
-                    unexpectedErrors.add(t);
-                  }
-                }));
+            pool.submit(() -> {
+              try {
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrorCount.incrementAndGet();
+                  return;
+                }
+                SecurityContextHolder.getContext().setAuthentication(SIGNER);
+                try {
+                  missionParticipantService.addParticipant(
+                      missionId, userId, null, null, null, null, null);
+                } finally {
+                  SecurityContextHolder.clearContext();
+                }
+                successCount.incrementAndGet();
+              } catch (ObjectOptimisticLockingFailureException unexpected) {
+                conflictCount.incrementAndGet();
+                unexpectedErrors.add(unexpected);
+              } catch (Throwable t) {
+                otherErrorCount.incrementAndGet();
+                unexpectedErrors.add(t);
+              }
+            }));
       }
 
       assertTrue(
@@ -247,31 +246,30 @@ class MissionParticipantConcurrencyTest {
     try {
       for (int i = 0; i < THREADS; i++) {
         futures.add(
-            pool.submit(
-                () -> {
-                  try {
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrorCount.incrementAndGet();
-                      return;
-                    }
-                    SecurityContextHolder.getContext().setAuthentication(SIGNER);
-                    try {
-                      missionParticipantService.addParticipant(
-                          missionId, userId, null, null, null, null, null);
-                    } finally {
-                      SecurityContextHolder.clearContext();
-                    }
-                    successCount.incrementAndGet();
-                  } catch (DuplicateEntityException expected) {
-                    rejectedByInMemoryCheck.incrementAndGet();
-                  } catch (DataIntegrityViolationException expected) {
-                    rejectedByDbIndex.incrementAndGet();
-                  } catch (Throwable t) {
-                    otherErrorCount.incrementAndGet();
-                    unexpectedErrors.add(t);
-                  }
-                }));
+            pool.submit(() -> {
+              try {
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrorCount.incrementAndGet();
+                  return;
+                }
+                SecurityContextHolder.getContext().setAuthentication(SIGNER);
+                try {
+                  missionParticipantService.addParticipant(
+                      missionId, userId, null, null, null, null, null);
+                } finally {
+                  SecurityContextHolder.clearContext();
+                }
+                successCount.incrementAndGet();
+              } catch (DuplicateEntityException expected) {
+                rejectedByInMemoryCheck.incrementAndGet();
+              } catch (DataIntegrityViolationException expected) {
+                rejectedByDbIndex.incrementAndGet();
+              } catch (Throwable t) {
+                otherErrorCount.incrementAndGet();
+                unexpectedErrors.add(t);
+              }
+            }));
       }
 
       assertTrue(

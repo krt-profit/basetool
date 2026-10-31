@@ -108,22 +108,20 @@ public class OrgUnitMembershipQueryService {
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>(listAllActiveOptions());
     orgUnitRepository.findActiveBereiche().stream()
         .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
-        .forEach(
-            b ->
-                options.add(
-                    new OrgUnitMembershipOptionDto(
-                        b.getId(), b.getName(), b.getShorthand(), OrgUnitKind.BEREICH, false)));
+        .forEach(b ->
+            options.add(
+                new OrgUnitMembershipOptionDto(
+                    b.getId(), b.getName(), b.getShorthand(), OrgUnitKind.BEREICH, false)));
     orgUnitRepository.findActiveOrganisationsleitung().stream()
         .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
-        .forEach(
-            ol ->
-                options.add(
-                    new OrgUnitMembershipOptionDto(
-                        ol.getId(),
-                        ol.getName(),
-                        ol.getShorthand(),
-                        OrgUnitKind.ORGANISATIONSLEITUNG,
-                        false)));
+        .forEach(ol ->
+            options.add(
+                new OrgUnitMembershipOptionDto(
+                    ol.getId(),
+                    ol.getName(),
+                    ol.getShorthand(),
+                    OrgUnitKind.ORGANISATIONSLEITUNG,
+                    false)));
     return options;
   }
 

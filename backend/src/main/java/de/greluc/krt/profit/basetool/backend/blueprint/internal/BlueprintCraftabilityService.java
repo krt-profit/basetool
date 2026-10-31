@@ -176,13 +176,12 @@ public class BlueprintCraftabilityService {
       }
     }
     Map<UUID, Material> bridges = new LinkedHashMap<>();
-    nameByGameItemId.forEach(
-        (gameItemId, name) -> {
-          Material material = materialByLowerName.get(name.toLowerCase(Locale.ROOT));
-          if (material != null && material.getId() != null) {
-            bridges.put(gameItemId, material);
-          }
-        });
+    nameByGameItemId.forEach((gameItemId, name) -> {
+      Material material = materialByLowerName.get(name.toLowerCase(Locale.ROOT));
+      if (material != null && material.getId() != null) {
+        bridges.put(gameItemId, material);
+      }
+    });
     return bridges;
   }
 
@@ -433,12 +432,11 @@ public class BlueprintCraftabilityService {
     }
     List<CraftabilitySlice> qualifying =
         slices.stream()
-            .filter(
-                s ->
-                    s.quality() != null
-                        && s.quality() >= floor
-                        && s.totalScu() != null
-                        && s.totalScu() > 0.0d)
+            .filter(s ->
+                s.quality() != null
+                    && s.quality() >= floor
+                    && s.totalScu() != null
+                    && s.totalScu() > 0.0d)
             .sorted(Comparator.comparingInt(CraftabilitySlice::quality).reversed())
             .toList();
     double available = qualifying.stream().mapToDouble(CraftabilitySlice::totalScu).sum();

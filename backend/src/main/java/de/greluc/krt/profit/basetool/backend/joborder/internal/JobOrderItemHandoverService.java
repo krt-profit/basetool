@@ -134,13 +134,12 @@ public class JobOrderItemHandoverService {
           jobOrder.getItems().stream()
               .filter(i -> i.getId().equals(entryDto.jobOrderItemId()))
               .findFirst()
-              .orElseThrow(
-                  () ->
-                      new BadRequestException(
-                          "Item line "
-                              + entryDto.jobOrderItemId()
-                              + " does not belong to job order "
-                              + jobOrderId));
+              .orElseThrow(() ->
+                  new BadRequestException(
+                      "Item line "
+                          + entryDto.jobOrderItemId()
+                          + " does not belong to job order "
+                          + jobOrderId));
 
       int outstanding = line.getManufacturedAmount() - line.getDeliveredAmount();
       if (entryDto.amount() > outstanding) {
@@ -247,16 +246,15 @@ public class JobOrderItemHandoverService {
             : null;
     userService
         .getCurrentUser()
-        .ifPresent(
-            current -> {
-              handover.setExecutingUser(current);
-              orgUnitMembershipQueryService
-                  .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
-                  .flatMap(orgUnitRepository::findById)
-                  .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-                  .filter(Squadron.class::isInstance)
-                  .map(Squadron.class::cast)
-                  .ifPresent(handover::setExecutingSquadron);
-            });
+        .ifPresent(current -> {
+          handover.setExecutingUser(current);
+          orgUnitMembershipQueryService
+              .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
+              .flatMap(orgUnitRepository::findById)
+              .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+              .filter(Squadron.class::isInstance)
+              .map(Squadron.class::cast)
+              .ifPresent(handover::setExecutingSquadron);
+        });
   }
 }

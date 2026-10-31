@@ -420,11 +420,10 @@ public class OperationPageController {
     }
     return authentication.getAuthorities().stream()
         .map(GrantedAuthority::getAuthority)
-        .anyMatch(
-            role ->
-                Roles.authority(Roles.ADMIN).equals(role)
-                    || Roles.authority(Roles.OFFICER).equals(role)
-                    || Roles.authority(Roles.MISSION_MANAGER).equals(role));
+        .anyMatch(role ->
+            Roles.authority(Roles.ADMIN).equals(role)
+                || Roles.authority(Roles.OFFICER).equals(role)
+                || Roles.authority(Roles.MISSION_MANAGER).equals(role));
   }
 
   private static boolean hasOfficerOrAdminRole(Authentication authentication) {
@@ -433,10 +432,9 @@ public class OperationPageController {
     }
     return authentication.getAuthorities().stream()
         .map(GrantedAuthority::getAuthority)
-        .anyMatch(
-            role ->
-                Roles.authority(Roles.ADMIN).equals(role)
-                    || Roles.authority(Roles.OFFICER).equals(role));
+        .anyMatch(role ->
+            Roles.authority(Roles.ADMIN).equals(role)
+                || Roles.authority(Roles.OFFICER).equals(role));
   }
 
   /**

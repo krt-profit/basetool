@@ -357,18 +357,17 @@ public class SpecialCommandMembersPageController {
     }
     List<OrgUnitMembershipDto> members =
         raw.stream()
-            .map(
-                m ->
-                    new OrgUnitMembershipDto(
-                        m.userId(),
-                        m.userDisplayName(),
-                        m.orgUnitId(),
-                        m.kind() == null ? OrgUnitKind.SPECIAL_COMMAND : m.kind(),
-                        Boolean.TRUE.equals(m.isLogistician()),
-                        Boolean.TRUE.equals(m.isMissionManager()),
-                        Boolean.TRUE.equals(m.isLead()),
-                        m.joinedAt(),
-                        m.version() == null ? 0L : m.version()))
+            .map(m ->
+                new OrgUnitMembershipDto(
+                    m.userId(),
+                    m.userDisplayName(),
+                    m.orgUnitId(),
+                    m.kind() == null ? OrgUnitKind.SPECIAL_COMMAND : m.kind(),
+                    Boolean.TRUE.equals(m.isLogistician()),
+                    Boolean.TRUE.equals(m.isMissionManager()),
+                    Boolean.TRUE.equals(m.isLead()),
+                    m.joinedAt(),
+                    m.version() == null ? 0L : m.version()))
             .collect(Collectors.toCollection(ArrayList::new));
     members.sort(
         Comparator.comparing(

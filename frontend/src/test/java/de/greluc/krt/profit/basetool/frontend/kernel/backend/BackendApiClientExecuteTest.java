@@ -158,22 +158,16 @@ class BackendApiClientExecuteTest {
 
   static Stream<Arguments> refusals() {
     return shapes()
-        .flatMap(
-            shape ->
-                Stream.of(
-                        new Object[] {401, "UNAUTHORIZED"},
-                        new Object[] {403, "FORBIDDEN"},
-                        new Object[] {404, "NOT_FOUND"},
-                        new Object[] {409, "CONFLICT"},
-                        new Object[] {503, "SERVICE_UNAVAILABLE"})
-                    .map(
-                        refusal ->
-                            Arguments.of(
-                                shape.get()[0],
-                                shape.get()[1],
-                                shape.get()[2],
-                                refusal[0],
-                                refusal[1])));
+        .flatMap(shape ->
+            Stream.of(
+                    new Object[] {401, "UNAUTHORIZED"},
+                    new Object[] {403, "FORBIDDEN"},
+                    new Object[] {404, "NOT_FOUND"},
+                    new Object[] {409, "CONFLICT"},
+                    new Object[] {503, "SERVICE_UNAVAILABLE"})
+                .map(refusal ->
+                    Arguments.of(
+                        shape.get()[0], shape.get()[1], shape.get()[2], refusal[0], refusal[1])));
   }
 
   /** A refresh token the OAuth2 client can no longer use becomes the re-authentication signal. */
@@ -184,11 +178,9 @@ class BackendApiClientExecuteTest {
     WebClient failing =
         WebClient.builder()
             .baseUrl(server.url("/").toString())
-            .filter(
-                (request, next) ->
-                    Mono.error(
-                        new ClientAuthorizationException(
-                            new OAuth2Error("invalid_grant"), "keycloak")))
+            .filter((request, next) ->
+                Mono.error(
+                    new ClientAuthorizationException(new OAuth2Error("invalid_grant"), "keycloak")))
             .build();
     BackendApiClient reauthClient =
         new BackendApiClient(failing, failing, meterRegistry, new NoOpCacheManager());

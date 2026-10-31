@@ -1076,12 +1076,11 @@ public class BankBackendClient {
             webClient
                 .get()
                 .uri(uri, id)
-                .headers(
-                    h -> {
-                      if (userTimeZone != null && !userTimeZone.isBlank()) {
-                        h.set("X-User-Time-Zone", userTimeZone);
-                      }
-                    }),
+                .headers(h -> {
+                  if (userTimeZone != null && !userTimeZone.isBlank()) {
+                    h.set("X-User-Time-Zone", userTimeZone);
+                  }
+                }),
         spec -> spec.bodyToMono(byte[].class));
   }
 
@@ -1102,12 +1101,11 @@ public class BankBackendClient {
             webClient
                 .get()
                 .uri(uri, uriVariables)
-                .headers(
-                    h -> {
-                      if (userTimeZone != null && !userTimeZone.isBlank()) {
-                        h.set("X-User-Time-Zone", userTimeZone);
-                      }
-                    }),
+                .headers(h -> {
+                  if (userTimeZone != null && !userTimeZone.isBlank()) {
+                    h.set("X-User-Time-Zone", userTimeZone);
+                  }
+                }),
         spec -> spec.bodyToMono(byte[].class));
   }
 }

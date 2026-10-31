@@ -556,10 +556,8 @@ public class RefineryImportService implements RefineryDraftBuilder {
             properties.suggestionFloor());
     List<ImportSuggestionDto> suggestions =
         ranked.stream()
-            .map(
-                s ->
-                    new ImportSuggestionDto(
-                        s.candidate().getId(), s.candidate().getName(), s.score()))
+            .map(s ->
+                new ImportSuggestionDto(s.candidate().getId(), s.candidate().getName(), s.score()))
             .toList();
     if (!ranked.isEmpty() && ranked.getFirst().score() >= properties.fuzzyAcceptThreshold()) {
       return MaterialMatch.fuzzy(

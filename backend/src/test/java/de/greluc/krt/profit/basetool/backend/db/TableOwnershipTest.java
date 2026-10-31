@@ -559,19 +559,18 @@ class TableOwnershipTest {
   private static Map<String, Set<String>> nativeCrossings(
       Map<String, NativeStatement> statements, Set<String> tables, Map<String, String> owners) {
     Map<String, Set<String>> crossings = new TreeMap<>();
-    statements.forEach(
-        (key, statement) -> {
-          String owner = owners.get(statement.ownerTable());
-          Set<String> foreign = new TreeSet<>();
-          for (String table : SqlReferences.tables(statement.sql(), tables)) {
-            if (!Objects.equals(owners.get(table), owner)) {
-              foreign.add(table);
-            }
-          }
-          if (!foreign.isEmpty()) {
-            crossings.put(key, foreign);
-          }
-        });
+    statements.forEach((key, statement) -> {
+      String owner = owners.get(statement.ownerTable());
+      Set<String> foreign = new TreeSet<>();
+      for (String table : SqlReferences.tables(statement.sql(), tables)) {
+        if (!Objects.equals(owners.get(table), owner)) {
+          foreign.add(table);
+        }
+      }
+      if (!foreign.isEmpty()) {
+        crossings.put(key, foreign);
+      }
+    });
     return crossings;
   }
 

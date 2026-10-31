@@ -239,11 +239,10 @@ class ServiceAccountTokenProviderTest {
     try (ExecutorService pool = Executors.newFixedThreadPool(callers)) {
       for (int i = 0; i < callers; i++) {
         results.add(
-            pool.submit(
-                () -> {
-                  start.await();
-                  return provider.currentToken();
-                }));
+            pool.submit(() -> {
+              start.await();
+              return provider.currentToken();
+            }));
       }
       start.countDown();
       for (Future<String> result : results) {

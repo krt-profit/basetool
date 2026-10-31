@@ -383,12 +383,11 @@ class NotificationStreamServiceTest {
     UUID sub = UUID.randomUUID();
 
     List<ILoggingEvent> events =
-        withStreamLogAppender(
-            () -> {
-              for (int i = 0; i < NotificationStreamService.MAX_EMITTERS_PER_SUB + 2; i++) {
-                service.subscribe(sub);
-              }
-            });
+        withStreamLogAppender(() -> {
+          for (int i = 0; i < NotificationStreamService.MAX_EMITTERS_PER_SUB + 2; i++) {
+            service.subscribe(sub);
+          }
+        });
 
     assertEquals(2.0, service.registry.get(MetricNames.SSE_EMITTERS_EVICTED).counter().count());
     ILoggingEvent evictionLine =

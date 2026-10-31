@@ -152,14 +152,8 @@ class WebClientBackendSeamTest {
     breaker.transitionToForcedOpenState();
     int before = backend.getRequestCount();
 
-    assertThatThrownBy(
-            () ->
-                webClient
-                    .get()
-                    .uri("/api/v1/seam/open")
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block(timeout()))
+    assertThatThrownBy(() ->
+            webClient.get().uri("/api/v1/seam/open").retrieve().toBodilessEntity().block(timeout()))
         .isInstanceOf(CallNotPermittedException.class);
     assertThat(backend.getRequestCount()).isEqualTo(before);
   }
@@ -169,23 +163,21 @@ class WebClientBackendSeamTest {
     clearInvocations(authorizedClientManager);
     int before = foreign.getRequestCount();
 
-    assertThatThrownBy(
-            () ->
-                webClient
-                    .get()
-                    .uri(foreign.url("/steal").toString())
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block(timeout()))
+    assertThatThrownBy(() ->
+            webClient
+                .get()
+                .uri(foreign.url("/steal").toString())
+                .retrieve()
+                .toBodilessEntity()
+                .block(timeout()))
         .isInstanceOf(BackendOriginViolationException.class);
-    assertThatThrownBy(
-            () ->
-                webClient
-                    .post()
-                    .uri(foreign.url("/steal").uri())
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block(timeout()))
+    assertThatThrownBy(() ->
+            webClient
+                .post()
+                .uri(foreign.url("/steal").uri())
+                .retrieve()
+                .toBodilessEntity()
+                .block(timeout()))
         .isInstanceOf(BackendOriginViolationException.class);
 
     assertThat(foreign.getRequestCount()).isEqualTo(before);
@@ -212,14 +204,13 @@ class WebClientBackendSeamTest {
     WebClient client = context.getBean(bean, WebClient.class);
     int before = foreign.getRequestCount();
 
-    assertThatThrownBy(
-            () ->
-                client
-                    .get()
-                    .uri(foreign.url("/steal").uri())
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block(timeout()))
+    assertThatThrownBy(() ->
+            client
+                .get()
+                .uri(foreign.url("/steal").uri())
+                .retrieve()
+                .toBodilessEntity()
+                .block(timeout()))
         .isInstanceOf(BackendOriginViolationException.class);
     assertThat(foreign.getRequestCount()).isEqualTo(before);
   }

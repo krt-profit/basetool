@@ -314,11 +314,10 @@ public class NotificationPageController {
     }
     Disposable.Swap subscription = Disposables.swap();
     emitter.onCompletion(subscription::dispose);
-    emitter.onTimeout(
-        () -> {
-          subscription.dispose();
-          completeQuietly(emitter);
-        });
+    emitter.onTimeout(() -> {
+      subscription.dispose();
+      completeQuietly(emitter);
+    });
     emitter.onError(_ -> subscription.dispose());
     String consentUrl = request.getContextPath() + TermsAcceptanceGateFilter.CONSENT_PATH;
     relayConnections.incrementAndGet();

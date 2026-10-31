@@ -1060,11 +1060,10 @@ public class JobOrderService {
     OrgUnit target =
         orgUnitRepository
             .findById(newResponsibleOrgUnitId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "responsibleOrgUnitId does not resolve to a known org unit: "
-                            + newResponsibleOrgUnitId));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "responsibleOrgUnitId does not resolve to a known org unit: "
+                        + newResponsibleOrgUnitId));
     if (!target.isProfitEligible()) {
       throw new BadRequestException(
           "The selected responsible org unit is not profit-eligible and cannot process orders: "

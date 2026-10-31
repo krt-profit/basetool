@@ -190,13 +190,12 @@ public class NotificationService {
   private Notification loadOwn(@NotNull UUID recipientUserId, @NotNull UUID id) {
     return notificationRepository
         .findByIdAndRecipientUserId(id, recipientUserId)
-        .orElseThrow(
-            () -> {
-              log.warn(
-                  "Notification access denied or not found: recipientUserId={} requested id={}",
-                  recipientUserId,
-                  id);
-              return new EntityNotFoundException("Notification not found: " + id);
-            });
+        .orElseThrow(() -> {
+          log.warn(
+              "Notification access denied or not found: recipientUserId={} requested id={}",
+              recipientUserId,
+              id);
+          return new EntityNotFoundException("Notification not found: " + id);
+        });
   }
 }

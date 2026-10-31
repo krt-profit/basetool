@@ -101,12 +101,10 @@ public class BankSecurityService {
     }
     return authHelperService
         .currentUserId()
-        .flatMap(
-            uid ->
-                holderRepository
-                    .findById(holderId)
-                    .map(
-                        holder -> holder.getUser() != null && uid.equals(holder.getUser().getId())))
+        .flatMap(uid ->
+            holderRepository
+                .findById(holderId)
+                .map(holder -> holder.getUser() != null && uid.equals(holder.getUser().getId())))
         .orElse(false);
   }
 
@@ -206,12 +204,11 @@ public class BankSecurityService {
   private Map<UUID, BankAccountGrant> loadCallerGrants() {
     return authHelperService
         .currentUserId()
-        .map(
-            uid ->
-                grantRepository.findByUserId(uid).stream()
-                    .collect(
-                        Collectors.toUnmodifiableMap(
-                            grant -> grant.getId().getAccountId(), Function.identity())))
+        .map(uid ->
+            grantRepository.findByUserId(uid).stream()
+                .collect(
+                    Collectors.toUnmodifiableMap(
+                        grant -> grant.getId().getAccountId(), Function.identity())))
         .orElseGet(Map::of);
   }
 

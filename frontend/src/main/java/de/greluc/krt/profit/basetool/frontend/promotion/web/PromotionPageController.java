@@ -119,11 +119,10 @@ public class PromotionPageController {
         .sorted(
             Comparator.comparingInt(RankRequirementDto::fromRank)
                 .thenComparingInt(RankRequirementDto::toRank))
-        .forEach(
-            req -> {
-              String key = req.fromRank() + "_" + req.toRank();
-              groupedRankRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
-            });
+        .forEach(req -> {
+          String key = req.fromRank() + "_" + req.toRank();
+          groupedRankRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
+        });
 
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
@@ -417,11 +416,10 @@ public class PromotionPageController {
         .sorted(
             Comparator.comparingInt(RankRequirementDto::fromRank)
                 .thenComparingInt(RankRequirementDto::toRank))
-        .forEach(
-            req -> {
-              String key = req.fromRank() + "_" + req.toRank();
-              groupedRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
-            });
+        .forEach(req -> {
+          String key = req.fromRank() + "_" + req.toRank();
+          groupedRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
+        });
 
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
