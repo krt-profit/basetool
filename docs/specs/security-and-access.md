@@ -467,6 +467,13 @@ delivered, stolen, book-out, personal rebook, the stock viewer's `canEdit`), the
 and handover reports (the responsible unit, SK-queue orders included), the earmarks, the squadron a
 material claim is made for, and the refinery order read, edit, delete, store, creation for another member (the stamped unit),
 the user order list and the mission order list (own orders plus those of the Logistician units).
+`isLogisticianOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
+pinned (`OwnerScopeService#canActAsLogisticianInActiveContext()`, true when `currentLogisticianScope()`
+reaches a unit, so the cascade of a Bereich or Organisationsleitung grant applies); the frontend
+gates for the inventory, job-order and refinery pages and their write proxies read it through
+`LogisticianGate`, and per-object controls follow the backend's per-unit answer. **Enforced by:**
+`LogisticianPerUnitSurfacesTest`, `MeControllerTest`, `LogisticianGateTest`,
+`LogisticianPinAwareSurfacesMvcTest`.
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
 per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
 MUST `POST /api/v1/refinery-orders/users/{userId}`, which reads the target from the path. `POST
@@ -3799,8 +3806,8 @@ layer directly.
 - **The flags are presentation.** The backend re-checks officer reach on the target's owning unit
   on every request (REQ-SEC-015); a flag that reads `true` for the union never authorises a write
   in a unit without reach.
-- `isLogisticianOrAbove` and `isMissionManagerOrAbove` still resolve through the hierarchy; a seat
-  holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
+- `isLogisticianOrAbove` and `isMissionManagerOrAbove` are pin-aware grant flags (REQ-SEC-005); a
+  seat holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
   officer role.
 
 **Live ahead of the cut:** the officer flags `hasOfficerReach`, `canOpenLeitung`,

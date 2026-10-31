@@ -23,8 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,27 +35,35 @@ import org.springframework.stereotype.Component;
  * every write.
  */
 @Component(MissionManagerGate.BEAN_NAME)
-@RequiredArgsConstructor
-@Slf4j
 public class MissionManagerGate {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "missionManagerGate";
 
   /** The backend endpoint answering the caller's capability flags. */
-  static final String CAPABILITIES_PATH = "/api/v1/me/capabilities";
+  static final String CAPABILITIES_PATH = CapabilityGate.CAPABILITIES_PATH;
 
-  /** Request attribute holding the memoised answer of the current request. */
-  static final String REQUEST_ATTRIBUTE = MissionManagerGate.class.getName() + ".granted";
+  private final CapabilityGate gate;
 
-  /** The single seam to the backend. */
-  private final BackendApiClient backendApiClient;
-
-  /** Answers whether the caller holds {@code ADMIN}. */
-  private final FrontendAuthHelperService authHelper;
-
-  /** The current request, which carries the memo. */
-  private final HttpServletRequest request;
+  /**
+   * Creates the gate.
+   *
+   * @param backendApiClient the single seam to the backend
+   * @param authHelper answers whether the caller holds {@code ADMIN}
+   * @param request the current request, which carries the memo
+   */
+  public MissionManagerGate(
+      BackendApiClient backendApiClient,
+      FrontendAuthHelperService authHelper,
+      HttpServletRequest request) {
+    this.gate =
+        new CapabilityGate(
+            backendApiClient,
+            authHelper,
+            request,
+            MissionManagerGate.class.getName() + ".granted",
+            CapabilitiesResponse::isMissionManagerOrAbove);
+  }
 
   /**
    * Whether the caller holds a Mission Manager grant in the pinned unit, or in any unit when none
@@ -66,30 +72,6 @@ public class MissionManagerGate {
    * @return {@code true} iff the caller may manage missions and operations in the active context
    */
   public boolean isGranted() {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    if (request.getAttribute(REQUEST_ATTRIBUTE) instanceof Boolean memo) {
-      return memo;
-    }
-    boolean granted = fetch();
-    request.setAttribute(REQUEST_ATTRIBUTE, granted);
-    return granted;
-  }
-
-  /**
-   * Reads the flag from the backend.
-   *
-   * @return the backend's answer, or {@code false} on an empty answer or a failure
-   */
-  private boolean fetch() {
-    try {
-      CapabilitiesResponse capabilities =
-          backendApiClient.get(CAPABILITIES_PATH, CapabilitiesResponse.class);
-      return capabilities != null && capabilities.isMissionManagerOrAbove();
-    } catch (Exception ex) {
-      log.debug("Failed to resolve the Mission Manager capability", ex);
-      return false;
-    }
+    return gate.isGranted();
   }
 }

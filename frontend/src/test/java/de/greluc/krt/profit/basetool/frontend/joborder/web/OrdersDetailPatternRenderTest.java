@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -91,6 +92,7 @@ class OrdersDetailPatternRenderTest {
   /** A material order shows the head, the progress, its four tabs and one action per tab. */
   @Test
   void materialOrderRendersTheDetailPattern() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     MaterialDto titanium = material("Titanium");
     JobOrderDto order =

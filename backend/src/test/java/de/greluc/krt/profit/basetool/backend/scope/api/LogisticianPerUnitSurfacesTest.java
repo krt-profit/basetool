@@ -260,4 +260,26 @@ class LogisticianPerUnitSurfacesTest {
       assertThat(listScope.memberOrgUnitIds()).isEqualTo(caller.reachable());
     }
   }
+
+  @ParameterizedTest
+  @MethodSource("callers")
+  void theCapabilityFlagIsOnExactlyWhereTheCallerHandlesAUnitInTheActiveScope(Caller caller) {
+    OwnerScopeService scope = new Chain(caller).ownerScopeService;
+
+    assertThat(scope.canActAsLogisticianInActiveContext())
+        .isEqualTo(caller.admin() || !caller.reachable().isEmpty());
+  }
+
+  @Test
+  void aGrantOutsideTheScopeIsNotListed() {
+    Caller caller =
+        new Caller(
+            "grant in B, scope A only",
+            false,
+            Set.of(UNIT_B),
+            new ScopePredicate(false, null, Set.of(UNIT_A)),
+            Set.of());
+
+    assertThat(new Chain(caller).ownerScopeService.currentLogisticianOrgUnitIds()).isEmpty();
+  }
 }

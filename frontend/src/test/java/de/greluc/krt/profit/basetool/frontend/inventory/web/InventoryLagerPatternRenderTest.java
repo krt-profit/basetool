@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -423,6 +424,7 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void globalLagerRendersTheListPatternForALogistician() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     String main = main(render("/inventory/all", "/inventory/all/grouped", materialGroups()));
 
     assertThat(main)

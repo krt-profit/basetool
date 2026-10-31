@@ -538,10 +538,9 @@ would reach the appenders verbatim — log the user's `sub` UUID instead (the ro
 same UUID space and is not PII).
 
 **No log line carries a name-derived token either.** A hash of the principal name (for example
-`String#hashCode`) is reversible against a known member list, so it is no pseudonym: the `isLogistician`
-helpers and `BackendRoleSyncFilter` log without any user tag, and a line that must correlate a user
-relies on the `userId` MDC field. **Enforced by:** `LogisticianCheckLogPrivacyTest` and
-`BackendRoleSyncFilterTest`.
+`String#hashCode`) is reversible against a known member list, so it is no pseudonym: the capability
+gates (`CapabilityGate`) and `BackendRoleSyncFilter` log without any user tag, and a line that must
+correlate a user relies on the `userId` MDC field. **Enforced by:** `BackendRoleSyncFilterTest`.
 
 **A value object that holds a credential redacts it in `toString()`.** The scrape credentials
 (`MonitoringScrapeProperties` in all three apps) print the password as `<redacted>`, and the

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
@@ -36,7 +37,6 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -60,7 +60,7 @@ class JobOrderAssigneeNoteBackendUriTest {
     controller =
         new JobOrderWriteController(
             new JobOrderBackendClient(RealBackendApiClient.over(webClient)),
-            mock(RoleHierarchy.class),
+            mock(LogisticianGate.class),
             mock(MutationResponseHelper.class),
             mock(LiveSyncLocalBus.class));
   }

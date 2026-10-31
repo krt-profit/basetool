@@ -280,6 +280,16 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianInActiveContext()}: whether the caller
+   * handles a unit as Logistician in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds a Logistician grant in the context
+   */
+  public boolean canActAsLogisticianInActiveContext() {
+    return accessGateService.canActAsLogisticianInActiveContext();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#canActAsOfficerInActiveContext()}: whether the caller
    * holds officer reach in the pinned unit, or in any unit when nothing is pinned.
    *
