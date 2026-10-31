@@ -290,6 +290,28 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canManageMissionsOf(UUID)}: a Mission Manager grant in
+   * the target's owning unit, where a target without a unit needs a grant in an
+   * Organisationsleitung or Bereich unit.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds the matching grant
+   */
+  public boolean canManageMissionsOf(@Nullable UUID orgUnitId) {
+    return accessGateService.canManageMissionsOf(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#canActAsMissionManagerInActiveContext()}: whether the
+   * caller holds a Mission Manager grant in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds a grant in the active context
+   */
+  public boolean canActAsMissionManagerInActiveContext() {
+    return requestScopeResolver.canActAsMissionManagerInActiveContext();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentOversightScope()}: the cascading (view)
    * oversight scope backing the blueprint overview and the F1 bank balance view.
    *

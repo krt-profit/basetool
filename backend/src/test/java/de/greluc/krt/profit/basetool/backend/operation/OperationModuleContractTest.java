@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -194,14 +195,28 @@ class OperationModuleContractTest {
   }
 
   @Test
-  void aForeignMissionManagerIsForbiddenButMayEditAnOwnerlessOperation() throws Exception {
+  void aMissionManagerGrantCountsOnlyInTheOwningUnitAndAnOwnerlessOperationNeedsALeadershipGrant()
+      throws Exception {
     User manager = user("op-foreign-manager", foreign);
     Operation owned = operation(home);
     Operation ownerless = operation(null);
-    RequestPostProcessor caller = as(manager, "ROLE_KRT_MEMBER", "ROLE_MISSION_MANAGER");
+    RequestPostProcessor foreignGrant =
+        jwt()
+            .jwt(builder -> builder.subject(manager.getId().toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                new OrgUnitContextualAuthority("MISSION_MANAGER", foreign.getId()));
+    RequestPostProcessor homeGrant =
+        jwt()
+            .jwt(builder -> builder.subject(manager.getId().toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority("MISSION_MANAGER", home.getId()));
 
-    mockMvc.perform(update(owned).with(caller)).andExpect(status().isForbidden());
-    mockMvc.perform(update(ownerless).with(caller)).andExpect(status().isOk());
+    mockMvc.perform(update(owned).with(foreignGrant)).andExpect(status().isForbidden());
+    mockMvc.perform(update(ownerless).with(foreignGrant)).andExpect(status().isForbidden());
+    mockMvc.perform(update(owned).with(homeGrant)).andExpect(status().isOk());
   }
 
   @Test

@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.time.Instant;
 import java.util.Set;
@@ -200,7 +201,9 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());
@@ -221,7 +224,9 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());
@@ -242,7 +247,9 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());
