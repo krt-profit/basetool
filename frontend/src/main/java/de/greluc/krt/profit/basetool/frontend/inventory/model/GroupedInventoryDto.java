@@ -37,7 +37,7 @@ import java.util.Objects;
  * @param averageQuality amount-weighted mean quality, or {@code null}
  * @param maxQuality highest quality across the stacks, or {@code null}
  * @param stacks the per-stock-identity stacks of this group
- * @param lowStock whether a minimum stock level of this material is low (REQ-INV-068)
+ * @param lowStock whether a minimum stock level of this material or game item is low (REQ-INV-068)
  */
 @DtoMirror
 public record GroupedInventoryDto(

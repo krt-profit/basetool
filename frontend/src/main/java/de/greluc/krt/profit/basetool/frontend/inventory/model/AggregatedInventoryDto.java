@@ -35,7 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
  * @param quality amount-weighted average quality, or {@code null}
  * @param maxQuality highest single-entry quality, or {@code null}
  * @param amount total quantity in stock
- * @param lowStock whether a minimum stock level of the material is low (REQ-INV-068)
+ * @param lowStock whether a minimum stock level of the material or game item is low (REQ-INV-068)
  */
 @DtoMirror
 public record AggregatedInventoryDto(

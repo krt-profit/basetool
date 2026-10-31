@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     krtEvents.on('click', 'supply-open-need', openCreate);
     krtEvents.on('click', 'supply-edit-need', openEdit);
 
-    const SHORTCUT_PARAMS = ['needUnit', 'needMaterial', 'needTier', 'needAmount'];
+    const SHORTCUT_PARAMS = ['needUnit', 'needMaterial', 'needItem', 'needTier', 'needAmount'];
 
     /**
      * Selects an option by value when the select offers it; any other value leaves it unchanged.
@@ -178,11 +178,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function openFromShortcut() {
         const params = new URLSearchParams(window.location.search);
         const materialId = params.get('needMaterial');
-        if (!materialId) return;
+        const itemId = params.get('needItem');
+        if (!materialId && !itemId) return;
         openCreate();
         selectIfOffered(select('supply-need-unit'), params.get('needUnit'));
-        selectIfOffered(select('supply-need-material'), materialId);
-        selectIfOffered(select('supply-need-tier'), params.get('needTier'));
+        if (itemId) {
+            select('supply-need-kind').value = 'item';
+            select('supply-need-kind').dispatchEvent(new Event('change'));
+            selectIfOffered(select('supply-need-item'), itemId);
+        } else {
+            selectIfOffered(select('supply-need-material'), materialId);
+            selectIfOffered(select('supply-need-tier'), params.get('needTier'));
+        }
         const amount = params.get('needAmount');
         if (amount) field('supply-need-amount').value = amount;
         SHORTCUT_PARAMS.forEach((name) => params.delete(name));

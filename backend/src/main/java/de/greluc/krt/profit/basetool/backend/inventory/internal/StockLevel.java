@@ -35,8 +35,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -100,6 +102,16 @@ public class StockLevel extends AbstractEntity<UUID> {
   /** The amount the level is filled up to; at least the minimum. */
   @Column(name = "target_amount", nullable = false)
   private double target;
+
+  /**
+   * When the unit was told that the level turned low, {@code null} while the level is armed. Only
+   * the repository's conditional updates write it, so a level edit never carries a stale value and
+   * the level's version stays untouched (REQ-NOTIF-030).
+   */
+  @Column(name = "low_notified_at", insertable = false, updatable = false)
+  @Setter(AccessLevel.NONE)
+  @Nullable
+  private Instant lowNotifiedAt;
 
   /**
    * The id of the watched catalogue entry, the material or the game item.
