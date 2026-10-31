@@ -270,9 +270,9 @@ class AdminSettingsPageControllerMvcTest {
   }
 
   /**
-   * The page renders on the form pattern: a page head under the "System &amp; Daten" eyebrow, the
-   * three saved settings as numbered sections of one form card with a single sticky primary action,
-   * the rounding mode as a segment carrying the stored value, and the per-unit flags as switches in
+   * The page renders on the form pattern: a page head under the "Betrieb" eyebrow, the three saved
+   * settings as numbered sections of one form card with a single sticky primary action, the
+   * rounding mode as a segment carrying the stored value, and the per-unit flags as switches in
    * their own numbered sections that save on change.
    */
   @Test
@@ -285,7 +285,7 @@ class AdminSettingsPageControllerMvcTest {
 
     assertThat(html)
         .contains("data-testid=\"page-head\"")
-        .containsPattern("<span class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("<span class=\"page-eyebrow\"[^>]*>Betrieb<")
         .contains("<h1>Systemeinstellungen</h1>")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");

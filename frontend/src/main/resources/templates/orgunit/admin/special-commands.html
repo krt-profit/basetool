@@ -11,7 +11,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.specialcommands.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.specialcommands', eyebrowKey='nav.admin.group.members', titleText=#{admin.specialcommands.title},
         count=${specialCommands != null ? #lists.size(specialCommands) : 0}, countId='sc-count', countFor='sc-results', actions=~{::sc-actions})}">
         <th:block th:ref="sc-actions">
             <button type="button" id="add-sc-btn" class="btn btn--cta" data-testid="page-head-primary"

@@ -67,6 +67,11 @@
                     <th:block th:replace="~{kernel/fragments/nav-entries :: group(${navigation.personal()}, #{${navigation.personal().group().labelKey()}}, true)}" />
                 </div>
                 <div class="nav-mode nav-mode-admin" data-nav-mode="admin" th:unless="${navigation.admin().isEmpty()}">
+                    <div class="nav-top" th:data-nav-group="#{nav.admin.crumb}">
+                        <th:block th:each="entry : ${navigation.adminTop().links()}">
+                            <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-top-link', null, ${entry.icon()}, false)}" />
+                        </th:block>
+                    </div>
                     <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
                         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false)}" />
                     </th:block>

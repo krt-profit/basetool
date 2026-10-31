@@ -1639,8 +1639,9 @@ SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageC
 
 ### REQ-UI-026 — Navigation: a structured drawer, a quick access and a phone tab bar
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current text below stays
-> authoritative; the planned amendment at the end of this requirement replaces the parts it names.
+> **Status: partly shipped** (ADR-0297, map #2800). Admin mode of the planned amendment is
+> implemented; until the member default ships, the current text below stays authoritative for the
+> rest, and the planned amendment replaces the parts it names.
 
 The navigation has grown to about 65 links for a member with many roles, several viewport heights
 of one flat drawer. It is one model on every device
@@ -1796,6 +1797,12 @@ its former sibling pages become tabs of it.
 
 **Admin mode: the admin dashboard plus 13 links in 3 groups, collapsed by default.** The admin
 dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four current admin groups.
+*Shipped:* `/admin` is the hub until the dashboard widgets exist, the groups start collapsed (the
+member's own choice and the group holding the current page win), and every merged page shows a tab
+bar of its sibling pages (`NavigationPageTabs` in the registry). Former admin pages that remain
+reachable only as quick-access pages: Informationen (`/admin/announcement`), the admin personal
+inventory and blueprints pages. `/admin/bank` redirects to the Gefahrenzone tab
+(`/admin/settings/danger-zone`).
 
 | Group | Icon | Links (tabs) |
 |---|---|---|
@@ -1871,6 +1878,10 @@ navigation. One bar per mode.
 |---|---|
 | Member | Missionen · Lager · Aufträge |
 | Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
+
+**Enforced by (admin mode shipped):** `AdminNavigationRenderMvcTest` (hub, three collapsed groups,
+13 links, tab bar, `/admin/bank` redirect) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
+bars and counts).
 
 **Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or

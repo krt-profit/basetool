@@ -133,7 +133,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
             .getContentAsString();
 
     assertThat(html)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .containsPattern("id=\"add-sc-btn\" class=\"btn btn--cta\"")
         .contains("class=\"krt-switch\" for=\"includeInactive\"")

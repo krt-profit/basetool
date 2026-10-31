@@ -40,9 +40,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Controller for the admin-only bank page ({@code /admin/bank}) with the wipe reset (REQ-BANK-013);
- * bank management has no access (REQ-BANK-010). The wipe reset is a form post guarded by a
- * type-to-confirm step.
+ * Controller for the admin-only danger-zone tab of the system settings ({@code
+ * /admin/settings/danger-zone}) with the bank wipe reset (REQ-BANK-013); bank management has no
+ * access (REQ-BANK-010). The wipe reset is a form post guarded by a type-to-confirm step.
  */
 @Controller
 @UsesLayoutModel
@@ -51,6 +51,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminBankPageController {
 
+  /** The danger-zone tab of the system settings. */
+  private static final String DANGER_ZONE = "/admin/settings/danger-zone";
+
   /** The bank domain's backend calls. */
   private final BankBackendClient bankClient;
 
@@ -58,12 +61,23 @@ public class AdminBankPageController {
    * Renders the wipe-reset danger card. The page is static except for the PRG flash attributes,
    * which Spring exposes to the template without a model parameter.
    *
-   * @return the {@code admin/bank} view name
+   * @return the {@code bank/admin/bank} view name
+   */
+  @NotNull
+  @GetMapping(DANGER_ZONE)
+  public String dangerZone() {
+    return "bank/admin/bank";
+  }
+
+  /**
+   * Redirects the former {@code /admin/bank} page to the danger-zone tab of the system settings.
+   *
+   * @return a redirect to the danger-zone tab
    */
   @NotNull
   @GetMapping("/admin/bank")
-  public String bankAdmin() {
-    return "bank/admin/bank";
+  public String bankRedirect() {
+    return "redirect:" + DANGER_ZONE;
   }
 
   /**
@@ -83,7 +97,7 @@ public class AdminBankPageController {
    *
    * @param confirm the type-to-confirm token; must equal {@code WIPE}
    * @param redirectAttributes flash attributes carrier
-   * @return redirect back to the admin bank page
+   * @return redirect back to the danger-zone tab
    */
   @NotNull
   @PostMapping("/admin/bank/wipe-reset")
@@ -91,7 +105,7 @@ public class AdminBankPageController {
       @RequestParam(required = false) String confirm, RedirectAttributes redirectAttributes) {
     if (!"WIPE".equals(confirm)) {
       redirectAttributes.addFlashAttribute("error", "admin.bank.wipe.error.confirm");
-      return "redirect:/admin/bank";
+      return "redirect:" + DANGER_ZONE;
     }
     try {
       BankWipeResetResultDto result = bankClient.wipeReset();
@@ -104,7 +118,7 @@ public class AdminBankPageController {
       log.error("Bank wipe reset failed", e);
       redirectAttributes.addFlashAttribute("error", "admin.bank.wipe.error.failed");
     }
-    return "redirect:/admin/bank";
+    return "redirect:" + DANGER_ZONE;
   }
 
   /**

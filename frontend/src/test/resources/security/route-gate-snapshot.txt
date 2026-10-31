@@ -1,11 +1,12 @@
 / GET -> HomeController#home gate=none layout=yes
+/admin GET -> AdminHubPageController#hub gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement GET -> AdminAnnouncementPageController#showAnnouncementPage gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/delete POST -> AdminAnnouncementPageController#deleteAnnouncement gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#deleteAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/update POST -> AdminAnnouncementPageController#updateAnnouncement gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#updateAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/audit-log GET -> AdminAuditLogPageController#auditLog gate=class:hasRole('ADMIN') layout=yes
-/admin/bank GET -> AdminBankPageController#bankAdmin gate=class:hasRole('ADMIN') layout=yes
+/admin/bank GET -> AdminBankPageController#bankRedirect gate=class:hasRole('ADMIN') layout=yes
 /admin/bank-audit GET -> AdminBankPageController#bankAuditRedirect gate=class:hasRole('ADMIN') layout=yes
 /admin/bank/wipe-reset POST -> AdminBankPageController#wipeReset gate=class:hasRole('ADMIN') layout=yes
 /admin/bank/wipe-reset POST headers=[X-Requested-With=XMLHttpRequest] -> AdminBankPageController#wipeResetAjax gate=class:hasRole('ADMIN') layout=yes
@@ -127,6 +128,7 @@
 /admin/settings GET -> AdminSettingsPageController#viewSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/settings/danger-zone GET -> AdminBankPageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands GET -> AdminSpecialCommandsPageController#listSpecialCommands gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST -> AdminSpecialCommandsPageController#createSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#createSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes

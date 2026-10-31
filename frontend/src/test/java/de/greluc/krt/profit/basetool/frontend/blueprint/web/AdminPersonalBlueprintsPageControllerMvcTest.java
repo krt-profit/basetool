@@ -341,7 +341,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
 
     assertThat(html)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"bp-results\"")
         .containsPattern("overflow-menu__item--danger\"[^>]*data-testid=\"bp-purge-open\"")
