@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
@@ -31,21 +32,26 @@ import org.jetbrains.annotations.Nullable;
  * @param id the level
  * @param version the level's optimistic-lock version, echoed on a change or delete
  * @param orgUnit the unit whose pool the level watches
- * @param material the watched material
- * @param qualityTier the tier, {@code null} for any quality; an inactive tier flags the level
+ * @param material the watched material, {@code null} for a game-item level
+ * @param gameItem the watched game item, {@code null} for a material level
+ * @param qualityTier the tier, {@code null} for any quality and for a game item; an inactive tier
+ *     flags the level
  * @param minimum the amount below which the level is low
  * @param target the amount the level is filled up to
  * @param allocated the free stock allocated to the level
  * @param shortfall the target minus the allocated stock, never below zero
  * @param fillRatio the allocated stock divided by the minimum
  * @param low whether the allocated stock is below the minimum
+ * @param requested the outstanding amount of the unit's open supply needs and open requesting job
+ *     orders at the level's tier or above; shown only, never counted as stock
  * @param editable whether the caller may change and delete the level
  */
 public record StockLevelDto(
     UUID id,
     Long version,
     OrgUnitReferenceDto orgUnit,
-    MaterialReferenceDto material,
+    @Nullable MaterialReferenceDto material,
+    @Nullable GameItemReferenceDto gameItem,
     @Nullable QualityTierDto qualityTier,
     double minimum,
     double target,
@@ -53,4 +59,5 @@ public record StockLevelDto(
     double shortfall,
     double fillRatio,
     boolean low,
+    double requested,
     boolean editable) {}

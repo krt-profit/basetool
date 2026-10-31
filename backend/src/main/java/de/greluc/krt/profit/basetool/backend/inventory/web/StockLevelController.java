@@ -62,18 +62,23 @@ public class StockLevelController {
    * Lists the levels in the caller's Lager scope with their figures.
    *
    * @param orgUnitId only this unit, or {@code null} for every unit in scope
-   * @return the levels, by unit, material and tier floor descending
+   * @param lowOnly whether to return only the low levels, emptiest first
+   * @param limit the most levels to return, or {@code null} for all
+   * @return the levels, by unit, material and tier floor descending unless {@code lowOnly}
    */
   @Operation(
       summary = "List minimum stock levels",
       description =
           "Lists the minimum stock levels of the active units in the caller's Lager scope with"
-              + " their allocated free stock, shortfall, fill ratio and low flag.")
+              + " their allocated free stock, shortfall, fill ratio and low flag. With lowOnly it"
+              + " returns the low levels sorted by fill ratio, empty first, capped by limit.")
   @GetMapping
   @PreAuthorize(InventoryItemController.INVENTORY_ACCESS)
   public List<StockLevelDto> listStockLevels(
-      @RequestParam(required = false) @Nullable UUID orgUnitId) {
-    return stockLevelService.list(orgUnitId);
+      @RequestParam(required = false) @Nullable UUID orgUnitId,
+      @RequestParam(defaultValue = "false") boolean lowOnly,
+      @RequestParam(required = false) @Nullable Integer limit) {
+    return stockLevelService.list(orgUnitId, lowOnly, limit);
   }
 
   /**

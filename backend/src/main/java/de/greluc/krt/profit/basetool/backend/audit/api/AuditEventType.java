@@ -159,6 +159,9 @@ public enum AuditEventType {
   /** A minimum stock level was removed (REQ-INV-068). */
   MIN_STOCK_LEVEL_REMOVED(AuditDomain.INVENTORY),
 
+  /** A minimum stock level was removed together with its deleted catalogue entry (REQ-INV-068). */
+  MIN_STOCK_LEVEL_REMOVED_BY_CASCADE(AuditDomain.INVENTORY),
+
   /**
    * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
    *

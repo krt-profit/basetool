@@ -59,6 +59,26 @@ function showRow(id, visible) {
     if (row) row.hidden = !visible;
 }
 
+/**
+ * Whether the create dialog is set to a game item rather than a material.
+ *
+ * @returns {boolean} true when the item picker is the active subject
+ */
+function itemKindSelected() {
+    return control('stock-level-kind').value === 'item';
+}
+
+/**
+ * Shows the subject picker of the chosen kind; a game item has no quality tier.
+ */
+function syncKind() {
+    const item = itemKindSelected();
+    showRow('stock-level-material-row', !item);
+    showRow('stock-level-item-row', item);
+    showRow('stock-level-tier-row', !item);
+    if (item) control('stock-level-tier').value = '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const seam = krtPageSections.create({
         topicClass: 'INVENTORY_ALL',
@@ -132,7 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
         control('stock-level-id').value = '';
         control('stock-level-version').value = '';
         showRow('stock-level-unit-row', true);
-        showRow('stock-level-material-row', true);
+        showRow('stock-level-kind-row', true);
+        syncKind();
         if (entry) entry.hidden = true;
         krtModal.open(modal);
     });
@@ -145,13 +166,18 @@ document.addEventListener('DOMContentLoaded', () => {
         control('stock-level-minimum').value = button.getAttribute('data-minimum') || '';
         control('stock-level-target').value = button.getAttribute('data-target') || '';
         showRow('stock-level-unit-row', false);
+        showRow('stock-level-kind-row', false);
         showRow('stock-level-material-row', false);
+        showRow('stock-level-item-row', false);
+        showRow('stock-level-tier-row', button.getAttribute('data-item') !== 'true');
         if (entry) {
             entry.textContent = button.getAttribute('data-entry') || '';
             entry.hidden = false;
         }
         krtModal.open(modal);
     });
+
+    control('stock-level-kind').addEventListener('change', syncKind);
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -167,7 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
             : {
                   ...common,
                   orgUnitId: control('stock-level-unit').value,
-                  materialId: control('stock-level-material').value,
+                  materialId: itemKindSelected() ? null : control('stock-level-material').value,
+                  gameItemId: itemKindSelected() ? control('stock-level-item').value || null : null,
               };
         send(
             id ? 'PUT' : 'POST',

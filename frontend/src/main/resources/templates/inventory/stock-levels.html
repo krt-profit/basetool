@@ -28,11 +28,12 @@
                 <table class="data-table data-table--stack">
                     <thead>
                         <tr>
-                            <th th:text="#{inventory.stockLevels.col.material}">Material</th>
+                            <th th:text="#{inventory.stockLevels.col.material}">Material / Item</th>
                             <th th:text="#{inventory.stockLevels.col.tier}">Qualit&auml;tsstufe</th>
                             <th class="num" th:text="#{inventory.stockLevels.col.minimum}">Minimum</th>
                             <th class="num" th:text="#{inventory.stockLevels.col.target}">Ziel</th>
                             <th class="num" th:text="#{inventory.stockLevels.col.free}">Frei</th>
+                            <th class="num" th:text="#{inventory.stockLevels.col.requested}">Angefordert</th>
                             <th th:text="#{inventory.stockLevels.col.fill}">F&uuml;llstand</th>
                             <th class="cell-status" th:text="#{inventory.stockLevels.col.status}">Status</th>
                             <th class="cell-actions"><span class="visually-hidden" th:text="#{inventory.stockLevels.col.actions}">Aktionen</span></th>
@@ -40,8 +41,8 @@
                     </thead>
                     <tbody>
                         <tr th:each="l : ${group.levels()}" data-testid="stock-level-row" th:data-level-id="${l.id()}"
-                            th:with="qt=${l.material().quantityType()}">
-                            <td><span class="cell-title" th:text="${l.material().name()}">Quantanium</span></td>
+                            th:with="qt=${l.quantityType()}">
+                            <td><span class="cell-title" th:text="${l.entryName()}">Quantanium</span></td>
                             <td th:attr="data-label=#{inventory.stockLevels.col.tier}">
                                 <span th:if="${l.qualityTier() == null}" th:text="#{inventory.stockLevels.anyTier}">Jede Qualit&auml;t</span>
                                 <span th:if="${l.qualityTier() != null}" th:text="${l.qualityTier().label(#locale)}">Gut (650+)</span>
@@ -51,6 +52,7 @@
                             <td class="num" th:attr="data-label=#{inventory.stockLevels.col.minimum}"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.minimum()}, ${qt})}">10 SCU</th:block></td>
                             <td class="num" th:attr="data-label=#{inventory.stockLevels.col.target}"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.target()}, ${qt})}">20 SCU</th:block></td>
                             <td class="num" th:attr="data-label=#{inventory.stockLevels.col.free}" data-testid="stock-level-free"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.allocated()}, ${qt})}">6 SCU</th:block></td>
+                            <td class="num" th:attr="data-label=#{inventory.stockLevels.col.requested}" data-testid="stock-level-requested"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.requested()}, ${qt})}">3 SCU</th:block></td>
                             <td th:attr="data-label=#{inventory.stockLevels.col.fill}">
                                 <div class="meter stock-level-meter" aria-hidden="true">
                                     <i th:if="${l.low()}" class="meter__fill--danger" th:attr="data-krtm-width=${l.fillPercent()}"></i>
@@ -65,11 +67,21 @@
                             </td>
                             <td class="cell-actions">
                                 <div class="stock-level-actions" th:if="${l.editable()}">
+                                    <th:block th:if="${l.low()}">
+                                        <a class="btn btn-outline btn-xs" data-testid="stock-level-order"
+                                           th:href="@{/orders/create(materialId=${l.material().id()},minQuality=${l.qualityTier() != null ? l.qualityTier().minQuality() : 0},amount=${l.shortfall()},requestingOrgUnitId=${l.orgUnit().id()})}"
+                                           th:text="#{inventory.stockLevels.action.order}">Auftrag anlegen</a>
+                                        <a class="btn btn-outline btn-xs" data-testid="stock-level-need"
+                                           th:if="${needRaisingUnitIds.contains(l.orgUnit().id())}"
+                                           th:href="@{/supply/needs(needUnit=${l.orgUnit().id()},needMaterial=${l.material().id()},needTier=${l.qualityTier() != null ? l.qualityTier().id() : ''},needAmount=${l.shortfall()})}"
+                                           th:text="#{inventory.stockLevels.action.need}">Bedarf anlegen</a>
+                                    </th:block>
                                     <button type="button" class="btn btn-ghost btn-icon" data-trigger="stock-level-edit" data-testid="stock-level-edit"
                                             th:data-level-id="${l.id()}" th:data-version="${l.version()}"
                                             th:data-tier-id="${l.qualityTier() != null ? l.qualityTier().id() : ''}"
                                             th:data-minimum="${l.minimum()}" th:data-target="${l.target()}"
-                                            th:data-entry="${l.material().name()}"
+                                            th:data-entry="${l.entryName()}"
+                                            th:data-item="${l.gameItem() != null}"
                                             th:attr="title=#{inventory.stockLevels.edit},aria-label=#{inventory.stockLevels.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                                     <button type="button" class="btn btn-ghost btn-icon" data-trigger="stock-level-delete" data-testid="stock-level-delete"
                                             th:data-level-id="${l.id()}" th:data-version="${l.version()}"
@@ -101,13 +113,27 @@
                             <option th:each="u : ${maintainableUnits}" th:value="${u.id()}" th:text="${u.name()}">ARGON</option>
                         </select>
                     </div>
+                    <div class="form-group" id="stock-level-kind-row">
+                        <label for="stock-level-kind" th:text="#{inventory.stockLevels.field.kind}">Art</label>
+                        <select id="stock-level-kind">
+                            <option value="material" th:text="#{inventory.stockLevels.field.kind.material}">Material</option>
+                            <option value="item" th:text="#{inventory.stockLevels.field.kind.item}">Item</option>
+                        </select>
+                    </div>
                     <div class="form-group" id="stock-level-material-row">
                         <label for="stock-level-material" th:text="#{inventory.stockLevels.field.material}">Material</label>
                         <select id="stock-level-material" required>
                             <option th:each="m : ${materials}" th:value="${m.id()}" th:text="${m.name()}">Quantanium</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="stock-level-item-row" hidden>
+                        <label for="stock-level-item" th:text="#{inventory.stockLevels.field.item}">Item</label>
+                        <select id="stock-level-item" data-krt-combobox="remote-game-items"
+                                th:data-combobox-placeholder="#{inventory.form.item.placeholder}">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="stock-level-tier-row">
                         <label for="stock-level-tier" th:text="#{inventory.stockLevels.field.tier}">Qualit&auml;tsstufe</label>
                         <select id="stock-level-tier">
                             <option value="" th:text="#{inventory.stockLevels.anyTier}">Jede Qualit&auml;t</option>
