@@ -101,8 +101,6 @@ public class UserController {
       "hasAnyRole('"
           + Roles.ADMIN
           + "', '"
-          + Roles.OFFICER
-          + "', '"
           + Roles.KRT_MEMBER
           + "', '"
           + Roles.BANK_EMPLOYEE
@@ -129,7 +127,7 @@ public class UserController {
    */
   @GetMapping("/users/search/references")
   @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserReferenceDto> searchUserReferences(
       @RequestParam(required = false) String query,

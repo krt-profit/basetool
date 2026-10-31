@@ -72,7 +72,7 @@ public class UserProfileController {
    */
   @GetMapping("/users")
   @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> getAllUsers(
       @RequestParam(required = false) Integer page,
@@ -88,7 +88,7 @@ public class UserProfileController {
    */
   @GetMapping("/users/search")
   @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> searchUsers(
       @RequestParam(required = false) String query,
@@ -107,7 +107,7 @@ public class UserProfileController {
    */
   @GetMapping("/users/{id}")
   @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
     return userDirectoryService.get(id);

@@ -216,8 +216,8 @@ public class SecurityConfig {
 
   /**
    * Declares the role hierarchy that {@code @PreAuthorize("hasRole('LOGISTICIAN')")} and friends
-   * use. Mirrors the matrix in {@code ROLES_AND_PERMISSIONS.md}: admin and officer both imply
-   * logistician and mission-manager, so an admin satisfies a {@code @PreAuthorize} for {@code
+   * use. Mirrors the matrix in {@code ROLES_AND_PERMISSIONS.md}: an admin implies logistician and
+   * mission-manager, so an admin satisfies a {@code @PreAuthorize} for {@code
    * LOGISTICIAN} without being explicitly granted that role.
    *
    * @return the {@link RoleHierarchy} bean consumed by Spring Security's expression handlers
@@ -228,9 +228,7 @@ public class SecurityConfig {
         String.join(
             "\n",
             Roles.authority(Roles.ADMIN) + " > " + Roles.authority(Roles.LOGISTICIAN),
-            Roles.authority(Roles.OFFICER) + " > " + Roles.authority(Roles.LOGISTICIAN),
             Roles.authority(Roles.ADMIN) + " > " + Roles.authority(Roles.MISSION_MANAGER),
-            Roles.authority(Roles.OFFICER) + " > " + Roles.authority(Roles.MISSION_MANAGER),
             Roles.authority(Roles.ADMIN) + " > " + Roles.authority(Roles.BANK_MANAGEMENT),
             Roles.authority(Roles.BANK_MANAGEMENT) + " > " + Roles.authority(Roles.BANK_EMPLOYEE)));
   }
@@ -383,20 +381,19 @@ public class SecurityConfig {
                     "/api/v1/roles/**")
                 .hasRole(Roles.ADMIN)
                 .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
-                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                .hasAnyRole(Roles.ADMIN, Roles.KRT_MEMBER)
                 .requestMatchers("/api/v1/users/lookup")
                 .hasAnyRole(
                     Roles.ADMIN,
-                    Roles.OFFICER,
                     Roles.KRT_MEMBER,
                     Roles.BANK_MANAGEMENT,
                     Roles.BANK_EMPLOYEE)
                 .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users")
-                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                .hasAnyRole(Roles.ADMIN, Roles.KRT_MEMBER)
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
-                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                .hasAnyRole(Roles.ADMIN, Roles.KRT_MEMBER)
                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                 .hasRole(Roles.ADMIN)
                 .requestMatchers("/api/v1/users/**")
@@ -418,7 +415,7 @@ public class SecurityConfig {
                     "/api/v1/inventory/my-inventory", "/api/v1/inventory/my-inventory/**")
                 .authenticated()
                 .requestMatchers("/api/v1/inventory", "/api/v1/inventory/**")
-                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.LOGISTICIAN, Roles.KRT_MEMBER)
+                .hasAnyRole(Roles.ADMIN, Roles.LOGISTICIAN, Roles.KRT_MEMBER)
                 .requestMatchers("/api/v1/personal-inventory", "/api/v1/personal-inventory/**")
                 .authenticated()
                 .requestMatchers("/api/v1/uex/locations/**")
