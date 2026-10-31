@@ -100,8 +100,8 @@ web, naming its client (REQ-AUDIT-005):
   restored records nothing, REQ-XCH-046) /
   a unit's minimum stock levels (REQ-INV-068: `MIN_STOCK_LEVEL_SET` on create,
   `MIN_STOCK_LEVEL_CHANGED` only when minimum, target or tier changed, with from / to of all three,
-  `MIN_STOCK_LEVEL_REMOVED` on delete; the subject is the level, labelled by the material name, the
-  details carry the unit as `kind:id`, the material id, tier codes and amounts) /
+  `MIN_STOCK_LEVEL_REMOVED` on delete; the subject is the level, labelled by the material or item name,
+  the details carry the unit as `kind:id`, the material or game-item id, tier codes and amounts) /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover — material handover **and** item delivery consuming the order's earmarked item
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
@@ -430,7 +430,7 @@ per-domain emission assertions in the service tests · **Code:** `audit/api/Audi
 The coverage list gains:
 
 - **Lager** — minimum stock levels (REQ-INV-068): `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE` (one per
-  level a catalogue deletion removed), and the write events above for game-item levels. The subject
+  level the deletion of its material removed), and the write events above for game-item levels. The subject
   is the level, labelled by the material or item name; the details carry ids, the unit as
   `kind:id`, tier codes and amounts.
 - **Aufträge** — an assignee who is not a direct member of the processing unit

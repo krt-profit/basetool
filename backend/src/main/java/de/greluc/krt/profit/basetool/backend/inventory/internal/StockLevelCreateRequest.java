@@ -28,14 +28,17 @@ import org.jetbrains.annotations.Nullable;
  * A new minimum stock level (REQ-INV-068).
  *
  * @param orgUnitId the unit whose pool the level watches
- * @param materialId the watched material
- * @param qualityTierId the tier, or {@code null} for any quality
+ * @param materialId the watched material, or {@code null} for a game item
+ * @param gameItemId the watched game item, or {@code null} for a material
+ * @param qualityTierId the tier, or {@code null} for any quality; always {@code null} for a game
+ *     item
  * @param minimum the amount below which the level is low
  * @param target the amount the level is filled up to, or {@code null} for the minimum
  */
 public record StockLevelCreateRequest(
     @NotNull UUID orgUnitId,
-    @NotNull UUID materialId,
+    @Nullable UUID materialId,
+    @Nullable UUID gameItemId,
     @Nullable UUID qualityTierId,
     @NotNull @Positive Double minimum,
     @Nullable @Positive Double target) {}
