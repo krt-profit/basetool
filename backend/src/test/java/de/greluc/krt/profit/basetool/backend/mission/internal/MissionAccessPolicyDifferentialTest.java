@@ -162,11 +162,7 @@ class MissionAccessPolicyDifferentialTest {
         new Gate(
             "canSeeMission",
             ScopeHubMissionGates::canSeeMission,
-            MissionAccessPolicy::canSeeMission),
-        new Gate(
-            "canEditMission",
-            ScopeHubMissionGates::canEditMission,
-            MissionAccessPolicy::canEditMission));
+            MissionAccessPolicy::canSeeMission));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
@@ -308,15 +304,6 @@ class MissionAccessPolicyDifferentialTest {
             }
             return true;
           })
-          .orElse(false);
-    }
-
-    boolean canEditMission(UUID missionId) {
-      return missions
-          .findByIdForAuthorization(missionId)
-          .map(m ->
-              m.getOwningOrgUnit() == null
-                  || accessGateService.canEditSquadron(m.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -128,6 +129,21 @@ public class AccessGateService {
    */
   public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
     return orgUnitId == null ? authHelper.isAdmin() : canActAsOfficerIn(orgUnitId);
+  }
+
+  /**
+   * Checks whether the caller may manage the missions and operations of {@code orgUnitId}: a
+   * Mission Manager grant in that unit. A target without a unit is managed by a grant in an
+   * Organisationsleitung or Bereich unit only; admins always pass (REQ-SEC-065).
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds the matching Mission Manager grant
+   */
+  public boolean canManageMissionsOf(@Nullable UUID orgUnitId) {
+    if (orgUnitId != null) {
+      return hasRoleInOrgUnit(orgUnitId, Roles.MISSION_MANAGER);
+    }
+    return authHelper.isAdmin() || requestScopeResolver.holdsLeadershipMissionManagerGrant();
   }
 
   /**

@@ -296,10 +296,10 @@ as the owning scope:
 - **Internal** (`is_internal = true`) → visible to organisation members-or-above
   (`AuthHelperService.isMemberOrAbove()`), so not to an account below member.
 
-Editing follows the normal mission-management gate: `OwnerScopeService.canEditMission` is a no-op
-(returns `true`) for an ownerless mission, so `MissionAccessPolicy.canManageMission` decides via
-its usual elevated-role-or-owner/manager check (owner, co-managers, mission-managers/officers,
-admins) — the same path as a normal mission, minus the squadron-scope narrowing. The list queries
+Editing follows the mission-management gate with the ownerless rule of REQ-SEC-005:
+`MissionAccessPolicy.canManageMission` admits the owner, co-managers, admins and a caller with a
+Mission Manager grant in an Organisationsleitung or Bereich unit; a squadron Mission Manager does
+not manage an ownerless mission. The list queries
 (`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag so an internal
 ownerless mission surfaces in the lists of members-or-above.
 
@@ -316,8 +316,9 @@ creator column and no `is_internal` flag:
   `canSeeOperation` defers to `isMemberOrAbove()` on the null-owner branch, and the three scoped
   operation queries (`findAllScoped`, `findAllReferenceScoped`, `searchOperations`) carry a
   `viewerIsMemberOrAbove` flag so the list and the per-row detail gate stay consistent. Editing
-  follows the role gate: `canEditOperation` is a no-op for an ownerless operation, so an org-wide
-  operation is editable by any mission manager and deletable by any admin.
+  follows the same grant rule as an ownerless mission (REQ-SEC-005): `canEditOperation` admits a
+  Mission Manager grant in an Organisationsleitung or Bereich unit for an ownerless operation, and
+  deletion stays with admins.
 - **Participation — all operations (#500).** Independently of ownership, any member who
   participated in one of an operation's linked missions
   may see that operation — so participants can view the operation and their payout even when it is
