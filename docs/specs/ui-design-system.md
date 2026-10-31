@@ -16,7 +16,8 @@
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
-> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned) ·
+> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned; REQ-UI-033
+> partially shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -2364,14 +2365,24 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code and the quick-access
-> text of REQ-UI-026 stay authoritative.
+> **Status: partially shipped** (ADR-0297, map #2800). Shipped: the entity search for missions,
+> operations and materials, the limits, the prefixes with their help, the mixed ranking by match
+> quality and the kept highlight. Still planned, with the current code and the quick-access text
+> of REQ-UI-026 authoritative until they ship: the other five entity types, „Häufig", the empty
+> state, filtering of hidden pages, the additional actions and the dialog keys.
 
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
 (`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
-each type is scoped by its domain's rules and fails closed on its own.
+each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
+backend list that backs the page its hits open (missions and operations over every period,
+materials from the visible catalogue), so a hit is exactly an entity that list would show the
+caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
+caller to the login. An optional repeatable `kind` parameter (the type keys `mission`,
+`operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`) narrows the
+search; an unknown key asks no type. Each hit is `{kind, href, label, crumb, icon, status, date}`,
+with `crumb` the type's name and `status` localized.
 
 | Type | Matched on | Opens |
 |---|---|---|
@@ -2386,12 +2397,14 @@ each type is scoped by its domain's rules and fails closed on its own.
 
 - A hit carries a slim projection (id, name, status, date). A member finds exactly the people the
   org chart shows them, with the same fields; no search reveals more than the page it opens.
-- **Limits:** debounced, at least 2 characters (1 digit for a job-order number), 5 hits per type,
-  aborted when the user types on.
+- **Limits:** debounced (250 ms), at least 2 characters (1 digit for a job-order number), at most
+  100 characters, 5 hits per type, aborted when the user types on.
 - **The term stays a query parameter;** it never reaches a path, an MDC field or a metric label.
 
 **Prefixes.** Symbol and word are equivalent; both languages' words are accepted in either UI
-language; `?` shows the prefix help.
+language, in any case and with or without a space after the colon; `?` alone shows the prefix
+help, one row per prefix, which puts that prefix into the input. A page or action prefix asks the
+backend nothing; an entity prefix asks only that type.
 
 | Kind | Symbol | Words (DE / EN) |
 |---|---|---|
@@ -2406,9 +2419,12 @@ language; `?` shows the prefix help.
 | Ships | — | `schiff:` / `ship:` |
 | Org units | — | `einheit:` / `unit:` |
 
-**Ranking.** One mixed list, scored by match quality plus the „Häufig" weight (pages and tabs
-only). Entity hits arrive later and the list re-sorts, but the highlighted hit stays highlighted
-and Enter opens exactly it.
+**Ranking.** One mixed list („Treffer"), scored by match quality plus the „Häufig" weight (pages
+and tabs only): a label that starts with the term, then one that contains it, then a breadcrumb
+or search-term hit, then an entity hit the backend matched otherwise; on a tie pages come first.
+The actions follow in their own group. Entity hits arrive later and the list re-sorts, but the
+highlighted hit stays highlighted and Enter opens exactly it. Each entity row shows the type, the
+status and the date as its breadcrumb.
 
 **„Häufig".** A per-device ranking in `localStorage`: every page or tab visit counts, however it
 was reached; entry keys only; each visit decays over about 30 days. It ranks typed results and
@@ -2434,14 +2450,22 @@ suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or 
 only while the dialog is open).
 
 **Monitoring:** `basetool_quick_access_search_total{kind,outcome}` (REQ-OBS-011); the p95 of
-`/quick-access/search` alerts above 1 s for 10 minutes.
+`/quick-access/search` alerts above 1 s for 10 minutes (`QuickAccessSearchSlow`).
 
-**Enforced by (to be added):** `QuickAccessSearchControllerTest` (parallel contributors, fail
-closed per type, limits, term not in the path or MDC) · one `…QuickAccessSearchContributorTest` per
-type (scope, member visibility equal to the org chart) · `:frontend:testSearchJs` (prefix parsing,
-ranking, decay, empty-state de-duplication) · `NavigationE2eTest` (late hits keep the highlight,
-Ctrl+Enter, Tab, Ctrl+D, `?` help, hidden pages filtered) · **Related:** REQ-UI-026, REQ-UI-032,
-REQ-SEC-007, REQ-OBS-011, ADR-0282, ADR-0297
+**Enforced by:** `QuickAccessSearchControllerTest` (parallel contributors, fail closed per type,
+limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTest` ·
+`MissionQuickAccessSearchContributorTest`, `OperationQuickAccessSearchContributorTest`,
+`MaterialQuickAccessSearchContributorTest` (the list read the page uses) · `:frontend:testSearchJs`
+(prefix parsing, ranking) · `QuickAccessSearchE2eTest` (every type found, entity names kept out of
+`krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
+`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:** one
+`…QuickAccessSearchContributorTest` per remaining type (member visibility equal to the org chart) ·
+`:frontend:testSearchJs` (decay, empty-state de-duplication) · `NavigationE2eTest` (Ctrl+Enter,
+Tab, Ctrl+D, hidden pages filtered) · **Code:** `shell/web/QuickAccessSearchController.java`,
+`shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
+`kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
+`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
+ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 

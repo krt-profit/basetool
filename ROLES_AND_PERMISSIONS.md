@@ -1226,7 +1226,7 @@ rendered menu, so it offers exactly the screens the „Navigation“ column gran
 adds the tabs a screen shows under the same condition: „Mein Lager“, „Globales Lager“ and the
 hangar's „Org-Einheit“ tab for every member, the sync-report tabs for `ADMIN`, and — read on demand
 from `GET /quick-access/entries` (`isAuthenticated()`, ADR-0282) — the supply and purchasing tabs
-for the members those pages show them to. Its actions follow the same buttons: „Ins globale Lager
+for the members those pages show them to. Its entity search, `GET /quick-access/search` (`isAuthenticated()`, REQ-UI-033), reads the backend list behind each page it opens — missions and operations as their lists show them, materials from the visible catalogue — so a hit never reveals more than that page. Its actions follow the same buttons: „Ins globale Lager
 einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMIN`. Page controllers live under `frontend/.../<domain>/web/`.
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
