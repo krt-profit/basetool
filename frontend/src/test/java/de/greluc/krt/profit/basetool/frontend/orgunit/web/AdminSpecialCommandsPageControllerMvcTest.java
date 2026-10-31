@@ -34,11 +34,13 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
@@ -254,6 +256,33 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .param("version", "0"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/organisation/special-commands/" + skId));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleMemberLead_classic_withoutKrtMember_namesTheRefusal() throws Exception {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.patch(contains("/lead"), any(), eq(Void.class), eq(skId), eq(userId)))
+        .thenThrow(
+            new BackendServiceException(
+                "seat refused",
+                null,
+                409,
+                BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
+                null,
+                List.of(),
+                null));
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + skId + "/members/" + userId + "/lead")
+                .with(csrf())
+                .param("isLead", "true")
+                .param("version", "0"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/organisation/special-commands/" + skId))
+        .andExpect(flash().attribute("errorToast", "error.orgUnit.seatRequiresKrtMember"));
   }
 
   @Test

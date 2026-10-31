@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class TemplateTypeReferenceTest {
 
   /** Selection floor: the {@code T(…)} references the templates hold. */
-  private static final int MIN_REFERENCES = 145;
+  private static final int MIN_REFERENCES = 126;
 
   /** Selection floor: the templates holding them. */
   private static final int MIN_TEMPLATES = 22;

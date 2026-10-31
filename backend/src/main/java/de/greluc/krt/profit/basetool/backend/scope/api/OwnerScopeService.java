@@ -190,6 +190,38 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentOfficerOrgUnitIds()}: the org units in which
+   * the caller holds officer reach through a leadership seat.
+   *
+   * @return the caller's officer org-unit ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> currentOfficerOrgUnitIds() {
+    return requestScopeResolver.currentOfficerOrgUnitIds();
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsOfficerIn(UUID)}: whether the caller holds
+   * officer reach in the target's owning unit.
+   *
+   * @param orgUnitId the target's owning org unit; never {@code null}
+   * @return {@code true} iff the caller is an admin or holds officer reach in {@code orgUnitId}
+   */
+  public boolean canActAsOfficerIn(@NotNull UUID orgUnitId) {
+    return accessGateService.canActAsOfficerIn(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#canActAsOfficerInActiveContext()}: whether the caller
+   * holds officer reach in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds reach in the active context
+   */
+  public boolean canActAsOfficerInActiveContext() {
+    return requestScopeResolver.canActAsOfficerInActiveContext();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentOversightScope()}: the cascading (view)
    * oversight scope backing the blueprint overview and the F1 bank balance view.
    *
@@ -198,6 +230,17 @@ public class OwnerScopeService implements SquadronVisibility {
   @NotNull
   public ScopePredicate currentOversightScope() {
     return requestScopeResolver.currentOversightScope();
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#currentOversightScopeIgnoringPin()}: the cascading
+   * oversight scope over the caller's whole reach, ignoring the active-org-unit pin.
+   *
+   * @return a never-null, pin-free cascading oversight scope.
+   */
+  @NotNull
+  public ScopePredicate currentOversightScopeIgnoringPin() {
+    return requestScopeResolver.currentOversightScopeIgnoringPin();
   }
 
   /**

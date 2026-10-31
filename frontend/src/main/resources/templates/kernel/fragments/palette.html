@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <body>
 <th:block th:fragment="palette">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='nav-palette', titleKey='palette.aria',
@@ -8,7 +8,7 @@
 </th:block>
 <th:block th:fragment="palette-body">
     <div class="palette"
-         th:attr="data-recent=#{palette.recent},data-pages=#{palette.pages},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries}">
+         th:attr="data-recent=#{palette.recent},data-results=#{palette.results},data-help=#{palette.help},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries},data-entity-search-url=@{/quick-access/search}">
         <div class="palette-input-row">
             <svg class="krt-icon palette-input-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
             <input type="text" id="palette-input" class="palette-input" data-testid="palette-input" autofocus
@@ -23,45 +23,42 @@
             <span class="palette-hint"><span class="nav-kbd">&uarr; &darr;</span><span th:text="#{palette.hint.navigate}">Navigieren</span></span>
             <span class="palette-hint"><span class="nav-kbd">&crarr;</span><span th:text="#{palette.hint.open}">Öffnen</span></span>
             <span class="palette-hint"><span class="nav-kbd">ESC</span><span th:text="#{palette.hint.close}">Schließen</span></span>
+            <span class="palette-hint"><span class="nav-kbd">?</span><span th:text="#{palette.hint.prefixes}">Präfixe</span></span>
         </div>
         <div class="palette-source" hidden>
+            <div class="palette-source-prefixes" data-testid="palette-source-prefixes">
+                <span data-prefix-kind="action" th:text="#{palette.prefix.action}">Nur Aktionen</span>
+                <span data-prefix-kind="page" th:text="#{palette.prefix.page}">Nur Seiten und Tabs</span>
+                <span data-prefix-kind="job_order" th:text="#{palette.prefix.order}">Nur Aufträge nach Nummer</span>
+                <span data-prefix-kind="member" th:text="#{palette.prefix.member}">Nur Mitglieder</span>
+                <span data-prefix-kind="mission" th:text="#{palette.prefix.mission}">Nur Missionen</span>
+                <span data-prefix-kind="operation" th:text="#{palette.prefix.operation}">Nur Operationen</span>
+                <span data-prefix-kind="material" th:text="#{palette.prefix.material}">Nur Material</span>
+                <span data-prefix-kind="blueprint" th:text="#{palette.prefix.blueprint}">Nur Blueprints</span>
+                <span data-prefix-kind="ship" th:text="#{palette.prefix.ship}">Nur Schiffe</span>
+                <span data-prefix-kind="org_unit" th:text="#{palette.prefix.unit}">Nur Org-Einheiten</span>
+            </div>
             <div class="palette-source-pages" data-testid="palette-source-pages">
-                <a th:href="@{/hangar/squadron}" th:data-nav-group="#{nav.section.logistics}" data-nav-icon="bookout"
-                   th:data-nav-keywords="#{palette.keywords.hangarUnit}" th:text="#{palette.page.hangarUnit}">Hangar der Org-Einheit</a>
-                <a th:href="@{/inventory/my}" th:data-nav-group="#{nav.section.logistics}" data-nav-icon="bookout"
-                   th:data-nav-keywords="#{palette.keywords.inventoryMy}" th:text="#{palette.page.inventoryMy}">Mein Lager</a>
-                <a th:href="@{/inventory/all}" th:data-nav-group="#{nav.section.logistics}" data-nav-icon="bookout"
-                   th:data-nav-keywords="#{palette.keywords.inventoryAll}" th:text="#{palette.page.inventoryAll}">Globales Lager</a>
-                <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-                    <a th:href="@{/admin/sync-reports/uex}" th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.system}|"
-                       data-nav-icon="gear" th:data-nav-keywords="#{palette.keywords.syncReports}"
-                       th:text="#{palette.page.syncUex}">Sync-Berichte · UEX</a>
-                    <a th:href="@{/admin/sync-reports/scwiki}" th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.system}|"
-                       data-nav-icon="gear" th:data-nav-keywords="#{palette.keywords.syncReports}"
-                       th:text="#{palette.page.syncScWiki}">Sync-Berichte · SC Wiki</a>
+                <th:block th:each="item : ${navigation.main()}">
+                    <th:block th:each="entry : ${item.palettePages()}">
+                        <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, #{${item.group().labelKey()}}, ${item.group().icon()}, false)}" />
+                    </th:block>
+                </th:block>
+                <th:block th:each="item : ${navigation.admin()}">
+                    <th:block th:each="entry : ${item.palettePages()}">
+                        <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, ${item.group().icon()}, false)}" />
+                    </th:block>
                 </th:block>
             </div>
             <div class="palette-source-actions" data-testid="palette-source-actions">
-                <a th:href="@{/orders/create}" data-nav-icon="plus" data-testid="palette-action-create-order"
-                   th:data-nav-keywords="#{palette.keywords.create}" th:text="#{palette.action.createOrder}">Neuen Auftrag anlegen</a>
-                <a th:href="@{/missions/new}" data-nav-icon="plus" data-testid="palette-action-create-mission"
-                   th:data-nav-keywords="#{palette.keywords.create}" th:text="#{palette.action.createMission}">Neue Mission anlegen</a>
-                <a th:href="@{/refinery-orders/create}" data-nav-icon="plus" data-testid="palette-action-create-refinery"
-                   th:data-nav-keywords="#{palette.keywords.create}" th:text="#{palette.action.createRefinery}">Neuen Raffinerieauftrag anlegen</a>
-                <a th:href="@{/inventory/input(source='my')}" data-nav-icon="plus" data-testid="palette-action-book-my"
-                   th:data-nav-keywords="#{palette.keywords.book}" th:text="#{palette.action.bookMy}">In mein Lager einbuchen</a>
-                <a th:href="@{/inventory/input(source='admin')}" data-nav-icon="plus" data-testid="palette-action-book-global"
-                   sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)"
-                   th:data-nav-keywords="#{palette.keywords.book}" th:text="#{palette.action.bookGlobal}">Ins globale Lager einbuchen</a>
+                <th:block th:each="entry : ${navigation.actions().links()}">
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, null, ${entry.icon()}, false)}" />
+                </th:block>
             </div>
             <div class="palette-source-tail" data-testid="palette-source-tail">
-                <a href="https://github.com/krt-profit/basetool/wiki" target="_blank" rel="noopener noreferrer"
-                   data-nav-icon="external-link" data-testid="palette-action-handbook"
-                   th:data-nav-keywords="#{palette.keywords.handbook}" th:text="#{palette.action.handbook}">Handbuch öffnen</a>
-                <a th:if="${#locale.language != 'de'}" th:href="@{''(lang='de')}" data-nav-icon="swap" data-testid="palette-action-lang-de"
-                   th:data-nav-keywords="#{palette.keywords.language}" th:text="#{palette.action.langDe}">Sprache auf Deutsch umstellen</a>
-                <a th:if="${#locale.language != 'en'}" th:href="@{''(lang='en')}" data-nav-icon="swap" data-testid="palette-action-lang-en"
-                   th:data-nav-keywords="#{palette.keywords.language}" th:text="#{palette.action.langEn}">Sprache auf Englisch umstellen</a>
+                <th:block th:each="entry : ${navigation.paletteTail().links()}">
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, null, ${entry.icon()}, false)}" />
+                </th:block>
             </div>
         </div>
     </div>

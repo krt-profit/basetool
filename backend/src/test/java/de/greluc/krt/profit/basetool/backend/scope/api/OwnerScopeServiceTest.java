@@ -2243,6 +2243,174 @@ class OwnerScopeServiceTest {
       assertFalse(scope.adminAllScope());
       assertEquals(Set.of(bereichId, childStaffelId), scope.memberOrgUnitIds());
     }
+
+    @Test
+    void ignoringPin_pinWithinOversight_keepsWholeOversightSet() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setRole(MembershipRole.SK_LEAD);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+      lenient()
+          .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      ScopePredicate scope = service.currentOversightScopeIgnoringPin();
+
+      assertFalse(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+      assertEquals(Set.of(SQUADRON_A_ID, skId), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void ignoringPin_adminWithPin_allScope() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      lenient()
+          .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      ScopePredicate scope = service.currentOversightScopeIgnoringPin();
+
+      assertTrue(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+    }
+  }
+
+  /**
+   * Officer reach per org unit (REQ-SEC-015, ADR-0300): a seat confers reach in the units it covers
+   * while its holder holds {@code KRT Member}; an admin passes everywhere.
+   */
+  @Nested
+  class OfficerReachTests {
+
+    private static final String KRT_MEMBER_AUTHORITY = "ROLE_KRT_MEMBER";
+
+    private void stubCaller(boolean krtMember, OrgUnitMembership... memberships) {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole(KRT_MEMBER_AUTHORITY)).thenReturn(krtMember);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(memberships));
+    }
+
+    private OrgUnitMembership rankedStaffelSeat(UUID squadronId, MembershipRole rank) {
+      OrgUnitMembership seat = staffelMembership(MEMBER_USER_ID, squadronId);
+      seat.setRole(rank);
+      return seat;
+    }
+
+    @Test
+    void squadronRank_reachesOwnStaffel_notAStaffelHeIsOnlyAMemberOf() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+
+      assertTrue(service.canActAsOfficerIn(SQUADRON_A_ID));
+      assertFalse(service.canActAsOfficerIn(SQUADRON_B_ID));
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerOrgUnitIds());
+    }
+
+    @Test
+    void skLead_reachesOwnSk() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setRole(MembershipRole.SK_LEAD);
+      stubCaller(true, lead);
+
+      assertTrue(service.canActAsOfficerIn(skId));
+      assertFalse(service.canActAsOfficerIn(SQUADRON_A_ID));
+    }
+
+    @Test
+    void bereichRank_reachesTheCascadedUnits() {
+      UUID bereichId = UUID.randomUUID();
+      UUID childStaffelId = UUID.randomUUID();
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
+      stubCaller(true, seat);
+      when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, childStaffelId));
+
+      assertTrue(service.canActAsOfficerIn(bereichId));
+      assertTrue(service.canActAsOfficerIn(childStaffelId));
+      assertFalse(service.canActAsOfficerIn(SQUADRON_A_ID));
+    }
+
+    @Test
+    void seatWithoutKrtMember_confersNoReach() {
+      stubCaller(false, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
+
+      assertFalse(service.canActAsOfficerIn(SQUADRON_A_ID));
+      assertTrue(service.currentOfficerOrgUnitIds().isEmpty());
+      verify(orgUnitCascadeService, never()).cascadedOfficerReach(any());
+    }
+
+    @Test
+    void plainMember_hasNoReach() {
+      stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID));
+
+      assertFalse(service.canActAsOfficerIn(SQUADRON_A_ID));
+      assertTrue(service.currentOfficerOrgUnitIds().isEmpty());
+    }
+
+    @Test
+    void admin_passesEveryUnit() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canActAsOfficerIn(SQUADRON_B_ID));
+    }
+
+    @Test
+    void activeContext_pinnedUnitWithReach_isOfficer() {
+      stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      assertTrue(service.canActAsOfficerInActiveContext());
+    }
+
+    @Test
+    void activeContext_pinnedUnitWithoutReach_isNotOfficer() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertFalse(service.canActAsOfficerInActiveContext());
+    }
+
+    @Test
+    void activeContext_unpinned_isTheUnionOfTheCallersUnits() {
+      stubCaller(
+          true,
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID),
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.KOMMANDOLEITER));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(service.canActAsOfficerInActiveContext());
+    }
+
+    @Test
+    void activeContext_unpinnedWithoutAnySeat_isNotOfficer() {
+      stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID));
+      lenient().when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertFalse(service.canActAsOfficerInActiveContext());
+    }
+
+    @Test
+    void activeContext_admin_isOfficerWhateverIsPinned() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canActAsOfficerInActiveContext());
+    }
   }
 
   private Mission newMission(UUID id, Squadron owningSquadron, boolean isInternal) {

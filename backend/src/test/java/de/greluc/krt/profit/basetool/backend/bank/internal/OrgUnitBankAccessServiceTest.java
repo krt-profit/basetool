@@ -373,6 +373,102 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
+  void listViewableActiveAccounts_unpinned_equalsTheOrgUnitBankPageSet() {
+    UUID staffelId = UUID.randomUUID();
+    UUID ownAccountId = UUID.randomUUID();
+    UUID cartelId = UUID.randomUUID();
+    BankAccount cartel =
+        typedAccount(
+            cartelId, "KB-0001", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    BankAccount ownAccount = account(ownAccountId, "KB-0002", squadron(staffelId, "Own", "OWN"));
+    BankAccount foreignAccount =
+        account(UUID.randomUUID(), "KB-0003", squadron(UUID.randomUUID(), "Foreign", "FRG"));
+    BankAccount closedOwn =
+        account(UUID.randomUUID(), "KB-0004", squadron(staffelId, "Own", "OWN"));
+    closedOwn.setStatus(BankAccountStatus.CLOSED);
+    BankAccount special = specialAccount(UUID.randomUUID(), "KB-0005", BankAccountStatus.ACTIVE);
+    ScopePredicate unpinned = new ScopePredicate(false, null, Set.of(staffelId));
+    when(ownerScopeService.currentOversightScope()).thenReturn(unpinned);
+    when(ownerScopeService.currentOversightScopeIgnoringPin()).thenReturn(unpinned);
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(cartel, ownAccount, foreignAccount, closedOwn, special));
+    when(bankPostingRepository.accountBalances(anyCollection())).thenReturn(List.of());
+
+    List<UUID> pageSet =
+        service.listOverseenOrgUnitBalances().stream()
+            .map(OrgUnitBankBalanceDto::accountId)
+            .toList();
+    List<UUID> visibleSet =
+        service.listViewableActiveAccounts().stream().map(BankAccount::getId).toList();
+
+    assertThat(visibleSet).containsExactly(cartelId, ownAccountId).isEqualTo(pageSet);
+  }
+
+  @Test
+  void listViewableActiveAccounts_pinDoesNotNarrowTheSet() {
+    UUID staffelAId = UUID.randomUUID();
+    UUID staffelBId = UUID.randomUUID();
+    UUID accountAId = UUID.randomUUID();
+    UUID accountBId = UUID.randomUUID();
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, staffelAId, Set.of()));
+    when(ownerScopeService.currentOversightScopeIgnoringPin())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelAId, staffelBId)));
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(
+            List.of(
+                account(accountAId, "KB-0001", squadron(staffelAId, "A", "AAA")),
+                account(accountBId, "KB-0002", squadron(staffelBId, "B", "BBB"))));
+
+    List<BankAccount> visible = service.listViewableActiveAccounts();
+
+    assertThat(visible).extracting(BankAccount::getId).containsExactly(accountAId, accountBId);
+  }
+
+  @Test
+  void listViewableActiveAccounts_plainMemberAlwaysSeesTheKrtAccount() {
+    UUID cartelId = UUID.randomUUID();
+    BankAccount cartel =
+        typedAccount(
+            cartelId, "KB-0001", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    when(ownerScopeService.currentOversightScopeIgnoringPin())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(
+            List.of(
+                cartel,
+                account(UUID.randomUUID(), "KB-0002", squadron(UUID.randomUUID(), "S", "S"))));
+
+    List<BankAccount> visible = service.listViewableActiveAccounts();
+
+    assertThat(visible).extracting(BankAccount::getId).containsExactly(cartelId);
+  }
+
+  @Test
+  void activeContextOrgUnitIds_pinned_isThePinnedUnit() {
+    UUID pinned = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, pinned, Set.of()));
+    when(ownerScopeService.currentDirectMembershipOrgUnitIds())
+        .thenReturn(Set.of(pinned, UUID.randomUUID()));
+
+    assertThat(service.activeContextOrgUnitIds()).containsExactly(pinned);
+  }
+
+  @Test
+  void activeContextOrgUnitIds_unpinned_isEveryDirectMembership() {
+    UUID unitA = UUID.randomUUID();
+    UUID unitB = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(unitA, unitB, UUID.randomUUID())));
+    when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of(unitA, unitB));
+
+    assertThat(service.activeContextOrgUnitIds()).containsExactlyInAnyOrder(unitA, unitB);
+  }
+
+  @Test
   void getViewableAccountBookings_redactsHolderHandles() {
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();

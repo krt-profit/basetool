@@ -646,6 +646,9 @@ public class GlobalExceptionHandler {
     m.put("BANK_OWNER_APPROVAL_REQUIRED", "error.bank.ownerApprovalRequired");
     m.put("BANK_FOUR_EYES_REQUIRED", "error.bank.fourEyesRequired");
     m.put("RANK_OUTSIDE_ROLE_RANGE", "error.member.rank.outsideRoleRange");
+    m.put(
+        BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
+        "error.orgUnit.seatRequiresKrtMember");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");
     m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");
     m.put("SUPPLY_UNIT_CANNOT_RECEIVE", "error.supply.unitCannotReceive");

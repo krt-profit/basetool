@@ -5156,6 +5156,136 @@
         "x-domain" : "identity"
       }
     },
+    "/api/v1/bank/org-units/accounts/visible" : {
+      "get" : {
+        "description" : "Returns the accounts the authenticated member may view on the org-unit bank page, over their whole reach and not narrowed by the active org-unit pin: the KRT account first, then the accounts of the active context, then the rest, each by account number with id as tiebreaker. The order is fixed; no sort parameter. Each account carries its balance, balance target and 30-day trend; no holders, custody, history or capabilities.",
+        "operationId" : "listVisibleAccounts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseOrgUnitBankVisibleAccountDto"
+                }
+              }
+            },
+            "description" : "One page of viewable accounts",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Page over the org-unit accounts the caller may view",
+        "tags" : [ "bank" ],
+        "x-domain" : "bank"
+      }
+    },
     "/api/v1/bank/org-units/accounts/{id}" : {
       "get" : {
         "operationId" : "getAccountDetail",
@@ -80412,10 +80542,25 @@
           "canManageBank" : {
             "type" : "boolean"
           },
+          "canManageJobOrders" : {
+            "type" : "boolean"
+          },
+          "canManageMissionFinance" : {
+            "type" : "boolean"
+          },
+          "canManagePromotions" : {
+            "type" : "boolean"
+          },
           "canMarkStolen" : {
             "type" : "boolean"
           },
+          "canOpenLeitung" : {
+            "type" : "boolean"
+          },
           "canSeeBlueprintOverview" : {
+            "type" : "boolean"
+          },
+          "canSeeHangarOwnerDetails" : {
             "type" : "boolean"
           },
           "canViewBankStaff" : {
@@ -80425,6 +80570,9 @@
             "type" : "boolean"
           },
           "canViewOwnJobOrders" : {
+            "type" : "boolean"
+          },
+          "hasOfficerReach" : {
             "type" : "boolean"
           },
           "isAdmin" : {
@@ -86709,6 +86857,54 @@
           }
         }
       },
+      "OrgUnitBankVisibleAccountDto" : {
+        "type" : "object",
+        "properties" : {
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "accountNo" : {
+            "type" : "string"
+          },
+          "balance" : {
+            "type" : "number"
+          },
+          "balanceTarget" : {
+            "type" : "number"
+          },
+          "delta30d" : {
+            "type" : "number"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnitKind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "orgUnitName" : {
+            "type" : "string"
+          },
+          "orgUnitShorthand" : {
+            "type" : "string"
+          },
+          "sparkline" : {
+            "type" : "array",
+            "items" : {
+              "type" : "number"
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "ORG_UNIT", "AREA", "CARTEL", "CARTEL_BANK", "SPECIAL" ]
+          }
+        }
+      },
       "OrgUnitMembershipDto" : {
         "type" : "object",
         "properties" : {
@@ -88022,6 +88218,39 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/OperationDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseOrgUnitBankVisibleAccountDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgUnitBankVisibleAccountDto"
             }
           },
           "page" : {
@@ -89448,7 +89677,7 @@
           "code" : {
             "type" : "string",
             "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RANK_OUTSIDE_ROLE_RANGE", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RANK_OUTSIDE_ROLE_RANGE", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",

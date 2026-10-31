@@ -22,8 +22,13 @@ package de.greluc.krt.profit.basetool.backend.bank.web;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountStatus;
@@ -37,6 +42,8 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSet
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.math.BigDecimal;
@@ -48,6 +55,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
  * Thin delegation tests for {@link OrgUnitBankController}. The scope / balance behaviour is pinned
@@ -61,8 +74,57 @@ class OrgUnitBankControllerTest {
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
   @Mock private OrgUnitBankSettingsService orgUnitBankSettingsService;
   @Mock private OrgUnitBankRequestService orgUnitBankRequestService;
+  @Mock private OrgUnitBankVisibleAccountsQuery orgUnitBankVisibleAccountsQuery;
 
   @InjectMocks private OrgUnitBankController controller;
+
+  @Test
+  void listVisibleAccounts_routeBindsPageAndSizeIgnoresSortAndBeatsTheAccountIdRoute()
+      throws Exception {
+    OrgUnitBankVisibleAccountDto dto =
+        new OrgUnitBankVisibleAccountDto(
+            UUID.randomUUID(),
+            "KB-0001",
+            "KRT",
+            BankAccountType.CARTEL,
+            UUID.randomUUID(),
+            "Organisationsleitung",
+            "OL",
+            OrgUnitKind.ORGANISATIONSLEITUNG,
+            new BigDecimal("4200"),
+            null,
+            new BigDecimal("300"),
+            List.of(new BigDecimal("3900"), new BigDecimal("4200")));
+    Pageable expected = PageRequest.of(1, 3);
+    when(orgUnitBankVisibleAccountsQuery.listVisibleAccounts(expected))
+        .thenReturn(new PageImpl<>(List.of(dto), expected, 7));
+    MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+    mockMvc
+        .perform(
+            get("/api/v1/bank/org-units/accounts/visible")
+                .param("page", "1")
+                .param("size", "3")
+                .param("sort", "accountNo,desc"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].accountNo").value("KB-0001"))
+        .andExpect(jsonPath("$.totalElements").value(7))
+        .andExpect(jsonPath("$.sort").isEmpty());
+
+    verify(orgUnitBankVisibleAccountsQuery).listVisibleAccounts(expected);
+    verify(orgUnitBankAccessService, never()).getViewableAccountDetail(any());
+  }
+
+  @Test
+  void listVisibleAccounts_isOpenToAuthenticatedMembersOutsideTheBankRoleSpace()
+      throws NoSuchMethodException {
+    PreAuthorize gate =
+        OrgUnitBankController.class
+            .getMethod("listVisibleAccounts", Integer.class, Integer.class)
+            .getAnnotation(PreAuthorize.class);
+
+    assertEquals("isAuthenticated()", gate.value());
+  }
 
   @Test
   void listOverseenBalances_delegatesToService() {

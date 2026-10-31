@@ -396,7 +396,15 @@ authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
   The provisioning script deletes the realm role after the release; the test realms, the e2e realm
   export and the sandbox realm drop it.
 - **Precondition of the cut:** a report of every leadership seat holder who lacks `KRT Member`. The
-  cut ships only when that list is empty (REQ-ORG-029).
+  cut ships only when that list is empty (REQ-ORG-029). The report ships ahead of the cut as
+  `scripts/officer-cut-report.sql`: a read-only session, SELECTs only, ids and coded words but no
+  names. Beside the blocking section `seat_without_krt_member` it lists what the cut removes or
+  changes, so the release can be checked against it: `officer_without_seat` (hand-granted officers
+  who lose officer power), `bank_view_grant_officer` and `bank_approval_limit_officer` (the
+  `GLOBAL_ROLE OFFICER` buckets the cut deletes, each with a bank audit event) and `notification_rule_role_officer` (the `ROLE OFFICER` selectors the cut moves to the
+  seat-holder target). Every section prints a `count=` line, so an empty one reads `count=0`. Enforced
+  by `OfficerCutReportIntegrationTest`; how to run it on production: `docs/deployment.md`,
+  *Pre-cut report for the OFFICER retirement*.
 
 **Enforced by (to be added):** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a
 realm role or a seat), `UserReconciliationServiceTest` (an `OFFICER` realm role is not mirrored),
@@ -1206,15 +1214,24 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   every Staffel membership of a role holder: a member gets officer power only in the units their
   seats reach.
 - **A seat confers reach only while its holder holds `KRT Member`.** An appointment of a member
-  without it is refused; a seat whose holder loses it later stays in the org chart and confers
-  nothing (REQ-ORG-029).
+  without it is refused with `409 LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER` — every seat-writing path of
+  `OrgUnitMembershipService`: Bereich rank, OL seat, Grand Admiral, SK lead, squadron rank. A seat
+  whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029).
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Enforced by (to be added):** `OwnerScopeServiceTest` (officer reach per seat kind, no reach from a
-membership without a seat, no reach without `KRT Member`), `OrgUnitMembershipServiceTest`
-(appointment without `KRT Member` refused), `OrgHierarchyVisibilityMatrixE2eTest` (a Staffel officer
-denied a foreign Staffel they are a plain member of) · **Related:** REQ-ROLE-002, REQ-ORG-015,
-ADR-0300
+**Live ahead of the cut:** the reach computation and the appointment precondition. The scope
+kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes),
+`#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`; no gate reads them yet, and
+every `OFFICER` gate keeps its behaviour until the cut.
+
+**Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
+membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
+`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`), `DomainProblemContractTest` ·
+**Code:** `MembershipRole#confersOwnUnitOfficerReach`, `RequestScopeResolver#currentOfficerOrgUnitIds`,
+`AccessGateService#canActAsOfficerIn`, `OrgUnitMembershipService`,
+`LeadershipSeatRequiresKrtMemberException` · **Enforced by (to be added):**
+`OrgHierarchyVisibilityMatrixE2eTest` (a Staffel officer denied a foreign Staffel they are a plain
+member of) · **Related:** REQ-ROLE-002, REQ-ORG-015, ADR-0300
 
 ### REQ-SEC-018 — Anonymous guest sign-up edits require a per-row capability token *(superseded)*
 
@@ -3752,10 +3769,19 @@ layer directly.
   holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
   officer role.
 
-**Enforced by (to be added):** `MeControllerTest` (officer flags for a pinned unit with a seat, a
-pinned unit without one, the unpinned union, an admin), a frontend ArchUnit or source scan that no
-template or controller names `ROLE_OFFICER` or `ADMIN_OR_OFFICER` · **Related:** REQ-SEC-013,
-REQ-SEC-048, REQ-ROLE-002, ADR-0300
+**Live ahead of the cut:** the officer flags `hasOfficerReach`, `canOpenLeitung`,
+`canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
+`canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`;
+the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
+pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
+(fail-closed `false`, admin `true`); no template reads them yet.
+
+**Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
+carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
+without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest` ·
+**Enforced by (to be added):** a frontend ArchUnit or source scan that no template or controller
+names `ROLE_OFFICER` or `ADMIN_OR_OFFICER` · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
+ADR-0300
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 

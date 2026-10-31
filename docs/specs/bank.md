@@ -2977,8 +2977,6 @@ observer treats the call as idempotent.
 
 ### REQ-BANK-064 — Collective read of the viewable org-unit bank accounts
 
-> **Status: planned** (ADR-0299, map #2800). Until it ships, the current code stays authoritative.
-
 `GET /api/v1/bank/org-units/accounts/visible` returns, as one paged read, the accounts the caller
 may view on the **org-unit bank page** (`/org-unit-bank`), with what the home dashboard's „Bank"
 widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal accounts
@@ -2988,13 +2986,16 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
   over the active accounts (REQ-BANK-021, -035, -037). The bank-staff view (`/bank`) does not count.
   Every member sees at least the KRT (`CARTEL`) account, so the result is never empty for a member.
 - **Context-free set.** The set is computed for the caller's whole reach and does not follow the
-  active org-unit pin; only the order below uses the active context.
-- **Paged and sorted in the backend.** The read takes the standard `Pageable` and answers a
-  `PageResponse` (REQ-API-005). The order is fixed by the backend and takes no client sort field:
-  the KRT (`CARTEL`) account first, then the accounts owned by the active org-unit context (the
-  pinned unit, or every unit of the union when none is pinned, REQ-UI-026), then all others, each
-  part by account number, `id` as the tiebreaker. The widget requests page 0 with its row count as
-  `size`.
+  active org-unit pin (`OwnerScopeService#currentOversightScopeIgnoringPin`; an admin sees every
+  active account); only the order below uses the active context.
+- **Paged and sorted in the backend.** The read takes the standard `page` / `size` and answers a
+  `PageResponse` (REQ-API-005) with the true `totalElements`; visibility is decided in Java, so the
+  page is cut in memory and only its accounts' figures are loaded. The order is fixed by the backend
+  and takes no client sort field (a `sort` parameter is ignored): the KRT (`CARTEL`) account first,
+  then the accounts owned by the active org-unit context (the pinned unit, or every unit the caller
+  is a direct member of when none is pinned — the units of the union, REQ-UI-026), then all others,
+  each part by account number, `id` as the tiebreaker. The widget requests page 0 with its row count
+  as `size`.
 - **Per account:** id, account number, name, type, owning org unit, current balance, balance target
   (when set, REQ-BANK-036) and the 30-day series of daily end-of-day balances with its net delta, as
   on the org-unit bank cards (`BankTrendCalculator`, no per-account query).
@@ -3005,21 +3006,24 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
   widget refetches this read on such a frame. No new room.
 - **Not audited** (a read) and not a new metric: `http_server_requests` covers the route.
 
-**Acceptance (planned)**
+**Acceptance**
 
-- [ ] The read returns exactly the accounts the org-unit bank page lists for the same caller,
+- [x] The read returns exactly the accounts the org-unit bank page lists for the same caller,
   unpinned, with balance, target and the 30-day series.
-- [ ] A plain member gets the KRT account; a pin does not change the set.
-- [ ] The KRT account comes first, the active context's accounts next, the rest by account number;
+- [x] A plain member gets the KRT account; a pin does not change the set.
+- [x] The KRT account comes first, the active context's accounts next, the rest by account number;
   page 0 with `size` 3 returns the first three of that order and the true `totalElements`.
-- [ ] The response carries no holder or custody data.
+- [x] The response carries no holder or custody data.
 
-**Enforced by (to be added):** `OrgUnitBankAccessServiceTest` (visible set equals the page's set,
-pin ignored for the set, no holders), `OrgUnitBankVisibleAccountsQueryTest` (backend order, paging),
-`OrgUnitBankControllerTest` (route, member gate, `Pageable` binding),
-`OrgUnitBankVisibleAccountsDtoTest` (no holder field) · **Code (planned):**
-`bank/internal/OrgUnitBankAccessService`, `bank/web/OrgUnitBankController` · **Related:** REQ-BANK-021, REQ-BANK-035, REQ-BANK-037,
-REQ-API-005, REQ-UI-034, ADR-0299
+**Enforced by:** `OrgUnitBankAccessServiceTest` (visible set equals the page's set unpinned, pin
+ignored for the set, KRT for a plain member, active context), `OrgUnitBankVisibleAccountsQueryTest`
+(backend order, paging, figures), `OrgUnitBankControllerTest` (route, member gate, `page` / `size`
+binding, no sort), `OrgUnitBankVisibleAccountDtoTest` (no holder field), `OwnerScopeServiceTest`
+(pin-free oversight scope), `AuthorizationMatrixTest`, `NoStoreApiScopesTest` · **Code:**
+`bank/internal/OrgUnitBankAccessService#listViewableActiveAccounts`,
+`bank/internal/OrgUnitBankVisibleAccountsQuery`, `bank/internal/OrgUnitBankVisibleAccountDto`,
+`bank/web/OrgUnitBankController#listVisibleAccounts` · **Related:** REQ-BANK-021, REQ-BANK-035,
+REQ-BANK-037, REQ-API-005, REQ-UI-034, ADR-0299
 
 ### REQ-BANK-065 — A deposit shows what the depositor transfers with the in-game fee
 

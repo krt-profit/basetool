@@ -127,6 +127,41 @@ class MeControllerTest {
   }
 
   @Test
+  void getCapabilities_officerFlagsFollowTheReachInTheActiveContext() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.hasOfficerReach());
+    assertTrue(response.canOpenLeitung());
+    assertTrue(response.canManagePromotions());
+    assertTrue(response.canSeeHangarOwnerDetails());
+    assertTrue(response.canManageJobOrders());
+    assertTrue(response.canManageMissionFinance());
+  }
+
+  @Test
+  void getCapabilities_officerFlagsOffWithoutReachInTheActiveContext() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertFalse(response.hasOfficerReach());
+    assertFalse(response.canOpenLeitung());
+    assertFalse(response.canManagePromotions());
+    assertFalse(response.canSeeHangarOwnerDetails());
+    assertFalse(response.canManageJobOrders());
+    assertFalse(response.canManageMissionFinance());
+  }
+
+  @Test
+  void getLayout_carriesTheSameOfficerFlags() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+
+    assertTrue(controller.getLayout(null, UUID.randomUUID()).capabilities().hasOfficerReach());
+  }
+
+  @Test
   void getPinnableOrgUnits_adminGetsTheWholeActiveCatalogue() {
     List<OrgUnitMembershipOptionDto> catalogue = List.of();
     when(authHelperService.isAdmin()).thenReturn(true);

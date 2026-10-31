@@ -77,3 +77,104 @@ export function krtSearchFind(text, foldedQuery) {
     const end = after < folded.map.length ? folded.map[after] : text.length;
     return { start: folded.map[at], end: Math.max(end, folded.map[at] + 1) };
 }
+
+/**
+ * @typedef {object} KrtSearchPrefix
+ * @property {string} kind the kind the prefix narrows to
+ * @property {string} symbol its one-character symbol, empty when it has only words
+ * @property {string[]} words its words without the colon, German first
+ */
+
+/**
+ * The quick-access prefixes: symbol and words narrow to one kind, both languages' words are
+ * accepted in either UI language (REQ-UI-033).
+ *
+ * @type {ReadonlyArray<KrtSearchPrefix>}
+ */
+export const KRT_SEARCH_PREFIXES = Object.freeze([
+    { kind: 'action', symbol: '>', words: ['aktion', 'action'] },
+    { kind: 'page', symbol: '/', words: ['seite', 'page'] },
+    { kind: 'job_order', symbol: '#', words: ['auftrag', 'order'] },
+    { kind: 'member', symbol: '@', words: ['mitglied', 'member'] },
+    { kind: 'mission', symbol: '', words: ['mission'] },
+    { kind: 'operation', symbol: '', words: ['operation'] },
+    { kind: 'material', symbol: '', words: ['material'] },
+    { kind: 'blueprint', symbol: '', words: ['blueprint'] },
+    { kind: 'ship', symbol: '', words: ['schiff', 'ship'] },
+    { kind: 'org_unit', symbol: '', words: ['einheit', 'unit'] },
+]);
+
+const PREFIX_WORD = /^([a-z]+):\s*/i;
+const HELP_QUERY = '?';
+
+/**
+ * Splits a quick-access query into its kind prefix and the term.
+ *
+ * @param {string} raw the text as typed
+ * @returns {{ kind: string | null, term: string, help: boolean }} the kind the prefix names, or
+ *     null without one; the trimmed term after it; whether the query asks for the prefix help
+ */
+export function krtSearchParse(raw) {
+    const text = raw.trim();
+    if (text === HELP_QUERY) return { kind: null, term: '', help: true };
+    const bySymbol = KRT_SEARCH_PREFIXES.find((p) => {
+        return p.symbol !== '' && text.charAt(0) === p.symbol;
+    });
+    if (bySymbol) return { kind: bySymbol.kind, term: text.slice(1).trim(), help: false };
+    const word = PREFIX_WORD.exec(text);
+    if (word) {
+        const lower = word[1].toLowerCase();
+        const byWord = KRT_SEARCH_PREFIXES.find((p) => {
+            return p.words.includes(lower);
+        });
+        if (byWord)
+            return { kind: byWord.kind, term: text.slice(word[0].length).trim(), help: false };
+    }
+    return { kind: null, term: text, help: false };
+}
+
+/**
+ * How well an entry matches a folded query: a label that starts with it, a label that contains it,
+ * then a breadcrumb or search term that contains it.
+ *
+ * @param {string} foldLabel the entry's folded label
+ * @param {string} foldRest its folded breadcrumb and search terms
+ * @param {string} q the folded query
+ * @returns {number} 0, 1 or 2 from best to worst, -1 for no match
+ */
+export function krtSearchScore(foldLabel, foldRest, q) {
+    if (foldLabel.startsWith(q)) return 0;
+    if (foldLabel.includes(q)) return 1;
+    return foldRest.includes(q) ? 2 : -1;
+}
+
+/** The score of a server hit whose label the folded query does not match. */
+const SERVER_MATCH_SCORE = 3;
+
+/**
+ * Ranks pages and server hits into one list: by score, a page before a server hit of the same
+ * score, then in the given order. Server hits always stay, since the server matched them.
+ *
+ * @template {{ foldLabel: string, foldRest: string, fromServer?: boolean }} T
+ * @param {T[]} items the candidates
+ * @param {string} q the folded query
+ * @returns {T[]} the matching items, best first
+ */
+export function krtSearchRank(items, q) {
+    return items
+        .map((item, i) => {
+            const s = krtSearchScore(item.foldLabel, item.foldRest, q);
+            return { item, i, s: s < 0 && item.fromServer ? SERVER_MATCH_SCORE : s };
+        })
+        .filter((x) => {
+            return x.s >= 0;
+        })
+        .sort((a, b) => {
+            return (
+                a.s - b.s || Number(!!a.item.fromServer) - Number(!!b.item.fromServer) || a.i - b.i
+            );
+        })
+        .map((x) => {
+            return x.item;
+        });
+}

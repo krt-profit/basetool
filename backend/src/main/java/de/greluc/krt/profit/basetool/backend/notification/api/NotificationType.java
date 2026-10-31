@@ -310,7 +310,7 @@ public enum NotificationType {
   BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
 
   /**
-   * A member's OFFICER role does not fit their leadership seats (REQ-ORG-029), rendered with {@code
+   * A leadership seat holder lacks the {@code KRT Member} role (REQ-ORG-029), rendered with {@code
    * member}, {@code unit}, the {@code seat} and {@code rank} words and the {@code mismatch} word.
    */
   ORG_LEADERSHIP_ROLE_MISMATCH,
