@@ -87,6 +87,7 @@ class OrderHierarchyVisibilityTest {
             java.util.List.of(),
             java.time.Instant.now(),
             1L,
+            true,
             null,
             false);
 

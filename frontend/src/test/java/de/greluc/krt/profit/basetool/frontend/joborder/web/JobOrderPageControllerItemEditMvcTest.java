@@ -93,6 +93,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
         Instant.now(),
         1L,
         null,
+        null,
         false);
   }
 
@@ -138,6 +139,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     when(reader.readItemEdit(id))
@@ -297,6 +299,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     when(reader.readItemEdit(id))

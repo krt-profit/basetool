@@ -189,6 +189,8 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_ASSIGNEE_REMOVED",
                   "JOB_ORDER_ASSIGNEE_NOTE_SET",
                   "JOB_ORDER_ASSIGNEE_NOTE_CLEARED",
+                  "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED",
+                  "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED",
                   "JOB_ORDER_MATERIAL_UNLINKED",
                   "JOB_ORDER_INVENTORY_UNLINKED",
                   "JOB_ORDER_HANDOVER_CREATED",

@@ -25,7 +25,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.UUID;
@@ -41,7 +43,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies that a non-admin without a profit-eligible membership is redirected from the order list
- * and detail to the create form, without the backend being queried.
+ * to the create form, and from an order detail the backend refuses to the list (REQ-ORDERS-047).
  */
 @SpringBootTest
 class JobOrderViewProfitGateMvcTest {
@@ -74,10 +76,14 @@ class JobOrderViewProfitGateMvcTest {
 
   @Test
   @WithMockUser
-  void orderDetail_nonProfitViewer_redirectsToCreate() throws Exception {
+  void orderDetail_nonProfitViewerTheBackendRefuses_redirectsToTheList() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, orderId))
+        .thenThrow(new BackendServiceException("forbidden", null, 403));
+
     mockMvc
-        .perform(get("/orders/" + UUID.randomUUID()))
+        .perform(get("/orders/" + orderId))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/orders/create"));
+        .andExpect(redirectedUrl("/orders"));
   }
 }

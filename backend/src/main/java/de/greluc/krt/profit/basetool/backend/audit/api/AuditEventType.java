@@ -227,6 +227,18 @@ public enum AuditEventType {
   /** An assignee's free-text note was cleared. */
   JOB_ORDER_ASSIGNEE_NOTE_CLEARED(AuditDomain.JOB_ORDER),
 
+  /**
+   * A user who is not a direct member of the order's processing unit was added as an assignee,
+   * which grants them read visibility of the order (REQ-ORDERS-047).
+   */
+  JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED(AuditDomain.JOB_ORDER),
+
+  /**
+   * A user who is not a direct member of the order's processing unit was removed as an assignee,
+   * ending the read visibility the entry granted (REQ-ORDERS-047).
+   */
+  JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED(AuditDomain.JOB_ORDER),
+
   /** A material requirement bucket was unlinked from a job order. */
   JOB_ORDER_MATERIAL_UNLINKED(AuditDomain.JOB_ORDER),
 

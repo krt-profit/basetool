@@ -126,10 +126,7 @@ non-admins see the union of their memberships unless they pin one.
 > lets a higher level see/edit its subordinate units' rows; a subordinate never sees the level above
 > (strict silo).
 
-#### Planned exception: a job-order assignee sees the order (ADR-0301)
-
-> **Status: planned** (ADR-0301, map #2800). Until it ships, the current text above / the current
-> code stays authoritative.
+#### Exception: a job-order assignee sees the order (ADR-0301)
 
 Being an **assignee** of a `JobOrder` (a `JobOrderAssignee` entry, „Bearbeiter") grants read
 visibility of that order, whatever its responsible unit, the profit gate, the caller's memberships
@@ -138,27 +135,33 @@ the job-order link above, and a deliberate exception to org-unit tenancy.
 
 - **Keyed on the person.** The grant matches the caller's own user id against the order's assignee
   entries, like the REQ-ORG-011 owner escape; never an authority, a pin or the admin all-scope.
-- **What it opens.** The order in full — materials, progress, assignees — on its detail page, in
-  the overview's „Ich bearbeite" segment and in its „Alle" list (REQ-ORDERS-040). „Zu bearbeiten"
-  keeps the normal tenancy scope. The scope fragment (`JobOrderScope`, `JOB_ORDER_SCOPE_PREDICATE`)
-  and `canSeeJobOrder` widen together, so a list never returns an order the detail gate would deny.
+- **What it opens.** The order in full — materials, progress, assignees — on its detail page and in
+  the overview's „Alle" list (REQ-ORDERS-040); the „Ich bearbeite" segment follows with the
+  REQ-ORDERS-040 amendment. „Zu bearbeiten" keeps the normal tenancy scope. `canSeeJobOrder` checks
+  the entry before the scope gate, and the queue list `findScopedJobOrders` adds the same entry as a
+  disjunct beside `JOB_ORDER_SCOPE_PREDICATE` (`JobOrderScope`), so the list never returns an order
+  the detail gate would deny. The shared fragment itself stays unwidened, because the material
+  board reuses it.
 - **What it does not open.** No write beyond the assignee's own note and removing themselves.
   Status, lines, materials and handovers stay with the processing unit under its role-and-scope
-  gates. It never widens the Lager view, the material board or the org-demand feed (the
-  membership-only, anonymised bullet above), and it grants no other order of the same unit.
+  gates (`canEditJobOrder`, `canSeeJobOrderInScope`), and so does assigning someone else. It never
+  widens the Lager view, the reference lookup of the Lager pickers, the material board or the
+  org-demand feed (the membership-only, anonymised bullet above), it opens no owner panel, and it
+  grants no other order of the same unit.
 - **How long it lasts.** As long as the assignee entry exists, whatever the order's status; leaving
   the unit does not end it. Erasing the account removes the entries (`JobOrderMemberUnlink`), and
   with them the grant.
-- **Who creates it.** A Logistician with access to the order may assign any active account,
-  including a member of a unit that is not profit-eligible (REQ-ORDERS-047). An assignee who is not
-  a direct member of the responsible unit is audited as such (`JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` /
-  `_REMOVED`, REQ-AUDIT-001).
+- **Who creates it.** A Logistician of the order may assign any active account, including a member
+  of a unit that is not profit-eligible (REQ-ORDERS-047). An assignee who is not a direct member of
+  the responsible unit is audited as such (`JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `_REMOVED`,
+  REQ-AUDIT-001).
 
-**Enforced by (to be added):** `JobOrderScopeQueryIntegrationTest` (an assignee outside the
-responsible unit lists and opens the order; a removed entry ends it), `JobOrderAccessPolicyTest`
-(the assignee's writes are limited to the own note and self-removal), `OwnerScopeServiceTest` (the
-grant ignores the pin and the admin all-scope) · **Related:** REQ-ORDERS-047, REQ-ORDERS-040,
-REQ-ORG-011, ADR-0301
+**Enforced by:** `JobOrderScopeQueryIntegrationTest` (`assigneeGrant_*`: an assignee outside the
+responsible unit lists the order, never in the processing queue, a unit-mate without an entry does
+not, a removed entry ends it), `JobOrderAccessPolicyTest` (`assigneeGrant_*`: the grant is keyed on
+the caller and opens no write, no owner panel and no assignee management),
+`JobOrderAssigneeGrantIntegrationTest` (two units over HTTP) · **Related:** REQ-ORDERS-047,
+REQ-ORDERS-040, REQ-ORG-011, ADR-0301
 
 ### REQ-ORG-004 — Create-time OrgUnit stamping
 
