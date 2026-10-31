@@ -1616,7 +1616,7 @@ The Keycloak `OFFICER` role is retired (REQ-SEC-004), so a Sonderkonto can no lo
 - **The `GLOBAL_ROLE` `OFFICER` audience is gone.** The Sichtbarkeit editor of a Sonderkonto no
   longer offers it; the remaining global-role audiences are `LOGISTICIAN` and `MISSION_MANAGER`
   (`OrgUnitBankSettingsService`, REQ-BANK-035).
-- **Existing grants and limits were removed by migration** `V316`. It deletes every
+- **Existing grants and limits were removed by migration** `V317`. It deletes every
   `bank_account_view_grant` row and every `bank_account_approval_limit` row (REQ-BANK-041) with
   `GLOBAL_ROLE` `OFFICER` and writes one `bank_audit_event` per removed row with the system as
   actor and `GLOBAL_ROLE:OFFICER` as details: `BALANCE_VISIBILITY_REVOKED` for a grant,
@@ -1629,7 +1629,7 @@ The Keycloak `OFFICER` role is retired (REQ-SEC-004), so a Sonderkonto can no lo
 
 **Enforced by:** `OrgUnitBankSettingsServiceTest` (the offered buckets), `OfficerCutMigrationTest`
 (grants and limits deleted, one audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`,
-`db/migration/V316` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
+`db/migration/V317` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 

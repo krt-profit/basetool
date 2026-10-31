@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The data cut of the {@code OFFICER} retirement (ADR-0300, REQ-SEC-004, REQ-BANK-037): the SQL of
- * migrations {@code V315}, {@code V316} and {@code V317} is run against rows the earlier schema
+ * migrations {@code V316}, {@code V317} and {@code V318} is run against rows the earlier schema
  * could hold, in a rolled-back transaction.
  */
 @SpringBootTest
@@ -154,7 +154,7 @@ class OfficerCutMigrationTest {
         jdbcTemplate.queryForObject(
             "SELECT id FROM role WHERE upper(code) = 'OFFICER'", Long.class);
 
-    migrate("V315");
+    migrate("V316");
 
     assertThat(count("SELECT count(*) FROM role WHERE upper(code) = 'OFFICER'")).isZero();
     assertThat(count("SELECT count(*) FROM user_roles WHERE user_id = ?", OFFICER_USER)).isZero();
@@ -165,7 +165,7 @@ class OfficerCutMigrationTest {
 
   @Test
   void theOfficerBankBucketsAreDeletedWithOneSystemAuditRowEach() throws IOException {
-    migrate("V316");
+    migrate("V317");
 
     assertThat(count("SELECT count(*) FROM bank_account_view_grant WHERE id = ?", OFFICER_GRANT))
         .isZero();
@@ -197,7 +197,7 @@ class OfficerCutMigrationTest {
 
   @Test
   void theRoleOfficerSelectorsBecomeSeatHolderSelectors() throws IOException {
-    migrate("V317");
+    migrate("V318");
 
     Map<String, Object> moved =
         jdbcTemplate.queryForMap(
@@ -226,7 +226,7 @@ class OfficerCutMigrationTest {
         UUID.randomUUID(),
         RULE);
 
-    migrate("V317");
+    migrate("V318");
 
     assertThat(
             count(
