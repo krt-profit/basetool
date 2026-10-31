@@ -92,6 +92,35 @@ class NavigationMenuTest {
     assertThat(keys(menu, "bank")).doesNotContain("bank.grants");
   }
 
+  /** The Leitung entry follows the capability flag, not a role. */
+  @Test
+  void leitungFollowsTheFlag() {
+    assertThat(keys(resolve(Set.of("KRT_MEMBER", "OFFICER"), Set.of()), "organisation"))
+        .doesNotContain("organisation.leadership");
+    assertThat(
+            keys(
+                resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.OPEN_LEITUNG)), "organisation"))
+        .contains("organisation.leadership");
+  }
+
+  /** The three promotion management entries follow the capability flag, not a role. */
+  @Test
+  void promotionManagementFollowsTheFlag() {
+    assertThat(keys(resolve(Set.of("OFFICER"), Set.of(NavigationFlag.PROMOTION)), "promotion"))
+        .containsExactly("promotion.overview", "promotion.evaluations");
+    assertThat(
+            keys(
+                resolve(
+                    Set.of(), Set.of(NavigationFlag.PROMOTION, NavigationFlag.MANAGE_PROMOTIONS)),
+                "promotion"))
+        .containsExactly(
+            "promotion.overview",
+            "promotion.evaluations",
+            "promotion.manage",
+            "promotion.topics",
+            "promotion.ranks");
+  }
+
   /** Quick-access-only pages stay out of the menu links but feed the page index. */
   @Test
   void paletteOnlyPagesFeedOnlyTheIndex() {

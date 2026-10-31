@@ -80,6 +80,8 @@ public class NavigationAdvice {
       addIf(flags, capabilities.canSeeBlueprintOverview(), NavigationFlag.BLUEPRINT_OVERVIEW);
       addIf(flags, capabilities.canViewJobOrders(), NavigationFlag.JOB_ORDERS);
       addIf(flags, capabilities.canViewOwnJobOrders(), NavigationFlag.OWN_JOB_ORDERS);
+      addIf(flags, capabilities.canOpenLeitung(), NavigationFlag.OPEN_LEITUNG);
+      addIf(flags, capabilities.canManagePromotions(), NavigationFlag.MANAGE_PROMOTIONS);
     }
     addIf(flags, Boolean.TRUE.equals(supplyEnabled), NavigationFlag.SUPPLY);
     addIf(flags, Boolean.TRUE.equals(purchasingEnabled), NavigationFlag.PURCHASING);

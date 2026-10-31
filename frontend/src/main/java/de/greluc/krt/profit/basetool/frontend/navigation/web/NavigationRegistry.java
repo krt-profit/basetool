@@ -24,6 +24,8 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_EN;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.MANAGE_PROMOTIONS;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PROMOTION;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING;
@@ -83,8 +85,10 @@ public class NavigationRegistry {
 
   private static final String HANDBOOK_URL = "https://github.com/krt-profit/basetool/wiki";
 
-  private static final NavigationGate ADMIN_OR_OFFICER =
-      NavigationGate.anyRole(Roles.ADMIN, Roles.OFFICER);
+  private static final NavigationGate LEITUNG_GATE = NavigationGate.requires(OPEN_LEITUNG);
+
+  private static final NavigationGate PROMOTION_MANAGEMENT_GATE =
+      NavigationGate.requires(MANAGE_PROMOTIONS);
 
   /** The two links above the member groups: home and notifications. */
   private final NavigationGroup top = buildTop();
@@ -240,17 +244,13 @@ public class NavigationRegistry {
                 .keywords("palette.keywords.orgChart")
                 .testId("nav-org-chart"),
             of("organisation.leadership", "/organisation/leitung", "nav.leitung")
-                .gate(ADMIN_OR_OFFICER)
+                .gate(LEITUNG_GATE)
                 .testId("nav-leitung"),
             of("orgunitbank.overview", "/org-unit-bank", "nav.bank.myOrgUnit")
                 .keywords("palette.keywords.bank")
                 .gate(
                     NavigationGate.anyRole(
-                        Roles.ADMIN,
-                        Roles.OFFICER,
-                        Roles.LOGISTICIAN,
-                        Roles.MISSION_MANAGER,
-                        Roles.KRT_MEMBER))
+                        Roles.ADMIN, Roles.LOGISTICIAN, Roles.MISSION_MANAGER, Roles.KRT_MEMBER))
                 .testId("nav-org-unit-bank")),
         NavigationGroup.of(
                 "promotion",
@@ -263,14 +263,14 @@ public class NavigationRegistry {
                     "/promotion/my-evaluations",
                     "nav.promotion.my_evaluations"),
                 of("promotion.manage", "/promotion/manage", "nav.promotion.manage")
-                    .gate(ADMIN_OR_OFFICER),
+                    .gate(PROMOTION_MANAGEMENT_GATE),
                 of("promotion.topics", "/promotion/admin/topics", "nav.promotion.admin_topics")
-                    .gate(ADMIN_OR_OFFICER),
+                    .gate(PROMOTION_MANAGEMENT_GATE),
                 of(
                         "promotion.ranks",
                         "/promotion/admin/rank-requirements",
                         "nav.promotion.admin_ranks")
-                    .gate(ADMIN_OR_OFFICER))
+                    .gate(PROMOTION_MANAGEMENT_GATE))
             .gate(NavigationGate.requires(PROMOTION)),
         NavigationGroup.of(
                 "bank",

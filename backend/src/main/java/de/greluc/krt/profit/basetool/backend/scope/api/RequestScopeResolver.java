@@ -352,14 +352,13 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Whether the caller may open the org-unit blueprint availability overview: admins, officers, and
-   * holders of an oversight seat (see {@link #isOversightSeat(OrgUnitMembership)}).
+   * Whether the caller may open the org-unit blueprint availability overview: admins and holders of
+   * an oversight seat (see {@link #isOversightSeat(OrgUnitMembership)}).
    *
-   * @return {@code true} iff the caller is an admin, an officer, or holds at least one oversight
-   *     seat.
+   * @return {@code true} iff the caller is an admin or holds at least one oversight seat.
    */
   public boolean canAccessBlueprintOverview() {
-    if (authHelper.isAdmin() || authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
+    if (authHelper.isAdmin()) {
       return true;
     }
     return currentCallerMemberships().stream().anyMatch(RequestScopeResolver::isOversightSeat);
