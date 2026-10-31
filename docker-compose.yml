@@ -5,7 +5,7 @@ x-logging: &default-logging
     max-file: "5"
 
 x-db-backend: &db-backend-template
-  image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+  image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
   restart: unless-stopped
   logging: *default-logging
   security_opt:
@@ -52,7 +52,7 @@ x-db-backend: &db-backend-template
     - /var/lib/basetool/db-backend:/var/lib/postgresql/data
 
 x-db-keycloak: &db-keycloak-template
-  image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+  image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
   restart: unless-stopped
   logging: *default-logging
   security_opt:
@@ -95,7 +95,7 @@ x-db-keycloak: &db-keycloak-template
     - /var/lib/basetool/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
-  image: quay.io/keycloak/keycloak:26.8@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+  image: quay.io/keycloak/keycloak:26.8@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
@@ -244,7 +244,7 @@ x-backend: &backend-template
     - ${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-redis: &redis-template
-  image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+  image: redis:8-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
   command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
@@ -759,7 +759,7 @@ services:
 
   acme:
     profiles: ["prod"]
-    image: goacme/lego:v5.5.2@sha256:1944e8c36055beec47c7de6f15202b41128be75eea0ffa257f0c14d93c5155fd
+    image: goacme/lego:v5.6.0@sha256:6f1583fc026a455ea46a7a5858c576105bb69c2e2de69db391cab7f14750350c
     container_name: acme
     restart: unless-stopped
     logging: *default-logging

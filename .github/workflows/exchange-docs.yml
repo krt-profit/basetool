@@ -48,7 +48,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "24"
+          node-version: "26"
 
       - name: links / Self-test the link checker
         run: python3 .github/scripts/check_exchange_docs_links.py --selftest
@@ -75,8 +75,8 @@ jobs:
 
       - name: reference / Add the pinned Redoc bundle
         env:
-          REDOC_VERSION: 2.5.4
-          REDOC_INTEGRITY: sha512-M6jWhG1qoBnH6TFmzJnstyCZ87HmOY/UzDm78mHiYihEdlV/YcS9ogOo1NlElnJMeLsyxHFe2yFc4sNjHTrABQ==
+          REDOC_VERSION: 3.0.1
+          REDOC_INTEGRITY: sha512-KDfoKaYW19LCl4YStgBnwlaNjYEFfs5zCNt1s1WZ2YM5u8d26Yuzd2l43fZO851ZsgIMe/D640fDJkD8eaRQKQ==
         run: |
           set -euo pipefail
           mkdir -p build/redoc

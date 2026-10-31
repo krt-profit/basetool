@@ -593,7 +593,7 @@ grep -n '\${' /etc/basetool/monitoring/secrets/alertmanager.yml.new | grep -v '^
 chown "$(own 65534):$(own 65534)" /etc/basetool/monitoring/secrets/alertmanager.yml.new
 chmod 600 /etc/basetool/monitoring/secrets/alertmanager.yml.new
 ${PODMAN} run --rm -v /etc/basetool/monitoring/secrets/alertmanager.yml.new:/cfg.yml:ro \
-  --entrypoint amtool quay.io/prometheus/alertmanager:v0.34.1 check-config /cfg.yml
+  --entrypoint amtool quay.io/prometheus/alertmanager:v0.34.2 check-config /cfg.yml
 mv /etc/basetool/monitoring/secrets/alertmanager.yml.new /etc/basetool/monitoring/secrets/alertmanager.yml
 restorecon -F /etc/basetool/monitoring/secrets/alertmanager.yml
 ${SYSTEMCTL} restart alertmanager.service       # a single-file mount: restart, never reload
@@ -935,7 +935,7 @@ docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
 scripts/check-loki-rules.sh
 
 # Alertmanager — check a RENDERED alertmanager.yml, not the .tmpl, from the directory holding it.
-docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.34.1 \
+docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.34.2 \
   check-config /cfg/alertmanager.yml
 
 # Blackbox — no `check-config` subcommand, so start it on the config and assert it logs
@@ -955,9 +955,9 @@ done
 docker rm -f bb-lint
 
 # Alloy — format check + validate. `validate` exits 0 even on failure: read its output.
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.0 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.3 \
   fmt --test /cfg/config.alloy
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.0 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.3 \
   validate /cfg/config.alloy
 # The shipper-side masks (CI: repo-lint -> alloy-log-masking)
 python3 scripts/check-alloy-log-masking.py

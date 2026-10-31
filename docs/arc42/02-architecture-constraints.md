@@ -25,7 +25,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 | **Rootless Podman with Quadlet units** on Rocky Linux 10, SELinux enforcing | The production runtime since 2026-09-22 (ADR-0163). Containers are systemd units owned by an unprivileged service user; there is no Docker socket to hand anything. The Compose files remain the *source* the units are generated from, and the local and test stacks still run on Compose. See §7. |
 | **Every resolved build dependency matches a committed checksum** | `gradle/verification-metadata.xml` pins each jar, POM and module file by SHA-256 and Gradle refuses anything else (ADR-0208, REQ-OPS-034). A change to the dependency graph carries the regenerated file. |
 | **Images are pinned by digest, Cosign-signed, and verified before they run** | A tag is not an identity. The deploy refuses an image whose signature does not verify against the pinned workflow identity. |
-| **Node 24 for the frontend's asset toolchain** | It is a build-time dependency only; nothing in the served application is a Node runtime. |
+| **Node 26 for the frontend's asset toolchain** | It is a build-time dependency only; nothing in the served application is a Node runtime. |
 
 ## 2.3 Conventions that function as constraints
 

@@ -16,6 +16,7 @@ dependencies {
   compileOnly(libs.keycloak.services)
   compileOnly(libs.keycloak.core)
   compileOnly(platform(libs.protobuf3.bom))
+  compileOnly(platform(libs.vertx.bom))
 
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter)
@@ -29,5 +30,6 @@ dependencies {
   testImplementation(libs.keycloak.core)
   testImplementation(libs.jboss.logmanager) { isTransitive = false }
   testImplementation(platform(libs.protobuf3.bom))
+  testImplementation(platform(libs.vertx.bom))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

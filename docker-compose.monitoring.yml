@@ -48,7 +48,7 @@ services:
   grafana:
     <<: *mon-base
     container_name: grafana
-    image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     cap_drop: [ALL]
     environment:
       GOMEMLIMIT: "768MiB"
@@ -128,7 +128,7 @@ services:
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:3.1.0@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
+    image: grafana/tempo:3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044
     cap_drop: [ALL]
     command: ["-target=all", "-config.expand-env=true", "-config.file=/etc/tempo/tempo.yaml"]
     environment:
@@ -149,7 +149,7 @@ services:
   alloy:
     <<: *mon-base
     container_name: alloy
-    image: grafana/alloy:v1.21.0@sha256:9726bfba078de9bc2212c60c6e643238c700b4fe0868ea78cbe03163d03d95bf
+    image: grafana/alloy:v1.21.3@sha256:8ab871206bd2d8f89277f53abffee5f452a293980788d52f85fa183a87a505a4
     cap_drop: [ALL]
     group_add: ["473", "4"]
     environment:
@@ -179,7 +179,7 @@ services:
   alertmanager:
     <<: *mon-base
     container_name: alertmanager
-    image: quay.io/prometheus/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    image: quay.io/prometheus/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
     cap_drop: [ALL]
     environment:
       GOMEMLIMIT: "36MiB"
@@ -272,7 +272,7 @@ services:
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
-    image: oliver006/redis_exporter:v1.94.0@sha256:0842ef7110e62b40bbde2d5c11f38c6fbd99f7100c75e3866637c1b335a1eff7
+    image: oliver006/redis_exporter:v1.96.0@sha256:3d57b9eb142a62ffc600063606a41cd471cd53d81bed10be5b56b3a8918f2c26
     cap_drop: [ALL]
     environment:
       GOMEMLIMIT: "24MiB"
