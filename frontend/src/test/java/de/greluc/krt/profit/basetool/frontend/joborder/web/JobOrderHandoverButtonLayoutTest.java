@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.Collections;
@@ -91,6 +92,7 @@ class JobOrderHandoverButtonLayoutTest {
 
   @Test
   void orderDetail_HandoverButton_ShouldSitInTheHandoversTab_NotInThePageHead() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     JobOrderDto order =

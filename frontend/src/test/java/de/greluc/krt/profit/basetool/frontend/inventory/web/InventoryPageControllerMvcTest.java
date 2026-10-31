@@ -58,6 +58,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
@@ -158,6 +159,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void viewAllInventory_AsLogistician_ShouldShowActions() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -1528,6 +1530,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1602,6 +1605,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -2249,6 +2253,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllGameItemStackEntries_rendersItemLeaf() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -2350,6 +2355,7 @@ class InventoryPageControllerMvcTest {
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllGameItemStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed()
       throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();

@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNee
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.ItemPickerOption;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ItemPickerLabels;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
@@ -61,7 +61,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -121,8 +120,8 @@ public class InventoryPageController {
 
   private final ParallelPageLoader parallelPageLoader;
 
-  /** Resolves ADMIN onto LOGISTICIAN so the gate is asked, not enumerated. */
-  private final RoleHierarchy roleHierarchy;
+  /** Answers the pin-aware Logistician capability of the active context. */
+  private final LogisticianGate logisticianGate;
 
   /** Labels the item picker's search results with size, grade and class (REQ-INV-064). */
   private final ItemPickerLabels itemPickerLabels;
@@ -467,7 +466,7 @@ public class InventoryPageController {
       model.addAttribute("selectedPersonalOnly", query.personalOnly());
       model.addAttribute("selectedNonPersonalOnly", query.nonPersonalOnly());
       model.addAttribute("authUserId", currentAuthName());
-      model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+      model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
       if (fragment) {
         return "inventory/inventory-my :: inventoryTableFragment";
       }
@@ -498,7 +497,7 @@ public class InventoryPageController {
     model.addAttribute("selectedPersonalOnly", query.personalOnly());
     model.addAttribute("selectedNonPersonalOnly", query.nonPersonalOnly());
     model.addAttribute("authUserId", currentAuthName());
-    model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+    model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
 
     if (fragment) {
       return "inventory/inventory-my :: inventoryTableFragment";
@@ -685,7 +684,7 @@ public class InventoryPageController {
           query,
           fragment);
       model.addAttribute("authUserId", currentAuthName());
-      model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+      model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
       if (fragment) {
         return "inventory/inventory-admin :: inventoryTableFragment";
       }
@@ -713,7 +712,7 @@ public class InventoryPageController {
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("authUserId", currentAuthName());
-    model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+    model.addAttribute("canEditForeignNotes", logisticianGate.isGranted());
 
     if (fragment) {
       return "inventory/inventory-admin :: inventoryTableFragment";
@@ -1180,20 +1179,5 @@ public class InventoryPageController {
   private static String currentAuthName() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     return auth != null ? auth.getName() : null;
-  }
-
-  /**
-   * Whether the caller holds {@code LOGISTICIAN} or a role above it, resolved through the role
-   * hierarchy (ADR-0151).
-   *
-   * @return {@code true} iff the caller holds Logistician or a role above it.
-   */
-  private boolean hasLogisticianOrAbove() {
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || auth.getAuthorities() == null) {
-      return false;
-    }
-    return roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities()).stream()
-        .anyMatch(a -> Roles.authority(Roles.LOGISTICIAN).equals(a.getAuthority()));
   }
 }

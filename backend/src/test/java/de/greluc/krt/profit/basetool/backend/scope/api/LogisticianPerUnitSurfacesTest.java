@@ -254,6 +254,15 @@ class LogisticianPerUnitSurfacesTest {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("callers")
+  void theCapabilityFlagIsOnExactlyWhereTheCallerHandlesAUnitInTheActiveScope(Caller caller) {
+    OwnerScopeService scope = new Chain(caller).ownerScopeService;
+
+    assertThat(scope.canActAsLogisticianInActiveContext())
+        .isEqualTo(caller.admin() || !caller.reachable().isEmpty());
+  }
+
   @Test
   void aGrantOutsideTheScopeIsNotListed() {
     Caller caller =

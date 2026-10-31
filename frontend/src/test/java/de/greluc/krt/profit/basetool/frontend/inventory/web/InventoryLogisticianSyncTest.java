@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,6 +76,7 @@ class InventoryLogisticianSyncTest {
 
   @Test
   void memberWithLogisticianFlag_ShouldSeeActions() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -161,6 +163,7 @@ class InventoryLogisticianSyncTest {
 
   @Test
   void officerWithoutLogisticianFlag_ShouldSeeActionsByHierarchy() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(

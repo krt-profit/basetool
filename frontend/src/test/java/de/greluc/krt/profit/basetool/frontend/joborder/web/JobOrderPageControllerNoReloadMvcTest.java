@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.Collections;
@@ -141,6 +142,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updatePriorityAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/{id}/priority?priority={priority}"),
@@ -167,6 +169,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updatePriorityAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/{id}/priority?priority={priority}"),
@@ -199,6 +202,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void blueprintVariantCounting_AsLogistician_RelaysAndReturnsOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.patch(
             eq("/api/v1/orders/{id}/blueprint-variant-counting"),
@@ -245,6 +249,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItemAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
@@ -266,6 +271,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItemAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
     doThrow(new BackendServiceException("conflict", null, 409))
@@ -332,6 +338,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateOrderAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(eq("/api/v1/orders/{id}"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 4L));
@@ -349,6 +356,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateOrderAjax_EmptyMaterials_Returns400WithoutCallingBackend() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
 
     mockMvc
@@ -387,6 +395,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 3L));
@@ -404,6 +413,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandoverAjax_EmptyItems_Returns400() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
 
     mockMvc
@@ -432,6 +442,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createItemHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 6L));
@@ -460,6 +471,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void bookProductionAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
@@ -486,6 +498,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void bookProductionAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.post(

@@ -170,6 +170,20 @@ public class AccessGateService {
   }
 
   /**
+   * Whether the caller handles at least one unit as Logistician inside the active scope: the pinned
+   * unit when one is pinned, any unit otherwise. Admins always pass. Drives visibility only, never
+   * a write.
+   *
+   * @return {@code true} iff {@link #currentLogisticianScope()} reaches at least one unit
+   */
+  public boolean canActAsLogisticianInActiveContext() {
+    ScopePredicate scope = currentLogisticianScope();
+    return scope.adminAllScope()
+        || scope.activeOrgUnitId() != null
+        || !scope.memberOrgUnitIds().isEmpty();
+  }
+
+  /**
    * Checks whether the caller holds officer reach in {@code orgUnitId}, the unit that owns the
    * target (REQ-SEC-015, ADR-0300); admins always pass.
    *

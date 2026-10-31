@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.time.Instant;
@@ -39,7 +40,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
@@ -56,11 +56,13 @@ class JobOrderPageControllerReaderTest {
 
   private final QualityTierCatalog qualityTiers = mock(QualityTierCatalog.class);
 
+  private final LogisticianGate logisticianGate = mock(LogisticianGate.class);
+
   private final JobOrderPageController controller =
       new JobOrderPageController(
           mock(JobOrderBackendClient.class),
           reader,
-          mock(RoleHierarchy.class),
+          logisticianGate,
           qualityTiers,
           mock(JobOrderItemLines.class));
 
@@ -169,6 +171,22 @@ class JobOrderPageControllerReaderTest {
         .containsEntry("orphanedInventory", null)
         .doesNotContainKeys("itemBlueprintOwners", "itemStockByGameItem");
     assertThat((List<?>) model.asMap().get("responsibleOptions")).hasSize(1);
+  }
+
+  @Test
+  void theLogisticianFlagOfTheDetailReadFollowsTheGateOfTheActiveContext() {
+    when(reader.readOrderDetail(any(), any(), any()))
+        .thenThrow(new IllegalStateException("stop after the caller is built"));
+
+    for (boolean granted : new boolean[] {false, true}) {
+      when(logisticianGate.isGranted()).thenReturn(granted);
+
+      controller.viewOrderDetail(ID, new ExtendedModelMap(), null, null);
+
+      verify(reader)
+          .readOrderDetail(
+              eq(ID), eq(new JobOrderPageReader.OrderCaller(false, null, granted)), any());
+    }
   }
 
   @Test

@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
@@ -76,26 +77,13 @@ class InventoryPageControllerTest {
   private InventoryPageController controller;
   private InventoryWriteController writeController;
 
-  /** Mirrors {@code SecurityConfig#roleHierarchy}, which mirrors the backend's. */
-  private static final org.springframework.security.access.hierarchicalroles.RoleHierarchy
-      ROLE_HIERARCHY =
-          org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl.fromHierarchy(
-              """
-              ROLE_ADMIN > ROLE_LOGISTICIAN
-              ROLE_OFFICER > ROLE_LOGISTICIAN
-              ROLE_ADMIN > ROLE_MISSION_MANAGER
-              ROLE_OFFICER > ROLE_MISSION_MANAGER
-              ROLE_ADMIN > ROLE_BANK_MANAGEMENT
-              ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
-              """);
-
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
     controller =
         new InventoryPageController(
-            inventoryClient, PARALLEL, ROLE_HIERARCHY, mock(ItemPickerLabels.class));
+            inventoryClient, PARALLEL, mock(LogisticianGate.class), mock(ItemPickerLabels.class));
     writeController = new InventoryWriteController(inventoryClient, controller);
   }
 

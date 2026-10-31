@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.time.Instant;
 import java.util.*;
@@ -77,6 +78,7 @@ class OfficerRefineryAccessTest {
 
   @Test
   void officer_ShouldBeAbleToSelectUserInCreateForm() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(

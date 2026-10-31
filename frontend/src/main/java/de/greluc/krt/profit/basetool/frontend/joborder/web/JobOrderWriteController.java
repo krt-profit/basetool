@@ -46,17 +46,16 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBluep
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -69,12 +68,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -108,11 +103,8 @@ public class JobOrderWriteController {
   /** Sends every job-order mutation and its follow-up reads to the backend. */
   private final JobOrderBackendClient jobOrderClient;
 
-  /**
-   * Role hierarchy consulted by the duplicated {@link #isLogistician} check so implied authorities
-   * (ADMIN reaching LOGISTICIAN) gate the assignee-section rendering exactly as on the read side.
-   */
-  private final RoleHierarchy roleHierarchy;
+  /** Answers the pin-aware Logistician capability of the active context. */
+  private final LogisticianGate logisticianGate;
 
   /**
    * Shared redirect/flash-toast helper backing the classic (non-AJAX) priority and delete
@@ -258,7 +250,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/items/update")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String updateItemOrder(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
@@ -298,7 +290,7 @@ public class JobOrderWriteController {
    * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/items/update", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateItemOrderAjax(
       @PathVariable UUID id, @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
@@ -484,7 +476,7 @@ public class JobOrderWriteController {
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PutMapping("/{id}/priority/ajax")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updatePriorityAjax(
       @PathVariable UUID id, @RequestParam Integer priority) {
@@ -526,7 +518,7 @@ public class JobOrderWriteController {
    * @return the updated order on success, or the propagated backend error status
    */
   @PostMapping("/{id}/blueprint-variant-counting")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateBlueprintVariantCounting(
       @PathVariable UUID id, @RequestBody UpdateJobOrderBlueprintCountingDto dto) {
@@ -549,7 +541,7 @@ public class JobOrderWriteController {
    *     a surviving claim race)
    */
   @PostMapping("/{id}/claims")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
@@ -570,7 +562,7 @@ public class JobOrderWriteController {
    * @return 204 on success, or the propagated backend error status
    */
   @PostMapping("/{id}/claims/{claimId}/withdraw")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> withdrawClaim(@PathVariable UUID id, @PathVariable UUID claimId) {
     return relay(
@@ -591,7 +583,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/update")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String updateOrder(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -639,7 +631,7 @@ public class JobOrderWriteController {
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/update", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
@@ -806,7 +798,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/handovers")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String createHandover(
       @PathVariable UUID id,
       @ModelAttribute("handoverForm") JobOrderHandoverForm form,
@@ -882,7 +874,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/item-handovers")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String createItemHandover(
       @PathVariable UUID id,
       @ModelAttribute("itemHandoverForm") JobOrderItemHandoverForm form,
@@ -972,7 +964,7 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> createHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderHandoverForm form) {
@@ -1017,7 +1009,7 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/item-handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> createItemHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderItemHandoverForm form) {
@@ -1055,7 +1047,7 @@ public class JobOrderWriteController {
   @PostMapping(
       value = "/{id}/items/{itemId}/production",
       consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') or hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> bookProductionAjax(
       @PathVariable UUID id,
@@ -1080,7 +1072,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/materials/unlink")
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String unlinkMaterial(
       @PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
     try {
@@ -1104,7 +1096,7 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String unlinkInventoryItem(
       @PathVariable UUID id,
       @PathVariable UUID inventoryItemId,
@@ -1133,7 +1125,7 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @DeleteMapping("/{id}/inventory/{inventoryItemId}/unlink/ajax")
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> unlinkInventoryItemAjax(
       @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
@@ -1254,7 +1246,7 @@ public class JobOrderWriteController {
       @NotNull Model model, OidcUser principal, JobOrderDto order) {
     model.addAttribute("order", order);
     model.addAttribute("currentUserId", getCurrentUserId(principal));
-    model.addAttribute("isLogistician", isLogistician(principal) && order.callerMayEdit());
+    model.addAttribute("isLogistician", logisticianGate.isGranted() && order.callerMayEdit());
     model.addAttribute("canManageAssignees", order.callerMayManageAssignees());
   }
 
@@ -1282,36 +1274,5 @@ public class JobOrderWriteController {
       log.warn("Failed to get current user ID from backend: {}", ex.getMessage());
       return null;
     }
-  }
-
-  /**
-   * Checks whether the caller reaches LOGISTICIAN or ADMIN through the role hierarchy.
-   *
-   * @param principal the authenticated caller, or {@code null} for a guest
-   * @return {@code true} when the caller holds one of the two authorities
-   */
-  private boolean isLogistician(OidcUser principal) {
-    if (principal == null) {
-      return false;
-    }
-
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    Collection<? extends GrantedAuthority> authorities =
-        (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
-
-    Collection<? extends GrantedAuthority> reachableAuthorities =
-        roleHierarchy.getReachableGrantedAuthorities(authorities);
-    log.debug(
-        "JobOrder: Checking logistician status. Original authorities: {}."
-            + " Reachable authorities: {}",
-        authorities,
-        reachableAuthorities);
-    boolean result =
-        reachableAuthorities.stream()
-            .anyMatch(a ->
-                a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
-    log.debug("JobOrder: Is logistician: {}", result);
-    return result;
   }
 }

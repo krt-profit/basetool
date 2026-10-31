@@ -83,16 +83,15 @@ class MeControllerTest {
   }
 
   @Test
-  void getCapabilities_logisticianFlagIsTheHierarchyAnswer_notTheMembershipOne() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+  void getCapabilities_logisticianFlagFollowsTheGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isLogisticianOrAbove());
-    verify(authHelperService).isLogisticianOrAbove();
   }
 
   @Test
-  void getCapabilities_logisticianFlagFalseWhenTheCallerReachesNeitherRole() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+  void getCapabilities_logisticianFlagIsFalseWithoutAGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().isLogisticianOrAbove());
   }
@@ -266,7 +265,7 @@ class MeControllerTest {
     when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.of(active));
     when(authHelperService.isAdmin()).thenReturn(true);
     when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(true);
     when(notificationService.unreadCount(callerId)).thenReturn(7L);
 
     MeController.LayoutResponse layout = controller.getLayout(null, callerId);

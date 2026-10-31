@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_EN;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LOGISTICIAN_HERE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.MANAGE_PROMOTIONS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
@@ -573,7 +574,7 @@ public class NavigationRegistry {
             .keywords("palette.keywords.book")
             .icon(ICON_PLUS)
             .testId("palette-action-book-global")
-            .gate(NavigationGate.anyRole(Roles.LOGISTICIAN)));
+            .gate(NavigationGate.requires(LOGISTICIAN_HERE)));
   }
 
   @NotNull

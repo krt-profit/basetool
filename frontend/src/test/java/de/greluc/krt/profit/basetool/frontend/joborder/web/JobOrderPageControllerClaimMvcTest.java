@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,6 +87,7 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_AsLogistician_RelaysAndReturnsCreated() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -126,6 +128,7 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_WhenBackendReturns409_PropagatesConflict() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -149,6 +152,7 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_Conflict_PreservesRfc7807Code() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -182,6 +186,7 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_WhenBackendRejectsOverclaim_Propagates400() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -224,6 +229,7 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void withdrawClaim_AsLogistician_RelaysAndReturnsNoContent() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();
     doReturn(null)
@@ -243,6 +249,7 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void withdrawClaim_WhenBackendReturns409_PropagatesConflict() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();
     doThrow(new BackendServiceException("conflict", null, 409))

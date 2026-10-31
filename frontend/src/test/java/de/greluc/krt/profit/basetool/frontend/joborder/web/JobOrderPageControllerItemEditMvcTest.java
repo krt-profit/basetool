@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -100,6 +101,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderNoHandovers_rendersCreateFormInEditMode() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     when(reader.readItemEdit(id))
         .thenReturn(JobOrderPageStubs.editable(order(id, "ITEM", List.of()), List.of(), List.of()));
@@ -116,6 +118,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrder_preselectsStoredResponsibleAndRequestingOrgUnit() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     UUID responsibleId = UUID.randomUUID();
     UUID requestingId = UUID.randomUUID();
@@ -191,6 +194,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_nonItemOrder_redirectsWithError() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     when(reader.readItemEdit(id))
         .thenReturn(
@@ -208,6 +212,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderWithHandover_redirectsWithError() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     JobOrderItemHandoverDto handover =
         new JobOrderItemHandoverDto(
@@ -228,6 +233,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateItemOrder_relaysToBackendAndRedirects() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID blueprintId = UUID.randomUUID();
@@ -264,6 +270,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderWithLine_inlinesSavedItemNameForPicker() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID blueprintId = UUID.randomUUID();

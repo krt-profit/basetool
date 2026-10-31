@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.Collections;
@@ -363,7 +364,7 @@ class InventoryStolenMarkerRenderTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void allStackEntries_offerUnmarkOnAnEditableRowWhileMarkingIsOn() throws Exception {
-    stubMarking(true);
+    CapabilityStubs.report(backendApiClient, LayoutResponses.logistician(true));
     UUID itemId = UUID.randomUUID();
     stubEntries("/inventory/all/stack/entries", entry(itemId, true, true));
 

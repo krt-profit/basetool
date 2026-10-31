@@ -31,6 +31,9 @@ public enum NavigationFlag {
   /** The caller may view the orders their own org unit requested (REQ-ORDERS-023). */
   OWN_JOB_ORDERS,
 
+  /** The caller holds a Logistician grant in the active context. */
+  LOGISTICIAN_HERE,
+
   /** The Leitung page is offered in the active context (officer reach). */
   OPEN_LEITUNG,
 

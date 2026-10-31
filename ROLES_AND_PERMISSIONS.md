@@ -653,6 +653,10 @@ of the manage row above.
 > (`canSeeOperationLedger`), and `/payouts` reduces an escape-only caller to their own row. Before
 > 2026-08-30 that caller received every participant's callsign, percentage, expenses, share,
 > donation, transfer fee, net payout and confirming officer.
+> Logistician powers apply **per unit** as well: the Logistician controls of the Lager, the
+> job-order and the refinery pages show only where the caller holds a Logistician grant in the pinned
+> unit (or in any unit when none is pinned); the backend re-checks the owning unit of every action.
+>
 > Mission Manager powers apply **per unit**: a grant in unit A (own flag, officer rank or the cascaded
 > reach of a Bereich or Organisationsleitung seat) creates, edits and marks payouts for A's operations
 > only; creating stamps the pinned or picked unit and needs the grant there. An ownerless
