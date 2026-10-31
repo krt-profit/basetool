@@ -40,8 +40,9 @@ even though they are style rules on paper:
 - **Javadoc is mandatory and gate-enforced** on every type and public member. Checkstyle enforces
   the form; the substance is on the author. A misplaced or orphaned Javadoc fails the build in
   every source set, `test` and `e2e` included (ADR-0222).
-- **No comments besides Javadoc** (ADR-0214). Javadoc is short and carries no history; reasoning
-  goes into the commit message and the PR, durable facts into the spec, the ADR or the runbook.
+- **Javadoc and short technical comments, no history** (ADR-0214). Both are short and describe the
+  current state; reasoning goes into the commit message and the PR, durable facts into the spec,
+  the ADR or the runbook.
   Nothing gates this beyond review.
 - **Google Java Style**, applied by Spotless and checked by Checkstyle; SpotBugs runs on `main`.
 - **Files and methods do not grow.** Checkstyle caps a production file at 1,000 lines and a method at

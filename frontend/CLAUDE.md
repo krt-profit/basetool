@@ -39,10 +39,11 @@ against an empty design system and never treat its absence as "no design system 
 A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
 `TemplateCommentHygieneTest`):
 
-- **No comments.** A template carries no comment of any kind — the code base keeps no comments
-  besides Javadoc (ADR-0214); the reasoning goes into the commit message and the PR. A plain
-  `<!-- … -->` would also be sent with every response, which `TemplateCommentHygieneTest` fails.
-  The only `<!--/*/ … /*/-->` allowed is Thymeleaf's prototype-only markup, which is not a comment.
+- **No plain HTML comments.** A template never carries `<!-- … -->` — it would be sent with every
+  response, which `TemplateCommentHygieneTest` fails. A short technical comment (ADR-0214) is a
+  Thymeleaf parser-level `<!--/* … */-->` block, which the engine drops at parse time; history,
+  restated markup and TODOs stay out, the reasoning goes into the commit message and the PR.
+  `<!--/*/ … /*/-->` is Thymeleaf's prototype-only markup, not a comment.
 - **Page CSS goes into `static/css/pages/<domain>/<page>.css`**, linked with `<link rel="stylesheet">` where
   a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
   a template. It is linted by `:frontend:lintCss` with the standard rule set, like every other

@@ -1451,11 +1451,10 @@ entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsAcceptanceGa
 
 A rendered page carries what the browser needs and nothing a developer wrote for another developer.
 
-- **Templates carry no comments** (ADR-0214; amended 2026-09-25 — until then the rule was that
-  template comments are Thymeleaf parser-level comments). A plain `<!-- … -->` is sent with every
-  response. Should a parser-level `<!--/* … */-->` block ever appear (the engine drops it at parse
-  time), the star-slash pair may not appear inside it — it closes the block early and renders the
-  rest.
+- **Templates emit no plain HTML comments** (ADR-0214). A plain `<!-- … -->` is sent with every
+  response. A short technical comment is a parser-level `<!--/* … */-->` block (the engine drops it
+  at parse time); the star-slash pair may not appear inside it — it closes the block early and
+  renders the rest.
 - **Page CSS lives in `static/css/pages/<domain>/<page>.css`**, linked by a `<link rel="stylesheet">` in the
   place the page's `<style>` block used to stand. A template carries no `<style>` element. Each file
   belongs to exactly one template. Its rules sit in the `page` cascade layer (REQ-UI-024), so where
