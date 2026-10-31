@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionReadView;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +54,7 @@ class PromotionPageControllerReauthMvcTest {
 
   @Test
   void anExpiredSessionOnTheTopicsRedirectsToLogin() throws Exception {
-    when(client.topics()).thenThrow(expiredSession());
+    when(client.topics(PromotionReadView.MEMBER)).thenThrow(expiredSession());
 
     mockMvc
         .perform(get("/promotion/overview").param("promotionFeatureEnabled", "true"))

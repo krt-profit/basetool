@@ -66,35 +66,36 @@ public class PromotionTopicService {
   private final AuditRecorder auditRecorder;
 
   /**
-   * Pages the promotion topics in the caller's squadron scope; admins in "all squadrons" mode see
-   * every squadron.
+   * Pages the promotion topics of the requested view; admins in "all squadrons" mode see every
+   * squadron.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of promotion topics
    */
-  public Page<PromotionTopicResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<PromotionTopicResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
    * Returns every {@link PromotionTopicResponse} ordered by {@code sortOrder}, scoped exactly as
-   * {@link #list(Pageable)}. Used by the promotion UI to render the full topic list without
-   * pagination.
+   * {@link #list(Pageable, PromotionReadView)}. Used by the promotion UI to render the full topic
+   * list without pagination.
    *
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return visible topics in display order
    */
-  public List<PromotionTopicResponse> listAll() {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope).stream().map(mapper::toResponse).toList();
+  public List<PromotionTopicResponse> listAll(@NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds()).stream().map(mapper::toResponse).toList())
+        .orElseGet(List::of);
   }
 
   /**

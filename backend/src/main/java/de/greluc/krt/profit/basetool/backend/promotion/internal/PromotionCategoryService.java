@@ -68,15 +68,16 @@ public class PromotionCategoryService {
    * method is invoked.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of categories
    */
-  public Page<PromotionCategoryResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<PromotionCategoryResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
@@ -85,16 +86,18 @@ public class PromotionCategoryService {
    *
    * @param topicId identifier of the parent topic
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of categories scoped to the topic
    */
   public Page<PromotionCategoryResponse> listByTopic(
-      @NotNull UUID topicId, @NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllByTopicIdScoped(topicId, scope, pageable).map(mapper::toResponse);
+      @NotNull UUID topicId, @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository
+                .findAllByTopicIdScoped(topicId, scope.squadronIds(), pageable)
+                .map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
@@ -102,17 +105,18 @@ public class PromotionCategoryService {
    * sortOrder}. Used by the promotion UI to render the full evaluation table without pagination.
    *
    * @param topicId identifier of the parent topic
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return the topic's categories in display order
    */
-  public List<PromotionCategoryResponse> listAllByTopic(@NotNull UUID topicId) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllByTopicIdScopedOrdered(topicId, scope).stream()
-        .map(mapper::toResponse)
-        .toList();
+  public List<PromotionCategoryResponse> listAllByTopic(
+      @NotNull UUID topicId, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllByTopicIdScopedOrdered(topicId, scope.squadronIds()).stream()
+                .map(mapper::toResponse)
+                .toList())
+        .orElseGet(List::of);
   }
 
   /**

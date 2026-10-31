@@ -68,15 +68,16 @@ public class RankRequirementService {
    * #SORTABLE_FIELDS} by the controller.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of rank requirements
    */
-  public Page<RankRequirementResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<RankRequirementResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
@@ -84,17 +85,18 @@ public class RankRequirementService {
    *
    * @param fromRank ordinal of the current rank
    * @param toRank ordinal of the rank being promoted to
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return the rank requirements applicable to that transition
    */
-  public List<RankRequirementResponse> listByRanks(int fromRank, int toRank) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findScopedByFromRankAndToRank(fromRank, toRank, scope).stream()
-        .map(mapper::toResponse)
-        .toList();
+  public List<RankRequirementResponse> listByRanks(
+      int fromRank, int toRank, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findScopedByFromRankAndToRank(fromRank, toRank, scope.squadronIds()).stream()
+                .map(mapper::toResponse)
+                .toList())
+        .orElseGet(List::of);
   }
 
   /**

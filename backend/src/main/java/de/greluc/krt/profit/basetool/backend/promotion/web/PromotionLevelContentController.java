@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -71,6 +72,8 @@ public class PromotionLevelContentController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of level contents
    */
   @GetMapping
@@ -82,7 +85,8 @@ public class PromotionLevelContentController {
   public PageResponse<PromotionLevelContentResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -90,7 +94,7 @@ public class PromotionLevelContentController {
             sort,
             PromotionLevelContentService.SORTABLE_FIELDS,
             PromotionLevelContentService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.list(pageable));
+    return PageResponse.of(service.list(pageable, view));
   }
 
   /**
@@ -99,6 +103,8 @@ public class PromotionLevelContentController {
    *
    * @param categoryId identifier of the parent {@link
    *     de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategory}
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return the level contents bound to that category
    */
   @GetMapping("/by-category/{categoryId}")
@@ -106,8 +112,10 @@ public class PromotionLevelContentController {
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Level contents for the category.")
   })
-  public List<PromotionLevelContentResponse> listByCategory(@PathVariable UUID categoryId) {
-    return service.listByCategory(categoryId);
+  public List<PromotionLevelContentResponse> listByCategory(
+      @PathVariable UUID categoryId,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
+    return service.listByCategory(categoryId, view);
   }
 
   /**

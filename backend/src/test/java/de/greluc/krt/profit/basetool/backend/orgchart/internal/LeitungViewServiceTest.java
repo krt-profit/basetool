@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -252,6 +254,27 @@ class LeitungViewServiceTest {
     assertEquals(MembershipRole.STAFFELLEITER, sq.members().getFirst().role());
     assertTrue(sq.members().getFirst().self(), "the caller's own seat is flagged");
     assertFalse(sq.members().get(1).self());
+  }
+
+  @Test
+  void staffelleiterInA_plainMemberOfB_seesAOnlyAndNeverReadsBsRoster() {
+    allUnitsExist();
+    callerHolds(
+        Set.of(),
+        seat(squadronId, MembershipRole.STAFFELLEITER),
+        seat(otherSquadronId, MembershipRole.MEMBER));
+    when(roleSecurity.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, auth))
+        .thenReturn(false);
+    when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+        .thenReturn(List.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertEquals(1, view.squadrons().size());
+    assertEquals(squadronId, view.squadrons().getFirst().id());
+    verify(membershipRepository, never()).findAllByIdOrgUnitId(otherSquadronId);
   }
 
   @Test

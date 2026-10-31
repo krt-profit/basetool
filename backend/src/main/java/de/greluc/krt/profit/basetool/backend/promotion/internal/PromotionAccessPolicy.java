@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -60,6 +62,35 @@ public class PromotionAccessPolicy {
    */
   public boolean hasReadAccess() {
     return authHelper.isAdmin() || ownerScopeService.currentSquadronId().isPresent();
+  }
+
+  /**
+   * Resolves the squadrons a promotion read may touch, or nothing when the read shows nothing: the
+   * feature flag is off, a member has no read access, or an officer view has no officer reach.
+   * {@link PromotionReadView#MANAGEMENT} never reaches beyond the caller's officer reach, narrowed
+   * to the pinned unit (REQ-ROLE-007).
+   *
+   * @param view whose data the read shows
+   * @return the readable squadrons, or empty when the read answers empty
+   */
+  public @NotNull Optional<PromotionReadScope> readScope(@NotNull PromotionReadView view) {
+    if (!isFeatureEnabledForCurrentScope()) {
+      return Optional.empty();
+    }
+    return switch (view) {
+      case MEMBER ->
+          hasReadAccess()
+              ? Optional.of(
+                  new PromotionReadScope(
+                      ownerScopeService.currentSquadronId().<Set<UUID>>map(Set::of).orElse(null)))
+              : Optional.empty();
+      case MANAGEMENT -> {
+        Set<UUID> reach = ownerScopeService.currentOfficerReadScope();
+        yield reach != null && reach.isEmpty()
+            ? Optional.empty()
+            : Optional.of(new PromotionReadScope(reach));
+      }
+    };
   }
 
   /**

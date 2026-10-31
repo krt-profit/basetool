@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -46,26 +47,28 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
 
   /**
    * Squadron-scoped unpaginated read for the promotion-system overview. When {@code
-   * owningSquadronId} is {@code null} the result spans every squadron (admin "all squadrons" mode);
+   * scopeSquadronIds} is {@code null} the result spans every squadron (admin "all squadrons" mode);
    * a non-null id restricts the result to a single squadron's topics. The {@code sortOrder ASC}
    * default matches {@link #findAllByOrderBySortOrderAsc()}.
    */
   @Query(
       """
-      SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id =
-      :owningSquadronId ORDER BY t.sortOrder ASC
+      SELECT t FROM PromotionTopic t WHERE :scopeSquadronIds IS NULL OR t.owningSquadron.id =
+      :scopeSquadronIds ORDER BY t.sortOrder ASC
       """)
-  List<PromotionTopic> findAllScoped(@Param("owningSquadronId") @Nullable UUID owningSquadronId);
+  List<PromotionTopic> findAllScoped(
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 
   /**
    * Squadron-scoped paged read. Same {@code null}-means-no-filter contract as {@link
-   * #findAllScoped(UUID)}; sort is delegated to {@link Pageable} so the caller can override.
+   * #findAllScoped(java.util.Collection)}; sort is delegated to {@link Pageable} so the caller can
+   * override.
    */
   @Query(
       """
-      SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id =
-      :owningSquadronId
+      SELECT t FROM PromotionTopic t WHERE :scopeSquadronIds IS NULL OR t.owningSquadron.id =
+      :scopeSquadronIds
       """)
   Page<PromotionTopic> findAllScoped(
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
 }

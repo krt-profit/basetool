@@ -377,8 +377,8 @@ public class UserService {
   }
 
   /**
-   * Returns the caller-scoped squadron members the promotion system evaluates, excluding admins and
-   * leadership-seat holders; delegates to {@link
+   * Returns the squadron members the promotion system evaluates, limited to the caller's officer
+   * reach, excluding admins and leadership-seat holders; delegates to {@link
    * UserRepository#findEvaluatableMembers(java.util.Collection, Pageable)}.
    *
    * @param pageable page request
@@ -386,7 +386,10 @@ public class UserService {
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentOfficerReadScope();
+    if (scope != null && scope.isEmpty()) {
+      return Page.empty(pageable);
+    }
     return userRepository.findEvaluatableMembers(scope, pageable);
   }
 

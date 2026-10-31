@@ -2366,6 +2366,63 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void readScope_seatInA_memberOfB_unpinned_isAOnly() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_pinnedToAUnitWithReach_isThatUnit() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_pinnedToAUnitWithoutReach_isEmpty() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertTrue(service.currentOfficerReadScope().isEmpty());
+    }
+
+    @Test
+    void readScope_plainMember_isEmpty() {
+      stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+
+      assertTrue(service.currentOfficerReadScope().isEmpty());
+    }
+
+    @Test
+    void readScope_adminUnpinned_isUnrestricted() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertNull(service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_adminPinned_isThePin() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_B_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
     void officerAnywhere_isTrueForAnySeatWithKrtMember() {
       stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN));
 

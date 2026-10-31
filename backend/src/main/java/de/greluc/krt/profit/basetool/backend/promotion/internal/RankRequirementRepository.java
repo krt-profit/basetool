@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -49,41 +50,42 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
   List<RankRequirement> findAllByFromRankAndToRankOrderByIdAsc(int fromRank, int toRank);
 
   /**
-   * Squadron-scoped paged read for the admin list endpoint. When {@code owningSquadronId} is {@code
+   * Squadron-scoped paged read for the admin list endpoint. When {@code scopeSquadronIds} is {@code
    * null} the result spans every squadron (admin "all squadrons" mode); a non-null id restricts the
    * result to a single squadron's requirements via the requirement's own squadron.
    *
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of rank requirements visible to the caller
    */
   @Query(
       """
-      SELECT r FROM RankRequirement r WHERE :owningSquadronId IS NULL OR r.owningSquadron.id =
-      :owningSquadronId
+      SELECT r FROM RankRequirement r WHERE :scopeSquadronIds IS NULL OR r.owningSquadron.id =
+      :scopeSquadronIds
       """)
   Page<RankRequirement> findAllScoped(
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
    * Squadron-scoped variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)}. Same
-   * {@code null}-means-all-squadrons contract as {@link #findAllScoped(UUID, Pageable)}.
+   * {@code null}-means-all-squadrons contract as {@link #findAllScoped(java.util.Collection,
+   * Pageable)}.
    *
    * @param fromRank the rank the member currently holds
    * @param toRank the rank the member would be promoted to
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @return matching requirements visible to the caller, ordered by id
    */
   @Query(
       """
       SELECT r FROM RankRequirement r WHERE r.fromRank = :fromRank AND r.toRank = :toRank AND
-      (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId) ORDER BY r.id
+      (:scopeSquadronIds IS NULL OR r.owningSquadron.id IN :scopeSquadronIds) ORDER BY r.id
       ASC
       """)
   List<RankRequirement> findScopedByFromRankAndToRank(
       @Param("fromRank") int fromRank,
       @Param("toRank") int toRank,
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 
   /**
    * Paginated variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)} for admin REST
@@ -114,19 +116,19 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
   /**
    * Squadron-scoped variant of {@link #findDistinctRankTransitions()} used by the eligibility
    * service so a member is evaluated only against the transitions configured for their squadron.
-   * When {@code owningSquadronId} is {@code null} the result spans every squadron (admin "all
+   * When {@code scopeSquadronIds} is {@code null} the result spans every squadron (admin "all
    * squadrons" mode).
    *
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @return one row per configured transition in the scope, carrying {@code [fromRank, toRank]}
    */
   @Query(
       """
-      SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r WHERE :owningSquadronId IS NULL
-      OR r.owningSquadron.id = :owningSquadronId ORDER BY r.fromRank DESC, r.toRank DESC
+      SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r WHERE :scopeSquadronIds IS NULL
+      OR r.owningSquadron.id IN :scopeSquadronIds ORDER BY r.fromRank DESC, r.toRank DESC
       """)
   List<Object[]> findDistinctRankTransitionsScoped(
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 
   /**
    * JOIN-FETCH variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)} used by the
@@ -159,7 +161,7 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    *
    * @param fromRank the rank the member currently holds
    * @param toRank the rank the member would be promoted to
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @return matching requirements with topic+category eagerly fetched, scoped to the caller
    */
   @Query(
@@ -169,11 +171,11 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
       LEFT JOIN FETCH r.category c
       LEFT JOIN FETCH c.topic
       WHERE r.fromRank = :fromRank AND r.toRank = :toRank
-      AND (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId)
+      AND (:scopeSquadronIds IS NULL OR r.owningSquadron.id IN :scopeSquadronIds)
       ORDER BY r.id ASC
       """)
   List<RankRequirement> findAllForRankTransitionWithRelationsScoped(
       @Param("fromRank") int fromRank,
       @Param("toRank") int toRank,
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 }

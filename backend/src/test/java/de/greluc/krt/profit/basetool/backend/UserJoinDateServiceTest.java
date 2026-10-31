@@ -25,9 +25,12 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.OfficerReachDirectory;
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +46,9 @@ class UserJoinDateServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private MembershipOperations membershipOperations;
   @Mock private AuditRecorder auditRecorder;
+  @Mock private OfficerReachDirectory officerReachDirectory;
+  @Mock private SquadronVisibility squadronVisibility;
+  @Mock private AuthHelperService authHelperService;
 
   @InjectMocks private UserService userService;
 

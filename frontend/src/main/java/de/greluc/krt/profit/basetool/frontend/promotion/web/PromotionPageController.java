@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDt
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionReadView;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionRequirementCheckDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
@@ -100,20 +101,22 @@ public class PromotionPageController {
   public String overview(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
-    List<PromotionTopicDto> topics = fetchTopics();
+    List<PromotionTopicDto> topics = fetchTopics(PromotionReadView.MEMBER);
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
     Map<String, List<PromotionLevelContentDto>> categoryContentMap = new LinkedHashMap<>();
 
     for (PromotionTopicDto topic : topics) {
-      List<PromotionCategoryDto> categories = fetchCategoriesByTopic(topic.id().toString());
+      List<PromotionCategoryDto> categories =
+          fetchCategoriesByTopic(topic.id().toString(), PromotionReadView.MEMBER);
       topicCategoryMap.put(topic.id().toString(), categories);
       for (PromotionCategoryDto category : categories) {
-        List<PromotionLevelContentDto> contents = fetchLevelContents(category.id().toString());
+        List<PromotionLevelContentDto> contents =
+            fetchLevelContents(category.id().toString(), PromotionReadView.MEMBER);
         categoryContentMap.put(category.id().toString(), contents);
       }
     }
 
-    List<RankRequirementDto> rankRequirements = fetchAllRankRequirements();
+    List<RankRequirementDto> rankRequirements = fetchAllRankRequirements(PromotionReadView.MEMBER);
     Map<String, List<RankRequirementDto>> groupedRankRequirements = new LinkedHashMap<>();
     rankRequirements.stream()
         .sorted(
@@ -151,7 +154,7 @@ public class PromotionPageController {
   public String myEvaluations(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
-    List<PromotionTopicDto> topics = fetchTopics();
+    List<PromotionTopicDto> topics = fetchTopics(PromotionReadView.MEMBER);
     List<MemberEvaluationDto> myEvaluations = fetchMyEvaluations();
 
     Map<String, MemberEvaluationDto> evaluationByCategoryId = new LinkedHashMap<>();
@@ -161,12 +164,13 @@ public class PromotionPageController {
 
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
     for (PromotionTopicDto topic : topics) {
-      List<PromotionCategoryDto> categories = fetchCategoriesByTopic(topic.id().toString());
+      List<PromotionCategoryDto> categories =
+          fetchCategoriesByTopic(topic.id().toString(), PromotionReadView.MEMBER);
       topicCategoryMap.put(topic.id().toString(), categories);
     }
 
     Map<String, String> requiredLevelByCategory = new LinkedHashMap<>();
-    for (RankRequirementDto req : fetchAllRankRequirements()) {
+    for (RankRequirementDto req : fetchAllRankRequirements(PromotionReadView.MEMBER)) {
       if (req.categoryId() == null || req.minimumLevel() == null) {
         continue;
       }
@@ -297,12 +301,13 @@ public class PromotionPageController {
       return "promotion/promotion-manage :: eligibilityCell";
     }
 
-    List<PromotionTopicDto> topics = fetchTopics();
+    List<PromotionTopicDto> topics = fetchTopics(PromotionReadView.MANAGEMENT);
     List<PromotionCategoryDto> allCategories = new ArrayList<>();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
     Map<String, Integer> categoryCountByTopic = new LinkedHashMap<>();
     for (PromotionTopicDto topic : topics) {
-      List<PromotionCategoryDto> topicCategories = fetchCategoriesByTopic(topic.id().toString());
+      List<PromotionCategoryDto> topicCategories =
+          fetchCategoriesByTopic(topic.id().toString(), PromotionReadView.MANAGEMENT);
       categoriesByTopic.put(topic.id().toString(), topicCategories);
       categoryCountByTopic.put(topic.id().toString(), topicCategories.size());
       allCategories.addAll(topicCategories);
@@ -371,15 +376,17 @@ public class PromotionPageController {
       @RequestParam(name = "topic", required = false) @Nullable String selectedTopic,
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
-    List<PromotionTopicDto> topics = fetchTopics();
+    List<PromotionTopicDto> topics = fetchTopics(PromotionReadView.MANAGEMENT);
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
     Map<String, List<PromotionLevelContentDto>> categoryContentMap = new LinkedHashMap<>();
     for (PromotionTopicDto topic : topics) {
-      List<PromotionCategoryDto> categories = fetchCategoriesByTopic(topic.id().toString());
+      List<PromotionCategoryDto> categories =
+          fetchCategoriesByTopic(topic.id().toString(), PromotionReadView.MANAGEMENT);
       topicCategoryMap.put(topic.id().toString(), categories);
       for (PromotionCategoryDto category : categories) {
         categoryContentMap.put(
-            category.id().toString(), fetchLevelContents(category.id().toString()));
+            category.id().toString(),
+            fetchLevelContents(category.id().toString(), PromotionReadView.MANAGEMENT));
       }
     }
     model.addAttribute("topics", topics);
@@ -409,7 +416,7 @@ public class PromotionPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
-    List<RankRequirementDto> requirements = fetchAllRankRequirements();
+    List<RankRequirementDto> requirements = fetchAllRankRequirements(PromotionReadView.MANAGEMENT);
 
     Map<String, List<RankRequirementDto>> groupedRequirements = new LinkedHashMap<>();
     requirements.stream()
@@ -421,10 +428,12 @@ public class PromotionPageController {
           groupedRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
         });
 
-    List<PromotionTopicDto> topics = fetchTopics();
+    List<PromotionTopicDto> topics = fetchTopics(PromotionReadView.MANAGEMENT);
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
     for (PromotionTopicDto topic : topics) {
-      categoriesByTopic.put(topic.id().toString(), fetchCategoriesByTopic(topic.id().toString()));
+      categoriesByTopic.put(
+          topic.id().toString(),
+          fetchCategoriesByTopic(topic.id().toString(), PromotionReadView.MANAGEMENT));
     }
 
     Map<String, List<RankRequirementDto>> requirementsByCell = new LinkedHashMap<>();
@@ -444,7 +453,7 @@ public class PromotionPageController {
     model.addAttribute("requirementsByCell", requirementsByCell);
     model.addAttribute("highestLevelByCell", highestLevelByCell);
     model.addAttribute("topics", topics);
-    model.addAttribute("categories", fetchAllCategories());
+    model.addAttribute("categories", fetchAllCategories(PromotionReadView.MANAGEMENT));
     model.addAttribute("categoriesByTopic", categoriesByTopic);
     if ("ranksResults".equals(fragment)) {
       return "promotion/promotion-admin-rank-requirements :: ranksResults";
@@ -492,35 +501,39 @@ public class PromotionPageController {
     return first.id() != null ? first.id().toString() : null;
   }
 
-  private List<PromotionTopicDto> fetchTopics() {
+  private List<PromotionTopicDto> fetchTopics(PromotionReadView view) {
     List<PromotionTopicDto> result =
-        SectionFallback.load(log, "promotion-topics", promotionClient::topics, null);
+        SectionFallback.load(log, "promotion-topics", () -> promotionClient.topics(view), null);
     return result != null ? result : new ArrayList<>();
   }
 
-  private List<PromotionCategoryDto> fetchCategoriesByTopic(String topicId) {
+  private List<PromotionCategoryDto> fetchCategoriesByTopic(
+      String topicId, PromotionReadView view) {
     List<PromotionCategoryDto> result =
         SectionFallback.load(
-            log, "topic-categories", () -> promotionClient.categoriesByTopic(topicId), null);
+            log, "topic-categories", () -> promotionClient.categoriesByTopic(topicId, view), null);
     return result != null ? result : new ArrayList<>();
   }
 
-  private List<PromotionCategoryDto> fetchAllCategories() {
+  private List<PromotionCategoryDto> fetchAllCategories(PromotionReadView view) {
     PageResponse<PromotionCategoryDto> result =
-        SectionFallback.load(log, "promotion-categories", promotionClient::allCategories, null);
+        SectionFallback.load(
+            log, "promotion-categories", () -> promotionClient.allCategories(view), null);
     return result != null && result.content() != null ? result.content() : new ArrayList<>();
   }
 
-  private List<PromotionLevelContentDto> fetchLevelContents(String categoryId) {
+  private List<PromotionLevelContentDto> fetchLevelContents(
+      String categoryId, PromotionReadView view) {
     List<PromotionLevelContentDto> result =
         SectionFallback.load(
-            log, "level-contents", () -> promotionClient.levelContents(categoryId), null);
+            log, "level-contents", () -> promotionClient.levelContents(categoryId, view), null);
     return result != null ? result : new ArrayList<>();
   }
 
-  private List<RankRequirementDto> fetchAllRankRequirements() {
+  private List<RankRequirementDto> fetchAllRankRequirements(PromotionReadView view) {
     PageResponse<RankRequirementDto> result =
-        SectionFallback.load(log, "rank-requirements", promotionClient::rankRequirements, null);
+        SectionFallback.load(
+            log, "rank-requirements", () -> promotionClient.rankRequirements(view), null);
     return result != null && result.content() != null ? result.content() : new ArrayList<>();
   }
 

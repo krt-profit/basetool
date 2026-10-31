@@ -90,15 +90,19 @@ public class MemberEvaluationService {
     return repository.findAllByUserIdScoped(userId, scope, pageable).map(mapper::toResponse);
   }
 
-  /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
+  /**
+   * Returns the evaluations of every member in the squadrons the caller manages as an officer.
+   *
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of evaluations, empty without officer reach
+   */
   @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+    return promotionAccessPolicy
+        .readScope(PromotionReadView.MANAGEMENT)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**

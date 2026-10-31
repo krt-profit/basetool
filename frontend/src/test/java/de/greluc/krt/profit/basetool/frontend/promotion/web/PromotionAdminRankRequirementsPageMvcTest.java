@@ -125,7 +125,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(req), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),

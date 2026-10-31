@@ -358,6 +358,16 @@ writes, a former lead can be given a rank above 12 as soon as their last seat is
 Keycloak change and no reconciliation is needed. The identity module asks the org-unit module through
 its own SPI (`OfficerReachDirectory`).
 
+**Officer surfaces read only the caller's reach.** The Beförderung management pages (evaluation
+matrix, topic and rank-requirement editors) and the Leitung page list and edit only the units where
+the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows A's
+members, evaluations, topics, categories, level texts, rank requirements and eligibility, and
+never B's. A pin narrows this to the pinned unit when it is within reach and to nothing when it is
+not (the pages are then hidden); unpinned, the units of reach are the union. Admins are not
+restricted beyond their pin. The management catalogue reads take `view=MANAGEMENT`
+(`PromotionReadView`); without it they answer the caller's own squadron, which is what members see
+of their progress and is not an officer surface.
+
 A rank that does not fit the range is refused with `400 RANK_OUTSIDE_ROLE_RANGE`
 (`identity.api.RankOutsideRoleRangeException`). Its `detail` is localized and names the basis of the
 range (a leadership seat, or `KRT Member`) and what has to change in the tool. The problem body

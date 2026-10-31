@@ -54120,6 +54120,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -54382,6 +54391,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -54505,6 +54523,15 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -56160,6 +56187,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -56398,6 +56434,15 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -56896,6 +56941,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -57142,6 +57196,15 @@
           "schema" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -57640,6 +57703,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -57871,6 +57943,16 @@
     "/api/v1/promotion/topics/all" : {
       "get" : {
         "operationId" : "listAll",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
+        } ],
         "responses" : {
           "200" : {
             "content" : {

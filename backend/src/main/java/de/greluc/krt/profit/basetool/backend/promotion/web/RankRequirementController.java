@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.web;
 import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementWriteRequest;
@@ -69,6 +70,8 @@ public class RankRequirementController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of rank requirements
    */
   @GetMapping
@@ -80,7 +83,8 @@ public class RankRequirementController {
   public PageResponse<RankRequirementResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -88,7 +92,7 @@ public class RankRequirementController {
             sort,
             RankRequirementService.SORTABLE_FIELDS,
             RankRequirementService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.list(pageable));
+    return PageResponse.of(service.list(pageable, view));
   }
 
   /**
@@ -98,6 +102,8 @@ public class RankRequirementController {
    *
    * @param fromRank ordinal of the current rank
    * @param toRank ordinal of the rank being promoted to
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return the rank requirements applicable to that transition
    */
   @GetMapping("/by-ranks")
@@ -106,8 +112,10 @@ public class RankRequirementController {
     @ApiResponse(responseCode = "200", description = "Requirements for the rank transition.")
   })
   public List<RankRequirementResponse> listByRanks(
-      @RequestParam int fromRank, @RequestParam int toRank) {
-    return service.listByRanks(fromRank, toRank);
+      @RequestParam int fromRank,
+      @RequestParam int toRank,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
+    return service.listByRanks(fromRank, toRank, view);
   }
 
   /**

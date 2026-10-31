@@ -62,15 +62,16 @@ public class PromotionLevelContentService {
    * #SORTABLE_FIELDS} by the controller.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of level contents
    */
-  public Page<PromotionLevelContentResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<PromotionLevelContentResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
@@ -78,17 +79,18 @@ public class PromotionLevelContentService {
    * de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevel}.
    *
    * @param categoryId identifier of the parent category
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return the category's level contents in display order
    */
-  public List<PromotionLevelContentResponse> listByCategory(@NotNull UUID categoryId) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllByCategoryIdScopedOrdered(categoryId, scope).stream()
-        .map(mapper::toResponse)
-        .toList();
+  public List<PromotionLevelContentResponse> listByCategory(
+      @NotNull UUID categoryId, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllByCategoryIdScopedOrdered(categoryId, scope.squadronIds()).stream()
+                .map(mapper::toResponse)
+                .toList())
+        .orElseGet(List::of);
   }
 
   /**

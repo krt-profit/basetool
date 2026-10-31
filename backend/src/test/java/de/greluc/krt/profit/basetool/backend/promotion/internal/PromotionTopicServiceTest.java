@@ -70,11 +70,12 @@ class PromotionTopicServiceTest {
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
         new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
-    when(repository.findAllScoped((UUID) null)).thenReturn(List.of(topic));
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(null)));
+    when(repository.findAllScoped((java.util.Collection<UUID>) null)).thenReturn(List.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
-    List<PromotionTopicResponse> result = service.listAll();
+    List<PromotionTopicResponse> result = service.listAll(PromotionReadView.MEMBER);
 
     assertEquals(1, result.size());
     assertEquals("Grundlagen", result.get(0).name());

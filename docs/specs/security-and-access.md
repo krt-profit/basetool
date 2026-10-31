@@ -3252,7 +3252,11 @@ the token, and there is no id an anonymous caller could substitute. They answer 
 here is that every admitted path has its status recorded when it is added — not that the obvious
 ones may be assumed, because "obvious" is exactly what the one wrong entry always looked like
 beforehand. The officers' matrix (`/promotion/manage`, `/evaluations/all`, `/evaluations/members`)
-is **not** on the list at all: the admin area is web-only permanently.
+is **not** on the list at all: the admin area is web-only permanently. Those reads, like every
+list behind an officer surface, are limited to the caller's officer reach, pin-aware, rather than to
+the member-list scope (REQ-ROLE-007, REQ-SEC-015): `SquadronVisibility#currentOfficerReadScope`
+yields the reach units, narrowed to the pin or empty when the pin is out of reach, and `null` only
+for an unpinned admin.
 
 **The live-sync bridge adds a second stream and the vhost's first client-driven publish**
 (ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and

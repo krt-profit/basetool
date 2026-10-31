@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -55,7 +54,6 @@ public class PromotionEligibilityService {
 
   private final RankRequirementRepository rankRequirementRepository;
   private final MemberEvaluationRepository memberEvaluationRepository;
-  private final OwnerScopeService ownerScopeService;
   private final PromotionAccessPolicy promotionAccessPolicy;
 
   /**
@@ -70,12 +68,14 @@ public class PromotionEligibilityService {
   @NotNull
   public PromotionEligibilityResponse evaluateForRanks(
       @NotNull UUID userId, int fromRank, int toRank) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return evaluateForRanks(userId, fromRank, toRank, scope, loadEvaluationIndex(userId, scope));
+    return promotionAccessPolicy
+        .readScope(PromotionReadView.MEMBER)
+        .map(scope -> {
+          Set<UUID> ids = scope.squadronIds();
+          return evaluateForRanks(userId, fromRank, toRank, ids, loadEvaluationIndex(userId, ids));
+        })
+        .orElseGet(() ->
+            new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of()));
   }
 
   /**
@@ -85,7 +85,8 @@ public class PromotionEligibilityService {
    * @param userId the member's {@code app_user.id}
    * @param fromRank the source rank
    * @param toRank the target rank
-   * @param scope the promotion scope (squadron id) the requirements and evaluation are read in
+   * @param scope the promotion scope (squadron ids) the requirements and evaluation are read in, or
+   *     {@code null} for every squadron
    * @param index the member's pre-loaded assigned-level and category-to-topic maps
    * @return the per-rule outcome plus the aggregate {@code eligible} flag
    */
@@ -94,7 +95,7 @@ public class PromotionEligibilityService {
       @NotNull UUID userId,
       int fromRank,
       int toRank,
-      @Nullable UUID scope,
+      @Nullable Set<UUID> scope,
       @NotNull EvaluationIndex index) {
     List<RankRequirement> requirements =
         rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(
@@ -132,20 +133,35 @@ public class PromotionEligibilityService {
    */
   @NotNull
   public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull UUID userId) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    EvaluationIndex index = loadEvaluationIndex(userId, scope);
-    List<Object[]> transitions = rankRequirementRepository.findDistinctRankTransitionsScoped(scope);
-    List<PromotionEligibilityResponse> result = new ArrayList<>(transitions.size());
-    for (Object[] row : transitions) {
-      int from = ((Number) row[0]).intValue();
-      int to = ((Number) row[1]).intValue();
-      result.add(evaluateForRanks(userId, from, to, scope, index));
-    }
-    return result;
+    return evaluateAllForUser(userId, PromotionReadView.MEMBER);
+  }
+
+  /**
+   * Evaluates every transition configured in the squadrons the view covers.
+   *
+   * @param userId the {@code app_user.id} of the member being evaluated
+   * @param view whose requirements and grades the evaluation reads
+   * @return eligibility entries for every configured transition, possibly empty
+   */
+  @NotNull
+  private List<PromotionEligibilityResponse> evaluateAllForUser(
+      @NotNull UUID userId, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope -> {
+          Set<UUID> ids = scope.squadronIds();
+          EvaluationIndex index = loadEvaluationIndex(userId, ids);
+          List<Object[]> transitions =
+              rankRequirementRepository.findDistinctRankTransitionsScoped(ids);
+          List<PromotionEligibilityResponse> result = new ArrayList<>(transitions.size());
+          for (Object[] row : transitions) {
+            int from = ((Number) row[0]).intValue();
+            int to = ((Number) row[1]).intValue();
+            result.add(evaluateForRanks(userId, from, to, ids, index));
+          }
+          return result;
+        })
+        .orElseGet(List::of);
   }
 
   /**
@@ -159,7 +175,7 @@ public class PromotionEligibilityService {
   @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public List<PromotionEligibilityResponse> evaluateAllForUserAsAdmin(@NotNull UUID userId) {
     promotionAccessPolicy.assertOfficerOverMember(userId);
-    return evaluateAllForUser(userId);
+    return evaluateAllForUser(userId, PromotionReadView.MANAGEMENT);
   }
 
   /**
@@ -177,11 +193,11 @@ public class PromotionEligibilityService {
    * (REQ-DATA-003).
    *
    * @param userId the member's {@code app_user.id}
-   * @param scope the promotion scope (squadron id) to read the evaluation in, or {@code null}
+   * @param scope the promotion scope (squadron ids) to read the evaluation in, or {@code null}
    * @return the assigned-level and category-to-topic maps for the member
    */
   @NotNull
-  private EvaluationIndex loadEvaluationIndex(@NotNull UUID userId, @Nullable UUID scope) {
+  private EvaluationIndex loadEvaluationIndex(@NotNull UUID userId, @Nullable Set<UUID> scope) {
     Map<UUID, PromotionLevel> levels = new HashMap<>();
     Map<UUID, UUID> topics = new HashMap<>();
     for (MemberEvaluation evaluation :
