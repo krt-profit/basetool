@@ -175,9 +175,11 @@ public enum LiveSyncTopicClass {
 
   /**
    * Global shared-Lager room for {@code /inventory/all} (REQ-INV-027) with the {@code stock}
-   * section, authorized by the socket's authentication alone.
+   * section and the minimum stock levels' {@code stock-levels} section (REQ-INV-068), authorized by
+   * the socket's authentication alone.
    */
-  INVENTORY_ALL("inventory", false, Set.of("stock"), false, "inventory_all", null, null),
+  INVENTORY_ALL(
+      "inventory", false, Set.of("stock", "stock-levels"), false, "inventory_all", null, null),
 
   /**
    * A member's own hangar room for {@code /hangar} and the admin member hangar, keyed by the

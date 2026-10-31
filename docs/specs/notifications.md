@@ -262,6 +262,7 @@ from the event.
 Four group kinds were added for the wider notifications of issue #2414 and read no selector
 column either: `MISSION_PARTICIPANTS`, `MISSION_LEADERSHIP`, `EXCHANGE_CLIENT_HOLDERS` and
 `EVENT_RECIPIENTS` (REQ-NOTIF-024), and `ORG_RELATIVE_ROLE` gained the role `UNIT_LEADERSHIP`.
+`SEAT_HOLDERS` (every leadership seat holder, REQ-NOTIF-024) reads no column and no event field.
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
@@ -307,13 +308,11 @@ frontend `notification/web/AdminNotificationRulePageController`,
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
 
 When a job order is created, the seeded default rule resolves recipients from the **responsible
-org unit**: officers (global `OFFICER` role ∩ membership of that unit), leads
+org unit**: officers (the seat holders directly in that unit, `OrgRelativeRole.OFFICER`), leads
 (`org_unit_membership.role = SK_LEAD`), logisticians (`org_unit_membership.is_logistician`), plus the
 global admins (`ROLE` `ADMIN`). The creating actor is excluded. The seeded rule is
-admin-editable and -deletable. Officer-ness is a Keycloak role mirrored into `user_roles`, so a
-freshly-promoted-but-not-yet-logged-in officer becomes a recipient only after the next
-Keycloak reconciliation (`UserSyncTask`, daily at 05:00 Europe/Berlin by default, or an admin's
-manual sync) — an accepted eventual-consistency window. A login re-syncs the roles at once.
+admin-editable and -deletable. Officer-ness is the membership rank, read live from
+`org_unit_membership`; a newly appointed seat holder is a recipient at once.
 
 The notice leaves the inbox when the order closes: completing it (status change or the last
 handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which supersedes the order's
@@ -962,10 +961,18 @@ the rule editor like the others:
 | `MISSION_LEADERSHIP` | the mission's owner and its co-managers | `contextMissionId()` |
 | `EXCHANGE_CLIENT_HOLDERS` | every member with a non-revoked installation of the client; of any client when the event is exchange-wide | `contextExchangeClientId()` or `contextAllExchangeClients()` |
 | `EVENT_RECIPIENTS` | the set of affected users the event lists (bulk actions) | `contextRecipientUserIds()` |
+| `SEAT_HOLDERS` | every member who holds a leadership seat in any org unit | nothing |
 
 `OrgRelativeRole.UNIT_LEADERSHIP` resolves to the members whose rank confers oversight of the context
-org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …), whether or not
-they hold the global `OFFICER` role.
+org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …). The seats
+are read **directly in that unit**: the seat holders of a Bereich or the Organisationsleitung are not
+included for a Staffel, and a Bereich's rule does not reach its Staffeln. No `KRT Member` filter
+applies; a seat holder without that role is a recipient like any other.
+
+`OFFICER` is no stored role any more. `OrgRelativeRole.OFFICER` is an alias of `UNIT_LEADERSHIP`,
+and a `ROLE` selector with the code `OFFICER` resolves like `SEAT_HOLDERS`, so rules that name it
+keep addressing the seat holders (ADR-0300). `SEAT_HOLDERS` is the persistable, editable target
+such rules are migrated to.
 
 An event that carries nothing a kind needs resolves to nobody for that kind. The plain
 `excludeActor` rule and the de-duplication apply to the new kinds exactly as to the old ones, and
@@ -977,6 +984,10 @@ data only through its SPIs `MissionRecipientDirectory` and `ExchangeRecipientDir
 - [x] Each new kind resolves through the event's context and drops the actor when the rule says so.
 - [x] A mission or exchange event without its context resolves to nobody.
 - [x] `UNIT_LEADERSHIP` reaches every seat holder of the unit and no plain member.
+- [x] `OrgRelativeRole.OFFICER` resolves to the seat holders directly in the context unit; the
+  seat holders of a higher unit (Bereich, Organisationsleitung) are not reached.
+- [x] A `ROLE` selector `OFFICER` and a `SEAT_HOLDERS` selector resolve to every seat holder
+  without reading the role mirror; `SEAT_HOLDERS` is stored with every selector column `null`.
 - [x] The rule editor offers every new kind and the new role, under a localized label, and stores a
   group kind with every selector column `null`.
 

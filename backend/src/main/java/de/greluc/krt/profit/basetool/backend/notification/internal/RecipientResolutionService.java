@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.ExchangeRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.MissionRecipientDirectory;
@@ -37,15 +36,15 @@ import org.springframework.stereotype.Service;
  * Resolves a notification rule selector's recipient description into concrete user {@code sub}s
  * through the recipient directories the owning modules implement (plan §5.3).
  *
- * <p>Officer role membership comes from the periodically synced {@code user_roles} mirror, so a
- * fresh promotion becomes visible only after the next sync (REQ-NOTIF-008).
+ * <p>The {@code OFFICER} pseudo-role is not a stored role: it resolves to the holders of a
+ * leadership seat, in one org unit or in any (REQ-NOTIF-008).
  */
 @Service
 @RequiredArgsConstructor
 public class RecipientResolutionService {
 
-  /** Stable code of the global Officer role in {@code role.code}. */
-  static final String ROLE_OFFICER = Roles.OFFICER;
+  /** Role code that stands for "holds a leadership seat" instead of a stored role. */
+  static final String ROLE_OFFICER = "OFFICER";
 
   private final RoleRecipientDirectory roleRecipientDirectory;
   private final OrgUnitRecipientDirectory orgUnitRecipientDirectory;
@@ -54,18 +53,33 @@ public class RecipientResolutionService {
   private final ExchangeRecipientDirectory exchangeRecipientDirectory;
 
   /**
-   * Resolves every holder of a global role by its stable code.
+   * Resolves every holder of a global role by its stable code; {@code OFFICER} resolves to every
+   * seat holder.
    *
    * @param roleCode the role code (e.g. {@code ADMIN})
    * @return the matching user subs; never {@code null}
    */
   @NotNull
   public Set<UUID> resolveByRole(@NotNull String roleCode) {
-    return roleRecipientDirectory.holdersOfRole(roleCode);
+    return ROLE_OFFICER.equalsIgnoreCase(roleCode)
+        ? resolveSeatHolders()
+        : roleRecipientDirectory.holdersOfRole(roleCode);
   }
 
   /**
-   * Resolves a role evaluated relative to a specific org unit.
+   * Resolves every member who holds a leadership seat in any org unit, the {@code SEAT_HOLDERS}
+   * selector's recipients.
+   *
+   * @return the seat holders' user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> resolveSeatHolders() {
+    return orgUnitRecipientDirectory.allSeatHolders();
+  }
+
+  /**
+   * Resolves a role evaluated relative to a specific org unit; {@code OFFICER} is the seat holders
+   * directly in that unit, without any cascade.
    *
    * @param role the org-relative role
    * @param orgUnitId the context org unit
@@ -74,11 +88,10 @@ public class RecipientResolutionService {
   @NotNull
   public Set<UUID> resolveOrgRelative(@NotNull OrgRelativeRole role, @NotNull UUID orgUnitId) {
     return switch (role) {
-      case OFFICER -> roleRecipientDirectory.holdersOfRoleInOrgUnit(ROLE_OFFICER, orgUnitId);
+      case OFFICER, UNIT_LEADERSHIP -> orgUnitRecipientDirectory.leadershipOf(orgUnitId);
       case LEAD -> orgUnitRecipientDirectory.leadsOf(orgUnitId);
       case LOGISTICIAN -> orgUnitRecipientDirectory.logisticiansOf(orgUnitId);
       case MISSION_MANAGER -> orgUnitRecipientDirectory.missionManagersOf(orgUnitId);
-      case UNIT_LEADERSHIP -> orgUnitRecipientDirectory.leadershipOf(orgUnitId);
     };
   }
 

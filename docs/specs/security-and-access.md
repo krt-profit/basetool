@@ -1221,13 +1221,17 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
 
 **Live ahead of the cut:** the reach computation and the appointment precondition. The scope
 kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes),
-`#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`; the promotion services (`ADMIN_OR_OFFICER_REACH` in front of
-`PromotionAccessPolicy#assertOfficerIn` / `#assertOfficerOverMember`) and the member-rank range read
-them, every other `OFFICER` gate keeps its behaviour until the cut.
+`#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. The purchasing
+`leadsUnit` check reads `canActAsOfficerIn` (no `OFFICER@<unit>` authority is read), and the job-order,
+inventory and game-item gates and the job-order and inventory pages no longer name `OFFICER`: a
+seat holder reaches `LOGISTICIAN` through the seat. The promotion services (`ADMIN_OR_OFFICER_REACH`
+in front of `PromotionAccessPolicy#assertOfficerIn` / `#assertOfficerOverMember`) and the member-rank
+range read the reach too. The other `OFFICER` gates keep their behaviour until the cut.
 
 **Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
-`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`), `DomainProblemContractTest` ·
+`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`), `DomainProblemContractTest`,
+`PurchasingAccessPolicyTest` (a seat in one unit leads no other unit), `GameItemControllerTest` ·
 **Code:** `MembershipRole#confersOwnUnitOfficerReach`, `RequestScopeResolver#currentOfficerOrgUnitIds`,
 `AccessGateService#canActAsOfficerIn`, `OrgUnitMembershipService`,
 `LeadershipSeatRequiresKrtMemberException` · **Enforced by (to be added):**

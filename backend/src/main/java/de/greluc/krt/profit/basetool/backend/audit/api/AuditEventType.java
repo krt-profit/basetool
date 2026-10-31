@@ -150,6 +150,15 @@ public enum AuditEventType {
    */
   INVENTORY_ITEM_RESTORED(AuditDomain.INVENTORY),
 
+  /** A minimum stock level was set for a unit's pool (REQ-INV-068). */
+  MIN_STOCK_LEVEL_SET(AuditDomain.INVENTORY),
+
+  /** A minimum stock level's minimum, target or tier changed (REQ-INV-068). */
+  MIN_STOCK_LEVEL_CHANGED(AuditDomain.INVENTORY),
+
+  /** A minimum stock level was removed (REQ-INV-068). */
+  MIN_STOCK_LEVEL_REMOVED(AuditDomain.INVENTORY),
+
   /**
    * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
    *
