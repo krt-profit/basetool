@@ -99,7 +99,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void createMission_WithEmptyDescription_ShouldSucceed() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
@@ -120,7 +120,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void createMission_parsesTheGoalAndStepCarriersIntoTheCreateRequest() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
@@ -155,7 +155,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void createMission_aCarrierWithAnUnknownKeyFailsInsteadOfDroppingTheValue() throws Exception {
     mockMvc
         .perform(
@@ -171,7 +171,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_ShouldRenderWithoutErrors() throws Exception {
     UUID missionId = UUID.randomUUID();
 
@@ -220,7 +220,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_rendersAblaufChecklistAndEditor_whenStepsPresent() throws Exception {
     UUID missionId = UUID.randomUUID();
     var step1 =
@@ -254,7 +254,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_omitsEmptyGoalAndProcedureTiles_andOpensDescription() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -475,7 +475,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_crewWithUnresolvableParticipant_SuppressesGhostRow() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID realParticipantId = UUID.randomUUID();
@@ -547,7 +547,7 @@ class MissionPageControllerMvcTest {
    * @throws Exception if the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_CrewBoardZones_AdvertiseTheClickPathNotOnlyDrag() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -627,7 +627,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_AsAuthenticated_ShouldShowParticipationColumn() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -696,7 +696,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_ShouldRenderEditButtonWithCheckInTimes() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -798,7 +798,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_LinkedRefineryOrder_RendersEndTimeForClientSideLocalZoneConversion()
       throws Exception {
     UUID missionId = UUID.randomUUID();
@@ -880,7 +880,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_ShouldRenderParticipantsCounter_AsXSlashY() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID p1Id = UUID.randomUUID();
@@ -977,7 +977,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void setMissionOwner_forwardsTheUserAndTheOwnershipVersionToTheVersionedEndpoint()
       throws Exception {
     UUID missionId = UUID.randomUUID();
@@ -1003,7 +1003,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void setMissionOwner_staleOwnershipVersion_relaysTheConflictWithItsCode() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -1032,7 +1032,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updatePayoutPreference_callsTheSlimEndpointAndAnswersWithTheParticipantRow()
       throws Exception {
     UUID missionId = UUID.randomUUID();
@@ -1062,7 +1062,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void setMissionOwner_WithInvalidUserId_ShouldReturn400() throws Exception {
     mockMvc
         .perform(
@@ -1074,7 +1074,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addManager_WithInvalidIds_ShouldReturn400() throws Exception {
     mockMvc
         .perform(post("/missions/not-a-uuid/managers/not-a-uuid").with(csrf()))
@@ -1082,7 +1082,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_AssetShapedPath_ShouldReturn404NotWarn400() throws Exception {
     mockMvc
         .perform(get("/missions/common-handlers.js"))
@@ -1091,13 +1091,13 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_UndottedMalformedId_ShouldKeep400() throws Exception {
     mockMvc.perform(get("/missions/8bd4a2de")).andExpect(status().isBadRequest());
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateActualTime_Success_ShouldReturn200WithRefreshedMission() throws Exception {
     UUID missionId = UUID.randomUUID();
     MissionDto current =
@@ -1195,7 +1195,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateActualTime_OptimisticLockConflict_ShouldReturn409() throws Exception {
     UUID missionId = UUID.randomUUID();
     MissionDto current =
@@ -1255,7 +1255,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateActualTime_InvalidField_ShouldReturn400() throws Exception {
     UUID missionId = UUID.randomUUID();
     String body = "{\"field\":\"unknownField\",\"value\":\"2026-04-20T13:00:00Z\",\"version\":1}";
@@ -1269,7 +1269,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addManager_WithBackendError_ShouldPropagateStatus() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -1290,7 +1290,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addOrUpdateFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
@@ -1322,7 +1322,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addOrUpdateFrequencyAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
@@ -1346,7 +1346,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void deleteFrequencyAjax_Success_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
@@ -1365,7 +1365,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
@@ -1392,7 +1392,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
@@ -1420,7 +1420,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateCustomFrequencyAjax_WithBackendConflict_ShouldPropagateStatus() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
@@ -1445,7 +1445,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addUnitAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     MissionUnitDto[] slimResponse = {
@@ -1472,7 +1472,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateUnitAjax_WithBackendConflict_ShouldReturn409() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
@@ -1497,7 +1497,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void deleteUnitAjax_Success_ShouldReturn204() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
@@ -1511,7 +1511,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addParticipantAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     MissionParticipantDto[] slimResponse = {participant(UUID.randomUUID(), "Guest-X", 0L)};
@@ -1535,7 +1535,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateParticipantAjax_WithBackendConflict_ShouldReturn409() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -1560,7 +1560,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void deleteParticipantAjax_Success_ShouldReturn204() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -1579,7 +1579,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void checkInParticipantAjax_Success_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -1601,7 +1601,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void checkOutParticipantAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -1623,7 +1623,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addCrewAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
@@ -1652,7 +1652,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updateCrewAjax_WithBackendConflict_ShouldReturn409() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
@@ -1679,7 +1679,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void deleteCrewAjax_Success_ShouldReturn204() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
@@ -1922,7 +1922,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void getUnassignedParticipantsAjax_ShouldReturn200WithList() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -1939,7 +1939,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void getUnassignedParticipantsAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(
@@ -2640,7 +2640,7 @@ class MissionPageControllerMvcTest {
                         .SecurityMockMvcRequestPostProcessors.oidcLogin()
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                                "ROLE_OFFICER"))
+                                "ROLE_MISSION_MANAGER"))
                         .idToken(token ->
                             token
                                 .subject(UUID.randomUUID().toString())
@@ -2762,7 +2762,7 @@ class MissionPageControllerMvcTest {
    * th:utext sink must never emit user-controlled markup.
    */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_DescriptionMarkdown_RendersHtmlAndEscapesRawTags() throws Exception {
     UUID missionId = UUID.randomUUID();
 
@@ -2869,7 +2869,7 @@ class MissionPageControllerMvcTest {
    * that carries a value, pointing at that frequency row, and none for a type without a value.
    */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_OrganisationFragment_OffersDeleteForTypedFrequencyWithValue()
       throws Exception {
     UUID missionId = UUID.randomUUID();
@@ -2917,7 +2917,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_CrewBoardFragment_RendersBoardOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -2935,7 +2935,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FinanceFragment_RendersFinancePaneOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -2953,7 +2953,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_MgmtFragment_RendersManagementPanelOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -2971,7 +2971,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_StepsEditorFragment_RendersStepsEditorOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -2989,7 +2989,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_ObjectivesEditorFragment_RendersObjectivesEditorOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3007,7 +3007,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FrequenciesEditorFragment_RendersFrequenciesEditorOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3025,7 +3025,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_OrganisationFragment_RendersPartyLeadAndTypedFrequenciesOnly()
       throws Exception {
     UUID missionId = UUID.randomUUID();
@@ -3044,7 +3044,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_OrganisationFragment_ErrorPathRendersSectionSizedAlert() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3058,7 +3058,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FragmentBackendError_RendersInlineErrorFragmentNotRedirect() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3100,7 +3100,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_CrewBoardFragment_SkipsFinanceAndMgmtReads() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3118,7 +3118,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_OverviewFragment_SkipsFinanceMgmtAndShipReads() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3138,7 +3138,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FinanceFragment_IssuesFinanceReads() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3171,7 +3171,7 @@ class MissionPageControllerMvcTest {
 
   /** Verifies that only the stolen row of the mission's stock table carries the stolen chip. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FinanceFragment_MarksOnlyTheStolenInventoryRow() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3209,7 +3209,7 @@ class MissionPageControllerMvcTest {
 
   /** Verifies that a mission's stock table without stolen entries renders no stolen chip. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FinanceFragment_NoStolenInventory_RendersNoChip() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3279,7 +3279,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_MgmtFragment_SkipsFinanceAndUserLookupReads() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3297,7 +3297,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_FullPage_StillIssuesEveryGatedRead() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
@@ -3319,7 +3319,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void setPartyLeadAjax_Success_ReturnsRefreshedMission() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.put(
@@ -3339,7 +3339,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void setPartyLeadAjax_BackendConflict_Returns409() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.put(

@@ -87,7 +87,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void page_officer_returns200() throws Exception {
     stubEmptyView();
 
@@ -127,7 +127,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void page_skLead_managesRosterInPlaceWithoutLeadToggle() throws Exception {
     UUID skId = UUID.randomUUID();
     stubSpecialCommandView(skId, false, true);
@@ -144,7 +144,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void page_bereichsleiter_keepsLeadToggleWithoutMemberPageLink() throws Exception {
     UUID skId = UUID.randomUUID();
     stubSpecialCommandView(skId, true, false);
@@ -208,7 +208,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void page_staffelleiter_seesOwnSeatAsStaffelleiterReadOnly() throws Exception {
     stubSquadronView(
         false,
@@ -234,7 +234,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void page_bereichsleiter_seesLowerRanksReadOnlyAndMayAppointStaffelleiter() throws Exception {
     stubSquadronView(
         false,
@@ -258,7 +258,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void page_readOnlyViewer_getsNoRankControls() throws Exception {
     stubSquadronView(
         false,
@@ -310,7 +310,7 @@ class LeitungPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void assignSquadronRank_officer_returns200() throws Exception {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

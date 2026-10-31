@@ -74,7 +74,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void adminRankRequirements_rendersCreateButtonAndInlineScript_forOfficer() throws Exception {
     UUID topicId = UUID.randomUUID();
     UUID catId = UUID.randomUUID();

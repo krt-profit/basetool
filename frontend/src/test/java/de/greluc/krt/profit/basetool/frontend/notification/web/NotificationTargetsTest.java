@@ -38,10 +38,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 /** Tests the page each notification type opens (REQ-NOTIF-022, REQ-NOTIF-032). */
 class NotificationTargetsTest {
 
-  private static final Viewer MEMBER = new Viewer(false, false, false);
-  private static final Viewer OFFICER = new Viewer(false, true, false);
-  private static final Viewer ADMIN = new Viewer(true, false, false);
-  private static final Viewer BANK_STAFF = new Viewer(false, false, true);
+  private static final Viewer MEMBER = new Viewer(false, false);
+  private static final Viewer ADMIN = new Viewer(true, false);
+  private static final Viewer BANK_STAFF = new Viewer(false, true);
 
   private static final UUID ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
 
@@ -212,8 +211,7 @@ class NotificationTargetsTest {
     assertNull(target("ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_UNIT_MEMBER"));
     assertEquals(
         "/organisation/leitung",
-        NotificationTargets.targetOf("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER", ID, OFFICER));
-    assertNull(target("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER"));
+        NotificationTargets.targetOf("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER", ID, MEMBER));
   }
 
   @Test
@@ -223,14 +221,14 @@ class NotificationTargetsTest {
             SecurityConfig.roleHierarchy()
                 .getReachableGrantedAuthorities(
                     List.of(new SimpleGrantedAuthority(Roles.authority(Roles.BANK_MANAGEMENT)))));
-    assertEquals(new Viewer(false, false, true), management);
+    assertEquals(new Viewer(false, true), management);
 
     Viewer admin =
         Viewer.of(
             SecurityConfig.roleHierarchy()
                 .getReachableGrantedAuthorities(
                     List.of(new SimpleGrantedAuthority(Roles.authority(Roles.ADMIN)))));
-    assertEquals(new Viewer(true, false, true), admin);
+    assertEquals(new Viewer(true, true), admin);
     assertEquals(MEMBER, Viewer.of(List.of()));
   }
 }

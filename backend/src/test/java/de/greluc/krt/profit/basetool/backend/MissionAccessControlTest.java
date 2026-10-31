@@ -129,7 +129,7 @@ class MissionAccessControlTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -272,7 +272,7 @@ class MissionAccessControlTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),

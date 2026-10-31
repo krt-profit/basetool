@@ -195,7 +195,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void detail_officer_rendersWithoutLeadToggleAndBackToLeitung() throws Exception {
     stubSpecialCommandWithOneMember();
 
@@ -221,7 +221,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void detail_backendRefuses_returns403Page() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
@@ -233,7 +233,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void detail_backendFails_redirectsToBackUrlWithError() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
@@ -259,7 +259,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void addMemberAjax_officer_returns200WithoutEviction() throws Exception {
     UUID userId = UUID.randomUUID();
     when(backendApiClient.post(
@@ -282,7 +282,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void removeMemberAjax_backendRefuses_relays403() throws Exception {
     when(backendApiClient.delete(
             eq("/api/v1/special-commands/{id}/members/{userId}"),
@@ -300,7 +300,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void patchMemberFlags_classic_redirectsToMemberPage() throws Exception {
     when(backendApiClient.patch(contains("/members/" + memberId), any(), eq(Void.class)))
         .thenReturn(null);

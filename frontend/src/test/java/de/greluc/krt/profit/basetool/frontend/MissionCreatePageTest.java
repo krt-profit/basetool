@@ -57,7 +57,7 @@ class MissionCreatePageTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void testCreateMissionPage_ShouldHideActualTimeFields() throws Exception {
     mockMvc
         .perform(get("/missions/new"))
@@ -67,7 +67,7 @@ class MissionCreatePageTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void testCreateMissionPage_ShouldRenderDetailsCardFullWidth() throws Exception {
     mockMvc
         .perform(get("/missions/new"))

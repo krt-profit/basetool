@@ -287,7 +287,7 @@ class LeitungPagePatternRenderTest {
 
   /** A caller who manages no unit sees the empty state instead of the tree. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void rendersTheEmptyState() throws Exception {
     when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of()));

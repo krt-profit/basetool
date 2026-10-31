@@ -82,7 +82,7 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   private static SimpleGrantedAuthority officer() {
-    return new SimpleGrantedAuthority("ROLE_OFFICER");
+    return new SimpleGrantedAuthority("ROLE_MISSION_MANAGER");
   }
 
   private static SimpleGrantedAuthority member() {

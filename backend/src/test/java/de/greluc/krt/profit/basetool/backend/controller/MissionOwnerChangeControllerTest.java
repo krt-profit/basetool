@@ -79,8 +79,10 @@ class MissionOwnerChangeControllerTest {
     when(missionAccessPolicy.canChangeOwner(eq(missionId), any())).thenReturn(true);
   }
 
-  private static SimpleGrantedAuthority officer() {
-    return new SimpleGrantedAuthority("ROLE_OFFICER");
+  private static SimpleGrantedAuthority[] officer() {
+    return new SimpleGrantedAuthority[] {
+      new SimpleGrantedAuthority("ROLE_LOGISTICIAN"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")
+    };
   }
 
   private String body(Long version) {

@@ -114,7 +114,7 @@ class UserManagementTest {
                 .with(
                     jwt()
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new SimpleGrantedAuthority("USER_MANAGE"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());

@@ -200,7 +200,7 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());
@@ -221,7 +221,7 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());
@@ -242,7 +242,7 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());

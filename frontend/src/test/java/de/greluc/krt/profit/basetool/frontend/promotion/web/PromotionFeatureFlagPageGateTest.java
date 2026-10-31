@@ -83,35 +83,35 @@ class PromotionFeatureFlagPageGateTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void officerWithFlagOff_overviewIsForbidden() throws Exception {
     stubSquadronContext(UUID.randomUUID(), false);
     mockMvc.perform(get("/promotion/overview")).andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void officerWithFlagOff_myEvaluationsIsForbidden() throws Exception {
     stubSquadronContext(UUID.randomUUID(), false);
     mockMvc.perform(get("/promotion/my-evaluations")).andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void officerWithFlagOff_manageIsForbidden() throws Exception {
     stubSquadronContext(UUID.randomUUID(), false);
     mockMvc.perform(get("/promotion/manage")).andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void officerWithFlagOff_adminTopicsIsForbidden() throws Exception {
     stubSquadronContext(UUID.randomUUID(), false);
     mockMvc.perform(get("/promotion/admin/topics")).andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void officerWithFlagOff_rankRequirementsIsForbidden() throws Exception {
     stubSquadronContext(UUID.randomUUID(), false);
     mockMvc.perform(get("/promotion/admin/rank-requirements")).andExpect(status().isForbidden());

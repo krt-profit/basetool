@@ -114,16 +114,6 @@ class MissionAccessPolicyGateTest {
   }
 
   @Test
-  void canManageMission_ManagerList_OfficerRole_ShouldReturnTrue() {
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
-
-    assertTrue(missionAccessPolicy.canManageMission(missionId, authentication));
-  }
-
-  @Test
   void canManageMission_ManagerList_MissionManagePermission_ShouldReturnTrue() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())

@@ -87,7 +87,7 @@ class OfficerRefineryAccessTest {
             null,
             null,
             null,
-            Set.of("OFFICER"),
+            Set.of("LOGISTICIAN"),
             Collections.emptySet(),
             null,
             false,
@@ -154,7 +154,7 @@ class OfficerRefineryAccessTest {
         new DefaultOidcUser(
             Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
+                    "ROLE_LOGISTICIAN")),
             idToken);
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
@@ -193,7 +193,7 @@ class OfficerRefineryAccessTest {
             null,
             null,
             null,
-            Set.of("OFFICER"),
+            Set.of("LOGISTICIAN"),
             Collections.emptySet(),
             null,
             false,
@@ -242,7 +242,7 @@ class OfficerRefineryAccessTest {
         new DefaultOidcUser(
             Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
+                    "ROLE_LOGISTICIAN")),
             idToken);
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");

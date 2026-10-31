@@ -65,14 +65,14 @@ class RoleHierarchyTest {
   @Autowired private RoleHierarchy roleHierarchy;
 
   @Test
-  void officerShouldReachLogistician() {
+  void retiredOfficerAuthorityReachesNothingElse() {
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(
             List.of(new SimpleGrantedAuthority("ROLE_OFFICER")));
 
     assertTrue(
-        reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN")),
-        "ROLE_OFFICER should reach ROLE_LOGISTICIAN. Reachable: " + reachable);
+        reachable.stream().noneMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN")),
+        "ROLE_OFFICER must carry no hierarchy edge. Reachable: " + reachable);
   }
 
   @Test

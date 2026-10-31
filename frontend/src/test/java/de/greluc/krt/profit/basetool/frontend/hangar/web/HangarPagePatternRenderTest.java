@@ -397,7 +397,7 @@ class HangarPagePatternRenderTest {
 
   /** The org-unit tab renders the tree rows and, for an officer, the hidden owner rows. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void rendersTheOrgUnitTreeWithOwnerRowsForOfficers() throws Exception {
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(LayoutResponses.officerReach(true));

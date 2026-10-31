@@ -411,7 +411,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
 
 **Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a realm role or
 a seat), `UserReconciliationServiceTest` (an `Officer` realm role is not mirrored),
-`SecurityConfigRoleHierarchyTest` (no `OFFICER` edge), `OfficerCutMigrationTest` (the
+`SecurityConfigTest` (no `OFFICER` edge), `OfficerCutMigrationTest` (the
 removed role with its rows, the moved notification selectors) · **Related:** REQ-ROLE-002,
 REQ-SEC-015, REQ-SEC-047, ADR-0300
 
