@@ -201,6 +201,18 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#narrowToPin(Set)}: narrows reached org units to the
+   * active-context pin.
+   *
+   * @param reach the org units the caller reaches
+   * @return the reached units the pin leaves, empty when the pin is out of reach
+   */
+  @NotNull
+  public Set<UUID> narrowToPin(@NotNull Set<UUID> reach) {
+    return requestScopeResolver.narrowToPin(reach);
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentOfficerReadScope()}: the org units whose
    * officer-surface data the caller may read, pin-aware.
    *

@@ -362,8 +362,10 @@ its own SPI (`OfficerReachDirectory`).
 matrix, topic and rank-requirement editors) and the Leitung page list and edit only the units where
 the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows A's
 members, evaluations, topics, categories, level texts, rank requirements and eligibility, and
-never B's. A pin narrows this to the pinned unit when it is within reach and to nothing when it is
-not (the pages are then hidden); unpinned, the units of reach are the union. Admins are not
+never B's. A pin narrows this to the pinned unit when it is within reach, widened by the units the
+caller's seat on it reaches through the cascade (a Bereich or OL pin covers the units below it), and
+to nothing when it is not within reach (the pages are then hidden); unpinned, the units of reach are
+the union. The Leitung page follows the same pin rule. Admins are not
 restricted beyond their pin. The management catalogue reads take `view=MANAGEMENT`
 (`PromotionReadView`); without it they answer the caller's own squadron, which is what members see
 of their progress and is not an officer surface.

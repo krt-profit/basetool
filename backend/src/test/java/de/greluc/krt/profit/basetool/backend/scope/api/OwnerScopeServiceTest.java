@@ -2393,6 +2393,51 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void readScope_pinnedToABereichWithASeat_widensToItsCascade() {
+      UUID bereichId = UUID.randomUUID();
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
+      stubCaller(true, seat);
+      when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, SQUADRON_A_ID, skId));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(bereichId.toString());
+
+      assertEquals(Set.of(bereichId, SQUADRON_A_ID, skId), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_pinnedToAUnitBelowTheSeat_isThatUnitOnly() {
+      UUID bereichId = UUID.randomUUID();
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
+      stubCaller(true, seat);
+      when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, SQUADRON_A_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void narrowToPin_unpinned_keepsTheReach() {
+
+      assertEquals(
+          Set.of(SQUADRON_A_ID, SQUADRON_B_ID),
+          service.narrowToPin(Set.of(SQUADRON_A_ID, SQUADRON_B_ID)));
+    }
+
+    @Test
+    void narrowToPin_pinOutsideTheReach_isEmpty() {
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertTrue(service.narrowToPin(Set.of(SQUADRON_A_ID)).isEmpty());
+    }
+
+    @Test
     void readScope_plainMember_isEmpty() {
       stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
 

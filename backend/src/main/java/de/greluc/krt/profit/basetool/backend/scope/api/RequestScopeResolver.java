@@ -449,8 +449,7 @@ public class RequestScopeResolver {
   /**
    * The org units whose officer-surface data the caller may read (REQ-ROLE-007): an admin sees
    * every unit, or the pinned one; any other caller sees the units of {@link
-   * #currentOfficerOrgUnitIds()}, narrowed to the pinned unit when it is one of them and to nothing
-   * when it is not.
+   * #currentOfficerOrgUnitIds()}, narrowed by {@link #narrowToPin(Set)}.
    *
    * @return the readable org-unit ids; empty for a caller without reach; {@code null} for the
    *     unrestricted admin scope
@@ -461,11 +460,38 @@ public class RequestScopeResolver {
     if (authHelper.isAdmin()) {
       return pin.<Set<UUID>>map(Set::of).orElse(null);
     }
-    Set<UUID> reach = currentOfficerOrgUnitIds();
+    return narrowToPin(currentOfficerOrgUnitIds());
+  }
+
+  /**
+   * Narrows a set of reached org units to the active-context pin: unchanged when nothing is pinned,
+   * empty when the pin is not among them, otherwise the pinned unit plus the units the caller's
+   * seat on it reaches through the cascade (a Bereich or OL pin covers the units below it).
+   *
+   * @param reach the org units the caller reaches; never {@code null}
+   * @return the reached units the pin leaves; never {@code null}
+   */
+  @NotNull
+  public Set<UUID> narrowToPin(@NotNull Set<UUID> reach) {
+    Optional<UUID> pin = readActiveSquadronFromHeader();
     if (pin.isEmpty()) {
       return reach;
     }
-    return reach.contains(pin.get()) ? Set.of(pin.get()) : Set.of();
+    UUID pinned = pin.get();
+    if (!reach.contains(pinned)) {
+      return Set.of();
+    }
+    List<OrgUnitMembership> seatsOnPin =
+        currentCallerMemberships().stream()
+            .filter(m -> m.getId().getOrgUnitId().equals(pinned))
+            .toList();
+    Set<UUID> narrowed = new LinkedHashSet<>();
+    narrowed.add(pinned);
+    if (!seatsOnPin.isEmpty()) {
+      narrowed.addAll(orgUnitCascadeService.cascadedOfficerReach(seatsOnPin));
+    }
+    narrowed.retainAll(reach);
+    return narrowed;
   }
 
   /**
