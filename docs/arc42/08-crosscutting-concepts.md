@@ -245,7 +245,7 @@ Two binding rules shape every UI change:
   nothing, even inside a view controller. New JSON handlers go into a `@RestController`
   (REQ-FE-020, ADR-0165, ratchet in `ArchitectureTest`).
 - **A page ships no developer text and no inline page CSS** (FE-PERF-02, 2026-09-23). Templates
-  carry no comments (ADR-0214), page CSS lives in `static/css/pages/<domain>/<page>.css`
+  emit no plain HTML comments (ADR-0214), page CSS lives in `static/css/pages/<domain>/<page>.css`
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
