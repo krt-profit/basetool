@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -96,34 +95,11 @@ public class OrgUnitBankAccessService {
   @NotNull
   @Transactional(readOnly = true)
   public List<OrgUnitBankBalanceDto> listOverseenOrgUnitBalances() {
-    boolean admin = authHelperService.isAdmin();
-    ScopePredicate viewScope = ownerScopeService.currentOversightScope();
-    List<BankAccount> active =
-        bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
-            .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
-            .toList();
-    if (active.isEmpty()) {
-      return List.of();
-    }
-    Map<UUID, List<BankAccountViewGrant>> grantsByAccount =
-        viewGrantRepository
-            .findByAccountIdIn(active.stream().map(BankAccount::getId).toList())
-            .stream()
-            .collect(Collectors.groupingBy(grant -> grant.getAccount().getId()));
-    List<BankAccount> visible =
-        active.stream()
-            .filter(account ->
-                admin
-                    || canViewInternal(
-                        account,
-                        viewScope,
-                        grantsByAccount.getOrDefault(account.getId(), List.of())))
-            .toList();
+    List<BankAccount> visible = visibleActiveAccounts(ownerScopeService.currentOversightScope());
     if (visible.isEmpty()) {
       return List.of();
     }
-    Map<UUID, BigDecimal> balances = balancesByAccountId(visible);
-    Map<UUID, List<BankPostingSlice>> slicesByAccount = slicesByAccountId(visible);
+    BankAccountFigures figures = BankAccountFigures.load(bankPostingRepository, visible);
     Map<UUID, List<BankAccountApprovalLimit>> limitsByAccount =
         approvalLimitRepository
             .findByAccountIdIn(visible.stream().map(BankAccount::getId).toList())
@@ -131,8 +107,8 @@ public class OrgUnitBankAccessService {
             .collect(Collectors.groupingBy(limit -> limit.getAccount().getId()));
     return visible.stream()
         .map(account -> {
-          BigDecimal balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
-          List<BankPostingSlice> slices = slicesByAccount.getOrDefault(account.getId(), List.of());
+          BigDecimal balance = figures.balanceOf(account.getId());
+          List<BankPostingSlice> slices = figures.slicesOf(account.getId());
           BigDecimal delta = BankTrendCalculator.windowDelta(slices);
           boolean canRequest = isRequestCapable(account);
           boolean approvalExempt = canRequest && isApprovalExempt(account);
@@ -151,6 +127,58 @@ public class OrgUnitBankAccessService {
               approvalLimit,
               approvalExempt);
         })
+        .toList();
+  }
+
+  /**
+   * Lists every active account the caller may view on the org-unit bank page over their whole
+   * reach, ignoring the active-org-unit pin (REQ-BANK-064).
+   *
+   * @return the visible active accounts ordered by account number; empty when none
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public List<BankAccount> listViewableActiveAccounts() {
+    return visibleActiveAccounts(ownerScopeService.currentOversightScopeIgnoringPin());
+  }
+
+  /**
+   * The org units of the caller's active context (REQ-BANK-064): the pinned unit, or every unit the
+   * caller is a direct member of when none is pinned.
+   *
+   * @return the active-context org-unit ids; empty for a caller without memberships and pin
+   */
+  @NotNull
+  public Set<UUID> activeContextOrgUnitIds() {
+    UUID pinned = ownerScopeService.currentScopePredicate().activeOrgUnitId();
+    return pinned != null ? Set.of(pinned) : ownerScopeService.currentDirectMembershipOrgUnitIds();
+  }
+
+  /**
+   * The active accounts the caller may view under the given oversight scope; an admin views all.
+   *
+   * @param viewScope the caller's cascading oversight scope
+   * @return the visible active accounts ordered by account number; empty when none
+   */
+  @NotNull
+  private List<BankAccount> visibleActiveAccounts(@NotNull ScopePredicate viewScope) {
+    boolean admin = authHelperService.isAdmin();
+    List<BankAccount> active =
+        bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
+            .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
+            .toList();
+    if (active.isEmpty() || admin) {
+      return active;
+    }
+    Map<UUID, List<BankAccountViewGrant>> grantsByAccount =
+        viewGrantRepository
+            .findByAccountIdIn(active.stream().map(BankAccount::getId).toList())
+            .stream()
+            .collect(Collectors.groupingBy(grant -> grant.getAccount().getId()));
+    return active.stream()
+        .filter(account ->
+            canViewInternal(
+                account, viewScope, grantsByAccount.getOrDefault(account.getId(), List.of())))
         .toList();
   }
 
@@ -714,38 +742,6 @@ public class OrgUnitBankAccessService {
         booking.transferFee(),
         booking.counterpartyHandle(),
         booking.counterpartyOrgUnitName());
-  }
-
-  /**
-   * Batch-computes the balances of the given accounts in one grouped query (REQ-DATA-003).
-   *
-   * @param accounts the accounts to sum
-   * @return a map of account id to balance for accounts that have at least one posting
-   */
-  @NotNull
-  private Map<UUID, BigDecimal> balancesByAccountId(@NotNull List<BankAccount> accounts) {
-    List<UUID> ids = accounts.stream().map(BankAccount::getId).toList();
-    Map<UUID, BigDecimal> byAccount = new HashMap<>();
-    for (BankAccountBalance row : bankPostingRepository.accountBalances(ids)) {
-      byAccount.put(row.accountId(), row.balance());
-    }
-    return byAccount;
-  }
-
-  /**
-   * Fetches the last 30 days of posting slices for the given accounts in one windowed query
-   * (REQ-DATA-003) and groups them by account id, for the per-card 30-day trend (REQ-BANK-016).
-   *
-   * @param accounts the visible accounts
-   * @return a map of account id to its in-window posting slices (only accounts with slices appear)
-   */
-  @NotNull
-  private Map<UUID, List<BankPostingSlice>> slicesByAccountId(@NotNull List<BankAccount> accounts) {
-    List<UUID> ids = accounts.stream().map(BankAccount::getId).toList();
-    return bankPostingRepository
-        .postingSlicesSince(ids, BankTrendCalculator.windowCutoff())
-        .stream()
-        .collect(Collectors.groupingBy(BankPostingSlice::accountId));
   }
 
   /**
