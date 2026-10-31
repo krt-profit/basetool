@@ -124,6 +124,15 @@ class OrgNoticeIntegrationTest {
   }
 
   @Test
+  void theSeatHolderQueriesSeparateSeatsFromPlainMembersPerUnitAndGlobally() {
+    assertThat(membershipRepository.findLeadershipUserIdsByOrgUnit(squadron.getId()))
+        .containsExactly(LEADER);
+    assertThat(membershipRepository.findAllLeadershipUserIds())
+        .contains(LEADER)
+        .doesNotContain(MEMBER);
+  }
+
+  @Test
   void theRoleQueryFindsHeldRolesOnly() {
     assertThat(userRepository.hasAnyRoleCode(LEADER, List.of("KRT_MEMBER"))).isTrue();
     assertThat(userRepository.hasAnyRoleCode(MEMBER, List.of("KRT_MEMBER", "ADMIN"))).isFalse();

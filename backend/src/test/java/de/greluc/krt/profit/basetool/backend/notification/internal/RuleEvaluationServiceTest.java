@@ -630,6 +630,18 @@ class RuleEvaluationServiceTest {
   }
 
   @Test
+  void seatHoldersSelectorReachesEverySeatHolderWithoutAnEventContext() {
+    givenRules(ruleOf(SelectorKind.SEAT_HOLDERS, false));
+    when(recipientResolutionService.resolveSeatHolders()).thenReturn(Set.of(OFFICER_A, ADMIN_B));
+
+    assertThat(
+            service
+                .resolveRecipients(StubNotificationEvent.builder().build())
+                .get(NotificationType.JOB_ORDER_CREATED))
+        .containsExactlyInAnyOrder(OFFICER_A, ADMIN_B);
+  }
+
+  @Test
   void unitLeadershipRoleResolvesThroughTheContextOrgUnit() {
     givenRules(
         jobOrderRule(
