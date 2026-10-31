@@ -43,6 +43,16 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllByIdUserId(UUID userId);
 
   /**
+   * Batch variant of {@link #findAllByIdUserId(UUID)}: every membership, of any kind, of the given
+   * users in one query.
+   *
+   * @param userIds the users whose memberships to list; never {@code null}; empty yields an empty
+   *     result
+   * @return the matching membership rows; never {@code null}, possibly empty.
+   */
+  List<OrgUnitMembership> findAllByIdUserIdIn(Collection<UUID> userIds);
+
+  /**
    * Counts the org-unit memberships of the given user. Used by {@code OrgUnitMembershipService} to
    * detect the two inventory-relevant boundary transitions — gaining the first membership
    * (membershipless → member) and losing the last (member → membershipless) — so {@link

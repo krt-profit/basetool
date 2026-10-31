@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -41,20 +41,22 @@ import org.springframework.data.domain.Pageable;
 
 /**
  * Unit tests for {@link UserDirectoryService}: the listing and search wrap the service page, the
- * peer redaction applies to callers below logistician, and a user outside the caller's squadrons is
- * always peer-shaped.
+ * peer redaction is lifted only for users the caller holds the Logistician grant for, and a user
+ * outside the caller's squadrons is always peer-shaped.
  */
 @ExtendWith(MockitoExtension.class)
 class UserDirectoryServiceTest {
 
   @Mock private UserService userService;
   @Mock private UserMapper userMapper;
-  @Mock private AuthHelperService authHelperService;
+  @Mock private UserPeerRedactionScope peerRedactionScope;
   @InjectMocks private UserDirectoryService service;
 
   @org.junit.jupiter.api.BeforeEach
   void setUp() {
-    lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    lenient()
+        .when(peerRedactionScope.usersWithUnredactedRead(any()))
+        .thenAnswer(inv -> new HashSet<UUID>(inv.<java.util.Collection<UUID>>getArgument(0)));
   }
 
   @Test
@@ -118,7 +120,7 @@ class UserDirectoryServiceTest {
 
   @Test
   void getUserById_nonOfficerCaller_redactsPii() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    doReturn(java.util.Set.of()).when(peerRedactionScope).usersWithUnredactedRead(any());
     UUID id = UUID.randomUUID();
     User entity = new User();
     UserDto fullDto = fullPiiUserDto(id);
@@ -138,7 +140,7 @@ class UserDirectoryServiceTest {
 
   @Test
   void searchUsers_nonOfficerCaller_redactsEveryRowPii() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    doReturn(java.util.Set.of()).when(peerRedactionScope).usersWithUnredactedRead(any());
     UUID id = UUID.randomUUID();
     User entity = new User();
     UserDto fullDto = fullPiiUserDto(id);
@@ -201,6 +203,50 @@ class UserDirectoryServiceTest {
     assertSame(fullDto, result, "same-squadron officer must see the original DTO unredacted");
   }
 
+  @Test
+  void list_logisticianInAOnly_redactsTheUserOfB() {
+    UUID inA = UUID.randomUUID();
+    UUID inB = UUID.randomUUID();
+    User entityA = new User();
+    User entityB = new User();
+    when(userService.findAll(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(entityA, entityB)));
+    when(userMapper.toDto(entityA)).thenReturn(fullPiiUserDto(inA));
+    when(userMapper.toDto(entityB)).thenReturn(fullPiiUserDto(inB));
+    doReturn(java.util.Set.of(inA)).when(peerRedactionScope).usersWithUnredactedRead(any());
+
+    PageResponse<UserDto> resp = service.list(0, 50, null);
+
+    assertEquals("bob@example.invalid", resp.content().get(0).email());
+    assertNull(resp.content().get(1).email());
+    assertNull(resp.content().get(1).roles());
+    assertNull(resp.content().get(1).joinDate());
+  }
+
+  @Test
+  void search_logisticianInAOnly_redactsTheUserOfB() {
+    UUID inB = UUID.randomUUID();
+    User entityB = new User();
+    when(userService.searchByUsername(any(), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(entityB)));
+    when(userMapper.toDto(entityB)).thenReturn(fullPiiUserDto(inB));
+    doReturn(java.util.Set.of()).when(peerRedactionScope).usersWithUnredactedRead(any());
+
+    assertNull(service.search("bob", 0, 50, null).content().getFirst().roles());
+  }
+
+  @Test
+  void getUserById_userOutsideTheGrantUnits_isPeerShaped() {
+    UUID userId = UUID.randomUUID();
+    User entity = new User();
+    entity.setId(userId);
+    when(userService.findById(userId)).thenReturn(entity);
+    when(userMapper.toDto(entity)).thenReturn(fullPiiUserDto(userId));
+    doReturn(java.util.Set.of()).when(peerRedactionScope).usersWithUnredactedRead(any());
+
+    assertNull(service.get(userId).email());
+  }
+
   private static UserDto fullPiiUserDto(UUID id) {
     return new UserDto(
         id,
@@ -225,7 +271,7 @@ class UserDirectoryServiceTest {
 
   @Test
   void list_nonOfficerCaller_redactsEveryRow() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    doReturn(java.util.Set.of()).when(peerRedactionScope).usersWithUnredactedRead(any());
     UUID id = UUID.randomUUID();
     User entity = new User();
     when(userService.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));

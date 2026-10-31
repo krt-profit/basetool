@@ -139,6 +139,33 @@ public class MissionAccessPolicy {
   }
 
   /**
+   * Checks whether the caller reads mission {@code missionId} without the peer redaction: the
+   * caller holds the Logistician grant in the owning unit; an ownerless mission is unredacted for
+   * admins only (REQ-SEC-007, REQ-SEC-005).
+   *
+   * @param missionId the mission whose DTO is being returned; never {@code null}
+   * @return {@code true} iff participants, units and ships are returned unredacted
+   */
+  public boolean liftsPeerRedaction(@NotNull UUID missionId) {
+    return missionRepository
+        .findByIdForAuthorization(missionId)
+        .map(this::liftsPeerRedaction)
+        .orElse(false);
+  }
+
+  /**
+   * {@link #liftsPeerRedaction(UUID)} for an already-loaded mission.
+   *
+   * @param mission the loaded mission
+   * @return {@code true} iff the caller reads the mission unredacted
+   */
+  public boolean liftsPeerRedaction(@NotNull Mission mission) {
+    return mission.getOwningOrgUnit() == null
+        ? authHelper.isAdmin()
+        : ownerScopeService.hasRoleInOrgUnit(mission.getOwningOrgUnit().getId(), Roles.LOGISTICIAN);
+  }
+
+  /**
    * Authorizes acting on one participant of an already-loaded mission: a linked participant's own
    * user, otherwise a caller who may manage the mission. An external participant is accessible to
    * managers only, and a participant of another mission to nobody.

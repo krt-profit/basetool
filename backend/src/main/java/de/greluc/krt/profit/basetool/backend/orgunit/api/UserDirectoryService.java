@@ -24,8 +24,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The squadron-scoped user listing and search behind the member endpoints, with the peer redaction
- * for callers below logistician.
+ * lifted only for users of units where the caller holds the Logistician grant.
  *
  * <p>Read-only; it joins the calling transaction and needs the session open for {@link UserMapper}.
  */
@@ -51,7 +51,7 @@ public class UserDirectoryService {
 
   private final UserService userService;
   private final UserMapper userMapper;
-  private final AuthHelperService authHelperService;
+  private final UserPeerRedactionScope peerRedactionScope;
 
   /**
    * Pages through all users.
@@ -67,7 +67,7 @@ public class UserDirectoryService {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<User> found = userService.findAll(pageable);
     userMapper.primeStaffelMemberships(found.getContent());
-    return PageResponse.of(found.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
+    return PageResponse.of(redactForPeers(found.map(userMapper::toDto)));
   }
 
   /**
@@ -88,7 +88,7 @@ public class UserDirectoryService {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<User> found = userService.searchByUsername(query == null ? "" : query, pageable);
     userMapper.primeStaffelMemberships(found.getContent());
-    return PageResponse.of(found.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
+    return PageResponse.of(redactForPeers(found.map(userMapper::toDto)));
   }
 
   /**
@@ -104,19 +104,22 @@ public class UserDirectoryService {
     if (userService.isCrossSquadronForNonAdmin(user.getId())) {
       return UserDtoRedaction.toPeerShape(dto);
     }
-    return redactForPeerIfNeeded(dto);
+    return peerRedactionScope.usersWithUnredactedRead(List.of(dto.id())).contains(dto.id())
+        ? dto
+        : UserDtoRedaction.toPeerShape(dto);
   }
 
   /**
-   * Reduces a DTO to the peer shape for callers below logistician.
+   * Reduces each DTO of the page to the peer shape unless the caller holds the Logistician grant in
+   * a unit of that user.
    *
-   * @param dto the persisted user DTO
-   * @return the peer shape for non-elevated callers, otherwise the original
+   * @param users the persisted user DTOs of one page
+   * @return the same page with the peer shape applied where the grant is missing
    */
-  private UserDto redactForPeerIfNeeded(UserDto dto) {
-    if (dto == null || authHelperService.isLogisticianOrAbove()) {
-      return dto;
-    }
-    return UserDtoRedaction.toPeerShape(dto);
+  private Page<UserDto> redactForPeers(Page<UserDto> users) {
+    Set<UUID> unredacted =
+        peerRedactionScope.usersWithUnredactedRead(users.stream().map(UserDto::id).toList());
+    return users.map(
+        dto -> unredacted.contains(dto.id()) ? dto : UserDtoRedaction.toPeerShape(dto));
   }
 }

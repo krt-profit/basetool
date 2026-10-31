@@ -125,12 +125,14 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * Stubs the caller as Logistician-or-above by default, so the peer redaction is a no-op unless a
-   * case overrides it (REQ-SEC-007).
+   * Stubs the caller with the Logistician grant in every mission's unit by default, so the peer
+   * redaction is a no-op unless a case overrides it (REQ-SEC-007).
    */
   @BeforeEach
   void assumeALogisticianUnlessACaseSaysOtherwise() {
-    org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    org.mockito.Mockito.lenient()
+        .when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class)))
+        .thenReturn(true);
   }
 
   private static Jwt jwt(String sub) {
@@ -402,7 +404,7 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(entity);
     when(missionMapper.toDto(entity)).thenReturn(full);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(true);
 
     MissionDto result = controller.getMissionById(id);
 
@@ -418,7 +420,7 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id, false);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(false);
 
     MissionDto result = controller.getMissionById(id);
 
@@ -455,7 +457,7 @@ class MissionControllerLifecycleTest {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id, false);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(false);
     when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
@@ -472,7 +474,7 @@ class MissionControllerLifecycleTest {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(true);
     when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
@@ -494,7 +496,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(true);
 
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
@@ -516,7 +518,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(true);
 
     MissionDto result =
         controller.joinMission(
@@ -540,7 +542,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(true);
 
     MissionDto result =
         controller.joinMission(
@@ -567,7 +569,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(full);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(missionAccessPolicy.liftsPeerRedaction(any(UUID.class))).thenReturn(false);
 
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
