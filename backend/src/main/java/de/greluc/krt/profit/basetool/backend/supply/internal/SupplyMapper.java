@@ -26,6 +26,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialCoverage;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialCoverage.BucketCoverage;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialCoverage.OrderCoverage;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -59,6 +62,7 @@ public class SupplyMapper {
   private final OrgUnitRepository orgUnitRepository;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
+  private final JobOrderMaterialCoverage jobOrderMaterialCoverage;
 
   /**
    * What a page of needs is mapped against.
@@ -68,13 +72,16 @@ public class SupplyMapper {
    * @param leadership whether the caller belongs to the governing leadership
    * @param managed the units the caller manages explicitly
    * @param delegate whether the caller reads the purchase fields of every need
+   * @param orders the linked orders' coverage by order id, loaded only for the needs the caller
+   *     manages
    */
   record NeedContext(
       Map<UUID, OrgUnit> units,
       boolean admin,
       boolean leadership,
       Set<UUID> managed,
-      boolean delegate) {
+      boolean delegate,
+      Map<UUID, OrderCoverage> orders) {
 
     /**
      * Whether the caller manages the needs of a unit.
@@ -137,13 +144,23 @@ public class SupplyMapper {
     Set<UUID> unitIds = needs.stream().map(SupplyNeed::getOrgUnitId).collect(Collectors.toSet());
     boolean leadership = accessPolicy.isGoverningLeadership();
     boolean delegate = !leadership && !needs.isEmpty() && accessPolicy.isTradeDelegate();
-
+    boolean admin = accessPolicy.isAdmin();
+    Set<UUID> managed = accessPolicy.managedUnitIds();
+    Set<UUID> orderIds = new HashSet<>();
+    for (SupplyNeed need : needs) {
+      if (need.getJobOrderId() != null
+          && isLive(need.getStatus())
+          && (admin || managed.contains(need.getOrgUnitId()))) {
+        orderIds.add(need.getJobOrderId());
+      }
+    }
     return new NeedContext(
         unitsById(unitIds),
-        accessPolicy.isAdmin(),
+        admin,
         leadership,
-        accessPolicy.managedUnitIds(),
-        delegate);
+        managed,
+        delegate,
+        jobOrderMaterialCoverage.coverageOf(orderIds));
   }
 
   /**
@@ -217,6 +234,7 @@ public class SupplyMapper {
         purchaseFields && need.isPurchasable() ? need.getPurchasedAmount() : null,
         purchaseFields && need.isPurchasable() && material != null ? material.getPriceBuy() : null,
         need.getJobOrderId(),
+        linkedOrder(need, context),
         context.manages(need.getOrgUnitId()),
         need.getVersion(),
         need.getCreatedAt());
@@ -260,6 +278,48 @@ public class SupplyMapper {
         pledged && (donorIsMe || context.admin()),
         donation.getVersion(),
         donation.getCreatedAt());
+  }
+
+  /**
+   * Maps the order a need is linked to with its coverage of the need's material and tier
+   * (REQ-SUP-023).
+   *
+   * @param need the need
+   * @param context the page context holding the loaded coverage
+   * @return the order, or {@code null} when the need is closed, unlinked or not managed by the
+   *     caller
+   */
+  private static @Nullable NeedOrderDto linkedOrder(
+      @NotNull SupplyNeed need, @NotNull NeedContext context) {
+    UUID orderId = need.getJobOrderId();
+    if (orderId == null || !isLive(need.getStatus()) || !context.manages(need.getOrgUnitId())) {
+      return null;
+    }
+    OrderCoverage order = context.orders().get(orderId);
+    if (order == null) {
+      return null;
+    }
+    Material material = need.getMaterial();
+    QualityTier tier = need.getQualityTier();
+    BucketCoverage bucket =
+        material == null || tier == null ? null : order.bucket(material.getId(), tier.getId());
+    return new NeedOrderDto(
+        order.id(),
+        order.displayId(),
+        order.handle(),
+        order.status(),
+        bucket == null ? null : bucket.requiredAmount(),
+        bucket == null ? null : bucket.bookedAmount());
+  }
+
+  /**
+   * Tells whether a need still takes donations or deliveries.
+   *
+   * @param status the need's status
+   * @return {@code true} for {@code OPEN} and {@code PAUSED}
+   */
+  private static boolean isLive(@NotNull NeedStatus status) {
+    return status == NeedStatus.OPEN || status == NeedStatus.PAUSED;
   }
 
   private static @Nullable SupplyRefDto materialRef(@Nullable Material material) {

@@ -121,6 +121,7 @@ class PurchasingPageControllerTest {
         0.0,
         null,
         null,
+        null,
         true,
         1L,
         Instant.parse("2026-09-01T12:00:00Z"));

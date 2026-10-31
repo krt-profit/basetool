@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (row) row.hidden = false;
         });
         select('supply-need-kind').dispatchEvent(new Event('change'));
+        showJobOrdersOf(select('supply-need-unit').value, '', '');
         syncPurchaseFields();
         krtModal.open(modal);
     }
@@ -110,9 +111,47 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.getElementById(id);
             if (row) row.hidden = true;
         });
+        showJobOrdersOf(
+            button.getAttribute('data-unit-id') || '',
+            button.getAttribute('data-job-order-id') || '',
+            button.getAttribute('data-job-order-label') || '',
+        );
         syncPurchaseFields();
         krtModal.open(modal);
     }
+
+    const jobOrder = select('supply-need-job-order');
+
+    /**
+     * Offers only the job orders of one unit and selects one of them. A linked order that is no
+     * longer offered, because it has closed, stays selectable under its label so an edit keeps it.
+     *
+     * @param {string} unitId the raising unit
+     * @param {string} selectedId the linked order, or an empty string for none
+     * @param {string} selectedLabel the label of the linked order, used when it is not offered
+     */
+    function showJobOrdersOf(unitId, selectedId, selectedLabel) {
+        jobOrder.querySelectorAll('option[data-kept-link]').forEach((option) => option.remove());
+        let offered = false;
+        Array.from(jobOrder.options).forEach((option) => {
+            const ownUnit = option.dataset.unitId;
+            const visible = !ownUnit || ownUnit === unitId;
+            option.hidden = !visible;
+            option.disabled = !visible;
+            if (visible && option.value === selectedId) offered = true;
+        });
+        if (selectedId && !offered) {
+            const kept = document.createElement('option');
+            kept.value = selectedId;
+            kept.textContent = selectedLabel || selectedId;
+            kept.dataset.keptLink = 'true';
+            jobOrder.append(kept);
+        }
+        jobOrder.value = selectedId;
+    }
+
+    const unitSelect = select('supply-need-unit');
+    unitSelect.addEventListener('change', () => showJobOrdersOf(unitSelect.value, '', ''));
 
     krtEvents.on('click', 'supply-open-need', openCreate);
     krtEvents.on('click', 'supply-edit-need', openEdit);
@@ -128,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             purchasable: buy,
             purchaseReason: buy ? select('supply-need-reason').value : null,
             maxUnitPrice: buy ? numberOrNull(field('supply-need-max-price').value) : null,
-            jobOrderId: null,
+            jobOrderId: textOrNull(jobOrder.value),
         };
         const payload = id
             ? { ...common, version: numberOrNull(field('supply-need-version').value) }

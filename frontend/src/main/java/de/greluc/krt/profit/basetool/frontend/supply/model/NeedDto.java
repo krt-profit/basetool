@@ -50,6 +50,8 @@ import java.util.UUID;
  * @param purchasedAmount the part covered by accepted deliveries, or {@code null}
  * @param uexReferencePrice the average UEX buy price, or {@code null}
  * @param jobOrderId the job order the need feeds, or {@code null}
+ * @param jobOrder the linked order with its coverage of the need, or {@code null} when the caller
+ *     does not manage the unit or the need is closed or unlinked
  * @param canManage whether the caller manages the raising unit's needs
  * @param version the optimistic-locking version
  * @param createdAt when the need was raised
@@ -75,6 +77,7 @@ public record NeedDto(
     Double purchasedAmount,
     Double uexReferencePrice,
     UUID jobOrderId,
+    NeedOrderDto jobOrder,
     boolean canManage,
     Long version,
     Instant createdAt) {

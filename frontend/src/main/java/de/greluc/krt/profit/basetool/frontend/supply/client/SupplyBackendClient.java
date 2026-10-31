@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.supply.model.DeclineDonationReques
 import de.greluc.krt.profit.basetool.frontend.supply.model.DonationDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.MyDonationStatsDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
+import de.greluc.krt.profit.basetool.frontend.supply.model.NeedJobOrderOptionDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.PledgeRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.ReceiveDonationRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.RecordDonationRequest;
@@ -67,6 +68,8 @@ public class SupplyBackendClient {
   private static final ParameterizedTypeReference<List<NeedDto>> NEED_LIST =
       new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<NeedJobOrderOptionDto>>
+      JOB_ORDER_OPTION_LIST = new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<PageResponse<DonationDto>> DONATION_PAGE =
       new ParameterizedTypeReference<>() {};
 
@@ -142,6 +145,17 @@ public class SupplyBackendClient {
   @Nullable
   public List<NeedDto> openNeeds(@NotNull UUID orgUnitId) {
     return backendApiClient.get(NEEDS + "/open?orgUnitId={id}", NEED_LIST, orgUnitId);
+  }
+
+  /**
+   * Reads the job orders the caller may link a need to, for the need form.
+   *
+   * @return the open and in-progress orders of the managed units, or {@code null} when the backend
+   *     sent no body
+   */
+  @Nullable
+  public List<NeedJobOrderOptionDto> needJobOrders() {
+    return backendApiClient.get(NEEDS + "/job-orders", JOB_ORDER_OPTION_LIST);
   }
 
   /**
