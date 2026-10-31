@@ -59,6 +59,12 @@ class OrgUnitBankPathCutTest {
   private static final String NEW_PREFIX = "/api/v1/bank/org-units";
   private static final String SAMPLE_UUID = "00000000-0000-4000-8000-00000000cafe";
 
+  /**
+   * Operations of the controller that are not in the cut map because they never had an old path.
+   */
+  private static final Set<String> NOT_IN_THE_CUT_MAP =
+      Set.of("GET " + NEW_PREFIX + "/accounts/visible");
+
   /** One wave-4 line of the map: verb, old path, new path, whether the operation is frozen. */
   private record Moved(String verb, String oldPath, String newPath, boolean frozen) {}
 
@@ -73,7 +79,9 @@ class OrgUnitBankPathCutTest {
   }
 
   @Test
-  @DisplayName("the controller serves exactly the new paths of wave 4 and nothing under the old")
+  @DisplayName(
+      "the controller serves exactly the new paths of wave 4 plus the operations outside the map,"
+          + " and nothing under the old")
   void theControllerServesExactlyTheNewPaths() throws IOException {
     List<Moved> moved = wave4();
     assertThat(moved).as("the 29 operations of wave 4").hasSize(29);
@@ -97,7 +105,7 @@ class OrgUnitBankPathCutTest {
           }
         });
 
-    Set<String> expected = new TreeSet<>();
+    Set<String> expected = new TreeSet<>(NOT_IN_THE_CUT_MAP);
     moved.forEach(m -> expected.add(m.verb() + " " + m.newPath()));
     assertThat(served).containsExactlyInAnyOrderElementsOf(expected);
     assertThat(underOldPrefix).as("handlers left under %s", OLD_PREFIX).isEmpty();
@@ -109,6 +117,12 @@ class OrgUnitBankPathCutTest {
     for (Moved m : wave4()) {
       mockMvc
           .perform(request(HttpMethod.valueOf(m.verb()), concrete(m.newPath())).with(csrf()))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String operation : NOT_IN_THE_CUT_MAP) {
+      String[] verbAndPath = operation.split(" ", 2);
+      mockMvc
+          .perform(request(HttpMethod.valueOf(verbAndPath[0]), verbAndPath[1]).with(csrf()))
           .andExpect(status().isUnauthorized());
     }
   }
