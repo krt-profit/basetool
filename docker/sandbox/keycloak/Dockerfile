@@ -1,4 +1,4 @@
-FROM eclipse-temurin:25-jdk-alpine@sha256:1e20ead9eec7234db293f1913438090d533ed47c0b9e12dc8c7627a802a44ed6 AS spi
+FROM eclipse-temurin:25-jdk-alpine@sha256:425f0b733cb23843bd78dbe5552513976d0cf12b9722752c48a5161cf5cd2f32 AS spi
 WORKDIR /app
 COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
@@ -25,7 +25,7 @@ RUN set -eu; \
     [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "Expected exactly one keycloak-spi-*.jar, got $#: '$*'" >&2; exit 1; }; \
     cp "$1" /app/keycloak-spi.jar
 
-FROM quay.io/keycloak/keycloak:26.8@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+FROM quay.io/keycloak/keycloak:26.8@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
 COPY --from=spi /app/keycloak-spi.jar /opt/keycloak/providers/keycloak-spi.jar
 COPY keycloak-theme/krt-theme/ /opt/keycloak/themes/krt-theme/
 COPY docker/sandbox/keycloak/realm-basetool.json /opt/keycloak/data/import/realm-basetool.json

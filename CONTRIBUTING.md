@@ -433,7 +433,7 @@ packages come from `--require-hashes` requirement files in
 [`.github/requirements/`](.github/requirements/) (zizmor, PyYAML,
 ansible-core with ansible-lint), regenerated with
 `uv pip compile <in> --universal --generate-hashes --python-version 3.12 --no-header --no-annotate -o .github/requirements/<name>.txt`
-from a one-line input such as `ansible-core==2.21.4` plus `ansible-lint==26.9.0`;
+from a one-line input such as `ansible-core==2.21.5` plus `ansible-lint==26.10.1`;
 markdownlint-cli comes from the lockfile in
 [`.github/tools/markdownlint/`](.github/tools/markdownlint/) through `npm ci`
 (bump with `npm install --package-lock-only` there); the Ansible collections in
