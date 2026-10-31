@@ -26,16 +26,22 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialCoverage;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialCoverage.BucketCoverage;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialCoverage.OrderCoverage;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +69,8 @@ class SupplyMapperTest {
             mock(SupplyAccessPolicy.class),
             mock(OrgUnitRepository.class),
             mock(UserRepository.class),
-            mock(AuthHelperService.class));
+            mock(AuthHelperService.class),
+            mock(JobOrderMaterialCoverage.class));
     unit = new Squadron();
     unit.setId(UUID.randomUUID());
     unit.setName("Alpha");
@@ -96,7 +103,68 @@ class SupplyMapperTest {
   private SupplyMapper.NeedContext needContext(
       boolean admin, boolean leadership, Set<UUID> managed, boolean delegate) {
     return new SupplyMapper.NeedContext(
-        Map.of(unit.getId(), unit), admin, leadership, managed, delegate);
+        Map.of(unit.getId(), unit), admin, leadership, managed, delegate, Map.of());
+  }
+
+  private SupplyNeed linkedNeed(UUID orderId, QualityTier tier) {
+    SupplyNeed need = purchasableNeed();
+    need.setQualityTier(tier);
+    need.setJobOrderId(orderId);
+    return need;
+  }
+
+  private SupplyMapper.NeedContext linkedContext(Set<UUID> managed, OrderCoverage order) {
+    return new SupplyMapper.NeedContext(
+        Map.of(unit.getId(), unit), false, false, managed, false, Map.of(order.id(), order));
+  }
+
+  @Test
+  void theUnitsManagerSeesHowFarTheLinkedOrderCoversTheNeed() {
+    QualityTier good = new QualityTier();
+    good.setId(UUID.randomUUID());
+    UUID orderId = UUID.randomUUID();
+    OrderCoverage order =
+        new OrderCoverage(
+            orderId,
+            42,
+            JobOrderStatus.IN_PROGRESS,
+            List.of(new BucketCoverage(material.getId(), good.getId(), 12.4, 12.4)));
+
+    NeedDto dto =
+        mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
+
+    assertThat(dto.jobOrder())
+        .isEqualTo(new NeedOrderDto(orderId, 42, JobOrderStatus.IN_PROGRESS, 12.4, 12.4));
+  }
+
+  @Test
+  void aLinkedOrderWithoutTheNeedsBucketCarriesNoCoverage() {
+    QualityTier good = new QualityTier();
+    good.setId(UUID.randomUUID());
+    UUID orderId = UUID.randomUUID();
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
+
+    NeedDto dto =
+        mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
+
+    assertThat(dto.jobOrder()).isNotNull();
+    assertThat(dto.jobOrder().requiredAmount()).isNull();
+    assertThat(dto.jobOrder().bookedAmount()).isNull();
+  }
+
+  @Test
+  void aMemberWhoDoesNotManageTheUnitAndAClosedNeedGetNoLinkedOrder() {
+    QualityTier good = new QualityTier();
+    good.setId(UUID.randomUUID());
+    UUID orderId = UUID.randomUUID();
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
+    SupplyNeed fulfilled = linkedNeed(orderId, good);
+    fulfilled.setStatus(NeedStatus.FULFILLED);
+
+    assertThat(mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(), order)).jobOrder())
+        .isNull();
+    assertThat(mapper.toDto(fulfilled, linkedContext(Set.of(unit.getId()), order)).jobOrder())
+        .isNull();
   }
 
   @Test

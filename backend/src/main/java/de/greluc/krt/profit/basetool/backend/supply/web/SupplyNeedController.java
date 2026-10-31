@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.internal.CreateNeedRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.NeedDto;
+import de.greluc.krt.profit.basetool.backend.supply.internal.NeedJobOrderOptionDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeedService;
 import de.greluc.krt.profit.basetool.backend.supply.internal.UpdateNeedRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.VersionRequest;
@@ -107,6 +108,17 @@ public class SupplyNeedController {
   @GetMapping("/open")
   public List<NeedDto> open(@RequestParam UUID orgUnitId) {
     return needService.openNeedsOf(orgUnitId);
+  }
+
+  /**
+   * Lists the job orders the caller may link a need to, for the need form's picker.
+   *
+   * @return the open and in-progress orders of the units the caller manages
+   */
+  @Operation(summary = "List the job orders a need of a managed unit may be linked to")
+  @GetMapping("/job-orders")
+  public List<NeedJobOrderOptionDto> jobOrders() {
+    return needService.jobOrderOptions();
   }
 
   /**

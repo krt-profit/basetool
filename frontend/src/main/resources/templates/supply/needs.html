@@ -75,6 +75,15 @@
                                     <i class="meter__fill--warning" th:attr="data-krtm-width=${n.fulfilledPercent()}"></i>
                                 </div>
                                 <span class="cell-sub" th:text="#{supply.need.amountOf(${n.fulfilledAmount()}, ${n.amount()}, #{'supply.unit.' + ${n.quantityType()}})}">3 von 10 SCU</span>
+                                <span th:if="${n.jobOrder() != null}" class="cell-sub" data-testid="supply-need-order"
+                                      th:with="o=${n.jobOrder()}, orderNo=${#strings.toString(o.displayId())}">
+                                    <span th:if="${o.requiredAmount() != null}"
+                                          th:text="#{supply.need.jobOrder.coverage(${orderNo}, ${o.bookedAmount()}, ${o.requiredAmount()}, #{'supply.unit.' + ${n.quantityType()}})}">Auftrag #42: 12,4 von 12,4 SCU im Bestand</span>
+                                    <span th:if="${o.requiredAmount() == null}"
+                                          th:text="#{supply.need.jobOrder.linked(${orderNo})}">Auftrag #42</span>
+                                    <span th:if="${o.covered()}" class="chip chip--success" data-testid="supply-need-order-covered"
+                                          th:text="#{supply.need.jobOrder.covered}">Auftrag gedeckt</span>
+                                </span>
                             </td>
                             <td th:attr="data-label=#{supply.need.priority}" th:text="#{'supply.need.priority.' + ${n.priority()}}">Normal</td>
                             <td class="cell-status">
@@ -93,6 +102,8 @@
                                         <button type="button" class="btn btn-ghost btn-icon" data-trigger="supply-edit-need"
                                                 data-testid="supply-edit-need"
                                                 th:data-need-id="${n.id()}" th:data-version="${n.version()}"
+                                                th:data-unit-id="${n.orgUnitId()}" th:data-job-order-id="${n.jobOrderId()}"
+                                                th:data-job-order-label="${n.jobOrder() != null ? '#' + #strings.toString(n.jobOrder().displayId()) : null}"
                                                 th:data-amount="${n.amount()}" th:data-priority="${n.priority()}"
                                                 th:data-purchasable="${n.purchasable()}"
                                                 th:data-reason="${n.purchaseReason()}"
@@ -171,6 +182,15 @@
                     <div class="form-group">
                         <label for="supply-need-amount" th:text="#{supply.need.amount}">Menge</label>
                         <input type="text" data-number-input id="supply-need-amount" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group" id="supply-need-job-order-row">
+                        <label for="supply-need-job-order" th:text="#{supply.need.jobOrder}">Auftrag</label>
+                        <select id="supply-need-job-order" data-testid="supply-need-job-order">
+                            <option value="" th:text="#{supply.need.jobOrder.none}">Kein Auftrag</option>
+                            <option th:each="o : ${needJobOrders}" th:value="${o.id()}" th:data-unit-id="${o.orgUnitId()}"
+                                    th:text="${'#' + #strings.toString(o.displayId())}">#42</option>
+                        </select>
+                        <p class="form-hint" th:text="#{supply.need.jobOrder.hint}">Der Bestand des Auftrags z&auml;hlt nicht als Spende.</p>
                     </div>
                     <div class="form-group">
                         <label for="supply-need-priority" th:text="#{supply.need.priority}">Priorit&auml;t</label>

@@ -63,10 +63,12 @@ class SupplyBackendClientTest {
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson("[]");
+    backend.answerJson("[]");
 
     assertThat(client.needs(UNIT, "OPEN", 1, 20)).isNotNull();
     assertThat(client.needs(null, " ", 0, 50)).isNotNull();
     assertThat(client.openNeeds(UNIT)).isEmpty();
+    assertThat(client.needJobOrders()).isEmpty();
 
     backend.expect(
         "GET",
@@ -75,6 +77,7 @@ class SupplyBackendClientTest {
             + "&status=OPEN");
     backend.expect("GET", "/api/v1/supply/needs?page=0&size=50&sort=createdAt,desc");
     backend.expect("GET", "/api/v1/supply/needs/open?orgUnitId=" + UNIT);
+    backend.expect("GET", "/api/v1/supply/needs/job-orders");
   }
 
   @Test

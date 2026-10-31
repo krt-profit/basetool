@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -50,6 +51,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -74,6 +76,10 @@ public class SupplyNeedService {
 
   /** The rounding tolerance of the "covered" comparison. */
   private static final double COVERED_TOLERANCE = 5e-4;
+
+  /** The job-order states a need may be newly linked to. */
+  private static final Set<JobOrderStatus> LINKABLE_ORDER_STATUSES =
+      Set.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS);
 
   private final SupplyNeedRepository needRepository;
   private final SupplyUnitSettingRepository unitSettingRepository;
@@ -467,13 +473,48 @@ public class SupplyNeedService {
       need.setJobOrderId(null);
       return;
     }
+    if (jobOrderId.equals(need.getJobOrderId())) {
+      return;
+    }
     JobOrder order =
         Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
     if (order.getResponsibleOrgUnit() == null
         || !need.getOrgUnitId().equals(order.getResponsibleOrgUnit().getId())) {
       throw new BadRequestException("The job order belongs to another unit");
     }
+    if (!LINKABLE_ORDER_STATUSES.contains(order.getStatus())) {
+      throw new BadRequestException("Only an open or in-progress job order can be linked");
+    }
     need.setJobOrderId(jobOrderId);
+  }
+
+  /**
+   * Lists the job orders the caller may link a need to: the open and in-progress orders of every
+   * unit the caller manages, every unit for an admin (REQ-SUP-003).
+   *
+   * @return the orders, newest first
+   */
+  @Transactional(readOnly = true)
+  public @NotNull List<NeedJobOrderOptionDto> jobOrderOptions() {
+    settingsService.requireEnabled();
+    Set<UUID> units =
+        accessPolicy.isAdmin()
+            ? unitSettingRepository.findAll().stream()
+                .filter(SupplyUnitSetting::isMayRaiseNeeds)
+                .map(SupplyUnitSetting::getId)
+                .collect(Collectors.toSet())
+            : accessPolicy.managedUnitIds();
+    if (units.isEmpty()) {
+      return List.of();
+    }
+    return jobOrderRepository
+        .findByResponsibleOrgUnitsAndStatuses(LINKABLE_ORDER_STATUSES, units)
+        .stream()
+        .map(
+            order ->
+                new NeedJobOrderOptionDto(
+                    order.getId(), order.getResponsibleOrgUnit().getId(), order.getDisplayId()))
+        .toList();
   }
 
   private static @NotNull String label(@NotNull SupplyNeed need) {

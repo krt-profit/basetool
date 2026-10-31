@@ -169,6 +169,11 @@ public class SupplyPageController {
     model.addAttribute("supplyLiveSyncTopic", LIVE_SYNC_NEEDS);
     if (!"results".equalsIgnoreCase(fragment)) {
       addCatalogues(model);
+      model.addAttribute(
+          "needJobOrders",
+          units.stream().anyMatch(u -> u.canManage() && u.mayRaiseNeeds())
+              ? orEmpty(supplyClient.needJobOrders())
+              : List.of());
     }
     return "results".equalsIgnoreCase(fragment) ? "supply/needs :: needsResults" : "supply/needs";
   }

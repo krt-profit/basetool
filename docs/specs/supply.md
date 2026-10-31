@@ -1,6 +1,7 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-13.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-31.
 > **Owner area:** SUP · **Related ADRs:** [ADR-0252](../adr/0252-stockcommands-gains-the-pool-and-donation-commands.md),
-> [ADR-0253](../adr/0253-material-supply-and-purchasing-are-two-modules.md)
+> [ADR-0253](../adr/0253-material-supply-and-purchasing-are-two-modules.md),
+> [ADR-0320](../adr/0320-a-need-shows-its-linked-orders-stock-and-only-donations-and-purchases-cover-it.md)
 
 # Bedarf & Spenden (supply)
 
@@ -51,7 +52,14 @@ material (the base tier when omitted), a priority and an optional job order of t
 caller receives 403. The catalogue entry and the tier of a need are fixed; a different one is a new
 need.
 
-**Enforced by:** `SupplyNeedServiceTest` · **Code:** `supply/internal/SupplyNeedService`
+The need form offers the job order as a picker: the open and in-progress orders of the units the
+caller manages (every raising unit for an admin), filtered to the selected unit
+(`GET /api/v1/supply/needs/job-orders`). A newly linked order must belong to the need's unit and be
+`OPEN` or `IN_PROGRESS`; a link to an order that has closed since survives an edit unchanged, and an
+edit sends the link back instead of clearing it (ADR-0320).
+
+**Enforced by:** `SupplyNeedServiceTest`, `SupplyNeedOrderRenderTest` · **Code:**
+`supply/internal/SupplyNeedService`, `supply/needs.html`, `static/js/supply/supply-needs.js`
 
 #### Planned amendment (ADR-0300, ADR-0302)
 
@@ -251,6 +259,25 @@ A need and a donation for a game item show the Lager chips beside the item's nam
 **Enforced by:** `SupplyItemChipsRenderTest`, `SupplyMapperTest` game-item cases · **Code:**
 `SupplyMapper`, `supply/needs.html`, `supply/my-donations.html`, `supply/incoming-donations.html`,
 `kernel/fragments/item-chips.html` · **Issues:** #2725
+
+### REQ-SUP-023 — A linked need shows its order's stock
+
+For the managers of the raising unit (and an admin), an `OPEN` or `PAUSED` need linked to a job order
+shows that order's number and, when the order is open or in progress and requires the need's material
+at the need's tier, the order-linked stock attributed to that requirement next to the requirement —
+„Auftrag #42: 12,4 von 12,4 SCU im Bestand" — with an „Auftrag gedeckt" chip once the stock reaches
+it. The figures are those of the material-demand overview for that order (REQ-ORDERS-034), read
+through `joborder.api.JobOrderMaterialCoverage` in one batch per page (REQ-DATA-003).
+
+- The coverage is a hint. It never adds to the need's covered amount, never fulfils it and is not
+  audited; only received donations and accepted deliveries cover a need (REQ-SUP-005, ADR-0320).
+- Any other caller receives no `jobOrder` property on the need; the order's own visibility is not
+  widened.
+- The hint is computed when the need list renders and refreshes with it (REQ-SUP-018).
+
+**Enforced by:** `JobOrderMaterialCoverageTest`, `SupplyMapperTest`, `SupplyNeedOrderRenderTest` ·
+**Code:** `joborder/api/JobOrderMaterialCoverage`, `supply/internal/SupplyMapper`,
+`supply/internal/NeedOrderDto`, `supply/needs.html`
 
 ## Out of scope
 

@@ -126,6 +126,7 @@ class SupplyItemChipsRenderTest {
         null,
         null,
         null,
+        null,
         false,
         0L,
         Instant.now());

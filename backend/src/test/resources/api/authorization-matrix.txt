@@ -586,6 +586,7 @@ GET /api/v1/supply/me/donations | SupplyDonationController#listMine | pre=hasRol
 GET /api/v1/supply/me/donations/stats | SupplyDonationController#myStats | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/needs | SupplyNeedController#list | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 POST /api/v1/supply/needs | SupplyNeedController#create | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+GET /api/v1/supply/needs/job-orders | SupplyNeedController#jobOrders | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/needs/open | SupplyNeedController#open | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/supply/needs/{id} | SupplyNeedController#get | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 PUT /api/v1/supply/needs/{id} | SupplyNeedController#update | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated

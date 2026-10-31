@@ -53,6 +53,8 @@ import org.jetbrains.annotations.Nullable;
  * @param purchasedAmount the part covered by accepted deliveries, only for the purchase audience
  * @param uexReferencePrice the average UEX buy price, only for the purchase audience
  * @param jobOrderId the job order the need feeds, or {@code null}
+ * @param jobOrder the linked order with its coverage of the need (REQ-SUP-023), only for a caller
+ *     who manages the raising unit and only while the need is open or paused
  * @param canManage whether the caller manages the raising unit's needs
  * @param version the optimistic-locking version
  * @param createdAt when the need was raised
@@ -77,6 +79,7 @@ public record NeedDto(
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Double purchasedAmount,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Double uexReferencePrice,
     @Nullable UUID jobOrderId,
+    @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable NeedOrderDto jobOrder,
     boolean canManage,
     Long version,
     Instant createdAt) {}

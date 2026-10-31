@@ -137,6 +137,41 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("orgUnitIds") Collection<UUID> orgUnitIds);
 
   /**
+   * Loads the orders in the given statuses that one of the given org units is responsible for,
+   * without any association, for the job-order picker of a need (REQ-SUP-003).
+   *
+   * @param statuses the statuses to keep; never empty
+   * @param orgUnitIds the responsible org units; never empty
+   * @return the orders, ordered by descending {@code displayId}
+   */
+  @Query(
+      """
+      SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds
+      AND o.status IN :statuses ORDER BY o.displayId DESC
+      """)
+  List<JobOrder> findByResponsibleOrgUnitsAndStatuses(
+      @Param("statuses") Collection<JobOrderStatus> statuses,
+      @Param("orgUnitIds") Collection<UUID> orgUnitIds);
+
+  /**
+   * Loads the given orders with both kinds' material requirement branches, for the coverage a
+   * linked need shows (REQ-SUP-023).
+   *
+   * @param ids the orders; never empty
+   * @return the existing orders among {@code ids}, in no particular order
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "items",
+        "items.materials",
+        "items.materials.material"
+      })
+  @Query("SELECT o FROM JobOrder o WHERE o.id IN :ids")
+  List<JobOrder> findAllWithMaterialRequirements(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Scoped, unpaged list of the orders in the given statuses with both kinds' material requirement
    * branches, for the cross-order material-demand overview (REQ-ORDERS-034). Scope is applied in
    * SQL via {@link JobOrderScope#PREDICATE}, including the SK-public escape.

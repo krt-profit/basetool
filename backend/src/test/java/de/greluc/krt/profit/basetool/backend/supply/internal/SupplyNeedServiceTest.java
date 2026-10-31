@@ -39,8 +39,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedLifecycleObserver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
@@ -509,8 +512,91 @@ class SupplyNeedServiceTest {
     when(needRepository.findAll(ArgumentMatchers.<Specification<SupplyNeed>>any()))
         .thenReturn(List.of());
     when(mapper.needContext(List.of()))
-        .thenReturn(new SupplyMapper.NeedContext(Map.of(), false, false, Set.of(), false));
+        .thenReturn(
+            new SupplyMapper.NeedContext(Map.of(), false, false, Set.of(), false, Map.of()));
 
     assertThat(service.openNeedsOf(UNIT)).isEmpty();
+  }
+
+  private JobOrder order(UUID responsibleUnit, JobOrderStatus status) {
+    Squadron unit = new Squadron();
+    unit.setId(responsibleUnit);
+    JobOrder order = new JobOrder();
+    order.setId(UUID.randomUUID());
+    order.setDisplayId(42);
+    order.setHandle("Stileron");
+    order.setStatus(status);
+    order.setResponsibleOrgUnit(unit);
+    return order;
+  }
+
+  private UpdateNeedRequest linkRequest(UUID jobOrderId) {
+    return new UpdateNeedRequest(10.0, NeedPriority.NORMAL, false, null, null, jobOrderId, 3L);
+  }
+
+  @Test
+  void anEditLinksAnOpenOrderOfTheRaisingUnit() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    JobOrder order = order(UNIT, JobOrderStatus.IN_PROGRESS);
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+    when(needRepository.saveAndFlush(need)).thenReturn(need);
+
+    service.update(need.getId(), linkRequest(order.getId()));
+
+    assertThat(need.getJobOrderId()).isEqualTo(order.getId());
+  }
+
+  @Test
+  void anOrderOfAnotherUnitOrAClosedOrderCannotBeLinked() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    JobOrder foreign = order(UUID.randomUUID(), JobOrderStatus.OPEN);
+    JobOrder completed = order(UNIT, JobOrderStatus.COMPLETED);
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(jobOrderRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+    when(jobOrderRepository.findById(completed.getId())).thenReturn(Optional.of(completed));
+
+    assertThatThrownBy(() -> service.update(need.getId(), linkRequest(foreign.getId())))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> service.update(need.getId(), linkRequest(completed.getId())))
+        .isInstanceOf(BadRequestException.class);
+    assertThat(need.getJobOrderId()).isNull();
+  }
+
+  @Test
+  void anEditKeepsALinkToAnOrderThatHasSinceClosed() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    UUID closedOrder = UUID.randomUUID();
+    need.setJobOrderId(closedOrder);
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(needRepository.saveAndFlush(need)).thenReturn(need);
+
+    service.update(need.getId(), linkRequest(closedOrder));
+
+    assertThat(need.getJobOrderId()).isEqualTo(closedOrder);
+    verify(jobOrderRepository, never()).findById(any());
+  }
+
+  @Test
+  void theOrderPickerListsTheOpenOrdersOfTheManagedUnits() {
+    JobOrder order = order(UNIT, JobOrderStatus.OPEN);
+    when(accessPolicy.managedUnitIds()).thenReturn(Set.of(UNIT));
+    when(jobOrderRepository.findByResponsibleOrgUnitsAndStatuses(
+            Set.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS), Set.of(UNIT)))
+        .thenReturn(List.of(order));
+
+    assertThat(service.jobOrderOptions())
+        .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42));
+  }
+
+  @Test
+  void aCallerWhoManagesNoUnitGetsNoOrders() {
+    when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
+
+    assertThat(service.jobOrderOptions()).isEmpty();
+    verify(jobOrderRepository, never()).findByResponsibleOrgUnitsAndStatuses(any(), any());
   }
 }
