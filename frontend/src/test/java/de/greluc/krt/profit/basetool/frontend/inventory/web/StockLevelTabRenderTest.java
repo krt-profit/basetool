@@ -262,4 +262,35 @@ class StockLevelTabRenderTest {
         .doesNotContain("data-testid=\"stock-level-order\"")
         .doesNotContain("data-testid=\"stock-level-need\"");
   }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void aLogisticianOfOneUnitGetsShortcutsOnlyOnThatUnitsLowRows() throws Exception {
+    OrgUnitReferenceDto bravo =
+        new OrgUnitReferenceDto(
+            UUID.fromString("00000000-0000-0000-0000-0000000000b2"), "Staffel B", "B", "SQUADRON");
+    StockLevelDto own = level("Quantanium", null, 6.0, true, true);
+    StockLevelDto foreign =
+        new StockLevelDto(
+            UUID.randomUUID(),
+            1L,
+            bravo,
+            new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU"),
+            null,
+            10.0,
+            20.0,
+            2.0,
+            18.0,
+            0.2,
+            true,
+            false);
+    supplyOn = true;
+    supplyUnits = List.of(supplyUnit(true, true));
+
+    String html = render(List.of(own, foreign), List.of(ARGON), "");
+
+    assertThat(html).contains("requestingOrgUnitId=" + ARGON.id());
+    assertThat(html).doesNotContain("requestingOrgUnitId=" + bravo.id());
+    assertThat(html).doesNotContain("needUnit=" + bravo.id());
+  }
 }

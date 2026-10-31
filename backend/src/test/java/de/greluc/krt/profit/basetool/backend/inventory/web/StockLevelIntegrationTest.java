@@ -274,6 +274,36 @@ class StockLevelIntegrationTest {
   }
 
   @Test
+  void aLogisticianInOneUnitAndMemberOfAnotherMaintainsOnlyTheFirstInTheLowOnlyRead()
+      throws Exception {
+    joins(logistician, otherUnit);
+    UUID other = material();
+    createIn(unit, material, 4.0);
+    createIn(otherUnit, other, 4.0);
+
+    mockMvc
+        .perform(get(PATH).param("lowOnly", "true").with(logisticianOf(logistician, unit)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[?(@.orgUnit.id == '" + unit + "')].editable").value(true))
+        .andExpect(jsonPath("$[?(@.orgUnit.id == '" + otherUnit + "')].editable").value(false));
+    mockMvc
+        .perform(
+            delete(PATH + "/" + createdIdIn(otherUnit, other))
+                .param("version", "0")
+                .with(logisticianOf(logistician, unit)))
+        .andExpect(status().isForbidden());
+  }
+
+  private @NotNull UUID createdIdIn(@NotNull UUID orgUnit, @NotNull UUID materialId) {
+    return jdbc.queryForObject(
+        "SELECT id FROM inventory_stock_level WHERE org_unit_id = ? AND material_id = ?",
+        UUID.class,
+        orgUnit,
+        materialId);
+  }
+
+  @Test
   void theLowOnlyReadAllocatesOverEveryLevelBeforeItFilters() throws Exception {
     stock(member, 700, 6.0, false, false);
     createIn(unit, material, GOOD_TIER, 6.0);
