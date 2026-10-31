@@ -176,7 +176,9 @@ class FeatureExpansionTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(toCreate)))
@@ -193,7 +195,9 @@ class FeatureExpansionTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePayload)))
@@ -208,7 +212,9 @@ class FeatureExpansionTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new OrgUnitContextualAuthority(
                                 "MISSION_MANAGER", Squadron.IRIDIUM_ID))))
         .andExpect(status().isForbidden());
@@ -259,7 +265,9 @@ class FeatureExpansionTest {
                         jwt()
                             .jwt(builder -> builder.subject(officerUser.getId().toString()))
                             .authorities(
-                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                                new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                                new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                                 new OrgUnitContextualAuthority(
                                     "MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                     .contentType(MediaType.APPLICATION_JSON)
