@@ -119,6 +119,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_WITHDRAWN` | none (no rule) | — | supersedes the pledge notices | REQ-SUP-016 |
+| `SUPPLY_NEED_ORDER_COVERED` | `SUPPLY_NEED_ORDER_COVERED` | V312 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); raised once per link by the `supply_order_covered` timed producer | REQ-SUP-024 |
+| `SUPPLY_NEED_CLOSED` | none (no rule) | — | supersedes the need's covered-order notices when it is fulfilled or withdrawn | REQ-SUP-024 |
 | `PURCHASING_NEED_RELEASED` | `PURCHASING_NEED_RELEASED` | V289 | `EVENT_RECIPIENTS` (the active Handelsbeauftragten); the only purchasing notice a member can mute | REQ-PUR-024 |
 | `PURCHASING_NEED_CLOSED` | none (no rule) | — | supersedes the need's release notices when it is fulfilled or withdrawn | REQ-PUR-024 |
 | `PURCHASING_DELIVERY_RECORDED` | `PURCHASING_DELIVERY_RECORDED` | V289 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); not mutable | REQ-PUR-024 |

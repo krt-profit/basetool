@@ -295,6 +295,12 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.SUPPLY_NEED_ORDER_COVERED,
+            NotificationType.SUPPLY_NEED_ORDER_COVERED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
             NotificationEventType.PURCHASING_NEED_RELEASED,
             NotificationType.PURCHASING_NEED_RELEASED,
             true,

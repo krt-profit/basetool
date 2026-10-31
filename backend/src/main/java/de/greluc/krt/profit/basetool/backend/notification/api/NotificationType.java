@@ -413,6 +413,13 @@ public enum NotificationType {
   SUPPLY_DONATION_DECLINED,
 
   /**
+   * The job order linked to an open need has stock covering the need's bucket (REQ-SUP-024). The
+   * default rule notifies the lead and the Logisticians of the raising unit; superseded when the
+   * need is fulfilled or withdrawn.
+   */
+  SUPPLY_NEED_ORDER_COVERED,
+
+  /**
    * A need was released for purchase (REQ-PUR-024). Rendered with the unit, the material and the
    * amount; superseded when the need is fulfilled or withdrawn.
    */
@@ -532,6 +539,7 @@ public enum NotificationType {
           SUPPLY_DONATION_PLEDGED,
           SUPPLY_DONATION_RECEIVED,
           SUPPLY_DONATION_DECLINED,
+          SUPPLY_NEED_ORDER_COVERED,
           PURCHASING_NEED_RELEASED ->
           true;
     };

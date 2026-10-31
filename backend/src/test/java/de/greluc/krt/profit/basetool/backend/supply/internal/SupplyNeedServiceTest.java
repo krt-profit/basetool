@@ -43,6 +43,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedLifecycleObserver;
@@ -53,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +70,7 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -94,6 +98,7 @@ class SupplyNeedServiceTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private ObjectProvider<NeedLifecycleObserver> lifecycleObservers;
   @Mock private NeedLifecycleObserver observer;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private SupplyNeedService service;
   private Material material;
@@ -115,7 +120,8 @@ class SupplyNeedServiceTest {
             auditRecorder,
             authHelperService,
             new SimpleMeterRegistry(),
-            lifecycleObservers);
+            lifecycleObservers,
+            eventPublisher);
     lenient()
         .when(lifecycleObservers.orderedStream())
         .thenAnswer(invocation -> Stream.of(observer));
@@ -590,6 +596,49 @@ class SupplyNeedServiceTest {
 
     assertThat(service.jobOrderOptions())
         .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42));
+  }
+
+  @Test
+  void relinkingANeedResetsItsCoveredOrderMarker() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    need.setJobOrderId(UUID.randomUUID());
+    need.setOrderCoveredNotifiedAt(Instant.parse("2026-10-30T12:00:00Z"));
+    JobOrder order = order(UNIT, JobOrderStatus.OPEN);
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+    when(needRepository.saveAndFlush(need)).thenReturn(need);
+
+    service.update(need.getId(), linkRequest(order.getId()));
+
+    assertThat(need.getJobOrderId()).isEqualTo(order.getId());
+    assertThat(need.getOrderCoveredNotifiedAt()).isNull();
+  }
+
+  @Test
+  void withdrawingAndFulfillingANeedClearItsCoveredOrderNotices() {
+    SupplyNeed open = storedNeed(NeedStatus.OPEN, 10, 0);
+    SupplyNeed covered = storedNeed(NeedStatus.FULFILLED, 10, 10);
+    when(needRepository.findByIdForUpdate(open.getId())).thenReturn(Optional.of(open));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(needRepository.saveAndFlush(open)).thenReturn(open);
+    when(needRepository.addFulfilled(eq(covered.getId()), anyDouble(), any(), any())).thenReturn(1);
+    when(needRepository.markFulfilledIfCovered(
+            eq(covered.getId()), anyDouble(), any(), any(), any()))
+        .thenReturn(1);
+    when(needRepository.findById(covered.getId())).thenReturn(Optional.of(covered));
+
+    service.withdraw(open.getId(), 3L);
+    service.credit(covered.getId(), 10.0);
+
+    ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(2)).publishEvent(events.capture());
+    assertThat(events.getAllValues())
+        .extracting(event -> ((NoticeEvent) event).eventType())
+        .containsOnly(NotificationEventType.SUPPLY_NEED_CLOSED);
+    assertThat(events.getAllValues())
+        .extracting(event -> ((NoticeEvent) event).entityId())
+        .containsExactly(open.getId(), covered.getId());
   }
 
   @Test

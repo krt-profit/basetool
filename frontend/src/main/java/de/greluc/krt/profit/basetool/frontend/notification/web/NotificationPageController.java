@@ -142,6 +142,7 @@ public class NotificationPageController {
           Map.entry("SUPPLY_DONATION_PLEDGED", "/supply/donations/incoming"),
           Map.entry("SUPPLY_DONATION_RECEIVED", "/supply/donations/mine"),
           Map.entry("SUPPLY_DONATION_DECLINED", "/supply/donations/mine"),
+          Map.entry("SUPPLY_NEED_ORDER_COVERED", "/supply/needs"),
           Map.entry("PURCHASING_NEED_RELEASED", "/purchasing/deals"),
           Map.entry("PURCHASING_PAUSED", "/purchasing/deals"),
           Map.entry("PURCHASING_RESUMED", "/purchasing/deals"),

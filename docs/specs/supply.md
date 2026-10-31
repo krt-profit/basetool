@@ -279,6 +279,27 @@ through `joborder.api.JobOrderMaterialCoverage` in one batch per page (REQ-DATA-
 **Code:** `joborder/api/JobOrderMaterialCoverage`, `supply/internal/SupplyMapper`,
 `supply/internal/NeedOrderDto`, `supply/needs.html`
 
+### REQ-SUP-024 — The unit is told when a linked order is covered
+
+When the job order linked to an `OPEN` material need has order-linked stock that reaches the order's
+requirement for the need's material and tier (the figures of REQ-SUP-023), the raising unit's lead and
+Logisticians receive `SUPPLY_NEED_ORDER_COVERED` once: „Auftrag #42 von ARGON hat Stileron im Bestand –
+der Bedarf ist noch offen". It links to the needs page.
+
+- The `supply_order_covered` timed producer (REQ-NOTIF-026) raises it while the supply surface is
+  switched on. `supply_need.order_covered_notified_at` (V312) marks the need by an atomic update that
+  leaves its version alone; only the run whose update changed the row publishes.
+- Changing or removing the link clears the marker, so a newly linked order is announced again.
+- Fulfilling or withdrawing the need publishes `SUPPLY_NEED_CLOSED`, which clears its covered-order
+  notices.
+- The notice changes nothing on the need (ADR-0320); it carries names and the order number only, no
+  free text. Mutable, like every supply notice.
+
+**Enforced by:** `SupplyOrderCoveredNoticeProducerTest`, `SupplyNeedServiceTest`,
+`SeededNotificationRulesIntegrationTest`, `NotificationTypeMessageCoverageTest` · **Code:**
+`supply/internal/SupplyOrderCoveredNoticeProducer`, `supply/api/events/SupplyNotices`,
+`V312__add_supply_need_order_covered_marker.sql`
+
 ## Out of scope
 
 Money, deals and partners ([`purchasing.md`](purchasing.md)); profit medals; any `/exchange/v1`
