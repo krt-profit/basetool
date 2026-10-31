@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +53,6 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
   public static final String BEAN_NAME = "jobOrderAccessPolicy";
 
   private final OwnerScopeService ownerScopeService;
-  private final AuthHelperService authHelper;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
@@ -170,18 +168,19 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
 
   @Override
   public boolean mayEditJobOrderEarmarks(@NotNull UUID jobOrderId) {
-    return authHelper.isLogisticianOrAbove() && canEditJobOrder(jobOrderId);
+    return canEditJobOrder(jobOrderId);
   }
 
+  /**
+   * The Logistician edit gate: a grant in the responsible unit, an order without one is admin's.
+   */
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
     if (!ownerScopeService.canViewJobOrders()) {
       return false;
     }
     OrgUnit responsible = order.getResponsibleOrgUnit();
-    if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
-      return true;
-    }
-    return ownerScopeService.canEditSquadron(responsible.getId());
+    return ownerScopeService.canActAsLogisticianInOwner(
+        responsible == null ? null : responsible.getId());
   }
 
   private boolean isOrderRequesterRow(@NotNull JobOrder order) {

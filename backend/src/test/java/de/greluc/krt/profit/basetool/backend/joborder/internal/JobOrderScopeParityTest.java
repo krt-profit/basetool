@@ -92,7 +92,6 @@ class JobOrderScopeParityTest {
         (wired, id) ->
             new JobOrderAccessPolicy(
                     wired.ownerScopeService(),
-                    wired.authHelper(),
                     jobOrderRepository,
                     jobOrderHandoverRepository,
                     jobOrderItemHandoverRepository)

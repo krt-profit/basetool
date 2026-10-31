@@ -242,7 +242,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getUserRefineryOrdersScoped_adminAllScope_forwardsAdminAllScopeToScopedQuery() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, true, null, Set.of(), pageable))
           .thenReturn(page);
@@ -253,10 +253,10 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
-    void getUserRefineryOrdersScoped_nonAdminMemberUnion_forwardsOnlyTheCallersOrgUnits() {
+    void getUserRefineryOrdersScoped_nonAdmin_forwardsOnlyTheLogisticianUnits() {
       UUID callerStaffelA = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffelA)));
       when(refineryOrderRepository.findByOwnerIdScoped(
               OWNER_ID, false, null, Set.of(callerStaffelA), pageable))
@@ -271,7 +271,7 @@ class RefineryOrderServiceLifecycleTest {
     void getUserRefineryOrdersScoped_pinnedCaller_forwardsActiveOrgUnitId() {
       UUID pinned = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, pinned, Set.of()));
       when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, false, pinned, Set.of(), pageable))
           .thenReturn(page);
@@ -343,33 +343,40 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
-    void getMissionRefineryOrdersScoped_passesCallerScope_soForeignSquadronOrdersAreUnreachable() {
+    void getMissionRefineryOrdersForCaller_listsTheLogisticianUnitsAndTheCallersOwnOrdersOnce() {
       UUID squadronA = UUID.randomUUID();
-      UUID squadronB = UUID.randomUUID();
-      ScopePredicate squadronAscope = new ScopePredicate(false, null, Set.of(squadronA));
-      when(ownerScopeService.currentScopePredicate()).thenReturn(squadronAscope);
-      RefineryOrder squadronAorder = new RefineryOrder();
+      when(ownerScopeService.currentLogisticianScope())
+          .thenReturn(new ScopePredicate(false, null, Set.of(squadronA)));
+      RefineryOrder inUnitA = orderWithId();
+      RefineryOrder ownElsewhere = orderWithId();
       when(refineryOrderRepository.findByMissionIdScoped(
               MISSION_ID, false, null, Set.of(squadronA)))
-          .thenReturn(List.of(squadronAorder));
+          .thenReturn(List.of(inUnitA));
+      when(refineryOrderRepository.findByMissionIdAndOwnerId(MISSION_ID, OWNER_ID))
+          .thenReturn(List.of(inUnitA, ownElsewhere));
 
-      List<RefineryOrder> result = service.getMissionRefineryOrdersScoped(MISSION_ID);
+      List<RefineryOrder> result = service.getMissionRefineryOrdersForCaller(MISSION_ID, OWNER_ID);
 
-      assertEquals(List.of(squadronAorder), result);
-      verify(refineryOrderRepository)
-          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronA));
-      verify(refineryOrderRepository, never())
-          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronB));
-      verify(refineryOrderRepository, never()).findByMissionId(any(UUID.class));
+      assertEquals(List.of(inUnitA, ownElsewhere), result);
     }
 
     @Test
-    void getMissionRefineryOrders_filteredByOwner_delegatesToCombinedQuery() {
-      RefineryOrder o = new RefineryOrder();
+    void getMissionRefineryOrdersForCaller_withoutALogisticianGrant_returnsOnlyTheOwnOrders() {
+      when(ownerScopeService.currentLogisticianScope())
+          .thenReturn(new ScopePredicate(false, null, Set.of()));
+      RefineryOrder own = orderWithId();
       when(refineryOrderRepository.findByMissionIdAndOwnerId(MISSION_ID, OWNER_ID))
-          .thenReturn(List.of(o));
+          .thenReturn(List.of(own));
 
-      assertEquals(List.of(o), service.getMissionRefineryOrders(MISSION_ID, OWNER_ID));
+      assertEquals(List.of(own), service.getMissionRefineryOrdersForCaller(MISSION_ID, OWNER_ID));
+      verify(refineryOrderRepository, never())
+          .findByMissionIdScoped(any(), anyBoolean(), any(), any());
+    }
+
+    private static RefineryOrder orderWithId() {
+      RefineryOrder order = new RefineryOrder();
+      order.setId(UUID.randomUUID());
+      return order;
     }
   }
 
