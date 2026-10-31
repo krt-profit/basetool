@@ -30,22 +30,18 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * Who trades, governs, manages a raising unit's side or reads the report (REQ-PUR-003, REQ-PUR-021,
@@ -91,10 +87,6 @@ class PurchasingAccessPolicyTest {
         .thenReturn(false);
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
         .thenReturn(false);
-  }
-
-  private Authentication authenticationWith(GrantedAuthority... authorities) {
-    return new UsernamePasswordAuthenticationToken("caller", "n/a", List.of(authorities));
   }
 
   @Test
@@ -371,22 +363,15 @@ class PurchasingAccessPolicyTest {
   }
 
   @Test
-  void managedUnitsAreTheLogisticianGrantsOfTheCallerOnly() {
-    UUID other = UUID.randomUUID();
-    when(authHelperService.currentAuthentication())
-        .thenReturn(
-            Optional.of(
-                authenticationWith(
-                    new OrgUnitContextualAuthority("LOGISTICIAN", UNIT),
-                    new OrgUnitContextualAuthority("OFFICER", other),
-                    new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))));
+  void managedUnitsAreTheLogisticianGrantsOfTheCaller() {
+    when(ownerScopeService.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of(UNIT));
 
     assertThat(policy.managedUnitIds()).containsExactly(UNIT);
   }
 
   @Test
-  void noAuthenticationManagesNoUnit() {
-    when(authHelperService.currentAuthentication()).thenReturn(Optional.empty());
+  void noGrantManagesNoUnit() {
+    when(ownerScopeService.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of());
 
     assertThat(policy.managedUnitIds()).isEmpty();
   }
@@ -409,9 +394,7 @@ class PurchasingAccessPolicyTest {
         .thenReturn(Optional.empty());
     noLeadership();
     noBankRole();
-    when(authHelperService.currentAuthentication())
-        .thenReturn(
-            Optional.of(authenticationWith(new OrgUnitContextualAuthority("LOGISTICIAN", UNIT))));
+    when(ownerScopeService.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of(UNIT));
 
     assertThat(policy.canReadReport()).isTrue();
     assertThat(policy.canReadPartnerNotes()).isFalse();
@@ -424,7 +407,7 @@ class PurchasingAccessPolicyTest {
         .thenReturn(Optional.empty());
     noLeadership();
     noBankRole();
-    when(authHelperService.currentAuthentication()).thenReturn(Optional.of(authenticationWith()));
+    when(ownerScopeService.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of());
 
     assertThat(policy.canReadReport()).isFalse();
   }

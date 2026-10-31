@@ -58,8 +58,8 @@ public class ExchangeOrgUnitService {
   }
 
   /**
-   * Returns the units whose membership makes the member a Logistician of that unit, without the
-   * cascade (REQ-XCH-043).
+   * Returns the units of which the member is a Logistician, by membership or by the cascade of a
+   * Bereich or Organisationsleitung membership (REQ-XCH-043).
    *
    * @param member the member the current request acts for
    * @return the unit ids, possibly empty

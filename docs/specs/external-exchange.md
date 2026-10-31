@@ -2598,8 +2598,9 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   or a leadership rank — `SK_LEAD`, `STAFFELLEITER`, `KOMMANDOLEITER`, `STELLV_KOMMANDOLEITER`,
   `ENSIGN`, `BEREICHSLEITER`, `BEREICHSKOORDINATOR`, `BEREICHSOPERATOR` or `OL_MEMBER`. The rule is
   read from the database by one method that the web's `CustomJwtGrantedAuthoritiesConverter` uses
-  for its own-unit contextual `LOGISTICIAN` authority too; the exchange omits the converter's
-  cascade, and the `OFFICER` realm role plays no part.
+  for its own-unit contextual `LOGISTICIAN` authority too. A Logistician of a Bereich or of the
+  Organisationsleitung is one of the units below it as well (REQ-SEC-005), and the `OFFICER` realm
+  role plays no part.
 - **An entry** carries its id and `version`, the holder, the amount, the note, the job-order
   earmarks (order id, `number` = `displayId`, amount, delivered) and the mission earmarks (mission
   id, name, amount) with the unearmarked rest per dimension (`free`) — what the web's entry row
@@ -2616,15 +2617,16 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
 - **The capability** gates no route of its own: a request without it is answered without entries,
   never refused. Like every capability it admits the routes any capability serves. A membership that
   starts or stops making its member a Logistician of the unit (the flag or the rank changes)
-  announces the unit's pool in the feed (`V297`), so the entries appear or vanish without a new
-  snapshot. The capability itself is the client's: a client whose token gains it reads a new
+  announces the unit's pool in the feed (`V297`) and, for a Bereich or the Organisationsleitung, the
+  pools below it (`V316`), so the entries appear or vanish without a new snapshot. The capability itself is the client's: a client whose token gains it reads a new
   snapshot, and one whose token loses it drops the entries it kept.
 
 **Acceptance**
 
 - [x] A member with `is_logistician` in a unit, and one holding any leadership rank there without
-  the flag, get entries for that unit's pool; a plain member gets none; a Bereich rank gets none
-  for a child unit's pool they are not a member of. *`ExchangeOrgStockDetailsControllerTest`.*
+  the flag get entries for that unit's pool; a plain member gets none; a Bereich rank gets entries
+  for the pools of the units below the Bereich and none for a unit outside it.
+  *`ExchangeOrgStockDetailsControllerTest`.*
 - [x] Without `exchange.orgstock.details` granted and consented, no lot carries entries.
   *`ExchangeOrgStockDetailsControllerTest`.*
 - [x] The converter and the exchange answer "Logistician of this unit" through the same method; a

@@ -292,6 +292,12 @@ promotes these into two authority surfaces:
   that the per-OrgUnit scoping at the `@PreAuthorize` call site
   (`@ownerScopeService.canEdit…`) can be resolved without a service roundtrip.
 
+**The grants cascade** like officer reach (REQ-SEC-005): a Logistician or Mission-Manager grant —
+flag or rank — in a **Bereich** covers the Bereich and the Staffeln and Spezialkommandos below it, a
+grant in the **Organisationsleitung** covers every unit, a grant in a Staffel or Spezialkommando
+covers that unit alone. Every per-unit Logistician and Mission-Manager gate and list reads this
+cascaded set; with a unit pinned, the pin must lie in it. Admins are unrestricted.
+
 > The **old** `app_user.is_logistician` / `app_user.is_mission_manager` columns
 > were removed with **V104** — the single source of truth is exclusively
 > `org_unit_membership`. Membership-less accounts (admins, for instance) carry no
