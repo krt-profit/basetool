@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.LinkedHashMap;
@@ -55,7 +56,8 @@ class NotificationRenderCodesTest {
         messages,
         new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
-        new SimpleMeterRegistry());
+        new SimpleMeterRegistry(),
+        SecurityConfig.roleHierarchy());
   }
 
   private static Map<String, String> params(String code) {
@@ -95,7 +97,8 @@ class NotificationRenderCodesTest {
             messages,
             new BackendSideChannels(mock(WebClient.class), null),
             mock(OAuth2AuthorizedClientManager.class),
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            SecurityConfig.roleHierarchy());
 
     assertEquals("Code X1", controller.render("PLAIN", params, Locale.GERMAN));
   }

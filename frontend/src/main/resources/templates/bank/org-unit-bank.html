@@ -177,7 +177,7 @@
                                 <tbody>
                                 <th:block th:each="r : ${ownRequests}"
                                           th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-own-req-' + ${r.id()}">
-                                <tr data-testid="org-unit-bank-request-row" class="bank-booking-row"
+                                <tr data-testid="org-unit-bank-request-row" class="bank-booking-row" th:data-focus-id="${r.id()}"
                                     th:classappend="${hasDetail} ? ' is-expandable' : ''">
                                     <td class="bank-expand-cell">
                                         <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
@@ -370,7 +370,7 @@
                                 <tbody>
                                 <th:block th:each="r : ${foreignRequests}"
                                           th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-foreign-req-' + ${r.id()}">
-                                <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
+                                <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row" th:data-focus-id="${r.id()}"
                                     th:classappend="${hasDetail} ? ' is-expandable' : ''">
                                     <td class="bank-expand-cell">
                                         <button type="button" class="bank-row-toggle" th:if="${hasDetail}"

@@ -19,36 +19,26 @@
 
 package de.greluc.krt.profit.basetool.frontend.i18n;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendNotificationTypes.resolveModuleRelative;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.BackendNotificationTypes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests that every {@code NotificationType} the backend can persist has a {@code
  * notifications.type.*} template in all three bundles (REQ-NOTIF-001).
- *
- * <p>The enum is read from the backend's source file, since the frontend holds no backend classes.
  */
 class NotificationTypeMessageCoverageTest {
-
-  /** The enum whose constants must each have a template. */
-  private static final Path NOTIFICATION_TYPE =
-      resolveModuleRelative(
-          "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/notification/api/"
-              + "NotificationType.java");
 
   /** The three bundles, by the name a failure should name. */
   private static final Map<String, Path> BUNDLES =
@@ -60,16 +50,9 @@ class NotificationTypeMessageCoverageTest {
           "messages_en.properties",
           resolveModuleRelative("src/main/resources/messages_en.properties"));
 
-  /** An enum constant: a bare upper-snake identifier at the start of a line, inside the body. */
-  private static final Pattern CONSTANT =
-      Pattern.compile("^\\s{2}([A-Z][A-Z0-9_]*)\\s*(?:,|;|$)", Pattern.MULTILINE);
-
   @Test
   void everyNotificationTypeHasATemplateInEveryBundle() throws IOException {
-    Set<String> constants = notificationTypes();
-    assertThat(constants)
-        .as("parsed NotificationType constants from " + NOTIFICATION_TYPE.toAbsolutePath())
-        .isNotEmpty();
+    Set<String> constants = BackendNotificationTypes.all();
 
     Map<String, List<String>> missingByBundle = new LinkedHashMap<>();
     for (Map.Entry<String, Path> bundle : BUNDLES.entrySet()) {
@@ -92,46 +75,5 @@ class NotificationTypeMessageCoverageTest {
                 + " parameters. Add notifications.type.<TYPE> to the bundle named here -- umlauts"
                 + " as \\\\uXXXX in the .properties files.")
         .isEmpty();
-  }
-
-  /**
-   * The enum's constants, read from the backend source.
-   *
-   * @return the constant names in declaration order
-   * @throws IOException when the source file cannot be read
-   */
-  private static Set<String> notificationTypes() throws IOException {
-    assertThat(Files.isRegularFile(NOTIFICATION_TYPE))
-        .as("NotificationType.java not found at " + NOTIFICATION_TYPE.toAbsolutePath())
-        .isTrue();
-    String source = Files.readString(NOTIFICATION_TYPE, StandardCharsets.UTF_8);
-    int body = source.indexOf("public enum NotificationType");
-    assertThat(body).as("the enum declaration").isGreaterThan(0);
-
-    Set<String> out = new LinkedHashSet<>();
-    Matcher m = CONSTANT.matcher(source.substring(body));
-    while (m.find()) {
-      out.add(m.group(1));
-    }
-    return out;
-  }
-
-  /**
-   * Resolves a path given relative to the frontend module root, tolerating a run from the
-   * repository root.
-   *
-   * @param relative the module-relative path
-   * @return the path that exists, or the module-relative one when neither does
-   */
-  private static Path resolveModuleRelative(String relative) {
-    Path direct = Paths.get(relative);
-    if (Files.exists(direct)) {
-      return direct;
-    }
-    Path fromRepoRoot = Paths.get("frontend").resolve(relative);
-    if (Files.exists(fromRepoRoot)) {
-      return fromRepoRoot;
-    }
-    return direct;
   }
 }

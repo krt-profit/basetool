@@ -284,7 +284,7 @@ through `joborder.api.JobOrderMaterialCoverage` in one batch per page (REQ-DATA-
 When the job order linked to an `OPEN` material need has order-linked stock that reaches the order's
 requirement for the need's material and tier (the figures of REQ-SUP-023), the raising unit's lead and
 Logisticians receive `SUPPLY_NEED_ORDER_COVERED` once: „Auftrag #42 von ARGON hat Stileron im Bestand –
-der Bedarf ist noch offen". It links to the needs page.
+der Bedarf ist noch offen". It opens the needs page with that need's row focused (REQ-NOTIF-032).
 
 - The `supply_order_covered` timed producer (REQ-NOTIF-026) raises it while the supply surface is
   switched on. `supply_need.order_covered_notified_at` (V312) marks the need by an atomic update that

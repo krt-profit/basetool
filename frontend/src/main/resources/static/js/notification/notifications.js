@@ -25,6 +25,7 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
 const SSE_LIVENESS_TIMEOUT_MS = 60000;
+const OPEN_MARK_READ_WAIT_MS = 1500;
 const bell = document.getElementById('notification-bell');
 const i18n = readMessages();
 /** @type {number | null} */
@@ -121,19 +122,18 @@ function refreshUnreadCount() {
 }
 
 /**
- * Builds one notification row.
+ * Builds one notification row, linked to the subject it is about when it has one (REQ-NOTIF-032).
  *
  * @param {any} item the server-localized notification view
- * @param {boolean} [linkable] whether the row links to the page the notification is about
  * @returns {HTMLLIElement} the row
  */
-function buildItem(item, linkable) {
+function buildItem(item) {
     const li = document.createElement('li');
     li.className = `notification-item${item.read ? ' is-read' : ''}`;
     li.setAttribute('data-notif-id', item.id);
     li.setAttribute('data-notif-read', item.read ? 'true' : 'false');
 
-    const href = linkable ? safeSameOriginUrl(item.href) : null;
+    const href = safeSameOriginUrl(item.href);
     const body = document.createElement('div');
     body.className = 'notification-item-body';
     const text = document.createElement(href ? 'span' : 'p');
@@ -146,6 +146,7 @@ function buildItem(item, linkable) {
         const link = document.createElement('a');
         link.className = 'row-link';
         link.setAttribute('data-testid', 'row-link');
+        link.setAttribute('data-notif-open', '');
         link.href = href;
         link.appendChild(text);
         body.appendChild(link);
@@ -381,6 +382,74 @@ function doMarkRead(id, submitter) {
 }
 
 /**
+ * Marks one notification read on the way to its subject and patches its rows in place; a failure
+ * leaves the row unread and shows no toast, because the member is already leaving for the subject.
+ *
+ * @param {string} id the notification id
+ * @returns {Promise<unknown>} settles when the write is done, successful or not
+ */
+function markReadOnOpen(id) {
+    return krtFetch
+        .write({
+            method: 'POST',
+            url: `/notifications/${encodeURIComponent(id)}/read`,
+            toast: false,
+            onError: () => true,
+            onNetworkError: () => true,
+            onSuccess() {
+                eachItem(id, markReadInPlace);
+            },
+        })
+        .finally(refreshUnreadCount);
+}
+
+/**
+ * Opens a notification's subject and marks the notification read (REQ-NOTIF-032).
+ *
+ * A plain activation waits for the mark-read write, at most `OPEN_MARK_READ_WAIT_MS`, and
+ * then follows the link; a click that opens a new tab or window keeps the browser's own handling
+ * and marks the row read in the background, since this page stays open.
+ *
+ * @param {MouseEvent} event the click or middle click on the row link
+ * @param {HTMLAnchorElement} link the row link
+ */
+function openNotification(event, link) {
+    const li = link.closest('[data-notif-id]');
+    if (!li || li.getAttribute('data-notif-read') === 'true') {
+        return;
+    }
+    const write = markReadOnOpen(/** @type {string} */ (li.getAttribute('data-notif-id')));
+    const elsewhere =
+        event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey;
+    if (elsewhere) {
+        return;
+    }
+    event.preventDefault();
+    const href = link.href;
+    const wait = new Promise((resolve) => {
+        window.setTimeout(resolve, OPEN_MARK_READ_WAIT_MS);
+    });
+    Promise.race([write, wait]).finally(() => {
+        window.location.assign(href);
+    });
+}
+
+/**
+ * Handles a middle click on a row link, which opens the subject in a new tab.
+ *
+ * @param {MouseEvent} event the auxiliary click
+ */
+function onDocumentAuxClick(event) {
+    if (event.button !== 1) {
+        return;
+    }
+    const link = /** @type {Element} */ (event.target).closest('a[data-notif-open]');
+    if (link) {
+        openNotification(event, /** @type {HTMLAnchorElement} */ (link));
+    }
+}
+
+/**
  * Deletes one notification and removes its rows in place.
  *
  * @param {string} id the notification id
@@ -468,7 +537,7 @@ function loadMorePage(btn) {
             }
             data.items.forEach((/** @type {any} */ item) => {
                 if (!list.querySelector(`[data-notif-id="${cssEscape(item.id)}"]`)) {
-                    list.appendChild(buildItem(item, true));
+                    list.appendChild(buildItem(item));
                 }
             });
             btn.setAttribute('data-notif-next-page', String(page + 1));
@@ -520,12 +589,18 @@ function confirmThen(title, body, action) {
 }
 
 /**
- * Handles every click of the page: row actions, bulk actions, load-more and the dropdown toggle.
+ * Handles every click of the page: row links, row actions, bulk actions, load-more and the
+ * dropdown toggle.
  *
  * @param {MouseEvent} event the click
  */
 function onDocumentClick(event) {
     const target = /** @type {Element} */ (event.target);
+    const openLink = target.closest('a[data-notif-open]');
+    if (openLink) {
+        openNotification(event, /** @type {HTMLAnchorElement} */ (openLink));
+        return;
+    }
     const markReadBtn = target.closest('[data-notif-mark-read]');
     if (markReadBtn) {
         const readLi = markReadBtn.closest('[data-notif-id]');
@@ -771,6 +846,7 @@ function startSse() {
 }
 
 document.addEventListener('click', onDocumentClick);
+document.addEventListener('auxclick', onDocumentAuxClick);
 document.addEventListener('visibilitychange', onVisibilityChange);
 
 startPolling();

@@ -55,7 +55,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="n : ${needs}" data-testid="supply-need-row" th:data-need-id="${n.id()}">
+                        <tr th:each="n : ${needs}" data-testid="supply-need-row" th:data-need-id="${n.id()}" th:data-focus-id="${n.id()}">
                             <td>
                                 <span class="cell-title" th:text="${n.orgUnitShorthand() != null ? n.orgUnitShorthand() : n.orgUnitName()}">ARGON</span>
                                 <span class="cell-sub" th:text="${n.orgUnitName()}">Spezialkommando ARGON</span>

@@ -36,7 +36,7 @@
             </th:block>
 
             <div class="grid-auto ca-apps" th:if="${apps != null and !#lists.isEmpty(apps)}">
-                <section class="card ca-app" th:each="app : ${apps}" th:attr="data-client-id=${app.clientId}">
+                <section class="card ca-app" th:each="app : ${apps}" th:attr="data-client-id=${app.clientId},data-focus-id=${app.clientId}">
                     <div class="card-head">
                         <h2 class="card-title" th:text="${app.displayName}">VerseKit</h2>
                         <div class="cluster gap-2">
@@ -65,7 +65,7 @@
                             </tr>
                             </thead>
                             <tbody>
-                            <tr th:each="inst : ${app.installations}" th:attr="data-installation-id=${inst.id}"
+                            <tr th:each="inst : ${app.installations}" th:attr="data-installation-id=${inst.id},data-focus-id=${inst.id}"
                                 th:classappend="${inst.unseen} ? 'ca-unseen'">
                                 <td>
                                     <span class="cell-title">

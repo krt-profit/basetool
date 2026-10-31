@@ -346,7 +346,9 @@ class ConnectedAppsPageControllerMvcTest {
         .contains("class=\"page-head\"")
         .containsPattern("class=\"page-eyebrow\"[^>]*>Persönlich<")
         .contains("class=\"grid-auto ca-apps\"")
-        .contains("<section class=\"card ca-app\" data-client-id=\"versekit\">")
+        .contains(
+            "<section class=\"card ca-app\" data-client-id=\"versekit\""
+                + " data-focus-id=\"versekit\">")
         .contains("class=\"data-table data-table--stack ca-installations\"")
         .contains("class=\"data-table data-table--stack ca-activity\"")
         .contains("class=\"btn btn-quiet-danger btn-xs\" data-ca-disconnect-client")

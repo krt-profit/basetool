@@ -38,11 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies the notifications centre ({@code /notifications}): a notification produced by a seeded
- * domain event is marked read in place, without a reload (REQ-FE-001, REQ-FE-002).
+ * Verifies the notifications centre: a notification produced by a seeded domain event is marked
+ * read in place, without a reload (REQ-FE-001, REQ-FE-002), and a click on one in the bell dropdown
+ * opens its subject and marks it read (REQ-NOTIF-032).
  *
- * <p>{@code test-member} creates a job order so that {@code test-admin} is notified; the row is
- * located by the order's {@code displayId}. Mutates data, so it runs only against the ephemeral
+ * <p>{@code test-member} creates job orders so that {@code test-admin} is notified; each row is
+ * located by its order's {@code displayId}. Mutates data, so it runs only against the ephemeral
  * stack.
  */
 @Tag("e2e")
@@ -66,10 +67,16 @@ class NotificationCenterE2eTest {
   /** The seeded order's display id — the unique discriminator in the notification text. */
   private static String orderDisplayId;
 
+  /** The id of the order whose notification is opened from the bell dropdown. */
+  private static String openedOrderId;
+
+  /** The display id of the order whose notification is opened from the bell dropdown. */
+  private static String openedOrderDisplayId;
+
   /**
-   * Launches the browser, seeds a job order as {@code test-member} so {@code test-admin} receives a
-   * {@code JOB_ORDER_CREATED} notification (mirroring the admin's role into the backend first), and
-   * captures one authenticated admin session reused across the test.
+   * Launches the browser, seeds two job orders as {@code test-member} so {@code test-admin}
+   * receives a {@code JOB_ORDER_CREATED} notification for each (mirroring the admin's role into the
+   * backend first), and captures one authenticated admin session reused across the tests.
    */
   @BeforeAll
   static void setUp() {
@@ -80,18 +87,9 @@ class NotificationCenterE2eTest {
       seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD);
       String materialId =
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Notif Material");
-      String orderId =
-          seeder.createJobOrder(
-              MEMBER_USER,
-              MEMBER_PASSWORD,
-              IRIDIUM_SQUADRON_ID,
-              "E2E Notif Order",
-              materialId,
-              650,
-              100.0);
-      String orderJson = seeder.getBody(ADMIN_USER, ADMIN_PASSWORD, "/api/v1/orders/" + orderId);
-      orderDisplayId =
-          JsonParser.parseString(orderJson).getAsJsonObject().get("displayId").getAsString();
+      orderDisplayId = displayIdOf(seeder, seedOrder(seeder, materialId, "E2E Notif Order"));
+      openedOrderId = seedOrder(seeder, materialId, "E2E Notif Open Order");
+      openedOrderDisplayId = displayIdOf(seeder, openedOrderId);
     }
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), ADMIN_USER, ADMIN_PASSWORD);
@@ -153,6 +151,72 @@ class NotificationCenterE2eTest {
         throw failure;
       }
     }
+  }
+
+  /**
+   * Opens the bell dropdown, clicks the unread notification for the second seeded order and asserts
+   * that the click lands on that order's detail page and that the notification is read afterwards
+   * (REQ-NOTIF-032).
+   */
+  @Test
+  void opensANotificationsSubjectFromTheBellAndMarksItRead() {
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context = authedContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/");
+        page.waitForLoadState();
+        page.locator("#notification-toggle").click();
+
+        Locator row =
+            page.locator(
+                "#notification-dropdown-list .notification-item",
+                new Page.LocatorOptions()
+                    .setHasText(Pattern.compile("#" + openedOrderDisplayId + "(?!\\d)")));
+        assertThat(row).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        assertThat(row).hasAttribute("data-notif-read", "false");
+
+        row.locator("a[data-notif-open]").click();
+        page.waitForURL("**/orders/" + openedOrderId);
+
+        E2eSupport.navigate(page, baseUrl + "/notifications");
+        page.waitForLoadState();
+        Locator inboxRow =
+            page.locator(
+                "#notification-page-list .notification-item",
+                new Page.LocatorOptions()
+                    .setHasText(Pattern.compile("#" + openedOrderDisplayId + "(?!\\d)")));
+        assertThat(inboxRow).hasAttribute("data-notif-read", "true");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "notification-open");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Creates a job order as {@code test-member} for the IRIDIUM squadron.
+   *
+   * @param seeder the backend seeder
+   * @param materialId the order's material
+   * @param title the order's title
+   * @return the new order's id
+   */
+  private static String seedOrder(BackendSeeder seeder, String materialId, String title) {
+    return seeder.createJobOrder(
+        MEMBER_USER, MEMBER_PASSWORD, IRIDIUM_SQUADRON_ID, title, materialId, 650, 100.0);
+  }
+
+  /**
+   * Reads an order's display id as the admin sees it.
+   *
+   * @param seeder the backend seeder
+   * @param orderId the order's id
+   * @return the order's display id
+   */
+  private static String displayIdOf(BackendSeeder seeder, String orderId) {
+    String orderJson = seeder.getBody(ADMIN_USER, ADMIN_PASSWORD, "/api/v1/orders/" + orderId);
+    return JsonParser.parseString(orderJson).getAsJsonObject().get("displayId").getAsString();
   }
 
   /**
