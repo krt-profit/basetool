@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -101,6 +102,10 @@ public class RequestScopeResolver {
    */
   private static final RequestMemo.Key<Boolean> CACHE_KEY_CAN_VIEW_JOB_ORDERS =
       RequestMemo.Key.of(RequestScopeResolver.class, "canViewJobOrders");
+
+  /** Request-memo key for {@link #currentOfficerOrgUnitIds()}. */
+  private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_OFFICER_ORG_UNIT_IDS =
+      RequestMemo.Key.of(RequestScopeResolver.class, "officerOrgUnitIds");
 
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -419,13 +424,65 @@ public class RequestScopeResolver {
         }
       }
     }
+    oversightOrgUnitIds.addAll(seatReach(memberships));
+    return oversightOrgUnitIds;
+  }
+
+  /**
+   * Returns the org units in which the caller holds officer reach through a leadership seat
+   * (REQ-SEC-015, ADR-0300): the own unit of an SK lead or squadron rank, plus the cascaded reach
+   * of Bereich and OL seats. Empty unless the caller holds {@code KRT Member}; an admin's pass is
+   * not part of the set. Memoised per request.
+   *
+   * @return the caller's officer org-unit ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> currentOfficerOrgUnitIds() {
+    return RequestMemo.get(
+        request,
+        CACHE_KEY_OFFICER_ORG_UNIT_IDS,
+        () ->
+            authHelper.hasReachableRole(Roles.authority(Roles.KRT_MEMBER))
+                ? Collections.unmodifiableSet(seatReach(currentCallerMemberships()))
+                : Set.of());
+  }
+
+  /**
+   * Whether the caller holds officer reach in the active context: in the pinned unit when one is
+   * pinned, in at least one unit otherwise. Admins always pass. Drives visibility only, never a
+   * write (REQ-SEC-047).
+   *
+   * @return {@code true} iff the caller is an admin or holds reach in the active context
+   */
+  public boolean canActAsOfficerInActiveContext() {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    Set<UUID> reach = currentOfficerOrgUnitIds();
+    if (reach.isEmpty()) {
+      return false;
+    }
+    return readActiveSquadronFromHeader().map(reach::contains).orElse(true);
+  }
+
+  /**
+   * Collects the org units the given seats reach: each own unit of a seat that {@link
+   * MembershipRole#confersOwnUnitOfficerReach()}, plus {@link
+   * OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}.
+   *
+   * @param memberships the caller's membership rows; never {@code null}
+   * @return the reached org-unit ids, insertion-ordered
+   */
+  @NotNull
+  private Set<UUID> seatReach(@NotNull List<OrgUnitMembership> memberships) {
+    Set<UUID> reach = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
-      if (m.getRole() == MembershipRole.SK_LEAD || m.getRole().isSquadronRank()) {
-        oversightOrgUnitIds.add(m.getId().getOrgUnitId());
+      if (m.getRole().confersOwnUnitOfficerReach()) {
+        reach.add(m.getId().getOrgUnitId());
       }
     }
-    oversightOrgUnitIds.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
-    return oversightOrgUnitIds;
+    reach.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
+    return reach;
   }
 
   /**
