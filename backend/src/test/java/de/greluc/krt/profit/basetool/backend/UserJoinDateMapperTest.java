@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.CallerUserProjection;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.FullUserProjection;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
@@ -42,8 +42,7 @@ class UserJoinDateMapperTest {
   @BeforeEach
   void setUp() {
     userMapper = new UserMapperImpl();
-    ReflectionTestUtils.setField(
-        userMapper, "callerUserProjection", (CallerUserProjection) full -> full);
+    ReflectionTestUtils.setField(userMapper, "callerUserProjection", new FullUserProjection());
     ReflectionTestUtils.setField(
         userMapper, "membershipRepository", Mockito.mock(OrgUnitMembershipRepository.class));
     ReflectionTestUtils.setField(

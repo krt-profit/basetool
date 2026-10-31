@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.Optional;
 import java.util.Set;
@@ -113,5 +114,38 @@ class UserMapperRedactionTest {
 
     assertThat(dto.roles()).isNull();
     assertThat(dto.permissions()).isNull();
+  }
+
+  @Test
+  void nonAdminSeesNoUsernameInTheReferenceOfAMemberWithADisplayName() {
+    UserReferenceDto reference = mapper.toReferenceDto(other);
+
+    assertThat(reference.username()).isNull();
+    assertThat(reference.displayName()).isEqualTo("Bob");
+    assertThat(reference.effectiveName()).isEqualTo("Bob");
+  }
+
+  @Test
+  void nonAdminSeesTheUsernameInTheReferenceOfAMemberWithoutDisplayName() {
+    other.setDisplayName(null);
+
+    assertThat(mapper.toReferenceDto(other).username()).isEqualTo("bob");
+  }
+
+  @Test
+  void adminAndSelfSeeTheFullReference() {
+    lenient().when(authHelper.isAdmin()).thenReturn(true);
+    assertThat(mapper.toReferenceDto(other).username()).isEqualTo("bob");
+
+    lenient().when(authHelper.isAdmin()).thenReturn(false);
+    other.setId(callerId);
+    assertThat(mapper.toReferenceDto(other).username()).isEqualTo("bob");
+  }
+
+  @Test
+  void withoutAProjectionTheReferenceFailsClosed() {
+    ReflectionTestUtils.setField(mapper, "callerUserProjection", null);
+
+    assertThat(mapper.toReferenceDto(other).username()).isNull();
   }
 }

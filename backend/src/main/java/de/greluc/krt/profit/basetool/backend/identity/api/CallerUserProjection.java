@@ -17,23 +17,32 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.orgunit.api;
+package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Reduces a full {@link UserDto} to what the current caller may see of that member; implemented by
- * the scope module so that the mapper does not depend on the service layer (REQ-SEC-007).
+ * Reduces a full {@link UserDto} or {@link UserReferenceDto} to what the current caller may see of
+ * that member; implemented by the scope module so that the mapper and the user service do not
+ * depend on the service layer (REQ-SEC-007).
  */
 public interface CallerUserProjection {
 
   /**
    * Projects a user for the current caller.
    *
-   * @param full the unredacted DTO; never {@code null}
+   * @param full the unredacted DTO
    * @return {@code full} for an admin and for the caller's own record, the peer shape otherwise
    */
   @NotNull
   UserDto forCaller(@NotNull UserDto full);
+
+  /**
+   * Projects a user reference for the current caller.
+   *
+   * @param full the unredacted reference
+   * @return {@code full} for an admin and for the caller's own record, the peer reference otherwise
+   */
+  @NotNull
+  UserReferenceDto forCaller(@NotNull UserReferenceDto full);
 }

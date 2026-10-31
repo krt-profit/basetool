@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.CallerUserProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.CallerUserProjection;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -39,10 +41,16 @@ public class AdminOrSelfUserProjection implements CallerUserProjection {
 
   @Override
   public @NotNull UserDto forCaller(@NotNull UserDto full) {
-    if (authHelperService.isAdmin()) {
-      return full;
-    }
-    boolean self = authHelperService.currentUserId().filter(full.id()::equals).isPresent();
-    return self ? full : UserDtoRedaction.toPeerShape(full);
+    return seesInFull(full.id()) ? full : UserDtoRedaction.toPeerShape(full);
+  }
+
+  @Override
+  public @NotNull UserReferenceDto forCaller(@NotNull UserReferenceDto full) {
+    return seesInFull(full.id()) ? full : UserDtoRedaction.toPeerReference(full);
+  }
+
+  private boolean seesInFull(UUID userId) {
+    return authHelperService.isAdmin()
+        || authHelperService.currentUserId().filter(userId::equals).isPresent();
   }
 }

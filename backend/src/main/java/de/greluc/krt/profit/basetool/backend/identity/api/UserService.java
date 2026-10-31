@@ -80,6 +80,7 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
+  private final CallerUserProjection callerUserProjection;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -340,7 +341,9 @@ public class UserService {
    */
   public List<UserReferenceDto> findAllReference() {
     Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.findAllReferenceScoped(scope);
+    return userRepository.findAllReferenceScoped(scope).stream()
+        .map(callerUserProjection::forCaller)
+        .toList();
   }
 
   /**
@@ -380,8 +383,9 @@ public class UserService {
   public Page<UserReferenceDto> searchReferencesByUsername(
       @NotNull String query, @NotNull Pageable pageable) {
     Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.searchScopedReferences(
-        LikePatterns.escapeNullable(query), scope, pageable);
+    return userRepository
+        .searchScopedReferences(LikePatterns.escapeNullable(query), scope, pageable)
+        .map(callerUserProjection::forCaller);
   }
 
   /**

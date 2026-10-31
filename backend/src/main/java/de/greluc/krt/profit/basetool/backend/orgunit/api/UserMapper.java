@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.CallerUserProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
@@ -150,8 +151,26 @@ public abstract class UserMapper {
         : callerUserProjection.forCaller(full);
   }
 
-  /** Narrow reference DTO (id + display name) used wherever the full user payload is overkill. */
-  public abstract UserReferenceDto toReferenceDto(User user);
+  @Named(FULL)
+  protected abstract UserReferenceDto toFullReferenceDto(User user);
+
+  /**
+   * Narrow reference DTO (id + display name) used wherever the full user payload is overkill, as
+   * the current caller may see it: the peer reference (no username next to a display name) for a
+   * non-admin looking at another member, the peer reference as well without a projection.
+   *
+   * @param user the user to reference
+   * @return the reference as seen by the current caller
+   */
+  public UserReferenceDto toReferenceDto(User user) {
+    UserReferenceDto full = toFullReferenceDto(user);
+    if (user == null) {
+      return full;
+    }
+    return callerUserProjection == null
+        ? UserDtoRedaction.toPeerReference(full)
+        : callerUserProjection.forCaller(full);
+  }
 
   /** MapStruct default - flattens the user's roles to a set of role-name strings. */
   protected Set<String> roleNames(Set<Role> roles) {
