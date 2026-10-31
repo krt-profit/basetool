@@ -357,7 +357,7 @@
 /materials GET -> MaterialsPageController#listMaterials gate=class:isAuthenticated() layout=yes
 /materials/overview GET -> MaterialsPageController#getMatrixOverview gate=class:isAuthenticated() layout=yes
 /materials/overview/data GET -> MaterialsPageController#getMatrixData gate=class:isAuthenticated() layout=yes
-/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN') layout=yes
+/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'ADMIN') layout=yes
 /materials/{id} GET -> MaterialsPageController#getMaterialDetail gate=class:isAuthenticated() layout=yes
 /me/active-org-unit POST -> MeFrontendController#setActiveOrgUnit gate=class:isAuthenticated() layout=yes
 /members GET -> MemberManagementController#listMembers gate=class:hasRole('ADMIN') layout=yes
@@ -445,7 +445,7 @@
 /operations/{id}/delete POST -> OperationPageController#deleteOperation gate=method:hasRole('ADMIN') layout=yes
 /operations/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#deleteOperationAjax gate=method:hasRole('ADMIN') layout=yes
 /operations/{id}/finance/{missionId} GET -> OperationPageController#operationMissionFinance gate=class:isAuthenticated() layout=yes
-/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:hasRole('MISSION_MANAGER') and (#request.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) layout=yes
+/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:hasRole('MISSION_MANAGER') layout=yes
 /operations/{id}/update POST -> OperationPageController#updateOperation gate=method:hasRole('MISSION_MANAGER') layout=yes
 /operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
 /orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
@@ -468,17 +468,17 @@
 /orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/delete POST -> JobOrderWriteController#deleteOrder gate=class:isAuthenticated() layout=yes
-/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
-/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
+/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
 /orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
+/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes

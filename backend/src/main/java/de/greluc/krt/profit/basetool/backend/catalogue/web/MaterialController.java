@@ -58,7 +58,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface for materials: catalog, price lists, price overview, material × terminal matrix,
- * job-order sub-catalog and reference projection. Mutations are ADMIN/OFFICER and touch only
+ * job-order sub-catalog and reference projection. Mutations are ADMIN-only and touch only
  * admin-maintained fields.
  *
  * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level

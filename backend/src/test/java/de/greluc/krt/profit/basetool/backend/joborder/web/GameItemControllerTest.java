@@ -155,9 +155,9 @@ class GameItemControllerTest {
   }
 
   @Test
-  @DisplayName("the full catalogue admits exactly the four roles of the former inventory rule")
+  @DisplayName("the full catalogue admits exactly the three roles of the former inventory rule")
   void fullCatalogueKeepsTheInventoryRoles() {
-    for (String role : List.of(Roles.ADMIN, Roles.OFFICER, Roles.LOGISTICIAN, Roles.KRT_MEMBER)) {
+    for (String role : List.of(Roles.ADMIN, Roles.LOGISTICIAN, Roles.KRT_MEMBER)) {
       assertThat(granted(false, Roles.authority(role))).as(role).isTrue();
     }
     for (String role : List.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.MISSION_MANAGER)) {

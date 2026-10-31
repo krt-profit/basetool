@@ -1164,8 +1164,7 @@ public class RefineryOrderPageController {
         reachableAuthorities.stream()
             .anyMatch(a ->
                 a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
     if (!result) {
       UserDto me =
           SectionFallback.load(log, "refinery-logistician-flag", refineryClient::currentUser, null);

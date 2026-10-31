@@ -221,8 +221,7 @@ public class OperationPageController {
    * @param size page size for the embedded missions table
    * @param fragment the requested fragment name ({@code overview}/{@code payout}/{@code
    *     finance}/{@code missions})
-   * @param authentication current user's authentication (used for {@code canEdit} / {@code
-   *     canUnsetPaidOut})
+   * @param authentication current user's authentication (used for {@code canEdit})
    * @param model Thymeleaf model populated with the fragment's data
    * @return the {@code operation-detail :: <fragment>} view, or {@code :: fragmentError} on an
    *     unknown fragment or a backend failure
@@ -263,9 +262,9 @@ public class OperationPageController {
   /**
    * Loads the full operation-detail model (the overview fragment needs all of it): the four
    * independent reads fanned out on virtual threads via {@link ParallelPageLoader} plus the derived
-   * {@code operationMaxMissionResult}, {@code payoutProgress}, {@code canEdit} and {@code
-   * canUnsetPaidOut}. Propagates a backend failure to the caller (the full page redirects, the
-   * overview fragment shows its inline error).
+   * {@code operationMaxMissionResult}, {@code payoutProgress} and {@code canEdit}. Propagates a
+   * backend failure to the caller (the full page redirects, the overview fragment shows its inline
+   * error).
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
@@ -310,7 +309,6 @@ public class OperationPageController {
     model.addAttribute("operationMaxMissionResult", maxMissionResult);
 
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-    model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
   }
 
   /**
@@ -330,7 +328,6 @@ public class OperationPageController {
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
     model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-    model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
   }
 
   /**
@@ -422,19 +419,7 @@ public class OperationPageController {
         .map(GrantedAuthority::getAuthority)
         .anyMatch(role ->
             Roles.authority(Roles.ADMIN).equals(role)
-                || Roles.authority(Roles.OFFICER).equals(role)
                 || Roles.authority(Roles.MISSION_MANAGER).equals(role));
-  }
-
-  private static boolean hasOfficerOrAdminRole(Authentication authentication) {
-    if (authentication == null) {
-      return false;
-    }
-    return authentication.getAuthorities().stream()
-        .map(GrantedAuthority::getAuthority)
-        .anyMatch(role ->
-            Roles.authority(Roles.ADMIN).equals(role)
-                || Roles.authority(Roles.OFFICER).equals(role));
   }
 
   /**
@@ -497,7 +482,7 @@ public class OperationPageController {
   /**
    * AJAX endpoint behind the per-row "Bezahlt" checkbox, proxying to {@code PUT
    * /api/v1/operations/{id}/payouts/paid-out}. Any mission manager may set {@code paidOut=true};
-   * only ADMIN or OFFICER may clear it.
+   * the backend lets only an admin or a caller with officer reach in the operation's unit clear it.
    *
    * @param id operation id (from the URL)
    * @param request participant key + new {@code paidOut} value
@@ -505,14 +490,7 @@ public class OperationPageController {
    *     status
    */
   @PostMapping("/{id}/payouts/paid-out")
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.MISSION_MANAGER
-          + "') and (#request.paidOut() or hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "'))")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   @ResponseBody
   public ResponseEntity<OperationPayoutStatusDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {

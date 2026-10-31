@@ -15975,7 +15975,7 @@
     },
     "/api/v1/game-items" : {
       "get" : {
-        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
+        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
         "operationId" : "getGameItems",
         "parameters" : [ {
           "in" : "query",
@@ -41251,7 +41251,7 @@
     },
     "/api/v1/operations/{id}/payouts/paid-out" : {
       "put" : {
-        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and OFFICER — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified, `guest_<name>` for an external participant, or `deleted_<participantId>` for a participant whose account was deleted). Returns only the participant's paid-out status block (flag + audit trace) — a toggle never changes any amount, so the payout computation is not re-run.",
+        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and callers with officer reach in the operation's owning unit — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified, `guest_<name>` for an external participant, or `deleted_<participantId>` for a participant whose account was deleted). Returns only the participant's paid-out status block (flag + audit trace) — a toggle never changes any amount, so the payout computation is not re-run.",
         "operationId" : "setPayoutStatus",
         "parameters" : [ {
           "in" : "path",
