@@ -85,7 +85,7 @@ class OperationAccessPolicyDifferentialTest {
 
   private static final List<UUID> OPERATIONS = List.of(OP_A, OP_B, OP_C, OP_OWNERLESS, OP_UNKNOWN);
 
-  private static final int GATES = 3;
+  private static final int GATES = 2;
 
   /**
    * One caller of the matrix.
@@ -175,11 +175,7 @@ class OperationAccessPolicyDifferentialTest {
         new Gate(
             "canSeeOperationLedger",
             ScopeHubOperationGates::canSeeOperationLedger,
-            OperationAccessPolicy::canSeeOperationLedger),
-        new Gate(
-            "canEditOperation",
-            ScopeHubOperationGates::canEditOperation,
-            OperationAccessPolicy::canEditOperation));
+            OperationAccessPolicy::canSeeOperationLedger));
   }
 
   private static String label(UUID operation) {
@@ -314,15 +310,6 @@ class OperationAccessPolicyDifferentialTest {
               o.getOwningOrgUnit() == null
                   ? authHelper.isMemberOrAbove()
                   : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId()))
-          .orElse(false);
-    }
-
-    boolean canEditOperation(UUID operationId) {
-      return operationRepository
-          .findById(operationId)
-          .map(o ->
-              o.getOwningOrgUnit() == null
-                  || accessGateService.canEditSquadron(o.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 

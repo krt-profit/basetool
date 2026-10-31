@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -85,6 +86,7 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
+    when(ownerScopeService.canManageMissionsOf(null)).thenReturn(true);
     when(userService.getCurrentUser()).thenReturn(java.util.Optional.empty());
     org.mockito.Mockito.lenient()
         .when(ownerScopeService.currentOrgUnit())
@@ -121,6 +123,7 @@ class OperationServiceTest {
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, pickedOrgUnitId))
         .thenReturn(picked);
+    when(ownerScopeService.canManageMissionsOf(pickedOrgUnitId)).thenReturn(true);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Operation saved = operationService.createOperation(operation, pickedOrgUnitId);
@@ -139,12 +142,35 @@ class OperationServiceTest {
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(ownerScopeService.canManageMissionsOf(null)).thenReturn(true);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Operation saved = operationService.createOperation(operation, null);
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership caller → ownerless operation");
     verify(operationRepository, times(1)).save(operation);
+  }
+
+  @Test
+  void createOperation_withoutAGrantInTheStampedUnit_isRefusedAndNothingIsSaved() {
+    Operation operation = new Operation();
+    operation.setName("Foreign Op");
+    operation.setStatus(OperationStatus.PLANNED);
+
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stamped =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+    stamped.setId(UUID.randomUUID());
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(stamped);
+    when(ownerScopeService.canManageMissionsOf(stamped.getId())).thenReturn(false);
+
+    assertThrows(
+        org.springframework.security.access.AccessDeniedException.class,
+        () -> operationService.createOperation(operation, null));
+    verify(operationRepository, never()).save(any(Operation.class));
   }
 
   @Test

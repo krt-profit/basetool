@@ -104,6 +104,23 @@ class OperationPayoutPaidOutSecurityTest {
   }
 
   @Test
+  void flatMissionManagerWithoutAGrantInTheOwningUnit_isForbidden() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(false);
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, true))
+                .with(jwt().authorities(missionManager())))
+        .andExpect(status().isForbidden());
+
+    verify(operationPayoutService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
+  }
+
+  @Test
   void missionManager_isForbiddenFromSetting_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();

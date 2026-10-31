@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
@@ -122,19 +121,17 @@ public class MissionAccessPolicy {
   }
 
   /**
-   * Checks whether the caller may edit mission {@code missionId}: an ownerless mission passes and
-   * leaves the decision to the manage gates, any other needs the owning org unit's edit scope,
-   * without the public escape.
+   * Checks whether the caller holds the Mission Manager grant for mission {@code missionId}: in the
+   * owning org unit, or for an ownerless mission in an Organisationsleitung or Bereich unit; admins
+   * pass (REQ-SEC-065).
    *
    * @param missionId the mission to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the mission
+   * @return {@code true} iff the caller may manage the mission as Mission Manager
    */
   public boolean canEditMission(@NotNull UUID missionId) {
     return missionRepository
         .findByIdForAuthorization(missionId)
-        .map(m ->
-            m.getOwningOrgUnit() == null
-                || ownerScopeService.canEditSquadron(m.getOwningOrgUnit().getId()))
+        .map(this::holdsMissionManagerGrant)
         .orElse(false);
   }
 
@@ -262,8 +259,8 @@ public class MissionAccessPolicy {
   }
 
   /**
-   * Authorizes management actions on a mission: elevated authorities (ADMIN, MISSION_MANAGER) or
-   * the mission's owner or a co-manager.
+   * Authorizes management actions on a mission: ADMIN, a Mission Manager grant for the mission's
+   * owning unit, or the mission's owner or a co-manager.
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -286,13 +283,10 @@ public class MissionAccessPolicy {
       return true;
     }
 
-    if (hasElevatedMissionAuthority(reachable) && canEditMission(missionId)) {
-      return true;
-    }
-
     return missionRepository
         .findByIdForAuthorization(missionId)
-        .map(mission -> isOwnerOrManager(mission, authentication))
+        .map(mission ->
+            holdsMissionManagerGrant(mission) || isOwnerOrManager(mission, authentication))
         .orElse(false);
   }
 
@@ -352,10 +346,7 @@ public class MissionAccessPolicy {
     if (reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()))) {
       return true;
     }
-    if (hasElevatedMissionAuthority(reachable) && canEditMission(mission.getId())) {
-      return true;
-    }
-    return isOwnerOrManager(mission, authentication);
+    return holdsMissionManagerGrant(mission) || isOwnerOrManager(mission, authentication);
   }
 
   /**
@@ -382,13 +373,10 @@ public class MissionAccessPolicy {
     return mission.getManagers().stream().anyMatch(user -> user.getId().equals(userId));
   }
 
-  private static boolean hasElevatedMissionAuthority(
-      @NotNull Collection<? extends GrantedAuthority> reachable) {
-    return reachable.stream()
-        .anyMatch(a ->
-            Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
-                || Roles.MISSION_MANAGER.equals(a.getAuthority())
-                || Permissions.MISSION_MANAGE.equals(a.getAuthority()));
+  /** Whether the caller holds the Mission Manager grant for the unit that owns {@code mission}. */
+  private boolean holdsMissionManagerGrant(@NotNull Mission mission) {
+    return ownerScopeService.canManageMissionsOf(
+        mission.getOwningOrgUnit() == null ? null : mission.getOwningOrgUnit().getId());
   }
 
   /**

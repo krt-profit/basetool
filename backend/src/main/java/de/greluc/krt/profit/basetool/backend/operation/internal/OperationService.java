@@ -47,6 +47,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -192,6 +193,8 @@ public class OperationService {
    * @param owningOrgUnitId optional picker output from {@link OperationCreateDto#owningOrgUnitId},
    *     or {@code null}
    * @return the persisted operation
+   * @throws AccessDeniedException when the caller holds no Mission Manager grant in the stamped
+   *     unit, or for an ownerless operation none in an Organisationsleitung or Bereich unit
    */
   @Transactional
   public Operation createOperation(@NotNull Operation operation, @Nullable UUID owningOrgUnitId) {
@@ -203,6 +206,11 @@ public class OperationService {
       } else {
         ownerScopeService.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }
+    }
+    UUID stampedOrgUnitId =
+        operation.getOwningOrgUnit() == null ? null : operation.getOwningOrgUnit().getId();
+    if (!ownerScopeService.canManageMissionsOf(stampedOrgUnitId)) {
+      throw new AccessDeniedException("Mission Manager grant required in the owning org unit");
     }
     Operation saved = operationRepository.save(operation);
     auditRecorder.record(

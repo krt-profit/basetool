@@ -71,6 +71,7 @@ public final class LayoutResponses {
         canSeeBlueprintOverview,
         canViewJobOrders,
         canViewOwnJobOrders,
+        false,
         canMarkStolen,
         false,
         false,
@@ -81,6 +82,17 @@ public final class LayoutResponses {
   }
 
   /**
+   * Capability flags with only the Mission Manager flag set, as the backend's capabilities endpoint
+   * answers a caller holding that grant in the active context.
+   *
+   * @return the capability flags
+   */
+  public static CapabilitiesResponse missionManager() {
+    return new CapabilitiesResponse(
+        false, false, false, true, false, false, false, false, false, false, false);
+  }
+
+  /**
    * A layout answer carrying only the officer flags of the active context (REQ-SEC-047).
    *
    * @param officerHere whether the caller holds officer reach in the active context
@@ -88,32 +100,22 @@ public final class LayoutResponses {
    *     unread notifications
    */
   public static MeLayoutResponse officerReach(boolean officerHere) {
-    return new MeLayoutResponse(null, List.of(), officerCaps(officerHere), 0L);
-  }
-
-  /**
-   * A layout answer carrying the officer flags of the active context and the effective org unit.
-   *
-   * @param activeOrgUnitId the effective org unit, or {@code null} for none
-   * @return the answer, with every non-officer capability off, no pinnable units and no unread
-   *     notifications
-   */
-  public static MeLayoutResponse officerReachIn(UUID activeOrgUnitId) {
-    return new MeLayoutResponse(activeOrgUnitId, List.of(), officerCaps(true), 0L);
-  }
-
-  private static CapabilitiesResponse officerCaps(boolean officerHere) {
-    return new CapabilitiesResponse(
-        false,
-        false,
-        false,
-        false,
-        officerHere,
-        officerHere,
-        officerHere,
-        officerHere,
-        officerHere,
-        officerHere);
+    return new MeLayoutResponse(
+        null,
+        List.of(),
+        new CapabilitiesResponse(
+            false,
+            false,
+            false,
+            false,
+            false,
+            officerHere,
+            officerHere,
+            officerHere,
+            officerHere,
+            officerHere,
+            officerHere),
+        0L);
   }
 
   /**
