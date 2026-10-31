@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -105,6 +106,9 @@ class InventoryItemServiceTest {
 
   @BeforeEach
   void wireDelegates() {
+    lenient()
+        .when(stockLevelService.lowSubjects())
+        .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
     realAggregationService =
         new InventoryAggregationService(
             inventoryItemRepository,

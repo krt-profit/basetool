@@ -58,8 +58,8 @@ caller manages (every raising unit for an admin), filtered to the selected unit
 edit sends the link back instead of clearing it (ADR-0320).
 
 The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses the same gate and
-opens the form prefilled from the `needUnit`, `needMaterial`, `needTier` and `needAmount` query
-parameters of `/supply/needs`.
+opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` for a game item),
+`needTier` and `needAmount` query parameters of `/supply/needs`.
 
 **Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`), `SupplyNeedOrderRenderTest`
 · **Code:** `supply/internal/SupplyNeedService`, `supply/needs.html`,
