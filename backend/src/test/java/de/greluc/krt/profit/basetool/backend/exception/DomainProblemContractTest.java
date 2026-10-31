@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.AppException;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ErrorDisclosurePolicy;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.LeadershipSeatRequiresKrtMemberException;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
@@ -191,6 +192,16 @@ class DomainProblemContractTest {
             "problem.owner_org_unit_required",
             "No owning org unit could be resolved.",
             "Owning org unit required",
+            null,
+            Map.of()),
+        new Expected(
+            new LeadershipSeatRequiresKrtMemberException(),
+            HttpStatus.CONFLICT,
+            "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER",
+            "leadership-seat-requires-krt-member",
+            "problem.leadership_seat_requires_krt_member",
+            "problem.leadership_seat_requires_krt_member.detail",
+            "Leadership seat requires KRT Member",
             null,
             Map.of()),
         new Expected(

@@ -147,16 +147,80 @@ class CapabilityFlagsAdviceTest {
 
   @Test
   void derivedFlags_readFromCapabilities() {
-    assertTrue(
-        advice().canSeeBlueprintOverview(new CapabilitiesResponse(true, false, false, false)));
-    assertFalse(
-        advice().canSeeBlueprintOverview(new CapabilitiesResponse(false, true, false, false)));
-    assertTrue(advice().canViewJobOrders(new CapabilitiesResponse(false, true, false, false)));
-    assertFalse(advice().canViewJobOrders(new CapabilitiesResponse(true, false, false, false)));
-    assertTrue(advice().canViewOwnJobOrders(new CapabilitiesResponse(false, false, true, false)));
-    assertFalse(advice().canViewOwnJobOrders(new CapabilitiesResponse(false, false, false, false)));
-    assertTrue(advice().canMarkStolen(new CapabilitiesResponse(false, false, false, true)));
-    assertFalse(advice().canMarkStolen(new CapabilitiesResponse(true, true, true, false)));
+    assertTrue(advice().canSeeBlueprintOverview(LayoutResponses.caps(true, false, false, false)));
+    assertFalse(advice().canSeeBlueprintOverview(LayoutResponses.caps(false, true, false, false)));
+    assertTrue(advice().canViewJobOrders(LayoutResponses.caps(false, true, false, false)));
+    assertFalse(advice().canViewJobOrders(LayoutResponses.caps(true, false, false, false)));
+    assertTrue(advice().canViewOwnJobOrders(LayoutResponses.caps(false, false, true, false)));
+    assertFalse(advice().canViewOwnJobOrders(LayoutResponses.caps(false, false, false, false)));
+    assertTrue(advice().canMarkStolen(LayoutResponses.caps(false, false, false, true)));
+    assertFalse(advice().canMarkStolen(LayoutResponses.caps(true, true, true, false)));
+  }
+
+  @Test
+  void meCapabilities_admin_officerFlagsTrue() {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(authHelper.isAdmin()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.stolenMarking(false));
+
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
+
+    assertTrue(caps.hasOfficerReach());
+    assertTrue(caps.canOpenLeitung());
+    assertTrue(caps.canManagePromotions());
+    assertTrue(caps.canSeeHangarOwnerDetails());
+    assertTrue(caps.canManageJobOrders());
+    assertTrue(caps.canManageMissionFinance());
+  }
+
+  @Test
+  void meCapabilities_nonAdmin_officerFlagsFromBackend() {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(authHelper.isAdmin()).thenReturn(false);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
+
+    assertTrue(caps.hasOfficerReach());
+    assertTrue(caps.canManageMissionFinance());
+    assertFalse(caps.canViewJobOrders());
+  }
+
+  @Test
+  void meCapabilities_nonAdmin_backendFails_officerFlagsOff() {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(authHelper.isAdmin()).thenReturn(false);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenThrow(new RuntimeException("boom"));
+
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
+
+    assertFalse(caps.hasOfficerReach());
+    assertFalse(caps.canOpenLeitung());
+  }
+
+  @Test
+  void officerModelAttributes_readFromCapabilities() {
+    CapabilityFlagsAdvice advice = advice();
+    CapabilitiesResponse on = LayoutResponses.officerReach(true).capabilities();
+    CapabilitiesResponse off = LayoutResponses.officerReach(false).capabilities();
+
+    assertTrue(advice.hasOfficerReach(on));
+    assertTrue(advice.canOpenLeitung(on));
+    assertTrue(advice.canManagePromotions(on));
+    assertTrue(advice.canSeeHangarOwnerDetails(on));
+    assertTrue(advice.canManageJobOrders(on));
+    assertTrue(advice.canManageMissionFinance(on));
+    assertFalse(advice.hasOfficerReach(off));
+    assertFalse(advice.canOpenLeitung(off));
+    assertFalse(advice.canManagePromotions(off));
+    assertFalse(advice.canSeeHangarOwnerDetails(off));
+    assertFalse(advice.canManageJobOrders(off));
+    assertFalse(advice.canManageMissionFinance(off));
+    assertFalse(advice.hasOfficerReach(null));
+    assertFalse(advice.canManageMissionFinance(null));
   }
 
   @Test

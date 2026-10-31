@@ -886,6 +886,7 @@ officer of one's own Staffel or lead of one's own Spezialkommando (oversight sco
 | Function (gate)                                                                                                                | Member | Off./Lead | Bank Empl. | Bank Mgmt. | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------|:------:|:---------:|:----------:|:----------:|:-----:|
 | View **only the balance** of one's own OrgUnit account (`GET /api/v1/bank/org-units/balances`, oversight scope)                |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| View the org-unit accounts one may view, with balance and trend (`GET /api/v1/bank/org-units/accounts/visible`, REQ-BANK-064)  |   ✅    |     ✅     |     ✅      |     ✅      |   ✅   |
 | Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/bank/org-units/requests/**`) |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
 | **Confirm** a request (books it, records holders) / **reject** it (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + account flag) |   ❌    |     ❌     | ✅ per flag |     ✅      |   ✅   |
 
@@ -1226,7 +1227,7 @@ rendered menu, so it offers exactly the screens the „Navigation“ column gran
 adds the tabs a screen shows under the same condition: „Mein Lager“, „Globales Lager“ and the
 hangar's „Org-Einheit“ tab for every member, the sync-report tabs for `ADMIN`, and — read on demand
 from `GET /quick-access/entries` (`isAuthenticated()`, ADR-0282) — the supply and purchasing tabs
-for the members those pages show them to. Its actions follow the same buttons: „Ins globale Lager
+for the members those pages show them to. Its entity search, `GET /quick-access/search` (`isAuthenticated()`, REQ-UI-033), reads the backend list behind each page it opens — missions and operations as their lists show them, materials from the visible catalogue — so a hit never reveals more than that page. Its actions follow the same buttons: „Ins globale Lager
 einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMIN`. Page controllers live under `frontend/.../<domain>/web/`.
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
@@ -1275,7 +1276,8 @@ backend serves every member) but no control that writes.
   own; a bank manager who also holds a leadership seat has reach there like anyone else.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
   whose holder loses it stays in the org chart and confers no reach. Membership rights rest on
-  `KRT Member` alone.
+  `KRT Member` alone. The refusal and the reach computation are live already; until the cut the
+  gates in the tables above still read the `OFFICER` role.
 - An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
   at least one unit (REQ-ROLE-007). The bank's global
   `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).

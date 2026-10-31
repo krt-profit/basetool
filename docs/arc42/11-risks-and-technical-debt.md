@@ -376,9 +376,10 @@ since the go-live of 2026-09-28, so these risks hold now.
   removes the seeded role and its permissions, and the provisioner deletes the realm role
   afterwards. Membership rights then rest on `KRT Member` alone, so a seat holder without it loses
   officer **and** member rights at the cut. The precondition is a pre-cut report of every seat
-  holder lacking `KRT Member`; the cut ships only once that list is empty. Once the provisioner
-  has deleted the realm role, a release rollback past the cut finds no `OFFICER` grants to fall
-  back on.
+  holder lacking `KRT Member` (`scripts/officer-cut-report.sql`, runbook in
+  [`deployment.md`](../deployment.md)); the cut ships only once that list is empty. Once the
+  provisioner has deleted the realm role, a release rollback past the cut finds no `OFFICER`
+  grants to fall back on.
 - **Closing it** is the implementation of ADR-0300 with REQ-ROLE-002, REQ-ROLE-007, REQ-SEC-004,
   REQ-SEC-015, REQ-SEC-047, REQ-SEC-065, REQ-ORG-029 and REQ-BANK-037
   ([`ROLES_AND_PERMISSIONS.md` §7](../../ROLES_AND_PERMISSIONS.md#7-planned-adr-0300-adr-0301-adr-0302)).

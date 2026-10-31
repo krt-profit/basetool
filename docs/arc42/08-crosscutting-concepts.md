@@ -245,7 +245,7 @@ Two binding rules shape every UI change:
   nothing, even inside a view controller. New JSON handlers go into a `@RestController`
   (REQ-FE-020, ADR-0165, ratchet in `ArchitectureTest`).
 - **A page ships no developer text and no inline page CSS** (FE-PERF-02, 2026-09-23). Templates
-  carry no comments (ADR-0214), page CSS lives in `static/css/pages/<domain>/<page>.css`
+  emit no plain HTML comments (ADR-0214), page CSS lives in `static/css/pages/<domain>/<page>.css`
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
@@ -284,8 +284,14 @@ Two binding rules shape every UI change:
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it and into the
   palette's own source lists, so the server alone decides which pages a member is offered; tabs
   whose visibility needs a backend read come from domain `QuickAccessContributor`s through
-  `GET /quick-access/entries` on the first opening (REQ-UI-026, ADR-0240, ADR-0282,
-  `NavigationRenderMvcTest`, `NavigationE2eTest`).
+  `GET /quick-access/entries` on the first opening, and entities from domain
+  `QuickAccessSearchContributor`s through `GET /quick-access/search`, asked in parallel, each scoped
+  by the backend list its page uses and failing closed on its own; the term stays a query parameter,
+  never a log line, MDC field or label (REQ-UI-026, REQ-UI-033, ADR-0240, ADR-0282, ADR-0297,
+  `NavigationRenderMvcTest`, `NavigationE2eTest`, `QuickAccessSearchE2eTest`). The drawer, the phone tab bar and the quick
+  access's own pages and actions are rendered from one entry registry (`navigation.web
+  .NavigationRegistry`), every link under its stable entry key (`data-entry-key`), so a change of
+  the navigation edits the registry, not the fragments (`NavigationEntryKeyRenderMvcTest`).
 - **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
   overview of the home page (B) or a form (C): one page head with at most one primary action and an
   overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on

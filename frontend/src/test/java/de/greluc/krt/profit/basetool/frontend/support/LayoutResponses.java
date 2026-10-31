@@ -49,8 +49,59 @@ public final class LayoutResponses {
     return new MeLayoutResponse(
         null,
         List.of(),
+        caps(canSeeBlueprintOverview, canViewJobOrders, canViewOwnJobOrders, false),
+        0L);
+  }
+
+  /**
+   * Capability flags with the four non-officer flags as given and every officer flag off.
+   *
+   * @param canSeeBlueprintOverview whether the blueprint availability overview is offered
+   * @param canViewJobOrders whether the Job-Order area is offered
+   * @param canViewOwnJobOrders whether the own-unit "Meine Aufträge" view is offered
+   * @param canMarkStolen whether the server allows the „gestohlen" marking
+   * @return the capability flags
+   */
+  public static CapabilitiesResponse caps(
+      boolean canSeeBlueprintOverview,
+      boolean canViewJobOrders,
+      boolean canViewOwnJobOrders,
+      boolean canMarkStolen) {
+    return new CapabilitiesResponse(
+        canSeeBlueprintOverview,
+        canViewJobOrders,
+        canViewOwnJobOrders,
+        canMarkStolen,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
+  }
+
+  /**
+   * A layout answer carrying only the officer flags of the active context (REQ-SEC-047).
+   *
+   * @param officerHere whether the caller holds officer reach in the active context
+   * @return the answer, with every other capability off, no org unit, no pinnable units and no
+   *     unread notifications
+   */
+  public static MeLayoutResponse officerReach(boolean officerHere) {
+    return new MeLayoutResponse(
+        null,
+        List.of(),
         new CapabilitiesResponse(
-            canSeeBlueprintOverview, canViewJobOrders, canViewOwnJobOrders, false),
+            false,
+            false,
+            false,
+            false,
+            officerHere,
+            officerHere,
+            officerHere,
+            officerHere,
+            officerHere,
+            officerHere),
         0L);
   }
 
@@ -62,8 +113,7 @@ public final class LayoutResponses {
    *     unread notifications
    */
   public static MeLayoutResponse stolenMarking(boolean canMarkStolen) {
-    return new MeLayoutResponse(
-        null, List.of(), new CapabilitiesResponse(false, false, false, canMarkStolen), 0L);
+    return new MeLayoutResponse(null, List.of(), caps(false, false, false, canMarkStolen), 0L);
   }
 
   /**

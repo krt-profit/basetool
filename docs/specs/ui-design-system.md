@@ -16,7 +16,8 @@
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
-> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned) ·
+> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned; REQ-UI-033
+> partially shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -1451,11 +1452,10 @@ entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsAcceptanceGa
 
 A rendered page carries what the browser needs and nothing a developer wrote for another developer.
 
-- **Templates carry no comments** (ADR-0214; amended 2026-09-25 — until then the rule was that
-  template comments are Thymeleaf parser-level comments). A plain `<!-- … -->` is sent with every
-  response. Should a parser-level `<!--/* … */-->` block ever appear (the engine drops it at parse
-  time), the star-slash pair may not appear inside it — it closes the block early and renders the
-  rest.
+- **Templates emit no plain HTML comments** (ADR-0214). A plain `<!-- … -->` is sent with every
+  response. A short technical comment is a parser-level `<!--/* … */-->` block (the engine drops it
+  at parse time); the star-slash pair may not appear inside it — it closes the block early and
+  renders the rest.
 - **Page CSS lives in `static/css/pages/<domain>/<page>.css`**, linked by a `<link rel="stylesheet">` in the
   place the page's `<style>` block used to stand. A template carries no `<style>` element. Each file
   belongs to exactly one template. Its rules sit in the `page` cascade layer (REQ-UI-024), so where
@@ -1723,10 +1723,22 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   removes both.
 - **No data, nothing mutates.** Every action navigates or opens the drawer; the org-unit switch
   and logout keep their existing forms, so no live-update wiring, audit event or metric changes.
+- **One entry registry.** The drawer (top links, groups, personal panel, admin groups, legal
+  links), the phone tab bar and the quick access's own pages and actions are rendered from one
+  frontend registry, never from links written into the fragments. Each entry carries a stable
+  **entry key**, its path, label, search terms and its gate (roles, of which one is needed, read
+  through the role hierarchy, plus the capability and feature flags it requires or excludes);
+  every rendered link names its key in `data-entry-key`. A tab-bar slot names candidate entries
+  and opens the first one the member may see. **Key format:** two or more dot-separated segments,
+  each a lower-case letter followed by lower-case letters or digits, at most 64 characters
+  (e.g. `missions.list`, `storage.my`, `admin.syncreports.uex`); a key never encodes the path.
 
 **Enforced by:** `NavigationRenderMvcTest` (header, drawer zones and groups, admin mode only for
 administrators, the quick-access metadata, search terms on menu links, the quick access's own pages
 and actions per role, no „Rechtliches" group, nothing of it for a signed-out visitor) ·
+`NavigationEntryKeyRenderMvcTest` (every rendered link names a registered entry key) ·
+`NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
+`NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
 `PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
 `:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
@@ -1736,7 +1748,8 @@ mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access foll
 chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
 `kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
 `static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
-`kernel/layout/QuickAccessContributor.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
+`kernel/layout/QuickAccessContributor.java`, `kernel/fragments/nav-entries.html`,
+`navigation/web/NavigationRegistry.java`, `navigation/web/NavigationAdvice.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
 ADR-0282
 
 #### Planned amendment (ADR-0297)
@@ -2238,8 +2251,8 @@ page use it; positions there count the reorderable rows of the rendered page.
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
 **Entry keys.** Every page and every tab of a tabbed page — the personal pages included — has a
-stable entry key (e.g. `missions.list`, `orders.demand`) from a frontend-side entry registry,
-never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
+stable entry key (e.g. `missions.list`, `orders.demand`) from the frontend entry registry and in
+its key format (REQ-UI-026, „One entry registry"), never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
 the „Lager" tab with that switch selected (REQ-UI-026), keyed and handled like a tab. The backend
 checks the key's format only. A renamed page keeps its key or gets an explicit key remap; an
 unknown key from a new release (entry or group) is placed after its default predecessor, with no
@@ -2364,14 +2377,24 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code and the quick-access
-> text of REQ-UI-026 stay authoritative.
+> **Status: partially shipped** (ADR-0297, map #2800). Shipped: the entity search for missions,
+> operations and materials, the limits, the prefixes with their help, the mixed ranking by match
+> quality and the kept highlight. Still planned, with the current code and the quick-access text
+> of REQ-UI-026 authoritative until they ship: the other five entity types, „Häufig", the empty
+> state, filtering of hidden pages, the additional actions and the dialog keys.
 
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
 (`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
-each type is scoped by its domain's rules and fails closed on its own.
+each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
+backend list that backs the page its hits open (missions and operations over every period,
+materials from the visible catalogue), so a hit is exactly an entity that list would show the
+caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
+caller to the login. An optional repeatable `kind` parameter (the type keys `mission`,
+`operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`) narrows the
+search; an unknown key asks no type. Each hit is `{kind, href, label, crumb, icon, status, date}`,
+with `crumb` the type's name and `status` localized.
 
 | Type | Matched on | Opens |
 |---|---|---|
@@ -2386,12 +2409,14 @@ each type is scoped by its domain's rules and fails closed on its own.
 
 - A hit carries a slim projection (id, name, status, date). A member finds exactly the people the
   org chart shows them, with the same fields; no search reveals more than the page it opens.
-- **Limits:** debounced, at least 2 characters (1 digit for a job-order number), 5 hits per type,
-  aborted when the user types on.
+- **Limits:** debounced (250 ms), at least 2 characters (1 digit for a job-order number), at most
+  100 characters, 5 hits per type, aborted when the user types on.
 - **The term stays a query parameter;** it never reaches a path, an MDC field or a metric label.
 
 **Prefixes.** Symbol and word are equivalent; both languages' words are accepted in either UI
-language; `?` shows the prefix help.
+language, in any case and with or without a space after the colon; `?` alone shows the prefix
+help, one row per prefix, which puts that prefix into the input. A page or action prefix asks the
+backend nothing; an entity prefix asks only that type.
 
 | Kind | Symbol | Words (DE / EN) |
 |---|---|---|
@@ -2406,9 +2431,12 @@ language; `?` shows the prefix help.
 | Ships | — | `schiff:` / `ship:` |
 | Org units | — | `einheit:` / `unit:` |
 
-**Ranking.** One mixed list, scored by match quality plus the „Häufig" weight (pages and tabs
-only). Entity hits arrive later and the list re-sorts, but the highlighted hit stays highlighted
-and Enter opens exactly it.
+**Ranking.** One mixed list („Treffer"), scored by match quality plus the „Häufig" weight (pages
+and tabs only): a label that starts with the term, then one that contains it, then a breadcrumb
+or search-term hit, then an entity hit the backend matched otherwise; on a tie pages come first.
+The actions follow in their own group. Entity hits arrive later and the list re-sorts, but the
+highlighted hit stays highlighted and Enter opens exactly it. Each entity row shows the type, the
+status and the date as its breadcrumb.
 
 **„Häufig".** A per-device ranking in `localStorage`: every page or tab visit counts, however it
 was reached; entry keys only; each visit decays over about 30 days. It ranks typed results and
@@ -2434,14 +2462,22 @@ suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or 
 only while the dialog is open).
 
 **Monitoring:** `basetool_quick_access_search_total{kind,outcome}` (REQ-OBS-011); the p95 of
-`/quick-access/search` alerts above 1 s for 10 minutes.
+`/quick-access/search` alerts above 1 s for 10 minutes (`QuickAccessSearchSlow`).
 
-**Enforced by (to be added):** `QuickAccessSearchControllerTest` (parallel contributors, fail
-closed per type, limits, term not in the path or MDC) · one `…QuickAccessSearchContributorTest` per
-type (scope, member visibility equal to the org chart) · `:frontend:testSearchJs` (prefix parsing,
-ranking, decay, empty-state de-duplication) · `NavigationE2eTest` (late hits keep the highlight,
-Ctrl+Enter, Tab, Ctrl+D, `?` help, hidden pages filtered) · **Related:** REQ-UI-026, REQ-UI-032,
-REQ-SEC-007, REQ-OBS-011, ADR-0282, ADR-0297
+**Enforced by:** `QuickAccessSearchControllerTest` (parallel contributors, fail closed per type,
+limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTest` ·
+`MissionQuickAccessSearchContributorTest`, `OperationQuickAccessSearchContributorTest`,
+`MaterialQuickAccessSearchContributorTest` (the list read the page uses) · `:frontend:testSearchJs`
+(prefix parsing, ranking) · `QuickAccessSearchE2eTest` (every type found, entity names kept out of
+`krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
+`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:** one
+`…QuickAccessSearchContributorTest` per remaining type (member visibility equal to the org chart) ·
+`:frontend:testSearchJs` (decay, empty-state de-duplication) · `NavigationE2eTest` (Ctrl+Enter,
+Tab, Ctrl+D, hidden pages filtered) · **Code:** `shell/web/QuickAccessSearchController.java`,
+`shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
+`kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
+`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
+ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 

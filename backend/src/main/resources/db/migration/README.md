@@ -348,11 +348,12 @@ the same contract as prod:
 
 ## Where the *why* goes
 
-A new migration file carries no comment ([ADR-0214](../../../../../../docs/adr/0214-code-carries-no-comments-besides-javadoc.md)).
+A new migration file carries no history comment ([ADR-0214](../../../../../../docs/adr/0214-code-carries-no-comments-besides-javadoc.md)).
 The reason for the change — the bug or feature request that motivated it,
 and the answer to the obvious "why now?" — goes into the commit message and
 the PR, where `git log -- V42__*` finds it. Durable facts about the schema
-belong in the spec.
+belong in the spec; a short `--` comment is acceptable only for something the SQL
+cannot say itself, such as a non-obvious invariant.
 
 Migrations that already shipped keep the header comments they were applied
 with: editing a `V*.sql` changes its checksum and fails Flyway `validate` on
@@ -362,7 +363,7 @@ every existing database.
 
 - [ ] Filename is `V<next-unused-integer>__<snake_case>.sql`.
 - [ ] The commit message and PR explain *why*, not just what; the file itself
-  carries no comment (ADR-0214).
+  carries no history or TODO comment (ADR-0214).
 - [ ] No `DROP TABLE` / `DROP COLUMN` on data that's already in production
   without a phase-1 stop-writing predecessor in an earlier release.
 - [ ] Backfill (if any) is idempotent and inside the same migration file.

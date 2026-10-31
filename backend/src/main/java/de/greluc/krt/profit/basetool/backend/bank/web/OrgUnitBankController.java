@@ -32,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSet
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -71,9 +73,9 @@ import org.springframework.web.bind.annotation.RestController;
  * service and not by a bank role, for the officers and leads who oversee an org unit (REQ-BANK-021,
  * REQ-BANK-022).
  *
- * <p>Only relays to {@link OrgUnitBankAccessService} and the {@link OrgUnitBankSettingsService} and
- * {@link OrgUnitBankRequestService} behind it, which scope every call to the caller's oversight; a
- * caller who oversees nothing gets an empty result.
+ * <p>Only relays to {@link OrgUnitBankAccessService} and the {@link OrgUnitBankSettingsService},
+ * {@link OrgUnitBankRequestService} and {@link OrgUnitBankVisibleAccountsQuery} behind it, which
+ * scope every call to the caller's oversight; a caller who oversees nothing gets an empty result.
  */
 @RestController
 @RequestMapping("/api/v1/bank/org-units")
@@ -88,6 +90,7 @@ public class OrgUnitBankController {
   private final OrgUnitBankAccessService orgUnitBankAccessService;
   private final OrgUnitBankSettingsService orgUnitBankSettingsService;
   private final OrgUnitBankRequestService orgUnitBankRequestService;
+  private final OrgUnitBankVisibleAccountsQuery orgUnitBankVisibleAccountsQuery;
 
   /**
    * Returns the balance-only view of every org-unit account the caller oversees (REQ-BANK-021); a
@@ -109,6 +112,34 @@ public class OrgUnitBankController {
       value = {@ApiResponse(responseCode = "200", description = "Overseen org-unit balances")})
   public List<OrgUnitBankBalanceDto> listOverseenBalances() {
     return orgUnitBankAccessService.listOverseenOrgUnitBalances();
+  }
+
+  /**
+   * Pages over every org-unit account the caller may view on the org-unit bank page, regardless of
+   * the active-org-unit pin, in the fixed backend order of REQ-BANK-064.
+   *
+   * @param page zero-based page index
+   * @param size page size
+   * @return one page of accounts with balance, target and 30-day trend
+   */
+  @GetMapping("/accounts/visible")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Page over the org-unit accounts the caller may view",
+      description =
+          "Returns the accounts the authenticated member may view on the org-unit bank page, over"
+              + " their whole reach and not narrowed by the active org-unit pin: the KRT account"
+              + " first, then the accounts of the active context, then the rest, each by account"
+              + " number with id as tiebreaker. The order is fixed; no sort parameter. Each account"
+              + " carries its balance, balance target and 30-day trend; no holders, custody,"
+              + " history or capabilities.")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "One page of viewable accounts")})
+  public PageResponse<OrgUnitBankVisibleAccountDto> listVisibleAccounts(
+      @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+    return PageResponse.of(
+        orgUnitBankVisibleAccountsQuery.listVisibleAccounts(
+            PaginationUtil.createUnsortedPageRequest(page, size)));
   }
 
   /**

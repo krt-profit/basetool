@@ -403,7 +403,7 @@ public class CustomJwtGrantedAuthoritiesConverter
       if (m.isLogisticianOfOwnUnit()) {
         contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId));
       }
-      if (m.isMissionManager() || confersOwnUnitOfficerReach(m)) {
+      if (m.isMissionManager() || m.getRole().confersOwnUnitOfficerReach()) {
         contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", orgUnitId));
       }
     }
@@ -425,17 +425,5 @@ public class CustomJwtGrantedAuthoritiesConverter
    */
   private static boolean confersFlatOfficerRole(@NonNull OrgUnitMembership m) {
     return m.getRole().confersOwnLevelOversight();
-  }
-
-  /**
-   * Whether holding {@code m} mints its own org unit's contextual {@code MISSION_MANAGER@<id>}
-   * authority without cascade (REQ-ROLE-002). Area and OL ranks get theirs from the cascade
-   * instead.
-   *
-   * @param m the membership row to classify
-   * @return {@code true} iff {@code m} is an SK-Lead or one of the four squadron ranks
-   */
-  private static boolean confersOwnUnitOfficerReach(@NonNull OrgUnitMembership m) {
-    return m.getRole() == MembershipRole.SK_LEAD || m.getRole().isSquadronRank();
   }
 }
