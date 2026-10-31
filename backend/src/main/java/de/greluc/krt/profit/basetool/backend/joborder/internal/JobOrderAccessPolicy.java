@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -205,17 +204,12 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
    * @return {@code true} iff the caller may manage the order's assignees
    */
   public boolean canManageAssignees(@NotNull JobOrder order) {
-    OrgUnit responsible = order.getResponsibleOrgUnit();
-    return authHelper.isLogisticianOrAbove()
-        && canEditJobOrderRow(order)
-        && (responsible == null
-            ? authHelper.isAdmin()
-            : ownerScopeService.hasRoleInOrgUnit(responsible.getId(), Roles.LOGISTICIAN));
+    return canEditJobOrderRow(order);
   }
 
   @Override
   public boolean mayEditJobOrderEarmarks(@NotNull UUID jobOrderId) {
-    return authHelper.isLogisticianOrAbove() && canEditJobOrder(jobOrderId);
+    return canEditJobOrder(jobOrderId);
   }
 
   private boolean isAssigneeRow(@NotNull JobOrder order) {
@@ -227,15 +221,16 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
         .orElse(false);
   }
 
+  /**
+   * The Logistician edit gate: a grant in the responsible unit, an order without one is admin's.
+   */
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
     if (!ownerScopeService.canViewJobOrders()) {
       return false;
     }
     OrgUnit responsible = order.getResponsibleOrgUnit();
-    if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
-      return true;
-    }
-    return ownerScopeService.canEditSquadron(responsible.getId());
+    return ownerScopeService.canActAsLogisticianInOwner(
+        responsible == null ? null : responsible.getId());
   }
 
   private boolean isOrderRequesterRow(@NotNull JobOrder order) {

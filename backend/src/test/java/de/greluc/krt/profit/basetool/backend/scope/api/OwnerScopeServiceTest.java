@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverR
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
@@ -63,10 +64,13 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +84,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 
 /**
  * Unit tests for {@link OwnerScopeService}: org-unit context resolution for admins and non-admins,
@@ -733,22 +739,22 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void memberCanEditOwnSquadronMission() {
+    void plainMemberCannotEditOwnSquadronMission() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronA, true);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(missionPolicy.canEditMission(missionId));
+      assertFalse(missionPolicy.canEditMission(missionId));
     }
 
     @Test
-    void ownerlessMission_passesPerRowEditCheck() {
+    void ownerlessMission_isRefusedWithoutAGrant() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
-      assertTrue(missionPolicy.canEditMission(missionId));
+      assertFalse(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -757,6 +763,131 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
       assertFalse(missionPolicy.canEditMission(missionId));
+    }
+  }
+
+  /**
+   * Mission Manager grants per unit: the gate reads the contextual authority of the owning unit,
+   * never the flat role, and an ownerless target needs a grant in a leadership unit.
+   */
+  @Nested
+  class MissionManagerGrantTests {
+
+    private final UUID leadershipUnitId = UUID.randomUUID();
+
+    private void stubGrants(UUID... orgUnitIds) {
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      List<GrantedAuthority> authorities = new ArrayList<>();
+      for (UUID orgUnitId : orgUnitIds) {
+        authorities.add(new OrgUnitContextualAuthority(Roles.MISSION_MANAGER, orgUnitId));
+      }
+      lenient()
+          .when(authHelper.currentAuthentication())
+          .thenReturn(Optional.of(new TestingAuthenticationToken("caller", "n/a", authorities)));
+      lenient()
+          .when(orgUnitRepository.findLeadershipOrgUnitIdsAmong(any()))
+          .thenAnswer(invocation -> {
+            Collection<UUID> ids = invocation.getArgument(0);
+            return ids.contains(leadershipUnitId) ? List.of(leadershipUnitId) : List.of();
+          });
+    }
+
+    private void pinTo(UUID orgUnitId) {
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(orgUnitId.toString());
+    }
+
+    @Test
+    void grantInA_managesAMissionOfA_notOfB() {
+      stubGrants(SQUADRON_A_ID);
+
+      assertTrue(service.canManageMissionsOf(SQUADRON_A_ID));
+      assertFalse(service.canManageMissionsOf(SQUADRON_B_ID));
+    }
+
+    @Test
+    void grantInA_unpinned_offersTheCapability() {
+      stubGrants(SQUADRON_A_ID);
+
+      assertTrue(service.canActAsMissionManagerInActiveContext());
+    }
+
+    @Test
+    void grantInA_pinnedToA_offersTheCapability() {
+      stubGrants(SQUADRON_A_ID);
+      pinTo(SQUADRON_A_ID);
+
+      assertTrue(service.canActAsMissionManagerInActiveContext());
+    }
+
+    @Test
+    void grantInA_pinnedToB_hidesTheCapability() {
+      stubGrants(SQUADRON_A_ID);
+      pinTo(SQUADRON_B_ID);
+
+      assertFalse(service.canActAsMissionManagerInActiveContext());
+    }
+
+    @Test
+    void noGrant_hidesTheCapability() {
+      stubGrants();
+
+      assertFalse(service.canActAsMissionManagerInActiveContext());
+    }
+
+    @Test
+    void ownerlessTarget_squadronGrantIsRefused() {
+      stubGrants(SQUADRON_A_ID);
+
+      assertFalse(service.canManageMissionsOf(null));
+    }
+
+    @Test
+    void ownerlessTarget_leadershipGrantIsAdmitted() {
+      stubGrants(leadershipUnitId);
+
+      assertTrue(service.canManageMissionsOf(null));
+    }
+
+    @Test
+    void admin_passesEveryTarget() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canManageMissionsOf(SQUADRON_B_ID));
+      assertTrue(service.canManageMissionsOf(null));
+      assertTrue(service.canActAsMissionManagerInActiveContext());
+    }
+
+    @Test
+    void missionPolicy_followsTheOwningUnitGrant() {
+      stubGrants(SQUADRON_A_ID);
+      UUID ownMissionId = UUID.randomUUID();
+      UUID foreignMissionId = UUID.randomUUID();
+      when(missionRepository.findByIdForAuthorization(ownMissionId))
+          .thenReturn(Optional.of(newMission(ownMissionId, squadronA, true)));
+      when(missionRepository.findByIdForAuthorization(foreignMissionId))
+          .thenReturn(Optional.of(newMission(foreignMissionId, squadronB, false)));
+
+      assertTrue(missionPolicy.canEditMission(ownMissionId));
+      assertFalse(missionPolicy.canEditMission(foreignMissionId));
+    }
+
+    @Test
+    void operationPolicy_followsTheOwningUnitGrant() {
+      stubGrants(SQUADRON_A_ID);
+      UUID ownId = UUID.randomUUID();
+      UUID foreignId = UUID.randomUUID();
+      Operation own = new Operation();
+      own.setId(ownId);
+      own.setOwningOrgUnit(squadronA);
+      Operation foreign = new Operation();
+      foreign.setId(foreignId);
+      foreign.setOwningOrgUnit(squadronB);
+      when(operationRepository.findById(ownId)).thenReturn(Optional.of(own));
+      when(operationRepository.findById(foreignId)).thenReturn(Optional.of(foreign));
+
+      assertTrue(operationPolicy.canEditOperation(ownId));
+      assertFalse(operationPolicy.canEditOperation(foreignId));
     }
   }
 
@@ -916,13 +1047,14 @@ class OwnerScopeServiceTest {
   class CanEditJobOrderTests {
 
     @Test
-    void skResponsibleOrder_isOpenToTheRoleGate_forProfitEligibleCaller() {
+    void skResponsibleOrder_notEditableWithoutALogisticianGrantInTheSpecialCommand() {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubMemberInSquadronA();
+      stubLogisticianGrantIn(SQUADRON_A_ID);
 
-      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -946,13 +1078,24 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void squadronResponsibleOrder_editableByMemberOfThatSquadron() {
+    void squadronResponsibleOrder_editableByALogisticianOfThatSquadron() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
+      stubMemberInSquadronA();
+      stubLogisticianGrantIn(SQUADRON_A_ID);
+
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_notEditableByAPlainMemberOfThatSquadron() {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
       stubMemberInSquadronA();
 
-      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -1247,14 +1390,14 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void ownerlessOperation_passesPerRowEditCheck() {
+    void ownerlessOperation_isRefusedWithoutAGrant() {
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
       op.setOwningOrgUnit(null);
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
 
-      assertTrue(operationPolicy.canEditOperation(opId));
+      assertFalse(operationPolicy.canEditOperation(opId));
     }
 
     @Test
@@ -2446,6 +2589,19 @@ class OwnerScopeServiceTest {
     sc.setId(UUID.randomUUID());
     sc.setShorthand("SKX");
     return sc;
+  }
+
+  private void stubLogisticianGrantIn(UUID orgUnitId) {
+    lenient()
+        .when(authHelper.currentAuthentication())
+        .thenReturn(
+            Optional.of(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                    "member",
+                    "n/a",
+                    List.of(
+                        new de.greluc.krt.profit.basetool.backend.platform.api
+                            .OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId)))));
   }
 
   private void stubMemberInSquadronA() {
