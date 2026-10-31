@@ -103,21 +103,22 @@ RUN set -eu; \
     fi; \
     [ -s /app/app.aot ] || { cat /tmp/aot-training.log; echo "[AOT] FAILED: no cache written to /app/app.aot" >&2; exit 1; }; \
     echo "[AOT] Cache created: $(wc -c < /app/app.aot) bytes"; \
-    if ! java -XX:AOTCache=/app/app.aot -XX:AOTMode=on "$layout" -Xlog:aot+codecache+init=info \
+    if ! java -XX:AOTCache=/app/app.aot -XX:AOTMode=on "$layout" -Xlog:aot+codecache*=info \
             -Dspring.context.exit=onRefresh -Dserver.ssl.enabled=false "$@" \
             -jar app.jar > /tmp/aot-check.log 2>&1; then \
         cat /tmp/aot-check.log; \
         echo "[AOT] FAILED: a JVM started with the runtime's layout ($layout) refuses the cache (see above)." >&2; \
         exit 1; \
     fi; \
-    if ! grep -q "AOT Code Cache is empty" /tmp/aot-check.log; then \
-        grep -i "codecache" /tmp/aot-check.log || true; \
+    grep -F "[aot,codecache" /tmp/aot-check.log > /tmp/aot-codecache.log || true; \
+    if grep -qvF "AOT Code Cache is empty" /tmp/aot-codecache.log; then \
+        cat /tmp/aot-codecache.log; \
         echo "[AOT] FAILED: the cache holds machine code (see above); it would crash on a host with another CPU. Keep -XX:-AOTAdapterCaching -XX:-AOTStubCaching on the training run." >&2; \
         exit 1; \
     fi; \
     echo "[AOT] Cache accepted by a start under -XX:AOTMode=on $layout, and it holds no machine code"; \
     chown 10001:10001 /app/app.aot; \
-    rm -rf /tmp/aot-training.log /tmp/aot-check.log /tmp/tomcat.* /tmp/tomcat-docbase.*; \
+    rm -rf /tmp/aot-training.log /tmp/aot-check.log /tmp/aot-codecache.log /tmp/tomcat.* /tmp/tomcat-docbase.*; \
     rm -rf /app/logs && mkdir -p /app/logs && chown 10001:10001 /app/logs; \
     echo "[AOT] Training-run logs cleared; /app/logs ships empty."
 

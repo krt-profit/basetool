@@ -1,6 +1,6 @@
 # ADR-0209 — The images ship a Java AOT cache, trained on an eager context refresh and verified at build time
 
-- **Status:** Accepted — amended 2026-09-23 (Amendment 1: the training run unsets the release builder's `OTEL_*` variables and stores no machine code)
+- **Status:** Accepted — amended 2026-09-23 (Amendment 1: the training run unsets the release builder's `OTEL_*` variables and stores no machine code) and 2026-10-31 (Amendment 2: the machine-code check refuses every code-cache report but the empty one)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc (IMG-MOD-11, IMG-PERF-12, IMG-CI-13 and IMG-SIMP-14 approved with the
   improvement audit of 2026-09-22; "adopt the AOT cache only if readiness is not worse")
@@ -196,3 +196,29 @@ from. The cache sizes are unchanged within 1 % (ingest 117.6 MB, backend 194.1 M
 
 `CONTRIBUTING.md` (*Building an app image*) now tells a contributor who changes the training `RUN`
 or the base image to build once with a `docker-container` builder, which is the one release uses.
+
+## Amendment 2 (2026-10-31) — the machine-code check refuses what it sees, not the absence of a line
+
+Temurin 25.0.5 (2026-10-20) writes no AOT code cache at all and logs nothing under
+`aot,codecache`: neither `AOT Code Cache is empty` nor `Loaded … AOT code entries`, with code
+caching switched off or left at its default. The check of Amendment 1 required the *empty* line,
+so every app image failed at `[AOT] FAILED: the cache holds machine code` although the cache held
+none. Probed on the 25.0.4.1 and 25.0.5 `eclipse-temurin:25-jdk-alpine` images, each with a cache
+trained with and without `-XX:-AOTAdapterCaching -XX:-AOTStubCaching`:
+
+| JDK | Code caching | `aot,codecache` lines on the verifying start |
+| --- | --- | --- |
+| 25.0.4.1 | default (on by ergonomics) | `Loaded 320 AOT code entries from AOT Code Cache`, `Early stubs recorded` |
+| 25.0.4.1 | off | `AOT Code Cache is empty` |
+| 25.0.5 | default | none |
+| 25.0.5 | off | none |
+
+**The verifying start now logs `aot+codecache*` and fails the build on any `aot,codecache` line
+other than `AOT Code Cache is empty`.** A cache with code always announces itself (the first row
+fails the new check), and any report the check does not know is refused rather than shipped, which
+keeps Amendment 1's guarantee. Silence passes, because silence is what a JDK that stores no code
+prints. The training flags stay, so a later JDK that switches code caching back on by ergonomics
+still writes none.
+
+Rejected: matching only `Loaded N AOT code entries` (a renamed message would pass unseen), and
+pinning the base image to 25.0.4.1 (holds back the October security patch for a log line).
