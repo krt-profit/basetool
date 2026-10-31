@@ -396,7 +396,15 @@ authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
   The provisioning script deletes the realm role after the release; the test realms, the e2e realm
   export and the sandbox realm drop it.
 - **Precondition of the cut:** a report of every leadership seat holder who lacks `KRT Member`. The
-  cut ships only when that list is empty (REQ-ORG-029).
+  cut ships only when that list is empty (REQ-ORG-029). The report ships ahead of the cut as
+  `scripts/officer-cut-report.sql`: a read-only session, SELECTs only, ids and coded words but no
+  names. Beside the blocking section `seat_without_krt_member` it lists what the cut removes or
+  changes, so the release can be checked against it: `officer_without_seat` (hand-granted officers
+  who lose officer power), `bank_view_grant_officer` and `bank_approval_limit_officer` (the
+  `GLOBAL_ROLE OFFICER` buckets the cut deletes, each with a bank audit event) and `notification_rule_role_officer` (the `ROLE OFFICER` selectors the cut moves to the
+  seat-holder target). Every section prints a `count=` line, so an empty one reads `count=0`. Enforced
+  by `OfficerCutReportIntegrationTest`; how to run it on production: `docs/deployment.md`,
+  *Pre-cut report for the OFFICER retirement*.
 
 **Enforced by (to be added):** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a
 realm role or a seat), `UserReconciliationServiceTest` (an `OFFICER` realm role is not mirrored),
