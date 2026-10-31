@@ -207,6 +207,34 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
+   * Unscoped list of the orders in the given statuses that the given units requested, with both
+   * kinds' requirement branches and the requested items, for the requested amount of the minimum
+   * stock levels (REQ-INV-067).
+   *
+   * <p>Unpaged because the result is aggregated into sums; callers pass only non-terminal statuses.
+   *
+   * @param statuses the statuses to keep; never empty.
+   * @param requestingOrgUnitIds the requesting units; never empty.
+   * @return the orders with their requirement branches loaded.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "items",
+        "items.gameItem",
+        "items.materials",
+        "items.materials.material",
+        "requestingOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE o.status IN :statuses"
+          + " AND o.requestingOrgUnit.id IN :requestingOrgUnitIds")
+  List<JobOrder> findRequestedBy(
+      @Param("statuses") Collection<JobOrderStatus> statuses,
+      @Param("requestingOrgUnitIds") Collection<UUID> requestingOrgUnitIds);
+
+  /**
    * Scoped, paged job-order list behind {@code GET /api/v1/orders}, combining visibility scope,
    * status filter and optional squadron display filter.
    *

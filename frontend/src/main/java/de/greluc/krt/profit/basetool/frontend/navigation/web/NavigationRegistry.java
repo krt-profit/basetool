@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,8 @@ public class NavigationRegistry {
 
   private static final String ICON_GEAR = "gear";
 
+  private static final String ICON_DATABASE = "database";
+
   private static final String ICON_LIST = "list";
 
   private static final String ICON_EXTERNAL = "external-link";
@@ -99,8 +102,14 @@ public class NavigationRegistry {
   /** The personal pages of the user row's panel, also searchable by the menu filter. */
   private final NavigationGroup personal = buildPersonal();
 
+  /** The admin hub link above the administration groups. */
+  private final NavigationGroup adminTop = buildAdminTop();
+
   /** The administration groups, shown in admin mode only. */
   private final List<NavigationGroup> admin = buildAdmin();
+
+  /** The tab bars of the pages that merge several pages. */
+  private final List<NavigationPageTabs> pageTabs = buildPageTabs();
 
   /** The links a signed-out visitor gets. */
   private final NavigationGroup anonymous = buildAnonymous();
@@ -142,6 +151,7 @@ public class NavigationRegistry {
             Stream.of(top),
             main.stream(),
             Stream.of(personal),
+            Stream.of(adminTop),
             admin.stream(),
             Stream.of(anonymous, legal, fanKit, actions, paletteTail))
         .flatMap(Function.identity())
@@ -361,6 +371,18 @@ public class NavigationRegistry {
   }
 
   @NotNull
+  private static NavigationGroup buildAdminTop() {
+    return NavigationGroup.of(
+            "admin-hub",
+            "nav.admin.dashboard",
+            ICON_GEAR,
+            of("admin.dashboard", "/admin", "nav.admin.dashboard")
+                .icon(ICON_GEAR)
+                .testId("nav-admin-dashboard"))
+        .gate(NavigationGate.anyRole(Roles.ADMIN));
+  }
+
+  @NotNull
   private static List<NavigationGroup> buildAdmin() {
     NavigationGate adminOnly = NavigationGate.anyRole(Roles.ADMIN);
     return List.of(
@@ -369,76 +391,64 @@ public class NavigationRegistry {
                 "nav.admin.group.members",
                 ICON_USERS,
                 of("admin.members", "/members", "nav.members").keywords("palette.keywords.members"),
-                of("admin.specialcommands", "/admin/special-commands", "nav.admin.specialcommands"),
                 of("admin.orgstructure", "/admin/org-structure", "nav.admin.orgStructure")
                     .testId("nav-admin-org-structure"),
-                of("admin.announcement", "/admin/announcement", "info.title"),
-                of("admin.terms", "/admin/terms", "nav.admin.terms").testId("nav-admin-terms"))
-            .gate(adminOnly),
-        NavigationGroup.of(
-                "admin-masterdata",
-                "nav.admin.group.masterdata",
-                ICON_LIST,
-                of("admin.missiondata", "/admin/mission-data", "nav.mission_data"),
-                of("admin.locations", "/admin/locations", "nav.locations"),
-                of("admin.shipdata", "/ship-data", "nav.hangar_data"),
-                of("admin.materials", "/admin/materials", "nav.admin.materials"),
-                of("admin.materialaliases", "/admin/material-aliases", "nav.admin.materialAliases"),
-                of("admin.qualitytiers", "/admin/quality-tiers", "nav.admin.qualityTiers")
-                    .testId("nav-admin-quality-tiers"),
-                of("admin.blueprints", "/admin/blueprints", "nav.admin.blueprints"),
-                of(
-                    "admin.defaultblueprints",
-                    "/admin/default-blueprints",
-                    "nav.admin.defaultBlueprints"),
-                of("admin.uex", "/admin/uex-data", "nav.admin.uex"),
-                of("admin.p4kimport", "/admin/p4k-import", "nav.admin.p4kImport"))
-            .gate(adminOnly),
-        NavigationGroup.of(
-                "admin-bank",
-                "nav.admin.group.bank",
-                ICON_BANK,
-                of("admin.bank", "/admin/bank", "nav.admin.bank").testId("nav-admin-bank"))
-            .gate(adminOnly),
-        NavigationGroup.of(
-                "admin-system",
-                "nav.admin.group.system",
-                ICON_GEAR,
-                of("admin.auditlog", "/admin/audit-log", "nav.admin.auditLog")
-                    .keywords("palette.keywords.auditLog")
-                    .testId("nav-admin-audit-log"),
-                of("admin.settings", "/admin/settings", "nav.admin.settings")
-                    .keywords("palette.keywords.settings"),
-                of("admin.exchangeclients", "/admin/exchange-clients", "nav.admin.exchangeClients")
-                    .testId("nav-admin-exchange-clients"),
-                of("admin.supply", "/admin/supply", "nav.admin.supply").testId("nav-admin-supply"),
-                of("admin.purchasing", "/admin/purchasing", "nav.admin.purchasing")
-                    .testId("nav-admin-purchasing"),
-                of(
-                    "admin.notificationrules",
-                    "/admin/notification-rules",
-                    "nav.admin.notificationRules"),
-                of("admin.syncreports", "/admin/sync-reports", "nav.admin.syncReports"),
+                of("admin.privacy", "/admin/person-search", "nav.admin.privacy")
+                    .testId("nav-admin-person-search"),
+                of("admin.members.list", "/members", "nav.admin.tab.members").with(PALETTE_ONLY),
                 of(
                         "admin.discordregistrations",
                         "/admin/discord-registrations",
                         "nav.admin.discordRegistrations")
-                    .testId("nav-admin-discord-registrations"),
+                    .with(PALETTE_ONLY),
+                of("admin.terms", "/admin/terms", "nav.admin.terms").with(PALETTE_ONLY),
+                of(
+                        "admin.orgstructure.structure",
+                        "/admin/org-structure",
+                        "nav.admin.tab.structure")
+                    .with(PALETTE_ONLY),
+                of(
+                        "admin.squadrons",
+                        "/admin/org-structure/squadrons",
+                        "admin.mission_data.squadrons")
+                    .with(PALETTE_ONLY),
+                of("admin.specialcommands", "/admin/special-commands", "nav.admin.specialcommands")
+                    .with(PALETTE_ONLY),
+                of("admin.personsearch", "/admin/person-search", "nav.admin.personSearch")
+                    .with(PALETTE_ONLY),
                 of(
                         "admin.deletionrequests",
                         "/admin/deletion-requests",
                         "nav.admin.deletionRequests")
-                    .testId("nav-admin-deletion-requests"),
-                of("admin.personsearch", "/admin/person-search", "nav.admin.personSearch")
-                    .testId("nav-admin-person-search"),
+                    .with(PALETTE_ONLY),
+                of("admin.announcement", "/admin/announcement", "info.title").with(PALETTE_ONLY))
+            .gate(adminOnly)
+            .startCollapsed(),
+        NavigationGroup.of(
+                "admin-masterdata",
+                "nav.admin.group.masterdata",
+                ICON_DATABASE,
+                of("admin.missiondata", "/admin/mission-data", "nav.mission_data"),
+                of("admin.locations", "/admin/locations", "nav.locations"),
+                of("admin.shipdata", "/ship-data", "nav.hangar_data"),
+                of("admin.materials", "/admin/materials", "nav.admin.materials"),
+                of("admin.blueprints", "/admin/blueprints", "nav.admin.blueprints"),
+                of("admin.dataimports", "/admin/p4k-import", "nav.admin.dataImports"),
+                of("admin.uex", "/admin/uex-data", "nav.admin.uex").with(PALETTE_ONLY),
+                of("admin.materialaliases", "/admin/material-aliases", "nav.admin.materialAliases")
+                    .with(PALETTE_ONLY),
+                of("admin.qualitytiers", "/admin/quality-tiers", "nav.admin.qualityTiers")
+                    .testId("nav-admin-quality-tiers")
+                    .with(PALETTE_ONLY),
                 of(
-                    "admin.personalinventory",
-                    "/admin/personal-inventory",
-                    "admin.personalInventory.menu"),
-                of(
-                    "admin.personalblueprints",
-                    "/admin/personal-blueprints",
-                    "admin.personalInventory.blueprints.menu"),
+                        "admin.defaultblueprints",
+                        "/admin/default-blueprints",
+                        "nav.admin.defaultBlueprints")
+                    .with(PALETTE_ONLY),
+                of("admin.p4kimport", "/admin/p4k-import", "nav.admin.p4kImport")
+                    .with(PALETTE_ONLY),
+                of("admin.syncreports", "/admin/sync-reports", "nav.admin.syncReports")
+                    .with(PALETTE_ONLY),
                 of("admin.syncreports.uex", "/admin/sync-reports/uex", "palette.page.syncUex")
                     .keywords("palette.keywords.syncReports")
                     .with(PALETTE_ONLY),
@@ -448,7 +458,50 @@ public class NavigationRegistry {
                         "palette.page.syncScWiki")
                     .keywords("palette.keywords.syncReports")
                     .with(PALETTE_ONLY))
-            .gate(adminOnly));
+            .gate(adminOnly)
+            .startCollapsed(),
+        NavigationGroup.of(
+                "admin-operations",
+                "nav.admin.group.system",
+                ICON_GEAR,
+                of("admin.auditlog", "/admin/audit-log", "nav.admin.auditLog")
+                    .keywords("palette.keywords.auditLog")
+                    .testId("nav-admin-audit-log"),
+                of("admin.settings", "/admin/settings", "nav.admin.settings")
+                    .keywords("palette.keywords.settings"),
+                of("admin.exchangeclients", "/admin/exchange-clients", "nav.admin.exchangeClients")
+                    .testId("nav-admin-exchange-clients"),
+                of(
+                    "admin.notificationrules",
+                    "/admin/notification-rules",
+                    "nav.admin.notificationRules"),
+                of("admin.settings.general", "/admin/settings", "nav.admin.tab.general")
+                    .with(PALETTE_ONLY),
+                of("admin.supply", "/admin/supply", "nav.admin.supply")
+                    .testId("nav-admin-supply")
+                    .with(PALETTE_ONLY),
+                of("admin.purchasing", "/admin/purchasing", "nav.admin.purchasing")
+                    .testId("nav-admin-purchasing")
+                    .with(PALETTE_ONLY),
+                of("admin.dangerzone", "/admin/settings/danger-zone", "nav.admin.tab.dangerZone")
+                    .with(PALETTE_ONLY))
+            .gate(adminOnly)
+            .startCollapsed());
+  }
+
+  @NotNull
+  private static List<NavigationPageTabs> buildPageTabs() {
+    return List.of(
+        NavigationPageTabs.of("admin.members.list", "admin.discordregistrations", "admin.terms"),
+        NavigationPageTabs.of(
+            "admin.orgstructure.structure", "admin.squadrons", "admin.specialcommands"),
+        NavigationPageTabs.of("admin.personsearch", "admin.deletionrequests"),
+        NavigationPageTabs.of("admin.locations", "admin.uex"),
+        NavigationPageTabs.of("admin.materials", "admin.materialaliases", "admin.qualitytiers"),
+        NavigationPageTabs.of("admin.blueprints", "admin.defaultblueprints"),
+        NavigationPageTabs.of("admin.p4kimport", "admin.syncreports"),
+        NavigationPageTabs.of(
+            "admin.settings.general", "admin.supply", "admin.purchasing", "admin.dangerzone"));
   }
 
   @NotNull

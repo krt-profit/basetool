@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="#{admin.mission_data.squadrons} + ' - ' + ${appTitle}">Staffeln - Profit Basetool</title>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.squadrons', eyebrowKey='nav.admin.group.members', titleText=#{admin.mission_data.squadrons},
+        count=${squadrons != null ? #lists.size(squadrons) : 0}, countId='squadrons-count', countFor='squadrons-results', actions=~{::squadron-actions})}">
+        <th:block th:ref="squadron-actions">
+            <button type="button" id="add-squadron-btn" class="btn btn--cta" data-testid="page-head-primary"
+                    th:data-action="@{/admin/org-structure/squadrons}" th:text="#{admin.squadron.create}">Neue Staffel</button>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
+
+    <section class="list-panel">
+        <form th:action="@{/admin/org-structure/squadrons}" method="get" id="squadron-filter-form" class="no-track">
+            <div class="toolbar">
+                <label class="krt-switch" for="includeInactiveSquadrons">
+                    <input type="checkbox" role="switch" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
+                    <span th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</span>
+                </label>
+            </div>
+        </form>
+
+        <div class="card card--flush" id="squadrons-results">
+            <th:block th:fragment="squadrons-results">
+            <span hidden th:data-list-total="${squadrons != null ? #lists.size(squadrons) : 0}"></span>
+            <th:block th:if="${squadronsTruncated}">
+                <div th:replace="~{kernel/fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
+            </th:block>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(squadrons)}">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.squadron.name}">Name</th>
+                            <th th:text="#{admin.squadron.shorthand}">K&uuml;rzel</th>
+                            <th th:text="#{admin.squadron.description}">Beschreibung</th>
+                            <th th:text="#{admin.settings.squadron.column.promotion}">Bef&ouml;rderung aktiv</th>
+                            <th th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="sq : ${squadrons}" th:attr="data-squadron-id=${sq.id}" th:classappend="${!sq.active} ? 'md-row--inactive' : ''">
+                            <td>
+                                <span class="cell-title"><span th:text="${sq.name}">Name</span><span th:if="${!sq.active}" class="badge-inactive" th:text="#{admin.squadron.inactive}">Inaktiv</span></span>
+                            </td>
+                            <td th:attr="data-label=#{admin.squadron.shorthand}" th:text="${sq.shorthand}">K&uuml;rzel</td>
+                            <td class="md-desc" th:text="${sq.description}">Desc</td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.promotion}">
+                                <label class="krt-switch">
+                                    <input type="checkbox" role="switch" class="squadron-promotion-toggle"
+                                           th:attr="data-squadron-id=${sq.id}"
+                                           th:aria-label="|#{admin.settings.squadron.column.promotion}: ${sq.shorthand}|"
+                                           th:checked="${sq.isPromotionEnabled}" th:disabled="${!sq.active}">
+                                    <span class="toggle-state-text" th:text="${sq.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
+                                </label>
+                            </td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.profit}">
+                                <label class="krt-switch">
+                                    <input type="checkbox" role="switch" class="squadron-profit-toggle"
+                                           th:attr="data-squadron-id=${sq.id}"
+                                           th:aria-label="|#{admin.settings.squadron.column.profit}: ${sq.shorthand}|"
+                                           th:checked="${sq.isProfitEligible}" th:disabled="${!sq.active}">
+                                    <span class="toggle-state-text" th:text="${sq.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
+                                </label>
+                            </td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-icon edit-squadron-btn"
+                                        th:data-action="@{/admin/org-structure/squadrons/{id}/update(id=${sq.id})}"
+                                        th:data-id="${sq.id}"
+                                        th:data-name="${sq.name}"
+                                        th:data-shorthand="${sq.shorthand}"
+                                        th:data-desc="${sq.description}"
+                                        th:data-version="${sq.version}"
+                                        th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                <button th:if="${sq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
+                                        th:data-action="@{/admin/org-structure/squadrons/{id}/delete(id=${sq.id})}"
+                                        th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                <form th:if="${!sq.active}" th:action="@{/admin/org-structure/squadrons/{id}/activate(id=${sq.id})}" method="post" class="md-inline-form">
+                                    <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.squadron.activate}">Aktivieren</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <th:block th:if="${#lists.isEmpty(squadrons)}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.mission_data.empty.title', textKey='admin.mission_data.empty.squadrons')}"></th:block>
+            </th:block>
+            </th:block>
+        </div>
+    </section>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='squadron-modal', titleKey='admin.squadron.create', variant='krt-modal--wide', titleId='squadron-modal-title', open=${openModal == 'squadron-modal'}, closeTrigger='', closeClass='close-squadron-modal', body=~{::squadron-modal-body})}">
+        <th:block th:ref="squadron-modal-body">
+            <form id="squadron-form" method="post" th:action="${modalAction != null && openModal == 'squadron-modal'} ? ${modalAction} : @{/admin/org-structure/squadrons}" th:object="${squadronForm}">
+                <div class="krt-modal-body">
+                    <input type="hidden" name="version" id="edit-squadron-version" th:value="*{version}">
+                    <div class="form-group">
+                        <label th:text="#{admin.squadron.name}">Name</label>
+                        <input type="text" name="name" id="sq-name" th:value="*{name}" required>
+                        <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label th:text="#{admin.squadron.shorthand}">K&uuml;rzel</label>
+                        <input type="text" name="shorthand" id="sq-shorthand" th:value="*{shorthand}" required>
+                        <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" class="field-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label th:text="#{admin.squadron.description}">Beschreibung</label>
+                        <textarea name="description" id="sq-desc" rows="3" th:text="*{description}"></textarea>
+                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost close-squadron-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
+        <th:block th:ref="delete-confirm-modal-body">
+            <div class="krt-modal-body">
+                <p th:text="#{info.delete.confirm.message}" class="m-0">Wirklich l&ouml;schen?</p>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <form id="delete-confirm-form" th:action="@{/admin/org-structure/squadrons}" method="post" class="m-0">
+                    <button type="submit" class="btn btn-danger" th:text="#{info.delete}">L&ouml;schen</button>
+                </form>
+            </div>
+        </th:block>
+    </th:block>
+</main>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    var SQUADRON_MSG = {
+        saved:   /*[[#{notification.success.save}]]*/ '',
+        deleted: /*[[#{notification.success.delete}]]*/ '',
+        error:   /*[[#{notification.error.save}]]*/ '',
+        createTitle: /*[[#{admin.squadron.create}]]*/ '',
+        editTitle:   /*[[#{admin.edit}]]*/ '',
+        promotionOn:  /*[[#{admin.settings.squadron.promotion.enabled}]]*/ '',
+        promotionOff: /*[[#{admin.settings.squadron.promotion.disabled}]]*/ '',
+        promotionSaved: /*[[#{admin.settings.squadron.promotion.saved}]]*/ '',
+        promotionError: /*[[#{admin.settings.squadron.promotion.error}]]*/ '',
+        profitOn:  /*[[#{admin.settings.squadron.profit.enabled}]]*/ '',
+        profitOff: /*[[#{admin.settings.squadron.profit.disabled}]]*/ '',
+        profitSaved: /*[[#{admin.settings.squadron.profit.saved}]]*/ '',
+        profitError: /*[[#{admin.settings.squadron.profit.error}]]*/ ''
+    };
+    var SQUADRON_CONFLICT = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ '',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ '',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ '',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ '',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ ''
+    };
+</script>
+<script type="module" th:src="@{/js/catalogue/admin-squadrons.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

@@ -167,6 +167,7 @@ public class AdminAuditLogPageController {
                   "MIN_STOCK_LEVEL_SET",
                   "MIN_STOCK_LEVEL_CHANGED",
                   "MIN_STOCK_LEVEL_REMOVED",
+                  "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE",
                   "INVENTORY_OWNER_REASSIGNED",
                   "INVENTORY_PURGED_ON_USER_DELETION",
                   "INVENTORY_AUDIT_EXPORTED",

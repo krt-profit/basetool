@@ -22,6 +22,7 @@
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { wireInstantToggle } from '/js/kernel/krt-instant-toggle.js';
 
 const modal = /** @type {HTMLElement} */ (document.getElementById('specialcommand-modal'));
 const form = /** @type {HTMLFormElement} */ (document.getElementById('sc-form'));
@@ -197,4 +198,18 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
 
     scWrite(actForm, SC_MSG.saved, null);
+});
+
+wireInstantToggle({
+    selector: '.sk-profit-toggle',
+    idAttribute: 'data-sk-id',
+    urlFor: (id) => `/api/proxy/special-commands/${encodeURIComponent(id)}/profit-eligible`,
+    bodyFor: (checked) => ({ eligible: checked }),
+    labels: {
+        on: SC_MSG.profitOn,
+        off: SC_MSG.profitOff,
+        saved: SC_MSG.profitSaved,
+        error: SC_MSG.profitError,
+    },
+    conflict: SC_CONFLICT,
 });

@@ -42,7 +42,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
@@ -91,13 +90,12 @@ class AdminPersonalInventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_shouldRenderAdminView_whenUserIsAdmin() throws Exception {
-    PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
-        .perform(get("/admin/personal-inventory"))
+        .perform(get("/admin/personal-inventory").param("userSub", UUID.randomUUID().toString()))
         .andExpect(status().isOk())
         .andExpect(view().name("personalinventory/admin/personal-inventory"));
   }
@@ -167,10 +165,15 @@ class AdminPersonalInventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_rendersThePageHead() throws Exception {
+    PageResponse<PersonalInventoryItemDto> empty =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
+
     mockMvc
-        .perform(get("/admin/personal-inventory"))
+        .perform(get("/admin/personal-inventory").param("userSub", UUID.randomUUID().toString()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-testid=\"page-head\"")))
+        .andExpect(content().string(containsString("data-testid=\"member-tabs\"")))
         .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
         .andExpect(content().string(not(containsString("class=\"greeting"))))
         .andExpect(content().string(not(containsString("hud-box"))))

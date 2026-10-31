@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.defaultblueprints', eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
         count=${defaults != null ? #lists.size(defaults) : null}, countId='krt-dbp-count', countFor='krt-dbp-list-host')}"></th:block>
 
     <section class="card krt-personal-inventory dbp-section form-width" aria-labelledby="krt-dbp-add-heading">

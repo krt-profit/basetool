@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{supply.admin.title}, count=null, actions=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.supply', eyebrowKey='nav.admin.group.system', titleText=#{supply.admin.title}, count=null, actions=null)}"></th:block>
 
     <form id="supply-settings-form" class="form-layout card no-track" novalidate>
         <fieldset class="form-section">

@@ -1640,8 +1640,9 @@ SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageC
 
 ### REQ-UI-026 — Navigation: a structured drawer, a quick access and a phone tab bar
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current text below stays
-> authoritative; the planned amendment at the end of this requirement replaces the parts it names.
+> **Status: partly shipped** (ADR-0297, map #2800). Admin mode of the planned amendment is
+> implemented; until the member default ships, the current text below stays authoritative for the
+> rest, and the planned amendment replaces the parts it names.
 
 The navigation has grown to about 65 links for a member with many roles, several viewport heights
 of one flat drawer. It is one model on every device
@@ -1797,6 +1798,11 @@ its former sibling pages become tabs of it.
 
 **Admin mode: the admin dashboard plus 13 links in 3 groups, collapsed by default.** The admin
 dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four current admin groups.
+*Shipped:* `/admin` is the hub until the dashboard widgets exist, the groups start collapsed (the
+member's own choice and the group holding the current page win), and every merged page shows a tab
+bar of its sibling pages (`NavigationPageTabs` in the registry). The old four admin groups are gone;
+the former admin pages that became tabs keep their URLs, and the URLs that merged redirect
+(`NavigationLegacyRedirectMvcTest`).
 
 | Group | Icon | Links (tabs) |
 |---|---|---|
@@ -1806,15 +1812,22 @@ dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four cur
 
 Page merges this needs:
 
-- All four org-unit kinds are managed on Organisationsstruktur. Staffel CRUD leaves Missionsdaten;
-  the per-unit switches „Beförderung aktiv" and „Auftragsbearbeitung" leave Systemeinstellungen
-  for the unit's row.
-- The person detail (`/members/{id}`) gets the tabs Stammdaten · Hangar · Inventar · Blueprints ·
-  Export; the admin personal-inventory and personal-blueprints pages and their member picker go.
-- „Gefahrenzone" holds the destructive one-off actions: the bank wipe-reset and deleting every
-  user's blueprints.
+- All four org-unit kinds are managed on Organisationsstruktur: the tabs Struktur · Staffeln ·
+  Spezialkommandos. Staffel CRUD left Missionsdaten (`/admin/mission-data?kind=squadrons` redirects
+  to `/admin/org-structure/squadrons`), and the per-unit switches „Beförderung aktiv" and
+  „Auftragsbearbeitung" left Systemeinstellungen for the unit's row — on the Staffeln tab for
+  squadrons and on the Spezialkommandos tab for the „Auftragsbearbeitung" of a special command. The
+  switches save in place and need no audit event of their own beyond the existing ones.
+- The person detail (`/members/{id}/edit`) has the tabs Stammdaten · Hangar · Inventar ·
+  Blueprints · Export. Inventar and Blueprints are the former admin personal-inventory and
+  personal-blueprints pages, now keyed by the member (`/admin/personal-inventory?userSub=…`,
+  `/admin/personal-blueprints?userSub=…`); the member picker is gone and the pages without a member
+  lead to the member list.
+- „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the bank
+  wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
 - „Informationen" (the home-page announcement) is edited inline in its dashboard widget; it has no
-  admin link.
+  admin link. Until the widget exists (REQ-UI-034), `/admin/announcement` stays reachable from the
+  admin hub and the quick access.
 
 **One default for every role; visibility follows the active context.**
 
@@ -1872,6 +1885,11 @@ navigation. One bar per mode.
 |---|---|
 | Member | Missionen · Lager · Aufträge |
 | Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
+
+**Enforced by (admin mode shipped):** `AdminNavigationRenderMvcTest` (hub, three collapsed groups,
+13 links, tab bar) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
+tab, in-place requests are not redirected) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
+bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, the tab bar).
 
 **Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
