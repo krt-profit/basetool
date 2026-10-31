@@ -1724,8 +1724,8 @@ the web maps a refusal to its existing problem, a command to its refusal value.
 
 ### REQ-INV-067 — Minimum stock levels: what a level counts and when it is low
 
-> **Status: planned** (ADR-0302, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+> Material levels, the counting and the allocation are built. Still planned (ADR-0302): levels for
+> a game item and the requested amount („angefordert") (#2852).
 
 A **minimum stock level** („Mindestbestand") states how much of one thing one org unit's pool should
 hold.
@@ -1754,30 +1754,36 @@ hold.
 
 **Acceptance**
 
-- [ ] Personal, stolen and earmarked stock never counts; free stock at several locations sums.
-- [ ] Two tiered levels of one material: the higher floor fills to its target first, the rest flows
-  down, and the untiered level takes the remainder.
-- [ ] A level is low exactly while allocated < minimum; shortfall and fill ratio follow the rules
-  above.
+- [x] Personal, stolen and earmarked stock never counts; free stock at several locations sums.
+  *`StockLevelAllocationTest`, `StockLevelIntegrationTest`.*
+- [x] Two tiered levels of one material: the higher floor fills to its target first, the rest flows
+  down, and the untiered level takes the remainder. *`StockLevelAllocationTest`.*
+- [x] A level is low exactly while allocated < minimum; shortfall and fill ratio follow the rules
+  above. *`StockLevelAllocationTest`.*
 - [ ] Open needs and open or in-progress requesting orders at the tier or above appear as
   requested and leave the low state unchanged.
 
-**Enforced by (to be added):** `StockLevelAllocationTest` (pure allocation over plain rows),
-`StockLevelQueryIntegrationTest` · **Code:** to be added in the inventory module · **Related:**
+**Enforced by:** `StockLevelAllocationTest` (pure allocation over plain rows),
+`StockLevelIntegrationTest` · **Code:** `inventory/internal/StockLevelAllocation`,
+`StockLevelFigures`, `StockLevelRepository#sumPoolStock` · **Related:**
 REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-0302
 
 ### REQ-INV-068 — Minimum stock levels: maintenance, API, the „Mindestbestände" tab and the widget
 
-> **Status: planned** (ADR-0302, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+> Maintenance of material levels, the API without `lowOnly` / `limit`, the tab, the audit events
+> on a write and the live update are built. Still planned (ADR-0302): the low-only read and its
+> order, the „niedrig" badge and the shortcuts (#2853), the lifecycle cascade (#2852), the widget
+> and the notice (#2854).
 
 - **Who maintains.** A Logistician of the unit, the lead included (`hasRoleInOrgUnit(unit,
   LOGISTICIAN)`, an admin passes); any other write answers `403`. **Who sees:** everyone who can see
-  the unit's pool, through the Lager's `ScopePredicate`.
+  the unit's pool, through the Lager's `ScopePredicate`. Levels of an inactive unit are not shown.
 - **API.** `GET /api/v1/inventory/stock-levels?orgUnitId=&lowOnly=&limit=` returns the levels in the
   caller's scope with the figures of REQ-INV-067, sorted by fill ratio, empty levels first; without
-  `orgUnitId` it spans every unit in scope and names each level's unit. `POST` creates a level;
-  `PUT /{id}` changes minimum, target and tier; `DELETE /{id}` removes it. The unit and the
+  `orgUnitId` it spans every unit in scope and names each level's unit. Until the low-only read
+  ships, it lists by unit, material and tier floor descending. `GET /stock-levels/units` lists the
+  active units in scope whose levels the caller maintains. `POST` creates a level;
+  `PUT /{id}` changes minimum, target and tier; `DELETE /{id}?version=` removes it. The unit and the
   catalogue entry of a level are fixed. A second level for the same unit and material-and-tier
   answers `409`.
 - **Locking.** Each level row carries its own `@Version`; `PUT` and `DELETE` echo it and a stale
@@ -1814,22 +1820,27 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 
 **Acceptance**
 
-- [ ] A Logistician (the lead included) creates, changes and deletes a level; a plain member and a
-  Logistician of another unit get `403`; a pool viewer reads it.
-- [ ] A duplicate level and a stale version answer `409`; a stock write does not 409 a level edit.
+- [x] A Logistician (the lead included) creates, changes and deletes a level; a plain member and a
+  Logistician of another unit get `403`; a pool viewer reads it. *`StockLevelIntegrationTest`.*
+- [x] A duplicate level and a stale version answer `409`; a stock write does not 409 a level edit.
+  *`StockLevelIntegrationTest`.*
 - [ ] Each write records its audit event, an unchanged `PUT` records none, and a catalogue deletion
-  records one cascade event per level.
-- [ ] The tab edits inline and a peer's level write appears without a reload.
+  records one cascade event per level. *The write events: `StockLevelIntegrationTest`; the cascade
+  is planned.*
+- [x] The tab edits without a reload and a peer's level write appears without a reload.
+  *`StockLevelTabRenderTest`, `LiveSyncSectionMapParityTest`.*
 - [ ] „Bedarf anlegen" is hidden while supply is off or the unit may not raise needs; both shortcuts
   prefill the shortfall.
 - [ ] The widget follows the active context, shows the union with unit labels when nothing is
   pinned, and honours a pinned unit and the row count.
 
-**Enforced by (to be added):** `StockLevelServiceTest`, `StockLevelControllerTest`,
-`StockLevelIntegrationTest`, `AuthorizationMatrixTest`, `RouteGateSnapshotTest`,
-`MassAssignmentGuardTest`, `LiveSyncTopicRegistryParityTest`, `AdminAuditLogPageControllerTest`,
-`StockLevelTabRenderTest` · **Code:** to be added in the inventory module and the frontend storage
-page · **Related:** REQ-INV-067, REQ-NOTIF-030, REQ-SUP-003, REQ-UI-026, REQ-UI-034, REQ-AUDIT-001,
+**Enforced by:** `StockLevelIntegrationTest`, `AuthorizationMatrixTest`, `RouteGateSnapshotTest`,
+`MassAssignmentGuardTest`, `TenancyGuardTest`, `LiveSyncTopicRegistryParityTest`,
+`LiveSyncSectionMapParityTest`, `AdminAuditLogPageControllerTest`, `StockLevelTabRenderTest`,
+`StockLevelBackendClientTest` · **Code:** `inventory/internal/StockLevelService`,
+`StockLevelAccessPolicy`, `inventory/web/StockLevelController`; frontend
+`inventory/web/StockLevelPageController`, `StockLevelProxyController`,
+`templates/inventory/stock-levels.html`, `static/js/inventory/stock-levels.js` · **Related:** REQ-INV-067, REQ-NOTIF-030, REQ-SUP-003, REQ-UI-026, REQ-UI-034, REQ-AUDIT-001,
 REQ-OBS-011 · **Decision:** ADR-0302
 
 ## Out of scope

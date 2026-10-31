@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCre
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPoolChangeDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelCreateRequest;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
@@ -214,6 +215,12 @@ class MassAssignmentGuardTest {
           Map.entry(
               ReassignResponsibleOrgUnitRequest.class,
               Map.of("responsibleOrgUnitId", JOB_ORDER_UNITS)),
+          Map.entry(
+              StockLevelCreateRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the unit whose pool the level watches, authorised by the controller gate"
+                      + " StockLevelAccessPolicy.canMaintainStockLevelsOf")),
           Map.entry(
               CreateNeedRequest.class,
               Map.of(
