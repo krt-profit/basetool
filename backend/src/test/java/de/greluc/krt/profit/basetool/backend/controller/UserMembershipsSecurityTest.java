@@ -84,7 +84,12 @@ class UserMembershipsSecurityTest {
     mockMvc
         .perform(
             get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
         .andExpect(status().isOk());
   }
 

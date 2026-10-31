@@ -70,7 +70,12 @@ public class UserAccessControlTest {
         .perform(
             get("/api/v1/users/search")
                 .param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
         .andExpect(status().isOk());
   }
 

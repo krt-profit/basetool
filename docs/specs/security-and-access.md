@@ -3694,8 +3694,8 @@ REQ-UI-034, REQ-DATA-021, ADR-0298, ADR-0299
 
 ### REQ-SEC-047 — A client is told its authorisation, never left to derive it
 
-> **Status: planned** (ADR-0300, ADR-0301, map #2800). Until it ships, the current text below /
-> the current code stays authoritative.
+> **Status: partly planned** (ADR-0301, map #2800). The officer flags (ADR-0300) are live; the
+> `canViewAssignedJobOrders` flag of the amendment below follows ADR-0301.
 
 The API answers "may this caller do this" itself. Two shapes carry it:
 
@@ -3758,7 +3758,7 @@ layer directly.
 `InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047
 
-#### Planned amendment (ADR-0300)
+#### Officer reach in the capabilities (ADR-0300)
 
 - **The capabilities are pin-aware.** `GET /api/v1/me/capabilities` and the `capabilities` object of
   `GET /api/v1/me/layout` carry the caller's officer flags (officer reach and the officer-gated
@@ -3778,7 +3778,7 @@ layer directly.
   holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
   officer role.
 
-**Live ahead of the cut:** the officer flags `hasOfficerReach`, `canOpenLeitung`,
+**The officer flags:** `hasOfficerReach`, `canOpenLeitung`,
 `canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`;
 the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
@@ -3793,9 +3793,8 @@ pages and proxies and the Spezialkommando members page gate on `canManagePromoti
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
 carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
 without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest`, `NavigationMenuTest`,
-`SidebarRoleBadgeMvcTest` ·
-**Enforced by (to be added):** a frontend ArchUnit or source scan that no template or controller
-names `ROLE_OFFICER` or `ADMIN_OR_OFFICER` · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
+`SidebarRoleBadgeMvcTest`, `OfficerRoleRetiredSourceScanTest` (no main source or template names
+`ROLE_OFFICER` or `ADMIN_OR_OFFICER`) · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
 ADR-0300
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin

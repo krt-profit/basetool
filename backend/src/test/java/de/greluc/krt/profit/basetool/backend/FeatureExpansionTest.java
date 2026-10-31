@@ -174,7 +174,10 @@ class FeatureExpansionTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(toCreate)))
         .andExpect(status().isForbidden());
@@ -189,7 +192,10 @@ class FeatureExpansionTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePayload)))
         .andExpect(status().isForbidden());
@@ -202,7 +208,10 @@ class FeatureExpansionTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
         .andExpect(status().isForbidden());
     assertTrue(locationRepository.findById(seededId).isPresent());
   }
@@ -250,7 +259,10 @@ class FeatureExpansionTest {
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"), new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
+                            .authorities(
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                                new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                                new SimpleGrantedAuthority("ROLE_LOGISTICIAN")))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(subJson))
             .andExpect(status().isOk())

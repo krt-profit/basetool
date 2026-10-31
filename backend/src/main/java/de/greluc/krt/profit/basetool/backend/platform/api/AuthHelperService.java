@@ -124,8 +124,8 @@ public class AuthHelperService {
 
   /**
    * Shortcut for {@link #hasReachableRole(String) hasReachableRole("ROLE_LOGISTICIAN")}. Because
-   * the role hierarchy declares {@code ROLE_ADMIN > ROLE_LOGISTICIAN}, this
-   * returns {@code true} for an admin and for a derived or granted logistician.
+   * the role hierarchy declares {@code ROLE_ADMIN > ROLE_LOGISTICIAN}, this returns {@code true}
+   * for an admin and for a derived or granted logistician.
    */
   public boolean isLogisticianOrAbove() {
     return hasReachableRole(Roles.authority(Roles.LOGISTICIAN));

@@ -38,8 +38,6 @@ public final class Roles {
   public static final String ROLE_PREFIX = "ROLE_";
 
   public static final String ADMIN = "ADMIN";
-  public static final String OFFICER = "OFFICER"; // SHIM-2847
-  public static final String ADMIN_OR_OFFICER = "hasAnyRole('ADMIN','OFFICER')"; // SHIM-2847
   public static final String KRT_MEMBER = "KRT_MEMBER";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";

@@ -1,11 +1,12 @@
 /*
- * Profit Basetool - Management software for the Star Citizen organisation DAS KARTELL / IRIDIUM
- * Copyright (C) 2025-2026 Lucas Greuloch (greluc)
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * the Free Software Foundation, version 3.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -62,7 +63,8 @@ class OfficerCutMigrationTest {
   private static final UUID RULE = UUID.fromString("55555555-5555-5555-5555-5555555928c1");
   private static final UUID OFFICER_SELECTOR =
       UUID.fromString("55555555-5555-5555-5555-5555555928c2");
-  private static final UUID ADMIN_SELECTOR = UUID.fromString("55555555-5555-5555-5555-5555555928c3");
+  private static final UUID ADMIN_SELECTOR =
+      UUID.fromString("55555555-5555-5555-5555-5555555928c3");
   private static final UUID RELATIVE_SELECTOR =
       UUID.fromString("55555555-5555-5555-5555-5555555928c4");
 
@@ -134,7 +136,10 @@ class OfficerCutMigrationTest {
   private void migrate(String name) throws IOException {
     try (var files = Files.list(MIGRATIONS)) {
       Path script =
-          files.filter(file -> file.getFileName().toString().startsWith(name + "__")).findFirst().orElseThrow();
+          files
+              .filter(file -> file.getFileName().toString().startsWith(name + "__"))
+              .findFirst()
+              .orElseThrow();
       jdbcTemplate.execute(Files.readString(script, StandardCharsets.UTF_8));
     }
   }
@@ -146,7 +151,8 @@ class OfficerCutMigrationTest {
   @Test
   void theOfficerRoleLeavesWithItsAssignmentsAndPermissions() throws IOException {
     long officerRoleId =
-        jdbcTemplate.queryForObject("SELECT id FROM role WHERE upper(code) = 'OFFICER'", Long.class);
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM role WHERE upper(code) = 'OFFICER'", Long.class);
 
     migrate("V315");
 
@@ -163,14 +169,15 @@ class OfficerCutMigrationTest {
 
     assertThat(count("SELECT count(*) FROM bank_account_view_grant WHERE id = ?", OFFICER_GRANT))
         .isZero();
-    assertThat(count("SELECT count(*) FROM bank_account_view_grant WHERE id = ?", LOGISTICIAN_GRANT))
+    assertThat(
+            count("SELECT count(*) FROM bank_account_view_grant WHERE id = ?", LOGISTICIAN_GRANT))
         .isEqualTo(1);
-    assertThat(count("SELECT count(*) FROM bank_account_approval_limit WHERE id = ?", OFFICER_LIMIT))
+    assertThat(
+            count("SELECT count(*) FROM bank_account_approval_limit WHERE id = ?", OFFICER_LIMIT))
         .isZero();
     assertThat(
             count(
-                "SELECT count(*) FROM bank_account_approval_limit WHERE id = ?",
-                LOGISTICIAN_LIMIT))
+                "SELECT count(*) FROM bank_account_approval_limit WHERE id = ?", LOGISTICIAN_LIMIT))
         .isEqualTo(1);
     List<Map<String, Object>> audit =
         jdbcTemplate.queryForList(
@@ -194,7 +201,8 @@ class OfficerCutMigrationTest {
 
     Map<String, Object> moved =
         jdbcTemplate.queryForMap(
-            "SELECT kind, role_code FROM notification_rule_selector WHERE id = ?", OFFICER_SELECTOR);
+            "SELECT kind, role_code FROM notification_rule_selector WHERE id = ?",
+            OFFICER_SELECTOR);
     assertThat(moved.get("kind")).isEqualTo("SEAT_HOLDERS");
     assertThat(moved.get("role_code")).isNull();
     assertThat(

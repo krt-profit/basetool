@@ -217,8 +217,8 @@ public class SecurityConfig {
   /**
    * Declares the role hierarchy that {@code @PreAuthorize("hasRole('LOGISTICIAN')")} and friends
    * use. Mirrors the matrix in {@code ROLES_AND_PERMISSIONS.md}: an admin implies logistician and
-   * mission-manager, so an admin satisfies a {@code @PreAuthorize} for {@code
-   * LOGISTICIAN} without being explicitly granted that role.
+   * mission-manager, so an admin satisfies a {@code @PreAuthorize} for {@code LOGISTICIAN} without
+   * being explicitly granted that role.
    *
    * @return the {@link RoleHierarchy} bean consumed by Spring Security's expression handlers
    */
@@ -384,10 +384,7 @@ public class SecurityConfig {
                 .hasAnyRole(Roles.ADMIN, Roles.KRT_MEMBER)
                 .requestMatchers("/api/v1/users/lookup")
                 .hasAnyRole(
-                    Roles.ADMIN,
-                    Roles.KRT_MEMBER,
-                    Roles.BANK_MANAGEMENT,
-                    Roles.BANK_EMPLOYEE)
+                    Roles.ADMIN, Roles.KRT_MEMBER, Roles.BANK_MANAGEMENT, Roles.BANK_EMPLOYEE)
                 .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users")

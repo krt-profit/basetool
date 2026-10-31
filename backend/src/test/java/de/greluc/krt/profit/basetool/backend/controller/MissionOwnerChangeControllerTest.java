@@ -81,7 +81,8 @@ class MissionOwnerChangeControllerTest {
 
   private static SimpleGrantedAuthority[] officer() {
     return new SimpleGrantedAuthority[] {
-      new SimpleGrantedAuthority("ROLE_LOGISTICIAN"), new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")
+      new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+      new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")
     };
   }
 

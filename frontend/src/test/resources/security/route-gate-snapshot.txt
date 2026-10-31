@@ -501,8 +501,8 @@
 /org-chart/positions/{id}/ajax DELETE -> OrgChartPageController#deletePosition gate=method:hasRole('ADMIN') layout=yes
 /org-chart/positions/{id}/ajax PUT -> OrgChartPageController#updatePosition gate=method:hasRole('ADMIN') layout=yes
 /org-chart/positions/{id}/leader/ajax DELETE -> OrgChartPageController#vacateLeader gate=method:hasRole('ADMIN') layout=yes
-/org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
-/org-unit-bank/accounts/{id} GET -> OrgUnitBankPageController#orgUnitBankAccount gate=method:hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
+/org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
+/org-unit-bank/accounts/{id} GET -> OrgUnitBankPageController#orgUnitBankAccount gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
 /organisation/leitung GET -> LeitungPageController#leitung gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
 /organisation/leitung/bereiche/{bereichId}/members/ajax POST -> LeitungPageController#addBereichLeader gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
 /organisation/leitung/bereiche/{bereichId}/members/{userId}/ajax DELETE -> LeitungPageController#removeBereichLeader gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes

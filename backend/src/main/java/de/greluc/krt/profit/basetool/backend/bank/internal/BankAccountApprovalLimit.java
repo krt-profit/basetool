@@ -79,8 +79,8 @@ public class BankAccountApprovalLimit extends AbstractEntity<UUID> {
 
   /**
    * The role this limit addresses: a {@link MembershipRole} name when {@link #granteeKind} is
-   * {@code MEMBERSHIP_ROLE}, a global role code (e.g. {@code LOGISTICIAN}) when {@code GLOBAL_ROLE}.
-   * {@code null} for {@code USER} / {@code ALL_MEMBERS}.
+   * {@code MEMBERSHIP_ROLE}, a global role code (e.g. {@code LOGISTICIAN}) when {@code
+   * GLOBAL_ROLE}. {@code null} for {@code USER} / {@code ALL_MEMBERS}.
    */
   @Nullable
   @Column(name = "role_code", length = 64)

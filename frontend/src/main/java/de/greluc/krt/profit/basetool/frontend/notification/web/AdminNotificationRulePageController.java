@@ -274,8 +274,7 @@ public class AdminNotificationRulePageController {
    * save rather than stored as a rule that addresses nobody.
    */
   static final List<String> ROLE_CODES =
-      List.of(
-          Roles.ADMIN, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
+      List.of(Roles.ADMIN, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
 
   private final NotificationBackendClient notificationClient;
 
