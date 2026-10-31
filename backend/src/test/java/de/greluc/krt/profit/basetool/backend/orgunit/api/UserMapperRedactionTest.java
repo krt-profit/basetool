@@ -104,4 +104,14 @@ class UserMapperRedactionTest {
 
     assertThat(mapper.toDto(other).roles()).containsExactly("ROLE_X");
   }
+
+  @Test
+  void withoutAProjectionTheMapperFailsClosedToThePeerShape() {
+    ReflectionTestUtils.setField(mapper, "callerUserProjection", null);
+
+    UserDto dto = mapper.toDto(other);
+
+    assertThat(dto.roles()).isNull();
+    assertThat(dto.permissions()).isNull();
+  }
 }

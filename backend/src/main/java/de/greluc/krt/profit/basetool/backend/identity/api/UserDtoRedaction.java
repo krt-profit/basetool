@@ -68,7 +68,31 @@ public final class UserDtoRedaction {
   }
 
   private static boolean hasDisplayName(UserDto dto) {
-    return dto.displayName() != null && !dto.displayName().isBlank();
+    return hasDisplayName(dto.displayName());
+  }
+
+  private static boolean hasDisplayName(@Nullable String displayName) {
+    return displayName != null && !displayName.isBlank();
+  }
+
+  /**
+   * Returns the peer view of a user reference: the {@code username} is dropped when a display name
+   * is set, since the display name is then the name shown.
+   *
+   * @param reference the reference, or {@code null}
+   * @return the peer-shaped reference, or {@code null} when {@code reference} was {@code null}
+   */
+  @Contract("null -> null; !null -> !null")
+  public static @Nullable UserReferenceDto toPeerReference(@Nullable UserReferenceDto reference) {
+    if (reference == null) {
+      return null;
+    }
+    return new UserReferenceDto(
+        reference.id(),
+        hasDisplayName(reference.displayName()) ? null : reference.username(),
+        reference.displayName(),
+        reference.effectiveName(),
+        reference.rank());
   }
 
   /**

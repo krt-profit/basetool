@@ -34,8 +34,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Redacts mission DTOs for every non-admin (REQ-SEC-007): owner and managers are hidden from
- * readers and every nested user is reduced to the public callsign tuple (REQ-SEC-040).
+ * Redacts mission DTOs for every non-admin (REQ-SEC-007): owner, managers and every nested user are
+ * reduced to the peer shape (REQ-SEC-040).
  *
  * <p>Each DTO is rebuilt field by field so that a new field fails compilation until someone decides
  * whether a peer may see it; every nested record that reaches a user needs its own {@code
@@ -45,19 +45,14 @@ import org.springframework.stereotype.Component;
 public class MissionPeerRedactor {
 
   /**
-   * Redacts a mission DTO for a peer: hides owner and managers from a reader, keeps the caller's
-   * own capability flags, and cleans each participant.
-   *
-   * <p>A caller who may manage the mission keeps the owner and manager list.
+   * Redacts a mission DTO for a peer: reduces owner, managers and each participant to the peer
+   * shape and keeps the caller's own capability flags.
    *
    * @param dto the full mission DTO
-   * @return a redacted copy safe for a member below Logistician
+   * @return a redacted copy safe for a non-admin
    */
   @NotNull
   public MissionDto cleanupMissionForPeer(@NotNull MissionDto dto) {
-    boolean managing =
-        Boolean.TRUE.equals(dto.canEdit()) || Boolean.TRUE.equals(dto.canManageManagers());
-
     Set<MissionParticipantDto> cleanedParticipants =
         dto.participants() == null
             ? null
@@ -86,8 +81,12 @@ public class MissionPeerRedactor {
         cleanedUnits,
         dto.frequencies(),
         dto.operation(),
-        managing ? dto.owner() : null,
-        managing ? dto.managers() : null,
+        UserDtoRedaction.toPeerReference(dto.owner()),
+        dto.managers() == null
+            ? null
+            : dto.managers().stream()
+                .map(UserDtoRedaction::toPeerReference)
+                .collect(Collectors.toSet()),
         dto.canEdit(),
         dto.canManageManagers(),
         dto.version(),

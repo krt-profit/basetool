@@ -426,8 +426,8 @@ class MissionControllerLifecycleTest {
     assertThat(result.name()).isEqualTo("Op Foxglove");
     assertThat(result.status()).isEqualTo("PLANNED");
     assertThat(result.description()).isEqualTo("internal description");
-    assertThat(result.owner()).isNull();
-    assertThat(result.managers()).isNull();
+    assertThat(result.owner()).isNotNull();
+    assertThat(result.managers()).isNotNull();
     assertThat(result.canEdit()).isFalse();
     assertThat(result.canManageManagers()).isFalse();
     assertThat(result.participants()).hasSize(1);
@@ -464,7 +464,7 @@ class MissionControllerLifecycleTest {
     verify(missionService).getNextMission();
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody().owner()).isNull();
+    assertThat(response.getBody().owner()).isNotNull();
   }
 
   @Test
@@ -572,8 +572,8 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
     assertThat(result).isNotSameAs(full);
-    assertThat(result.owner()).isNull();
-    assertThat(result.managers()).isNull();
+    assertThat(result.owner()).isNotNull();
+    assertThat(result.managers()).isNotNull();
     assertThat(result.participants().iterator().next().user().email()).isNull();
   }
 

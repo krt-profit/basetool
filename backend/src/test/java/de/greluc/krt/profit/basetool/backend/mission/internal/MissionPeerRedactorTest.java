@@ -99,7 +99,7 @@ class MissionPeerRedactorTest {
   }
 
   @Test
-  void cleanupMissionForPeer_forAReadingPeer_clearsOwnerAndManagers() {
+  void cleanupMissionForPeer_forAReadingPeer_keepsOwnerAndManagersAsPeerReferences() {
     List<MissionStepDto> steps = List.of();
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
@@ -107,8 +107,12 @@ class MissionPeerRedactorTest {
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
-    assertThat(redacted.owner()).isNull();
-    assertThat(redacted.managers()).isNull();
+    assertThat(redacted.owner()).isNotNull();
+    assertThat(redacted.owner().id()).isEqualTo(full.owner().id());
+    assertThat(redacted.owner().displayName()).isEqualTo(full.owner().displayName());
+    assertThat(redacted.owner().username()).isNull();
+    assertThat(redacted.managers()).hasSize(full.managers().size());
+    assertThat(redacted.managers()).allSatisfy(m -> assertThat(m.username()).isNull());
     assertThat(redacted.canEdit()).isFalse();
     assertThat(redacted.canManageManagers()).isFalse();
     assertThat(redacted.description()).isEqualTo("secret plan");
@@ -121,10 +125,10 @@ class MissionPeerRedactorTest {
   }
 
   /**
-   * A peer who may manage the mission keeps the managers list the same response says they may edit.
+   * A peer who may manage the mission keeps its capability flag and sees the same peer-shaped list.
    */
   @Test
-  void cleanupMissionForPeer_forAManagingPeer_keepsTheListItSaysTheyMayEdit() {
+  void cleanupMissionForPeer_forAManagingPeer_keepsTheCapabilityFlag() {
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
     MissionDto full = mission("secret plan", squadron, participant, List.of(), List.of(), true);
@@ -132,8 +136,7 @@ class MissionPeerRedactorTest {
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
     assertThat(redacted.canManageManagers()).isTrue();
-    assertThat(redacted.owner()).isEqualTo(full.owner());
-    assertThat(redacted.managers()).isEqualTo(full.managers());
+    assertThat(redacted.owner().id()).isEqualTo(full.owner().id());
     assertThat(redacted.participants().iterator().next().user().email()).isNull();
   }
 

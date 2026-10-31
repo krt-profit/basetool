@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
@@ -134,15 +135,18 @@ public abstract class UserMapper {
   /**
    * Maps a {@link User} to the DTO the current caller may see: the full record for an admin and for
    * the caller's own user, the peer shape of every other member for everyone else (REQ-SEC-007).
-   * Outside a Spring context, where no caller is known, the full record is returned.
+   * Without a projection the peer shape is returned.
    *
    * @param user the user to project; {@code null} maps to {@code null}
    * @return the DTO as seen by the current caller, or {@code null} for a {@code null} user
    */
   public UserDto toDto(User user) {
     UserDto full = toFullDto(user);
-    return full == null || callerUserProjection == null
-        ? full
+    if (user == null) {
+      return full;
+    }
+    return callerUserProjection == null
+        ? UserDtoRedaction.toPeerShape(full)
         : callerUserProjection.forCaller(full);
   }
 

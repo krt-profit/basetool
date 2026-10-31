@@ -130,8 +130,7 @@ Mission responses are cleaned up server-side in [`MissionController`](backend/sr
 through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
-  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for **every non-admin**: owner and managers are emptied (unless the same response tells the caller it may
-  manage the mission, see below), and every nested user — participant, assigned ship's owner — is
+  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for **every non-admin**: the owner, the managers and every nested user — participant, assigned ship's owner — are
   reduced to the peer shape (display/effective name, rank, description, squadrons; the username only
   without a display name): e-mail, roles, permissions, flags, join date and the Discord-link flag are dropped. The
   roster itself stays, as do the description, the organisation, the units, the frequencies, the
@@ -139,9 +138,8 @@ through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/baset
   of the organisation and reads the Einsatz's own planning data.
 - The caller's **own** capability flags (`canEdit`, `canManageManagers`) survive the pass. They are
   answers about the caller, not somebody else's data, and forcing them off would hide the management
-  controls from a MISSION_MANAGER — who sits below Logistician in the hierarchy. When either flag is
-  true the owner and manager list survive too, as the callsign tuple, because the caller may rewrite
-  exactly that list.
+  controls from a MISSION_MANAGER — who sits below Logistician in the hierarchy. The owner and the manager
+  list are visible to everyone who may see the mission, in the peer shape.
 
 **There used to be a second, stricter level** (`cleanupOutsiderMissionForGuest`) for anonymous and
 role-less callers, which additionally hid the description and each participant's payout preference

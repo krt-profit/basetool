@@ -55,6 +55,8 @@ class UserMapperTest {
     membershipRepository = mock(OrgUnitMembershipRepository.class);
     squadronRepository = mock(SquadronRepository.class);
     orgUnitRepository = mock(OrgUnitRepository.class);
+    ReflectionTestUtils.setField(
+        mapper, "callerUserProjection", (CallerUserProjection) full -> full);
     ReflectionTestUtils.setField(mapper, "membershipRepository", membershipRepository);
     ReflectionTestUtils.setField(
         mapper,

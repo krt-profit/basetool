@@ -552,15 +552,9 @@ own profile — never elsewhere.) The naming convention is enforced structurally
 > role-less `GUEST` callers. Both audiences are gone (REQ-SEC-052, REQ-SEC-053), so the tier went
 > with them and `MissionGuestRedactor` became `MissionPeerRedactor`.
 
-**The mission's owner and managers are withheld from a peer who is only reading, and kept for one
-who may manage the mission** (`canEdit` or `canManageManagers`). The exemption exists because the
-pass now runs for callers who hold those rights: a bare `MISSION_MANAGER` is below Logistician — the
-hierarchy puts ADMIN/OFFICER above both roles but never MISSION_MANAGER above LOGISTICIAN — so the
-response asserted `canManageManagers: true` and handed over an empty manager list in the same
-breath, and the Verwaltung panel offered add/remove controls over a list nobody could see. It
-discloses nothing: `UserReferenceDto` is id, username, display name, effective name and rank, the
-same public callsign tuple every participant on that mission already carries, and it travels only to
-a caller who may rewrite the list it names.
+**The mission's owner and managers are visible to everyone who may see the mission**, in the peer shape of
+this requirement (names and rank, no admin fields; the username only when no display name is set). They are
+no longer limited to a caller who may manage the mission.
 
 > The rule that selects the endpoints was rewritten rather than renamed, and that is the part worth
 > reading. It used to select gates carrying **no** `isAuthenticated()` clause — the shape that made
