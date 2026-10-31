@@ -160,6 +160,7 @@ class PagedFindersNoCollectionFetchTest {
                   true,
                   null,
                   Set.of(),
+                  new UUID(0L, 0L),
                   PAGE)
               .getContent();
       assertUnfetched(scoped, JobOrder::getMaterials);

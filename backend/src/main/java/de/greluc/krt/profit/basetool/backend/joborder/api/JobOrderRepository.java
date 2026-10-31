@@ -243,8 +243,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}). The squadron filter matches
    * the responsible or requesting side and only narrows the scoped result. The processing filter
    * keeps only orders whose profit-eligible responsible unit is in {@code processingOrgUnitIds}
-   * (REQ-ORDERS-040) and likewise only narrows. Only the two org units are fetched; collections
-   * batch-load (REQ-DATA-003).
+   * (REQ-ORDERS-040) and likewise only narrows. Without the processing filter the scope is widened
+   * by the assignee grant: an order on which {@code callerId} holds an assignee entry is visible
+   * too (REQ-ORDERS-047). Only the two org units are fetched; collections batch-load
+   * (REQ-DATA-003).
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
@@ -260,13 +262,16 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the OrgUnits the caller belongs to (non-admin path); empty for admins
    *     and anonymous callers.
+   * @param callerId the caller's user id for the assignee grant; a placeholder when unknown.
    * @param pageable page request.
    * @return paged job orders visible to the caller, matching the status and squadron filters.
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
-      "SELECT o FROM JobOrder o WHERE "
+      "SELECT o FROM JobOrder o WHERE ("
           + JobOrderScope.PREDICATE
+          + " OR (:processingFilter = FALSE AND EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE"
+          + " a.jobOrder = o AND a.user.id = :callerId)))"
           + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
           + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds) AND (:processingFilter ="
           + " FALSE OR (o.responsibleOrgUnit.id IN :processingOrgUnitIds AND"
@@ -280,6 +285,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("callerId") UUID callerId,
       Pageable pageable);
 
   /**

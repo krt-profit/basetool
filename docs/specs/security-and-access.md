@@ -435,6 +435,18 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
+**A Logistician grant is per unit.** A contextual `LOGISTICIAN@unit` authority (own membership flag,
+lead or seat-derived reach) gives reads, lists and actions of **that unit** only; a plain membership
+of another unit never adds Logistician powers there, and grants in A and C give exactly A and C
+(unpinned: their union; pinned: the pinned unit only if it is one of them). The flat
+`ROLE_LOGISTICIAN` stays a coarse gate and decides nothing on a target by itself. The per-target
+decision is `AccessGateService.canActAsLogisticianIn(unit)` (`hasRoleInOrgUnit` inside the active
+scope; a target without a unit is reserved to admins), the list decision is
+`currentLogisticianScope()`. It governs the Lager rows of other members (allocation, note,
+delivered, stolen, book-out, personal rebook, the stock viewer's `canEdit`), the job-order writes
+and handover reports (the responsible unit, SK-queue orders included), the earmarks, the squadron a
+material claim is made for, and the refinery order read, edit, delete, store, creation for another member (the stamped unit),
+the user order list and the mission order list (own orders plus those of the Logistician units).
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
 per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
 MUST `POST /api/v1/refinery-orders/users/{userId}`, which reads the target from the path. `POST

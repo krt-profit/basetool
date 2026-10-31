@@ -923,13 +923,14 @@ class OwnerScopeServiceTest {
   class CanEditJobOrderTests {
 
     @Test
-    void skResponsibleOrder_isOpenToTheRoleGate_forProfitEligibleCaller() {
+    void skResponsibleOrder_notEditableWithoutALogisticianGrantInTheSpecialCommand() {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubMemberInSquadronA();
+      stubLogisticianGrantIn(SQUADRON_A_ID);
 
-      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -953,13 +954,24 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void squadronResponsibleOrder_editableByMemberOfThatSquadron() {
+    void squadronResponsibleOrder_editableByALogisticianOfThatSquadron() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
+      stubMemberInSquadronA();
+      stubLogisticianGrantIn(SQUADRON_A_ID);
+
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_notEditableByAPlainMemberOfThatSquadron() {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
       stubMemberInSquadronA();
 
-      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -2429,6 +2441,19 @@ class OwnerScopeServiceTest {
     sc.setId(UUID.randomUUID());
     sc.setShorthand("SKX");
     return sc;
+  }
+
+  private void stubLogisticianGrantIn(UUID orgUnitId) {
+    lenient()
+        .when(authHelper.currentAuthentication())
+        .thenReturn(
+            Optional.of(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                    "member",
+                    "n/a",
+                    List.of(
+                        new de.greluc.krt.profit.basetool.backend.platform.api
+                            .OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId)))));
   }
 
   private void stubMemberInSquadronA() {

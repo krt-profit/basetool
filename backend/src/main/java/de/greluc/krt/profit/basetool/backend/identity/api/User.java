@@ -166,6 +166,16 @@ public class User extends AbstractEntity<UUID> {
     return approvalStatus == ApprovalStatus.ACTIVE;
   }
 
+  /**
+   * Whether the account is active: approved, and present and enabled in Keycloak as of the last
+   * roster sync.
+   *
+   * @return {@code true} iff the account is approved, present and enabled
+   */
+  public boolean isActiveAccount() {
+    return isApproved() && inKeycloak && enabledInKeycloak;
+  }
+
   public String getEffectiveName() {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }

@@ -30,6 +30,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -220,6 +221,62 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
     return accessGateService.canActAsOfficerInOwner(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianIn(UUID)}: whether the caller is
+   * Logistician of the target's owning unit inside the active scope.
+   *
+   * @param orgUnitId the target's owning org unit; never {@code null}
+   * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active scope
+   */
+  public boolean canActAsLogisticianIn(@NotNull UUID orgUnitId) {
+    return accessGateService.canActAsLogisticianIn(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianInOwner(UUID)}: Logistician reach in
+   * the target's owning unit, where a target without a unit is reserved to admins.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or Logistician of {@code orgUnitId}
+   */
+  public boolean canActAsLogisticianInOwner(@Nullable UUID orgUnitId) {
+    return accessGateService.canActAsLogisticianInOwner(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#currentLogisticianOrgUnitIds()}: the org units in which
+   * the caller holds a Logistician grant inside the active scope.
+   *
+   * @return the caller's Logistician org-unit ids; never {@code null}, empty for an admin
+   */
+  @NotNull
+  public Set<UUID> currentLogisticianOrgUnitIds() {
+    return accessGateService.currentLogisticianOrgUnitIds();
+  }
+
+  /**
+   * Refuses the caller unless they act as Logistician in the unit that owns the target.
+   *
+   * @param orgUnit the target's owning org unit, or {@code null} when it has none (admin only)
+   * @throws AccessDeniedException when the caller is no Logistician of {@code orgUnit}
+   */
+  public void requireLogisticianInOwner(@Nullable OrgUnit orgUnit) {
+    if (!canActAsLogisticianInOwner(orgUnit == null ? null : orgUnit.getId())) {
+      throw new AccessDeniedException("Access denied: not a Logistician of the target's org unit");
+    }
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#currentLogisticianScope()}: the scope vector of the data
+   * the caller handles as Logistician, for list queries.
+   *
+   * @return a never-null scope vector limited to the caller's Logistician units
+   */
+  @NotNull
+  public ScopePredicate currentLogisticianScope() {
+    return accessGateService.currentLogisticianScope();
   }
 
   /**

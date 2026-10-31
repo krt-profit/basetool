@@ -7279,18 +7279,18 @@
             min-height: calc(var(--touch-target) - 2px);
         }
 
-        :is(.krt-segmented--block, .toolbar > .krt-segmented) {
+        :is(.krt-segmented--block, :is(.toolbar, .page-actions) > .krt-segmented) {
             flex-wrap: wrap;
             gap: 1px;
             background-color: var(--control-border);
         }
 
-        :is(.krt-segmented--block, .toolbar > .krt-segmented) > * {
+        :is(.krt-segmented--block, :is(.toolbar, .page-actions) > .krt-segmented) > * {
             flex: 1 0 auto;
             background-color: var(--control-bg);
         }
 
-        :is(.krt-segmented--block, .toolbar > .krt-segmented)
+        :is(.krt-segmented--block, :is(.toolbar, .page-actions) > .krt-segmented)
             > .krt-segmented__item:is(
                 [aria-current='page'],
                 [aria-pressed='true'],
@@ -7301,7 +7301,7 @@
             background-color: color-mix(in srgb, var(--color-primary) 18%, var(--control-bg));
         }
 
-        :is(.krt-segmented--block, .toolbar > .krt-segmented)
+        :is(.krt-segmented--block, :is(.toolbar, .page-actions) > .krt-segmented)
             > .krt-segmented__item
             + .krt-segmented__item {
             border-left: 0;

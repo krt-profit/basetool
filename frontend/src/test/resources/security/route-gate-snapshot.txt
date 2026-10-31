@@ -465,6 +465,7 @@
 /orders/material-demand GET -> JobOrderMaterialDemandPageController#viewMaterialDemand gate=method:isAuthenticated() layout=yes
 /orders/{id} DELETE -> JobOrderWriteController#deleteOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/{id} GET -> JobOrderPageController#viewOrderDetail gate=class:isAuthenticated() layout=yes
+/orders/{id}/assignee-candidates GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderAssigneeCandidateProxyController#assigneeCandidates gate=class:isAuthenticated() layout=no
 /orders/{id}/assignees POST -> JobOrderWriteController#addAssignee gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId} DELETE -> JobOrderWriteController#removeAssignee gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId}/note DELETE -> JobOrderWriteController#deleteAssigneeNote gate=class:isAuthenticated() layout=yes
