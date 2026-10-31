@@ -1087,12 +1087,45 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
         });
 }
 
+/**
+ * Finds the donation button of the Umbuchen row, which the supply module renders only for stock
+ * that can be pledged.
+ *
+ * @returns {HTMLElement | null} the row's donation button, or null when the row cannot be pledged
+ */
+function umbuchenDonationButton() {
+    if (!umbuchenItemId) return null;
+    return /** @type {HTMLElement | null} */ (
+        document.querySelector(
+            `[data-trigger="supply-lager-donate"][data-id="${CSS.escape(umbuchenItemId)}"]`,
+        )
+    );
+}
+
+/**
+ * Leaves the Umbuchen dialog for the supply module's donation dialog of the same row; nothing is
+ * moved until the receiving unit accepts the donation.
+ */
+function handOverToDonation() {
+    const donate = umbuchenDonationButton();
+    const locationMode = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="umbuchenMode"][value="LOCATION"]')
+    );
+    if (locationMode) locationMode.checked = true;
+    myLager.closeUmbuchenModal();
+    if (donate) donate.click();
+}
+
 /** Shows the transfer or the personalize fields of the Umbuchen dialog for the chosen mode. */
 function toggleUmbuchenMode() {
     const modeInput = /** @type {HTMLInputElement | null} */ (
         document.querySelector('input[name="umbuchenMode"]:checked')
     );
     const mode = modeInput ? modeInput.value : 'LOCATION';
+    if (mode === 'DONATION') {
+        handOverToDonation();
+        return;
+    }
     const transferFields = document.getElementById('umbuchenTransferFields');
     const personalFields = document.getElementById('umbuchenPersonalFields');
     const targetUser = /** @type {HTMLInputElement | null} */ (
@@ -1211,6 +1244,8 @@ function openUmbuchenModal(
             : umbuchenI18n.hintDepersonalize;
     const personalDisabled = personalizing && hasAssoc;
     if (personalLabel) personalLabel.hidden = personalDisabled;
+    const donationLabel = document.getElementById('umbuchenModeDonationLabel');
+    if (donationLabel) donationLabel.hidden = umbuchenDonationButton() === null;
     if (!personalizing) {
         refreshUmbuchenPersonalOrgUnitPicker(userId);
     } else {

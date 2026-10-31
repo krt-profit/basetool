@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -119,5 +120,19 @@ class SupplyPledgeSourceRenderTest {
             .getContentAsString();
 
     assertThat(json).contains(ROW.toString()).contains("Lorville").contains("\"freeAmount\":10.0");
+  }
+
+  /** The proxy relays the open needs a Lager row can be pledged to (REQ-SUP-026). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theProxyRelaysTheNeedsARowFits() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/supply/me/donation-targets?rowId={rowId}"), anyTypeRef(), eq(ROW)))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/api/proxy/supply/me/donation-targets").param("rowId", ROW.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().json("[]"));
   }
 }

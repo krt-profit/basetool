@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.supply.api.DeclineReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
+import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import de.greluc.krt.profit.basetool.backend.supply.api.events.SupplyNotices;
@@ -54,9 +55,11 @@ import jakarta.persistence.criteria.JoinType;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -566,6 +569,48 @@ public class SupplyDonationService {
               SupplyMapper.quantityType(row.getMaterial())));
     }
     return sources;
+  }
+
+  /**
+   * Lists the open needs a pledge from one of the caller's Lager rows can credit: needs of the
+   * row's material or game item whose tier the row's quality reaches, of units that accept
+   * donations (REQ-SUP-026).
+   *
+   * @param rowId the caller's Lager row
+   * @return the needs, oldest first
+   * @throws SupplyProblemException when the row belongs to another member
+   * @throws BadRequestException when the row is marked stolen
+   */
+  @Transactional(readOnly = true)
+  public @NotNull List<NeedDto> targets(@NotNull UUID rowId) {
+    settingsService.requireEnabled();
+    StockRow row = ownedUnstolenRow(rowId, requireCaller());
+    Material material = row.getMaterial();
+    GameItem item = row.getGameItem();
+    List<SupplyNeed> candidates =
+        needRepository.findByStatusAndEntry(
+            NeedStatus.OPEN,
+            material == null ? null : material.getId(),
+            item == null ? null : item.getId());
+    Set<UUID> accepting = new HashSet<>();
+    for (SupplyUnitSetting setting :
+        unitSettingRepository.findAllById(
+            candidates.stream().map(SupplyNeed::getOrgUnitId).collect(Collectors.toSet()))) {
+      if (setting.isAcceptsDonations()) {
+        accepting.add(setting.getId());
+      }
+    }
+    List<SupplyNeed> fitting =
+        candidates.stream()
+            .filter(need -> accepting.contains(need.getOrgUnitId()))
+            .filter(
+                need ->
+                    material == null
+                        || need.getQualityTier() == null
+                        || need.getQualityTier().isSatisfiedBy(row.getQuality()))
+            .toList();
+    SupplyMapper.NeedContext context = mapper.needContext(fitting);
+    return fitting.stream().map(need -> mapper.toDto(need, context)).toList();
   }
 
   private static void requireFitsNeed(

@@ -610,4 +610,51 @@ class SupplyDonationServiceTest {
         .isInstanceOf(BadRequestException.class);
     verify(stockReads, never()).donatableRows(any(), any(), any());
   }
+
+  @Test
+  void theTargetsOfARowAreTheOpenNeedsItFitsOfAcceptingUnits() {
+    callerIs(DONOR);
+    UUID rowId = UUID.randomUUID();
+    StockRow row = org.mockito.Mockito.mock(StockRow.class);
+    when(row.getUser()).thenReturn(donor);
+    when(row.getMaterial()).thenReturn(material);
+    when(row.getQuality()).thenReturn(700);
+    when(stockReads.findRow(rowId)).thenReturn(Optional.of(row));
+    SupplyNeed fits = openNeed(650);
+    SupplyNeed tooHigh = openNeed(800);
+    SupplyNeed closedUnit = openNeed(0);
+    UUID otherUnit = UUID.randomUUID();
+    closedUnit.setOrgUnitId(otherUnit);
+    when(needRepository.findByStatusAndEntry(NeedStatus.OPEN, material.getId(), null))
+        .thenReturn(List.of(fits, tooHigh, closedUnit));
+    SupplyUnitSetting accepting = new SupplyUnitSetting();
+    accepting.setId(unit.getId());
+    accepting.setAcceptsDonations(true);
+    SupplyUnitSetting refusing = new SupplyUnitSetting();
+    refusing.setId(otherUnit);
+    refusing.setAcceptsDonations(false);
+    when(unitSettingRepository.findAllById(Set.of(unit.getId(), otherUnit)))
+        .thenReturn(List.of(accepting, refusing));
+
+    service.targets(rowId);
+
+    verify(mapper).needContext(List.of(fits));
+  }
+
+  @Test
+  void anotherMembersRowHasNoTargets() {
+    callerIs(DONOR);
+    UUID rowId = UUID.randomUUID();
+    StockRow row = org.mockito.Mockito.mock(StockRow.class);
+    User other = new User();
+    other.setId(UUID.randomUUID());
+    when(row.getUser()).thenReturn(other);
+    when(stockReads.findRow(rowId)).thenReturn(Optional.of(row));
+
+    assertThatThrownBy(() -> service.targets(rowId))
+        .isInstanceOfSatisfying(
+            SupplyProblemException.class,
+            e -> assertThat(e.getProblemCode()).isEqualTo(SupplyProblemCode.SUPPLY_ROW_NOT_OWNED));
+    verify(needRepository, never()).findByStatusAndEntry(any(), any(), any());
+  }
 }

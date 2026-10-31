@@ -148,6 +148,18 @@ public class SupplyBackendClient {
   }
 
   /**
+   * Reads the open needs a pledge from one of the caller's Lager rows can credit (REQ-SUP-026).
+   *
+   * @param rowId the caller's Lager row
+   * @return the needs, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<NeedDto> donationTargets(@NotNull UUID rowId) {
+    return backendApiClient.get(
+        "/api/v1/supply/me/donation-targets?rowId={rowId}", NEED_LIST, rowId);
+  }
+
+  /**
    * Appends one optional query parameter as a template variable.
    *
    * @param template the URI template being built

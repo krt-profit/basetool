@@ -73,16 +73,68 @@ function fillUnits(target, units) {
     }
 }
 
+/**
+ * Fills the need select with the open needs the row can be pledged to, keeping the empty choice.
+ *
+ * @param {HTMLSelectElement} target the select
+ * @param {HTMLOptionElement} none the "without a need" option
+ * @param {string} rowId the Lager row
+ */
+async function fillNeeds(target, none, rowId) {
+    target.replaceChildren(none);
+    target.value = '';
+    /** @type {unknown} */
+    let needs;
+    try {
+        needs = await krtFetch.getJson(
+            `/api/proxy/supply/me/donation-targets?rowId=${encodeURIComponent(rowId)}`,
+        );
+    } catch {
+        return;
+    }
+    if (!Array.isArray(needs)) return;
+    const english = document.documentElement.lang === 'en';
+    for (const need of /** @type {ApiDto<'NeedDto'>[]} */ (needs)) {
+        if (!need.id || !need.orgUnitId) continue;
+        const option = document.createElement('option');
+        option.value = need.id;
+        option.dataset.unitId = need.orgUnitId;
+        const tier = need.qualityTier
+            ? ((english ? need.qualityTier.labelEn : need.qualityTier.labelDe) ?? '')
+            : '';
+        const quantityType = need.quantityType ?? 'SCU';
+        option.textContent = String(supplyI18n.lagerNeedOption)
+            .replace('{0}', need.orgUnitShorthand ?? need.orgUnitName ?? '')
+            .replace('{1}', tier)
+            .replace('{2}', formatAmount(need.openAmount ?? 0, quantityType));
+        target.appendChild(option);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('supply-lager-modal');
     const form = document.getElementById('supply-lager-form');
     if (!modal || !form) return;
+    const needSelect = select('supply-lager-need');
+    const noNeed = needSelect.options[0];
+    const unitRow = document.getElementById('supply-lager-unit-row');
+
+    /** Takes the unit from the chosen need and hides the unit choice while a need is chosen. */
+    function syncNeed() {
+        const option = needSelect.selectedOptions[0];
+        const unitId = option?.dataset.unitId;
+        if (unitId) select('supply-lager-unit').value = unitId;
+        if (unitRow) unitRow.hidden = Boolean(unitId);
+    }
+    needSelect.addEventListener('change', syncNeed);
 
     krtEvents.on('click', 'supply-lager-donate', async (button) => {
         const units = await receivingUnits();
         const unitSelect = select('supply-lager-unit');
         /** @type {HTMLFormElement} */ (form).reset();
         fillUnits(unitSelect, units);
+        await fillNeeds(needSelect, noNeed, button.getAttribute('data-id') || '');
+        syncNeed();
         const amount = Number(button.getAttribute('data-amount') || '0');
         const reserved = Number(button.getAttribute('data-reserved') || '0');
         const quantityType = button.getAttribute('data-quantity-type') || 'SCU';
@@ -110,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
+        const needId = textOrNull(needSelect.value);
         const unitId = textOrNull(select('supply-lager-unit').value);
         const submitter = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
@@ -118,8 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             url: '/api/proxy/supply/donations',
             payload: {
-                needId: null,
-                receivingOrgUnitId: unitId,
+                needId,
+                receivingOrgUnitId: needId ? null : unitId,
                 materialId: null,
                 gameItemId: null,
                 quality: null,
