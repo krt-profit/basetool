@@ -353,7 +353,7 @@
 /materials GET -> MaterialsPageController#listMaterials gate=class:isAuthenticated() layout=yes
 /materials/overview GET -> MaterialsPageController#getMatrixOverview gate=class:isAuthenticated() layout=yes
 /materials/overview/data GET -> MaterialsPageController#getMatrixData gate=class:isAuthenticated() layout=yes
-/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN') layout=yes
+/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'ADMIN') layout=yes
 /materials/{id} GET -> MaterialsPageController#getMaterialDetail gate=class:isAuthenticated() layout=yes
 /me/active-org-unit POST -> MeFrontendController#setActiveOrgUnit gate=class:isAuthenticated() layout=yes
 /members GET -> MemberManagementController#listMembers gate=class:hasRole('ADMIN') layout=yes

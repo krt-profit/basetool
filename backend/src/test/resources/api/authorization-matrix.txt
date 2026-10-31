@@ -37,8 +37,8 @@ POST /api/v1/bank/holders/transfer | BankHolderController#transfer | pre=hasRole
 GET /api/v1/bank/holders/{id} | BankHolderController#getHolder | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
 PATCH /api/v1/bank/holders/{id} | BankHolderController#updateHolder | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/holders/{id}/transactions | BankHolderController#getHolderBookings | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
-GET /api/v1/bank/members/search | BankMemberSearchController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
-GET /api/v1/bank/members/search/references | BankMemberSearchController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/members/search | BankMemberSearchController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/members/search/references | BankMemberSearchController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/accounts/visible | OrgUnitBankController#listVisibleAccounts | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/accounts/{id} | OrgUnitBankController#getAccountDetail | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/all-members | OrgUnitBankController#clearAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -252,7 +252,7 @@ GET /api/v1/materials/job-order | MaterialController#getJobOrderMaterials | pre=
 GET /api/v1/materials/lookup | MaterialController#lookupMaterials | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/materials/matrix | MaterialController#getMaterialMatrixItems | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/materials/prices-overview | MaterialController#getMaterialPriceOverview | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/materials/profit-calculation | ProfitCalculationController#getProfitCalculation | pre=hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/materials/profit-calculation | ProfitCalculationController#getProfitCalculation | pre=hasAnyRole('KRT_MEMBER', 'ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/materials/search | MaterialController#searchMaterials | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/materials/{id} | MaterialController#deleteMaterial | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/materials/{id} | MaterialController#getMaterial | pre=isAuthenticated() | url=anyRequest -> authenticated

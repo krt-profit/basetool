@@ -3774,11 +3774,15 @@ layer directly.
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`;
 the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
 pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
-(fail-closed `false`, admin `true`); no template reads them yet.
+(fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on
+`canOpenLeitung` and the promotion management entries on `canManagePromotions`, and the sidebar's
+role badge reads `hasOfficerReach`; the bank member search, the profit calculation and the
+blueprint availability overview no longer admit the `OFFICER` role.
 
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
 carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
-without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest` ·
+without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest`, `NavigationMenuTest`,
+`SidebarRoleBadgeMvcTest` ·
 **Enforced by (to be added):** a frontend ArchUnit or source scan that no template or controller
 names `ROLE_OFFICER` or `ADMIN_OR_OFFICER` · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
 ADR-0300
