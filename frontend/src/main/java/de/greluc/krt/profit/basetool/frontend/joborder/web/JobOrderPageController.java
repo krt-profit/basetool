@@ -399,7 +399,7 @@ public class JobOrderPageController {
    * catalogs and both owner-pickers (ADR-0149).
    *
    * @param source optional origin marker for the post-save redirect
-   * @param prefill optional material line and requesting unit to start the form with
+   * @param prefill optional material or item line and requesting unit to start the form with
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
@@ -421,7 +421,12 @@ public class JobOrderPageController {
     if (!model.containsAttribute("jobOrderItemForm")) {
       JobOrderItemForm itemForm = new JobOrderItemForm();
       itemForm.setSource(source);
+      prefill.applyTo(itemForm);
       model.addAttribute("jobOrderItemForm", itemForm);
+    }
+    if (prefill.itemOrder()) {
+      model.addAttribute("startInItemMode", true);
+      model.addAttribute("editItems", List.of(prefill.itemLine()));
     }
     JobOrderPageReader.OrderCreatePage create = pageReader.readOrderCreate();
     model.addAttribute("materials", create.materials());

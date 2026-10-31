@@ -227,6 +227,34 @@ class InventoryIndexListPatternRenderTest {
         .doesNotContain("Max. Qualit");
   }
 
+  /** A game item with a low level carries the „niedrig" marker in the items view (REQ-INV-068). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemsViewMarksAnItemWithALowLevel() throws Exception {
+    AggregatedInventoryDto low =
+        new AggregatedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(GAME_ITEM_ID, "Quantum Drive XL-1", "RSI", null),
+            null,
+            null,
+            7.0,
+            true);
+
+    assertThat(render(pageOf(low), "view=items")).contains("data-testid=\"inventory-low-stock\"");
+    assertThat(
+            render(
+                pageOf(
+                    new AggregatedInventoryDto(
+                        null,
+                        new InventoryGameItemReferenceDto(
+                            GAME_ITEM_ID, "Quantum Drive XL-1", "RSI", null),
+                        null,
+                        null,
+                        7.0)),
+                "view=items"))
+        .doesNotContain("data-testid=\"inventory-low-stock\"");
+  }
+
   /**
    * A ship component shows its type, size/grade and class chips instead of the category
    * (REQ-INV-061, REQ-INV-062).

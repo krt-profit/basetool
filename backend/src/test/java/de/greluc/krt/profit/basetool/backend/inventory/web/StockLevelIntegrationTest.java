@@ -656,6 +656,29 @@ class StockLevelIntegrationTest {
         .andExpect(jsonPath("$[?(@.material.id == '" + material + "')].lowStock").value(false));
   }
 
+  @Test
+  void theAggregatedLagerMarksAGameItemWhileItsLevelIsLow() throws Exception {
+    itemStock(member, 4, false);
+    createItemLevel(5.0, null).andExpect(status().isCreated());
+
+    mockMvc
+        .perform(
+            get("/api/v1/inventory/aggregated").param("catalog", "ITEM").with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.gameItem.id == '" + item + "')].lowStock").value(true));
+    mockMvc
+        .perform(
+            get("/api/v1/inventory/all/grouped").param("catalog", "ITEM").with(memberOf(member)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.gameItem.id == '" + item + "')].lowStock").value(true));
+
+    itemStock(member, 2, false);
+    mockMvc
+        .perform(
+            get("/api/v1/inventory/all/grouped").param("catalog", "ITEM").with(memberOf(member)))
+        .andExpect(jsonPath("$[?(@.gameItem.id == '" + item + "')].lowStock").value(false));
+  }
+
   private void createIn(@NotNull UUID orgUnit, @NotNull UUID materialId, double minimum)
       throws Exception {
     createIn(orgUnit, materialId, null, minimum);

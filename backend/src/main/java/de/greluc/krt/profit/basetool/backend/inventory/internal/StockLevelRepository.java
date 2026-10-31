@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,16 +34,10 @@ import org.springframework.data.repository.query.Param;
 public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
 
   /**
-   * Lists the levels of the active units in the caller's Lager scope, catalogue entries loaded.
-   * Levels of a catalogue entry that the catalogue no longer lists stay stored but are left out.
-   *
-   * @param isAdminAllScope whether the caller is an admin without a pinned unit
-   * @param activeOrgUnitId the pinned unit, or {@code null}
-   * @param memberOrgUnitIds the caller's member units when nothing is pinned
-   * @param orgUnitId only this unit, or {@code null} for every unit in scope
-   * @return the levels, by unit name, material name and tier floor descending
+   * The levels of active units and of catalogue entries that are still listed, catalogue entries
+   * loaded; the {@code WHERE} clause is open for further conditions.
    */
-  @Query(
+  String ACTIVE_LEVELS =
       """
       SELECT l FROM StockLevel l
       JOIN FETCH l.orgUnit u
@@ -55,6 +51,13 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
           OR (g.scwikiSyncedAt IS NOT NULL AND g.scwikiDeletedAt IS NULL)
           OR (g.uexItemId IS NOT NULL AND g.uexDeletedAt IS NULL)
         )
+      """;
+
+  /**
+   * The scope and order clause of the levels the caller may see, following {@link #ACTIVE_LEVELS}.
+   */
+  String VISIBLE_TO_CALLER =
+      """
         AND (:orgUnitId IS NULL OR u.id = :orgUnitId)
         AND (
           :isAdminAllScope = true
@@ -62,12 +65,59 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
           OR (:activeOrgUnitId IS NULL AND u.id IN :memberOrgUnitIds)
         )
       ORDER BY u.name, COALESCE(m.name, g.name), t.minQuality DESC NULLS LAST
-      """)
+      """;
+
+  /**
+   * Lists the levels of the active units in the caller's Lager scope, catalogue entries loaded.
+   * Levels of a catalogue entry that the catalogue no longer lists stay stored but are left out.
+   *
+   * @param isAdminAllScope whether the caller is an admin without a pinned unit
+   * @param activeOrgUnitId the pinned unit, or {@code null}
+   * @param memberOrgUnitIds the caller's member units when nothing is pinned
+   * @param orgUnitId only this unit, or {@code null} for every unit in scope
+   * @return the levels, by unit name, material name and tier floor descending
+   */
+  @Query(ACTIVE_LEVELS + VISIBLE_TO_CALLER)
   List<StockLevel> findVisible(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("orgUnitId") @Nullable UUID orgUnitId);
+
+  /**
+   * Lists the levels of every active unit and every listed catalogue entry, whoever may see them,
+   * for the notice producer and the gauge.
+   *
+   * @return the levels, units, catalogue entries and tiers loaded
+   */
+  @Query(ACTIVE_LEVELS)
+  List<StockLevel> findAllActive();
+
+  /**
+   * Marks a level as announced, atomically and without touching its version: the one caller whose
+   * update changes the row is the one that announces it.
+   *
+   * @param id the level
+   * @param now the announcement time
+   * @return {@code 1} when this call marked the level, {@code 0} when it was marked already
+   */
+  @Modifying
+  @Query(
+      "UPDATE StockLevel l SET l.lowNotifiedAt = :now"
+          + " WHERE l.id = :id AND l.lowNotifiedAt IS NULL")
+  int markLowNotified(@Param("id") UUID id, @Param("now") Instant now);
+
+  /**
+   * Arms a level again, without touching its version.
+   *
+   * @param id the level
+   * @return {@code 1} when this call cleared the marker, {@code 0} when the level was armed already
+   */
+  @Modifying
+  @Query(
+      "UPDATE StockLevel l SET l.lowNotifiedAt = NULL"
+          + " WHERE l.id = :id AND l.lowNotifiedAt IS NOT NULL")
+  int clearLowNotified(@Param("id") UUID id);
 
   /**
    * Lists every level of one catalogue entry in one unit, for the allocation of a single changed

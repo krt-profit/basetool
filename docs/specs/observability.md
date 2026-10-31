@@ -2734,16 +2734,18 @@ label**, a tag, an MDC field or a log line.
   `BusinessGaugeSource` (`NavigationBusinessGauges`) on the business-metrics timer: the number of
   accounts holding a non-default value in that section, same `section` values. It is the data base
   for deciding a second personalisation round; it carries no account label.
-- `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
-  `InventoryBusinessGauges`: the number of minimum stock levels that are low (REQ-INV-067). A count
-  only, no unit, material or tier label. The metric is named after the module that owns the levels.
+- *Shipped:* `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
+  `InventoryBusinessGauges`: the number of minimum stock levels of active units and listed
+  catalogue entries that are low (REQ-INV-067), from the real allocation and not from the notice
+  marker. A count only, no unit, material or tier label. The metric is named after the module that
+  owns the levels.
 - *Shipped:* `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's
   quick-access search (REQ-UI-033, `QuickAccessSearchMetrics`), one increment per entity type per
   search, every pair registered at zero. `kind` ∈ the `QuickAccessSearchKind` keys — today
   `mission`, `operation`, `material`; `blueprint`, `ship`, `org_unit`, `job_order`, `member` join
   with their contributors; `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed),
   `timeout` (a contributor that did not answer within 2 s).
-- `basetool_notification_created_total{notification_type}` and
+- *Shipped:* `basetool_notification_created_total{notification_type}` and
   `basetool_notification_muted_total{notification_type}` gain `INVENTORY_STOCK_LEVEL_LOW`, and
   `basetool_notification_timed_produced_total{kind}` the producer kind `stock_level_low`
   (REQ-NOTIF-030).
@@ -2757,7 +2759,8 @@ label**, a tag, an MDC field or a log line.
 **Dashboard.** `07-basetool-operations.json` gains the row „Navigation & Dashboard": preference
 writes by section and outcome, personalised accounts by section, quick-access searches by kind and
 outcome, the p95 of `/quick-access/search`, the 5xx rate of the preference and widget endpoints, and
-the low minimum stock levels.
+the low minimum stock levels. *Shipped:* the panel „Minimum stock levels below their minimum"
+(`basetool_inventory_minimum_levels_below`) on the Operations dashboard.
 
 **Alerts** in `monitoring/prometheus/alerts/apps.yml`, each with a promtool test and a runbook row:
 
@@ -2768,8 +2771,9 @@ the low minimum stock levels.
 
 A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 
-**Enforced by:** `QuickAccessSearchMetricsTest`, `quick_access_search_slow_test.yml` · **To be
-added:** `NavigationMetricsTest`, `NavigationBusinessGaugesTest`, `InventoryBusinessGaugesTest`,
+**Enforced by:** `QuickAccessSearchMetricsTest`, `quick_access_search_slow_test.yml`,
+`StockLevelNoticeIntegrationTest`, `InventoryBusinessGaugesTest` · **To be
+added:** `NavigationMetricsTest`, `NavigationBusinessGaugesTest`,
 `AlertedMeterPresenceTest`, `navigation_alerts_test.yml`
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
