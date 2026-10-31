@@ -13,12 +13,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{nav.inventory},
         count=${inventoryPage != null ? inventoryPage.totalElements() : null}, countId='inventory-count', countFor='inventory-results', actions=~{::inventory-actions})}">
         <th:block th:ref="inventory-actions">
-            <nav class="krt-segmented" th:aria-label="#{inventory.overview.switch.aria}">
-                <a th:href="${view == 'items'} ? @{/inventory/all(view='items')} : @{/inventory/all}" class="krt-segmented__item"
-                   data-testid="inventory-global-link" th:text="#{inventory.overview.global}">Globales Lager</a>
-                <a th:href="${view == 'items'} ? @{/inventory/my(view='items')} : @{/inventory/my}" class="krt-segmented__item"
-                   data-testid="inventory-my-link" th:text="#{inventory.overview.my}">Mein Lager</a>
-            </nav>
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(active='storage')}"></th:block>
         </th:block>
     </th:block>
 

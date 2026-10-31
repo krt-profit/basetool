@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="stockAmount(value, quantityType)"
+          th:text="${quantityType == 'PIECE'} ? |${#numbers.formatInteger(value, 1)} #{material.quantity.piece}| : |${#numbers.formatDecimal(value, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|">10 SCU</th:block>
+</body>
+</html>

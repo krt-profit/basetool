@@ -251,7 +251,8 @@ public class AdminNotificationRulePageController {
           "MISSION_PARTICIPANTS",
           "MISSION_LEADERSHIP",
           "EXCHANGE_CLIENT_HOLDERS",
-          "EVENT_RECIPIENTS");
+          "EVENT_RECIPIENTS",
+          "SEAT_HOLDERS");
 
   /**
    * {@code OrgRelativeRole} codes, labelled via {@code

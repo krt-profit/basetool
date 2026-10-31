@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
@@ -117,6 +118,7 @@ class TenancyGuardTest {
           JobOrderAccessPolicy.class,
           MissionAccessPolicy.class,
           InventoryAccessPolicy.class,
+          StockLevelAccessPolicy.class,
           HangarAccessPolicy.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class,
