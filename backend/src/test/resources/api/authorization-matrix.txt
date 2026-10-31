@@ -162,7 +162,7 @@ GET /api/v1/hangar/ships | HangarController#getAllShips | pre=hasAuthority('HANG
 POST /api/v1/hangar/ships | HangarController#addShip | pre=isAuthenticated() | url=POST /api/v1/hangar/ships -> authenticated
 POST /api/v1/hangar/ships/bulk-org-unit | HangarController#bulkChangeMyShipsOrgUnit | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships/home-location | HangarController#setHomeLocationForMyShips | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=hasAnyRole('ADMIN','OFFICER') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
+POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=@hangarAccessPolicy.canResetFitted() | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
 PUT /api/v1/hangar/ships/{id} | HangarController#updateMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=PUT /api/v1/hangar/ships/* -> authenticated
 PUT /api/v1/hangar/ships/{id}/org-unit | HangarController#changeMyShipOrgUnit | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
@@ -338,7 +338,7 @@ GET /api/v1/operations/{id}/finance-summary | OperationController#getOperationFi
 GET /api/v1/operations/{id}/finances | OperationController#getOperationFinances | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
 GET /api/v1/operations/{id}/finances/{missionId} | OperationController#getMissionFinanceDetail | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
 GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperation(#id) | url=anyRequest -> authenticated
-PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=hasRole('MISSION_MANAGER') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) | url=anyRequest -> authenticated
+PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=hasRole('MISSION_MANAGER') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or @operationAccessPolicy.canClearPayout(#id)) | url=anyRequest -> authenticated
 GET /api/v1/orders | JobOrderController#getAllJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders | JobOrderController#createJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated

@@ -397,6 +397,47 @@ class HangarServiceTest {
   }
 
   @Test
+  void resetAllFittedStatus_unpinnedOfficer_resetsOnlyTheUnitsInReach() {
+    UUID reachedUnit = UUID.randomUUID();
+    UUID foreignUnit = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
+    when(ownerScopeService.canActAsOfficerIn(reachedUnit)).thenReturn(true);
+    when(ownerScopeService.canActAsOfficerIn(foreignUnit)).thenReturn(false);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(reachedUnit))).thenReturn(2);
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    hangarService.resetAllFittedStatus();
+
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(reachedUnit));
+  }
+
+  @Test
+  void resetAllFittedStatus_pinnedUnit_resetsThePinnedUnitOnly() {
+    UUID pinned = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, pinned, Set.of(UUID.randomUUID())));
+    when(ownerScopeService.canActAsOfficerIn(pinned)).thenReturn(true);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(pinned))).thenReturn(0);
+
+    hangarService.resetAllFittedStatus();
+
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(pinned));
+  }
+
+  @Test
+  void resetAllFittedStatus_adminAllScope_staysUnnarrowed() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(shipRepository.resetAllFittedScoped(true, null, Set.of())).thenReturn(0);
+
+    hangarService.resetAllFittedStatus();
+
+    verify(shipRepository).resetAllFittedScoped(true, null, Set.of());
+    verify(ownerScopeService, never()).canActAsOfficerIn(any());
+  }
+
+  @Test
   void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
@@ -506,6 +547,8 @@ class HangarServiceTest {
     inScopeShip.setShipType(fighter);
     inScopeShip.setOwner(owner);
     inScopeShip.setFitted(true);
+    inScopeShip.setOwningOrgUnit(unit(squadronId));
+    when(ownerScopeService.canActAsOfficerInOwner(squadronId)).thenReturn(true);
     when(shipRepository.findByShipTypeInScoped(List.of(fighter), false, squadronId, Set.of()))
         .thenReturn(List.of(inScopeShip));
     when(shipTypeMapper.toDto(any())).thenReturn(null);
@@ -517,6 +560,36 @@ class HangarServiceTest {
     assertEquals(1L, page.getContent().get(0).count());
     assertEquals(1, page.getContent().get(0).details().size());
     assertEquals("pilot", page.getContent().get(0).details().get(0).ownerName());
+  }
+
+  @Test
+  void getSquadronOverview_withOwnerDetails_omitsShipsOfUnitsWithoutOfficerReach() {
+    UUID reachedUnit = UUID.randomUUID();
+    UUID foreignUnit = UUID.randomUUID();
+    Pageable pageable = PageRequest.of(0, 20);
+    when(ownerScopeService.currentUnitOverviewScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
+    ShipType fighter = new ShipType();
+    fighter.setId(UUID.randomUUID());
+    when(shipRepository.countShipsByType(
+            eq(false), isNull(), eq(Set.of(reachedUnit, foreignUnit)), isNull(), eq(pageable)))
+        .thenReturn(new PageImpl<>(List.<Object[]>of(new Object[] {fighter, 3L, 0L}), pageable, 1));
+    Ship reached = shipOf(fighter, "reached", reachedUnit);
+    Ship foreign = shipOf(fighter, "foreign", foreignUnit);
+    Ship ownerless = shipOf(fighter, "ownerless", null);
+    when(shipRepository.findByShipTypeInScoped(
+            eq(List.of(fighter)), eq(false), isNull(), eq(Set.of(reachedUnit, foreignUnit))))
+        .thenReturn(List.of(reached, foreign, ownerless));
+    when(ownerScopeService.canActAsOfficerInOwner(reachedUnit)).thenReturn(true);
+    when(ownerScopeService.canActAsOfficerInOwner(foreignUnit)).thenReturn(false);
+    when(ownerScopeService.canActAsOfficerInOwner(null)).thenReturn(false);
+
+    var details = hangarService.getSquadronOverview(pageable, true, null).getContent().get(0);
+
+    assertEquals(3L, details.count());
+    assertEquals(
+        List.of("reached"),
+        details.details().stream().map(SquadronShipDetailDto::ownerName).toList());
   }
 
   @Test
@@ -606,5 +679,22 @@ class HangarServiceTest {
         BadRequestException.class,
         () -> hangarService.setHomeLocationForMyShips(userId, locationId));
     verify(shipRepository, never()).setLocationForOwner(any(), any());
+  }
+
+  private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(UUID id) {
+    var unit = new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+    unit.setId(id);
+    return unit;
+  }
+
+  private static Ship shipOf(ShipType type, String ownerName, UUID unitId) {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    owner.setUsername(ownerName);
+    Ship ship = new Ship();
+    ship.setShipType(type);
+    ship.setOwner(owner);
+    ship.setOwningOrgUnit(unitId == null ? null : unit(unitId));
+    return ship;
   }
 }
