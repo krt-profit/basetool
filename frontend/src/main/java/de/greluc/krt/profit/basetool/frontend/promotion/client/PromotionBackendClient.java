@@ -105,7 +105,12 @@ public class PromotionBackendClient {
    */
   @Nullable
   public List<PromotionTopicDto> topics(@NotNull PromotionReadView view) {
-    return backendApiClient.get("/api/v1/promotion/topics/all" + view.query('?'), TOPIC_LIST);
+    return backendApiClient.get(
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/topics/all";
+          case MANAGEMENT -> "/api/v1/promotion/topics/all?view=MANAGEMENT";
+        },
+        TOPIC_LIST);
   }
 
   /**
@@ -119,7 +124,10 @@ public class PromotionBackendClient {
   public List<PromotionCategoryDto> categoriesByTopic(
       @Nullable String topicId, @NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/categories/by-topic/{topicId}/all" + view.query('?'),
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/categories/by-topic/{topicId}/all";
+          case MANAGEMENT -> "/api/v1/promotion/categories/by-topic/{topicId}/all?view=MANAGEMENT";
+        },
         CATEGORY_LIST,
         topicId);
   }
@@ -133,7 +141,11 @@ public class PromotionBackendClient {
   @Nullable
   public PageResponse<PromotionCategoryDto> allCategories(@NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/categories?size=1000" + view.query('&'), CATEGORY_PAGE);
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/categories?size=1000";
+          case MANAGEMENT -> "/api/v1/promotion/categories?size=1000&view=MANAGEMENT";
+        },
+        CATEGORY_PAGE);
   }
 
   /**
@@ -147,7 +159,11 @@ public class PromotionBackendClient {
   public List<PromotionLevelContentDto> levelContents(
       @Nullable String categoryId, @NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/level-contents/by-category/{categoryId}" + view.query('?'),
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/level-contents/by-category/{categoryId}";
+          case MANAGEMENT ->
+              "/api/v1/promotion/level-contents/by-category/{categoryId}?view=MANAGEMENT";
+        },
         LEVEL_CONTENT_LIST,
         categoryId);
   }
@@ -161,7 +177,11 @@ public class PromotionBackendClient {
   @Nullable
   public PageResponse<RankRequirementDto> rankRequirements(@NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank" + view.query('&'),
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank";
+          case MANAGEMENT ->
+              "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank&view=MANAGEMENT";
+        },
         RANK_REQUIREMENT_PAGE);
   }
 

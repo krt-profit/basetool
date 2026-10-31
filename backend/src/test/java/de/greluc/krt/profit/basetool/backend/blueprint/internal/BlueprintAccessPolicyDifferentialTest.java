@@ -48,8 +48,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the blueprint access policy (plan §5.4, ADR-0236): for every
  * caller of the matrix, {@link BlueprintAccessPolicy#canAccessBlueprintOverview()} returns the
- * scope hub's verdict and the verdict of a restatement of the rule on its inputs (admin, officer,
- * or an oversight seat).
+ * scope hub's verdict and the verdict of a restatement of the rule on its inputs (admin or an
+ * oversight seat).
  *
  * <p>The hub keeps the predicate for the member's own capability view, so both stay live and the
  * test keeps comparing them. The matrix covers an admin, an officer without a seat, a member of no
@@ -117,9 +117,7 @@ class BlueprintAccessPolicyDifferentialTest {
       BlueprintAccessPolicy policy = new BlueprintAccessPolicy(hub);
 
       boolean restated =
-          caller.admin()
-              || caller.officer()
-              || (caller.seat() != null && caller.seat().confersOwnLevelOversight());
+          caller.admin() || (caller.seat() != null && caller.seat().confersOwnLevelOversight());
       boolean now = policy.canAccessBlueprintOverview();
       assertThat(hub.canAccessBlueprintOverview()).as("hub for %s", caller.name()).isEqualTo(now);
       assertThat(now).as("policy for %s", caller.name()).isEqualTo(restated);

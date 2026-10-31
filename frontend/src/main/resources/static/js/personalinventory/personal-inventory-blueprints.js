@@ -98,52 +98,6 @@ function init() {
     });
     renderStaging();
     wireAdminSwap();
-    wireAdminMemberPersistence();
-}
-
-const ADMIN_USER_PREF_KEY = 'admin_personal_blueprints_user';
-
-function wireAdminMemberPersistence() {
-    if (!document.querySelector('form.krt-pi-userform [name="userSub"]')) {
-        return;
-    }
-    /**
-     * Stores the picked member, or clears the stored one.
-     *
-     * @param {string | null} value the member's sub, empty to clear
-     */
-    function persistMember(value) {
-        try {
-            if (value) {
-                localStorage.setItem(ADMIN_USER_PREF_KEY, JSON.stringify({ userSub: value }));
-            } else {
-                localStorage.removeItem(ADMIN_USER_PREF_KEY);
-            }
-        } catch (_e) {}
-    }
-    document.addEventListener('change', (e) => {
-        const sel = /** @type {HTMLSelectElement} */ (e.target);
-        if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
-            persistMember(sel.value);
-        }
-    });
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('userSub')) {
-        persistMember(params.get('userSub'));
-        return;
-    }
-    /** @type {string | null} */
-    let saved;
-    try {
-        const raw = localStorage.getItem(ADMIN_USER_PREF_KEY);
-        const parsed = raw === null ? null : JSON.parse(raw);
-        saved = parsed && typeof parsed.userSub === 'string' ? parsed.userSub : null;
-    } catch (_e) {
-        saved = null;
-    }
-    if (saved) {
-        window.location.replace(`${window.location.pathname}?userSub=${encodeURIComponent(saved)}`);
-    }
 }
 
 /**

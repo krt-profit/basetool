@@ -247,6 +247,8 @@
                         <div class="tree-cell tree-name">
                             <span class="tree-chevron toggle-icon">▶</span>
                             <span class="tree-label" th:text="${group.material.name}">Material</span>
+                            <span th:if="${group.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
+                                  th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
                         </div>
                         <div class="tree-cell lager-cell-muted" th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</div>
                         <div class="tree-cell tree-cell--num">

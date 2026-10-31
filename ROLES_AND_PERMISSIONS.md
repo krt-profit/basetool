@@ -408,7 +408,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Change the org unit of a selection of own ships (`POST /hangar/ships/bulk-org-unit`, `HANGAR_READ`/`HANGAR_WRITE` + Owner of every ship, REQ-HANGAR-010) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Manage other members' ships (`hasRole('ADMIN')`; page `/admin/members/{id}/hangar`, linked from the member edit page, REQ-HANGAR-011) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Change the org unit of one or several of a member's ships to one of the member's direct units or none (`PUT /hangar/admin/users/{userId}/ships/{shipId}/org-unit`, `POST /hangar/admin/users/{userId}/ships/bulk-org-unit`, `hasRole('ADMIN')`; the member is notified, REQ-HANGAR-012) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                           |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
+| `resetAllFittedStatus` (`canResetFitted`: officer reach in the active context, limited to the units reached)                                          |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | Read the unit tab „Org-Einheit" of the hangar (`/hangar/squadron`, `HANGAR_READ`)                  |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Live updates of the unit tab: a unit's room `hangar-unit:{orgUnitId}` (the unit-overview scope, `GET /hangar/units/{orgUnitId}/overview-access`) and the data-free `hangar-units` room (signed in), REQ-HANGAR-013 |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Live updates of another member's hangar on the web (`hangar:{userId}` room, `ROLE_ADMIN`; the app bridge keeps it self-only, ADR-0260) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -416,13 +416,13 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Manage personal inventory/blueprints of **others** (`/admin/...`, `hasRole('ADMIN')`)              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read blueprint availability of the org unit (`/blueprint-overview`, `canAccessBlueprintOverview`)  |   ❌    |  ❌¹  | ❌  |    ✅    |   ✅   |
 
-¹ `canAccessBlueprintOverview` admits Admin, the `OFFICER` realm role, and any membership holding a leadership rank (anything but `MEMBER`) — never the plain Logistician / Mission-Manager flag. The rows it aggregates follow `currentOversightScope()`: an officer all of their own Staffeln, an SK lead their SK, a Staffel rank its own Staffel, a Bereichsleitung its Bereich and every Staffel/SK in it, an OL member every org unit (the Phase-6 cascade, REQ-ORG-015); Admins without a pin all org units, with a pin only the pinned one. Its search matches the product name and, since 2026-10-03, the display names of the in-scope owners it counts — never a person outside that scope (REQ-INV-013).
+¹ `canAccessBlueprintOverview` admits Admin and any membership holding a leadership rank (anything but `MEMBER`; the `OFFICER` realm role alone no longer counts) — never the plain Logistician / Mission-Manager flag. The rows it aggregates follow `currentOversightScope()`: an officer all of their own Staffeln, an SK lead their SK, a Staffel rank its own Staffel, a Bereichsleitung its Bereich and every Staffel/SK in it, an OL member every org unit (the Phase-6 cascade, REQ-ORG-015); Admins without a pin all org units, with a pin only the pinned one. Its search matches the product name and, since 2026-10-03, the display names of the in-scope owners it counts — never a person outside that scope (REQ-INV-013).
 
 Every hangar mutation in this table — by the owner, by an admin on another member's hangar, the import and the fitted reset — is audited under `AuditDomain.HANGAR`; detaching a deleted ship from a mission unit also writes `MISSION_UNIT_UPDATED`. Every change to a member's own or another member's blueprints, the sharing opt-in, the default set and its provisioning is audited under `AuditDomain.BLUEPRINT` (see [`docs/specs/audit.md`](docs/specs/audit.md)).
 
 ³ Backend only: the one UI control that calls it (`/ship-data`, „Alle unfitted") is `hasRole('ADMIN')` in the frontend, so an Officer has no button for it.
 
-² The unit tab „Org-Einheit <Kürzel>" of the hangar (a page of its own called „Org-Einheitsübersicht" until 2026-10-03, „Staffelübersicht" before that) spans **all** visible org units: without an actively pinned unit a Member sees the ships of all their own Staffeln and SKs, a Bereichsleitung additionally those of the subordinate units of their Bereich (REQ-ORG-015), and an OL member **every** ship in the system — including the ownerless ships of members entirely without an org unit (`owningOrgUnit == null`); this OL extension is read-only and limited to this one overview (ADR-0048). With a pinned unit the overview shows only that unit for every caller. The per-ship breakdown (owner/location/fitted, the chevron that opens a ship type's owner rows) stays ADMIN/OFFICER-only — Member/BL/OL see only the counters and the readiness bar.
+² The unit tab „Org-Einheit <Kürzel>" of the hangar (a page of its own called „Org-Einheitsübersicht" until 2026-10-03, „Staffelübersicht" before that) spans **all** visible org units: without an actively pinned unit a Member sees the ships of all their own Staffeln and SKs, a Bereichsleitung additionally those of the subordinate units of their Bereich (REQ-ORG-015), and an OL member **every** ship in the system — including the ownerless ships of members entirely without an org unit (`owningOrgUnit == null`); this OL extension is read-only and limited to this one overview (ADR-0048). With a pinned unit the overview shows only that unit for every caller. The per-ship breakdown (owner/location/fitted, the chevron that opens a ship type's owner rows) needs officer reach in the ship's owning unit (REQ-SEC-015; Admin sees all) — a caller without it sees only the counters and the readiness bar.
 
 ### 3.2a Data protection: export, erasure, name search (REQ-SEC-058/060/061/062)
 
@@ -473,6 +473,8 @@ somebody's Art. 15 request than to the member themselves.
 | Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Read the **cross-order material demand** (`/orders/material-demand`, REQ-ORDERS-034) (`isAuthenticated()` + `canViewJobOrders`)                                                                                                                                                                                                                                          |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician)                                                                                                                                                                                                                                                             |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
+| Enter **any active account** as an editor through the picker (members of the processing unit first, every other account marked with its unit), remove other editors, change their notes (`canManageAssignees`: the Logistician grant of the order's unit + `canEditJobOrder`; a Logistician of another unit who is a member of the order's unit does not qualify, REQ-ORDERS-014/047) |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Read a job order you are an **editor** of — in full, also outside your unit and without profit access; on it only your own note and removing yourself (the assignee grant of `canSeeJobOrder`, REQ-ORDERS-047) |   ✅⁶   |  ✅⁶  | ✅⁶  |   ✅⁶    |   ✅   |
 | Read the **blueprint coverage** of an item order (`canSeeJobOrderBlueprintOwners`)                                                                                                                                                                                                                                                                                       |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
 | Material overview / material collection / item stock / claim buckets of a job order (`isAuthenticated()` + `canSeeJobOrder`)                                                                                                                                                                                                                                             |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | View and — while fully undelivered — limitedly edit an order **your own org unit requested** (`GET /orders/requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`; `canViewOwnJobOrders` / `canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester`, REQ-ORDERS-023)                                                                                         |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
@@ -518,8 +520,16 @@ via the public queue gets `403`; the frontend hides the section. Admins without 
 with a pin only for the matching unit.
 ⁵ Self-or-Logistician rule (`verifyAssigneeAccess`): anyone who sees the job order
 may add/remove **themselves** and maintain **their own** note (max. 500
-characters); other people's entries/notes may only be changed by a Logistician+.
+characters); other people's entries/notes may only be changed by a Logistician of the order
+(`canManageAssignees`: the Logistician grant of the order's unit, within its edit scope).
 Notes are visible to everyone who sees the job order.
+⁶ The **assignee grant** (ADR-0301): an editor entry opens that one order to its holder, whatever
+the responsible unit, the profit gate, their memberships or the pin, for as long as the entry
+exists — a status change or leaving the unit does not end it. It shows the order in its detail and
+in „Alle", never in „Zu bearbeiten", and widens no other list. Every other write — status, lines,
+claims, handovers, production, someone else's entry — answers `403`; the owner panels stay
+redacted. Adding or removing an editor who is not a direct member of the processing unit is
+audited as `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `_REMOVED`.
 
 ### 3.4 Refinery
 
@@ -570,8 +580,9 @@ caller below `Member` on this surface: an account whose realm roles map to nothi
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
-³ Mission-Manager/Officer additionally only within their own Staffel scope
-(`canEditMission`). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
+³ Mission-Manager additionally only within their own Staffel scope (`canEditMission`); an
+Officer's owner change needs officer reach in the mission's owning unit (`canChangeOwner`,
+REQ-SEC-065). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
 does not (§1.3). Which missions are in scope is `canSeeMission` — own Staffel, or any non-internal
 mission organisation-wide. The finance ledger stays member-or-above on its own endpoints.
 ⁵ The owning-org-unit reassignment shares the
@@ -620,12 +631,12 @@ of the manage row above.
 | Read finances / finance-summary (`canSeeOperationLedger` — **scope only**, ADR-0150)      |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
 | Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])               |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
 | **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)           |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| **Revoke** paid-out (additionally `hasAnyRole('ADMIN','OFFICER')`)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| **Revoke** paid-out (additionally `canClearPayout`: officer reach in the operation's unit)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
 | **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 > Payout asymmetry: every Mission-Manager may set `paidOut=true`,
-> but only Officer/Admin may reset a confirmed paid-out back to
-> `false`.
+> but only a caller with officer reach in the operation's owning unit, or an Admin, may reset a
+> confirmed paid-out back to `false`.
 >
 > **Visibility (`canSeeOperation`) has three paths since #500/#501** (one suffices):
 > **(1)** the normal Staffel scope (operation of one's own org unit);
@@ -652,12 +663,12 @@ of the manage row above.
 |:------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read a mission's finance entries, sum and summary (`isMemberOrAbove` + `canSeeMission`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** finance entry (`isMemberOrAbove` + `canCreateFinanceEntry`)        |   ✅¹   |  ✅¹  | ✅³ |   ✅³    |   ✅   |
-| Edit/delete finance entry (service-level `canEditFinanceEntry`: the entry's own participant **or** an Officer in scope **or** Admin) |   ✅¹   |  ✅¹  | ✅¹ |   ✅²   |   ✅   |
-| Read profit calculation (`hasAnyRole('KRT_MEMBER','OFFICER','ADMIN')`)        |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Edit/delete finance entry (service-level `canEditFinanceEntry`: the entry's own participant **or** officer reach in the mission's owning unit **or** Admin) |   ✅¹   |  ✅¹  | ✅¹ |   ✅²   |   ✅   |
+| Read profit calculation (`hasAnyRole('KRT_MEMBER','ADMIN')`)                  |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ¹ Only one's own entry and only while still a participant of the mission.
-² Only for a mission inside the officer's owning-OrgUnit scope (`canEditMission`, security audit
-H1); outside it an Officer is back to ¹.
+² Only for a mission whose owning unit the caller reaches as officer (leadership seat, REQ-SEC-015,
+security audit H1); outside it the caller is back to ¹. A mission without an owning unit is Admin-only.
 ³ For any participant of the mission, but only within their own owning-OrgUnit scope
 (`canManageMission`); the mission owner and its co-managers pass the same way. **Creating** is a
 write and therefore no longer rides the read-level `canSeeMission`, whose cross-squadron public
@@ -1240,7 +1251,7 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Materialbörse (`/materialboerse`)                                                                                                    | `hasRole('KRT_MEMBER')`                                                 | `KRT_MEMBER`                                                                   |
 | Aufträge (`/orders/**`, `/orders/material-demand`, item / material collection)                                                      | `isAuthenticated()`; order edit/claims `LOGISTICIAN`, handovers/unlink Logistician+ | „Aufträge" + „Materialbedarf" if `canViewJobOrders`, else „Meine Aufträge" if `canViewOwnJobOrders`, else „Auftrag anlegen" |
 | Blueprint-Verfügbarkeit (`/blueprint-overview`)                                                                                      | `isAuthenticated()` (backend `canAccessBlueprintOverview`)              | if `canAccessBlueprintOverview`                                                |
-| Materialien, Material-Übersicht, Profitberechnung (`/materials/**`, `/materials/profit-calculation`)                                | `isAuthenticated()`; profit calculation `KRT_MEMBER`/`OFFICER`/`ADMIN`  | always                                                                         |
+| Materialien, Material-Übersicht, Profitberechnung (`/materials/**`, `/materials/profit-calculation`)                                | `isAuthenticated()`; profit calculation `KRT_MEMBER`/`ADMIN`             | always                                                                         |
 | Mein Inventar, Meine Blueprints (`/personal-inventory/**`)                                                                           | `isAuthenticated()`                                                     | always, in the personal menu („Persönlich“) of the drawer’s user row           |
 | Beförderungssystem, Meine Bewertungen (`/promotion/overview`, `/promotion/my-evaluations`)                                           | `isAuthenticated()` + `promotionFeatureEnabled` (403 when the caller's Staffel has promotion off or there is no Staffel, §3.8) | group shown if `promotionFeatureEnabled`                                       |
 | Bewertungsverwaltung, Themenbereiche, Rangvoraussetzungen (`/promotion/manage`, `/promotion/admin/**`)                               | `ADMIN_OR_OFFICER` + `promotionFeatureEnabled`                          | `ADMIN`/`OFFICER`, inside the same group                                       |
@@ -1284,28 +1295,20 @@ backend serves every member) but no control that writes.
   at least one unit (REQ-ROLE-007). The bank's global
   `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).
 
-### 7.2 External assignee of a job order (ADR-0301, REQ-ORDERS-047)
+### 7.2 Navigation of an external assignee (ADR-0301, REQ-ORDERS-040)
 
-A Logistician with access to an order may enter any active account as its assignee (Bearbeiter). An
-**external assignee** reaches the order only through that entry:
+The assignee grant itself is built (§3.3, footnote ⁶). Still planned:
 
 | Function | External assignee |
 | --- | --- |
-| Read the full order (materials, progress, assignees) | ✅ |
-| Edit their own assignee note | ✅ |
-| Remove themselves as assignee | ✅ |
-| Change status, lines or handovers; anything else on the order | ❌ |
 | See the „Aufträge“ link, with only the „Ich bearbeite“ segment, without profit access | ✅ |
-
-The grant lasts as long as the assignee entry exists, whatever the order's status; leaving the unit
-does not end it.
 
 ### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 
-**Shipped for materials:** setting, changing and removing a unit's material levels and the
-„Mindestbestände“ tab follow the first two rows below (`StockLevelAccessPolicy`, the Lager
-`ScopePredicate`). The game-item levels, the shortcuts, the „niedrig“ badge, the widget and the
-notification are still planned.
+**Shipped for materials and game items:** setting, changing and removing a unit's levels and the
+„Mindestbestände“ tab, the shortcuts and the „niedrig“ badge follow the rows below
+(`StockLevelAccessPolicy`, the Lager `ScopePredicate`). The widget and the notification are still
+planned.
 
 | Function | Who |
 | --- | --- |

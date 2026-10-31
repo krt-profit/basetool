@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
-import org.jetbrains.annotations.NotNull;
-
 /**
  * Whose promotion catalogue a backend read returns: the caller's own squadron, as members see it,
  * or the squadrons the caller manages as an officer. Mirrors the backend {@code PromotionReadView}.
@@ -32,16 +30,4 @@ public enum PromotionReadView {
 
   /** The squadrons within the caller's officer reach; the management pages. */
   MANAGEMENT;
-
-  /**
-   * The {@code view} query parameter selecting this view, for appending to a backend path; the
-   * member view is the backend default and adds nothing.
-   *
-   * @param separator {@code '?'} when the path has no query yet, {@code '&'} otherwise
-   * @return the parameter with its separator, or an empty string for the member view
-   */
-  @NotNull
-  public String query(char separator) {
-    return this == MEMBER ? "" : separator + "view=" + name();
-  }
 }

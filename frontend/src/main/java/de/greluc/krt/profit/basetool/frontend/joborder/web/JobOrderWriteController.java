@@ -1243,7 +1243,8 @@ public class JobOrderWriteController {
 
   /**
    * Populates the model attributes the {@code assigneesSection} fragment reads: the order, the
-   * caller's user id and the Logistician flag.
+   * caller's user id, the flag that the caller may edit the order and the flag that they may change
+   * other users' entries.
    *
    * @param model the view model to populate
    * @param principal the authenticated caller
@@ -1253,8 +1254,8 @@ public class JobOrderWriteController {
       @NotNull Model model, OidcUser principal, JobOrderDto order) {
     model.addAttribute("order", order);
     model.addAttribute("currentUserId", getCurrentUserId(principal));
-    boolean canAssign = isLogistician(principal);
-    model.addAttribute("isLogistician", canAssign);
+    model.addAttribute("isLogistician", isLogistician(principal) && order.callerMayEdit());
+    model.addAttribute("canManageAssignees", order.callerMayManageAssignees());
   }
 
   /**

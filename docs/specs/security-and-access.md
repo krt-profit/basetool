@@ -1322,40 +1322,34 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 
 ### REQ-SEC-065 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 `MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
-`MissionAccessPolicy.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
-authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
-`canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
-the entry's mission is within their owning-OrgUnit scope (`OwnerScopeService.canEditMission`). Only
-`ROLE_ADMIN` bypasses the scope check (system-wide oversight). The entry owner's self-edit path (linked
-participant who is still a registered participant) is unchanged.
+`MissionAccessPolicy.canEditFinanceEntry`. `canEditFinanceEntry` passes for an admin, for a caller
+with **officer reach in the mission's owning unit** (REQ-SEC-015, ADR-0300), and on the self-edit path
+of the entry owner (a linked participant who is still a registered participant). A seat in another
+unit, or a plain membership of the owning unit, does not pass. A mission without an owning unit has no
+unit to reach in, so its officer-only writes are reserved to admins.
+
+The mission owner change (`canChangeOwner`: the current owner, an admin, or officer reach in the
+mission's owning unit) and the reset of an operation's payout status to unpaid
+(`OperationAccessPolicy#canClearPayout`: an admin or officer reach in the operation's owning unit)
+follow the same rule on the target's owning unit; every other mission manager keeps setting the mark.
+The frontend offers the unpaid reset from the pin-aware `hasOfficerReach` flag and leaves the
+per-operation decision to the backend.
 
 **Acceptance**
 
-- [x] An officer scoped to OrgUnit A is denied (403) editing/deleting a finance entry of an OrgUnit-B
-  mission (even a B-internal mission they cannot read).
-- [x] An officer in scope, an admin, and the entry owner-participant are allowed.
+- [x] A caller with a seat in unit A is denied (403) editing/deleting a finance entry, changing the
+  owner of a mission, or clearing a payout mark of unit B.
+- [x] A caller with a seat in the owning unit, an admin, and the entry owner-participant are allowed.
+- [x] A plain member of the owning unit is denied; an ownerless target is admin-only.
 
 **Enforced by:** `MissionAccessPolicyGateTest`
-(`canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse`, `…_OfficerInScope_*`, `…_Admin_*`,
-`…_OwnerStillParticipant_*`). **Security audit:** finding H1.
-
-#### Planned amendment (ADR-0300)
-
-There is no `ROLE_OFFICER` any more (REQ-SEC-004). `canEditFinanceEntry` passes for an admin, for a
-caller with **officer reach in the mission's owning unit** (REQ-SEC-015), and on the unchanged
-self-edit path of the entry owner. A seat in another unit, or a plain membership of the owning
-unit, does not pass. The mission owner change (`canChangeOwner`) and the reset of an operation's
-payout status to unpaid follow the same rule on the target's owning unit.
-
-**Enforced by (to be added):** `MissionAccessPolicyGateTest`
-(`canEditFinanceEntry_SeatInOwningUnit_*`, `…_SeatInOtherUnit_*`, `…_PlainMemberOfOwningUnit_*`),
-`OperationPayoutServiceTest` (unpaid reset by officer reach) · **Related:** REQ-SEC-015, ADR-0300
+(`canEditFinanceEntry_SeatInOwningUnit_*`, `…_SeatInOtherUnit_*`, `…_PlainMemberOfOwningUnit_*`,
+`…_Admin_*`, `…_OwnerStillParticipant_*`, `canChangeOwner_Seat*`),
+`OperationAccessPolicyClearPayoutTest`, `OperationPayoutPaidOutSecurityTest`,
+`OperationPageControllerMvcTest` · **Related:** REQ-SEC-015, ADR-0300. **Security audit:** finding H1.
 
 ### REQ-SEC-020 — Member-evaluation writes are scoped to the evaluated member's squadron
 
@@ -3783,13 +3777,17 @@ layer directly.
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`;
 the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
 pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
-(fail-closed `false`, admin `true`). The promotion and Leitung pages and proxies and the
-Spezialkommando members page gate on `canManagePromotions`, `canOpenLeitung` and `hasOfficerReach`
-through the frontend `OfficerSurfaceGate`.
+(fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on
+`canOpenLeitung` and the promotion management entries on `canManagePromotions`, and the sidebar's
+role badge reads `hasOfficerReach`; the bank member search, the profit calculation and the
+blueprint availability overview no longer admit the `OFFICER` role. The promotion and Leitung
+pages and proxies and the Spezialkommando members page gate on `canManagePromotions`,
+`canOpenLeitung` and `hasOfficerReach` through the frontend `OfficerSurfaceGate`.
 
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
 carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
-without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest` ·
+without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest`, `NavigationMenuTest`,
+`SidebarRoleBadgeMvcTest` ·
 **Enforced by (to be added):** a frontend ArchUnit or source scan that no template or controller
 names `ROLE_OFFICER` or `ADMIN_OR_OFFICER` · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
 ADR-0300

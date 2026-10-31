@@ -71,7 +71,7 @@ class NavigationRenderMvcTest {
 
   /**
    * An administrator gets the quick-access trigger and the bell in the header, a closed and inert
-   * drawer with the menu filter, the main groups, the four administration groups behind the
+   * drawer with the menu filter, the main groups, the three administration groups behind the
    * administration entry, the user row with logout, the palette dialog and the mobile tab bar.
    *
    * @throws Exception if the page cannot be rendered
@@ -97,8 +97,7 @@ class NavigationRenderMvcTest {
         .contains("data-group-key=\"resources\"")
         .contains("data-group-key=\"admin-members\"")
         .contains("data-group-key=\"admin-masterdata\"")
-        .contains("data-group-key=\"admin-bank\"")
-        .contains("data-group-key=\"admin-system\"")
+        .contains("data-group-key=\"admin-operations\"")
         .contains("data-testid=\"nav-admin-toggle\"")
         .contains("data-testid=\"nav-user-toggle\"")
         .contains("data-testid=\"nav-logout\"")

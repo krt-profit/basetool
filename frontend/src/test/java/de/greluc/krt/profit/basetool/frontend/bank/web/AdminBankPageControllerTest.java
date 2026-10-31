@@ -58,7 +58,7 @@ class AdminBankPageControllerTest {
 
     String view = controller.wipeReset("nope", attrs);
 
-    assertEquals("redirect:/admin/bank", view);
+    assertEquals("redirect:/admin/settings/danger-zone", view);
     assertEquals("admin.bank.wipe.error.confirm", attrs.getFlashAttributes().get("error"));
     verify(backendApiClient, never()).post(any(), any(), any());
   }
@@ -72,7 +72,7 @@ class AdminBankPageControllerTest {
 
     String view = controller.wipeReset("WIPE", attrs);
 
-    assertEquals("redirect:/admin/bank", view);
+    assertEquals("redirect:/admin/settings/danger-zone", view);
     BankWipeResetResultDto result =
         (BankWipeResetResultDto) attrs.getFlashAttributes().get("wipeResult");
     assertNotNull(result);
@@ -106,11 +106,6 @@ class AdminBankPageControllerTest {
   @Test
   void bankAuditRedirect_redirectsToUnifiedAuditLogBankTab() {
     assertEquals("redirect:/admin/audit-log?domain=BANK", controller.bankAuditRedirect());
-  }
-
-  @Test
-  void bankAdmin_returnsView() {
-    assertEquals("bank/admin/bank", controller.bankAdmin());
   }
 
   @Test

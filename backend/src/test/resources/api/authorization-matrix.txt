@@ -37,8 +37,8 @@ POST /api/v1/bank/holders/transfer | BankHolderController#transfer | pre=hasRole
 GET /api/v1/bank/holders/{id} | BankHolderController#getHolder | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
 PATCH /api/v1/bank/holders/{id} | BankHolderController#updateHolder | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/holders/{id}/transactions | BankHolderController#getHolderBookings | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
-GET /api/v1/bank/members/search | BankMemberSearchController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
-GET /api/v1/bank/members/search/references | BankMemberSearchController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/members/search | BankMemberSearchController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/members/search/references | BankMemberSearchController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/accounts/visible | OrgUnitBankController#listVisibleAccounts | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/accounts/{id} | OrgUnitBankController#getAccountDetail | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/all-members | OrgUnitBankController#clearAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -162,7 +162,7 @@ GET /api/v1/hangar/ships | HangarController#getAllShips | pre=hasAuthority('HANG
 POST /api/v1/hangar/ships | HangarController#addShip | pre=isAuthenticated() | url=POST /api/v1/hangar/ships -> authenticated
 POST /api/v1/hangar/ships/bulk-org-unit | HangarController#bulkChangeMyShipsOrgUnit | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships/home-location | HangarController#setHomeLocationForMyShips | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=hasAnyRole('ADMIN','OFFICER') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
+POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=@hangarAccessPolicy.canResetFitted() | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
 PUT /api/v1/hangar/ships/{id} | HangarController#updateMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=PUT /api/v1/hangar/ships/* -> authenticated
 PUT /api/v1/hangar/ships/{id}/org-unit | HangarController#changeMyShipOrgUnit | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
@@ -257,7 +257,7 @@ GET /api/v1/materials/job-order | MaterialController#getJobOrderMaterials | pre=
 GET /api/v1/materials/lookup | MaterialController#lookupMaterials | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/materials/matrix | MaterialController#getMaterialMatrixItems | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/materials/prices-overview | MaterialController#getMaterialPriceOverview | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/materials/profit-calculation | ProfitCalculationController#getProfitCalculation | pre=hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/materials/profit-calculation | ProfitCalculationController#getProfitCalculation | pre=hasAnyRole('KRT_MEMBER', 'ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/materials/search | MaterialController#searchMaterials | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/materials/{id} | MaterialController#deleteMaterial | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/materials/{id} | MaterialController#getMaterial | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -343,7 +343,7 @@ GET /api/v1/operations/{id}/finance-summary | OperationController#getOperationFi
 GET /api/v1/operations/{id}/finances | OperationController#getOperationFinances | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
 GET /api/v1/operations/{id}/finances/{missionId} | OperationController#getMissionFinanceDetail | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
 GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperation(#id) | url=anyRequest -> authenticated
-PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=hasRole('MISSION_MANAGER') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) | url=anyRequest -> authenticated
+PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=hasRole('MISSION_MANAGER') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or @operationAccessPolicy.canClearPayout(#id)) | url=anyRequest -> authenticated
 GET /api/v1/orders | JobOrderController#getAllJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders | JobOrderController#createJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -356,10 +356,11 @@ GET /api/v1/orders/{id} | JobOrderController#getJobOrderById | pre=isAuthenticat
 PUT /api/v1/orders/{id} | JobOrderController#updateJobOrder | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/allocations/orphaned | JobOrderController#getOrphanedLinkedInventory | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id}/allocations/{inventoryItemId} | JobOrderController#unlinkInventoryItem | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{id}/assignees/{userId} | JobOrderController#removeAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-POST /api/v1/orders/{id}/assignees/{userId} | JobOrderController#addAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{id}/assignees/{userId}/note | JobOrderController#deleteAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/assignees/{userId}/note | JobOrderController#setAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/assignee-candidates | JobOrderAssigneeController#searchAssigneeCandidates | pre=isAuthenticated() and @jobOrderAccessPolicy.canManageAssignees(#id) | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{id}/assignees/{userId} | JobOrderAssigneeController#removeAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/assignees/{userId} | JobOrderAssigneeController#addAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{id}/assignees/{userId}/note | JobOrderAssigneeController#deleteAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/assignees/{userId}/note | JobOrderAssigneeController#setAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/orders/{id}/blueprint-variant-counting | JobOrderController#updateBlueprintVariantCounting | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/handovers | JobOrderController#createHandover | pre=(hasRole('LOGISTICIAN') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/item-blueprint-owners | JobOrderController#getItemBlueprintOwners | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners(#id) | url=anyRequest -> authenticated

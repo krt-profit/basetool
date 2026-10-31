@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <body>
-<a th:fragment="link(entry, linkClass, crumb, icon, filterOnly)" th:href="${entry.external()} ? ${entry.href()} : @{${entry.href()}}" th:data-nav-group="${crumb}" th:data-nav-icon="${icon}" th:data-nav-keywords="${entry.keywordsKey() != null} ? #{${entry.keywordsKey()}} : null" th:class="${linkClass}" th:data-testid="${filterOnly} ? null : ${entry.testId()}" th:data-nav-skip="${filterOnly or entry.notIndexed()} ? 'true' : null" th:target="${entry.external()} ? '_blank' : null" th:rel="${entry.external()} ? 'noopener noreferrer' : null" th:data-entry-key="${entry.key()}"><th:block th:if="${entry.unreadBadge()}"><span class="nav-top-label" th:text="#{${entry.labelKey()}}">Notifications</span>
+<a th:fragment="link(entry, linkClass, crumb, icon, filterOnly)" th:href="${entry.external()} ? ${entry.href()} : @{${entry.href()}}" th:data-nav-group="${crumb}" th:data-nav-icon="${icon}" th:data-nav-keywords="${entry.keywordsKey() != null} ? #{${entry.keywordsKey()}} : null" th:class="${linkClass}" th:data-testid="${filterOnly} ? null : ${entry.testId()}" th:data-nav-skip="${filterOnly or entry.notIndexed()} ? 'true' : null" th:target="${entry.external()} ? '_blank' : null" th:rel="${entry.external()} ? 'noopener noreferrer' : null" th:data-entry-key="${entry.key()}" th:data-nav-paths="${navigation != null} ? ${navigation.areaPaths(entry)} : ${null}"><th:block th:if="${entry.unreadBadge()}"><span class="nav-top-label" th:text="#{${entry.labelKey()}}">Notifications</span>
         <span class="nav-count-pill" data-notif-badge
               th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
               th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span></th:block><th:block th:if="${entry.labelWithIcon()}"><span th:text="#{${entry.labelKey()}}">Login</span>
         <svg class="krt-icon" aria-hidden="true" focusable="false"><use th:href="|#krt-icon-${entry.icon()}|"/></svg></th:block><th:block th:unless="${entry.unreadBadge() or entry.labelWithIcon()}" th:text="#{${entry.labelKey()}}">Label</th:block></a>
 <section th:fragment="group(item, crumb, filterOnly)" class="nav-group"
          th:classappend="${filterOnly} ? 'nav-group-filter-only'"
+         th:attr="data-collapsed=${item.group().collapsed()} ? 'true' : null"
          th:data-group-key="${item.group().key()}" th:data-nav-icon="${item.group().icon()}"
          th:data-nav-group="${crumb}" th:hidden="${filterOnly}">
     <button type="button" class="nav-group-head" aria-expanded="true"
@@ -23,5 +24,14 @@
         </th:block>
     </div>
 </section>
+<th:block th:fragment="pageTabs(entryKey)" th:with="tabs=${navigation != null} ? ${navigation.pageTabs(entryKey, currentRequestUri)} : ${null}">
+<nav th:unless="${tabs == null or #lists.isEmpty(tabs)}" class="tab-nav" th:aria-label="#{nav.tabs.aria}" data-testid="page-tabs">
+    <a th:each="tab : ${tabs}" th:href="@{${tab.entry().href()}}" class="tab"
+       th:classappend="${tab.current()} ? 'active'"
+       th:attr="aria-current=${tab.current()} ? 'page' : null"
+       th:data-entry-key="${tab.entry().key()}" th:data-testid="|page-tab-${tab.entry().key()}|"
+       th:text="#{${tab.entry().labelKey()}}">Tab</a>
+</nav>
+</th:block>
 </body>
 </html>

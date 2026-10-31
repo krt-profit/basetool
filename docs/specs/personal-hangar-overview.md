@@ -108,7 +108,7 @@ button, the other two in the ⋯ menu).
 
 Every change to a hangar writes exactly one event to the **Hangar** audit area
 (`AuditDomain.HANGAR`, REQ-AUDIT-001), whichever channel made it — the web, the app, an admin on
-another member's hangar, the file or Fleetview import, the officer's fitted reset, or a connected
+another member's hangar, the file or Fleetview import, the fitted reset of a caller with officer reach (limited to the units it reaches), or a connected
 application through the exchange API (REQ-XCH-017), which writes through the same create, update and
 delete and is recorded with its client. A run that changed nothing records nothing. The subject is the ship,
 labelled by its ship type, never by its free-text name; details hold ids, counts and changed field

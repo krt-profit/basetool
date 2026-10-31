@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -270,6 +273,56 @@ public class OrgUnitMembershipQueryService {
     return listDirectMembershipOptions(userId).stream()
         .findFirst()
         .map(OrgUnitMembershipOptionDto::orgUnitId);
+  }
+
+  /**
+   * Batched {@link #findPrimaryDirectMembershipOrgUnitId(UUID)}: each user's primary direct
+   * membership as a picker option, read in two queries for the whole set (REQ-DATA-003).
+   *
+   * @param userIds the users to resolve; never {@code null}
+   * @return the primary option per user; users without a direct membership are absent
+   */
+  @NotNull
+  public Map<UUID, OrgUnitMembershipOptionDto> findPrimaryDirectMembershipOptions(
+      @NotNull Collection<UUID> userIds) {
+    if (userIds.isEmpty()) {
+      return Map.of();
+    }
+    List<OrgUnitMembership> rows =
+        membershipRepository.findAllByIdUserIdInAndKindIn(
+            userIds, EnumSet.allOf(OrgUnitKind.class));
+    Map<UUID, OrgUnit> units =
+        orgUnitRepository
+            .findAllById(rows.stream().map(r -> r.getId().getOrgUnitId()).distinct().toList())
+            .stream()
+            .collect(Collectors.toMap(OrgUnit::getId, Function.identity()));
+    Comparator<OrgUnitMembershipOptionDto> order = pickerOrder();
+    Map<UUID, OrgUnitMembershipOptionDto> primary = new HashMap<>();
+    for (OrgUnitMembership row : rows) {
+      OrgUnit unit = units.get(row.getId().getOrgUnitId());
+      if (unit != null) {
+        primary.merge(
+            row.getId().getUserId(),
+            toOption(unit),
+            (current, candidate) -> order.compare(candidate, current) < 0 ? candidate : current);
+      }
+    }
+    return primary;
+  }
+
+  /**
+   * Projects an org unit to its picker option.
+   *
+   * @param orgUnit the org unit; never {@code null}
+   * @return the option
+   */
+  private static OrgUnitMembershipOptionDto toOption(@NotNull OrgUnit orgUnit) {
+    return new OrgUnitMembershipOptionDto(
+        orgUnit.getId(),
+        orgUnit.getName(),
+        orgUnit.getShorthand(),
+        orgUnit.getKind(),
+        orgUnit.isProfitEligible());
   }
 
   /**

@@ -38,6 +38,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -69,6 +70,7 @@ public class InventoryAggregationService {
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
   private final InventoryItemViewRepository inventoryItemViewRepository;
+  private final StockLevelService stockLevelService;
 
   /**
    * Sums the caller's own stock into one SCU total per material and quality for the blueprint
@@ -90,16 +92,20 @@ public class InventoryAggregationService {
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Set<UUID> lowMaterials = stockLevelService.lowMaterialIds();
     return inventoryItemRepository
         .getAggregatedInventory(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
-        .map(obj ->
-            new AggregatedInventoryDto(
-                materialMapper.toDto((Material) obj[0]),
-                null,
-                obj[1] != null ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0 : 0.0,
-                obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
-                obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0));
+        .map(obj -> {
+          Material material = (Material) obj[0];
+          return new AggregatedInventoryDto(
+              materialMapper.toDto(material),
+              null,
+              obj[1] != null ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0 : 0.0,
+              obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
+              obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0,
+              lowMaterials.contains(material.getId()));
+        });
   }
 
   /**
@@ -329,7 +335,12 @@ public class InventoryAggregationService {
             filter.stolenOnly(),
             filter.nonStolenOnly());
 
-    return buildGroupedFromStacks(stacks);
+    Set<UUID> lowMaterials = stockLevelService.lowMaterialIds();
+    return buildGroupedFromStacks(stacks).stream()
+        .map(group ->
+            group.withLowStock(
+                group.material() != null && lowMaterials.contains(group.material().id())))
+        .toList();
   }
 
   /**

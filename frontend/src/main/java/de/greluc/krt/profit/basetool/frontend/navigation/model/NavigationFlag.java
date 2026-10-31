@@ -31,6 +31,12 @@ public enum NavigationFlag {
   /** The caller may view the orders their own org unit requested (REQ-ORDERS-023). */
   OWN_JOB_ORDERS,
 
+  /** The Leitung page is offered in the active context (officer reach). */
+  OPEN_LEITUNG,
+
+  /** Promotion management is offered in the active context (officer reach). */
+  MANAGE_PROMOTIONS,
+
   /** The supply surface is on (REQ-SUP-001). */
   SUPPLY,
 

@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttribution
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
@@ -82,6 +83,7 @@ public class JobOrderQueryService {
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderMaterialRequirementResolver materialRequirementResolver;
+  private final AuthHelperService authHelper;
 
   /**
    * Paged list with an optional status filter, always constrained to the caller's visibility scope.
@@ -123,7 +125,8 @@ public class JobOrderQueryService {
    * <p>With {@code toProcess} only orders whose profit-eligible responsible unit is one of the
    * caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned org
    * unit when one is active, otherwise the caller's direct memberships. The filter only narrows the
-   * scoped result; a caller with no processing unit gets an empty page.
+   * scoped result; a caller with no processing unit gets an empty page. Without it the scope also
+   * holds the orders the caller is an assignee of (REQ-ORDERS-047).
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -165,6 +168,7 @@ public class JobOrderQueryService {
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
+            authHelper.currentUserId().orElse(NIL_ID),
             pageable);
 
     return jobOrderStockProjectionService.mapPageWithStock(page);
@@ -203,7 +207,7 @@ public class JobOrderQueryService {
     }
     List<JobOrder> visible =
         jobOrderRepository.findAllActiveWithMaterials().stream()
-            .filter(jobOrderAccessPolicy::canSeeJobOrder)
+            .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
             .toList();
     List<UUID> needIds = withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of();
     OrderLinkedStockIndex stockIndex =

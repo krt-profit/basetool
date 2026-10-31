@@ -11,7 +11,7 @@
 <th:block th:fragment="pageContent">
 <main>
     <th:block th:with="hasUser=${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.blueprints.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.members', eyebrowHref=@{/members}, titleText=#{admin.personalInventory.blueprints.title},
         count=${hasUser ? #lists.size(blueprints) : null}, countId='bp-count', countFor='bp-results', actions=~{::bp-actions})}">
         <th:block th:ref="bp-actions">
             <th:block th:if="${hasUser}">
@@ -20,58 +20,10 @@
                         data-trigger="bp-import-pick"
                         th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
             </th:block>
-            <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='bp-admin-menu', items=~{::bp-menu-items})}">
-                <th:block th:ref="bp-menu-items">
-                    <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
-                            data-trigger="open-modal-display" data-modal-id="bp-purge-modal" data-testid="bp-purge-open"
-                            th:text="#{admin.personalInventory.blueprints.purge.title}">Alle Blueprints aller Nutzer l&ouml;schen</button>
-                </th:block>
-            </th:block>
         </th:block>
     </th:block>
 
-    <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-userform form-width no-track">
-        <label for="krt-bp-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-        <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox="remote-users">
-            <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
-            <option th:if="${selectedUser != null}"
-                    th:value="${selectedUser.id}"
-                    th:selected="true"
-                    th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
-        </select>
-    </form>
-
-    <div th:if="${!hasUser}" class="card card--flush">
-        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
-    </div>
-
-    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bp-purge-modal', titleKey='admin.personalInventory.blueprints.purge.modal.title', variant='krt-modal--danger', body=~{::bp-purge-modal-body})}">
-        <th:block th:ref="bp-purge-modal-body">
-            <form method="post" th:action="@{/admin/personal-blueprints/delete-all-users}" class="no-track" data-bp-purge
-                  th:data-purge-success="#{admin.personalInventory.blueprints.purge.toast.count}"
-                  th:data-purge-error="#{admin.personalInventory.blueprints.purge.error}">
-                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                <div class="krt-modal-body stack gap-3">
-                    <p th:text="#{admin.personalInventory.blueprints.purge.modal.text}">Diese Aktion l&ouml;scht die Blueprints ALLER Nutzer unwiderruflich. Tippe LOESCHEN, um zu best&auml;tigen.</p>
-                    <div class="form-group">
-                        <label for="bp-purge-confirm" th:text="#{admin.personalInventory.blueprints.purge.modal.label}">Best&auml;tigung</label>
-                        <input type="text" id="bp-purge-confirm" name="confirm" autocomplete="off"
-                               data-confirm-token="LOESCHEN" data-confirm-submit="bp-purge-submit"
-                               data-testid="bp-purge-confirm" placeholder="LOESCHEN">
-                    </div>
-                </div>
-                <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
-                            data-modal-id="bp-purge-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn-danger" id="bp-purge-submit"
-                            data-testid="bp-purge-submit" disabled>
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-                        <span th:text="#{admin.personalInventory.blueprints.purge.button}">Alle l&ouml;schen</span>
-                    </button>
-                </div>
-            </form>
-        </th:block>
-    </th:block>
+    <th:block th:replace="~{identity/fragments/member-tabs :: tabs(${selectedUserSub}, 'blueprints')}"></th:block>
 
     <th:block th:if="${hasUser}">
         <section class="card krt-personal-inventory">
@@ -218,7 +170,6 @@
 </th:block>
 </th:block>
 <th:block th:fragment="pageTail">
-<script type="module" th:src="@{/js/personalinventory/admin-personal-blueprints-purge.js}" th:attr="nonce=${cspNonce}"></script>
 <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtBlueprintsI18n = {
