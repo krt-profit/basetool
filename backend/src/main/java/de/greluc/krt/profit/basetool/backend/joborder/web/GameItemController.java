@@ -55,15 +55,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class GameItemController {
 
   /**
-   * Gate of {@code GET /game-items}: any login for the orderable subset, ADMIN, OFFICER,
-   * LOGISTICIAN or KRT_MEMBER for the full bookable set (the former {@code /inventory/**} role
-   * rule).
+   * Gate of {@code GET /game-items}: any login for the orderable subset, ADMIN, LOGISTICIAN or
+   * KRT_MEMBER for the full bookable set (the former {@code /inventory/**} role rule).
    */
   static final String GAME_ITEM_ACCESS =
       "isAuthenticated() and (#orderable or hasAnyRole('"
           + Roles.ADMIN
-          + "','"
-          + Roles.OFFICER
           + "','"
           + Roles.LOGISTICIAN
           + "','"
@@ -92,7 +89,7 @@ public class GameItemController {
       description =
           "Returns a paginated list of game items that are the output of at least one active"
               + " blueprint; orderable=true keeps those with a resolvable material (item-order"
-              + " lines). The full set needs ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER, the"
+              + " lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the"
               + " orderable subset any login.")
   @Transactional(readOnly = true)
   public PageResponse<InventoryGameItemReferenceDto> getGameItems(
