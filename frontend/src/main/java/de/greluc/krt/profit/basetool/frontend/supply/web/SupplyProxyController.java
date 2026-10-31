@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient.
 import de.greluc.krt.profit.basetool.frontend.supply.model.CreateNeedRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.DeclineDonationRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.DonationDto;
+import de.greluc.krt.profit.basetool.frontend.supply.model.DonationSourceDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.PledgeRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.ReceiveDonationRequest;
@@ -47,6 +48,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -73,6 +75,24 @@ public class SupplyProxyController {
   public List<SupplyUnitDto> units() {
     List<SupplyUnitDto> units = supplyClient.units();
     return units == null ? List.of() : units;
+  }
+
+  /**
+   * Reads the caller's own Lager rows a pledge can be made from, for the pledge dialog's stock
+   * picker (REQ-SUP-025).
+   *
+   * @param needId the need the pledge credits
+   * @param materialId the material of a free pledge
+   * @param gameItemId the game item of a free pledge
+   * @return the rows, best quality first
+   */
+  @GetMapping("/me/donation-sources")
+  public List<DonationSourceDto> donationSources(
+      @RequestParam(required = false) UUID needId,
+      @RequestParam(required = false) UUID materialId,
+      @RequestParam(required = false) UUID gameItemId) {
+    List<DonationSourceDto> sources = supplyClient.donationSources(needId, materialId, gameItemId);
+    return sources == null ? List.of() : sources;
   }
 
   /**

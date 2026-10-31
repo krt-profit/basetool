@@ -81,6 +81,21 @@ class SupplyBackendClientTest {
   }
 
   @Test
+  void donationSourcesCarryOnlyThePresentFilters() {
+    backend.answerJson("[]");
+    backend.answerJson("[]");
+    backend.answerJson("[]");
+
+    assertThat(client.donationSources(ID, null, null)).isEmpty();
+    assertThat(client.donationSources(null, UNIT, null)).isEmpty();
+    assertThat(client.donationSources(null, null, ID)).isEmpty();
+
+    backend.expect("GET", "/api/v1/supply/me/donation-sources?needId=" + ID);
+    backend.expect("GET", "/api/v1/supply/me/donation-sources?materialId=" + UNIT);
+    backend.expect("GET", "/api/v1/supply/me/donation-sources?gameItemId=" + ID);
+  }
+
+  @Test
   void donationReadsAndStatistics() {
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.supply.model.CreateNeedRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.DeclineDonationRequest;
 import de.greluc.krt.profit.basetool.frontend.supply.model.DonationDto;
+import de.greluc.krt.profit.basetool.frontend.supply.model.DonationSourceDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.MyDonationStatsDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedJobOrderOptionDto;
@@ -76,6 +77,9 @@ public class SupplyBackendClient {
   private static final ParameterizedTypeReference<List<SupplyUnitDto>> UNIT_LIST =
       new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<DonationSourceDto>> SOURCE_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private static final ParameterizedTypeReference<List<MaterialReferenceDto>> MATERIAL_LIST =
       new ParameterizedTypeReference<>() {};
 
@@ -122,6 +126,50 @@ public class SupplyBackendClient {
       variables.add(status);
     }
     return backendApiClient.get(template.toString(), NEED_PAGE, variables.toArray());
+  }
+
+  /**
+   * Reads the caller's own Lager rows a pledge can be made from (REQ-SUP-025).
+   *
+   * @param needId the need the pledge credits, or {@code null}
+   * @param materialId the material of a free pledge, or {@code null}
+   * @param gameItemId the game item of a free pledge, or {@code null}
+   * @return the rows, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<DonationSourceDto> donationSources(
+      @Nullable UUID needId, @Nullable UUID materialId, @Nullable UUID gameItemId) {
+    StringBuilder template = new StringBuilder("/api/v1/supply/me/donation-sources");
+    List<Object> variables = new ArrayList<>();
+    appendQuery(template, variables, "needId", needId);
+    appendQuery(template, variables, "materialId", materialId);
+    appendQuery(template, variables, "gameItemId", gameItemId);
+    return backendApiClient.get(template.toString(), SOURCE_LIST, variables.toArray());
+  }
+
+  /**
+   * Appends one optional query parameter as a template variable.
+   *
+   * @param template the URI template being built
+   * @param variables the template variables in order
+   * @param name the parameter name
+   * @param value the value, or {@code null} to leave the parameter out
+   */
+  private static void appendQuery(
+      @NotNull StringBuilder template,
+      @NotNull List<Object> variables,
+      @NotNull String name,
+      @Nullable UUID value) {
+    if (value == null) {
+      return;
+    }
+    template
+        .append(variables.isEmpty() ? '?' : '&')
+        .append(name)
+        .append("={")
+        .append(name)
+        .append('}');
+    variables.add(value);
   }
 
   /**

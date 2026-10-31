@@ -19,6 +19,7 @@
 
 /* global supplyI18n, supplyConflict */
 
+import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
@@ -66,6 +67,20 @@ export function numberOrNull(value) {
 export function textOrNull(value) {
     const trimmed = value.trim();
     return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Formats an amount in its quantity type's precision for a hint or a picker label.
+ *
+ * @param {number} value the amount
+ * @param {string} quantityType `PIECE`, `ITEM` or `SCU`
+ * @returns {string} the formatted amount
+ */
+export function formatAmount(value, quantityType) {
+    const whole = quantityType === 'PIECE' || quantityType === 'ITEM';
+    return whole
+        ? formatNumber(Math.round(value), 0, document.documentElement.lang)
+        : formatNumber(value, 3, document.documentElement.lang);
 }
 
 /**
@@ -248,15 +263,109 @@ export function initPledgeModal(afterWrite) {
         'supply-pledge-quality-row',
     ]);
 
+    const source = select('supply-pledge-source');
+    const noSource = source.options[0];
+    const freeHint = document.getElementById('supply-pledge-free');
+    const qualityRow = document.getElementById('supply-pledge-quality-row');
+    let sourceRequest = 0;
+
+    /**
+     * Builds the query that selects the caller's Lager rows fitting the form: the need, or the
+     * chosen material or item of a free pledge.
+     *
+     * @returns {string | null} the query, or null when nothing is chosen yet
+     */
+    function sourceQuery() {
+        const needId = field('supply-pledge-need-id').value;
+        if (needId) return `needId=${encodeURIComponent(needId)}`;
+        const isItem = select('supply-pledge-kind').value === 'item';
+        const id = select(isItem ? 'supply-pledge-item' : 'supply-pledge-material').value;
+        if (!id) return null;
+        return `${isItem ? 'gameItemId' : 'materialId'}=${encodeURIComponent(id)}`;
+    }
+
+    /**
+     * Shows the free amount of the chosen Lager row and hides the quality the row already names.
+     */
+    function syncSource() {
+        const option = source.selectedOptions[0];
+        const chosen = option !== undefined && option.value !== '';
+        const isItem = select('supply-pledge-kind').value === 'item';
+        if (qualityRow) qualityRow.hidden = chosen || isItem;
+        const amount = field('supply-pledge-amount');
+        if (chosen) {
+            const free = Number(option.dataset.free || '0');
+            amount.max = String(free);
+            if (freeHint) {
+                freeHint.hidden = false;
+                freeHint.textContent = String(supplyI18n.lagerFree).replace(
+                    '{0}',
+                    formatAmount(free, option.dataset.quantityType || 'SCU'),
+                );
+            }
+        } else {
+            amount.removeAttribute('max');
+            if (freeHint) freeHint.hidden = true;
+        }
+    }
+
+    /**
+     * Reloads the stock picker for the current need or catalogue entry; an answer that a later
+     * change has overtaken is dropped.
+     */
+    async function loadSources() {
+        const request = ++sourceRequest;
+        source.replaceChildren(noSource);
+        source.value = '';
+        syncSource();
+        const query = sourceQuery();
+        if (query === null) return;
+        /** @type {unknown} */
+        let rows;
+        try {
+            rows = await krtFetch.getJson(`/api/proxy/supply/me/donation-sources?${query}`);
+        } catch {
+            return;
+        }
+        if (request !== sourceRequest || !Array.isArray(rows)) return;
+        for (const row of /** @type {ApiDto<'DonationSourceDto'>[]} */ (rows)) {
+            if (!row.id) continue;
+            const free = row.freeAmount ?? 0;
+            const quantityType = row.quantityType ?? 'SCU';
+            const location = row.locationName ?? '';
+            const option = document.createElement('option');
+            option.value = row.id;
+            option.dataset.free = String(free);
+            option.dataset.quantityType = quantityType;
+            const amount = formatAmount(free, quantityType);
+            option.textContent =
+                row.quality === null || row.quality === undefined
+                    ? String(supplyI18n.pledgeSourceItem)
+                          .replace('{0}', location)
+                          .replace('{1}', amount)
+                    : String(supplyI18n.pledgeSourceMaterial)
+                          .replace('{0}', location)
+                          .replace('{1}', String(row.quality))
+                          .replace('{2}', amount);
+            source.appendChild(option);
+        }
+    }
+
+    source.addEventListener('change', syncSource);
+    ['supply-pledge-kind', 'supply-pledge-material', 'supply-pledge-item'].forEach((id) =>
+        select(id).addEventListener('change', () => {
+            void loadSources();
+        }),
+    );
+
     /**
      * Resets the form to a free pledge and opens it.
      *
-     * @param {{ needId: string, unitId: string, entry: string, source: string }} preset the preset
+     * @param {{ needId: string, unitId: string, entry: string }} preset the preset
      */
     function open(preset) {
         /** @type {HTMLFormElement} */ (form).reset();
         field('supply-pledge-need-id').value = preset.needId;
-        field('supply-pledge-source-id').value = preset.source;
         const label = document.getElementById('supply-pledge-need-label');
         const catalogue = document.getElementById('supply-pledge-catalogue');
         const unitRow = document.getElementById('supply-pledge-unit-row');
@@ -270,18 +379,18 @@ export function initPledgeModal(afterWrite) {
         if (catalogue) catalogue.hidden = forNeed;
         if (unitRow) unitRow.hidden = forNeed;
         if (preset.unitId !== '') select('supply-pledge-unit').value = preset.unitId;
+        void loadSources();
         krtModal.open(modal);
     }
 
     krtEvents.on('click', 'supply-open-pledge', () => {
-        open({ needId: '', unitId: '', entry: '', source: '' });
+        open({ needId: '', unitId: '', entry: '' });
     });
     krtEvents.on('click', 'supply-open-pledge-for-need', (button) => {
         open({
             needId: button.getAttribute('data-need-id') || '',
             unitId: button.getAttribute('data-unit-id') || '',
             entry: button.getAttribute('data-entry') || '',
-            source: '',
         });
     });
 
@@ -289,6 +398,7 @@ export function initPledgeModal(afterWrite) {
         event.preventDefault();
         const needId = textOrNull(field('supply-pledge-need-id').value);
         const isItem = select('supply-pledge-kind').value === 'item';
+        const sourceId = textOrNull(source.value);
         const submitter = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
         );
@@ -303,9 +413,11 @@ export function initPledgeModal(afterWrite) {
                 gameItemId:
                     needId || !isItem ? null : textOrNull(select('supply-pledge-item').value),
                 quality:
-                    needId || isItem ? null : numberOrNull(field('supply-pledge-quality').value),
+                    needId || isItem || sourceId
+                        ? null
+                        : numberOrNull(field('supply-pledge-quality').value),
                 amount: numberOrNull(field('supply-pledge-amount').value),
-                sourceInventoryItemId: textOrNull(field('supply-pledge-source-id').value),
+                sourceInventoryItemId: sourceId,
             },
             successMessage: supplyI18n.pledgeSaved,
             errorMessage: supplyI18n.pledgeError,

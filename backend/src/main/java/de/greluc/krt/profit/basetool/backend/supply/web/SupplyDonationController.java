@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.supply.internal.DeclineDonationRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.DonationDto;
+import de.greluc.krt.profit.basetool.backend.supply.internal.DonationSourceDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.MyDonationStatsDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.PledgeRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.ReceiveDonationRequest;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyStatsService;
 import de.greluc.krt.profit.basetool.backend.supply.internal.VersionRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -186,6 +188,23 @@ public class SupplyDonationController {
   @GetMapping("/me/donations/stats")
   public MyDonationStatsDto myStats() {
     return statsService.mine();
+  }
+
+  /**
+   * Lists the caller's own Lager rows a pledge can be made from, for the pledge form's picker.
+   *
+   * @param needId the need the pledge credits
+   * @param materialId the material of a free pledge
+   * @param gameItemId the game item of a free pledge
+   * @return the rows, best quality first
+   */
+  @Operation(summary = "List the caller's own Lager rows a pledge can be made from")
+  @GetMapping("/me/donation-sources")
+  public List<DonationSourceDto> mySources(
+      @RequestParam(required = false) UUID needId,
+      @RequestParam(required = false) UUID materialId,
+      @RequestParam(required = false) UUID gameItemId) {
+    return donationService.sources(needId, materialId, gameItemId);
   }
 
   private static @NotNull Pageable pageable(Integer page, Integer size, String sort) {
