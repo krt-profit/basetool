@@ -122,9 +122,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Section patches ({@code /core}, {@code /schedule}, {@code /flags}) are versioned
  * independently, and {@code .../slim} endpoints return only the affected sub-DTO. Responses for
- * callers without the Logistician grant in the owning unit pass through {@link
- * MissionPeerRedactor#cleanupMissionForPeer} (REQ-SEC-007); authorisation is delegated to {@link
- * MissionAccessPolicy}.
+ * non-admin callers pass through {@link MissionPeerRedactor#cleanupMissionForPeer} (REQ-SEC-007);
+ * authorisation is delegated to {@link MissionAccessPolicy}.
  */
 @RestController
 @RequestMapping("/api/v1/missions")
@@ -206,7 +205,7 @@ public class MissionController {
   }
 
   /**
-   * Returns a single mission, visible per {@code canSeeMission}; callers below Logistician get the
+   * Returns a single mission, visible per {@code canSeeMission}; non-admin callers get the
    * peer-redacted DTO (REQ-SEC-007).
    *
    * @param id mission id
@@ -224,8 +223,7 @@ public class MissionController {
 
   /**
    * Returns the next upcoming {@code PLANNED} or {@code ACTIVE} mission, or 204 when none
-   * (REQ-MISSION-003); callers without the Logistician grant in the owning unit get the
-   * peer-redacted DTO.
+   * (REQ-MISSION-003); non-admin callers get the peer-redacted DTO.
    *
    * @return mission DTO or 204 No Content
    */
@@ -591,7 +589,7 @@ public class MissionController {
             request.responsibleUserId(),
             request.note());
     return redactUnitsForPeer(
-        id, mission.getAssignedUnits().stream().map(missionMapper::toDto).toList());
+        mission.getAssignedUnits().stream().map(missionMapper::toDto).toList());
   }
 
   /**
@@ -623,7 +621,7 @@ public class MissionController {
             request.frequency(),
             request.responsibleUserId(),
             request.note());
-    return redactForPeer(id, missionMapper.toDto(findUnit(mission, unitId)));
+    return redactForPeer(missionMapper.toDto(findUnit(mission, unitId)));
   }
 
   /**
@@ -876,7 +874,6 @@ public class MissionController {
               + "mission. Restricted to callers who may manage the mission.")
   public List<ShipDto> getUnitShipOptions(@PathVariable @NotNull UUID id) {
     return redactShipsForPeer(
-        id,
         missionStructureService.getSelectableUnitShips(id).stream()
             .map(shipMapper::toDto)
             .toList());
@@ -988,7 +985,7 @@ public class MissionController {
             request.guestName(),
             request.version(),
             authentication);
-    return redactForPeer(id, missionMapper.toDto(findParticipant(mission, participantId)));
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -1007,7 +1004,7 @@ public class MissionController {
   public MissionParticipantDto checkInParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionParticipantService.checkIn(id, participantId);
-    return redactForPeer(id, missionMapper.toDto(findParticipant(mission, participantId)));
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -1026,7 +1023,7 @@ public class MissionController {
   public MissionParticipantDto checkOutParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionParticipantService.checkOut(id, participantId);
-    return redactForPeer(id, missionMapper.toDto(findParticipant(mission, participantId)));
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -1049,7 +1046,7 @@ public class MissionController {
       @RequestBody @Valid @NotNull UpdatePayoutPreferenceRequest request) {
     var mission =
         missionParticipantService.updatePayoutPreference(id, participantId, request.preference());
-    return redactForPeer(id, missionMapper.toDto(findParticipant(mission, participantId)));
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -1086,7 +1083,7 @@ public class MissionController {
             request.orgUnitIds(),
             request.payoutPreference());
     return redactParticipantsForPeer(
-        id, mission.getParticipants().stream().map(missionMapper::toDto).toList());
+        mission.getParticipants().stream().map(missionMapper::toDto).toList());
   }
 
   /**
@@ -1122,7 +1119,6 @@ public class MissionController {
           "Returns all participants of a mission that are not yet assigned to any unit crew.")
   public List<MissionParticipantDto> getUnassignedParticipants(@PathVariable @NotNull UUID id) {
     return redactParticipantsForPeer(
-        id,
         missionParticipantService.getUnassignedParticipants(id).stream()
             .map(missionMapper::toDto)
             .toList());
@@ -1306,54 +1302,47 @@ public class MissionController {
   }
 
   /**
-   * Applies the peer redaction to a mission DTO unless the caller holds the Logistician grant in
-   * the owning unit (REQ-SEC-007).
+   * Applies the peer redaction to a mission DTO for non-admin callers (REQ-SEC-007).
    *
    * @param dto the freshly mapped DTO
-   * @return the same DTO when the grant lifts the redaction, the peer-redacted copy otherwise
+   * @return the same DTO for admins, the peer-redacted copy for everyone else
    */
   private MissionDto redactForPeer(MissionDto dto) {
-    return missionAccessPolicy.liftsPeerRedaction(dto.id())
-        ? dto
-        : missionPeerRedactor.cleanupMissionForPeer(dto);
+    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupMissionForPeer(dto);
   }
 
   /**
    * Peer pass for a single unit DTO (the slim unit endpoints).
    *
    * @param dto the freshly mapped unit
-   * @return the same DTO when the grant lifts the redaction, otherwise one whose nested ship owner
-   *     is reduced to the public callsign tuple (REQ-SEC-040)
+   * @return the same DTO for admins, otherwise one whose nested ship owner is reduced to the public
+   *     callsign tuple (REQ-SEC-040)
    */
-  private MissionUnitDto redactForPeer(UUID missionId, MissionUnitDto dto) {
-    return missionAccessPolicy.liftsPeerRedaction(missionId)
-        ? dto
-        : missionPeerRedactor.cleanupUnitForPeer(dto);
+  private MissionUnitDto redactForPeer(MissionUnitDto dto) {
+    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupUnitForPeer(dto);
   }
 
   /**
    * Peer pass for a single participant row (the slim participant endpoints).
    *
    * @param dto the freshly mapped participant
-   * @return the same DTO when the grant lifts the redaction, otherwise one whose nested user is
-   *     reduced to the public callsign tuple — no e-mail, no real name (REQ-SEC-007)
+   * @return the same DTO for admins, otherwise one whose nested user is reduced to the public
+   *     callsign tuple — no e-mail, no real name (REQ-SEC-007)
    */
-  private MissionParticipantDto redactForPeer(UUID missionId, MissionParticipantDto dto) {
-    return missionAccessPolicy.liftsPeerRedaction(missionId)
-        ? dto
-        : missionPeerRedactor.cleanupParticipantForPeer(dto);
+  private MissionParticipantDto redactForPeer(MissionParticipantDto dto) {
+    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupParticipantForPeer(dto);
   }
 
   /**
    * Peer pass for a participant list.
    *
    * @param participants the freshly mapped roster rows
-   * @return the same list when the grant lifts the redaction, otherwise one whose nested users are
-   *     reduced to the public callsign tuple
+   * @return the same list for admins, otherwise one whose nested users are reduced to the public
+   *     callsign tuple
    */
   private List<MissionParticipantDto> redactParticipantsForPeer(
-      UUID missionId, List<MissionParticipantDto> participants) {
-    return missionAccessPolicy.liftsPeerRedaction(missionId)
+      List<MissionParticipantDto> participants) {
+    return authHelperService.isAdmin()
         ? participants
         : participants.stream().map(missionPeerRedactor::cleanupParticipantForPeer).toList();
   }
@@ -1362,10 +1351,10 @@ public class MissionController {
    * Peer pass for a unit list.
    *
    * @param units the freshly mapped units
-   * @return the same list when the grant lifts the redaction, otherwise a redacted copy
+   * @return the same list for admins, otherwise a redacted copy
    */
-  private List<MissionUnitDto> redactUnitsForPeer(UUID missionId, List<MissionUnitDto> units) {
-    return missionAccessPolicy.liftsPeerRedaction(missionId)
+  private List<MissionUnitDto> redactUnitsForPeer(List<MissionUnitDto> units) {
+    return authHelperService.isAdmin()
         ? units
         : units.stream().map(missionPeerRedactor::cleanupUnitForPeer).toList();
   }
@@ -1375,10 +1364,10 @@ public class MissionController {
    * (REQ-SEC-040).
    *
    * @param ships the selectable ships
-   * @return the same list when the grant lifts the redaction, otherwise a redacted copy
+   * @return the same list for admins, otherwise a redacted copy
    */
-  private List<ShipDto> redactShipsForPeer(UUID missionId, List<ShipDto> ships) {
-    return missionAccessPolicy.liftsPeerRedaction(missionId)
+  private List<ShipDto> redactShipsForPeer(List<ShipDto> ships) {
+    return authHelperService.isAdmin()
         ? ships
         : ships.stream().map(missionPeerRedactor::cleanupShipForPeer).toList();
   }

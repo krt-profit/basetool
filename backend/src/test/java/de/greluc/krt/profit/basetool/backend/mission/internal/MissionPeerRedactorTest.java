@@ -56,19 +56,19 @@ class MissionPeerRedactorTest {
     UserDto redacted = redactor.cleanupUserForPeer(full);
 
     assertThat(redacted.id()).isEqualTo(full.id());
-    assertThat(redacted.username()).isEqualTo("bob.callsign");
+    assertThat(redacted.username()).isNull();
     assertThat(redacted.displayName()).isEqualTo("Bob");
     assertThat(redacted.effectiveName()).isEqualTo("Bob");
     assertThat(redacted.rank()).isEqualTo(5);
     assertThat(redacted.inKeycloak()).isTrue();
     assertThat(redacted.version()).isEqualTo(1L);
     assertThat(redacted.email()).isNull();
-    assertThat(redacted.description()).isNull();
+    assertThat(redacted.description()).isEqualTo(full.description());
     assertThat(redacted.roles()).isNull();
     assertThat(redacted.permissions()).isNull();
     assertThat(redacted.lastReadAnnouncementId()).isNull();
-    assertThat(redacted.squadron()).isNull();
-    assertThat(redacted.squadrons()).isNull();
+    assertThat(redacted.squadron()).isEqualTo(full.squadron());
+    assertThat(redacted.squadrons()).isEqualTo(full.squadrons());
     assertThat(redacted.joinDate()).isNull();
     assertThat(redacted.discordLinked()).isNull();
     assertThat(redacted.isLogistician()).isFalse();
@@ -83,7 +83,7 @@ class MissionPeerRedactorTest {
     MissionParticipantDto redacted = redactor.cleanupParticipantForPeer(participant);
 
     assertThat(redacted.user().email()).isNull();
-    assertThat(redacted.user().username()).isEqualTo("bob.callsign");
+    assertThat(redacted.user().username()).isNull();
     assertThat(redacted.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(redacted.comment()).isEqualTo("my comment");
   }
@@ -151,15 +151,12 @@ class MissionPeerRedactorTest {
     UserDto owner = redacted.assignedUnits().getFirst().ship().owner();
     assertThat(owner.roles()).isNull();
     assertThat(owner.permissions()).isNull();
-    assertThat(owner.description()).isNull();
     assertThat(owner.email()).isNull();
-    assertThat(owner.squadron()).isNull();
-    assertThat(owner.squadrons()).isNull();
     assertThat(owner.joinDate()).isNull();
     assertThat(owner.discordLinked()).isNull();
     assertThat(owner.isLogistician()).isFalse();
     assertThat(owner.isMissionManager()).isFalse();
-    assertThat(owner.username()).isEqualTo("bob.callsign");
+    assertThat(owner.username()).isNull();
     assertThat(owner.rank()).isEqualTo(5);
     assertThat(redacted.assignedUnits().getFirst().name()).isEqualTo("Alpha");
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");

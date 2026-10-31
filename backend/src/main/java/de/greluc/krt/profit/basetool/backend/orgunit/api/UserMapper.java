@@ -41,6 +41,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
@@ -56,9 +57,14 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {SquadronMapper.class})
 public abstract class UserMapper {
 
+  /** Qualifier keeping the unredacted mapping out of MapStruct's automatic method selection. */
+  protected static final String FULL = "fullUser";
+
   protected OrgUnitMembershipRepository membershipRepository;
 
   protected StaffelMembershipResolver staffelMembershipResolver;
+
+  protected CallerUserProjection callerUserProjection;
 
   /**
    * Receives the repository the user's Staffel memberships are loaded from.
@@ -68,6 +74,16 @@ public abstract class UserMapper {
   @Autowired
   void setMembershipRepository(OrgUnitMembershipRepository repository) {
     this.membershipRepository = repository;
+  }
+
+  /**
+   * Receives the projection that reduces a user to what the current caller may see.
+   *
+   * @param projection the container's {@link CallerUserProjection}
+   */
+  @Autowired
+  void setCallerUserProjection(CallerUserProjection projection) {
+    this.callerUserProjection = projection;
   }
 
   /**
@@ -104,6 +120,7 @@ public abstract class UserMapper {
    * @param user the user to project; {@code null} maps to {@code null}
    * @return the DTO with {@code email == null}, or {@code null} for a {@code null} user
    */
+  @Named(FULL)
   @Mapping(target = "email", ignore = true)
   @Mapping(target = "roles", expression = "java(roleNames(user.getRoles()))")
   @Mapping(target = "permissions", expression = "java(permissions(user.getRoles()))")
@@ -112,7 +129,22 @@ public abstract class UserMapper {
   @Mapping(target = "squadron", expression = "java(resolveSquadron(user))")
   @Mapping(target = "squadrons", expression = "java(resolveSquadrons(user))")
   @Mapping(target = "discordLinked", expression = "java(resolveDiscordLinked(user))")
-  public abstract UserDto toDto(User user);
+  protected abstract UserDto toFullDto(User user);
+
+  /**
+   * Maps a {@link User} to the DTO the current caller may see: the full record for an admin and for
+   * the caller's own user, the peer shape of every other member for everyone else (REQ-SEC-007).
+   * Outside a Spring context, where no caller is known, the full record is returned.
+   *
+   * @param user the user to project; {@code null} maps to {@code null}
+   * @return the DTO as seen by the current caller, or {@code null} for a {@code null} user
+   */
+  public UserDto toDto(User user) {
+    UserDto full = toFullDto(user);
+    return full == null || callerUserProjection == null
+        ? full
+        : callerUserProjection.forCaller(full);
+  }
 
   /** Narrow reference DTO (id + display name) used wherever the full user payload is overkill. */
   public abstract UserReferenceDto toReferenceDto(User user);

@@ -19,24 +19,21 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
-import java.util.Collection;
-import java.util.Set;
-import java.util.UUID;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Decides which users the caller reads without the peer redaction; implemented by the scope module
- * so that the org-unit module does not depend on it (REQ-SEC-007).
+ * Reduces a full {@link UserDto} to what the current caller may see of that member; implemented by
+ * the scope module so that the mapper does not depend on the service layer (REQ-SEC-007).
  */
-public interface UserPeerRedactionScope {
+public interface CallerUserProjection {
 
   /**
-   * Selects the users whose full record the caller may read.
+   * Projects a user for the current caller.
    *
-   * @param userIds the users to classify; never {@code null}
-   * @return the subset the caller holds the Logistician grant for through at least one shared unit
-   *     (all of them for an admin)
+   * @param full the unredacted DTO; never {@code null}
+   * @return {@code full} for an admin and for the caller's own record, the peer shape otherwise
    */
   @NotNull
-  Set<UUID> usersWithUnredactedRead(@NotNull Collection<UUID> userIds);
+  UserDto forCaller(@NotNull UserDto full);
 }

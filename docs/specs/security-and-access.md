@@ -431,9 +431,7 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
-The same holds for **reads that lift a redaction**: the user directory and the mission DTOs lift the peer
-redaction only where `OwnerScopeService.hasRoleInOrgUnit(unit, LOGISTICIAN)` holds for a unit of the
-user or the owning unit of the mission (REQ-SEC-007), never on the flat role.
+A contextual grant never lifts a redaction either: the personal data of other members is admin-only (REQ-SEC-007).
 
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
 per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
@@ -517,12 +515,7 @@ Every read/write filters by JWT `sub` unless the caller has an elevated role (`A
 > authenticated non-member ADR-0129 introduced. That gateway calls only the two import endpoints, so
 > the gate closes a hole rather than a path.
 
-For a **member below Logistician, or a Logistician reading data of a unit where the caller holds no
-Logistician grant**, return only the minimum required data. The peer redaction lifts per unit, never
-for the flat role: user list and search return the full user shape only for users who belong to a
-unit where the caller holds the grant, and a mission's participants, units and ships come back
-unredacted only for a mission owned by such a unit (an ownerless mission only for admins). Admins are
-unrestricted; the pinned unit does not change the result. Sensitive fields
+For **every non-admin** — a plain member, a Logistician, a Mission Manager or a seat holder alike, in any unit, pinned or not — another member's record is the peer shape on every surface that returns or embeds a user (user list, search and `get`, mission participants, unit ship owners, hangar, inventory, job-order and refinery owners): `roles`, `permissions`, the Logistician / Mission Manager flags, `joinDate`, `discordLinked` and `lastReadAnnouncementId` are visible to admins only, and no grant lifts that. `description`, display name, rank and squadrons are visible to every member; `username` only when the member has no display name. The projection is done once, in `UserMapper.toDto` (admin and the caller's own record stay full), so a new embedding surface is redacted by default. Sensitive fields
 (e-mail, real name, internal orders/items) MUST be explicitly cleared in the controller via a
 `cleanup…ForPeer`-style helper to prevent information disclosure. (E-mail is shown only in a user's
 own profile — never elsewhere.) The naming convention is enforced structurally by the ArchUnit rule

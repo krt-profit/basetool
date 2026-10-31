@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
@@ -33,8 +34,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Redacts mission DTOs for a member below Logistician (REQ-SEC-007): owner and managers are hidden
- * from readers and every nested user is reduced to the public callsign tuple (REQ-SEC-040).
+ * Redacts mission DTOs for every non-admin (REQ-SEC-007): owner and managers are hidden from
+ * readers and every nested user is reduced to the public callsign tuple (REQ-SEC-040).
  *
  * <p>Each DTO is rebuilt field by field so that a new field fails compilation until someone decides
  * whether a peer may see it; every nested record that reaches a user needs its own {@code
@@ -178,40 +179,14 @@ public class MissionPeerRedactor {
   }
 
   /**
-   * Redacts a user DTO for a peer down to username, display name and rank, dropping email,
-   * description, roles, permissions, announcement watermark, join date and squadrons.
-   *
-   * <p>Unlike {@code UserDtoRedaction.toPeerShape}, this also nulls {@code squadron} and {@code
-   * squadrons}.
+   * Redacts a user DTO to the peer shape of {@link UserDtoRedaction#toPeerShape}.
    *
    * @param dto the user DTO, or {@code null}
-   * @return a redacted copy safe for a member below Logistician, or {@code null} for a {@code null}
-   *     input
+   * @return the peer-shaped copy, or {@code null} for a {@code null} input
    */
   @Nullable
   @Contract("null -> null; !null -> !null")
   public UserDto cleanupUserForPeer(@Nullable UserDto dto) {
-    if (dto == null) {
-      return null;
-    }
-    return new UserDto(
-        dto.id(),
-        dto.username(),
-        dto.displayName(),
-        dto.effectiveName(),
-        null,
-        dto.rank(),
-        null,
-        null,
-        null,
-        null,
-        false,
-        false,
-        dto.inKeycloak(),
-        null,
-        null,
-        dto.version(),
-        null,
-        null);
+    return UserDtoRedaction.toPeerShape(dto);
   }
 }

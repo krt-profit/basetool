@@ -83,24 +83,6 @@ public class UserService {
   private final AuditRecorder auditRecorder;
 
   /**
-   * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
-   * scope API; a user without any Staffel counts as cross-squadron.
-   *
-   * @param userId the target user's id
-   * @return {@code true} if the caller is a non-admin and shares none of the user's Staffeln
-   */
-  public boolean isCrossSquadronForNonAdmin(@NotNull UUID userId) {
-    if (authHelperService.isAdmin()) {
-      return false;
-    }
-    List<UUID> targetSquadronIds = membershipOperations.findStaffelMembershipOrgUnitIds(userId);
-    if (targetSquadronIds.isEmpty()) {
-      return true;
-    }
-    return targetSquadronIds.stream().noneMatch(squadronVisibility::canSeeSquadron);
-  }
-
-  /**
    * Checks whether any user has this exact name, case-insensitively, as username or display name.
    *
    * @param name candidate name

@@ -21,11 +21,9 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -37,8 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The squadron-scoped user listing and search behind the member endpoints, with the peer redaction
- * lifted only for users of units where the caller holds the Logistician grant.
+ * The squadron-scoped user listing and search behind the member endpoints, whose user shape is the
+ * peer redaction of {@link UserMapper#toDto}.
  *
  * <p>Read-only; it joins the calling transaction and needs the session open for {@link UserMapper}.
  */
@@ -51,7 +49,6 @@ public class UserDirectoryService {
 
   private final UserService userService;
   private final UserMapper userMapper;
-  private final UserPeerRedactionScope peerRedactionScope;
 
   /**
    * Pages through all users.
@@ -59,7 +56,7 @@ public class UserDirectoryService {
    * @param page requested page index, or {@code null} for the first page
    * @param size requested page size, or {@code null} for the default
    * @param sort requested sort expression, or {@code null} for the username default
-   * @return the page of peer-redacted user DTOs
+   * @return the page of user DTOs as the caller may see them
    */
   public @NotNull PageResponse<UserDto> list(
       @Nullable Integer page, @Nullable Integer size, @Nullable String sort) {
@@ -67,7 +64,7 @@ public class UserDirectoryService {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<User> found = userService.findAll(pageable);
     userMapper.primeStaffelMemberships(found.getContent());
-    return PageResponse.of(redactForPeers(found.map(userMapper::toDto)));
+    return PageResponse.of(found.map(userMapper::toDto));
   }
 
   /**
@@ -77,7 +74,7 @@ public class UserDirectoryService {
    * @param page requested page index, or {@code null} for the first page
    * @param size requested page size, or {@code null} for the default
    * @param sort requested sort expression, or {@code null} for the username default
-   * @return the page of peer-redacted user DTOs
+   * @return the page of user DTOs as the caller may see them
    */
   public @NotNull PageResponse<UserDto> search(
       @Nullable String query,
@@ -88,38 +85,16 @@ public class UserDirectoryService {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<User> found = userService.searchByUsername(query == null ? "" : query, pageable);
     userMapper.primeStaffelMemberships(found.getContent());
-    return PageResponse.of(redactForPeers(found.map(userMapper::toDto)));
+    return PageResponse.of(found.map(userMapper::toDto));
   }
 
   /**
-   * Returns one user; a non-admin caller asking for a user outside their squadrons always gets the
-   * peer shape, regardless of role.
+   * Returns one user as the caller may see it: the peer shape of another member for a non-admin.
    *
    * @param id the user id
-   * @return the user DTO, peer-redacted for cross-squadron non-admin callers
+   * @return the user DTO as projected by {@link UserMapper#toDto}
    */
   public @NotNull UserDto get(@NotNull UUID id) {
-    User user = userService.findById(id);
-    UserDto dto = userMapper.toDto(user);
-    if (userService.isCrossSquadronForNonAdmin(user.getId())) {
-      return UserDtoRedaction.toPeerShape(dto);
-    }
-    return peerRedactionScope.usersWithUnredactedRead(List.of(dto.id())).contains(dto.id())
-        ? dto
-        : UserDtoRedaction.toPeerShape(dto);
-  }
-
-  /**
-   * Reduces each DTO of the page to the peer shape unless the caller holds the Logistician grant in
-   * a unit of that user.
-   *
-   * @param users the persisted user DTOs of one page
-   * @return the same page with the peer shape applied where the grant is missing
-   */
-  private Page<UserDto> redactForPeers(Page<UserDto> users) {
-    Set<UUID> unredacted =
-        peerRedactionScope.usersWithUnredactedRead(users.stream().map(UserDto::id).toList());
-    return users.map(
-        dto -> unredacted.contains(dto.id()) ? dto : UserDtoRedaction.toPeerShape(dto));
+    return userMapper.toDto(userService.findById(id));
   }
 }

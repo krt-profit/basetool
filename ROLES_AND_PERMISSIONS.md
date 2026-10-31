@@ -130,10 +130,10 @@ Mission responses are cleaned up server-side in [`MissionController`](backend/sr
 through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
-  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for a caller **without the Logistician grant in the owning unit** (a plain member, or a Logistician of another unit; admins unrestricted): owner and managers are emptied (unless the same response tells the caller it may
+  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for **every non-admin**: owner and managers are emptied (unless the same response tells the caller it may
   manage the mission, see below), and every nested user — participant, assigned ship's owner — is
-  reduced to the public callsign tuple (username, display/effective name, rank): e-mail, description,
-  roles, permissions, memberships, join date and the Discord-link flag are dropped. The
+  reduced to the peer shape (display/effective name, rank, description, squadrons; the username only
+  without a display name): e-mail, roles, permissions, flags, join date and the Discord-link flag are dropped. The
   roster itself stays, as do the description, the organisation, the units, the frequencies, the
   Ablauf steps, the Ziele and each participant's payout preference and comment — a peer is a member
   of the organisation and reads the Einsatz's own planning data.
@@ -394,7 +394,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream + mute preferences (`/notifications/**`, `/api/v1/notifications/preferences`, `/profile/notification-preferences`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted unless the caller holds the Logistician grant in a unit of the listed user, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Personal Data
 
@@ -552,7 +552,7 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 
 | Function (gate)                                                                                                              | Member | Log. | MM | Officer | Admin |
 |:-----------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
-| Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted unless the caller holds the Logistician grant in the owning unit, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
+| Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted for every non-admin, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** mission (`isMemberOrAbove()`)                                                                                     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, read gate⁸)                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Check in/out / change payout preference / edit / leave a participant row (participant gate⁸)                                |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |
@@ -1300,10 +1300,10 @@ does not end it.
 
 ### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 
-**Shipped for materials and game items:** setting, changing and removing a unit's levels and the
-„Mindestbestände“ tab, the shortcuts and the „niedrig“ badge follow the rows below
-(`StockLevelAccessPolicy`, the Lager `ScopePredicate`). The widget and the notification are still
-planned.
+**Shipped for materials:** setting, changing and removing a unit's material levels and the
+„Mindestbestände“ tab follow the first two rows below (`StockLevelAccessPolicy`, the Lager
+`ScopePredicate`). The game-item levels, the shortcuts, the „niedrig“ badge, the widget and the
+notification are still planned.
 
 | Function | Who |
 | --- | --- |

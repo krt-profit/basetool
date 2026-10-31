@@ -51,13 +51,23 @@ class MissionPeerRedactionSentinelTest {
 
   /** The components of a peer-visible user; everything else must be empty after redaction. */
   private static final Set<String> PEER_VISIBLE_USER_COMPONENTS =
-      Set.of("id", "username", "displayName", "effectiveName", "rank", "inKeycloak", "version");
+      Set.of(
+          "id",
+          "username",
+          "displayName",
+          "effectiveName",
+          "rank",
+          "description",
+          "inKeycloak",
+          "squadron",
+          "squadrons",
+          "version");
 
   /**
    * Components no record reachable from a mission may declare apart from {@link UserDto} itself.
    */
   private static final Set<String> PRIVATE_COMPONENT_NAMES =
-      Set.of("email", "roles", "permissions", "description", "joinDate", "discordLinked");
+      Set.of("email", "roles", "permissions", "joinDate", "discordLinked");
 
   private final MissionPeerRedactor redactor = new MissionPeerRedactor();
 

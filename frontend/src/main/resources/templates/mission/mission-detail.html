@@ -1256,7 +1256,7 @@
                     <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
                     <select name="responsibleUserId" id="add-unit-responsible" data-krt-combobox>
                         <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
-                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.username}" th:text="${p.user.effectiveName}">User</option>
+                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.effectiveName}" th:text="${p.user.effectiveName}">User</option>
                     </select>
                 </div>
                 </div>
@@ -1365,7 +1365,7 @@
                     <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
                     <select name="responsibleUserId" id="edit-unit-responsible" data-krt-combobox>
                         <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
-                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.username}" th:text="${p.user.effectiveName}">User</option>
+                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.effectiveName}" th:text="${p.user.effectiveName}">User</option>
                     </select>
                 </div>
                 </div>
@@ -1436,7 +1436,7 @@
                         <option value="" disabled selected th:text="#{general.select_placeholder}">- Bitte w&auml;hlen -</option>
                         <option th:each="p : ${participants}"
                                 th:value="${p.id}"
-                                th:attr="data-search=${p.user != null ? p.user.username : ''}"
+                                th:attr="data-search=${p.user != null ? p.user.effectiveName : ''}"
                                 th:text="${p.user != null ? p.user.effectiveName : (p.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}"
                                 th:selected="${financeForm.participantId != null and financeForm.participantId.toString() == p.id.toString()}"></option>
                     </select>
