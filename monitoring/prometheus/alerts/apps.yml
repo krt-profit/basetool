@@ -176,6 +176,16 @@ groups:
           summary: "p95 request latency >2s ({{ $labels.application }})"
           description: "The 95th-percentile request latency for {{ $labels.application }} exceeded 2 seconds for 10 minutes."
 
+      - alert: QuickAccessSearchSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Quick-access search p95 >1s"
+          description: "The quick access's entity search (/quick-access/search) answered slower than 1 second at the 95th percentile for 10 minutes (REQ-UI-033). Every entity type is asked in parallel and capped at 2 seconds, so one slow backend list read drags the whole answer. Runbook: sum by (kind, outcome) (rate(basetool_quick_access_search_total[10m])) names the type that times out or fails; check that type's backend list endpoint latency on dashboard 03 and the backend's slow-query log."
+
       - alert: FrontendBackendFanoutHigh
         expr: |
           sum(rate(http_client_requests_seconds_count{application="basetool-frontend"}[5m]))
