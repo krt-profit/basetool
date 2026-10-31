@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.inventory.model.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import java.util.Collections;
 import java.util.List;
@@ -88,6 +89,39 @@ class InventoryLowStockMarkerRenderTest {
           String url = inv.getArgument(0);
           return url.contains("/inventory/all/grouped") ? List.of(group) : Collections.emptyList();
         });
+  }
+
+  private void stubGroupedItem(boolean lowStock) {
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(UUID.randomUUID(), "Gatling S2", null, null),
+            4.0,
+            null,
+            null,
+            List.of(),
+            lowStock);
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains("/inventory/all/grouped") ? List.of(group) : Collections.emptyList();
+        });
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aGameItemWithALowLevelCarriesTheMarkerAndOneWithoutDoesNot() throws Exception {
+    stubGroupedItem(true);
+    mockMvc
+        .perform(get("/inventory/all").param("view", "items"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(MARKER)));
+
+    stubGroupedItem(false);
+    mockMvc
+        .perform(get("/inventory/all").param("view", "items"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString(MARKER))));
   }
 
   @Test
