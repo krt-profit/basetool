@@ -60,7 +60,7 @@ public enum LiveSyncTopicClass {
   /** Global Materialbörse room; the backend pokes {@code board} when a book-out changed offers. */
   MATERIALBOARD("materialboard", false, "materialboard");
 
-  private static final Set<String> INVENTORY_ALL_SECTIONS = Set.of("stock");
+  private static final Set<String> INVENTORY_ALL_SECTIONS = Set.of("stock", "stock-levels");
   private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
   private static final Set<String> BLUEPRINTS_OWN_SECTIONS = Set.of("list");
   private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board");

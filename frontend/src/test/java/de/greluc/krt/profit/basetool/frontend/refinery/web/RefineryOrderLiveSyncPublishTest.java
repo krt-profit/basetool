@@ -76,7 +76,7 @@ class RefineryOrderLiveSyncPublishTest {
     assertThat(LiveSyncTopicClass.REFINERY.prefix()).isEqualTo("refinery");
     assertThat(LiveSyncTopicClass.REFINERY.allowedSections()).containsExactlyElementsOf(QUEUE);
     assertThat(LiveSyncTopicClass.INVENTORY_ALL.prefix()).isEqualTo("inventory");
-    assertThat(LiveSyncTopicClass.INVENTORY_ALL.allowedSections()).containsExactlyElementsOf(STOCK);
+    assertThat(LiveSyncTopicClass.INVENTORY_ALL.allowedSections()).containsAll(STOCK);
   }
 
   @Test

@@ -98,7 +98,8 @@ public class InventoryOrgUnitChangeService {
         saved.getId(),
         InventoryAuditLabels.label(saved),
         callerId,
-        AuditDetails.of("fromOrgUnit", orgUnitRef(previous)).with("toOrgUnit", orgUnitRef(target)));
+        AuditDetails.of("fromOrgUnit", InventoryAuditLabels.orgUnitRef(previous))
+            .with("toOrgUnit", InventoryAuditLabels.orgUnitRef(target)));
     InventoryItem result =
         inventoryCheckoutService.mergeStockIfRequested(
             saved, Boolean.TRUE.equals(dto.mergeStock()));
@@ -154,7 +155,7 @@ public class InventoryOrgUnitChangeService {
           callerId,
           AuditDetails.of("changed", changed)
               .with("skipped", skipped)
-              .with("toOrgUnit", orgUnitRef(target)));
+              .with("toOrgUnit", InventoryAuditLabels.orgUnitRef(target)));
     }
     log.info("Bulk org-unit change by user {}: {} changed, {} skipped", callerId, changed, skipped);
     return new BulkOrgUnitChangeResultDto(changed, skipped);
@@ -208,15 +209,5 @@ public class InventoryOrgUnitChangeService {
     UUID currentId = current == null ? null : current.getId();
     UUID targetId = target == null ? null : target.getId();
     return Objects.equals(currentId, targetId);
-  }
-
-  /**
-   * Formats an org unit for an audit payload as {@code kind:id}, or {@code none}.
-   *
-   * @param orgUnit the unit, or {@code null}
-   * @return the bounded reference
-   */
-  private static @NotNull String orgUnitRef(@Nullable OrgUnit orgUnit) {
-    return orgUnit == null ? "none" : orgUnit.getKind() + ":" + orgUnit.getId();
   }
 }
