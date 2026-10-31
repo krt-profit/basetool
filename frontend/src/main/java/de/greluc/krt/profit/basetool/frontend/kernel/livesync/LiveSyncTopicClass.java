@@ -93,7 +93,9 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Global job-order queue room, authorized by the {@code canViewJobOrders} capability; sections
+   * Global job-order queue room, authorized by the {@code canViewJobOrders} or the {@code
+   * canViewAssignedJobOrders} capability; its frames carry only a section key, and each viewer
+   * refreshes their own scoped list, so an assignee learns of no order beyond their own. Sections
    * {@code queue} (the order list) and {@code demand} (the material-demand overview,
    * REQ-ORDERS-034).
    */
@@ -104,7 +106,7 @@ public enum LiveSyncTopicClass {
       false,
       "orders_queue",
       "/api/v1/me/capabilities",
-      "canViewJobOrders"),
+      "canViewJobOrders|canViewAssignedJobOrders"),
 
   /**
    * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET
@@ -339,9 +341,13 @@ public enum LiveSyncTopicClass {
 
   /**
    * For a global class authorized by a capability, the boolean field of the {@link #authProbePath}
-   * response that must be {@code true}; {@code null} otherwise.
+   * response that must be {@code true}, or several such fields joined by {@link
+   * #CAPABILITY_ANY_SEPARATOR} of which one must be; {@code null} otherwise.
    */
   private final @Nullable String capabilityField;
+
+  /** Separates alternative capability fields of which one grants the subscribe. */
+  static final String CAPABILITY_ANY_SEPARATOR = "\\|";
 
   /**
    * A second per-resource read tried when the {@link #authProbePath} explicitly refuses (403/404),

@@ -341,8 +341,10 @@ The pagination URL carries `scope=` for every chosen segment but `ALL`. The choi
 browser (`orders_scope_filter`, REQ-UI-017) and is restored only when that segment is offered on the
 page; an explicit `scope` query parameter wins. Switching segments swaps the results in place
 (REQ-FE-001). Adding or removing an assignee publishes the `queue` frame of the orders room, so an
-open list refreshes; a member without queue access holds no subscription to that room and sees the
-change on the next load.
+open list refreshes. The room is open to a caller with `canViewJobOrders` or
+`canViewAssignedJobOrders`; its frames carry only a section key and each viewer refetches their own
+scoped list, so an assignee without profit access learns of no order beyond their own and sees a
+new or removed assignment in place.
 
 **Enforced by:** `OrdersListPatternRenderTest` (four segments in order, assignee-only segment,
 `scope` cannot move an assignee), `OrderListScopeTest`, `NavigationRenderMvcTest`

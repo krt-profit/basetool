@@ -1296,7 +1296,7 @@ backend serves every member) but no control that writes.
   at least one unit (REQ-ROLE-007). The bank's global
   `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).
 
-### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
+### 7.2 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 
 **Shipped for materials and game items:** setting, changing and removing a unit's levels and the
 „Mindestbestände“ tab, the shortcuts and the „niedrig“ badge follow the rows below
@@ -1309,7 +1309,7 @@ planned.
 | See the „Mindestbestände“ tab, the „niedrig“ badge and the „Bestand niedrig“ widget | everyone who can see the unit's pool |
 | Receive the low-stock notification (REQ-NOTIF-030) | the unit's direct Logisticians and direct leadership seats |
 
-### 7.4 Navigation preferences (ADR-0298, REQ-UI-032, REQ-UI-034)
+### 7.3 Navigation preferences (ADR-0298, REQ-UI-032, REQ-UI-034)
 
 Favourites, hidden entries, order, tab bar, „Darstellung“, the dashboard and the start page are
 **owner-only**: only the user reads, edits and resets their own. There is no admin view and no

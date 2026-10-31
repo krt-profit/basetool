@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ActiveSquadronRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -307,7 +308,10 @@ public class LiveSyncSubscriptionAuthorizer {
               headers -> applyAuth(headers, accessToken, activeOrgUnitId),
               CAPABILITIES_TYPE,
               PROBE_TIMEOUT);
-      boolean granted = capabilities != null && Boolean.TRUE.equals(capabilities.get(field));
+      boolean granted =
+          capabilities != null
+              && Arrays.stream(field.split(LiveSyncTopicClass.CAPABILITY_ANY_SEPARATOR))
+                  .anyMatch(f -> Boolean.TRUE.equals(capabilities.get(f)));
       if (!granted) {
         log.debug(
             "Live-sync subscribe denied for global topic {} (capability {} not granted)",
