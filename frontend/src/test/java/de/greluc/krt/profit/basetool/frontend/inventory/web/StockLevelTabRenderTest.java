@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.StockLevelDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import java.util.List;
@@ -107,6 +108,7 @@ class StockLevelTabRenderTest {
         3L,
         ARGON,
         new MaterialReferenceDto(UUID.randomUUID(), material, "SCU"),
+        null,
         tier,
         10.0,
         20.0,
@@ -114,7 +116,26 @@ class StockLevelTabRenderTest {
         20.0 - allocated,
         allocated / 10.0,
         low,
+        7.0,
         edit);
+  }
+
+  private static @NotNull StockLevelDto itemLevel(@NotNull String item, double allocated) {
+    return new StockLevelDto(
+        UUID.randomUUID(),
+        1L,
+        ARGON,
+        null,
+        new GameItemReferenceDto(UUID.randomUUID(), item, "GENERIC"),
+        null,
+        4.0,
+        4.0,
+        allocated,
+        4.0 - allocated,
+        allocated / 4.0,
+        allocated < 4.0,
+        2.0,
+        true);
   }
 
   @Test
@@ -138,6 +159,26 @@ class StockLevelTabRenderTest {
         .contains("id=\"stock-level-modal\"")
         .contains("aria-current=\"page\"")
         .contains("/js/inventory/stock-levels.js");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void aGameItemLevelShowsItsNameWholeUnitsAndTheRequestedColumn() throws Exception {
+    String html =
+        render(
+            List.of(itemLevel("P4-AR Rifle", 1.0), level("Quantanium", null, 6.0, true, true)),
+            List.of(ARGON),
+            "");
+
+    assertThat(html)
+        .contains(">P4-AR Rifle<")
+        .contains("data-item=\"true\"")
+        .contains("data-item=\"false\"")
+        .contains("data-testid=\"stock-level-requested\"")
+        .contains("7,000 SCU")
+        .containsPattern("data-testid=\"stock-level-requested\"[^>]*>\\s*2 ")
+        .contains("id=\"stock-level-item\"")
+        .contains("data-krt-combobox=\"remote-game-items\"");
   }
 
   @Test
