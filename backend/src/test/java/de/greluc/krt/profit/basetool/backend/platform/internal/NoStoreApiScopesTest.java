@@ -129,6 +129,7 @@ class NoStoreApiScopesTest {
     "/api/v1/exchange/catalog/locations, REVALIDATE",
     "/api/v1/exchange/me/installation, NO_STORE",
     "/api/v1/bank/org-units/balances, NO_STORE",
+    "/api/v1/bank/org-units/accounts/visible, NO_STORE",
     "/api/v1/blueprints/admin/defaults, NO_STORE",
     "/api/v1/blueprints/00000000-0000-4000-8000-000000000000, REVALIDATE",
     "/api/v1/org-units/active, REVALIDATE",

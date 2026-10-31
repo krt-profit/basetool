@@ -329,7 +329,7 @@ is not configuration-cache compatible and is kept off every other build. The
 run annotates `gradle/libs.versions.toml` and recreates an empty, gitignored
 `versions.properties` — do not commit that file. Why an entry is held, pinned
 or floored is recorded in [`docs/dependency-pins.md`](docs/dependency-pins.md),
-not in a comment (ADR-0214); update its row in the PR that changes the entry.
+not in a comment beside the entry (ADR-0214); update its row in the PR that changes the entry.
 
 <a id="dependency-verification"></a>**Dependency verification** ([ADR-0208](docs/adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md),
 REQ-OPS-034). Every jar, POM and Gradle module file the build resolves must
@@ -776,9 +776,11 @@ that — promotion to `:stable` and the host rollout — is in
   `InvalidJavadocPosition` (`config/checkstyle/javadoc_position.xml`,
   ADR-0222): a Javadoc directly above another Javadoc fails `check`.
   Move the orphaned block back onto the member it describes.
-- **No comments besides Javadoc** (ADR-0214). Javadoc is short, precise
-  and carries no history; the reasoning behind a change goes into the
-  commit message and the PR.
+- **Javadoc plus short technical comments, no history** (ADR-0214).
+  Javadoc is short, precise and carries no history; a technical comment
+  states an invariant, format or unit the code cannot, in a line or two.
+  No `TODO`, no commented-out code; the reasoning behind a change goes
+  into the commit message and the PR.
 - **SpotBugs** runs as part of `check`. Same rule: no new findings on
   top of pre-existing ones.
 - **Constructor injection only**, ideally via Lombok

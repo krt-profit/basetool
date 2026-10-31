@@ -113,7 +113,7 @@ Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. The `test` pr
 ## Linting / static analysis
 
 - **Every new or modified piece of code must be linted before the task is considered done.** Run at least `./gradlew :<module>:checkstyleMain :<module>:spotbugsMain` (or `./gradlew check` for the full sweep) and read the reports.
-- **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case the reason goes into `@SuppressFBWarnings(justification = "…")` where the annotation has that attribute, otherwise into the commit message and the PR, never into a code comment (ADR-0214).
+- **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case the reason goes into `@SuppressFBWarnings(justification = "…")` where the annotation has that attribute, otherwise into the commit message and the PR, never into a comment (ADR-0214).
 - Pre-existing findings in code you did not touch are out of scope; do not opportunistically clean them up in an unrelated change. But never *add* a new finding on top of them.
 - **Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit**, and **ALL** lint tasks must be green before *every* push. Formatting alone is **not sufficient**: the frontend's `check` also runs strict asset gates — Stylelint (`:frontend:lintCss`, `:frontend:lintCssInline`), ESLint (`:frontend:lintJs`, `:frontend:lintProbeJs`), HTMLHint (`:frontend:lintHtml`), Prettier (`:frontend:prettierCheck`) — plus the static type check `:frontend:typecheckJs` (REQ-FE-018, ADR-0125) and the exchange developer pages' gate `:frontend:checkExchangeDocs` (no German text, every relative link resolving, markdownlint with 100-character lines — tables and code exempt — the DPoP reference tests; REQ-XCH-002), all of which fail CI independently and are not covered by Spotless/Checkstyle. Never push relying only on the tests + Spotless being green. Exact tasks, the Stylelint/ESLint rules that bite, and the auto-fix recipe: the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
 
@@ -299,16 +299,22 @@ Standard five-role vocabulary, with `needs-triage` mapped to the existing `triag
 
 Single-context, mapped onto the existing docs: glossary = arc42 §12, decisions = `docs/adr/`, requirements = `docs/specs/`; there is no `CONTEXT.md`. See `docs/agents/domain.md`.
 
-## Code comments (HARD RULE — no comments besides Javadoc)
+## Code comments (HARD RULE — documentation comments and short technical comments, no history)
 
-**The code carries no comments besides proper Javadoc, the Javadoc is short and precise, and no
-history is kept in either.** Binding on every change and every agent, in every file of the
-repository — main, test and e2e sources alike ([ADR-0214](docs/adr/0214-code-carries-no-comments-besides-javadoc.md)).
+**The code carries the language's documentation comment and, where it helps, short technical
+comments — both short and precise, describing only the current state, never history.** Binding on
+every change and every agent, in every file of the repository — main, test and e2e sources alike
+([ADR-0214](docs/adr/0214-code-carries-no-comments-besides-javadoc.md), amended 2026-10-31).
 
-- **No comments.** No `//` or `/* */` in Java, JS or CSS, no `<!-- -->` or `<!--/* */-->` in
-  templates, no `#` in YAML, shell, Python, properties, nginx, systemd, Dockerfiles or TOML, no `--`
-  in SQL, no commented-out code or config. An empty `catch` names its variable `_`, `ignored` or
-  `expected` instead of carrying a comment (`_` not in `keycloak-spi`).
+- **Technical comments are allowed** (`//`, `/* */`, `#`, `--`, and `<!--/* … */-->` in templates)
+  where they document something the code cannot say itself: a non-obvious invariant, a format or
+  protocol detail, a unit, a coordinate convention, why an algorithm is shaped the way it is, a
+  reference to the spec section it implements. A line or two, true now, next to the code.
+- **Still not allowed:** history of any kind (dates, PR or issue numbers, "previously" / "now" /
+  "used to" / "was changed", migration or incident stories), comments that restate the code,
+  commented-out code or config, `TODO` / `FIXME` notes (a follow-up issue instead), long prose. An
+  empty `catch` names its variable `_`, `ignored` or `expected` instead of carrying a comment (`_`
+  not in `keycloak-spi`).
 - **What stays:** Javadoc (and, under the same rules, JSDoc and Python docstrings), the licence
   header, and tool directives with no prose after them (`// @ts-check`, `/* global */`,
   `/* exported */`, `eslint-disable…`, `# shellcheck disable=|source=|shell=`, `# hadolint ignore=`,
@@ -317,9 +323,10 @@ repository — main, test and e2e sources alike ([ADR-0214](docs/adr/0214-code-c
   only when a caller needs it, then the tags. No dates, PR or issue numbers, "previously" / "now" /
   "used to", migration or incident stories, rationale essays or pointers to other comments; a bare
   `REQ-…` / `ADR-…` pointer is fine.
-- **The reasoning goes into the commit message and the PR body** — that is where a reviewer and a
-  later `git blame` find it. A durable fact a later change needs goes into the spec, the ADR, the
-  runbook, never into a comment.
+- **The story of a change goes into the commit message and the PR body** — that is where a reviewer
+  and a later `git blame` find it. A decision or durable fact a later change needs goes into the
+  ADR, the spec or the runbook.
+- **Existing code is not swept**: apply the rule to what you write and touch.
 - **Out of scope:** applied Flyway migrations (their checksum covers the comments), generated files
   (`openapi.json`, SBOMs, `verification-metadata.xml`, the units and templates
   `generate-quadlet.py` writes), vendored `gradlew`, Markdown, and test fixtures whose comments are
