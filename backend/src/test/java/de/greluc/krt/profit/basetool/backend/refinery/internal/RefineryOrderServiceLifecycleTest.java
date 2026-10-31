@@ -62,6 +62,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -441,6 +442,55 @@ class RefineryOrderServiceLifecycleTest {
           () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
     }
 
+    @Test
+    void onBehalf_stampedUnitWithoutALogisticianGrant_isRefused() {
+      Squadron unitB = new Squadron();
+      unitB.setId(UUID.randomUUID());
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
+          .thenReturn(unitB);
+      when(ownerScopeService.canActAsLogisticianInOwner(unitB.getId())).thenReturn(false);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () ->
+              service.createRefineryOrderOnBehalf(
+                  OWNER_ID, freshOrderWithLocation(), unitB.getId()));
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void onBehalf_ownerlessStampForANonAdmin_isRefused() {
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, null)).thenReturn(null);
+      when(ownerScopeService.canActAsLogisticianInOwner(null)).thenReturn(false);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () -> service.createRefineryOrderOnBehalf(OWNER_ID, freshOrderWithLocation(), null));
+    }
+
+    @Test
+    void onBehalf_stampedUnitWithALogisticianGrant_isCreated() {
+      Squadron unitA = new Squadron();
+      unitA.setId(UUID.randomUUID());
+      Location cityLoc = new Location();
+      cityLoc.setId(LOCATION_ID);
+      City city = new City();
+      city.setHasRefineryTerminal(true);
+      cityLoc.setCity(city);
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitA.getId()))
+          .thenReturn(unitA);
+      when(ownerScopeService.canActAsLogisticianInOwner(unitA.getId())).thenReturn(true);
+      when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
+      when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      RefineryOrder result =
+          service.createRefineryOrderOnBehalf(OWNER_ID, freshOrderWithLocation(), unitA.getId());
+
+      assertSame(unitA, result.getOwningOrgUnit());
+    }
     @Test
     void locationWithCityRefinery_isAccepted() {
       Location cityLoc = new Location();

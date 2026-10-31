@@ -294,7 +294,7 @@ class RefineryOrderControllerTest {
     void createUserRefineryOrder_admin_alwaysAttributesToPathUserId() {
       RefineryOrderCreateRequest incoming = createRequest(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
+      when(service.createRefineryOrderOnBehalf(any(), any(), any())).thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.createUserRefineryOrder(OTHER_USER_ID, incoming);

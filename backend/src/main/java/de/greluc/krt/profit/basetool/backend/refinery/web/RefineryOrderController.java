@@ -312,7 +312,7 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID userId,
       @RequestBody @Valid @NotNull RefineryOrderCreateRequest request) {
     RefineryOrder saved =
-        refineryOrderService.createRefineryOrder(
+        refineryOrderService.createRefineryOrderOnBehalf(
             userId, mapper.toEntity(request), request.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));

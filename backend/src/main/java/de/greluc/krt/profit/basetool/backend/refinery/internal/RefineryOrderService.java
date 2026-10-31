@@ -331,6 +331,31 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   @Transactional
   public RefineryOrder createRefineryOrder(
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
+    return create(userId, order, owningOrgUnitId, false);
+  }
+
+  /**
+   * Like {@link #createRefineryOrder}, for a Logistician creating the order for another member: the
+   * caller must be Logistician of the stamped unit (admins pass; an order without a unit is
+   * reserved to admins) (REQ-SEC-005).
+   *
+   * @param userId the member who will own the order
+   * @param order transient entity with shallow id-only references
+   * @param owningOrgUnitId the org unit to stamp, as for {@link #createRefineryOrder}
+   * @return the persisted order
+   * @throws AccessDeniedException when the caller is no Logistician of the stamped unit
+   */
+  @Transactional
+  public RefineryOrder createRefineryOrderOnBehalf(
+      @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
+    return create(userId, order, owningOrgUnitId, true);
+  }
+
+  private RefineryOrder create(
+      @NotNull UUID userId,
+      @NotNull RefineryOrder order,
+      UUID owningOrgUnitId,
+      boolean onBehalf) {
     order.setId(null);
     order.setVersion(null);
     order.setStatus(RefineryOrderStatus.OPEN);
@@ -341,6 +366,12 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     order.setOwner(user);
     order.setOwningOrgUnit(
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId));
+    if (onBehalf
+        && !ownerScopeService.canActAsLogisticianInOwner(
+            order.getOwningOrgUnit() == null ? null : order.getOwningOrgUnit().getId())) {
+      throw new AccessDeniedException(
+          "Access denied: You are not a Logistician of the order's org unit");
+    }
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
