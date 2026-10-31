@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
@@ -43,6 +44,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -61,6 +64,10 @@ public class StockLevelService {
 
   private static final String ITEM_HAS_NO_TIER = "A game item level has no tier";
 
+  /** Emptiest first; the stable sort keeps the unit, material and tier order among equals. */
+  private static final Comparator<StockLevelDto> BY_FILL_RATIO =
+      Comparator.comparingDouble(StockLevelDto::fillRatio);
+
   private final StockLevelRepository stockLevelRepository;
   private final StockLevelFigures figures;
   private final OrgUnitRepository orgUnitRepository;
@@ -75,14 +82,47 @@ public class StockLevelService {
    * Lists the levels of the active units in the caller's Lager scope with their figures.
    *
    * @param orgUnitId only this unit, or {@code null} for every unit in scope
-   * @return the levels, by unit, material and tier floor descending
+   * @param lowOnly whether to keep only the low levels, lowest fill ratio first (empty levels
+   *     first); every level of a material is allocated before the filter applies
+   * @param limit the most levels to return, or {@code null} for all
+   * @return the levels, by unit, material and tier floor descending unless {@code lowOnly}
+   * @throws BadRequestException when {@code limit} is below one
    */
   @Transactional(readOnly = true)
-  public @NotNull List<StockLevelDto> list(@Nullable UUID orgUnitId) {
+  public @NotNull List<StockLevelDto> list(
+      @Nullable UUID orgUnitId, boolean lowOnly, @Nullable Integer limit) {
+    if (limit != null && limit < 1) {
+      throw new BadRequestException("The limit must be at least 1");
+    }
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return figures.toDtos(
-        stockLevelRepository.findVisible(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), orgUnitId));
+    Stream<StockLevelDto> levels =
+        figures
+            .toDtos(
+                stockLevelRepository.findVisible(
+                    scope.adminAllScope(),
+                    scope.activeOrgUnitId(),
+                    scope.memberOrgUnitIds(),
+                    orgUnitId))
+            .stream();
+    if (lowOnly) {
+      levels = levels.filter(StockLevelDto::low).sorted(BY_FILL_RATIO);
+    }
+    return (limit == null ? levels : levels.limit(limit)).toList();
+  }
+
+  /**
+   * Lists the materials with at least one low level in the caller's Lager scope, for the „niedrig"
+   * marker of the aggregated Lager.
+   *
+   * @return the material ids
+   */
+  @Transactional(readOnly = true)
+  public @NotNull Set<UUID> lowMaterialIds() {
+    return list(null, true, null).stream()
+        .map(StockLevelDto::material)
+        .filter(Objects::nonNull)
+        .map(MaterialReferenceDto::id)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**

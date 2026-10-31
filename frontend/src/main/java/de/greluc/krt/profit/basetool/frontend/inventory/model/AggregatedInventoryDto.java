@@ -29,6 +29,13 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
  *
  * <p>A material row carries {@code material} and the quality figures; a game-item row carries
  * {@code gameItem} and {@code null} quality columns (REQ-INV-029).
+ *
+ * @param material the aggregated material, or {@code null} for a game-item row
+ * @param gameItem the aggregated game item, or {@code null} for a material row
+ * @param quality amount-weighted average quality, or {@code null}
+ * @param maxQuality highest single-entry quality, or {@code null}
+ * @param amount total quantity in stock
+ * @param lowStock whether a minimum stock level of the material is low (REQ-INV-068)
  */
 @DtoMirror
 public record AggregatedInventoryDto(
@@ -36,4 +43,24 @@ public record AggregatedInventoryDto(
     InventoryGameItemReferenceDto gameItem,
     Double quality,
     Double maxQuality,
-    Double amount) {}
+    Double amount,
+    boolean lowStock) {
+
+  /**
+   * Creates a row that no low level marks.
+   *
+   * @param material the aggregated material, or {@code null} for a game-item row
+   * @param gameItem the aggregated game item, or {@code null} for a material row
+   * @param quality amount-weighted average quality, or {@code null}
+   * @param maxQuality highest single-entry quality, or {@code null}
+   * @param amount total quantity in stock
+   */
+  public AggregatedInventoryDto(
+      MaterialDto material,
+      InventoryGameItemReferenceDto gameItem,
+      Double quality,
+      Double maxQuality,
+      Double amount) {
+    this(material, gameItem, quality, maxQuality, amount, false);
+  }
+}

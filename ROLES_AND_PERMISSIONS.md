@@ -1302,8 +1302,8 @@ does not end it.
 ### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 
 **Shipped for materials and game items:** setting, changing and removing a unit's levels and the
-„Mindestbestände“ tab follow the first two rows below (`StockLevelAccessPolicy`, the Lager
-`ScopePredicate`). The shortcuts, the „niedrig“ badge, the widget and the notification are still
+„Mindestbestände“ tab, the shortcuts and the „niedrig“ badge follow the rows below
+(`StockLevelAccessPolicy`, the Lager `ScopePredicate`). The widget and the notification are still
 planned.
 
 | Function | Who |

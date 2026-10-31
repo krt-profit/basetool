@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -216,7 +217,8 @@ class JobOrderPageControllerReaderTest {
         .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), false, List.of(), options));
     Model model = new ExtendedModelMap();
 
-    assertThat(controller.viewCreateForm(null, model)).isEqualTo("joborder/orders-create");
+    assertThat(controller.viewCreateForm(null, new JobOrderPrefill(null, null, null, null), model))
+        .isEqualTo("joborder/orders-create");
 
     assertThat(model.asMap())
         .containsEntry("hasOrderableItems", false)
@@ -230,7 +232,7 @@ class JobOrderPageControllerReaderTest {
         .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), true, List.of(), List.of()));
     Model model = new ExtendedModelMap();
 
-    controller.viewCreateForm(null, model);
+    controller.viewCreateForm(null, new JobOrderPrefill(null, null, null, null), model);
 
     assertThat(model.asMap())
         .containsEntry("materials", List.of())
