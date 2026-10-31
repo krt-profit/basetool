@@ -192,7 +192,7 @@
         </section>
 
         <section id="pane-op-payout" class="tab-pane" role="tabpanel" aria-labelledby="optab-payout"
-                 th:attr="data-operation-id=${operation.id}, data-can-unset-paid-out=${canUnsetPaidOut}">
+                 th:attr="data-operation-id=${operation.id}, data-can-unset-paid-out=${hasOfficerReach}">
             <div id="op-payout-results">
             <th:block th:fragment="payoutSection">
             <div th:if="${operation.payoutPreliminary != null and operation.payoutPreliminary}"
@@ -232,8 +232,8 @@
                                         <input type="checkbox" class="payout-paid-checkbox"
                                                th:attr="data-participant-id=${payout.participantId}, data-operation-id=${operation.id}, aria-label=#{operation.payout.paid}"
                                                th:checked="${payout.paidOut}"
-                                               th:disabled="${payout.paidOut and not canUnsetPaidOut}"
-                                               th:title="${payout.paidOut and not canUnsetPaidOut} ? #{operation.payout.paid.unset.locked} : ''">
+                                               th:disabled="${payout.paidOut and not hasOfficerReach}"
+                                               th:title="${payout.paidOut and not hasOfficerReach} ? #{operation.payout.paid.unset.locked} : ''">
                                         <span class="payout-paid-status" th:if="${payout.paidOut and payout.paidOutByName != null}"
                                               th:text="${payout.paidOutByName}"
                                               th:title="${payout.paidOutAt != null ? #temporals.format(payout.paidOutAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">audit name</span>

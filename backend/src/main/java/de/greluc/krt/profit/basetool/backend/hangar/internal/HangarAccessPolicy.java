@@ -86,4 +86,25 @@ public class HangarAccessPolicy {
   public boolean canSeeUnitHangar(@NotNull UUID orgUnitId) {
     return ownerScopeService.currentUnitOverviewScope().permits(orgUnitId);
   }
+
+  /**
+   * Checks whether the unit overview offers per-ship owner details in the caller's active context:
+   * officer reach in the pinned unit, or in any unit when none is pinned (REQ-HANGAR-001). The
+   * service narrows the details to the ships of units the caller reaches.
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in the active context
+   */
+  public boolean canSeeOwnerDetails() {
+    return ownerScopeService.canActAsOfficerInActiveContext();
+  }
+
+  /**
+   * Checks whether the caller may run the bulk reset of the {@code fitted} flag in the active
+   * context; the reset itself only touches ships of units the caller reaches (REQ-HANGAR-004).
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in the active context
+   */
+  public boolean canResetFitted() {
+    return ownerScopeService.canActAsOfficerInActiveContext();
+  }
 }

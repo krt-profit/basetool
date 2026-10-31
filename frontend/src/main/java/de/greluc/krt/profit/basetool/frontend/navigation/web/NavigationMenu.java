@@ -22,11 +22,17 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The navigation one caller gets on one request: the {@link NavigationRegistry} with every entry,
@@ -35,6 +41,7 @@ import org.jetbrains.annotations.NotNull;
  * @param top the links above the member groups
  * @param main the permitted member groups that keep at least one entry
  * @param personal the personal pages
+ * @param adminTop the admin hub link
  * @param admin the permitted administration groups that keep at least one entry
  * @param anonymous the links of a signed-out visitor
  * @param legal the legal links
@@ -42,18 +49,21 @@ import org.jetbrains.annotations.NotNull;
  * @param actions the quick access's create and booking actions
  * @param paletteTail the quick access's handbook and language actions
  * @param tabs the phone tab bar's slots that keep a permitted entry
+ * @param pageTabs the permitted tabs of each merged page, by the key of each of its entries
  */
 public record NavigationMenu(
     @NotNull Group top,
     @NotNull List<Group> main,
     @NotNull Group personal,
+    @NotNull Group adminTop,
     @NotNull List<Group> admin,
     @NotNull Group anonymous,
     @NotNull Group legal,
     @NotNull Group fanKit,
     @NotNull Group actions,
     @NotNull Group paletteTail,
-    @NotNull List<Tab> tabs) {
+    @NotNull List<Tab> tabs,
+    @NotNull Map<String, List<NavigationEntry>> pageTabs) {
 
   /**
    * Resolves the registry for one caller.
@@ -69,13 +79,35 @@ public record NavigationMenu(
         Group.of(registry.top(), access),
         groups(registry.main(), access),
         Group.of(registry.personal(), access),
+        Group.of(registry.adminTop(), access),
         groups(registry.admin(), access),
         Group.of(registry.anonymous(), access),
         Group.of(registry.legal(), access),
         Group.of(registry.fanKit(), access),
         Group.of(registry.actions(), access),
         Group.of(registry.paletteTail(), access),
-        registry.tabs().stream().flatMap(tab -> Tab.of(tab, registry, access).stream()).toList());
+        registry.tabs().stream().flatMap(tab -> Tab.of(tab, registry, access).stream()).toList(),
+        resolvePageTabs(registry, access));
+  }
+
+  /**
+   * The tab bar of the page an entry belongs to, with the current tab marked.
+   *
+   * @param entryKey the key of any entry of the page's tab bar
+   * @param requestUri the current request URI, with or without a query
+   * @return the permitted tabs in order, or empty when the entry has no tab bar or fewer than two
+   *     tabs are permitted
+   */
+  @NotNull
+  public List<PageTab> pageTabs(@NotNull String entryKey, @NotNull String requestUri) {
+    List<NavigationEntry> tabs = pageTabs.getOrDefault(entryKey, List.of());
+    String path = requestUri.split("\\?", 2)[0];
+    NavigationEntry current =
+        tabs.stream()
+            .filter(tab -> path.equals(tab.href()) || path.startsWith(tab.href() + "/"))
+            .max(Comparator.comparingInt(tab -> tab.href().length()))
+            .orElse(null);
+    return tabs.stream().map(tab -> new PageTab(tab, tab == current)).toList();
   }
 
   /**
@@ -89,6 +121,45 @@ public record NavigationMenu(
     return Stream.concat(main.stream(), admin.stream())
         .flatMap(group -> group.palettePages().stream())
         .toList();
+  }
+
+  /**
+   * The other paths of the area a menu link opens: the tabs of the merged page behind it.
+   *
+   * @param link a menu link
+   * @return the space-separated paths of the permitted tabs other than the link's own, or {@code
+   *     null} for a link without tabs
+   */
+  @Nullable
+  public String areaPaths(@NotNull NavigationEntry link) {
+    String paths =
+        pageTabs.values().stream()
+            .filter(tabs -> tabs.stream().anyMatch(tab -> tab.href().equals(link.href())))
+            .findFirst()
+            .stream()
+            .flatMap(List::stream)
+            .map(NavigationEntry::href)
+            .filter(href -> !href.equals(link.href()))
+            .distinct()
+            .collect(Collectors.joining(" "));
+    return paths.isEmpty() ? null : paths;
+  }
+
+  @NotNull
+  private static Map<String, List<NavigationEntry>> resolvePageTabs(
+      @NotNull NavigationRegistry registry, @NotNull NavigationAccess access) {
+    Map<String, List<NavigationEntry>> byKey = new HashMap<>();
+    for (NavigationPageTabs bar : registry.pageTabs()) {
+      List<NavigationEntry> permitted =
+          bar.entryKeys().stream()
+              .flatMap(key -> registry.entry(key).stream())
+              .filter(entry -> registry.permits(entry, access))
+              .toList();
+      if (permitted.size() >= 2) {
+        bar.entryKeys().forEach(key -> byKey.put(key, permitted));
+      }
+    }
+    return Map.copyOf(byKey);
   }
 
   @NotNull
@@ -123,6 +194,14 @@ public record NavigationMenu(
           permitted.stream().filter(NavigationEntry::paletteOnly).toList());
     }
   }
+
+  /**
+   * One tab of a merged page's tab bar.
+   *
+   * @param entry the tab's entry
+   * @param current whether the tab is the page being shown
+   */
+  public record PageTab(@NotNull NavigationEntry entry, boolean current) {}
 
   /**
    * A phone tab with the entry it opens.

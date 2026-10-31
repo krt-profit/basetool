@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materials.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.materials', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materials.title},
         count=${materialsPage.totalElements()}, countId='materials-count', countFor='materials-results', actions=~{::materials-actions})}">
         <th:block th:ref="materials-actions">
             <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" data-testid="page-head-primary"

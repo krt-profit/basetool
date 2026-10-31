@@ -19,14 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLevelDemandSource;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLevelDemandSource.Request;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAllocation.Fill;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAllocation.Level;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAllocation.Lot;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelRepository.PoolStockRow;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import java.util.HashMap;
@@ -41,8 +46,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Computes the figures of minimum stock levels from their units' pool stock in one read per call
- * and maps the levels to their DTOs (REQ-INV-067).
+ * Computes the figures of minimum stock levels from their units' pool stock and the requested
+ * amounts in one read per call and maps the levels to their DTOs (REQ-INV-067).
  */
 @Component
 @RequiredArgsConstructor
@@ -51,12 +56,13 @@ public class StockLevelFigures {
   private final StockLevelRepository stockLevelRepository;
   private final StockLevelAccessPolicy accessPolicy;
   private final QualityTierMapper qualityTierMapper;
+  private final List<StockLevelDemandSource> demandSources;
 
-  /** The pair a level allocation runs over: one material in one unit's pool. */
-  private record PoolKey(UUID unitId, UUID materialId) {
+  /** The pair a level allocation runs over: one material or game item in one unit's pool. */
+  private record PoolKey(UUID unitId, UUID subjectId) {
 
     private static PoolKey of(@NotNull StockLevel level) {
-      return new PoolKey(level.getOrgUnit().getId(), level.getMaterial().getId());
+      return new PoolKey(level.getOrgUnit().getId(), level.subjectId());
     }
   }
 
@@ -72,12 +78,14 @@ public class StockLevelFigures {
       return List.of();
     }
     Map<UUID, Fill> fills = allocate(levels);
+    Map<PoolKey, List<Request>> requests = requestsOf(levels);
     Map<UUID, Boolean> editable = new HashMap<>();
     return levels.stream()
         .map(level ->
             dtoOf(
                 level,
                 fills,
+                requestedOf(level, requests),
                 editable.computeIfAbsent(
                     level.getOrgUnit().getId(), accessPolicy::canMaintainStockLevelsOf)))
         .toList();
@@ -91,21 +99,23 @@ public class StockLevelFigures {
    */
   public @NotNull StockLevelDto toDto(@NotNull StockLevel level) {
     List<StockLevel> siblings =
-        stockLevelRepository.findByUnitAndMaterial(
-            level.getOrgUnit().getId(), level.getMaterial().getId());
+        stockLevelRepository.findByUnitAndSubject(level.getOrgUnit().getId(), level.subjectId());
     Map<UUID, Fill> fills = allocate(siblings);
-    return dtoOf(level, fills, accessPolicy.canMaintainStockLevelsOf(level.getOrgUnit().getId()));
+    return dtoOf(
+        level,
+        fills,
+        requestedOf(level, requestsOf(List.of(level))),
+        accessPolicy.canMaintainStockLevelsOf(level.getOrgUnit().getId()));
   }
 
   private @NotNull Map<UUID, Fill> allocate(@NotNull List<StockLevel> levels) {
     Set<UUID> units = levels.stream().map(l -> l.getOrgUnit().getId()).collect(Collectors.toSet());
-    Set<UUID> materials =
-        levels.stream().map(l -> l.getMaterial().getId()).collect(Collectors.toSet());
+    Set<UUID> subjects = levels.stream().map(StockLevel::subjectId).collect(Collectors.toSet());
     Map<PoolKey, List<Lot>> lots =
-        stockLevelRepository.sumPoolStock(units, materials).stream()
+        stockLevelRepository.sumPoolStock(units, subjects).stream()
             .collect(
                 Collectors.groupingBy(
-                    row -> new PoolKey(row.getUnitId(), row.getMaterialId()),
+                    row -> new PoolKey(row.getUnitId(), row.getSubjectId()),
                     Collectors.mapping(StockLevelFigures::toLot, Collectors.toList())));
     Map<UUID, Fill> fills = new HashMap<>();
     levels.stream()
@@ -115,6 +125,27 @@ public class StockLevelFigures {
         .forEach((key, group) ->
             fills.putAll(StockLevelAllocation.allocate(group, lots.getOrDefault(key, List.of()))));
     return fills;
+  }
+
+  private @NotNull Map<PoolKey, List<Request>> requestsOf(@NotNull List<StockLevel> levels) {
+    Set<UUID> units = levels.stream().map(l -> l.getOrgUnit().getId()).collect(Collectors.toSet());
+    Set<UUID> subjects = levels.stream().map(StockLevel::subjectId).collect(Collectors.toSet());
+    return demandSources.stream()
+        .flatMap(source -> source.outstandingRequests(units, subjects).stream())
+        .collect(
+            Collectors.groupingBy(request -> new PoolKey(request.unitId(), request.subjectId())));
+  }
+
+  /** Sums the requests at the level's tier floor or above; an untiered level takes them all. */
+  private static double requestedOf(
+      @NotNull StockLevel level, @NotNull Map<PoolKey, List<Request>> requests) {
+    QualityTier tier = level.getQualityTier();
+    int floor = tier == null ? 0 : tier.getMinQuality();
+    return ScuAmounts.roundToScuScale(
+        requests.getOrDefault(PoolKey.of(level), List.of()).stream()
+            .filter(request -> request.minQuality() >= floor)
+            .mapToDouble(Request::amount)
+            .sum());
   }
 
   private static @NotNull Lot toLot(@NotNull PoolStockRow row) {
@@ -132,16 +163,24 @@ public class StockLevelFigures {
   }
 
   private @NotNull StockLevelDto dtoOf(
-      @NotNull StockLevel level, @NotNull Map<UUID, Fill> fills, boolean editable) {
+      @NotNull StockLevel level,
+      @NotNull Map<UUID, Fill> fills,
+      double requested,
+      boolean editable) {
     Fill fill = Objects.requireNonNull(fills.get(level.getId()), "every level is allocated");
     QualityTier tier = level.getQualityTier();
     OrgUnit unit = level.getOrgUnit();
     Material material = level.getMaterial();
+    GameItem gameItem = level.getGameItem();
     return new StockLevelDto(
         level.getId(),
         level.getVersion(),
         new OrgUnitReferenceDto(unit.getId(), unit.getName(), unit.getShorthand(), unit.getKind()),
-        new MaterialReferenceDto(material.getId(), material.getName(), material.getQuantityType()),
+        material == null
+            ? null
+            : new MaterialReferenceDto(
+                material.getId(), material.getName(), material.getQuantityType()),
+        gameItem == null ? null : GameItemReferenceDto.of(gameItem),
         tier == null ? null : qualityTierMapper.toDto(tier),
         level.getMinimum(),
         level.getTarget(),
@@ -149,6 +188,7 @@ public class StockLevelFigures {
         fill.shortfall(),
         fill.fillRatio(),
         fill.low(),
+        requested,
         editable);
   }
 }

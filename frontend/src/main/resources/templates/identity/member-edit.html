@@ -12,13 +12,9 @@
                backHref=${fromProfile ? '/profile' : '/members'},
                descriptionLength=${memberEditForm.description != null ? memberEditForm.description.length() : 0}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${fromProfile ? 'nav.profile' : 'nav.members'},
-        eyebrowHref=@{${backHref}}, titleText=${user.effectiveName}, actions=~{::member-edit-actions})}">
-        <th:block th:ref="member-edit-actions">
-            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
-               th:href="@{/admin/members/{id}/hangar(id=${user.id})}" class="btn btn-ghost"
-               data-testid="member-edit-hangar"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-right"/></svg> <span th:text="#{members.edit.hangar}">Hangar</span></a>
-        </th:block>
-    </th:block>
+        eyebrowHref=@{${backHref}}, titleText=${user.effectiveName})}"></th:block>
+
+    <th:block th:replace="~{identity/fragments/member-tabs :: tabs(${user.id}, 'profile')}"></th:block>
 
     <div class="tab-nav member-edit-tabs" role="tablist" th:aria-label="#{members.edit.title}" data-testid="member-edit-tabs">
         <button class="tab active" id="member-tab-profile" type="button" role="tab" aria-selected="true"
@@ -29,10 +25,6 @@
                 aria-controls="member-panel-memberships" data-tab="memberships" data-testid="member-tab-memberships"
             ><span th:text="#{members.memberships.title}">Mitgliedschaften</span>
             <span class="tab-count" th:text="${memberMemberships != null ? memberMemberships.size() : 0}">0</span></button>
-        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
-                class="tab" id="member-tab-export" type="button" role="tab" aria-selected="false" tabindex="-1"
-                aria-controls="member-panel-export" data-tab="export" data-testid="member-tab-export"
-                th:text="#{members.export.title}">Datenauskunft</button>
     </div>
 
     <form id="member-edit-form" data-member-edit="true" class="form-layout card"
@@ -225,23 +217,6 @@
         </div>
     </form>
 
-    <section id="member-panel-export" class="card member-export stack" role="tabpanel" aria-labelledby="member-tab-export" hidden
-             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-        <h2 class="member-export__title" th:text="#{members.export.title}">Datenauskunft</h2>
-        <div class="alert alert-info" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</div>
-        <div class="cluster">
-            <a th:href="@{/admin/members/{id}/export/pdf(id=${user.id})}" class="btn btn-outline"
-               data-testid="member-export-pdf">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
-                <span th:text="#{members.export.pdf}">Als PDF</span>
-            </a>
-            <a th:href="@{/admin/members/{id}/export/json(id=${user.id})}" class="btn btn-ghost"
-               data-testid="member-export-json">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
-                <span th:text="#{members.export.json}">Als JSON</span>
-            </a>
-        </div>
-    </section>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     window.krtMemberEditI18n = {

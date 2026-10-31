@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<div th:fragment="pageHead" class="page-head" data-testid="page-head">
+<th:block th:fragment="pageHead">
+<div class="page-head" data-testid="page-head">
   <div class="page-head__main">
     <a th:if="${eyebrowHref != null}" class="page-eyebrow" th:href="${eyebrowHref}" data-testid="page-eyebrow"
       ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
@@ -18,5 +19,7 @@
     <th:block th:replace="${actions}"></th:block>
   </div>
 </div>
+<th:block th:if="${tabsKey != null}"><th:block th:replace="~{kernel/fragments/nav-entries :: pageTabs(${tabsKey})}"></th:block></th:block>
+</th:block>
 </body>
 </html>

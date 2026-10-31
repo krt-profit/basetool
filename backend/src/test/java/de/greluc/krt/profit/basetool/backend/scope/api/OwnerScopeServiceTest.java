@@ -2359,6 +2359,22 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void ownerless_target_isReservedToAdmins() {
+      stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
+
+      assertFalse(service.canActAsOfficerInOwner(null));
+      assertTrue(service.canActAsOfficerInOwner(SQUADRON_A_ID));
+      assertFalse(service.canActAsOfficerInOwner(SQUADRON_B_ID));
+    }
+
+    @Test
+    void admin_passesAnOwnerlessTarget() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canActAsOfficerInOwner(null));
+    }
+
+    @Test
     void activeContext_pinnedUnitWithReach_isOfficer() {
       stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
