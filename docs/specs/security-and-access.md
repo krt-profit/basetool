@@ -365,51 +365,55 @@ plan guard G-25
 
 ### REQ-SEC-004 — Roles & hierarchy
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+Roles: `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles, which the
+matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159) and **`OFFICER` is not one of
+them since `V315`** (ADR-0300): there is no role below member, and a token that maps to none of
+these is refused with `403 NO_ROLE` (REQ-SEC-053).
+Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, and on
+the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never**
+`MISSION_MANAGER > LOGISTICIAN`, which is why a mission manager is inside the peer-redaction tier
+(REQ-SEC-007). The full matrix is authoritative in
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 
-Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles,
-which the matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159): there is no role
-below member, and a token that maps to none of these is refused with `403 NO_ROLE` (REQ-SEC-053).
-Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`,
-`OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`, and on the bank side
-`ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never** `MISSION_MANAGER > LOGISTICIAN`, which is
-why a mission manager is inside the peer-redaction tier (REQ-SEC-007). The full matrix is
-authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
+#### Officer reach replaces the OFFICER role (ADR-0300)
 
-#### Planned amendment (ADR-0300)
+`OFFICER` was retired by a hard cut in one release:
 
-`OFFICER` is no longer a role. It is retired by a hard cut in one release:
-
-- **Roles:** `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` and the bank roles. A migration
-  removes the seeded `OFFICER` role and its permissions; `Roles.OFFICER`,
-  `Roles.ADMIN_OR_OFFICER` and their frontend mirrors go with it.
-- **Hierarchy:** `OFFICER > LOGISTICIAN` and `OFFICER > MISSION_MANAGER` are dropped. The rest is
-  unchanged, and `MISSION_MANAGER > LOGISTICIAN` stays absent.
+- **Roles:** migration `V315` removed the seeded `OFFICER` role, its `user_roles` rows and its
+  permissions; `Roles.OFFICER`, `Roles.ADMIN_OR_OFFICER` and their frontend mirrors are gone.
+- **Hierarchy:** the `OFFICER > LOGISTICIAN` and `OFFICER > MISSION_MANAGER` edges are gone, in both
+  `SecurityConfig`s. `MISSION_MANAGER > LOGISTICIAN` stays absent.
 - **Officer reach replaces the role.** It is derived per org unit from the caller's leadership
   seats (REQ-ROLE-002) and evaluated against the **owning unit of the target** (mission, job order,
   promotion topic, ship, …); lists are filtered to the caller's officer units. An admin passes every
   officer check. No token, realm role or per-membership flag grants it.
-- **Membership rights rest on `KRT_MEMBER` alone.** `MEMBER_OR_ABOVE` no longer lists `OFFICER`.
-- **The realm role is ignored, then deleted.** `UserReconciliationService` mirrors no `OFFICER`
-  realm role and `CustomJwtGrantedAuthoritiesConverter` mints no `ROLE_OFFICER` from any source.
-  The provisioning script deletes the realm role after the release; the test realms, the e2e realm
-  export and the sandbox realm drop it.
+- **Membership rights rest on `KRT_MEMBER`.** The member-list URL rules and `MEMBER_OR_ABOVE` no
+  longer list `OFFICER`; the oversight scope no longer adds every squadron membership of a role
+  holder.
+- **The realm role is ignored, then deleted.** The role catalogue holds no `Officer` role, so
+  `UserReconciliationService` maps no `OFFICER` realm role onto a local one and
+  `CustomJwtGrantedAuthoritiesConverter` mints no `ROLE_OFFICER` from any source. The provisioning
+  script deletes the realm role (ADR-0202 amendment 6); the test realms, the e2e realm export and
+  the sandbox realm dropped it.
+- **Notification rules** that addressed the `ROLE OFFICER` selector were moved to the `SEAT_HOLDERS`
+  selector by `V317` and stay editable (REQ-NOTIF-008).
 - **Precondition of the cut:** a report of every leadership seat holder who lacks `KRT Member`. The
-  cut ships only when that list is empty (REQ-ORG-029). The report ships ahead of the cut as
+  cut ships only when that list is empty (REQ-ORG-029). The report ships as
   `scripts/officer-cut-report.sql`: a read-only session, SELECTs only, ids and coded words but no
   names. Beside the blocking section `seat_without_krt_member` it lists what the cut removes or
   changes, so the release can be checked against it: `officer_without_seat` (hand-granted officers
   who lose officer power), `bank_view_grant_officer` and `bank_approval_limit_officer` (the
-  `GLOBAL_ROLE OFFICER` buckets the cut deletes, each with a bank audit event) and `notification_rule_role_officer` (the `ROLE OFFICER` selectors the cut moves to the
-  seat-holder target). Every section prints a `count=` line, so an empty one reads `count=0`. Enforced
-  by `OfficerCutReportIntegrationTest`; how to run it on production: `docs/deployment.md`,
-  *Pre-cut report for the OFFICER retirement*.
+  `GLOBAL_ROLE OFFICER` buckets the cut deletes, each with a bank audit event) and
+  `notification_rule_role_officer` (the `ROLE OFFICER` selectors the cut moves to the seat-holder
+  target). Every section prints a `count=` line, so an empty one reads `count=0`. Enforced by
+  `OfficerCutReportIntegrationTest`; how to run it on production: `docs/deployment.md`, *Pre-cut
+  report for the OFFICER retirement*.
 
-**Enforced by (to be added):** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a
-realm role or a seat), `UserReconciliationServiceTest` (an `OFFICER` realm role is not mirrored),
-`SecurityConfigRoleHierarchyTest` (no `OFFICER` edge), a migration test for the removed seeded role
-· **Related:** REQ-ROLE-002, REQ-SEC-015, REQ-SEC-047, ADR-0300
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a realm role or
+a seat), `UserReconciliationServiceTest` (an `Officer` realm role is not mirrored),
+`SecurityConfigRoleHierarchyTest` (no `OFFICER` edge), `OfficerCutMigrationTest` (the
+removed role with its rows, the moved notification selectors) · **Related:** REQ-ROLE-002,
+REQ-SEC-015, REQ-SEC-047, ADR-0300
 
 ### REQ-SEC-005 — Contextual LOGISTICIAN / MISSION_MANAGER grants
 
@@ -1158,9 +1162,6 @@ number of users that reconciled successfully; and each failure increments
 
 ### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 The org hierarchy (REQ-ORG-014) introduces Bereich and OL leadership whose access **cascades** down to
 subordinate units (REQ-ORG-015). This is a security-load-bearing carve-out, so the invariant is pinned
 here:
@@ -1194,9 +1195,9 @@ whitelist (incl. the new `OrgUnitBankAccessService`); `TenancyGuardTest`'s write
 matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
 
-#### Planned amendment (ADR-0300)
+#### Officer reach per leadership seat (ADR-0300)
 
-Officer-equivalent reach becomes **the** officer reach: there is no separate officer role to be
+Officer-equivalent reach is **the** officer reach: there is no separate officer role to be
 equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one reach computation
 (`confersOwnUnitOfficerReach` and `OrgUnitCascadeService.cascadedOfficerReach`):
 
@@ -1219,13 +1220,7 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029).
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Live ahead of the cut:** the reach computation and the appointment precondition. The scope
-kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes),
-`#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. The purchasing
-`leadsUnit` check reads `canActAsOfficerIn` (no `OFFICER@<unit>` authority is read), and the job-order,
-inventory and game-item gates and the job-order and inventory pages no longer name `OFFICER`: a
-seat holder reaches `LOGISTICIAN` through the seat. The other `OFFICER` gates keep their behaviour
-until the cut.
+**Where it is read.** The scope kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
 
 **Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
@@ -1233,7 +1228,7 @@ membership without a seat, none without `KRT Member`, admin pass, pinned / unpin
 `PurchasingAccessPolicyTest` (a seat in one unit leads no other unit), `GameItemControllerTest` ·
 **Code:** `MembershipRole#confersOwnUnitOfficerReach`, `RequestScopeResolver#currentOfficerOrgUnitIds`,
 `AccessGateService#canActAsOfficerIn`, `OrgUnitMembershipService`,
-`LeadershipSeatRequiresKrtMemberException` · **Enforced by (to be added):**
+`LeadershipSeatRequiresKrtMemberException` · **Enforced by:**
 `OrgHierarchyVisibilityMatrixE2eTest` (a Staffel officer denied a foreign Staffel they are a plain
 member of) · **Related:** REQ-ROLE-002, REQ-ORG-015, ADR-0300
 

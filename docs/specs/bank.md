@@ -1595,9 +1595,6 @@ it was a `PATCH` before wave 4 of the API cut). Both echo the version and write 
 
 ### REQ-BANK-037 — Fixed cartel/special visibility (KRT account & Sonderkonten)
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 Two account groups have **fixed** (non-holder-configurable) visibility on the org-unit bank page:
 
 - **OL/KRT-Konto (`CARTEL`):** its balance and read-only detail are **always visible to every KRT
@@ -1611,25 +1608,28 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
-#### Planned amendment (ADR-0300)
+#### The OFFICER audience is retired (ADR-0300)
 
 The Keycloak `OFFICER` role is retired (REQ-SEC-004), so a Sonderkonto can no longer be opened to
 "all officers":
 
-- **The `GLOBAL_ROLE` `OFFICER` audience goes.** The Sichtbarkeit editor of a Sonderkonto no longer
-  offers it; the remaining global-role audiences are `LOGISTICIAN` and `MISSION_MANAGER`
+- **The `GLOBAL_ROLE` `OFFICER` audience is gone.** The Sichtbarkeit editor of a Sonderkonto no
+  longer offers it; the remaining global-role audiences are `LOGISTICIAN` and `MISSION_MANAGER`
   (`OrgUnitBankSettingsService`, REQ-BANK-035).
-- **Existing grants are removed by migration.** It deletes every `bank_account_view_grant` row with
-  `GLOBAL_ROLE` `OFFICER` and writes one `BALANCE_VISIBILITY_REVOKED` `bank_audit_event` per removed
-  grant, with the system as actor (REQ-BANK-012).
+- **Existing grants and limits were removed by migration** `V316`. It deletes every
+  `bank_account_view_grant` row and every `bank_account_approval_limit` row (REQ-BANK-041) with
+  `GLOBAL_ROLE` `OFFICER` and writes one `bank_audit_event` per removed row with the system as
+  actor and `GLOBAL_ROLE:OFFICER` as details: `BALANCE_VISIBILITY_REVOKED` for a grant,
+  `APPROVAL_LIMIT_CLEARED` for a limit (REQ-BANK-012). The one-time cut writes the rows in SQL, so
+  `basetool_bank_audit_events_total` counts runtime events only and does not see them.
 - **Bank management gains no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007). A
   bank manager who also holds a leadership seat has officer reach there like anyone else.
 - The fixed audiences above — `CARTEL` for every KRT member, `CARTEL_BANK` for its holder and bank
   staff, `SPECIAL` auto-visible to bank staff, admins, OL members and Bereichsleiter — stay.
 
-**Enforced by (to be added):** `OrgUnitBankAccessServiceTest` (no officer bucket on a Sonderkonto),
-`OrgUnitBankSettingsServiceTest` (the offered buckets), a migration test (grants deleted, one audit
-row per grant) · **Related:** REQ-BANK-035, REQ-SEC-004, ADR-0300
+**Enforced by:** `OrgUnitBankSettingsServiceTest` (the offered buckets), `OfficerCutMigrationTest`
+(grants and limits deleted, one audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`,
+`db/migration/V316` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 
