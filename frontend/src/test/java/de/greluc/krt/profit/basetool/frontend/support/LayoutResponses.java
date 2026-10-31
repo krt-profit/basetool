@@ -54,6 +54,34 @@ public final class LayoutResponses {
   }
 
   /**
+   * A layout answer carrying the three capability flags the web layout reads and the assignee flag.
+   *
+   * @param canViewJobOrders whether the Job-Order area is offered
+   * @param canViewOwnJobOrders whether the own-unit "Meine Aufträge" view is offered
+   * @param canViewAssignedJobOrders whether the caller holds an assignee entry
+   * @return the answer, with no org unit, no pinnable units and no unread notifications
+   */
+  public static MeLayoutResponse orderAccess(
+      boolean canViewJobOrders, boolean canViewOwnJobOrders, boolean canViewAssignedJobOrders) {
+    return new MeLayoutResponse(
+        null,
+        List.of(),
+        new CapabilitiesResponse(
+            false,
+            canViewJobOrders,
+            canViewOwnJobOrders,
+            canViewAssignedJobOrders,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false),
+        0L);
+  }
+
+  /**
    * Capability flags with the four non-officer flags as given and every officer flag off.
    *
    * @param canSeeBlueprintOverview whether the blueprint availability overview is offered
@@ -71,6 +99,7 @@ public final class LayoutResponses {
         canSeeBlueprintOverview,
         canViewJobOrders,
         canViewOwnJobOrders,
+        false,
         canMarkStolen,
         false,
         false,
@@ -92,6 +121,7 @@ public final class LayoutResponses {
         null,
         List.of(),
         new CapabilitiesResponse(
+            false,
             false,
             false,
             false,

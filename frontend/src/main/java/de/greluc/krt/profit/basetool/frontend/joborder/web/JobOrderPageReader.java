@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBluepri
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -114,8 +115,7 @@ public class JobOrderPageReader {
   /**
    * What the order list needs to ask for.
    *
-   * @param ownScope whether the requester-redacted own-orders list is read
-   * @param toProcessScope whether the queue of the caller's own units is read
+   * @param scope the segment to read
    * @param page the zero-based page index
    * @param size the page size
    * @param statuses the resolved status filter
@@ -123,8 +123,7 @@ public class JobOrderPageReader {
    * @param withSquadronFilter whether the active squadrons of the filter picker are read
    */
   public record OrderListQuery(
-      boolean ownScope,
-      boolean toProcessScope,
+      @NotNull OrderListScope scope,
       int page,
       int size,
       @NotNull List<String> statuses,
@@ -446,12 +445,7 @@ public class JobOrderPageReader {
   private OrderListPage loadOrderList(@NotNull OrderListQuery query) {
     PageResponse<JobOrderDto> p =
         jobOrderClient.orders(
-            query.ownScope(),
-            query.toProcessScope(),
-            query.page(),
-            query.size(),
-            query.statuses(),
-            query.squadronIds());
+            query.scope(), query.page(), query.size(), query.statuses(), query.squadronIds());
     List<JobOrderDto> orders = new ArrayList<>();
     if (p != null && p.content() != null) {
       orders = new ArrayList<>(p.content());

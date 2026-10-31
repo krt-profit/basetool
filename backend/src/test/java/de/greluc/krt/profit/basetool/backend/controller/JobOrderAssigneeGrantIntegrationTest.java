@@ -91,6 +91,7 @@ class JobOrderAssigneeGrantIntegrationTest {
   private UUID unitMateId;
   private UUID adminId;
   private UUID unitAMemberId;
+  private UUID unitCMemberId;
   private String tag;
 
   @BeforeEach
@@ -113,6 +114,11 @@ class JobOrderAssigneeGrantIntegrationTest {
       User unitAMember = newUser("grant-zmember-" + tag);
       unitAMemberId = unitAMember.getId();
       joinUnit(unitAMember, unitA);
+      String otherTag = UUID.randomUUID().toString().substring(0, 8);
+      Squadron unitC = newSquadron("Grant-C-" + otherTag, "GC" + otherTag, true);
+      User unitCMember = newUser("grant-cmember-" + otherTag);
+      unitCMemberId = unitCMember.getId();
+      joinUnit(unitCMember, unitC);
       User pending = newUser("grant-pending-" + tag);
       pending.setApprovalStatus(ApprovalStatus.PENDING);
       userRepository.save(pending);
@@ -212,6 +218,79 @@ class JobOrderAssigneeGrantIntegrationTest {
 
     as(get(ORDERS + orderId + "/assignee-candidates"), assigneeId, "ROLE_LOGISTICIAN")
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void assignedToMeListsTheOrderForAnAssigneeWithoutProfitAccess() throws Exception {
+    assignAsAdmin();
+
+    as(get("/api/v1/orders").param("assignedToMe", "true"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.id == '" + orderId + "')]").isNotEmpty())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(get("/api/v1/orders").param("assignedToMe", "true"), unitMateId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+  }
+
+  @Test
+  void theGrantWidensAllButNotToProcessAndAssignedToMeNarrowsToTheOwnEntries() throws Exception {
+    as(post(ORDERS + orderId + "/assignees/" + unitCMemberId), adminId, "ROLE_ADMIN")
+        .andExpect(status().isOk());
+    String inOrders = "$.content[?(@.id == '" + orderId + "')]";
+
+    as(get("/api/v1/orders").param("size", "1000"), unitCMemberId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath(inOrders).isNotEmpty());
+    as(
+            get("/api/v1/orders").param("toProcess", "true").param("size", "1000"),
+            unitCMemberId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath(inOrders).isEmpty());
+    as(
+            get("/api/v1/orders").param("assignedToMe", "true").param("size", "1000"),
+            unitCMemberId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath(inOrders).isNotEmpty());
+    as(
+            get("/api/v1/orders").param("assignedToMe", "true").param("size", "1000"),
+            unitAMemberId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath(inOrders).isEmpty());
+  }
+
+  @Test
+  void assignedToMeAnswers400WithToProcessOrASquadronFilter() throws Exception {
+    as(
+            get("/api/v1/orders").param("assignedToMe", "true").param("toProcess", "true"),
+            assigneeId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(status().isBadRequest());
+    as(
+            get("/api/v1/orders")
+                .param("assignedToMe", "true")
+                .param("squadronId", unitAId.toString()),
+            assigneeId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void theCapabilityFlagFollowsTheEntryAndTheOrderStaysReadableWithoutProfitAccess()
+      throws Exception {
+    as(get("/api/v1/me/capabilities"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.canViewAssignedJobOrders").value(false));
+
+    assignAsAdmin();
+
+    as(get("/api/v1/me/capabilities"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.canViewAssignedJobOrders").value(true))
+        .andExpect(jsonPath("$.canViewJobOrders").value(false));
+    as(get("/api/v1/me/capabilities"), unitMateId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.canViewAssignedJobOrders").value(false));
+    as(delete(ORDERS + orderId + "/assignees/" + assigneeId), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk());
+    as(get("/api/v1/me/capabilities"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.canViewAssignedJobOrders").value(false));
   }
 
   private void assignAsAdmin() throws Exception {

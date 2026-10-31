@@ -289,6 +289,36 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
+   * Paged list of the orders on which {@code callerId} holds an assignee entry, behind {@code GET
+   * /api/v1/orders?assignedToMe=true} (REQ-ORDERS-040). The entry is the visibility grant itself
+   * (REQ-ORDERS-047), so no tenancy predicate applies.
+   *
+   * @param statuses status values to keep; pass the full enum set to disable status filtering
+   *     (never empty).
+   * @param callerId the caller's user id.
+   * @param pageable page request (carries the sort).
+   * @return paged job orders the caller is an assignee of.
+   */
+  @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
+  @Query(
+      """
+      SELECT o FROM JobOrder o WHERE o.status IN :statuses AND EXISTS
+      (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id = :callerId)
+      """)
+  Page<JobOrder> findAssignedJobOrders(
+      @Param("statuses") List<JobOrderStatus> statuses,
+      @Param("callerId") UUID callerId,
+      Pageable pageable);
+
+  /**
+   * Whether {@code userId} holds an assignee entry on any job order.
+   *
+   * @param userId the user to check.
+   * @return {@code true} iff at least one entry exists.
+   */
+  boolean existsByAssigneesUserId(UUID userId);
+
+  /**
    * Requester-side paged job-order list (REQ-ORDERS-023): orders whose {@code requestingOrgUnit} is
    * one of {@code requesterOrgUnitIds} and whose status is in {@code statuses}, regardless of the
    * responsible side. Sorted by the {@link Pageable}.

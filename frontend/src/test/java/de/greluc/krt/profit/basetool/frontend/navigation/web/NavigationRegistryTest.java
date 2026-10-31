@@ -84,7 +84,7 @@ class NavigationRegistryTest {
         .flatExtracting(NavigationTab::entryKeys)
         .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
     assertThat(registry.tabs().get(2).entryKeys())
-        .containsExactly("orders.list", "orders.own", "orders.create");
+        .containsExactly("orders.list", "orders.own", "orders.assigned", "orders.create");
   }
 
   /** Admin mode has the hub and exactly 13 menu links in three groups that start collapsed. */

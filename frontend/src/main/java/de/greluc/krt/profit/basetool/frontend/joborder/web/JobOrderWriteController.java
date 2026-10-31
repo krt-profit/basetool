@@ -795,6 +795,7 @@ public class JobOrderWriteController {
       @AuthenticationPrincipal OidcUser principal) {
     JobOrderDto order =
         callAssigneeMutation("add assignee", () -> jobOrderClient.addAssignee(id, userId));
+    liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
     populateAssigneeSectionModel(model, principal, order);
     return "joborder/orders-detail :: assigneesSection";
   }
@@ -1165,6 +1166,7 @@ public class JobOrderWriteController {
       @AuthenticationPrincipal OidcUser principal) {
     JobOrderDto order =
         callAssigneeMutation("remove assignee", () -> jobOrderClient.removeAssignee(id, userId));
+    liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
     populateAssigneeSectionModel(model, principal, order);
     return "joborder/orders-detail :: assigneesSection";
   }

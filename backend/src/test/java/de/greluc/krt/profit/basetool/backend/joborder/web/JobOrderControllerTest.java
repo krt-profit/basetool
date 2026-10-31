@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandGro
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.time.Instant;
@@ -170,7 +173,7 @@ class JobOrderControllerTest {
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), null, false, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN), null, false, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     assertThat(result.sort()).isNotEmpty();
@@ -187,7 +190,7 @@ class JobOrderControllerTest {
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(null, null, false, 0, 20, "priority,asc");
+        controller.getAllJobOrders(null, null, false, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
@@ -205,7 +208,7 @@ class JobOrderControllerTest {
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), squadronIds, false, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN), squadronIds, false, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
@@ -222,11 +225,51 @@ class JobOrderControllerTest {
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), null, true, 0, 20, "priority,asc");
+        controller.getAllJobOrders(
+            List.of(JobOrderStatus.OPEN), null, true, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
         .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(true), any(Pageable.class));
+  }
+
+  @Test
+  void getAllJobOrders_forwardsAssignedToMe() {
+    JobOrderDto dto = jobOrderDto(UUID.randomUUID());
+    Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(jobOrderQueryService.getAssignedJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<JobOrderDto> result =
+        controller.getAllJobOrders(
+            List.of(JobOrderStatus.OPEN), null, false, true, 0, 20, "priority,asc");
+
+    assertThat(result.content()).containsExactly(dto);
+    verify(jobOrderQueryService)
+        .getAssignedJobOrders(eq(List.of(JobOrderStatus.OPEN)), any(Pageable.class));
+    verify(jobOrderQueryService, never())
+        .getAllJobOrders(any(), any(), anyBoolean(), any(Pageable.class));
+  }
+
+  @Test
+  void getAllJobOrders_assignedToMeWithToProcess_isRejected() {
+    assertThatThrownBy(
+            () -> controller.getAllJobOrders(null, null, true, true, 0, 20, "priority,asc"))
+        .isInstanceOf(BadRequestException.class);
+
+    verifyNoInteractions(jobOrderQueryService);
+  }
+
+  @Test
+  void getAllJobOrders_assignedToMeWithSquadronFilter_isRejected() {
+    List<UUID> squadronIds = List.of(UUID.randomUUID());
+
+    assertThatThrownBy(
+            () -> controller.getAllJobOrders(null, squadronIds, false, true, 0, 20, "priority,asc"))
+        .isInstanceOf(BadRequestException.class);
+
+    verifyNoInteractions(jobOrderQueryService);
   }
 
   @Test

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -27,6 +28,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
@@ -205,6 +208,33 @@ class NavigationRenderMvcTest {
     assertThat(sidebar)
         .containsPattern("href=\"/hangar\" data-nav-keywords=\"[^\"]+\"")
         .containsPattern("href=\"/profile\" data-nav-keywords=\"[^\"]+\"");
+  }
+
+  /**
+   * A member without profit access who is an assignee gets the „Aufträge" link and an orders tab
+   * that opens the list; without an entry neither shows (REQ-ORDERS-040).
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void assigneeWithoutProfitAccessGetsTheOrdersLink() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, false, true));
+    String assignee =
+        render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, false, false));
+    String plainMember =
+        render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+
+    assertThat(section(SIDEBAR, assignee))
+        .containsPattern("href=\"/orders\"[^>]*data-testid=\"nav-orders-assigned\"")
+        .doesNotContain("data-testid=\"nav-orders\"")
+        .doesNotContain("data-testid=\"nav-orders-own\"");
+    assertThat(assignee).containsPattern("href=\"/orders\"[^>]*data-testid=\"mobile-tab-orders\"");
+    assertThat(section(SIDEBAR, plainMember))
+        .doesNotContain("data-testid=\"nav-orders-assigned\"")
+        .contains("data-testid=\"nav-orders-create\"");
   }
 
   /**

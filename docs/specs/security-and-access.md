@@ -3747,16 +3747,25 @@ layer directly.
 `InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047
 
+#### The assignee capability (ADR-0301)
+
+`GET /api/v1/me/capabilities` and the `capabilities` object of `GET /api/v1/me/layout` carry
+`canViewAssignedJobOrders`: `true` iff the caller holds at least one job-order assignee entry
+(REQ-ORDERS-047, REQ-ORDERS-040, the exception in [`org-unit-tenancy.md`](org-unit-tenancy.md)
+REQ-ORG-003). It keys on the caller's person, never on the pinned unit or the profit gate, and it
+steers the UI only: the backend decides per order. The frontend mirrors it as the model attribute of
+the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
+
+**Enforced by:** `MeControllerTest` (`getCapabilities_assignedJobOrdersFlag*`),
+`JobOrderAssigneeGrantIntegrationTest`, `CapabilityFlagsAdviceTest`
+
 #### Planned amendment (ADR-0300)
 
 - **The capabilities are pin-aware.** `GET /api/v1/me/capabilities` and the `capabilities` object of
   `GET /api/v1/me/layout` carry the caller's officer flags (officer reach and the officer-gated
   surfaces: Leitung, promotion management, hangar owner details, job-order writes, mission finance)
   for the **active context**: for the pinned unit when one is pinned (REQ-SEC-048), for the union of
-  the caller's officer units when none is. An admin reads `true`. The object also carries
-  `canViewAssignedJobOrders`: a member who holds an assignee entry reads that order even outside
-  the order's unit (ADR-0301, REQ-ORDERS-047, REQ-ORDERS-040, the exception in
-  [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003).
+  the caller's officer units when none is. An admin reads `true`.
 - **The frontend keeps no reach logic.** Every frontend `ROLE_OFFICER` gate — `sec:authorize`,
   controller checks, `data-*` attributes, `Roles.ADMIN_OR_OFFICER` — is replaced by these flags.
   REQ-SEC-013 still governs the role checks that remain.

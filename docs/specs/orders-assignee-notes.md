@@ -89,8 +89,8 @@ visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, A
 - **What the grant shows.** An assignee who reaches the order only through the grant reads its
   detail **in full** (materials, progress, assignees, notes, linked-stock drill-downs) with the
   owner panels redacted as for any viewer outside the unit, and finds it in the „Alle" list (`ALL`)
-  of the overview. The „Ich bearbeite" segment (`assignedToMe=true`) follows with the amendment of
-  REQ-ORDERS-040. „Zu bearbeiten" (`TO_PROCESS`) keeps the normal tenancy scope, and the grant
+  of the overview. The „Ich bearbeite" segment (`assignedToMe=true`, REQ-ORDERS-040) lists the entries
+  without profit access. „Zu bearbeiten" (`TO_PROCESS`) keeps the normal tenancy scope, and the grant
   widens no other list — not the reference lookup of the Lager pickers, not the material board.
 - **What the grant allows.** Such an assignee may edit their own note (REQ-ORDERS-013) and remove
   themselves, nothing else. Status, priority, lines, claims, handovers and production stay with the
@@ -114,7 +114,8 @@ visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, A
 - [x] An assignee outside every visible unit opens the order's detail and sees it in full; a
   unit-mate of that assignee who holds no entry still cannot open it.
 - [x] Such an order appears in the assignee's „Alle" list, never in „Zu bearbeiten".
-- [ ] Such an order appears in the assignee's „Ich bearbeite" list (REQ-ORDERS-040 amendment).
+- [x] Such an order appears in the assignee's „Ich bearbeite" list, also for an assignee without
+  profit access, who then sees „Aufträge" in the navigation with only that segment (REQ-ORDERS-040).
 - [x] Such an assignee edits their own note and removes themselves; a status write, an assignment
   of someone else or a picker search answers `403`.
 - [x] The grant survives a status change and the assignee leaving their unit, and ends with the

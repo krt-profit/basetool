@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -44,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBluepri
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
@@ -176,11 +176,11 @@ class JobOrderPageReaderTest {
 
   private static JobOrderPageReader.OrderListQuery listQuery(boolean withSquadronFilter) {
     return new JobOrderPageReader.OrderListQuery(
-        false, false, 0, 100, List.of("OPEN"), List.of(), withSquadronFilter);
+        OrderListScope.ALL, 0, 100, List.of("OPEN"), List.of(), withSquadronFilter);
   }
 
   private void stubList(PageResponse<JobOrderDto> p) {
-    when(client.orders(anyBoolean(), anyBoolean(), anyInt(), anyInt(), any(), any())).thenReturn(p);
+    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any())).thenReturn(p);
   }
 
   @Test
@@ -226,7 +226,7 @@ class JobOrderPageReaderTest {
 
   @Test
   void orderListIsUnavailableWhenTheOrdersFail() {
-    when(client.orders(anyBoolean(), anyBoolean(), anyInt(), anyInt(), any(), any()))
+    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
         .thenThrow(backendDown());
 
     JobOrderPageReader.OrderListPage list = reader.readOrderList(listQuery(false));
@@ -251,7 +251,7 @@ class JobOrderPageReaderTest {
 
   @Test
   void orderListPropagatesALostSession() {
-    when(client.orders(anyBoolean(), anyBoolean(), anyInt(), anyInt(), any(), any()))
+    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
         .thenThrow(lostSession());
 
     assertThatThrownBy(() -> reader.readOrderList(listQuery(false)))

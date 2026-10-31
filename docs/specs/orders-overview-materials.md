@@ -296,74 +296,68 @@ query) · **Code:** `templates/joborder/orders-index.html`, `static/js/joborder/
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders`
 
-### REQ-ORDERS-040 — Overview scope segment „Meine · Zu bearbeiten · Alle"
+### REQ-ORDERS-040 — Overview scope segment „Meine · Ich bearbeite · Zu bearbeiten · Alle"
 
-> **Status: planned** (ADR-0301, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+A member chooses the scope of the overview with a segmented control (`scope`, REQ-UI-027), in this
+order. Which segments a member is offered follows from three capabilities: `canViewJobOrders` (the
+full queue), `canViewOwnJobOrders` and `canViewAssignedJobOrders` (at least one assignee entry).
 
-> Amended 2026-10-04: the third tab „Zu bearbeiten" is built, backed by the new `toProcess`
-> parameter of `GET /api/v1/orders`. Until then the segment was „Meine · Alle" and this requirement
-> said the third tab was not offered for lack of a backend read.
-
-A member who may see the full queue (`canViewJobOrders`) chooses its scope with a segmented control
-on the overview (`scope`, REQ-UI-027):
-
-- `ALL` reads `/api/v1/orders` with the status and squadron filters.
+- `ALL` („Alle") reads `/api/v1/orders` with the status and squadron filters. Besides the tenancy
+  scope (`JOB_ORDER_SCOPE_PREDICATE`) it holds the orders the caller is an assignee of
+  (REQ-ORDERS-047), so an order visible only through the grant shows here too.
 - `TO_PROCESS` („Zu bearbeiten") reads `/api/v1/orders?toProcess=true` with the status filter: the
   orders whose responsible (processing) unit is one of the caller's own units and is profit-eligible
   (`is_profit_eligible`, „Auftragsbearbeitung pro Staffel / pro Spezialkommando" in the admin
-  settings). The caller's units are the pinned
-  org unit when one is active, otherwise the caller's direct memberships (no leadership cascade). The
-  parameter is AND-ed with the existing visibility scope (`JOB_ORDER_SCOPE_PREDICATE`), so it only
-  narrows what `ALL` shows and never widens it; a caller with no such unit gets an empty page. The
-  squadron filter is hidden and no squadron parameter is sent.
-- `MINE` reads `/api/v1/orders/requested` (REQ-ORDERS-023), ignores and hides the squadron filter,
-  sends no squadron parameters and hides the progress column, whose data is redacted there. It is
-  offered only to a member who also holds `canViewOwnJobOrders`.
+  settings). The caller's units are the pinned org unit when one is active, otherwise the caller's
+  direct memberships (no leadership cascade). The parameter is AND-ed with the tenancy scope
+  *without* the assignee grant, so it only narrows and never widens; a caller with no such unit gets
+  an empty page. The squadron filter is hidden and no squadron parameter is sent.
+- `ASSIGNED` („Ich bearbeite") reads `/api/v1/orders?assignedToMe=true` with the status filter: the
+  orders on which the caller holds a `JobOrderAssignee` entry, with the full progress column. The
+  entry is the visibility grant itself, so the read needs no profit access and never shows an order
+  the caller is not an assignee of. `assignedToMe` combines with neither `toProcess` nor a
+  `squadronId`: such a request answers `400`. The squadron filter is hidden and no squadron
+  parameter is sent. The page total is the count the „Ich bearbeite" widget (REQ-UI-034) shows.
+- `MINE` („Meine") reads `/api/v1/orders/requested` (REQ-ORDERS-023), ignores and hides the squadron
+  filter, sends no squadron parameters and hides the progress column, whose data is redacted there.
+  It is offered to a member who holds `canViewOwnJobOrders` and has a second list to switch to: the
+  queue or an assignee entry.
 
-A member without `canViewJobOrders` reads their own requested orders and sees no segment; a
-`scope` parameter cannot move them onto another list. The pagination URL carries `scope=MINE` or
-`scope=TO_PROCESS` when chosen, nothing for `ALL`. The choice persists per browser
-(`orders_scope_filter`, REQ-UI-017) and is restored only when that scope is offered on the page; an
-explicit `scope` query parameter wins.
+**Who is offered what.** A member who may see the queue chooses among all four (without „Meine"
+when they lack `canViewOwnJobOrders`). A member without the queue who holds an assignee entry is
+offered „Ich bearbeite" alone — plus „Meine" when they also hold `canViewOwnJobOrders`. A member
+without the queue and without an entry reads their own requested orders and sees no segment; a
+member with none of the three capabilities is sent to the order form. A `scope` parameter that is
+not offered to the caller falls back to the caller's default list (`ALL`, else `MINE`, else
+`ASSIGNED`) and never moves them onto another list.
 
-**Enforced by:** `OrdersListPatternRenderTest`, `JobOrderControllerTest`
-(`getAllJobOrders_forwardsToProcessFlag`), `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
-`JobOrderScopeQueryIntegrationTest` (`processingFilter_*`), `JobOrderToProcessMvcTest` · **Code:**
-`JobOrderPageController.viewOrders`, `joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
-`JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
-`JobOrderRepository.findScopedJobOrders` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027, REQ-UI-027
+**Capability flag.** `canViewAssignedJobOrders` of `GET /api/v1/me/capabilities` (and of
+`/me/layout`) is `true` iff the caller holds at least one assignee entry. It does not depend on the
+pinned unit or on the profit gate. With it the navigation shows the „Aufträge" link — and its phone
+tab — for a member who has neither `canViewJobOrders` nor `canViewOwnJobOrders`; without an entry
+the link is absent. The sidebar entry registry carries it as the flag `ASSIGNED_JOB_ORDERS`.
 
-#### Planned amendment (ADR-0301)
+The pagination URL carries `scope=` for every chosen segment but `ALL`. The choice persists per
+browser (`orders_scope_filter`, REQ-UI-017) and is restored only when that segment is offered on the
+page; an explicit `scope` query parameter wins. Switching segments swaps the results in place
+(REQ-FE-001). Adding or removing an assignee publishes the `queue` frame of the orders room, so an
+open list refreshes; a member without queue access holds no subscription to that room and sees the
+change on the next load.
 
-The segment becomes **„Meine · Ich bearbeite · Zu bearbeiten · Alle"**, in that order.
-
-- **Read.** `GET /api/v1/orders` gains `assignedToMe=true`: the orders on which the caller holds a
-  `JobOrderAssignee` entry, with the status filter. The visibility scope is
-  `JOB_ORDER_SCOPE_PREDICATE` widened by the assignee grant (REQ-ORDERS-047), and the parameter
-  narrows it to the caller's own entries, so it never shows an order the caller is not an assignee
-  of. It combines with neither `toProcess` nor a squadron
-  filter; the squadron filter is hidden and no squadron parameter is sent. The page total is the
-  count the „Ich bearbeite" widget (REQ-UI-034) shows.
-- **Which lists the grant widens.** `ALL` („Alle") reads the same widened scope, so the orders the
-  caller is an assignee of appear in their „Alle" list as well. `TO_PROCESS` („Zu bearbeiten") is
-  AND-ed with the normal tenancy scope, without the assignee grant.
-- **`ASSIGNED`** („Ich bearbeite") reads `/api/v1/orders?assignedToMe=true` and is offered to every
-  member who holds at least one assignee entry or may see the full queue. The widget's „alle
-  anzeigen" link opens this segment.
-- **Without profit access.** A member who lacks `canViewJobOrders` and `canViewOwnJobOrders` but
-  holds at least one assignee entry gets the capability flag `canViewAssignedJobOrders` from
-  `GET /me/capabilities`. With it the navigation shows the „Aufträge" link, and the overview offers
-  only the „Ich bearbeite" segment; a `scope` parameter cannot move such a member onto another
-  list. Without an entry the flag is `false` and the link is absent.
-- The pagination URL carries `scope=ASSIGNED` when chosen; the persisted choice
-  (`orders_scope_filter`) is restored only when that scope is offered on the page.
-
-**Enforced by (to be added):** `JobOrderControllerTest` (`getAllJobOrders_forwardsAssignedToMe`),
-`JobOrderScopeQueryIntegrationTest` (`assignedToMe_*`, `assigneeGrant_inAllNotInToProcess`),
-`OrdersListPatternRenderTest` (four segments, assignee-only segment), `MeControllerTest`
-(`canViewAssignedJobOrders`) · **Related:**
-REQ-ORDERS-047, REQ-UI-026, REQ-UI-034
+**Enforced by:** `OrdersListPatternRenderTest` (four segments in order, assignee-only segment,
+`scope` cannot move an assignee), `OrderListScopeTest`, `NavigationRenderMvcTest`
+(`assigneeWithoutProfitAccessGetsTheOrdersLink`), `NavigationMenuTest`, `JobOrderControllerTest`
+(`getAllJobOrders_forwardsAssignedToMe`, rejected combinations),
+`JobOrderQueryServiceAssignedToMeTest`, `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
+`JobOrderScopeQueryIntegrationTest` (`processingFilter_*`, `assigneeGrant_inAllNotInToProcess`,
+`assignedToMe_*`), `JobOrderAssigneeGrantIntegrationTest` (`assignedToMe*`, capability flag),
+`JobOrderToProcessMvcTest`, `MeControllerTest` (`canViewAssignedJobOrders`),
+`CapabilityFlagsAdviceTest` · **Code:** `JobOrderPageController.viewOrders`, `OrderListScope`,
+`joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
+`JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders` /
+`getAssignedJobOrders`, `JobOrderRepository.findScopedJobOrders` / `findAssignedJobOrders`,
+`MeController.CapabilitiesResponse`, `NavigationRegistry` (`orders.assigned`) · **Related:**
+REQ-ORDERS-023, REQ-ORDERS-027, REQ-ORDERS-047, REQ-UI-026, REQ-UI-027, REQ-UI-034
 
 ## Out of scope
 

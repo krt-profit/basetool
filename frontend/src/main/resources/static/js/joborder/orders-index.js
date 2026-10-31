@@ -355,7 +355,7 @@ function restoreStatusFilter() {
 }
 
 const ORDERS_SCOPE_FILTER_KEY = 'orders_scope_filter';
-const ORDERS_SCOPES = ['MINE', 'TO_PROCESS', 'ALL'];
+const ORDERS_SCOPES = ['MINE', 'ASSIGNED', 'TO_PROCESS', 'ALL'];
 
 /** @returns {HTMLInputElement[]} the scope filter radio buttons */
 function scopeInputs() {

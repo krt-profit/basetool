@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
@@ -67,12 +67,15 @@ class JobOrderPageControllerReauthMvcTest {
 
   @Test
   void anExpiredSessionOnTheOrderListRedirectsToLogin() throws Exception {
-    when(client.orders(anyBoolean(), anyBoolean(), anyInt(), anyInt(), any(), any()))
+    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
         .thenThrow(expiredSession());
 
     mockMvc
         .perform(
-            get("/orders").param("canViewJobOrders", "true").param("canViewOwnJobOrders", "false"))
+            get("/orders")
+                .param("canViewJobOrders", "true")
+                .param("canViewOwnJobOrders", "false")
+                .param("canViewAssignedJobOrders", "false"))
         .andExpect(redirectsToLogin());
   }
 
