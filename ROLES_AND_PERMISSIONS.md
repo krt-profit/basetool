@@ -695,7 +695,8 @@ is **Staffel-scoped throughout**: every Staffel runs its own system
 sees exclusively its own data. Read **and** write access are filtered in the
 service layer via the active Staffel context
 (`OwnerScopeService.currentSquadronId()` for lists/eligibility,
-`canSeeSquadron`/`canEditSquadron(topic.owningSquadron.id)` for detail and maintenance).
+`canSeeSquadron` for detail reads, officer reach `canActAsOfficerIn(topic.owningSquadron.id)` for
+maintenance and evaluations, REQ-SEC-015).
 
 - **Member/Officer** see only their home Staffel's system.
 - **Admins** see that of the actively pinned Staffel; without a pin (all-Staffeln mode)
@@ -704,8 +705,8 @@ service layer via the active Staffel context
   system of their own: the menu item is hidden, every list/eligibility read
   returns empty, and a direct page call is blocked with 403 (`PromotionAccessPolicy.hasReadAccess()`).
 - The **evaluation matrix** (the member list of the evaluation management) lists exclusively the
-  **plain members** of a Staffel: whoever holds the `ADMIN` or `OFFICER` role **never** appears
-  there as a row to be evaluated — admins are Staffel-less, and officers carry out the evaluation
+  **plain members** of a Staffel: whoever holds the `ADMIN` role or a leadership seat **never** appears
+  there as a row to be evaluated — admins are Staffel-less, and seat holders carry out the evaluation
   instead of being evaluated themselves. The promotion system considers only plain members
   of a Staffel and is not available to any other OrgUnit kind (#817).
 
@@ -714,13 +715,14 @@ service layer via the active Staffel context
 | Read topic areas/categories/level contents/rank prerequisites (`isAuthenticated()`, **own Staffel only**)       |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
 | …**maintain** (service: admin **or** officer of the owning Staffel)                                             |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | View own evaluations / eligibility (`/my`, JWT sub, **own Staffel**)                                            |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| View **others'** evaluations/eligibility, member list (`hasAnyRole('ADMIN','OFFICER')`, officer Staffel-scoped) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
+| View **others'** evaluations/eligibility, member list (officer reach, **only the units of reach**⁵) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
 | Enable/disable promotion subsystem per Staffel (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)  |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `PromotionAccessPolicy.hasReadAccess()` is false, the menu is hidden, direct call 403.
 ² Admin: the actively pinned Staffel; in all-Staffeln mode a „Staffel wählen" (select Staffel) hint instead of mixing.
 ³ Only for one's own Staffel. **SKs are permanently excluded from the promotion system via DB CHECK/trigger + ArchUnit rule.**
 ⁴ The **member list** to be evaluated (`GET /api/v1/promotion/evaluations/members`) contains only the **plain members** of the Staffel — holders of the `ADMIN` and `OFFICER` roles are filtered out (#817), since they carry out the evaluation instead of being evaluated themselves. Officer/Admin therefore **read** the matrix but do **not appear** as a row in it.
+⁵ Reads on the management pages are filtered, not just the writes refused: with a seat in Staffel A and plain membership of Staffel B, the member list, the evaluations, the topics, categories, level texts, rank requirements and the eligibility of others cover Staffel A only; the Leitung page lists Staffel A only. A pin narrows to the pinned unit (plus what a Bereich or OL seat on it reaches below) when it is within reach and to nothing otherwise (the pages are hidden); unpinned, the units of reach are the union (REQ-ROLE-007).
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 

@@ -54269,6 +54269,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -54492,7 +54501,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Create a new promotion category. Requires ADMIN or OFFICER role.",
+        "summary" : "Create a new promotion category. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -54530,6 +54539,15 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -54654,6 +54672,15 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -54875,7 +54902,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Delete a promotion category. Requires ADMIN or OFFICER role.",
+        "summary" : "Delete a promotion category. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       },
@@ -55121,7 +55148,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Update a promotion category. Requires ADMIN or OFFICER role.",
+        "summary" : "Update a promotion category. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -55500,7 +55527,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Evaluate eligibility for another member (ADMIN/OFFICER only).",
+        "summary" : "Evaluate eligibility for another member (ADMIN or officer reach only).",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -55639,7 +55666,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "List all member evaluations (ADMIN/OFFICER, squadron-scoped for OFFICER).",
+        "summary" : "List all member evaluations (ADMIN or officer reach, squadron-scoped).",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -55778,7 +55805,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins and officers excluded).",
+        "summary" : "List squadron members eligible for evaluation (ADMIN or officer reach, squadron-scoped, admins and leadership seats excluded).",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -56169,7 +56196,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Upsert evaluation for a user/category. ADMIN or OFFICER of the category's owning squadron.",
+        "summary" : "Upsert evaluation for a user/category. ADMIN or officer reach in the category's owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -56278,7 +56305,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Delete a member evaluation. ADMIN or OFFICER of the category's owning squadron.",
+        "summary" : "Delete a member evaluation. ADMIN or officer reach in the category's owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -56308,6 +56335,15 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -56532,7 +56568,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Create a new level content. Requires ADMIN or OFFICER role.",
+        "summary" : "Create a new level content. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -56547,6 +56583,15 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -56768,7 +56813,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Delete a level content. Requires ADMIN or OFFICER role.",
+        "summary" : "Delete a level content. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       },
@@ -57014,7 +57059,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Update a level content. Requires ADMIN or OFFICER role.",
+        "summary" : "Update a level content. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -57044,6 +57089,15 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -57268,7 +57322,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Create a new rank requirement. Requires ADMIN or OFFICER role.",
+        "summary" : "Create a new rank requirement. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -57291,6 +57345,15 @@
           "schema" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -57512,7 +57575,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Delete a rank requirement. Requires ADMIN or OFFICER role.",
+        "summary" : "Delete a rank requirement. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       },
@@ -57758,7 +57821,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Update a rank requirement. Requires ADMIN or OFFICER role.",
+        "summary" : "Update a rank requirement. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -57788,6 +57851,15 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
           }
         } ],
         "responses" : {
@@ -58012,7 +58084,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Create a new promotion topic. Requires ADMIN or OFFICER role.",
+        "summary" : "Create a new promotion topic. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -58020,6 +58092,16 @@
     "/api/v1/promotion/topics/all" : {
       "get" : {
         "operationId" : "listAll",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "view",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MEMBER",
+            "enum" : [ "MEMBER", "MANAGEMENT" ]
+          }
+        } ],
         "responses" : {
           "200" : {
             "content" : {
@@ -58239,7 +58321,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Delete a promotion topic. Requires ADMIN or OFFICER role.",
+        "summary" : "Delete a promotion topic. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       },
@@ -58485,7 +58567,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Update a promotion topic. Requires ADMIN or OFFICER role.",
+        "summary" : "Update a promotion topic. Requires ADMIN or officer reach in the owning squadron.",
         "tags" : [ "promotion" ],
         "x-domain" : "promotion"
       }
@@ -78925,6 +79007,126 @@
         "x-domain" : "identity"
       }
     },
+    "/api/v1/users/{id}/rank-range" : {
+      "get" : {
+        "operationId" : "getUserRankRange",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserRankRangeResponse"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      }
+    },
     "/api/v1/users/{id}/rsi-handle" : {
       "get" : {
         "operationId" : "getUserRsiHandle",
@@ -93900,6 +94102,23 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "UserRankRangeResponse" : {
+        "type" : "object",
+        "properties" : {
+          "basis" : {
+            "type" : "string",
+            "enum" : [ "ADMIN", "LEADERSHIP_SEAT", "KRT_MEMBER" ]
+          },
+          "maxRank" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "minRank" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

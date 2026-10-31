@@ -24,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -75,6 +79,7 @@ class LeitungViewServiceTest {
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private KommandoGroupRepository kommandoGroupRepository;
   @Mock private OrgUnitCascadeService cascadeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @Spy private KommandoGroupMapper kommandoGroupMapper = new KommandoGroupMapperImpl();
 
@@ -92,6 +97,7 @@ class LeitungViewServiceTest {
   @BeforeEach
   void setUp() {
     auth = org.mockito.Mockito.mock(Authentication.class);
+    lenient().when(ownerScopeService.narrowToPin(any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
   private OrgUnit ol() {
@@ -252,6 +258,62 @@ class LeitungViewServiceTest {
     assertEquals(MembershipRole.STAFFELLEITER, sq.members().getFirst().role());
     assertTrue(sq.members().getFirst().self(), "the caller's own seat is flagged");
     assertFalse(sq.members().get(1).self());
+  }
+
+  @Test
+  void staffelleiterInA_plainMemberOfB_seesAOnlyAndNeverReadsBsRoster() {
+    allUnitsExist();
+    callerHolds(
+        Set.of(),
+        seat(squadronId, MembershipRole.STAFFELLEITER),
+        seat(otherSquadronId, MembershipRole.MEMBER));
+    when(roleSecurity.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, auth))
+        .thenReturn(false);
+    when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+        .thenReturn(List.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertEquals(1, view.squadrons().size());
+    assertEquals(squadronId, view.squadrons().getFirst().id());
+    verify(membershipRepository, never()).findAllByIdOrgUnitId(otherSquadronId);
+  }
+
+  @Test
+  void pinnedToAUnitWithReach_listsOnlyThePinnedScope() {
+    allUnitsExist();
+    callerHolds(
+        Set.of(),
+        seat(squadronId, MembershipRole.STAFFELLEITER),
+        seat(skId, MembershipRole.SK_LEAD));
+    when(ownerScopeService.narrowToPin(any())).thenReturn(Set.of(squadronId));
+    when(roleSecurity.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, auth))
+        .thenReturn(false);
+    when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+        .thenReturn(List.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertEquals(1, view.squadrons().size());
+    assertTrue(view.specialCommands().isEmpty());
+  }
+
+  @Test
+  void pinnedToAUnitWithoutReach_listsNothing() {
+    allUnitsExist();
+    callerHolds(Set.of(), seat(squadronId, MembershipRole.STAFFELLEITER));
+    when(ownerScopeService.narrowToPin(any())).thenReturn(Set.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertTrue(view.squadrons().isEmpty());
+    assertTrue(view.bereiche().isEmpty());
+    assertTrue(view.specialCommands().isEmpty());
+    verifyNoInteractions(roleSecurity);
   }
 
   @Test

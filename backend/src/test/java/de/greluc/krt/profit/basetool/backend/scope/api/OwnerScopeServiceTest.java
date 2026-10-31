@@ -2502,6 +2502,136 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void readScope_seatInA_memberOfB_unpinned_isAOnly() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_pinnedToAUnitWithReach_isThatUnit() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_pinnedToAUnitWithoutReach_isEmpty() {
+      stubCaller(
+          true,
+          rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertTrue(service.currentOfficerReadScope().isEmpty());
+    }
+
+    @Test
+    void readScope_pinnedToABereichWithASeat_widensToItsCascade() {
+      UUID bereichId = UUID.randomUUID();
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
+      stubCaller(true, seat);
+      when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, SQUADRON_A_ID, skId));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(bereichId.toString());
+
+      assertEquals(Set.of(bereichId, SQUADRON_A_ID, skId), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_pinnedToAUnitBelowTheSeat_isThatUnitOnly() {
+      UUID bereichId = UUID.randomUUID();
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
+      stubCaller(true, seat);
+      when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, SQUADRON_A_ID, SQUADRON_B_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_A_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void narrowToPin_unpinned_keepsTheReach() {
+
+      assertEquals(
+          Set.of(SQUADRON_A_ID, SQUADRON_B_ID),
+          service.narrowToPin(Set.of(SQUADRON_A_ID, SQUADRON_B_ID)));
+    }
+
+    @Test
+    void narrowToPin_pinOutsideTheReach_isEmpty() {
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertTrue(service.narrowToPin(Set.of(SQUADRON_A_ID)).isEmpty());
+    }
+
+    @Test
+    void readScope_plainMember_isEmpty() {
+      stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
+
+      assertTrue(service.currentOfficerReadScope().isEmpty());
+    }
+
+    @Test
+    void readScope_adminUnpinned_isUnrestricted() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertNull(service.currentOfficerReadScope());
+    }
+
+    @Test
+    void readScope_adminPinned_isThePin() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_B_ID), service.currentOfficerReadScope());
+    }
+
+    @Test
+    void officerAnywhere_isTrueForAnySeatWithKrtMember() {
+      stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN));
+
+      assertTrue(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
+    void officerAnywhere_isFalseForAPlainMember() {
+      stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID));
+
+      assertFalse(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
+    void officerAnywhere_isFalseForASeatWithoutKrtMember() {
+      stubCaller(false, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
+
+      assertFalse(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
+    void officerAnywhere_isTrueForAnAdmin() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canActAsOfficerAnywhere());
+    }
+
+    @Test
     void ownerless_target_isReservedToAdmins() {
       stubCaller(true, rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.STAFFELLEITER));
 

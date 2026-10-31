@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -59,21 +60,21 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
   Page<PromotionCategory> findAllByTopicId(UUID topicId, Pageable pageable);
 
   /**
-   * Squadron-scoped paged read across all topics. When {@code owningSquadronId} is {@code null} the
+   * Squadron-scoped paged read across all topics. When {@code scopeSquadronIds} is {@code null} the
    * result spans every squadron (admin "all squadrons" mode); a non-null id restricts the result to
    * categories whose topic is owned by that squadron.
    *
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of categories visible to the caller
    */
   @Query(
       """
-      SELECT c FROM PromotionCategory c WHERE :owningSquadronId IS NULL OR
-      c.topic.owningSquadron.id = :owningSquadronId
+      SELECT c FROM PromotionCategory c WHERE :scopeSquadronIds IS NULL OR
+      c.topic.owningSquadron.id IN :scopeSquadronIds
       """)
   Page<PromotionCategory> findAllScoped(
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
    * Squadron-scoped paged read of the categories under one topic. A topic outside the caller's
@@ -81,33 +82,35 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
    * categories.
    *
    * @param topicId identifier of the parent topic
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of categories under the topic, scoped to the caller
    */
   @Query(
       """
-      SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL
-      OR c.topic.owningSquadron.id = :owningSquadronId)
+      SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:scopeSquadronIds IS NULL
+      OR c.topic.owningSquadron.id IN :scopeSquadronIds)
       """)
   Page<PromotionCategory> findAllByTopicIdScoped(
       @Param("topicId") UUID topicId,
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId,
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds,
       Pageable pageable);
 
   /**
    * Squadron-scoped unpaginated read of one topic's categories in display order. Same
-   * empty-on-foreign-topic contract as {@link #findAllByTopicIdScoped(UUID, UUID, Pageable)}.
+   * empty-on-foreign-topic contract as {@link #findAllByTopicIdScoped(UUID, java.util.Collection,
+   * Pageable)}.
    *
    * @param topicId identifier of the parent topic
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @return the topic's categories in display order, scoped to the caller
    */
   @Query(
       """
-      SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL
-      OR c.topic.owningSquadron.id = :owningSquadronId) ORDER BY c.sortOrder ASC
+      SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:scopeSquadronIds IS NULL
+      OR c.topic.owningSquadron.id IN :scopeSquadronIds) ORDER BY c.sortOrder ASC
       """)
   List<PromotionCategory> findAllByTopicIdScopedOrdered(
-      @Param("topicId") UUID topicId, @Param("owningSquadronId") @Nullable UUID owningSquadronId);
+      @Param("topicId") UUID topicId,
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 }

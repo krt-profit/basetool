@@ -37,8 +37,10 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
+import de.greluc.krt.profit.basetool.frontend.identity.model.RankRangeBasis;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRankRangeResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -360,6 +362,39 @@ class MemberManagementControllerTest {
 
       assertEquals("identity/member-edit", view);
       assertNull(model.getAttribute("memberRsiHandle"));
+    }
+
+    @Test
+    void showsTheMembersRankRange() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      UserRankRangeResponse range =
+          new UserRankRangeResponse(RankRangeBasis.LEADERSHIP_SEAT, 1, 12);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(newUser("alice"));
+      when(backendApiClient.get(
+              eq("/api/v1/users/{id}/rank-range"), eq(UserRankRangeResponse.class), eq(id)))
+          .thenReturn(range);
+
+      controller.editMember(id, null, model, redirectAttributes);
+
+      assertEquals(range, model.getAttribute("memberRankRange"));
+    }
+
+    @Test
+    void anUnreadableRankRangeStillRendersThePageWithoutTheHint() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(newUser("alice"));
+      when(backendApiClient.get(
+              eq("/api/v1/users/{id}/rank-range"), eq(UserRankRangeResponse.class), eq(id)))
+          .thenThrow(new BackendServiceException("backend down", null, 503));
+
+      String view = controller.editMember(id, null, model, redirectAttributes);
+
+      assertEquals("identity/member-edit", view);
+      assertNull(model.getAttribute("memberRankRange"));
     }
 
     @Test

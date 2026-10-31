@@ -82,7 +82,7 @@ class PromotionManagePagePatternRenderTest {
     PromotionCategoryDto cat =
         new PromotionCategoryDto(
             UUID.randomUUID(), 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(cat));

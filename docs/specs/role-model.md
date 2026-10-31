@@ -340,89 +340,69 @@ an OL member's by construction.
 
 **Enforced by:** `OrgChartServiceTest` (the `mirror*` cases of the `MembershipChangeObserver` methods, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
-### REQ-ROLE-007 — The member rank follows the stored Keycloak role
-
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+### REQ-ROLE-007 — The member rank follows officer reach
 
 Besides the functional rank of REQ-ROLE-001, every account carries a numeric **member rank** from 1
 to 20 (`app_user.rank`), which an admin sets on the member-edit page
-(`PUT /api/v1/users/{id}/attributes`). Its permitted range follows the account's **stored**
-Keycloak realm roles, the set `UserReconciliationService` last mirrored from a token:
-
-- an account with `OFFICER` holds ranks **1–12**;
-- an account with `KRT_MEMBER` and without `OFFICER` holds ranks **13–20**;
-- an account with neither role is not range-checked; a role holder's rank outside 1–20 is
-  `ILLEGAL_ARGUMENT`.
-
-The roles are identified by their stable role code (`role.code`: `OFFICER`, `KRT_MEMBER`), never by
-the display name the realm role and the `role.name` column carry (`Officer`, `KRT Member`).
-
-`OFFICER` is granted and removed by hand in Keycloak (the operational grant of
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)), and the tool writes no realm role. A
-former lead who still holds `OFFICER` therefore cannot be given a rank above 12 until the role is
-removed in Keycloak and the change has been reconciled (the role sync or the member's next login).
-The rule is kept, not relaxed (ADR-0264).
-
-A rank that does not fit the stored role is refused with `400 RANK_OUTSIDE_ROLE_RANGE`
-(`identity.api.RankOutsideRoleRangeException`). Its `detail` is localized and role-specific: it names
-the role the member holds and what has to change in Keycloak first. The problem body carries `role`,
-`minRank` and `maxRank`. The member-edit page shows the member's role and its range under the rank
-select; a refusal is shown on the rank field (the AJAX save answers `422 {rank: detail}`, the
-form post flashes `error.member.rank.outsideRoleRange`), so the admin can reset the rank and save
-the Staffel change in the same form. A rank that differs from the stored one records
-`MEMBER_RANK_CHANGED` in the Rollen & Mitglieder audit area, with only the old and new rank in its
-details (REQ-AUDIT-001); an unchanged or refused rank records nothing.
-
-**Acceptance**
-
-- [x] A rank above 12 for an account with `OFFICER`, or below 13 for a `KRT_MEMBER` without
-  `OFFICER`, is refused with `RANK_OUTSIDE_ROLE_RANGE`, its role-specific detail and the range; the
-  stored rank does not change.
-- [x] The member-edit page names the refusal on the rank field and no membership change is sent with
-  it; a save with an unchanged, fitting rank sends the Staffel set as usual.
-- [x] The page shows the member's role and its permitted range under the rank select.
-- [x] A changed rank writes one `MEMBER_RANK_CHANGED` audit row; an unchanged or refused rank writes
-  none.
-
-**Enforced by:** `UserServiceRankTest`, `UserServiceAttributesTest`, `DomainProblemContractTest`,
-`ProblemCodeRegistryTest`, `MemberManagementControllerTest` · **Code:** `UserService#updateUserAttributes`,
-`RankOutsideRoleRangeException`, `IdentityProblemCode`, `MemberManagementController#updateMemberAjax`,
-`identity/member-edit.html` · **Decision:** ADR-0264 · **Issues:** #2636
-
-#### Planned amendment (ADR-0300)
-
-The officer range follows **officer reach** (REQ-ROLE-002), not a stored `OFFICER` role, which no
-longer exists:
+(`PUT /api/v1/users/{id}/attributes`). Its permitted range follows the account's standing:
 
 - an **admin** may hold any rank **1–20**: the admin's pass on officer checks counts for this range;
 - for everyone else, an account with officer reach in **at least one** org unit, derived from a
-  leadership seat, holds ranks **1–12**;
+  leadership seat held with `KRT Member` (REQ-ROLE-002), holds ranks **1–12**;
 - an account with `KRT_MEMBER` and no officer reach holds ranks **13–20**;
-- an account with none of these is not range-checked; a rank outside 1–20 stays `ILLEGAL_ARGUMENT`.
+- an account with none of these is not range-checked; a ranked account's rank outside 1–20 is
+  `ILLEGAL_ARGUMENT`.
 
-Because reach follows the
-seats the tool itself writes, a former lead can be given a rank above 12 as soon as their last seat
-is removed; no Keycloak change and no reconciliation is needed. The paragraph above on removing
-`OFFICER` in Keycloak no longer applies. `RANK_OUTSIDE_ROLE_RANGE`, its range fields and the
-member-edit page behave as above, except that the detail and the hint under the rank select name
-the basis of the range (the admin role, a leadership seat, or `KRT Member`) and what has to change
-in the tool.
+A stored `OFFICER` role no longer sets a range. Because reach follows the seats the tool itself
+writes, a former lead can be given a rank above 12 as soon as their last seat is removed; no
+Keycloak change and no reconciliation is needed. The identity module asks the org-unit module through
+its own SPI (`OfficerReachDirectory`).
 
-**Enforced by (to be added):** `UserServiceRankTest` (range by officer reach, a removed last seat
-frees 13–20, an admin without a seat accepts 1–20), `MemberManagementControllerTest` (the hint
-names the seat) ·
-**Related:** REQ-ROLE-002, ADR-0264, ADR-0300
+**Officer surfaces read only the caller's reach.** The Beförderung management pages (evaluation
+matrix, topic and rank-requirement editors) and the Leitung page list and edit only the units where
+the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows A's
+members, evaluations, topics, categories, level texts, rank requirements and eligibility, and
+never B's. A pin narrows this to the pinned unit when it is within reach, widened by the units the
+caller's seat on it reaches through the cascade (a Bereich or OL pin covers the units below it), and
+to nothing when it is not within reach (the pages are then hidden); unpinned, the units of reach are
+the union. The Leitung page follows the same pin rule. Admins are not
+restricted beyond their pin. The management catalogue reads take `view=MANAGEMENT`
+(`PromotionReadView`); without it they answer the caller's own squadron, which is what members see
+of their progress and is not an officer surface.
 
+A rank that does not fit the range is refused with `400 RANK_OUTSIDE_ROLE_RANGE`
+(`identity.api.RankOutsideRoleRangeException`). Its `detail` is localized and names the basis of the
+range (a leadership seat, or `KRT Member`) and what has to change in the tool. The problem body
+carries `role` (the basis: `LEADERSHIP_SEAT` or `KRT_MEMBER`), `minRank` and `maxRank`. The admin-only
+`GET /api/v1/users/{id}/rank-range` returns the basis (`ADMIN`, `LEADERSHIP_SEAT`, `KRT_MEMBER`, or
+none) and the bounds; the member-edit page shows them as a hint under the rank select, a refusal is
+shown on the rank field (the AJAX save answers `422 {rank: detail}`, the form post flashes
+`error.member.rank.outsideRoleRange`), so the admin can reset the rank and save the Staffel change in
+the same form. A rank that differs from the stored one records `MEMBER_RANK_CHANGED` in the Rollen &
+Mitglieder audit area, with only the old and new rank in its details (REQ-AUDIT-001); an unchanged or
+refused rank records nothing.
+
+**Acceptance**
+
+- [x] A rank above 12 for an account with officer reach, or below 13 for a `KRT_MEMBER` without it,
+  is refused with `RANK_OUTSIDE_ROLE_RANGE`, its basis-specific detail and the range; the stored rank
+  does not change.
+- [x] An admin may hold any rank 1–20; a stored `OFFICER` role without a seat sets no range.
+- [x] The member-edit page names the refusal on the rank field and no membership change is sent with
+  it; a save with an unchanged, fitting rank sends the Staffel set as usual.
+- [x] The page shows the basis and the permitted range under the rank select.
+- [x] A changed rank writes one `MEMBER_RANK_CHANGED` audit row; an unchanged or refused rank writes
+  none.
+
+**Enforced by:** `UserServiceRankTest`, `UserServiceAttributesTest`, `OrgUnitOfficerReachDirectoryTest`,
+`UserControllerTest`, `DomainProblemContractTest`, `ProblemCodeRegistryTest`,
+`MemberManagementControllerTest` · **Code:** `UserService#updateUserAttributes`,
+`UserService#findRankRange`, `RankRange`, `RankOutsideRoleRangeException`, `OfficerReachDirectory`,
+`IdentityProblemCode`, `MemberManagementController#updateMemberAjax`, `identity/member-edit.html` ·
+**Decision:** ADR-0264, ADR-0300 · **Issues:** #2636, #2844
 ## Out of scope
 
 - Per-rank / per-feature differentiation of rights beyond the SK-lead-equivalent baseline.
-- Retiring the flat Keycloak `OFFICER` role for squadrons.
-
-#### Planned amendment (ADR-0300)
-
-The second line is dropped: ADR-0300 retires the Keycloak `OFFICER` role for every unit
-(REQ-ROLE-002, REQ-SEC-004). The first line stays out of scope.
 
 ## Open questions
 

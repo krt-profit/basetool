@@ -37,6 +37,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class PromotionTopicServiceTest {
@@ -69,11 +70,12 @@ class PromotionTopicServiceTest {
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
         new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
-    when(repository.findAllScoped((UUID) null)).thenReturn(List.of(topic));
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(null)));
+    when(repository.findAllScoped((java.util.Collection<UUID>) null)).thenReturn(List.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
-    List<PromotionTopicResponse> result = service.listAll();
+    List<PromotionTopicResponse> result = service.listAll(PromotionReadView.MEMBER);
 
     assertEquals(1, result.size());
     assertEquals("Grundlagen", result.get(0).name());
@@ -119,6 +121,7 @@ class PromotionTopicServiceTest {
     PromotionTopicResponse result = service.create(request);
 
     assertEquals("Grundlagen", result.name());
+    verify(promotionAccessPolicy).assertOfficerIn(squadron.getId());
     verify(repository).save(entity);
     verify(auditService)
         .record(
@@ -127,6 +130,21 @@ class PromotionTopicServiceTest {
             eq("Grundlagen"),
             isNull(),
             isNull());
+  }
+
+  @Test
+  void create_shouldRefuseWithoutOfficerReachInTheActiveSquadron() {
+    PromotionTopicWriteRequest request =
+        new PromotionTopicWriteRequest("Grundlagen", null, 0, null);
+    Squadron squadron = new Squadron();
+    squadron.setId(UUID.randomUUID());
+    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
+    doThrow(new AccessDeniedException("no reach"))
+        .when(promotionAccessPolicy)
+        .assertOfficerIn(squadron.getId());
+
+    assertThrows(AccessDeniedException.class, () -> service.create(request));
+    verify(repository, never()).save(any());
   }
 
   @Test

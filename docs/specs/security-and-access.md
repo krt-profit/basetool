@@ -1267,8 +1267,9 @@ kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes),
 `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. The purchasing
 `leadsUnit` check reads `canActAsOfficerIn` (no `OFFICER@<unit>` authority is read), and the job-order,
 inventory and game-item gates and the job-order and inventory pages no longer name `OFFICER`: a
-seat holder reaches `LOGISTICIAN` through the seat. The other `OFFICER` gates keep their behaviour
-until the cut.
+seat holder reaches `LOGISTICIAN` through the seat. The promotion services (`ADMIN_OR_OFFICER_REACH`
+in front of `PromotionAccessPolicy#assertOfficerIn` / `#assertOfficerOverMember`) and the member-rank
+range read the reach too. The other `OFFICER` gates keep their behaviour until the cut.
 
 **Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
@@ -3288,7 +3289,11 @@ the token, and there is no id an anonymous caller could substitute. They answer 
 here is that every admitted path has its status recorded when it is added — not that the obvious
 ones may be assumed, because "obvious" is exactly what the one wrong entry always looked like
 beforehand. The officers' matrix (`/promotion/manage`, `/evaluations/all`, `/evaluations/members`)
-is **not** on the list at all: the admin area is web-only permanently.
+is **not** on the list at all: the admin area is web-only permanently. Those reads, like every
+list behind an officer surface, are limited to the caller's officer reach, pin-aware, rather than to
+the member-list scope (REQ-ROLE-007, REQ-SEC-015): `SquadronVisibility#currentOfficerReadScope`
+yields the reach units, narrowed to the pin or empty when the pin is out of reach, and `null` only
+for an unpinned admin.
 
 **The live-sync bridge adds a second stream and the vhost's first client-driven publish**
 (ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and
@@ -3819,7 +3824,9 @@ pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of
 (fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on
 `canOpenLeitung` and the promotion management entries on `canManagePromotions`, and the sidebar's
 role badge reads `hasOfficerReach`; the bank member search, the profit calculation and the
-blueprint availability overview no longer admit the `OFFICER` role.
+blueprint availability overview no longer admit the `OFFICER` role. The promotion and Leitung
+pages and proxies and the Spezialkommando members page gate on `canManagePromotions`,
+`canOpenLeitung` and `hasOfficerReach` through the frontend `OfficerSurfaceGate`.
 
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
 carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit

@@ -179,7 +179,8 @@ class GatedSelfInvocationTest {
     assertThat(gate(MissionFinanceEntryService.class, "updateEntry")).isEqualTo(financeGate);
     assertThat(gate(MissionFinanceEntryService.class, "deleteEntry")).isEqualTo(financeGate);
     for (String write : new String[] {"create", "update", "delete"}) {
-      assertThat(gate(PromotionCategoryService.class, write)).isEqualTo(Roles.ADMIN_OR_OFFICER);
+      assertThat(gate(PromotionCategoryService.class, write))
+          .isEqualTo(Roles.ADMIN_OR_OFFICER_REACH);
     }
   }
 

@@ -169,6 +169,17 @@ public class AccessGateService {
   }
 
   /**
+   * Checks whether the caller holds officer reach in at least one org unit; the coarse method gate
+   * in front of a write whose owning unit is checked afterwards with {@link
+   * #canActAsOfficerIn(UUID)}. Admins always pass.
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in any unit
+   */
+  public boolean canActAsOfficerAnywhere() {
+    return authHelper.isAdmin() || !requestScopeResolver.currentOfficerOrgUnitIds().isEmpty();
+  }
+
+  /**
    * {@link #canActAsOfficerIn(UUID)} for a target that may have no owning unit: such a target is
    * reserved to admins.
    *

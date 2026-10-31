@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRankRangeResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
@@ -229,6 +230,7 @@ public class MemberManagementController {
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
       }
       model.addAttribute("memberRsiHandle", memberRsiHandle);
+      model.addAttribute("memberRankRange", loadRankRange(id));
 
       try {
         List<OrgUnitMembershipOptionDto> memberships = identityClient.memberships(id);
@@ -301,6 +303,23 @@ public class MemberManagementController {
       log.error("Could not fetch member details", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.details.load");
       return "redirect:/members";
+    }
+  }
+
+  /**
+   * Reads the member's rank range for the hint under the rank select; a failed read hides the hint
+   * and never blocks the page.
+   *
+   * @param id the member
+   * @return the range, or {@code null} when it could not be read
+   */
+  @Nullable
+  private UserRankRangeResponse loadRankRange(@NotNull UUID id) {
+    try {
+      return identityClient.userRankRange(id);
+    } catch (BackendServiceException ex) {
+      log.debug("Failed to load the rank range for the member-edit page", ex);
+      return null;
     }
   }
 

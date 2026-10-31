@@ -132,23 +132,34 @@ public final class LayoutResponses {
    *     unread notifications
    */
   public static MeLayoutResponse officerReach(boolean officerHere) {
-    return new MeLayoutResponse(
-        null,
-        List.of(),
-        new CapabilitiesResponse(
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            officerHere,
-            officerHere,
-            officerHere,
-            officerHere,
-            officerHere,
-            officerHere),
-        0L);
+    return new MeLayoutResponse(null, List.of(), officerCaps(officerHere), 0L);
+  }
+
+  /**
+   * A layout answer carrying the officer flags of the active context and the effective org unit.
+   *
+   * @param activeOrgUnitId the effective org unit, or {@code null} for none
+   * @return the answer, with every non-officer capability off, no pinnable units and no unread
+   *     notifications
+   */
+  public static MeLayoutResponse officerReachIn(UUID activeOrgUnitId) {
+    return new MeLayoutResponse(activeOrgUnitId, List.of(), officerCaps(true), 0L);
+  }
+
+  private static CapabilitiesResponse officerCaps(boolean officerHere) {
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere);
   }
 
   /**
