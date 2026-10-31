@@ -221,9 +221,8 @@ public abstract class MissionMapper {
                     ou -> ou.getKind() == OrgUnitKind.SQUADRON ? 0 : 1)
                 .thenComparing(
                     ou -> ou.getName() == null ? "" : ou.getName(), String.CASE_INSENSITIVE_ORDER))
-        .map(
-            ou ->
-                new OrgUnitReferenceDto(ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
+        .map(ou ->
+            new OrgUnitReferenceDto(ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
         .toList();
   }
 
@@ -311,11 +310,10 @@ public abstract class MissionMapper {
     }
     Comparator<MissionCrew> leaderFirst =
         Comparator.comparingInt((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
-            .thenComparing(
-                c -> {
-                  String n = resolveParticipantName(c);
-                  return n == null ? "" : n.toLowerCase(Locale.ROOT);
-                });
+            .thenComparing(c -> {
+              String n = resolveParticipantName(c);
+              return n == null ? "" : n.toLowerCase(Locale.ROOT);
+            });
     return unit.getCrew().stream().sorted(leaderFirst).map(this::toDto).toList();
   }
 

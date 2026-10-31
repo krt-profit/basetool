@@ -183,12 +183,11 @@ final class LiveSyncRateLimiter {
     long cutoff = nowNanos - TOPIC_BUCKET_IDLE_REAP_NANOS;
     changedRateByTopic
         .entrySet()
-        .removeIf(
-            entry -> {
-              synchronized (entry.getValue()) {
-                return entry.getValue().lastRefillNanos <= cutoff;
-              }
-            });
+        .removeIf(entry -> {
+          synchronized (entry.getValue()) {
+            return entry.getValue().lastRefillNanos <= cutoff;
+          }
+        });
   }
 
   /**

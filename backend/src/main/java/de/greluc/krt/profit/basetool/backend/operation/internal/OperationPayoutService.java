@@ -324,13 +324,12 @@ public class OperationPayoutService {
     OperationPayoutStatus status =
         payoutStatusRepository
             .findByOperationIdAndParticipantKey(operationId, participantKey)
-            .orElseGet(
-                () -> {
-                  OperationPayoutStatus s = new OperationPayoutStatus();
-                  s.setOperation(operation);
-                  s.setParticipantKey(participantKey);
-                  return s;
-                });
+            .orElseGet(() -> {
+              OperationPayoutStatus s = new OperationPayoutStatus();
+              s.setOperation(operation);
+              s.setParticipantKey(participantKey);
+              return s;
+            });
 
     final boolean wasPaidOut = status.isPaidOut();
     status.setPaidOut(paidOut);

@@ -59,11 +59,10 @@ class PersonSearchIntegrationTest {
   /** Removes what this class committed into the container the whole suite shares. */
   @AfterEach
   void cleanUp() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          userRepository.deleteAllById(seededUsers);
-          seededUsers.clear();
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      userRepository.deleteAllById(seededUsers);
+      seededUsers.clear();
+    });
   }
 
   @Test
@@ -140,14 +139,13 @@ class PersonSearchIntegrationTest {
    */
   private void seedMember(String username, String description) {
     UUID id = UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User u = new User();
-          u.setId(id);
-          u.setUsername(username);
-          u.setDescription(description);
-          userRepository.save(u);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User u = new User();
+      u.setId(id);
+      u.setUsername(username);
+      u.setDescription(description);
+      userRepository.save(u);
+    });
     seededUsers.add(id);
   }
 

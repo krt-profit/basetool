@@ -498,18 +498,16 @@ public class AdminUexPageController {
       }
 
       List<TerminalDto> systemOrphans = new ArrayList<>(acc.orphanTerminals);
-      sysCityBuckets.forEach(
-          (k, v) -> {
-            if (!usedCityKeys.contains(k)) {
-              systemOrphans.addAll(v);
-            }
-          });
-      sysStationBuckets.forEach(
-          (k, v) -> {
-            if (!usedStationKeys.contains(k)) {
-              systemOrphans.addAll(v);
-            }
-          });
+      sysCityBuckets.forEach((k, v) -> {
+        if (!usedCityKeys.contains(k)) {
+          systemOrphans.addAll(v);
+        }
+      });
+      sysStationBuckets.forEach((k, v) -> {
+        if (!usedStationKeys.contains(k)) {
+          systemOrphans.addAll(v);
+        }
+      });
 
       result.add(
           new StarSystemGroup(

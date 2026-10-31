@@ -300,12 +300,11 @@ class OrgChartServiceTest {
   @Test
   void createPosition_areaCoordinatorFreeText_persistsAndReturnsDto() {
     when(positionRepository.save(any()))
-        .thenAnswer(
-            inv -> {
-              OrgChartPosition p = inv.getArgument(0);
-              p.setId(UUID.randomUUID());
-              return p;
-            });
+        .thenAnswer(inv -> {
+          OrgChartPosition p = inv.getArgument(0);
+          p.setId(UUID.randomUUID());
+          return p;
+        });
 
     OrgChartPositionDto dto =
         service()
@@ -327,12 +326,11 @@ class OrgChartServiceTest {
             unitId, OrgChartPositionType.COMMAND_LEAD))
         .thenReturn(0L);
     when(positionRepository.save(any()))
-        .thenAnswer(
-            inv -> {
-              OrgChartPosition p = inv.getArgument(0);
-              p.setId(UUID.randomUUID());
-              return p;
-            });
+        .thenAnswer(inv -> {
+          OrgChartPosition p = inv.getArgument(0);
+          p.setId(UUID.randomUUID());
+          return p;
+        });
 
     OrgChartPositionDto dto =
         service()

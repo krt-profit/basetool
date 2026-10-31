@@ -264,18 +264,16 @@ public class WebClientConfig {
 
       HttpClient httpClient =
           HttpClient.create(provider)
-              .secure(
-                  t -> {
-                    var spec = t.sslContext(sslContext);
-                    if (disableHostnameVerification) {
-                      spec.handlerConfigurator(
-                          sslHandler -> {
-                            SSLParameters params = sslHandler.engine().getSSLParameters();
-                            params.setEndpointIdentificationAlgorithm("");
-                            sslHandler.engine().setSSLParameters(params);
-                          });
-                    }
-                  })
+              .secure(t -> {
+                var spec = t.sslContext(sslContext);
+                if (disableHostnameVerification) {
+                  spec.handlerConfigurator(sslHandler -> {
+                    SSLParameters params = sslHandler.engine().getSSLParameters();
+                    params.setEndpointIdentificationAlgorithm("");
+                    sslHandler.engine().setSSLParameters(params);
+                  });
+                }
+              })
               .option(
                   ChannelOption.CONNECT_TIMEOUT_MILLIS,
                   Math.toIntExact(httpProperties.connectTimeout().toMillis()));
@@ -284,31 +282,27 @@ public class WebClientConfig {
       }
       if (streaming) {
         httpClient =
-            httpClient.doOnConnected(
-                conn ->
-                    conn.addHandlerLast(
-                        new WriteTimeoutHandler(
-                            httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+            httpClient.doOnConnected(conn ->
+                conn.addHandlerLast(
+                    new WriteTimeoutHandler(
+                        httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
       } else {
         httpClient = httpClient.responseTimeout(httpProperties.responseTimeout());
         if (http2) {
           httpClient =
-              httpClient.doOnConnected(
-                  conn ->
-                      conn.addHandlerLast(
-                          new WriteTimeoutHandler(
-                              httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+              httpClient.doOnConnected(conn ->
+                  conn.addHandlerLast(
+                      new WriteTimeoutHandler(
+                          httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
         } else {
           httpClient =
-              httpClient.doOnConnected(
-                  conn ->
-                      conn.addHandlerLast(
-                              new ReadTimeoutHandler(
-                                  httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
-                          .addHandlerLast(
-                              new WriteTimeoutHandler(
-                                  httpProperties.writeTimeout().toMillis(),
-                                  TimeUnit.MILLISECONDS)));
+              httpClient.doOnConnected(conn ->
+                  conn.addHandlerLast(
+                          new ReadTimeoutHandler(
+                              httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
+                      .addHandlerLast(
+                          new WriteTimeoutHandler(
+                              httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
         }
       }
       return new ReactorClientHttpConnector(httpClient);
@@ -330,26 +324,24 @@ public class WebClientConfig {
 
     return (request, next) ->
         next.exchange(request)
-            .flatMap(
-                resp -> {
-                  if (resp.statusCode().is5xxServerError()) {
-                    return resp.createException().flatMap(Mono::error);
-                  }
-                  return Mono.just(resp);
-                })
+            .flatMap(resp -> {
+              if (resp.statusCode().is5xxServerError()) {
+                return resp.createException().flatMap(Mono::error);
+              }
+              return Mono.just(resp);
+            })
             .transformDeferred(BulkheadOperator.of(bh))
             .transformDeferred(TimeLimiterOperator.of(tl))
-            .transformDeferred(
-                mono -> {
-                  String method = request.method().name();
-                  if ("GET".equals(method)
-                      || "HEAD".equals(method)
-                      || "OPTIONS".equals(method)
-                      || "TRACE".equals(method)) {
-                    return mono.transformDeferred(RetryOperator.of(retry));
-                  }
-                  return mono;
-                })
+            .transformDeferred(mono -> {
+              String method = request.method().name();
+              if ("GET".equals(method)
+                  || "HEAD".equals(method)
+                  || "OPTIONS".equals(method)
+                  || "TRACE".equals(method)) {
+                return mono.transformDeferred(RetryOperator.of(retry));
+              }
+              return mono;
+            })
             .transformDeferred(CircuitBreakerOperator.of(cb));
   }
 
@@ -376,21 +368,19 @@ public class WebClientConfig {
                 ChannelOption.CONNECT_TIMEOUT_MILLIS,
                 Math.toIntExact(httpProperties.connectTimeout().toMillis()))
             .responseTimeout(httpProperties.responseTimeout())
-            .doOnConnected(
-                conn ->
-                    conn.addHandlerLast(
-                            new ReadTimeoutHandler(
-                                httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
-                        .addHandlerLast(
-                            new WriteTimeoutHandler(
-                                httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+            .doOnConnected(conn ->
+                conn.addHandlerLast(
+                        new ReadTimeoutHandler(
+                            httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
+                    .addHandlerLast(
+                        new WriteTimeoutHandler(
+                            httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
     return RestClient.builder()
-        .configureMessageConverters(
-            converters ->
-                converters
-                    .disableDefaults()
-                    .addCustomConverter(new FormHttpMessageConverter())
-                    .addCustomConverter(new OAuth2AccessTokenResponseHttpMessageConverter()))
+        .configureMessageConverters(converters ->
+            converters
+                .disableDefaults()
+                .addCustomConverter(new FormHttpMessageConverter())
+                .addCustomConverter(new OAuth2AccessTokenResponseHttpMessageConverter()))
         .defaultStatusHandler(new OAuth2ErrorResponseErrorHandler())
         .requestFactory(new ReactorClientHttpRequestFactory(httpClient))
         .build();

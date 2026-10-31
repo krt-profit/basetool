@@ -126,19 +126,18 @@ public class ExchangeMassChangeService {
             request.clientId(),
             request.installationKey(),
             () ->
-                transaction.execute(
-                    _ -> {
-                      ExchangeChangeResultDto applied =
-                          run(caller, resourceOf(request), request, false);
-                      auditRecorder.record(
-                          AuditEventType.EXCHANGE_MASS_CHANGE_CONFIRMED,
-                          client.getId(),
-                          client.getClientId(),
-                          member,
-                          AuditDetails.of("resource", request.resource())
-                              .with("applied", applied.applied()));
-                      return applied;
-                    }));
+                transaction.execute(_ -> {
+                  ExchangeChangeResultDto applied =
+                      run(caller, resourceOf(request), request, false);
+                  auditRecorder.record(
+                      AuditEventType.EXCHANGE_MASS_CHANGE_CONFIRMED,
+                      client.getId(),
+                      client.getClientId(),
+                      member,
+                      AuditDetails.of("resource", request.resource())
+                          .with("applied", applied.applied()));
+                  return applied;
+                }));
     if (result == null) {
       throw new IllegalStateException("The confirmed change set returned no result");
     }

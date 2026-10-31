@@ -399,8 +399,8 @@ public class OrgHierarchyController {
   }
 
   /**
-   * Response for the set-parent endpoint: the child's identity plus its freshly-bumped optimistic-
-   * lock version so the caller can chain further edits.
+   * Response for the set-parent endpoint: the child's identity plus its freshly-bumped
+   * optimistic-lock version so the caller can chain further edits.
    *
    * @param orgUnitId the child org unit id.
    * @param kind the child's kind.

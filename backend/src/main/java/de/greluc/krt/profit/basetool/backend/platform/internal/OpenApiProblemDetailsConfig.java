@@ -101,38 +101,35 @@ public class OpenApiProblemDetailsConfig {
     }
     openApi
         .getPaths()
-        .forEach(
-            (path, pathItem) ->
-                pathItem
-                    .readOperations()
-                    .forEach(
-                        operation -> {
-                          ApiResponses responses = operation.getResponses();
-                          if (responses == null) {
-                            return;
-                          }
-                          addProblemResponse(responses, "400", "Bad Request");
-                          addProblemResponse(responses, "401", "Unauthorized");
-                          addProblemResponse(responses, "403", "Forbidden");
-                          addProblemResponse(responses, "404", "Not Found");
-                          addProblemResponse(responses, "409", "Conflict");
-                          if (path.startsWith(RATE_LIMITED_PREFIX)) {
-                            addProblemResponse(
-                                responses,
-                                "429",
-                                "Too Many Requests: a rate limit was exceeded"
-                                    + " (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds"
-                                    + " to wait");
-                            RATE_LIMIT_HEADERS
-                                .keySet()
-                                .forEach(
-                                    name ->
-                                        Objects.requireNonNull(responses.get("429"))
-                                            .addHeaderObject(
-                                                name, new Header().$ref(HEADER_REF_PREFIX + name)));
-                          }
-                          addProblemResponse(responses, "500", "Internal Server Error");
-                        }));
+        .forEach((path, pathItem) ->
+            pathItem
+                .readOperations()
+                .forEach(operation -> {
+                  ApiResponses responses = operation.getResponses();
+                  if (responses == null) {
+                    return;
+                  }
+                  addProblemResponse(responses, "400", "Bad Request");
+                  addProblemResponse(responses, "401", "Unauthorized");
+                  addProblemResponse(responses, "403", "Forbidden");
+                  addProblemResponse(responses, "404", "Not Found");
+                  addProblemResponse(responses, "409", "Conflict");
+                  if (path.startsWith(RATE_LIMITED_PREFIX)) {
+                    addProblemResponse(
+                        responses,
+                        "429",
+                        "Too Many Requests: a rate limit was exceeded"
+                            + " (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds"
+                            + " to wait");
+                    RATE_LIMIT_HEADERS
+                        .keySet()
+                        .forEach(name ->
+                            Objects.requireNonNull(responses.get("429"))
+                                .addHeaderObject(
+                                    name, new Header().$ref(HEADER_REF_PREFIX + name)));
+                  }
+                  addProblemResponse(responses, "500", "Internal Server Error");
+                }));
   }
 
   /**

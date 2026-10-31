@@ -148,14 +148,13 @@ class AdminAuditLogModalRenderMvcTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =
-        assertDoesNotThrow(
-            () ->
-                mockMvc
-                    .perform(get("/admin/audit-log").param("domain", "BANK"))
-                    .andExpect(status().isOk())
-                    .andReturn()
-                    .getResponse()
-                    .getContentAsString());
+        assertDoesNotThrow(() ->
+            mockMvc
+                .perform(get("/admin/audit-log").param("domain", "BANK"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
 
     assertThat(html).contains("data-testid=\"audit-filter-client\"");
     assertThat(html).doesNotContain("??admin.audit.client.");

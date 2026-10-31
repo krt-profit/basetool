@@ -171,10 +171,8 @@ public class MissionService implements MissionCommands {
     }
     return authHelperService
         .currentUserId()
-        .map(
-            userId ->
-                Set.copyOf(
-                    missionParticipantRepository.findMissionIdsSignedUpBy(userId, missionIds)))
+        .map(userId ->
+            Set.copyOf(missionParticipantRepository.findMissionIdsSignedUpBy(userId, missionIds)))
         .orElse(Set.of());
   }
 
@@ -774,13 +772,12 @@ public class MissionService implements MissionCommands {
           MissionOwnership.class, existing.map(MissionOwnership::getId).orElse(mission.getId()));
     }
     MissionOwnership ownership =
-        existing.orElseGet(
-            () -> {
-              MissionOwnership fresh = new MissionOwnership();
-              fresh.setMission(mission);
-              fresh.setOwner(mission.getOwner());
-              return missionOwnershipRepository.saveAndFlush(fresh);
-            });
+        existing.orElseGet(() -> {
+          MissionOwnership fresh = new MissionOwnership();
+          fresh.setMission(mission);
+          fresh.setOwner(mission.getOwner());
+          return missionOwnershipRepository.saveAndFlush(fresh);
+        });
     ownership.setOwner(newOwner);
     MissionOwnership saved = missionOwnershipRepository.saveAndFlush(ownership);
     return saved.getVersion() == null ? 0L : saved.getVersion();

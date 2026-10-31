@@ -56,15 +56,13 @@ public class OpenApiCachingConfig {
     return openApi ->
         openApi
             .getPaths()
-            .forEach(
-                (path, item) ->
-                    item.readOperationsMap()
-                        .forEach(
-                            (httpMethod, operation) -> {
-                              if (httpMethod.name().equalsIgnoreCase("GET")) {
-                                document(path, operation.getResponses());
-                              }
-                            }));
+            .forEach((path, item) ->
+                item.readOperationsMap()
+                    .forEach((httpMethod, operation) -> {
+                      if (httpMethod.name().equalsIgnoreCase("GET")) {
+                        document(path, operation.getResponses());
+                      }
+                    }));
   }
 
   /**

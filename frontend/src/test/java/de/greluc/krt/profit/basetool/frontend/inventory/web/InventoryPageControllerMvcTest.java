@@ -895,14 +895,13 @@ class InventoryPageControllerMvcTest {
             Instant.parse("2026-02-03T10:15:30Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1047,14 +1046,13 @@ class InventoryPageControllerMvcTest {
    */
   private void stubMyStackEntries(InventoryItemDto item) {
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
   }
@@ -1094,14 +1092,13 @@ class InventoryPageControllerMvcTest {
             Instant.parse("2026-02-03T10:15:30Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1180,17 +1177,16 @@ class InventoryPageControllerMvcTest {
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              if (url.contains("/orders/lookup")) {
-                return List.of(matching, unrelated);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          if (url.contains("/orders/lookup")) {
+            return List.of(matching, unrelated);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1230,14 +1226,13 @@ class InventoryPageControllerMvcTest {
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/orders/lookup")) {
-                return List.of(itemOrder);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/orders/lookup")) {
+            return List.of(itemOrder);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1278,15 +1273,14 @@ class InventoryPageControllerMvcTest {
 
     java.util.List<String> lookupUrls = new java.util.ArrayList<>();
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/orders/lookup")) {
-                lookupUrls.add(url);
-                return List.of(order);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/orders/lookup")) {
+            lookupUrls.add(url);
+            return List.of(order);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1341,13 +1335,12 @@ class InventoryPageControllerMvcTest {
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              return url.contains("/orders/lookup")
-                  ? List.of(order, needless)
-                  : Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains("/orders/lookup")
+              ? List.of(order, needless)
+              : Collections.emptyList();
+        });
 
     mockMvc
         .perform(get("/inventory/order-needs").header("X-Requested-With", "XMLHttpRequest"))
@@ -1367,11 +1360,10 @@ class InventoryPageControllerMvcTest {
    */
   private void stubInputPageWithOwnerOptions(List<OrgUnitMembershipOptionDto> ownerOptions) {
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              return url.contains("org-units/me/pickable") ? ownerOptions : Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains("org-units/me/pickable") ? ownerOptions : Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
   }
@@ -1475,11 +1467,10 @@ class InventoryPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     List<String> probedUrls = new java.util.ArrayList<>();
     when(backendApiClient.get(anyString(), eq(InventoryMergeCandidatesDto.class)))
-        .thenAnswer(
-            invocation -> {
-              probedUrls.add(invocation.getArgument(0));
-              return new InventoryMergeCandidatesDto(true);
-            });
+        .thenAnswer(invocation -> {
+          probedUrls.add(invocation.getArgument(0));
+          return new InventoryMergeCandidatesDto(true);
+        });
 
     mockMvc
         .perform(
@@ -1496,17 +1487,16 @@ class InventoryPageControllerMvcTest {
 
     assertThat(probedUrls)
         .singleElement()
-        .satisfies(
-            url ->
-                assertThat(url)
-                    .startsWith("/api/v1/inventory/merge-candidates?")
-                    .contains("materialId=" + materialId)
-                    .contains("locationId=" + locationId)
-                    .contains("quality=640")
-                    .contains("personal=false")
-                    .contains("stolen=false")
-                    .contains("owningOrgUnitId=" + unitId)
-                    .doesNotContain("userId="));
+        .satisfies(url ->
+            assertThat(url)
+                .startsWith("/api/v1/inventory/merge-candidates?")
+                .contains("materialId=" + materialId)
+                .contains("locationId=" + locationId)
+                .contains("quality=640")
+                .contains("personal=false")
+                .contains("stolen=false")
+                .contains("owningOrgUnitId=" + unitId)
+                .doesNotContain("userId="));
   }
 
   /**
@@ -1579,17 +1569,16 @@ class InventoryPageControllerMvcTest {
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/all/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              if (url.contains("/orders/lookup")) {
-                return List.of(order);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/all/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          if (url.contains("/orders/lookup")) {
+            return List.of(order);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1642,14 +1631,13 @@ class InventoryPageControllerMvcTest {
             Instant.parse("2026-01-01T00:00:00Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/all/stack/entries")) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/all/stack/entries")) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1702,14 +1690,13 @@ class InventoryPageControllerMvcTest {
             List.of(stack));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/grouped")) {
-                return List.of(group);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/grouped")) {
+            return List.of(group);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1759,14 +1746,13 @@ class InventoryPageControllerMvcTest {
             List.of(stack));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/all/grouped")) {
-                return List.of(group);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/all/grouped")) {
+            return List.of(group);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1888,14 +1874,13 @@ class InventoryPageControllerMvcTest {
         new GroupedInventoryDto(null, sampleGameItem(gameItemId), 3.0, null, null, List.of(stack));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/grouped") && url.contains("catalog=ITEM")) {
-                return List.of(group);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/grouped") && url.contains("catalog=ITEM")) {
+            return List.of(group);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1943,14 +1928,13 @@ class InventoryPageControllerMvcTest {
         new GroupedInventoryDto(null, sampleGameItem(gameItemId), 5.0, null, null, List.of(stack));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/all/grouped") && url.contains("catalog=ITEM")) {
-                return List.of(group);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/all/grouped") && url.contains("catalog=ITEM")) {
+            return List.of(group);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2158,19 +2142,18 @@ class InventoryPageControllerMvcTest {
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")
-                  && url.contains("catalog=ITEM")
-                  && url.contains("gameItemId=" + gameItemId)) {
-                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
-              }
-              if (url.contains("/orders/lookup")) {
-                return List.of(matching, unrelated);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")
+              && url.contains("catalog=ITEM")
+              && url.contains("gameItemId=" + gameItemId)) {
+            return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+          }
+          if (url.contains("/orders/lookup")) {
+            return List.of(matching, unrelated);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2230,19 +2213,18 @@ class InventoryPageControllerMvcTest {
             Instant.parse("2026-03-01T00:00:00Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/my-inventory/stack/entries")
-                  && url.contains("catalog=ITEM")
-                  && url.contains("gameItemId=" + gameItemId)) {
-                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
-              }
-              if (url.contains("/material-exchange/released-item-ids")) {
-                return List.of(itemId);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/my-inventory/stack/entries")
+              && url.contains("catalog=ITEM")
+              && url.contains("gameItemId=" + gameItemId)) {
+            return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+          }
+          if (url.contains("/material-exchange/released-item-ids")) {
+            return List.of(itemId);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2294,17 +2276,16 @@ class InventoryPageControllerMvcTest {
             Instant.parse("2026-03-01T00:00:00Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/all/stack/entries")
-                  && url.contains("catalog=ITEM")
-                  && url.contains("gameItemId=" + gameItemId)
-                  && url.contains("userId=" + userId)) {
-                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/all/stack/entries")
+              && url.contains("catalog=ITEM")
+              && url.contains("gameItemId=" + gameItemId)
+              && url.contains("userId=" + userId)) {
+            return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2346,11 +2327,10 @@ class InventoryPageControllerMvcTest {
             List.of(new JobOrderGameItemNeedDto(gameItemId, 10, 2, 3, 5)));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              return url.contains("/orders/lookup") ? List.of(order) : Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains("/orders/lookup") ? List.of(order) : Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2411,17 +2391,16 @@ class InventoryPageControllerMvcTest {
             List.of(new JobOrderGameItemNeedDto(gameItemId, 10, 2, 3, 5)));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/inventory/all/stack/entries") && url.contains("catalog=ITEM")) {
-                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
-              }
-              if (url.contains("/orders/lookup")) {
-                return List.of(order);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/inventory/all/stack/entries") && url.contains("catalog=ITEM")) {
+            return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+          }
+          if (url.contains("/orders/lookup")) {
+            return List.of(order);
+          }
+          return Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2486,11 +2465,10 @@ class InventoryPageControllerMvcTest {
                 700,
                 List.of(stack));
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            invocation ->
-                ((String) invocation.getArgument(0)).contains("/grouped")
-                    ? List.of(group)
-                    : Collections.emptyList());
+        .thenAnswer(invocation ->
+            ((String) invocation.getArgument(0)).contains("/grouped")
+                ? List.of(group)
+                : Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 

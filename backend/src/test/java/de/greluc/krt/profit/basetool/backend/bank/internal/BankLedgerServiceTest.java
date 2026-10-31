@@ -544,10 +544,9 @@ class BankLedgerServiceTest {
     for (BankCounterLeg original : originalAccountLegs) {
       assertTrue(
           reversalAccountLegs.stream()
-              .anyMatch(
-                  mirrored ->
-                      mirrored.accountId().equals(original.accountId())
-                          && mirrored.amount().compareTo(original.amount().negate()) == 0),
+              .anyMatch(mirrored ->
+                  mirrored.accountId().equals(original.accountId())
+                      && mirrored.amount().compareTo(original.amount().negate()) == 0),
           "every original account leg must have a negated mirror");
     }
     assertEquals(postingsBefore + reversalAccountLegs.size(), postingRepository.count());
@@ -648,23 +647,22 @@ class BankLedgerServiceTest {
     ExecutorService pool = Executors.newFixedThreadPool(THREADS);
     try {
       for (int i = 0; i < THREADS; i++) {
-        pool.submit(
-            () -> {
-              ready.countDown();
-              try {
-                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                  return;
-                }
-                bankLedgerService.bookWithdrawal(
-                    new BankWithdrawalRequest(
-                        account.getId(), holderA.getId(), new BigDecimal("200"), null));
-                success.incrementAndGet();
-              } catch (BankConflictException expected) {
-                conflict.incrementAndGet();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-            });
+        pool.submit(() -> {
+          ready.countDown();
+          try {
+            if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+              return;
+            }
+            bankLedgerService.bookWithdrawal(
+                new BankWithdrawalRequest(
+                    account.getId(), holderA.getId(), new BigDecimal("200"), null));
+            success.incrementAndGet();
+          } catch (BankConflictException expected) {
+            conflict.incrementAndGet();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        });
       }
       assertTrue(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS));
       go.countDown();

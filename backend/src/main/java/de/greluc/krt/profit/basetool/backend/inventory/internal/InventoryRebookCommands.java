@@ -162,9 +162,8 @@ public class InventoryRebookCommands implements RebookCommands {
       @NotNull List<InventoryItem> lotRows, @NotNull UUID poolUnitId) {
     return lotRows.stream()
         .filter(row -> !Boolean.TRUE.equals(row.getPersonal()))
-        .filter(
-            row ->
-                row.getOwningOrgUnit() != null && poolUnitId.equals(row.getOwningOrgUnit().getId()))
+        .filter(row ->
+            row.getOwningOrgUnit() != null && poolUnitId.equals(row.getOwningOrgUnit().getId()))
         .sorted(oldestFirst())
         .toList();
   }

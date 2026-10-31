@@ -263,11 +263,10 @@ class UexSyncNotModifiedTest {
   private void assertUnchangedReportedAtInfo(String label) {
     assertTrue(
         appender.list.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.INFO
-                        && e.getFormattedMessage().toLowerCase().contains(label.toLowerCase())
-                        && e.getFormattedMessage().contains("304")),
+            .anyMatch(e ->
+                e.getLevel() == Level.INFO
+                    && e.getFormattedMessage().toLowerCase().contains(label.toLowerCase())
+                    && e.getFormattedMessage().contains("304")),
         "expected an INFO line naming the unchanged " + label + " catalogue and the 304");
     assertFalse(
         appender.list.stream()

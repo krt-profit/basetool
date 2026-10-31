@@ -305,13 +305,12 @@ class UserDeletionEndStateTest {
     Role adminRole =
         roleRepository
             .findByNameIgnoreCase("ADMIN")
-            .orElseGet(
-                () -> {
-                  Role fresh = new Role();
-                  fresh.setName("ADMIN");
-                  fresh.setCode("ADMIN");
-                  return roleRepository.save(fresh);
-                });
+            .orElseGet(() -> {
+              Role fresh = new Role();
+              fresh.setName("ADMIN");
+              fresh.setCode("ADMIN");
+              return roleRepository.save(fresh);
+            });
     User admin = new User();
     admin.setId(UUID.randomUUID());
     admin.setUsername("end-admin-" + tag);

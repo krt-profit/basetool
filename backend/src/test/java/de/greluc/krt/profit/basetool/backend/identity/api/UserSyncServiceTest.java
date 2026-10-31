@@ -198,14 +198,13 @@ class UserSyncServiceTest {
     when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
     when(userReconciliationService.markMissingUsers(anySet())).thenReturn(2);
 
-    withAppender(
-        appender -> {
-          userSyncService.syncFromKeycloak();
+    withAppender(appender -> {
+      userSyncService.syncFromKeycloak();
 
-          ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
-          assertEquals(Level.INFO, flagged.getLevel());
-          assertTrue(flagged.getFormattedMessage().contains("2 local users"));
-        });
+      ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
+      assertEquals(Level.INFO, flagged.getLevel());
+      assertTrue(flagged.getFormattedMessage().contains("2 local users"));
+    });
     verify(userReconciliationService).logRoleSyncSummary();
   }
 
@@ -214,14 +213,13 @@ class UserSyncServiceTest {
     when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
     when(userReconciliationService.markMissingUsers(anySet())).thenReturn(42);
 
-    withAppender(
-        appender -> {
-          userSyncService.syncFromKeycloak();
+    withAppender(appender -> {
+      userSyncService.syncFromKeycloak();
 
-          ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
-          assertEquals(Level.WARN, flagged.getLevel());
-          assertTrue(flagged.getFormattedMessage().contains("42 local users"));
-        });
+      ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
+      assertEquals(Level.WARN, flagged.getLevel());
+      assertTrue(flagged.getFormattedMessage().contains("42 local users"));
+    });
   }
 
   @Test
@@ -229,15 +227,13 @@ class UserSyncServiceTest {
     when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
     when(userReconciliationService.markMissingUsers(anySet())).thenReturn(0);
 
-    withAppender(
-        appender -> {
-          userSyncService.syncFromKeycloak();
+    withAppender(appender -> {
+      userSyncService.syncFromKeycloak();
 
-          assertTrue(
-              appender.list.stream()
-                  .noneMatch(
-                      e -> e.getFormattedMessage().contains("no longer present in Keycloak")));
-        });
+      assertTrue(
+          appender.list.stream()
+              .noneMatch(e -> e.getFormattedMessage().contains("no longer present in Keycloak")));
+    });
   }
 
   /**

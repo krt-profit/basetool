@@ -310,9 +310,8 @@ public class ScWikiItemSyncService {
           ctx.seen.size());
     }
 
-    statFollowUp.fetchMissing(
-        (uuid, dto) ->
-            self.getObject().fillClosureItemWithinTransaction(ctx.runId, uuid, dto, ctx.now));
+    statFollowUp.fetchMissing((uuid, dto) ->
+        self.getObject().fillClosureItemWithinTransaction(ctx.runId, uuid, dto, ctx.now));
 
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(

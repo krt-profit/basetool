@@ -213,14 +213,13 @@ class LoginMetricsHandlersTest {
 
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.getLevel()).isEqualTo(Level.WARN);
-              assertThat(event.getFormattedMessage())
-                  .contains(MetricNames.LOGIN_REASON_PROVIDER_ERROR)
-                  .contains("invalid_token_response")
-                  .contains("ConnectException");
-            });
+        .satisfies(event -> {
+          assertThat(event.getLevel()).isEqualTo(Level.WARN);
+          assertThat(event.getFormattedMessage())
+              .contains(MetricNames.LOGIN_REASON_PROVIDER_ERROR)
+              .contains("invalid_token_response")
+              .contains("ConnectException");
+        });
   }
 
   /**
@@ -258,15 +257,14 @@ class LoginMetricsHandlersTest {
 
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.getFormattedMessage()).contains("invalid_grant");
-              assertThat(event.getFormattedMessage())
-                  .doesNotContain("forged")
-                  .doesNotContain("login succeeded")
-                  .doesNotContain("example.invalid");
-              assertThat(event.getFormattedMessage()).doesNotContain("\n");
-            });
+        .satisfies(event -> {
+          assertThat(event.getFormattedMessage()).contains("invalid_grant");
+          assertThat(event.getFormattedMessage())
+              .doesNotContain("forged")
+              .doesNotContain("login succeeded")
+              .doesNotContain("example.invalid");
+          assertThat(event.getFormattedMessage()).doesNotContain("\n");
+        });
   }
 
   private static OAuth2AuthenticationException oauth2(String errorCode) {

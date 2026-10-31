@@ -135,11 +135,10 @@ public class PurchasingDealService {
     if (overdue) {
       Instant now = Instant.now();
       spec =
-          spec.and(
-              (root, q, cb) ->
-                  cb.and(
-                      root.get("status").in(DealStatus.DELIVERED, DealStatus.FAILED),
-                      cb.lessThan(root.<Instant>get("settlementDueAt"), now)));
+          spec.and((root, q, cb) ->
+              cb.and(
+                  root.get("status").in(DealStatus.DELIVERED, DealStatus.FAILED),
+                  cb.lessThan(root.<Instant>get("settlementDueAt"), now)));
     }
     Page<PurchasingDeal> page = dealRepository.findAll(spec, pageable);
     List<DealDto> dtos = assembler.toDtos(page.getContent());

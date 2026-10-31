@@ -58,10 +58,9 @@ public class NotificationMuteService {
       muted.add(mute.getType());
     }
     return Arrays.stream(NotificationType.values())
-        .map(
-            type ->
-                new NotificationPreferenceDto(
-                    type, type.isMutable(), type.isMutable() && muted.contains(type)))
+        .map(type ->
+            new NotificationPreferenceDto(
+                type, type.isMutable(), type.isMutable() && muted.contains(type)))
         .toList();
   }
 

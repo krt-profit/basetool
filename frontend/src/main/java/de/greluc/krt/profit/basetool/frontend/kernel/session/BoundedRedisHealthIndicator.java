@@ -85,11 +85,10 @@ public class BoundedRedisHealthIndicator implements ReactiveHealthIndicator {
         .health()
         .timeout(
             timeout,
-            Mono.fromSupplier(
-                () ->
-                    Health.down()
-                        .withDetail(
-                            "error", "health check timed out after " + timeout.toMillis() + " ms")
-                        .build()));
+            Mono.fromSupplier(() ->
+                Health.down()
+                    .withDetail(
+                        "error", "health check timed out after " + timeout.toMillis() + " ms")
+                    .build()));
   }
 }

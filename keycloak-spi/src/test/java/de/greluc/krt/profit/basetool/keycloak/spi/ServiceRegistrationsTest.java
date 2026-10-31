@@ -100,14 +100,13 @@ class ServiceRegistrationsTest {
       Class<?> spi = load(entry.getKey());
       List<String> found = new ArrayList<>();
       ServiceLoader.load(spi).stream()
-          .forEach(
-              provider -> {
-                try {
-                  found.add(provider.type().getName());
-                } catch (ServiceConfigurationError ignored) {
-                  found.add("?");
-                }
-              });
+          .forEach(provider -> {
+            try {
+              found.add(provider.type().getName());
+            } catch (ServiceConfigurationError ignored) {
+              found.add("?");
+            }
+          });
       assertTrue(
           found.contains(entry.getValue().implementation()),
           entry.getKey() + " does not discover " + entry.getValue().implementation());

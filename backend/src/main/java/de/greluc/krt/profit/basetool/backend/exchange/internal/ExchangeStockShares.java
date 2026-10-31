@@ -164,26 +164,25 @@ public class ExchangeStockShares {
       @NotNull UUID member, @NotNull StockLot lot, @NotNull Map<UUID, BigDecimal> pools) {
     List<RebookCommands.Rebook> toPersonal = new ArrayList<>();
     List<RebookCommands.Rebook> toPool = new ArrayList<>();
-    pools.forEach(
-        (pool, amount) -> {
-          if (amount.signum() > 0) {
-            toPersonal.add(
-                new RebookCommands.Rebook(
-                    member,
-                    lot,
-                    pool,
-                    RebookCommands.RebookDirection.TO_PERSONAL,
-                    amount.doubleValue()));
-          } else if (amount.signum() < 0) {
-            toPool.add(
-                new RebookCommands.Rebook(
-                    member,
-                    lot,
-                    pool,
-                    RebookCommands.RebookDirection.TO_POOL,
-                    amount.negate().doubleValue()));
-          }
-        });
+    pools.forEach((pool, amount) -> {
+      if (amount.signum() > 0) {
+        toPersonal.add(
+            new RebookCommands.Rebook(
+                member,
+                lot,
+                pool,
+                RebookCommands.RebookDirection.TO_PERSONAL,
+                amount.doubleValue()));
+      } else if (amount.signum() < 0) {
+        toPool.add(
+            new RebookCommands.Rebook(
+                member,
+                lot,
+                pool,
+                RebookCommands.RebookDirection.TO_POOL,
+                amount.negate().doubleValue()));
+      }
+    });
     List<RebookCommands.Rebook> rebooks = new ArrayList<>(toPersonal);
     rebooks.addAll(toPool);
     for (RebookCommands.Rebook rebook : rebooks) {

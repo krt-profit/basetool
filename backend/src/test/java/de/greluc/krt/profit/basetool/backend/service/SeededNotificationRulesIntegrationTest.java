@@ -358,13 +358,12 @@ class SeededNotificationRulesIntegrationTest {
 
     assertThat(rules)
         .singleElement()
-        .satisfies(
-            rule -> {
-              assertThat(rule.getNotificationType()).isEqualTo(type);
-              assertThat(rule.isExcludeActor()).isEqualTo(excludeActor);
-              assertThat(rule.getSelectors())
-                  .extracting(NotificationRuleSelector::getKind)
-                  .containsExactlyInAnyOrderElementsOf(kinds);
-            });
+        .satisfies(rule -> {
+          assertThat(rule.getNotificationType()).isEqualTo(type);
+          assertThat(rule.isExcludeActor()).isEqualTo(excludeActor);
+          assertThat(rule.getSelectors())
+              .extracting(NotificationRuleSelector::getKind)
+              .containsExactlyInAnyOrderElementsOf(kinds);
+        });
   }
 }

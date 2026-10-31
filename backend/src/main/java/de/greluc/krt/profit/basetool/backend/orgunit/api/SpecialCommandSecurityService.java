@@ -65,9 +65,8 @@ public class SpecialCommandSecurityService {
     }
     return authHelperService
         .currentUserId()
-        .flatMap(
-            userId ->
-                membershipRepository.findById(new OrgUnitMembershipId(userId, specialCommandId)))
+        .flatMap(userId ->
+            membershipRepository.findById(new OrgUnitMembershipId(userId, specialCommandId)))
         .map(m -> m.getRole() == MembershipRole.SK_LEAD)
         .orElse(false);
   }

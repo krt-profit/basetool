@@ -1225,14 +1225,13 @@ class InventoryPageControllerTest {
                 new InventoryStackDto(null, picked, 700, false, false, null, 10.0, 700.0, 700, 1),
                 new InventoryStackDto(null, other, 700, false, false, null, 20.0, 700.0, 700, 1)));
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            invocation -> {
-              String url = invocation.getArgument(0);
-              if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
-                return url.contains("locationIds=") ? List.of(filtered) : List.of(unfiltered);
-              }
-              return List.of();
-            });
+        .thenAnswer(invocation -> {
+          String url = invocation.getArgument(0);
+          if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
+            return url.contains("locationIds=") ? List.of(filtered) : List.of(unfiltered);
+          }
+          return List.of();
+        });
 
     controller.viewMyInventory(
         new LagerQuery(
@@ -1280,16 +1279,15 @@ class InventoryPageControllerTest {
     GroupedInventoryDto rifleGroup =
         new GroupedInventoryDto(null, rifle, 1.0, null, null, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            invocation -> {
-              String url = invocation.getArgument(0);
-              if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
-                return url.contains("itemClasses=")
-                    ? List.of(driveGroup)
-                    : List.of(driveGroup, shieldGroup, rifleGroup);
-              }
-              return List.of();
-            });
+        .thenAnswer(invocation -> {
+          String url = invocation.getArgument(0);
+          if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
+            return url.contains("itemClasses=")
+                ? List.of(driveGroup)
+                : List.of(driveGroup, shieldGroup, rifleGroup);
+          }
+          return List.of();
+        });
 
     controller.viewMyInventory(
         new LagerQuery(
@@ -1332,12 +1330,11 @@ class InventoryPageControllerTest {
         .get(urlCaptor.capture(), anyTypeRef());
     assertTrue(
         urlCaptor.getAllValues().stream()
-            .anyMatch(
-                u ->
-                    u.contains("/api/v1/inventory/my-inventory/grouped")
-                        && u.contains("componentTypes=QUANTUM_DRIVE")
-                        && u.contains("sizes=2")
-                        && u.contains("itemClasses=MILITARY")),
+            .anyMatch(u ->
+                u.contains("/api/v1/inventory/my-inventory/grouped")
+                    && u.contains("componentTypes=QUANTUM_DRIVE")
+                    && u.contains("sizes=2")
+                    && u.contains("itemClasses=MILITARY")),
         "the attribute filters must be forwarded");
   }
 
@@ -1469,10 +1466,9 @@ class InventoryPageControllerTest {
         .get(urlCaptor.capture(), anyTypeRef());
     assertTrue(
         urlCaptor.getAllValues().stream()
-            .allMatch(
-                u ->
-                    u.contains("/api/v1/inventory/my-inventory/entry-ids")
-                        && u.contains("locationIds=" + locationId)),
+            .allMatch(u ->
+                u.contains("/api/v1/inventory/my-inventory/entry-ids")
+                    && u.contains("locationIds=" + locationId)),
         "both views must relay locationIds to the select-all endpoint");
   }
 }

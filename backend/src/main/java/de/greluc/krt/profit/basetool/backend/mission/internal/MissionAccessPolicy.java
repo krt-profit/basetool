@@ -132,10 +132,9 @@ public class MissionAccessPolicy {
   public boolean canEditMission(@NotNull UUID missionId) {
     return missionRepository
         .findByIdForAuthorization(missionId)
-        .map(
-            m ->
-                m.getOwningOrgUnit() == null
-                    || ownerScopeService.canEditSquadron(m.getOwningOrgUnit().getId()))
+        .map(m ->
+            m.getOwningOrgUnit() == null
+                || ownerScopeService.canEditSquadron(m.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -390,12 +389,11 @@ public class MissionAccessPolicy {
   private static boolean hasElevatedMissionAuthority(
       @NotNull Collection<? extends GrantedAuthority> reachable) {
     return reachable.stream()
-        .anyMatch(
-            a ->
-                Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
-                    || Roles.MISSION_MANAGER.equals(a.getAuthority())
-                    || Permissions.MISSION_MANAGE.equals(a.getAuthority())
-                    || Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
+        .anyMatch(a ->
+            Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
+                || Roles.MISSION_MANAGER.equals(a.getAuthority())
+                || Permissions.MISSION_MANAGE.equals(a.getAuthority())
+                || Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
   }
 
   private boolean canSeeMissionChain(@NotNull Mission mission) {

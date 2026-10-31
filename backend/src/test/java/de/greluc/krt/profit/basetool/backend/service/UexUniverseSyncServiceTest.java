@@ -101,12 +101,11 @@ class UexUniverseSyncServiceTest {
     when(cityRepository.findByIdCity(1)).thenReturn(Optional.empty());
     when(cityRepository.findByName("Lorville")).thenReturn(Optional.empty());
     when(cityRepository.save(any(City.class)))
-        .thenAnswer(
-            invocation -> {
-              City c = invocation.getArgument(0);
-              if (c.getId() == null) c.setId(java.util.UUID.randomUUID());
-              return c;
-            });
+        .thenAnswer(invocation -> {
+          City c = invocation.getArgument(0);
+          if (c.getId() == null) c.setId(java.util.UUID.randomUUID());
+          return c;
+        });
 
     de.greluc.krt.profit.basetool.backend.catalogue.api.Location mockLocation =
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Location();
@@ -147,12 +146,11 @@ class UexUniverseSyncServiceTest {
     when(cityRepository.findByIdCity(2)).thenReturn(Optional.empty());
     when(cityRepository.findByName("Old Lorville")).thenReturn(Optional.empty());
     when(cityRepository.save(any(City.class)))
-        .thenAnswer(
-            invocation -> {
-              City c = invocation.getArgument(0);
-              if (c.getId() == null) c.setId(UUID.randomUUID());
-              return c;
-            });
+        .thenAnswer(invocation -> {
+          City c = invocation.getArgument(0);
+          if (c.getId() == null) c.setId(UUID.randomUUID());
+          return c;
+        });
 
     service.syncCities();
 
@@ -425,12 +423,11 @@ class UexUniverseSyncServiceTest {
     when(spaceStationRepository.findByIdSpaceStation(70)).thenReturn(Optional.empty());
     when(spaceStationRepository.findByName("Port Olisar")).thenReturn(Optional.empty());
     when(spaceStationRepository.save(any(SpaceStation.class)))
-        .thenAnswer(
-            i -> {
-              SpaceStation s = i.getArgument(0);
-              if (s.getId() == null) s.setId(UUID.randomUUID());
-              return s;
-            });
+        .thenAnswer(i -> {
+          SpaceStation s = i.getArgument(0);
+          if (s.getId() == null) s.setId(UUID.randomUUID());
+          return s;
+        });
     when(locationRepository.findBySpaceStationId(any())).thenReturn(Optional.empty());
     when(locationRepository.findByName("Port Olisar")).thenReturn(Optional.empty());
     when(locationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -453,12 +450,11 @@ class UexUniverseSyncServiceTest {
     when(spaceStationRepository.findByIdSpaceStation(71)).thenReturn(Optional.empty());
     when(spaceStationRepository.findByName("Decommissioned Station")).thenReturn(Optional.empty());
     when(spaceStationRepository.save(any(SpaceStation.class)))
-        .thenAnswer(
-            i -> {
-              SpaceStation s = i.getArgument(0);
-              if (s.getId() == null) s.setId(UUID.randomUUID());
-              return s;
-            });
+        .thenAnswer(i -> {
+          SpaceStation s = i.getArgument(0);
+          if (s.getId() == null) s.setId(UUID.randomUUID());
+          return s;
+        });
 
     service.syncSpaceStations();
 

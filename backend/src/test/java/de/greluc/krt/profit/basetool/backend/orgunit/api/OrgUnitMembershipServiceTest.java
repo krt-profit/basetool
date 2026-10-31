@@ -843,11 +843,10 @@ class OrgUnitMembershipServiceTest {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
     when(membershipRepository.saveAndFlush(m))
-        .thenAnswer(
-            inv -> {
-              m.setVersion(4L);
-              return m;
-            });
+        .thenAnswer(inv -> {
+          m.setVersion(4L);
+          return m;
+        });
 
     OrgUnitMembershipDto dto = membershipService.patchFlagsDto(scId, userId, request);
 
@@ -873,11 +872,10 @@ class OrgUnitMembershipServiceTest {
     when(membershipRepository.findById(new OrgUnitMembershipId(userId, squadronId)))
         .thenReturn(Optional.of(m));
     when(membershipRepository.saveAndFlush(m))
-        .thenAnswer(
-            inv -> {
-              m.setVersion(2L);
-              return m;
-            });
+        .thenAnswer(inv -> {
+          m.setVersion(2L);
+          return m;
+        });
 
     OrgUnitMembershipDto dto =
         membershipService.patchSquadronMemberFlagsDto(squadronId, userId, request);
@@ -897,11 +895,10 @@ class OrgUnitMembershipServiceTest {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
     when(membershipRepository.saveAndFlush(m))
-        .thenAnswer(
-            inv -> {
-              m.setVersion(1L);
-              return m;
-            });
+        .thenAnswer(inv -> {
+          m.setVersion(1L);
+          return m;
+        });
 
     OrgUnitMembershipDto dto = membershipService.toggleLeadDto(scId, userId, request);
 

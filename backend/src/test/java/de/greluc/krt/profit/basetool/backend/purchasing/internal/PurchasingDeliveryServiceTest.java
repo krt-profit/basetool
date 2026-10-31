@@ -158,12 +158,11 @@ class PurchasingDeliveryServiceTest {
     when(locationRepository.existsById(LOCATION)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(DELEGATE));
     when(deliveryRepository.saveAndFlush(any(PurchasingDealDelivery.class)))
-        .thenAnswer(
-            invocation -> {
-              PurchasingDealDelivery saved = invocation.getArgument(0);
-              saved.setId(DELIVERY);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          PurchasingDealDelivery saved = invocation.getArgument(0);
+          saved.setId(DELIVERY);
+          return saved;
+        });
     when(orgUnitRepository.findById(UNIT)).thenReturn(Optional.of(unit));
     when(assembler.toDto(deal)).thenReturn(dealDto);
 
@@ -429,10 +428,9 @@ class PurchasingDeliveryServiceTest {
     recorded.setVersion(1L);
     allowAcceptance(recorded);
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL, DELIVERY, new AcceptDeliveryRequest(0.0, 10.0, null, null, null, 1L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(0.0, 10.0, null, null, null, 1L)))
         .isInstanceOf(BadRequestException.class);
 
     verifyNoInteractions(stockCommands);
@@ -445,12 +443,11 @@ class PurchasingDeliveryServiceTest {
     recorded.setVersion(1L);
     allowAcceptance(recorded);
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL,
-                    DELIVERY,
-                    new AcceptDeliveryRequest(3.0, 3.0, RejectReason.OTHER, 500, LOCATION, 1L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL,
+                DELIVERY,
+                new AcceptDeliveryRequest(3.0, 3.0, RejectReason.OTHER, 500, LOCATION, 1L)))
         .isInstanceOf(BadRequestException.class);
 
     verifyNoInteractions(stockCommands);
@@ -465,10 +462,9 @@ class PurchasingDeliveryServiceTest {
     recorded.setVersion(1L);
     allowAcceptance(recorded);
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 1L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 1L)))
         .isInstanceOfSatisfying(
             PurchasingProblemException.class,
             problem ->
@@ -487,10 +483,9 @@ class PurchasingDeliveryServiceTest {
     allowAcceptance(recorded);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ACCEPTOR));
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, null, 1L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, null, 1L)))
         .isInstanceOf(BadRequestException.class);
 
     verifyNoInteractions(stockCommands);
@@ -502,10 +497,9 @@ class PurchasingDeliveryServiceTest {
     when(accessPolicy.canAcceptDeliveries(deal)).thenReturn(true);
     when(accessPolicy.isDealDelegate(deal)).thenReturn(true);
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 1L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 1L)))
         .isInstanceOfSatisfying(
             PurchasingProblemException.class,
             problem ->
@@ -521,10 +515,9 @@ class PurchasingDeliveryServiceTest {
     when(dealService.lock(DEAL)).thenReturn(deal);
     when(accessPolicy.canAcceptDeliveries(deal)).thenReturn(false);
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 1L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 1L)))
         .isInstanceOf(AccessDeniedException.class);
 
     verifyNoInteractions(deliveryRepository);
@@ -536,10 +529,9 @@ class PurchasingDeliveryServiceTest {
     recorded.setVersion(4L);
     allowAcceptance(recorded);
 
-    assertThatThrownBy(
-            () ->
-                service.accept(
-                    DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 3L)))
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, LOCATION, 3L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
     verifyNoInteractions(stockCommands);

@@ -114,14 +114,13 @@ class InventoryPoolCommandsTest {
 
   private void stubSaveAssignsAnId() {
     when(inventoryRepository.save(any(InventoryItem.class)))
-        .thenAnswer(
-            invocation -> {
-              InventoryItem item = invocation.getArgument(0);
-              if (item.getId() == null) {
-                item.setId(UUID.randomUUID());
-              }
-              return item;
-            });
+        .thenAnswer(invocation -> {
+          InventoryItem item = invocation.getArgument(0);
+          if (item.getId() == null) {
+            item.setId(UUID.randomUUID());
+          }
+          return item;
+        });
   }
 
   @Test
@@ -155,28 +154,26 @@ class InventoryPoolCommandsTest {
     material.setQuantityType(QuantityType.PIECE);
     when(userRepository.findById(HOLDER)).thenReturn(Optional.of(holder));
 
-    assertThatThrownBy(
-            () ->
-                commands.bookIntoPool(
-                    HOLDER,
-                    pool,
-                    new StockLot(material, null, location, 0, false),
-                    1.5,
-                    StockBookingReason.PURCHASE))
+    assertThatThrownBy(() ->
+            commands.bookIntoPool(
+                HOLDER,
+                pool,
+                new StockLot(material, null, location, 0, false),
+                1.5,
+                StockBookingReason.PURCHASE))
         .isInstanceOf(BadRequestException.class);
     verify(inventoryRepository, never()).save(any());
   }
 
   @Test
   void aPoolBookInRefusesANonPositiveAmount() {
-    assertThatThrownBy(
-            () ->
-                commands.bookIntoPool(
-                    HOLDER,
-                    pool,
-                    new StockLot(material, null, location, 500, false),
-                    0.0,
-                    StockBookingReason.DONATION))
+    assertThatThrownBy(() ->
+            commands.bookIntoPool(
+                HOLDER,
+                pool,
+                new StockLot(material, null, location, 500, false),
+                0.0,
+                StockBookingReason.DONATION))
         .isInstanceOf(BadRequestException.class);
   }
 
@@ -229,10 +226,9 @@ class InventoryPoolCommandsTest {
     InventoryItem source = donorRow(2.0);
     when(inventoryRepository.findById(source.getId())).thenReturn(Optional.of(source));
 
-    assertThatThrownBy(
-            () ->
-                commands.transferToPool(
-                    source.getId(), 3.0, pool, HOLDER, location, StockBookingReason.DONATION))
+    assertThatThrownBy(() ->
+            commands.transferToPool(
+                source.getId(), 3.0, pool, HOLDER, location, StockBookingReason.DONATION))
         .isInstanceOf(BadRequestException.class);
     verify(inventoryRepository, never()).save(any());
   }
@@ -244,10 +240,9 @@ class InventoryPoolCommandsTest {
     when(inventoryRepository.findById(source.getId())).thenReturn(Optional.of(source));
     when(userRepository.findById(HOLDER)).thenReturn(Optional.of(holder));
 
-    assertThatThrownBy(
-            () ->
-                commands.transferToPool(
-                    source.getId(), 4.0, pool, HOLDER, location, StockBookingReason.DONATION))
+    assertThatThrownBy(() ->
+            commands.transferToPool(
+                source.getId(), 4.0, pool, HOLDER, location, StockBookingReason.DONATION))
         .isInstanceOf(OverAllocationException.class);
     verify(inventoryRepository, never()).saveAndFlush(any());
   }

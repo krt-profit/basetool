@@ -194,20 +194,19 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
   @Transactional
   @Override
   public void recordResponsibleHolderChanges(@NotNull Map<UUID, Set<UUID>> before) {
-    before.forEach(
-        (accountId, oldHolders) -> {
-          Set<UUID> newHolders = resolveResponsibleHolderUserIds(accountId);
-          if (!oldHolders.equals(newHolders)) {
-            bankAuditService.record(
-                BankAuditEventType.ACCOUNT_RESPONSIBLE_CHANGED,
-                accountId,
-                null,
-                newHolders.size() == 1 ? newHolders.iterator().next() : null,
-                AuditDetails.of("old", joinResponsibleIds(oldHolders))
-                    .with("new", joinResponsibleIds(newHolders)));
-            announceResponsibleHolderChange(accountId, oldHolders, newHolders);
-          }
-        });
+    before.forEach((accountId, oldHolders) -> {
+      Set<UUID> newHolders = resolveResponsibleHolderUserIds(accountId);
+      if (!oldHolders.equals(newHolders)) {
+        bankAuditService.record(
+            BankAuditEventType.ACCOUNT_RESPONSIBLE_CHANGED,
+            accountId,
+            null,
+            newHolders.size() == 1 ? newHolders.iterator().next() : null,
+            AuditDetails.of("old", joinResponsibleIds(oldHolders))
+                .with("new", joinResponsibleIds(newHolders)));
+        announceResponsibleHolderChange(accountId, oldHolders, newHolders);
+      }
+    });
   }
 
   /**
@@ -238,9 +237,8 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
             open.stream()
                 .filter(BankBookingRequest::isRequiresOwnerApproval)
                 .filter(request -> !request.isOwnerApprovalGranted())
-                .filter(
-                    request ->
-                        request.getRequiredApprover() == BankRequestApprover.RESPONSIBLE_HOLDER)
+                .filter(request ->
+                    request.getRequiredApprover() == BankRequestApprover.RESPONSIBLE_HOLDER)
                 .count();
     UUID actor = authHelperService.currentUserId().orElse(null);
     for (UUID holder : added) {

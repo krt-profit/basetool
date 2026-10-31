@@ -133,77 +133,75 @@ class MissionCrewBoardTouchDragE2eTest {
    */
   @Test
   void aHeldTouchDragMovesAParticipantIntoAUnit() {
-    withCrewBoardOnAPhone(
-        page -> {
-          assertThat(page.locator("#board-pool .person-row")).hasCount(1);
-          assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(0);
+    withCrewBoardOnAPhone(page -> {
+      assertThat(page.locator("#board-pool .person-row")).hasCount(1);
+      assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(0);
 
-          pressAndHold(page, "#board-pool .person-row", 1);
-          page.evaluate(
-              VISIBLE_BOTTOM_JS
-                  + """
-                    const row = document.querySelector('#board-pool .person-row');
-                    const r = row.getBoundingClientRect();
-                    row.dispatchEvent(new PointerEvent('pointermove', {
-                      bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-                      isPrimary: true, clientX: r.left + r.width / 2, clientY: visibleBottom() - 8
-                    }));
-                  }
-                  """);
-          page.waitForFunction(
-              VISIBLE_BOTTOM_JS
-                  + """
-                    const hint = document.querySelector('.board-units .drop-zone .drop-hint');
-                    return hint.getBoundingClientRect().bottom <= visibleBottom();
-                  }
-                  """);
-          page.evaluate(
-              """
-              () => {
+      pressAndHold(page, "#board-pool .person-row", 1);
+      page.evaluate(
+          VISIBLE_BOTTOM_JS
+              + """
                 const row = document.querySelector('#board-pool .person-row');
+                const r = row.getBoundingClientRect();
+                row.dispatchEvent(new PointerEvent('pointermove', {
+                  bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+                  isPrimary: true, clientX: r.left + r.width / 2, clientY: visibleBottom() - 8
+                }));
+              }
+              """);
+      page.waitForFunction(
+          VISIBLE_BOTTOM_JS
+              + """
                 const hint = document.querySelector('.board-units .drop-zone .drop-hint');
-                const r = hint.getBoundingClientRect();
-                const x = r.left + r.width / 2;
-                const y = r.top + r.height / 2;
+                return hint.getBoundingClientRect().bottom <= visibleBottom();
+              }
+              """);
+      page.evaluate(
+          """
+          () => {
+            const row = document.querySelector('#board-pool .person-row');
+            const hint = document.querySelector('.board-units .drop-zone .drop-hint');
+            const r = hint.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            const y = r.top + r.height / 2;
+            for (const type of ['pointermove', 'pointerup']) {
+              row.dispatchEvent(new PointerEvent(type, {
+                bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+                isPrimary: true, clientX: x, clientY: y
+              }));
+            }
+          }
+          """);
+
+      assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
+      assertThat(page.locator("#board-pool .person-row")).hasCount(0);
+
+      List<String> crewDeletes = new CopyOnWriteArrayList<>();
+      page.onRequest(request -> {
+        if ("DELETE".equals(request.method()) && request.url().contains("/crew/")) {
+          crewDeletes.add(request.url());
+        }
+      });
+      pressAndHold(page, ".board-units .drop-zone .person-row", 3);
+      page.evaluate(
+          VISIBLE_BOTTOM_JS
+              + """
+                const row = document.querySelector('.board-units .drop-zone .person-row');
+                const y = (visibleBottom() + window.innerHeight) / 2;
                 for (const type of ['pointermove', 'pointerup']) {
                   row.dispatchEvent(new PointerEvent(type, {
-                    bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-                    isPrimary: true, clientX: x, clientY: y
+                    bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch',
+                    isPrimary: true, clientX: window.innerWidth / 2, clientY: y
                   }));
                 }
               }
               """);
+      page.waitForTimeout(SETTLE_WAIT_MS);
 
-          assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
-          assertThat(page.locator("#board-pool .person-row")).hasCount(0);
-
-          List<String> crewDeletes = new CopyOnWriteArrayList<>();
-          page.onRequest(
-              request -> {
-                if ("DELETE".equals(request.method()) && request.url().contains("/crew/")) {
-                  crewDeletes.add(request.url());
-                }
-              });
-          pressAndHold(page, ".board-units .drop-zone .person-row", 3);
-          page.evaluate(
-              VISIBLE_BOTTOM_JS
-                  + """
-                    const row = document.querySelector('.board-units .drop-zone .person-row');
-                    const y = (visibleBottom() + window.innerHeight) / 2;
-                    for (const type of ['pointermove', 'pointerup']) {
-                      row.dispatchEvent(new PointerEvent(type, {
-                        bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch',
-                        isPrimary: true, clientX: window.innerWidth / 2, clientY: y
-                      }));
-                    }
-                  }
-                  """);
-          page.waitForTimeout(SETTLE_WAIT_MS);
-
-          assertTrue(crewDeletes.isEmpty(), "release over the tab bar unassigned: " + crewDeletes);
-          assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
-          assertThat(page.locator("#board-pool .person-row")).hasCount(0);
-        });
+      assertTrue(crewDeletes.isEmpty(), "release over the tab bar unassigned: " + crewDeletes);
+      assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
+      assertThat(page.locator("#board-pool .person-row")).hasCount(0);
+    });
   }
 
   /**
@@ -238,48 +236,47 @@ class MissionCrewBoardTouchDragE2eTest {
    */
   @Test
   void aTouchPressOnARowSuppressesTheBrowsersLongPressMenu() {
-    withCrewBoardOnAPhone(
-        page -> {
-          @SuppressWarnings("unchecked")
-          Map<String, Object> style =
-              (Map<String, Object>)
-                  page.evaluate(
-                      """
-                      () => {
-                        const cs = getComputedStyle(document.querySelector('.person-row'));
-                        return {
-                          touchAction: cs.touchAction,
-                          userSelect: cs.userSelect || cs.webkitUserSelect,
-                          callout: cs.webkitTouchCallout || 'unsupported'
-                        };
-                      }
-                      """);
-          assertTrue(
-              String.valueOf(style.get("touchAction")).contains("pan-y"),
-              "row touch-action keeps vertical panning, was: " + style.get("touchAction"));
-          assertEquals("none", style.get("userSelect"), "row user-select");
-
-          Object prevented =
+    withCrewBoardOnAPhone(page -> {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> style =
+          (Map<String, Object>)
               page.evaluate(
                   """
                   () => {
-                    const row = document.querySelector('.person-row');
-                    const r = row.getBoundingClientRect();
-                    row.dispatchEvent(new PointerEvent('pointerdown', {
-                      bubbles: true, cancelable: true, pointerId: 2, pointerType: 'touch',
-                      isPrimary: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2
-                    }));
-                    const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
-                    row.dispatchEvent(menu);
-                    row.dispatchEvent(new PointerEvent('pointercancel', {
-                      bubbles: true, cancelable: true, pointerId: 2, pointerType: 'touch',
-                      isPrimary: true
-                    }));
-                    return menu.defaultPrevented;
+                    const cs = getComputedStyle(document.querySelector('.person-row'));
+                    return {
+                      touchAction: cs.touchAction,
+                      userSelect: cs.userSelect || cs.webkitUserSelect,
+                      callout: cs.webkitTouchCallout || 'unsupported'
+                    };
                   }
                   """);
-          assertTrue(Boolean.TRUE.equals(prevented), "contextmenu cancelled during a touch press");
-        });
+      assertTrue(
+          String.valueOf(style.get("touchAction")).contains("pan-y"),
+          "row touch-action keeps vertical panning, was: " + style.get("touchAction"));
+      assertEquals("none", style.get("userSelect"), "row user-select");
+
+      Object prevented =
+          page.evaluate(
+              """
+              () => {
+                const row = document.querySelector('.person-row');
+                const r = row.getBoundingClientRect();
+                row.dispatchEvent(new PointerEvent('pointerdown', {
+                  bubbles: true, cancelable: true, pointerId: 2, pointerType: 'touch',
+                  isPrimary: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2
+                }));
+                const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+                row.dispatchEvent(menu);
+                row.dispatchEvent(new PointerEvent('pointercancel', {
+                  bubbles: true, cancelable: true, pointerId: 2, pointerType: 'touch',
+                  isPrimary: true
+                }));
+                return menu.defaultPrevented;
+              }
+              """);
+      assertTrue(Boolean.TRUE.equals(prevented), "contextmenu cancelled during a touch press");
+    });
   }
 
   /**

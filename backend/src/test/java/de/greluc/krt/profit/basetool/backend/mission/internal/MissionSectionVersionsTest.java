@@ -72,10 +72,9 @@ class MissionSectionVersionsTest {
   void staleEchoIsAConflict() {
     when(repository.bumpCoreVersionIfMatches(eq(MISSION_ID), anyLong())).thenReturn(0);
 
-    assertThatThrownBy(
-            () ->
-                MissionSectionVersions.enforceSectionVersion(
-                    repository, mission, MissionSection.CORE, 6L, MISSION_ID))
+    assertThatThrownBy(() ->
+            MissionSectionVersions.enforceSectionVersion(
+                repository, mission, MissionSection.CORE, 6L, MISSION_ID))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     assertThat(mission.getCoreVersion()).isEqualTo(7L);
   }
@@ -85,10 +84,9 @@ class MissionSectionVersionsTest {
   void maxValueEchoDoesNotWrapTheCounter() {
     when(repository.bumpCoreVersionIfMatches(MISSION_ID, Long.MAX_VALUE)).thenReturn(1);
 
-    assertThatThrownBy(
-            () ->
-                MissionSectionVersions.enforceSectionVersion(
-                    repository, mission, MissionSection.CORE, Long.MAX_VALUE, MISSION_ID))
+    assertThatThrownBy(() ->
+            MissionSectionVersions.enforceSectionVersion(
+                repository, mission, MissionSection.CORE, Long.MAX_VALUE, MISSION_ID))
         .isInstanceOf(ArithmeticException.class);
     assertThat(mission.getCoreVersion()).isEqualTo(7L);
   }

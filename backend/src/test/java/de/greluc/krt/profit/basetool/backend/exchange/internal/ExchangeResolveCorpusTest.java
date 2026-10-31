@@ -148,10 +148,8 @@ class ExchangeResolveCorpusTest {
             new ExchangeResolveRequest(
                 ExchangeCatalogKind.BLUEPRINT,
                 entries.stream()
-                    .map(
-                        e ->
-                            new ExchangeItemRef(
-                                null, null, null, null, null, e.externalName(), null))
+                    .map(e ->
+                        new ExchangeItemRef(null, null, null, null, null, e.externalName(), null))
                     .toList()));
 
     assertThat(entries).hasSize(31);

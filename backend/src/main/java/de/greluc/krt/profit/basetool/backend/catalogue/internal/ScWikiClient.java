@@ -500,17 +500,16 @@ public class ScWikiClient {
           client
               .get()
               .uri(endpoint + "/{id}", id)
-              .exchange(
-                  (_, response) -> {
-                    int status = response.getStatusCode().value();
-                    if (status == 404 || status == 304) {
-                      return null;
-                    }
-                    if (!response.getStatusCode().is2xxSuccessful()) {
-                      throw response.createException();
-                    }
-                    return response.bodyTo(String.class);
-                  });
+              .exchange((_, response) -> {
+                int status = response.getStatusCode().value();
+                if (status == 404 || status == 304) {
+                  return null;
+                }
+                if (!response.getStatusCode().is2xxSuccessful()) {
+                  throw response.createException();
+                }
+                return response.bodyTo(String.class);
+              });
     } catch (RuntimeException e) {
       log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
       recordFetchErrorOnce(errorLatch);
@@ -554,25 +553,24 @@ public class ScWikiClient {
       request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
     }
     try {
-      return request.exchangeForRequiredValue(
-          (_, response) -> {
-            int status = response.getStatusCode().value();
-            if (status == 304) {
-              log.debug(
-                  "SC Wiki {} page unchanged since last sync (304 Not Modified) — skipping.",
-                  resourceLabel);
-              return PageOutcome.<T>unchanged();
-            }
-            if (!response.getStatusCode().is2xxSuccessful()) {
-              throw response.createException();
-            }
-            String etag = response.getHeaders().getETag();
-            if (etag != null && !etag.isBlank()) {
-              etagByFirstPageUri.put(requestUri, etag);
-            }
-            ScWikiResponseDto<T> body = response.bodyTo(typeRef);
-            return body == null ? PageOutcome.<T>error() : PageOutcome.ok(body);
-          });
+      return request.exchangeForRequiredValue((_, response) -> {
+        int status = response.getStatusCode().value();
+        if (status == 304) {
+          log.debug(
+              "SC Wiki {} page unchanged since last sync (304 Not Modified) — skipping.",
+              resourceLabel);
+          return PageOutcome.<T>unchanged();
+        }
+        if (!response.getStatusCode().is2xxSuccessful()) {
+          throw response.createException();
+        }
+        String etag = response.getHeaders().getETag();
+        if (etag != null && !etag.isBlank()) {
+          etagByFirstPageUri.put(requestUri, etag);
+        }
+        ScWikiResponseDto<T> body = response.bodyTo(typeRef);
+        return body == null ? PageOutcome.<T>error() : PageOutcome.ok(body);
+      });
     } catch (RuntimeException e) {
       log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
       recordFetchErrorOnce(errorLatch);

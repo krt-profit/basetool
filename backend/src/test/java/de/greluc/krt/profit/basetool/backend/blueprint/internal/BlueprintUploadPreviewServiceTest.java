@@ -101,13 +101,12 @@ class BlueprintUploadPreviewServiceTest {
 
   @Test
   void anEnvelopeOfAnotherMajorVersionIsRefused() {
-    assertThatThrownBy(
-            () ->
-                service.preview(
-                    OWNER,
-                    file(
-                        "{\"format\":\"basetool.blueprints\",\"formatVersion\":\"2.0\","
-                            + "\"items\":[]}")))
+    assertThatThrownBy(() ->
+            service.preview(
+                OWNER,
+                file(
+                    "{\"format\":\"basetool.blueprints\",\"formatVersion\":\"2.0\","
+                        + "\"items\":[]}")))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.personalBlueprint.formatVersionUnsupported");
     verifyNoInteractions(draftService, importService);

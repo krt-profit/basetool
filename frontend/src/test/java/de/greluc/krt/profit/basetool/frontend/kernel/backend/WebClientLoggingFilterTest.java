@@ -113,12 +113,11 @@ class WebClientLoggingFilterTest {
     wc.get().uri("/api/v1/ok").retrieve().toBodilessEntity().block();
 
     assertThat(appender.list)
-        .anyMatch(
-            e ->
-                e.getLevel() == Level.INFO
-                    && e.getFormattedMessage().contains("GET")
-                    && e.getFormattedMessage().contains("/api/v1/ok")
-                    && e.getFormattedMessage().contains("-> 200"));
+        .anyMatch(e ->
+            e.getLevel() == Level.INFO
+                && e.getFormattedMessage().contains("GET")
+                && e.getFormattedMessage().contains("/api/v1/ok")
+                && e.getFormattedMessage().contains("-> 200"));
   }
 
   @Test
@@ -137,12 +136,11 @@ class WebClientLoggingFilterTest {
 
     assertThat(appender.list).noneMatch(e -> e.getLevel() == Level.WARN);
     assertThat(appender.list)
-        .anyMatch(
-            e ->
-                e.getLevel() == Level.INFO
-                    && e.getFormattedMessage().contains("Slow backend call")
-                    && e.getFormattedMessage().contains("/api/v1/users/sync")
-                    && e.getFormattedMessage().contains("-> 200"));
+        .anyMatch(e ->
+            e.getLevel() == Level.INFO
+                && e.getFormattedMessage().contains("Slow backend call")
+                && e.getFormattedMessage().contains("/api/v1/users/sync")
+                && e.getFormattedMessage().contains("-> 200"));
   }
 
   @Test
@@ -184,11 +182,10 @@ class WebClientLoggingFilterTest {
     }
 
     assertThat(appender.list)
-        .anyMatch(
-            e ->
-                e.getLevel() == Level.DEBUG
-                    && e.getFormattedMessage().contains("/api/v1/blocked")
-                    && e.getFormattedMessage().contains("short-circuited"));
+        .anyMatch(e ->
+            e.getLevel() == Level.DEBUG
+                && e.getFormattedMessage().contains("/api/v1/blocked")
+                && e.getFormattedMessage().contains("short-circuited"));
     assertThat(appender.list)
         .noneMatch(
             e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("/api/v1/blocked"));

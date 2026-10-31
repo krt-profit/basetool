@@ -116,14 +116,13 @@ class MissionLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
-                            + missionId
-                            + "') !== -1)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
+                        + missionId
+                        + "') !== -1)")));
 
         pageA.locator("#add-participant-btn").click();
         assertThat(pageA.locator("#participant-modal")).isVisible();
@@ -178,14 +177,13 @@ class MissionLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
-                            + missionId
-                            + "') !== -1)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
+                        + missionId
+                        + "') !== -1)")));
 
         pageA.locator("#mission-objective-add").click();
         assertThat(pageA.locator("#mission-objective-list .ae-row"))

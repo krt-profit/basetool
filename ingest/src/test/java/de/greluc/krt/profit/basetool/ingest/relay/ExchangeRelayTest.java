@@ -131,12 +131,11 @@ class ExchangeRelayTest {
   @Test
   void theBackendsGenericRefusalBecomesNotPermitted() {
     assertThat(interpret(403, "{\"code\":\"ACCESS_DENIED\",\"detail\":\"no\"}"))
-        .satisfies(
-            r -> {
-              assertThat(r.status()).isEqualTo(403);
-              assertThat(r.code()).isEqualTo("NOT_PERMITTED");
-              assertThat(r.detail()).isEqualTo(ExchangeRelay.DETAILS.get("NOT_PERMITTED"));
-            });
+        .satisfies(r -> {
+          assertThat(r.status()).isEqualTo(403);
+          assertThat(r.code()).isEqualTo("NOT_PERMITTED");
+          assertThat(r.detail()).isEqualTo(ExchangeRelay.DETAILS.get("NOT_PERMITTED"));
+        });
     assertThat(interpret(400, "{\"code\":\"VALIDATION_FAILED\"}").code())
         .isEqualTo("SCHEMA_INVALID");
     assertThat(interpret(400, "{\"code\":\"BAD_REQUEST\"}").code()).isEqualTo("SCHEMA_INVALID");
@@ -304,10 +303,9 @@ class ExchangeRelayTest {
   void anUnreachableBackendIsARelayFailureAndCounted() {
     backend
         .expect(requestTo("https://backend/api/v1/exchange/catalog/locations"))
-        .andRespond(
-            request -> {
-              throw new IOException("connection refused");
-            });
+        .andRespond(request -> {
+          throw new IOException("connection refused");
+        });
 
     ExchangeRelay.Result result =
         relay.forward(HttpMethod.GET, "/api/v1/exchange/catalog/locations", null, context(), null);

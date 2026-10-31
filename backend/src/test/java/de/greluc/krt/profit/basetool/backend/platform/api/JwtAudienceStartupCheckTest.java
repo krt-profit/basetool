@@ -39,11 +39,10 @@ class JwtAudienceStartupCheckTest {
    */
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
-          .withInitializer(
-              context ->
-                  context
-                      .getBeanFactory()
-                      .setConversionService(ApplicationConversionService.getSharedInstance()))
+          .withInitializer(context ->
+              context
+                  .getBeanFactory()
+                  .setConversionService(ApplicationConversionService.getSharedInstance()))
           .withUserConfiguration(JwtAudienceStartupCheck.class);
 
   /**
@@ -52,23 +51,21 @@ class JwtAudienceStartupCheckTest {
    * @return a runner whose context runs under {@code prod}
    */
   private ApplicationContextRunner prodRunner() {
-    return runner.withInitializer(
-        context ->
-            context.getEnvironment().setActiveProfiles(JwtAudienceStartupCheck.PROD_PROFILE));
+    return runner.withInitializer(context ->
+        context.getEnvironment().setActiveProfiles(JwtAudienceStartupCheck.PROD_PROFILE));
   }
 
   @Test
   void prod_blankAudiences_refusesToStart() {
     prodRunner()
         .withPropertyValues("app.security.jwt.expected-audiences=")
-        .run(
-            context ->
-                assertThat(context)
-                    .hasFailed()
-                    .getFailure()
-                    .rootCause()
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("BASETOOL_BACKEND_EXPECTED_AUDIENCES"));
+        .run(context ->
+            assertThat(context)
+                .hasFailed()
+                .getFailure()
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("BASETOOL_BACKEND_EXPECTED_AUDIENCES"));
   }
 
   @Test
@@ -87,32 +84,29 @@ class JwtAudienceStartupCheckTest {
   void prod_withAudience_startsAndExposesTrimmedList() {
     prodRunner()
         .withPropertyValues("app.security.jwt.expected-audiences= basetool-backend ")
-        .run(
-            context -> {
-              assertThat(context).hasNotFailed();
-              assertThat(context.getBean(JwtAudienceStartupCheck.class).getAudiences())
-                  .containsExactly("basetool-backend");
-            });
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context.getBean(JwtAudienceStartupCheck.class).getAudiences())
+              .containsExactly("basetool-backend");
+        });
   }
 
   @Test
   void prod_commaList_bindsEveryAudience() {
     prodRunner()
         .withPropertyValues("app.security.jwt.expected-audiences=basetool-backend,account")
-        .run(
-            context ->
-                assertThat(context.getBean(JwtAudienceStartupCheck.class).getAudiences())
-                    .containsExactly("basetool-backend", "account"));
+        .run(context ->
+            assertThat(context.getBean(JwtAudienceStartupCheck.class).getAudiences())
+                .containsExactly("basetool-backend", "account"));
   }
 
   @Test
   void nonProd_blankAudiences_startsWithCheckOff() {
     runner
         .withPropertyValues("app.security.jwt.expected-audiences=")
-        .run(
-            context -> {
-              assertThat(context).hasNotFailed();
-              assertThat(context.getBean(JwtAudienceStartupCheck.class).getAudiences()).isEmpty();
-            });
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context.getBean(JwtAudienceStartupCheck.class).getAudiences()).isEmpty();
+        });
   }
 }

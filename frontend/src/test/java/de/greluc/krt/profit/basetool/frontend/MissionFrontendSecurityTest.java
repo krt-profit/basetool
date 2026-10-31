@@ -95,11 +95,10 @@ class MissionFrontendSecurityTest {
     mockMvc
         .perform(get("/missions"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(
-            result ->
-                org.assertj.core.api.Assertions.assertThat(result.getResponse().getRedirectedUrl())
-                    .as("an anonymous navigation is sent into the OAuth2 entry point")
-                    .contains("/oauth2/authorization/keycloak"));
+        .andExpect(result ->
+            org.assertj.core.api.Assertions.assertThat(result.getResponse().getRedirectedUrl())
+                .as("an anonymous navigation is sent into the OAuth2 entry point")
+                .contains("/oauth2/authorization/keycloak"));
   }
 
   @Test

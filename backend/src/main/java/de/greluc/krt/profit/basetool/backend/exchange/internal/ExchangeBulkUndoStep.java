@@ -73,16 +73,15 @@ public class ExchangeBulkUndoStep {
             run.getId());
     List<ExchangeBulkUndoSkip> skips =
         outcome.skipped().stream()
-            .map(
-                skipped ->
-                    ExchangeBulkUndoSkip.builder()
-                        .id(UUID.randomUUID())
-                        .runId(run.getId())
-                        .userId(member)
-                        .journalEntryId(skipped.journalEntryId())
-                        .resource(skipped.resource())
-                        .reason(skipped.reason())
-                        .build())
+            .map(skipped ->
+                ExchangeBulkUndoSkip.builder()
+                    .id(UUID.randomUUID())
+                    .runId(run.getId())
+                    .userId(member)
+                    .journalEntryId(skipped.journalEntryId())
+                    .resource(skipped.resource())
+                    .reason(skipped.reason())
+                    .build())
             .toList();
     skipRepository.saveAll(skips);
     runRepository.addProgress(run.getId(), outcome.restored(), skips.size(), 0);

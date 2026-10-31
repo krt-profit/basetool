@@ -199,12 +199,11 @@ class ConnectedAppsControllerTest {
             notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(
                 MEMBER, PageRequest.of(0, 10)))
         .singleElement()
-        .satisfies(
-            n -> {
-              assertThat(n.getType()).isEqualTo(NotificationType.EXCHANGE_INSTALLATION_CONNECTED);
-              assertThat(n.getEntityId()).isEqualTo(mine.getId());
-              assertThat(n.getParams()).contains("VerseKit").doesNotContain("Desktop");
-            });
+        .satisfies(n -> {
+          assertThat(n.getType()).isEqualTo(NotificationType.EXCHANGE_INSTALLATION_CONNECTED);
+          assertThat(n.getEntityId()).isEqualTo(mine.getId());
+          assertThat(n.getParams()).contains("VerseKit").doesNotContain("Desktop");
+        });
     assertThat(notificationRepository.countByRecipientUserIdAndReadFalse(OTHER)).isZero();
     mockMvc
         .perform(get(PATH).with(browser(MEMBER)))
@@ -227,12 +226,11 @@ class ConnectedAppsControllerTest {
     assertThat(installationRepository.findById(mine.getId()).orElseThrow().getRevokedAt())
         .isNotNull();
     assertThat(auditEventRepository.findAll())
-        .anyMatch(
-            e ->
-                e.getDomain() == AuditDomain.CONNECTED_APPS
-                    && e.getEventType() == AuditEventType.EXCHANGE_INSTALLATION_DISCONNECTED
-                    && mine.getId().equals(e.getSubjectId())
-                    && (e.getDetails() == null || !e.getDetails().contains("Desktop")));
+        .anyMatch(e ->
+            e.getDomain() == AuditDomain.CONNECTED_APPS
+                && e.getEventType() == AuditEventType.EXCHANGE_INSTALLATION_DISCONNECTED
+                && mine.getId().equals(e.getSubjectId())
+                && (e.getDetails() == null || !e.getDetails().contains("Desktop")));
     mockMvc.perform(get(PATH).with(browser(MEMBER))).andExpect(jsonPath("$.length()").value(0));
   }
 

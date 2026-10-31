@@ -55,6 +55,6 @@ class FrontendPropertiesValidationTest {
             "app.http.response-timeout=5s",
             "app.http.read-timeout=5s",
             "app.http.write-timeout=5s")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 }

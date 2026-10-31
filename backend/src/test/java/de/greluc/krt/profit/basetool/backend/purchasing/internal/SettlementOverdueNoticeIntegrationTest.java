@@ -103,14 +103,13 @@ class SettlementOverdueNoticeIntegrationTest {
   @AfterEach
   void restoreTheSwitchAndTheAreas() {
     systemSettings.putSettingValue("purchasing.enabled", switchBefore);
-    transactionTemplate.executeWithoutResult(
-        _ -> {
-          PurchasingSetting setting =
-              settingRepository.findById(PurchasingSetting.SINGLETON_ID).orElseThrow();
-          setting.getGoverningAreaIds().clear();
-          setting.getGoverningAreaIds().addAll(areasBefore);
-          settingRepository.save(setting);
-        });
+    transactionTemplate.executeWithoutResult(_ -> {
+      PurchasingSetting setting =
+          settingRepository.findById(PurchasingSetting.SINGLETON_ID).orElseThrow();
+      setting.getGoverningAreaIds().clear();
+      setting.getGoverningAreaIds().addAll(areasBefore);
+      settingRepository.save(setting);
+    });
   }
 
   @Test
@@ -124,13 +123,12 @@ class SettlementOverdueNoticeIntegrationTest {
     Organisationsleitung ol =
         organisationsleitungRepository.findAll().stream()
             .findFirst()
-            .orElseGet(
-                () -> {
-                  Organisationsleitung created = new Organisationsleitung();
-                  created.setName("OL overdue probe " + suffix);
-                  created.setShorthand("OV" + suffix.substring(0, 4));
-                  return organisationsleitungRepository.save(created);
-                });
+            .orElseGet(() -> {
+              Organisationsleitung created = new Organisationsleitung();
+              created.setName("OL overdue probe " + suffix);
+              created.setShorthand("OV" + suffix.substring(0, 4));
+              return organisationsleitungRepository.save(created);
+            });
     Bereich area = new Bereich();
     area.setName("Overdue Bereich " + suffix);
     area.setShorthand("OB" + suffix.substring(0, 4));
@@ -141,14 +139,13 @@ class SettlementOverdueNoticeIntegrationTest {
     member(operator, area, MembershipRole.BEREICHSOPERATOR);
 
     UUID areaId = area.getId();
-    transactionTemplate.executeWithoutResult(
-        _ -> {
-          PurchasingSetting setting =
-              settingRepository.findById(PurchasingSetting.SINGLETON_ID).orElseThrow();
-          setting.getGoverningAreaIds().clear();
-          setting.getGoverningAreaIds().add(areaId);
-          settingRepository.save(setting);
-        });
+    transactionTemplate.executeWithoutResult(_ -> {
+      PurchasingSetting setting =
+          settingRepository.findById(PurchasingSetting.SINGLETON_ID).orElseThrow();
+      setting.getGoverningAreaIds().clear();
+      setting.getGoverningAreaIds().add(areaId);
+      settingRepository.save(setting);
+    });
     systemSettings.putSettingValue("purchasing.enabled", "true");
 
     PurchasingDeal deal = overdueDeal(delegate, suffix);

@@ -107,15 +107,13 @@ class BackendApiClientResilienceTest {
                 .counter()
                 .count());
         assertThat(appender.list)
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.DEBUG
-                        && e.getFormattedMessage().contains("Circuit breaker open"));
+            .anyMatch(e ->
+                e.getLevel() == Level.DEBUG
+                    && e.getFormattedMessage().contains("Circuit breaker open"));
         assertThat(appender.list)
-            .noneMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("Circuit breaker open"));
+            .noneMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("Circuit breaker open"));
       } finally {
         clientLogger.detachAppender(appender);
         clientLogger.setLevel(originalLevel);

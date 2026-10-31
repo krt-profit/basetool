@@ -47,14 +47,13 @@ public record ItemCollectionGroup(
   @Contract(pure = true)
   public static List<ItemCollectionGroup> of(@NotNull List<JobOrderItemStockGroupDto> stock) {
     return stock.stream()
-        .map(
-            group ->
-                new ItemCollectionGroup(
-                    group,
-                    CollectionProgress.of(
-                        group.entries() == null ? List.of() : group.entries(),
-                        JobOrderItemStockEntryDto::allocatedQuantity,
-                        JobOrderItemStockEntryDto::delivered)))
+        .map(group ->
+            new ItemCollectionGroup(
+                group,
+                CollectionProgress.of(
+                    group.entries() == null ? List.of() : group.entries(),
+                    JobOrderItemStockEntryDto::allocatedQuantity,
+                    JobOrderItemStockEntryDto::delivered)))
         .toList();
   }
 

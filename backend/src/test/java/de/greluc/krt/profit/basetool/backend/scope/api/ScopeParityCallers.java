@@ -150,18 +150,17 @@ public final class ScopeParityCallers {
 
     OrgUnitCascadeService cascade = mock(OrgUnitCascadeService.class);
     when(cascade.expandWithDescendants(anyCollection()))
-        .thenAnswer(
-            invocation -> {
-              Collection<OrgUnitMembership> given = invocation.getArgument(0);
-              Set<UUID> ids = new LinkedHashSet<>();
-              for (OrgUnitMembership row : given) {
-                ids.add(row.getId().getOrgUnitId());
-                if (row.getId().getOrgUnitId().equals(units.bereichX())) {
-                  ids.add(units.childC());
-                }
-              }
-              return ids;
-            });
+        .thenAnswer(invocation -> {
+          Collection<OrgUnitMembership> given = invocation.getArgument(0);
+          Set<UUID> ids = new LinkedHashSet<>();
+          for (OrgUnitMembership row : given) {
+            ids.add(row.getId().getOrgUnitId());
+            if (row.getId().getOrgUnitId().equals(units.bereichX())) {
+              ids.add(units.childC());
+            }
+          }
+          return ids;
+        });
 
     MockHttpServletRequest request = new MockHttpServletRequest();
     if (caller.pin() != null) {

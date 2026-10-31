@@ -424,11 +424,10 @@ public class OrgChartService implements MembershipChangeObserver {
   public void onKommandoGroupUpdated(@NotNull KommandoGroup group) {
     positionRepository
         .findByKommandoGroupId(group.getId())
-        .ifPresent(
-            command -> {
-              command.setName(group.getName());
-              command.setSortIndex(group.getSortIndex());
-            });
+        .ifPresent(command -> {
+          command.setName(group.getName());
+          command.setSortIndex(group.getSortIndex());
+        });
   }
 
   /**
@@ -635,11 +634,10 @@ public class OrgChartService implements MembershipChangeObserver {
   private String effectiveName(@NotNull UUID userId) {
     return userRepository
         .findById(userId)
-        .map(
-            user ->
-                user.getDisplayName() != null && !user.getDisplayName().isBlank()
-                    ? user.getDisplayName()
-                    : user.getUsername())
+        .map(user ->
+            user.getDisplayName() != null && !user.getDisplayName().isBlank()
+                ? user.getDisplayName()
+                : user.getUsername())
         .orElse(null);
   }
 
@@ -655,16 +653,15 @@ public class OrgChartService implements MembershipChangeObserver {
       @NotNull UUID squadronId, @NotNull KommandoGroup group) {
     return positionRepository
         .findByKommandoGroupId(group.getId())
-        .orElseGet(
-            () -> {
-              OrgChartPosition command = new OrgChartPosition();
-              command.setPositionType(OrgChartPositionType.COMMAND_LEAD);
-              command.setOrgUnit(orgUnitReference(squadronId));
-              command.setKommandoGroup(group);
-              command.setName(group.getName());
-              command.setSortIndex(group.getSortIndex());
-              return positionRepository.save(command);
-            });
+        .orElseGet(() -> {
+          OrgChartPosition command = new OrgChartPosition();
+          command.setPositionType(OrgChartPositionType.COMMAND_LEAD);
+          command.setOrgUnit(orgUnitReference(squadronId));
+          command.setKommandoGroup(group);
+          command.setName(group.getName());
+          command.setSortIndex(group.getSortIndex());
+          return positionRepository.save(command);
+        });
   }
 
   /**

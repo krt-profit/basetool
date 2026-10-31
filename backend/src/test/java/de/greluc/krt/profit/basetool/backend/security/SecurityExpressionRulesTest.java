@@ -127,14 +127,13 @@ class SecurityExpressionRulesTest {
     assertThat(total)
         .as("bean references in security expressions (per bean: %s)", counts)
         .isGreaterThanOrEqualTo(floor);
-    REFERENCE_FLOORS.forEach(
-        (bean, minimum) ->
-            assertThat(counts.getOrDefault(bean, 0))
-                .as(
-                    "references to @%s dropped below %d: a gate lost its bean check. If that is"
-                        + " intended, lower the floor in the same change and say why",
-                    bean, minimum)
-                .isGreaterThanOrEqualTo(minimum));
+    REFERENCE_FLOORS.forEach((bean, minimum) ->
+        assertThat(counts.getOrDefault(bean, 0))
+            .as(
+                "references to @%s dropped below %d: a gate lost its bean check. If that is"
+                    + " intended, lower the floor in the same change and say why",
+                bean, minimum)
+            .isGreaterThanOrEqualTo(minimum));
   }
 
   @Test

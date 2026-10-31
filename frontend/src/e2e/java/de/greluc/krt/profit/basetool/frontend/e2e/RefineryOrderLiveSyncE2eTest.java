@@ -124,12 +124,11 @@ class RefineryOrderLiveSyncE2eTest {
         pageA.evaluate("window.__krtNoReload = true;");
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().length > 0)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
         E2eSupport.selectComboboxFirstOption(
             pageA.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"));

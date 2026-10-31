@@ -102,10 +102,8 @@ class AnonymousSurfaceSweepMvcTest {
    */
   private List<Call> allCalls() {
     return EndpointEnumeration.mappings(context).stream()
-        .filter(
-            call ->
-                NOT_SWEPT.stream()
-                    .noneMatch(root -> EndpointEnumeration.isUnder(call.path(), root)))
+        .filter(call ->
+            NOT_SWEPT.stream().noneMatch(root -> EndpointEnumeration.isUnder(call.path(), root)))
         .toList();
   }
 

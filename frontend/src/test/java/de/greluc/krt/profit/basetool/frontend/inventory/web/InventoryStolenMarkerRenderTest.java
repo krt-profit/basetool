@@ -148,26 +148,24 @@ class InventoryStolenMarkerRenderTest {
 
   private void stubGrouped(String pathFragment, GroupedInventoryDto group) {
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains(pathFragment)) {
-                return List.of(group);
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains(pathFragment)) {
+            return List.of(group);
+          }
+          return Collections.emptyList();
+        });
   }
 
   private void stubEntries(String pathFragment, InventoryItemDto item) {
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains(pathFragment)) {
-                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
-              }
-              return Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains(pathFragment)) {
+            return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+          }
+          return Collections.emptyList();
+        });
   }
 
   @Test

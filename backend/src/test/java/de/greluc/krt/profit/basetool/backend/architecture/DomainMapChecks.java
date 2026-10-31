@@ -51,13 +51,12 @@ public final class DomainMapChecks {
       @NotNull DomainMap map, @NotNull Collection<JavaClass> subjects) {
     return subjects.stream()
         .filter(subject -> map.ruleFor(subject.getName()).isEmpty())
-        .map(
-            subject ->
-                subject.getName()
-                    + " is in no module: add 'class "
-                    + subject.getSimpleName()
-                    + " <module> <reason>' or a matching name rule to "
-                    + DomainMap.SOURCE_PATH)
+        .map(subject ->
+            subject.getName()
+                + " is in no module: add 'class "
+                + subject.getSimpleName()
+                + " <module> <reason>' or a matching name rule to "
+                + DomainMap.SOURCE_PATH)
         .sorted()
         .toList();
   }

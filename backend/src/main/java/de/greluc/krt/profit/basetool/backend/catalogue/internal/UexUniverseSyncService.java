@@ -110,22 +110,19 @@ public class UexUniverseSyncService {
             City entity =
                 cityRepository
                     .findByIdCity(dto.id())
-                    .orElseGet(
-                        () ->
-                            cityRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdCity(dto.id());
-                                      return cityRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      City n = new City();
-                                      n.setIdCity(dto.id());
-                                      n.setName(dto.name());
-                                      return cityRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        cityRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdCity(dto.id());
+                              return cityRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              City n = new City();
+                              n.setIdCity(dto.id());
+                              n.setName(dto.name());
+                              return cityRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -165,22 +162,19 @@ public class UexUniverseSyncService {
               Location location =
                   locationRepository
                       .findByCityId(entity.getId())
-                      .orElseGet(
-                          () ->
-                              locationRepository
-                                  .findByName(entity.getName())
-                                  .map(
-                                      l -> {
-                                        l.setCity(entity);
-                                        return l;
-                                      })
-                                  .orElseGet(
-                                      () -> {
-                                        Location l = new Location();
-                                        l.setName(entity.getName());
-                                        l.setCity(entity);
-                                        return l;
-                                      }));
+                      .orElseGet(() ->
+                          locationRepository
+                              .findByName(entity.getName())
+                              .map(l -> {
+                                l.setCity(entity);
+                                return l;
+                              })
+                              .orElseGet(() -> {
+                                Location l = new Location();
+                                l.setName(entity.getName());
+                                l.setCity(entity);
+                                return l;
+                              }));
               location.setName(entity.getName());
               locationRepository.save(location);
             }
@@ -220,22 +214,19 @@ public class UexUniverseSyncService {
             Faction entity =
                 factionRepository
                     .findByIdFaction(dto.id())
-                    .orElseGet(
-                        () ->
-                            factionRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdFaction(dto.id());
-                                      return factionRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Faction n = new Faction();
-                                      n.setIdFaction(dto.id());
-                                      n.setName(dto.name());
-                                      return factionRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        factionRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdFaction(dto.id());
+                              return factionRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Faction n = new Faction();
+                              n.setIdFaction(dto.id());
+                              n.setName(dto.name());
+                              return factionRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setWiki(dto.wiki());
             entity.setIsPiracy(dto.checkIsPiracy());
@@ -278,22 +269,19 @@ public class UexUniverseSyncService {
             Jurisdiction entity =
                 jurisdictionRepository
                     .findByIdJurisdiction(dto.id())
-                    .orElseGet(
-                        () ->
-                            jurisdictionRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdJurisdiction(dto.id());
-                                      return jurisdictionRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Jurisdiction n = new Jurisdiction();
-                                      n.setIdJurisdiction(dto.id());
-                                      n.setName(dto.name());
-                                      return jurisdictionRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        jurisdictionRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdJurisdiction(dto.id());
+                              return jurisdictionRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Jurisdiction n = new Jurisdiction();
+                              n.setIdJurisdiction(dto.id());
+                              n.setName(dto.name());
+                              return jurisdictionRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
@@ -334,22 +322,19 @@ public class UexUniverseSyncService {
             Moon entity =
                 moonRepository
                     .findByIdMoon(dto.id())
-                    .orElseGet(
-                        () ->
-                            moonRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdMoon(dto.id());
-                                      return moonRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Moon n = new Moon();
-                                      n.setIdMoon(dto.id());
-                                      n.setName(dto.name());
-                                      return moonRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        moonRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdMoon(dto.id());
+                              return moonRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Moon n = new Moon();
+                              n.setIdMoon(dto.id());
+                              n.setName(dto.name());
+                              return moonRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -395,22 +380,19 @@ public class UexUniverseSyncService {
             Orbit entity =
                 orbitRepository
                     .findByIdOrbit(dto.id())
-                    .orElseGet(
-                        () ->
-                            orbitRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdOrbit(dto.id());
-                                      return orbitRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Orbit n = new Orbit();
-                                      n.setIdOrbit(dto.id());
-                                      n.setName(dto.name());
-                                      return orbitRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        orbitRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdOrbit(dto.id());
+                              return orbitRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Orbit n = new Orbit();
+                              n.setIdOrbit(dto.id());
+                              n.setName(dto.name());
+                              return orbitRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -455,22 +437,19 @@ public class UexUniverseSyncService {
             Outpost entity =
                 outpostRepository
                     .findByIdOutpost(dto.id())
-                    .orElseGet(
-                        () ->
-                            outpostRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdOutpost(dto.id());
-                                      return outpostRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Outpost n = new Outpost();
-                                      n.setIdOutpost(dto.id());
-                                      n.setName(dto.name());
-                                      return outpostRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        outpostRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdOutpost(dto.id());
+                              return outpostRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Outpost n = new Outpost();
+                              n.setIdOutpost(dto.id());
+                              n.setName(dto.name());
+                              return outpostRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
@@ -541,22 +520,19 @@ public class UexUniverseSyncService {
             Planet entity =
                 planetRepository
                     .findByIdPlanet(dto.id())
-                    .orElseGet(
-                        () ->
-                            planetRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdPlanet(dto.id());
-                                      return planetRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Planet n = new Planet();
-                                      n.setIdPlanet(dto.id());
-                                      n.setName(dto.name());
-                                      return planetRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        planetRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdPlanet(dto.id());
+                              return planetRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Planet n = new Planet();
+                              n.setIdPlanet(dto.id());
+                              n.setName(dto.name());
+                              return planetRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -605,22 +581,19 @@ public class UexUniverseSyncService {
             Poi entity =
                 poiRepository
                     .findByIdPoi(dto.id())
-                    .orElseGet(
-                        () ->
-                            poiRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdPoi(dto.id());
-                                      return poiRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Poi n = new Poi();
-                                      n.setIdPoi(dto.id());
-                                      n.setName(dto.name());
-                                      return poiRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        poiRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdPoi(dto.id());
+                              return poiRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Poi n = new Poi();
+                              n.setIdPoi(dto.id());
+                              n.setName(dto.name());
+                              return poiRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
@@ -695,22 +668,19 @@ public class UexUniverseSyncService {
             SpaceStation entity =
                 spacestationRepository
                     .findByIdSpaceStation(dto.id())
-                    .orElseGet(
-                        () ->
-                            spacestationRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdSpaceStation(dto.id());
-                                      return spacestationRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      SpaceStation n = new SpaceStation();
-                                      n.setIdSpaceStation(dto.id());
-                                      n.setName(dto.name());
-                                      return spacestationRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        spacestationRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdSpaceStation(dto.id());
+                              return spacestationRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              SpaceStation n = new SpaceStation();
+                              n.setIdSpaceStation(dto.id());
+                              n.setName(dto.name());
+                              return spacestationRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
@@ -753,22 +723,19 @@ public class UexUniverseSyncService {
               Location location =
                   locationRepository
                       .findBySpaceStationId(entity.getId())
-                      .orElseGet(
-                          () ->
-                              locationRepository
-                                  .findByName(entity.getName())
-                                  .map(
-                                      l -> {
-                                        l.setSpaceStation(entity);
-                                        return l;
-                                      })
-                                  .orElseGet(
-                                      () -> {
-                                        Location l = new Location();
-                                        l.setName(entity.getName());
-                                        l.setSpaceStation(entity);
-                                        return l;
-                                      }));
+                      .orElseGet(() ->
+                          locationRepository
+                              .findByName(entity.getName())
+                              .map(l -> {
+                                l.setSpaceStation(entity);
+                                return l;
+                              })
+                              .orElseGet(() -> {
+                                Location l = new Location();
+                                l.setName(entity.getName());
+                                l.setSpaceStation(entity);
+                                return l;
+                              }));
               location.setName(entity.getName());
               locationRepository.save(location);
             }
@@ -809,22 +776,19 @@ public class UexUniverseSyncService {
             Terminal entity =
                 terminalRepository
                     .findByIdTerminal(dto.id())
-                    .orElseGet(
-                        () ->
-                            terminalRepository
-                                .findByName(dto.name())
-                                .map(
-                                    e -> {
-                                      e.setIdTerminal(dto.id());
-                                      return terminalRepository.save(e);
-                                    })
-                                .orElseGet(
-                                    () -> {
-                                      Terminal n = new Terminal();
-                                      n.setIdTerminal(dto.id());
-                                      n.setName(dto.name());
-                                      return terminalRepository.save(n);
-                                    }));
+                    .orElseGet(() ->
+                        terminalRepository
+                            .findByName(dto.name())
+                            .map(e -> {
+                              e.setIdTerminal(dto.id());
+                              return terminalRepository.save(e);
+                            })
+                            .orElseGet(() -> {
+                              Terminal n = new Terminal();
+                              n.setIdTerminal(dto.id());
+                              n.setName(dto.name());
+                              return terminalRepository.save(n);
+                            }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setType(dto.type());

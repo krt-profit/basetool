@@ -76,17 +76,14 @@ public final class SecurityHeaders {
       headers.addHeaderWriter(cspNonceHeaderWriter(issuerUri, trustedTypes));
       headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
       headers.referrerPolicy(ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
-      headers.crossOriginOpenerPolicy(
-          coop ->
-              coop.policy(
-                  org.springframework.security.web.header.writers
-                      .CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy.SAME_ORIGIN));
-      headers.crossOriginResourcePolicy(
-          corp ->
-              corp.policy(
-                  org.springframework.security.web.header.writers
-                      .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
-                      .SAME_ORIGIN));
+      headers.crossOriginOpenerPolicy(coop ->
+          coop.policy(
+              org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter
+                  .CrossOriginOpenerPolicy.SAME_ORIGIN));
+      headers.crossOriginResourcePolicy(corp ->
+          corp.policy(
+              org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter
+                  .CrossOriginResourcePolicy.SAME_ORIGIN));
       headers.httpStrictTransportSecurity(
           hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
       headers.addHeaderWriter(

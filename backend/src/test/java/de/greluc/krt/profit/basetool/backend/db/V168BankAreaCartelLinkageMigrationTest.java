@@ -79,16 +79,15 @@ class V168BankAreaCartelLinkageMigrationTest {
       insertAccount(jdbc, legacyAreaAcctId, "KB-V168-4", "Legacy", "AREA", null, "Legacy-Bereich");
       assertThat(accountCount(jdbc, legacyAreaAcctId)).isOne();
 
-      assertThatThrownBy(
-              () ->
-                  insertAccount(
-                      jdbc,
-                      UUID.fromString("ffffff68-0000-0000-0000-0000000000b9"),
-                      "KB-V168-5",
-                      "Neither",
-                      "AREA",
-                      null,
-                      null))
+      assertThatThrownBy(() ->
+              insertAccount(
+                  jdbc,
+                  UUID.fromString("ffffff68-0000-0000-0000-0000000000b9"),
+                  "KB-V168-5",
+                  "Neither",
+                  "AREA",
+                  null,
+                  null))
           .isInstanceOf(DataAccessException.class);
     } finally {
       cleanupAccounts(jdbc, areaAcctId, cartelAcctId, dupAreaAcctId, legacyAreaAcctId);

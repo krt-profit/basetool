@@ -247,20 +247,19 @@ public class PurchasingDelegateService {
     long fallback = settingsService.current().getDefaultMonthlyLimit();
     Instant now = Instant.now();
     return delegates.stream()
-        .map(
-            delegate ->
-                new DelegateDto(
-                    delegate.getId(),
-                    delegate.getUserId(),
-                    delegate.getUserId() == null ? null : names.get(delegate.getUserId()),
-                    delegate.getAppointedAt(),
-                    delegate.getAppointedBy() == null ? null : names.get(delegate.getAppointedBy()),
-                    delegate.getValidUntil(),
-                    delegate.getMonthlyLimit(),
-                    delegate.getMonthlyLimit() == null ? fallback : delegate.getMonthlyLimit(),
-                    delegate.getRevokedAt(),
-                    delegate.isActiveAt(now),
-                    delegate.getVersion()))
+        .map(delegate ->
+            new DelegateDto(
+                delegate.getId(),
+                delegate.getUserId(),
+                delegate.getUserId() == null ? null : names.get(delegate.getUserId()),
+                delegate.getAppointedAt(),
+                delegate.getAppointedBy() == null ? null : names.get(delegate.getAppointedBy()),
+                delegate.getValidUntil(),
+                delegate.getMonthlyLimit(),
+                delegate.getMonthlyLimit() == null ? fallback : delegate.getMonthlyLimit(),
+                delegate.getRevokedAt(),
+                delegate.isActiveAt(now),
+                delegate.getVersion()))
         .toList();
   }
 }

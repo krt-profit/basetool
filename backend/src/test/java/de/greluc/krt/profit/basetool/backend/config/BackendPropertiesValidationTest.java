@@ -187,7 +187,7 @@ class BackendPropertiesValidationTest {
             "app.rate-limit.capacity=0",
             "app.rate-limit.refillTokens=1",
             "app.rate-limit.refillPeriod=1m")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** The same properties minus the offending one must start, or the test above proves nothing. */
@@ -198,7 +198,7 @@ class BackendPropertiesValidationTest {
             "app.rate-limit.capacity=1",
             "app.rate-limit.refillTokens=1",
             "app.rate-limit.refillPeriod=1m")
-        .run((context) -> assertThat(context).hasNotFailed());
+        .run(context -> assertThat(context).hasNotFailed());
   }
 
   @Test
@@ -210,7 +210,7 @@ class BackendPropertiesValidationTest {
             "app.keycloak.sync.realm=basetool",
             "app.keycloak.sync.client-id=backend-service",
             "app.keycloak.sync.client-secret=secret")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** The same configuration with a well-formed URL must start, for the same reason as above. */
@@ -223,7 +223,7 @@ class BackendPropertiesValidationTest {
             "app.keycloak.sync.realm=basetool",
             "app.keycloak.sync.client-id=backend-service",
             "app.keycloak.sync.client-secret=secret")
-        .run((context) -> assertThat(context).hasNotFailed());
+        .run(context -> assertThat(context).hasNotFailed());
   }
 
   /**
@@ -235,7 +235,7 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenAuthoritiesCacheTtlIsZero() {
     authoritiesCacheRunner
         .withPropertyValues("app.security.authorities-cache.ttl=0s")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** A negative TTL is rejected for the same reason a zero one is. */
@@ -243,7 +243,7 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenAuthoritiesCacheTtlIsNegative() {
     authoritiesCacheRunner
         .withPropertyValues("app.security.authorities-cache.ttl=-1m")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /**
@@ -255,7 +255,7 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenAuthoritiesCacheTtlExceedsCeiling() {
     authoritiesCacheRunner
         .withPropertyValues("app.security.authorities-cache.ttl=16m")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** The ceiling itself is allowed — the constraint is "at most", not "below". */
@@ -263,46 +263,43 @@ class BackendPropertiesValidationTest {
   void shouldBind_WhenAuthoritiesCacheTtlIsExactlyTheCeiling() {
     authoritiesCacheRunner
         .withPropertyValues("app.security.authorities-cache.ttl=15m")
-        .run(
-            (context) ->
-                assertThat(context.getBean(AuthoritiesCacheProperties.class).ttl())
-                    .isEqualTo(AuthoritiesCacheProperties.MAX_TTL));
+        .run(context ->
+            assertThat(context.getBean(AuthoritiesCacheProperties.class).ttl())
+                .isEqualTo(AuthoritiesCacheProperties.MAX_TTL));
   }
 
   /** Without configuration, the authorities cache TTL defaults to five minutes (ADR-0174). */
   @Test
   void shouldDefaultToFiveMinutes_WhenAuthoritiesCacheTtlOmitted() {
-    authoritiesCacheRunner.run(
-        (context) ->
-            assertThat(context.getBean(AuthoritiesCacheProperties.class).ttl())
-                .isEqualTo(Duration.ofMinutes(5)));
+    authoritiesCacheRunner.run(context ->
+        assertThat(context.getBean(AuthoritiesCacheProperties.class).ttl())
+            .isEqualTo(Duration.ofMinutes(5)));
   }
 
   @Test
   void shouldFail_WhenSubjectExportCapacityIsZero() {
     rateLimitRunner
         .withPropertyValues("app.rate-limit.subject.export.capacity=0")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** Without configuration, the subject export budget defaults to ten per minute. */
   @Test
   void shouldDefaultToTenPerMinute_WhenSubjectExportOmitted() {
-    rateLimitRunner.run(
-        (context) -> {
-          RateLimitProperties.Export export =
-              context.getBean(RateLimitProperties.class).subject().export();
-          assertThat(export.capacity()).isEqualTo(10);
-          assertThat(export.refillTokens()).isEqualTo(10);
-          assertThat(export.refillPeriod()).isEqualTo(Duration.ofMinutes(1));
-        });
+    rateLimitRunner.run(context -> {
+      RateLimitProperties.Export export =
+          context.getBean(RateLimitProperties.class).subject().export();
+      assertThat(export.capacity()).isEqualTo(10);
+      assertThat(export.refillTokens()).isEqualTo(10);
+      assertThat(export.refillPeriod()).isEqualTo(Duration.ofMinutes(1));
+    });
   }
 
   @Test
   void shouldFail_WhenAuditRetentionMaxAgeIsZero() {
     auditRetentionRunner
         .withPropertyValues("app.audit.retention.max-age=P0D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** A negative window puts the cutoff in the future — every row would be "older". */
@@ -310,7 +307,7 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenAuditRetentionMaxAgeIsNegative() {
     auditRetentionRunner
         .withPropertyValues("app.audit.retention.max-age=-P1D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** One day under the floor is refused; the floor itself is accepted (the twin below). */
@@ -318,7 +315,7 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenAuditRetentionMaxAgeIsBelowTheFloor() {
     auditRetentionRunner
         .withPropertyValues("app.audit.retention.max-age=P29D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** The floor itself is allowed — the constraint is "at least", not "above". */
@@ -326,10 +323,9 @@ class BackendPropertiesValidationTest {
   void shouldBind_WhenAuditRetentionMaxAgeIsExactlyTheFloor() {
     auditRetentionRunner
         .withPropertyValues("app.audit.retention.max-age=P30D")
-        .run(
-            (context) ->
-                assertThat(context.getBean(AuditRetentionProperties.class).maxAge())
-                    .isEqualTo(Duration.ofDays(AuditRetentionProperties.MIN_MAX_AGE_DAYS)));
+        .run(context ->
+            assertThat(context.getBean(AuditRetentionProperties.class).maxAge())
+                .isEqualTo(Duration.ofDays(AuditRetentionProperties.MIN_MAX_AGE_DAYS)));
   }
 
   /** A zero interval would turn the daily sweep into a busy loop against the audit tables. */
@@ -337,26 +333,25 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenAuditRetentionIntervalIsZero() {
     auditRetentionRunner
         .withPropertyValues("app.audit.retention.interval=PT0S")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** With nothing set, the shipped two-year window and daily pace apply. */
   @Test
   void shouldDefault_WhenAuditRetentionOmitted() {
-    auditRetentionRunner.run(
-        (context) -> {
-          AuditRetentionProperties properties = context.getBean(AuditRetentionProperties.class);
-          assertThat(properties.enabled()).isTrue();
-          assertThat(properties.maxAge()).isEqualTo(Duration.ofDays(730));
-          assertThat(properties.interval()).isEqualTo(Duration.ofHours(24));
-        });
+    auditRetentionRunner.run(context -> {
+      AuditRetentionProperties properties = context.getBean(AuditRetentionProperties.class);
+      assertThat(properties.enabled()).isTrue();
+      assertThat(properties.maxAge()).isEqualTo(Duration.ofDays(730));
+      assertThat(properties.interval()).isEqualTo(Duration.ofHours(24));
+    });
   }
 
   @Test
   void shouldFail_WhenRejectedRetentionMaxAgeIsZero() {
     rejectedRetentionRunner
         .withPropertyValues("app.registrations.rejected-retention.max-age=P0D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** A connection retention shorter than the 90-day session cap refuses to start. */
@@ -364,22 +359,20 @@ class BackendPropertiesValidationTest {
   void shouldFail_WhenConnectionRetentionMaxAgeIsBelowNinetyDays() {
     connectionRetentionRunner
         .withPropertyValues("app.exchange.connection-retention.max-age=P89D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** The connection retention defaults to its ninety-day floor, and a longer value binds. */
   @Test
   void shouldBind_WhenConnectionRetentionMaxAgeIsAtOrAboveNinetyDays() {
-    connectionRetentionRunner.run(
-        (context) ->
-            assertThat(context.getBean(ExchangeConnectionRetentionProperties.class).maxAge())
-                .isEqualTo(Duration.ofDays(90)));
+    connectionRetentionRunner.run(context ->
+        assertThat(context.getBean(ExchangeConnectionRetentionProperties.class).maxAge())
+            .isEqualTo(Duration.ofDays(90)));
     connectionRetentionRunner
         .withPropertyValues("app.exchange.connection-retention.max-age=P120D")
-        .run(
-            (context) ->
-                assertThat(context.getBean(ExchangeConnectionRetentionProperties.class).maxAge())
-                    .isEqualTo(Duration.ofDays(120)));
+        .run(context ->
+            assertThat(context.getBean(ExchangeConnectionRetentionProperties.class).maxAge())
+                .isEqualTo(Duration.ofDays(120)));
   }
 
   /** The one-day floor itself binds, and the default stays ninety days. */
@@ -387,21 +380,19 @@ class BackendPropertiesValidationTest {
   void shouldBind_WhenRejectedRetentionMaxAgeIsOneDay() {
     rejectedRetentionRunner
         .withPropertyValues("app.registrations.rejected-retention.max-age=P1D")
-        .run(
-            (context) ->
-                assertThat(context.getBean(RejectedRegistrationRetentionProperties.class).maxAge())
-                    .isEqualTo(Duration.ofDays(1)));
-    rejectedRetentionRunner.run(
-        (context) ->
+        .run(context ->
             assertThat(context.getBean(RejectedRegistrationRetentionProperties.class).maxAge())
-                .isEqualTo(Duration.ofDays(90)));
+                .isEqualTo(Duration.ofDays(1)));
+    rejectedRetentionRunner.run(context ->
+        assertThat(context.getBean(RejectedRegistrationRetentionProperties.class).maxAge())
+            .isEqualTo(Duration.ofDays(90)));
   }
 
   @Test
   void shouldFail_WhenNotificationReadMaxAgeIsZero() {
     notificationRetentionRunner
         .withPropertyValues("app.notifications.retention.max-age=P0D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** The unread window is floored on its own, not only through the read one. */
@@ -411,7 +402,7 @@ class BackendPropertiesValidationTest {
         .withPropertyValues(
             "app.notifications.retention.max-age=P1D",
             "app.notifications.retention.unread-max-age=-P1D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   @Test
@@ -420,7 +411,7 @@ class BackendPropertiesValidationTest {
         .withPropertyValues(
             "app.notifications.retention.max-age=P90D",
             "app.notifications.retention.unread-max-age=P30D")
-        .run((context) -> assertThat(context).hasFailed());
+        .run(context -> assertThat(context).hasFailed());
   }
 
   /** Equal windows are allowed ("never sooner"), and the defaults are 90 / 180 days. */
@@ -430,13 +421,12 @@ class BackendPropertiesValidationTest {
         .withPropertyValues(
             "app.notifications.retention.max-age=P1D",
             "app.notifications.retention.unread-max-age=P1D")
-        .run((context) -> assertThat(context).hasNotFailed());
-    notificationRetentionRunner.run(
-        (context) -> {
-          NotificationRetentionProperties properties =
-              context.getBean(NotificationRetentionProperties.class);
-          assertThat(properties.maxAge()).isEqualTo(Duration.ofDays(90));
-          assertThat(properties.unreadMaxAge()).isEqualTo(Duration.ofDays(180));
-        });
+        .run(context -> assertThat(context).hasNotFailed());
+    notificationRetentionRunner.run(context -> {
+      NotificationRetentionProperties properties =
+          context.getBean(NotificationRetentionProperties.class);
+      assertThat(properties.maxAge()).isEqualTo(Duration.ofDays(90));
+      assertThat(properties.unreadMaxAge()).isEqualTo(Duration.ofDays(180));
+    });
   }
 }

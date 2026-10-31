@@ -80,12 +80,11 @@ class ExchangeClientGaugesTest {
   private static @NotNull ExchangeRegistrySnapshot snapshot(
       @NotNull Map<String, ExchangeClientStatus> statuses) {
     TreeMap<String, ExchangeRegistrySnapshot.Client> clients = new TreeMap<>();
-    statuses.forEach(
-        (id, status) ->
-            clients.put(
-                id,
-                new ExchangeRegistrySnapshot.Client(
-                    id, status, List.of("exchange.connect"), null, null, null)));
+    statuses.forEach((id, status) ->
+        clients.put(
+            id,
+            new ExchangeRegistrySnapshot.Client(
+                id, status, List.of("exchange.connect"), null, null, null)));
     return new ExchangeRegistrySnapshot(true, clients);
   }
 

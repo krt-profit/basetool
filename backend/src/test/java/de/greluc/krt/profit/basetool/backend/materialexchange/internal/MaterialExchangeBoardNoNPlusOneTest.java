@@ -121,13 +121,12 @@ class MaterialExchangeBoardNoNPlusOneTest {
     long statements = stats.getPrepareStatementCount();
     assertThat(board.content()).hasSize(offers.size());
     assertThat(board.content())
-        .allSatisfy(
-            dto -> {
-              assertThat(dto.material()).isNotNull();
-              assertThat(dto.quality()).isEqualTo(500);
-              assertThat(dto.amount()).isEqualTo(4.0);
-              assertThat(dto.availableAmount()).isEqualTo(10.0);
-            });
+        .allSatisfy(dto -> {
+          assertThat(dto.material()).isNotNull();
+          assertThat(dto.quality()).isEqualTo(500);
+          assertThat(dto.amount()).isEqualTo(4.0);
+          assertThat(dto.availableAmount()).isEqualTo(10.0);
+        });
     return statements;
   }
 

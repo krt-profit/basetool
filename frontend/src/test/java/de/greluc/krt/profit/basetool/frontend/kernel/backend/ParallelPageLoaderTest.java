@@ -85,14 +85,13 @@ class ParallelPageLoaderTest {
 
     String[] seen =
         loader
-            .loadAsync(
-                () ->
-                    new String[] {
-                      String.valueOf(ActiveSquadronContext.get()),
-                      CorrelationContext.get(),
-                      ClientIpContext.get(),
-                      LocaleContextHolder.getLocale().toLanguageTag()
-                    })
+            .loadAsync(() ->
+                new String[] {
+                  String.valueOf(ActiveSquadronContext.get()),
+                  CorrelationContext.get(),
+                  ClientIpContext.get(),
+                  LocaleContextHolder.getLocale().toLanguageTag()
+                })
             .join();
 
     assertThat(seen)
@@ -106,11 +105,10 @@ class ParallelPageLoaderTest {
 
     Locale seenOnWorker =
         loader
-            .loadAsync(
-                () ->
-                    LocaleContextHolder.getLocaleContext() == null
-                        ? null
-                        : LocaleContextHolder.getLocaleContext().getLocale())
+            .loadAsync(() ->
+                LocaleContextHolder.getLocaleContext() == null
+                    ? null
+                    : LocaleContextHolder.getLocaleContext().getLocale())
             .join();
 
     assertThat(seenOnWorker).isEqualTo(Locale.GERMANY);
@@ -166,14 +164,13 @@ class ParallelPageLoaderTest {
       ActiveSquadronContext.set(orgUnit);
 
       loader
-          .loadAsync(
-              () ->
-                  client
-                      .get()
-                      .uri("/api/v1/section")
-                      .retrieve()
-                      .toBodilessEntity()
-                      .block(Duration.ofSeconds(10)))
+          .loadAsync(() ->
+              client
+                  .get()
+                  .uri("/api/v1/section")
+                  .retrieve()
+                  .toBodilessEntity()
+                  .block(Duration.ofSeconds(10)))
           .join();
 
       RecordedRequest request = backend.takeRequest(5, TimeUnit.SECONDS);

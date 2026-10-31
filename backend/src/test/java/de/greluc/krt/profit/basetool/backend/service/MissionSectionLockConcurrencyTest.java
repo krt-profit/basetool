@@ -212,28 +212,27 @@ class MissionSectionLockConcurrencyTest {
       for (int i = 0; i < threads; i++) {
         final int index = i;
         futures.add(
-            pool.submit(
-                () -> {
-                  try {
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrors.incrementAndGet();
-                      return;
-                    }
-                    SecurityContextHolder.getContext().setAuthentication(RACER);
-                    try {
-                      action.accept(index);
-                    } finally {
-                      SecurityContextHolder.clearContext();
-                    }
-                    successes.incrementAndGet();
-                  } catch (ObjectOptimisticLockingFailureException conflict) {
-                    conflicts.incrementAndGet();
-                  } catch (Throwable t) {
-                    otherErrors.incrementAndGet();
-                    errors.add(t);
-                  }
-                }));
+            pool.submit(() -> {
+              try {
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrors.incrementAndGet();
+                  return;
+                }
+                SecurityContextHolder.getContext().setAuthentication(RACER);
+                try {
+                  action.accept(index);
+                } finally {
+                  SecurityContextHolder.clearContext();
+                }
+                successes.incrementAndGet();
+              } catch (ObjectOptimisticLockingFailureException conflict) {
+                conflicts.incrementAndGet();
+              } catch (Throwable t) {
+                otherErrors.incrementAndGet();
+                errors.add(t);
+              }
+            }));
       }
 
       assertTrue(

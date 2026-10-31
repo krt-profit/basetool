@@ -159,10 +159,9 @@ final class SessionBoundTypeScan {
     for (MethodModel method : model.methods()) {
       method
           .code()
-          .ifPresent(
-              code ->
-                  writes.addAll(
-                      writesIn(owner + "#" + method.methodName().stringValue(), code, loader)));
+          .ifPresent(code ->
+              writes.addAll(
+                  writesIn(owner + "#" + method.methodName().stringValue(), code, loader)));
     }
     return List.copyOf(writes);
   }
@@ -185,12 +184,10 @@ final class SessionBoundTypeScan {
     for (MethodModel method : model.methods()) {
       method
           .findAttribute(Attributes.runtimeVisibleAnnotations())
-          .ifPresent(
-              attribute ->
-                  found.addAll(
-                      sessionAnnotations(
-                          owner + "#" + method.methodName().stringValue(),
-                          attribute.annotations())));
+          .ifPresent(attribute ->
+              found.addAll(
+                  sessionAnnotations(
+                      owner + "#" + method.methodName().stringValue(), attribute.annotations())));
     }
     return List.copyOf(found);
   }
@@ -210,10 +207,9 @@ final class SessionBoundTypeScan {
       boolean sessionScoped =
           type.equals("Lorg/springframework/context/annotation/Scope;")
               && annotation.elements().stream()
-                  .anyMatch(
-                      element ->
-                          element.value() instanceof AnnotationValue.OfString value
-                              && value.stringValue().equals("session"));
+                  .anyMatch(element ->
+                      element.value() instanceof AnnotationValue.OfString value
+                          && value.stringValue().equals("session"));
       if (type.equals("Lorg/springframework/web/bind/annotation/SessionAttributes;")
           || type.equals("Lorg/springframework/web/context/annotation/SessionScope;")
           || sessionScoped) {

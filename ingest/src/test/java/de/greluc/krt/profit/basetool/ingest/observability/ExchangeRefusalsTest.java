@@ -81,10 +81,9 @@ class ExchangeRefusalsTest {
   void everyReasonIsRegisteredAtZeroAndCountedPerClient() {
     assertThat(meters.get(MetricNames.EXCHANGE_REFUSED).counters())
         .hasSize(ExchangeRefusals.CODES.size())
-        .allSatisfy(
-            counter ->
-                assertThat(counter.getId().getTag(MetricNames.TAG_CLIENT_ID))
-                    .isEqualTo(MetricNames.EXCHANGE_CLIENT_NONE));
+        .allSatisfy(counter ->
+            assertThat(counter.getId().getTag(MetricNames.TAG_CLIENT_ID))
+                .isEqualTo(MetricNames.EXCHANGE_CLIENT_NONE));
 
     refusals.count(ExchangeRefusals.SCOPE_MISSING, "versekit");
 

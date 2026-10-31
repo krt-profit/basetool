@@ -625,9 +625,9 @@ public class JobOrderPageController {
   }
 
   /**
-   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): the delivered-against-
-   * required progress head, fulfilment, the open quantity split into SCU and pieces, and the claim
-   * and handover counts.
+   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): the
+   * delivered-against-required progress head, fulfilment, the open quantity split into SCU and
+   * pieces, and the claim and handover counts.
    *
    * <p>A material order's requirement is the still-open line amount plus what its handovers
    * delivered, per unit; the progress is withheld when the order is redacted for its requester,
@@ -854,11 +854,10 @@ public class JobOrderPageController {
         reachableAuthorities);
     boolean result =
         reachableAuthorities.stream()
-            .anyMatch(
-                a ->
-                    a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                        || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+            .anyMatch(a ->
+                a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
+                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
+                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     log.debug("JobOrder: Is logistician: {}", result);
     return result;
   }

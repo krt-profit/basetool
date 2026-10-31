@@ -145,12 +145,11 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
         s -> {
           var entries = stockReadService.getMaterialCollection(s.order().getId());
           assertThat(entries)
-              .allSatisfy(
-                  e -> {
-                    assertThat(e.materialName()).isEqualTo(s.material().getName());
-                    assertThat(e.allocatedQuantity()).isEqualTo(3.0);
-                    assertThat(e.delivered()).isFalse();
-                  });
+              .allSatisfy(e -> {
+                assertThat(e.materialName()).isEqualTo(s.material().getName());
+                assertThat(e.allocatedQuantity()).isEqualTo(3.0);
+                assertThat(e.delivered()).isFalse();
+              });
           return entries.size();
         });
     reads.put(

@@ -148,34 +148,33 @@ class OptimisticLockingTest {
       for (int i = 0; i < THREADS; i++) {
         final int idx = i;
         futures.add(
-            pool.submit(
-                () -> {
-                  try {
-                    ShipRequestDto dto =
-                        new ShipRequestDto(
-                            "Updated by thread " + idx,
-                            shipTypeId,
-                            "LTI",
-                            null,
-                            true,
-                            initialVersion,
-                            null);
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrorCount.incrementAndGet();
-                      return;
-                    }
-                    try {
-                      hangarService.updateShip(ownerId, shipId, dto);
-                      successCount.incrementAndGet();
-                    } catch (ObjectOptimisticLockingFailureException expected) {
-                      conflictCount.incrementAndGet();
-                    }
-                  } catch (Throwable t) {
-                    otherErrorCount.incrementAndGet();
-                    unexpectedErrors.add(t);
-                  }
-                }));
+            pool.submit(() -> {
+              try {
+                ShipRequestDto dto =
+                    new ShipRequestDto(
+                        "Updated by thread " + idx,
+                        shipTypeId,
+                        "LTI",
+                        null,
+                        true,
+                        initialVersion,
+                        null);
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrorCount.incrementAndGet();
+                  return;
+                }
+                try {
+                  hangarService.updateShip(ownerId, shipId, dto);
+                  successCount.incrementAndGet();
+                } catch (ObjectOptimisticLockingFailureException expected) {
+                  conflictCount.incrementAndGet();
+                }
+              } catch (Throwable t) {
+                otherErrorCount.incrementAndGet();
+                unexpectedErrors.add(t);
+              }
+            }));
       }
 
       assertTrue(

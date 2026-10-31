@@ -223,12 +223,11 @@ class ActingMemberFilterChainTest {
                 .with(jwt().jwt(token -> token.subject(MEMBER)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(
-            result ->
-                org.junit.jupiter.api.Assertions.assertNotEquals(
-                    403,
-                    result.getResponse().getStatus(),
-                    "no header must mean no acting-member handling"));
+        .andExpect(result ->
+            org.junit.jupiter.api.Assertions.assertNotEquals(
+                403,
+                result.getResponse().getStatus(),
+                "no header must mean no acting-member handling"));
   }
 
   /**

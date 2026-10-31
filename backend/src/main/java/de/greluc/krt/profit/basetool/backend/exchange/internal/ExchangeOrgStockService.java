@@ -222,16 +222,15 @@ public class ExchangeOrgStockService {
     Function<UUID, String> refs =
         entries.isEmpty() ? _ -> "" : holderRefs.forClient(caller.clientId());
     return lots.stream()
-        .map(
-            lot ->
-                toDto(
-                    lot,
-                    Objects.requireNonNull(pools.byId().get(lot.getUnitId())),
-                    pools.detailed().contains(lot.getUnitId())
-                        ? entries.getOrDefault(lot.getLotKey(), List.of())
-                        : null,
-                    withheld,
-                    refs))
+        .map(lot ->
+            toDto(
+                lot,
+                Objects.requireNonNull(pools.byId().get(lot.getUnitId())),
+                pools.detailed().contains(lot.getUnitId())
+                    ? entries.getOrDefault(lot.getLotKey(), List.of())
+                    : null,
+                withheld,
+                refs))
         .toList();
   }
 

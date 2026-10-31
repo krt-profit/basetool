@@ -455,10 +455,9 @@ public class OrgUnitBankSettingsService {
     List<BankAccountViewGrant> grants = viewGrantRepository.findByAccountId(account.getId());
     List<String> grantedRoleCodes =
         grants.stream()
-            .filter(
-                grant ->
-                    grant.getGranteeKind() == BankAccountViewGranteeKind.MEMBERSHIP_ROLE
-                        || grant.getGranteeKind() == BankAccountViewGranteeKind.GLOBAL_ROLE)
+            .filter(grant ->
+                grant.getGranteeKind() == BankAccountViewGranteeKind.MEMBERSHIP_ROLE
+                    || grant.getGranteeKind() == BankAccountViewGranteeKind.GLOBAL_ROLE)
             .map(BankAccountViewGrant::getRoleCode)
             .toList();
     boolean allMembersGranted =

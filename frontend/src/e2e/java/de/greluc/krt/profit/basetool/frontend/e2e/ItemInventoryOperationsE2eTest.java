@@ -345,13 +345,12 @@ class ItemInventoryOperationsE2eTest {
 
         pageA.evaluate("window.__krtNoReload = true;");
 
-        pageA.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageA.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics &&"
-                            + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
-                            + " 0)")));
+        pageA.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageA.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics &&"
+                        + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
+                        + " 0)")));
 
         pageB
             .locator("button[data-trigger='inv-admin-bookout'][data-id='" + syncItemRowId + "']")

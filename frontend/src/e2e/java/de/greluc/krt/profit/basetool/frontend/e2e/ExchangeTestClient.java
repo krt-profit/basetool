@@ -460,11 +460,10 @@ final class ExchangeTestClient {
   private static HttpRequest form(String url, Map<String, String> fields, String dpop) {
     String body =
         fields.entrySet().stream()
-            .map(
-                e ->
-                    URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
-                        + "="
-                        + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+            .map(e ->
+                URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
+                    + "="
+                    + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
             .collect(Collectors.joining("&"));
     HttpRequest.Builder request =
         HttpRequest.newBuilder(URI.create(url))

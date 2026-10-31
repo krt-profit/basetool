@@ -99,10 +99,9 @@ public class ProfitCalculationService {
     if (isHullC) {
       prices =
           prices.stream()
-              .filter(
-                  p ->
-                      p.getTerminal().getHasLoadingDock() != null
-                          && p.getTerminal().getHasLoadingDock())
+              .filter(p ->
+                  p.getTerminal().getHasLoadingDock() != null
+                      && p.getTerminal().getHasLoadingDock())
               .toList();
       log.debug("Hull C filtering reduced prices to {}", prices.size());
     }

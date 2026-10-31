@@ -90,11 +90,10 @@ class NotificationMuteServiceTest {
     assertThat(preferences)
         .filteredOn(p -> p.type() == NotificationType.JOB_ORDER_CREATED)
         .singleElement()
-        .satisfies(
-            p -> {
-              assertThat(p.mutable()).isTrue();
-              assertThat(p.muted()).isTrue();
-            });
+        .satisfies(p -> {
+          assertThat(p.mutable()).isTrue();
+          assertThat(p.muted()).isTrue();
+        });
     assertThat(preferences)
         .filteredOn(p -> p.type() == NotificationType.BANK_BOOKING_REQUEST_CREATED)
         .singleElement()
@@ -102,11 +101,10 @@ class NotificationMuteServiceTest {
     assertThat(preferences)
         .filteredOn(p -> p.type() == NotificationType.ACCOUNT_DELETION_REQUESTED)
         .singleElement()
-        .satisfies(
-            p -> {
-              assertThat(p.mutable()).isFalse();
-              assertThat(p.muted()).isFalse();
-            });
+        .satisfies(p -> {
+          assertThat(p.mutable()).isFalse();
+          assertThat(p.muted()).isFalse();
+        });
   }
 
   @Test

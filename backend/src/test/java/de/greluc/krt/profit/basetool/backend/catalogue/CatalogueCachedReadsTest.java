@@ -190,12 +190,11 @@ class CatalogueCachedReadsTest {
   @AfterEach
   void signOutAndCleanUp() {
     SecurityContextHolder.clearContext();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          while (!cleanup.isEmpty()) {
-            cleanup.pop().run();
-          }
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      while (!cleanup.isEmpty()) {
+        cleanup.pop().run();
+      }
+    });
     new JdbcTemplate(dataSource)
         .update(
             """
@@ -658,11 +657,10 @@ class CatalogueCachedReadsTest {
   }
 
   private void pinFields(JsonNode row, Map<String, Object> expected) {
-    expected.forEach(
-        (pointer, value) ->
-            assertThat(row.at(pointer))
-                .as("%s of %s", pointer, row)
-                .isEqualTo(mapper.valueToTree(value)));
+    expected.forEach((pointer, value) ->
+        assertThat(row.at(pointer))
+            .as("%s of %s", pointer, row)
+            .isEqualTo(mapper.valueToTree(value)));
   }
 
   private JsonNode rowOf(JsonNode result, UUID id) {

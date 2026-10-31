@@ -187,9 +187,8 @@ public class PurchasingReportService {
         dealService
             .visibleToCaller()
             .and((root, q, cb) -> root.get("status").in(REACHED_THE_BANK))
-            .and(
-                (root, q, cb) ->
-                    cb.greaterThanOrEqualTo(root.<Instant>get("createdAt"), period.start()))
+            .and((root, q, cb) ->
+                cb.greaterThanOrEqualTo(root.<Instant>get("createdAt"), period.start()))
             .and((root, q, cb) -> cb.lessThan(root.<Instant>get("createdAt"), period.end()));
     List<PurchasingDeal> deals =
         dealRepository.findAll(spec).stream()
@@ -279,16 +278,15 @@ public class PurchasingReportService {
     }
     List<ReportMonthDto> monthRows =
         months.entrySet().stream()
-            .map(
-                e ->
-                    new ReportMonthDto(
-                        e.getKey(),
-                        (int) e.getValue()[0],
-                        monthBought.getOrDefault(e.getKey(), 0.0),
-                        e.getValue()[1],
-                        e.getValue()[2],
-                        e.getValue()[1] - e.getValue()[2],
-                        e.getValue()[3]))
+            .map(e ->
+                new ReportMonthDto(
+                    e.getKey(),
+                    (int) e.getValue()[0],
+                    monthBought.getOrDefault(e.getKey(), 0.0),
+                    e.getValue()[1],
+                    e.getValue()[2],
+                    e.getValue()[1] - e.getValue()[2],
+                    e.getValue()[3]))
             .toList();
     Map<UUID, NeedRef> refs = supplyNeeds.findAll(needs.keySet());
     Map<UUID, String> unitNames = new HashMap<>();
@@ -299,16 +297,15 @@ public class PurchasingReportService {
     }
     List<ReportNeedDto> needRows =
         needs.values().stream()
-            .map(
-                acc -> {
-                  NeedRef ref = refs.get(acc.needId());
-                  return new ReportNeedDto(
-                      acc.needId(),
-                      ref == null ? "—" : unitNames.getOrDefault(ref.orgUnitId(), "—"),
-                      ref == null ? "—" : ref.label(),
-                      acc.dealCount(),
-                      acc.bought());
-                })
+            .map(acc -> {
+              NeedRef ref = refs.get(acc.needId());
+              return new ReportNeedDto(
+                  acc.needId(),
+                  ref == null ? "—" : unitNames.getOrDefault(ref.orgUnitId(), "—"),
+                  ref == null ? "—" : ref.label(),
+                  acc.dealCount(),
+                  acc.bought());
+            })
             .sorted(Comparator.comparingDouble(ReportNeedDto::boughtAmount).reversed())
             .toList();
     List<ReportMaterialDto> materialRows =

@@ -193,12 +193,11 @@ class RedisAclIngestIntegrationTest {
     assertThatThrownBy(() -> template.convertAndSend("basetool:livesync:changed", "{}"))
         .isInstanceOf(DataAccessException.class);
     try (RedisConnection connection = ingest.getConnection()) {
-      assertThatThrownBy(
-              () ->
-                  connection
-                      .keyCommands()
-                      .scan(org.springframework.data.redis.core.ScanOptions.NONE)
-                      .hasNext())
+      assertThatThrownBy(() ->
+              connection
+                  .keyCommands()
+                  .scan(org.springframework.data.redis.core.ScanOptions.NONE)
+                  .hasNext())
           .as("SCAN is not key-checked and would list every session id")
           .isInstanceOf(DataAccessException.class);
       assertThat(connection.serverCommands().info("server")).isNotEmpty();

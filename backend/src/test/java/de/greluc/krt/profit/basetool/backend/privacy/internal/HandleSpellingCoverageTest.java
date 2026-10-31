@@ -76,17 +76,16 @@ class HandleSpellingCoverageTest {
   @Test
   void everyDeclaredNonSpellingIsRealAndStatesAReason() {
     assertThat(HandleSpellings.NOT_A_SPELLING)
-        .allSatisfy(
-            (column, reason) -> {
-              assertThat(searchedColumns())
-                  .as("NOT_A_SPELLING names a searched app_user column: " + column)
-                  .contains(column);
-              assertThat(reason)
-                  .as("reason for " + column)
-                  .isNotBlank()
-                  .hasSizeGreaterThan(30)
-                  .doesNotContainIgnoringCase("todo");
-            });
+        .allSatisfy((column, reason) -> {
+          assertThat(searchedColumns())
+              .as("NOT_A_SPELLING names a searched app_user column: " + column)
+              .contains(column);
+          assertThat(reason)
+              .as("reason for " + column)
+              .isNotBlank()
+              .hasSizeGreaterThan(30)
+              .doesNotContainIgnoringCase("todo");
+        });
   }
 
   @Test

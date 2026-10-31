@@ -600,10 +600,9 @@ public class BlueprintImportService implements BlueprintImports {
             limit,
             threshold)
         .stream()
-        .map(
-            match ->
-                new BlueprintImportSuggestionDto(
-                    match.candidate().productKey(), match.candidate().productName(), match.score()))
+        .map(match ->
+            new BlueprintImportSuggestionDto(
+                match.candidate().productKey(), match.candidate().productName(), match.score()))
         .toList();
   }
 }

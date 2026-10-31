@@ -224,18 +224,17 @@ class OperationAccessPolicyDifferentialTest {
 
       OrgUnitCascadeService cascade = mock(OrgUnitCascadeService.class);
       when(cascade.expandWithDescendants(anyCollection()))
-          .thenAnswer(
-              invocation -> {
-                Collection<OrgUnitMembership> given = invocation.getArgument(0);
-                Set<UUID> ids = new LinkedHashSet<>();
-                for (OrgUnitMembership row : given) {
-                  ids.add(row.getId().getOrgUnitId());
-                  if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
-                    ids.add(CHILD_C);
-                  }
-                }
-                return ids;
-              });
+          .thenAnswer(invocation -> {
+            Collection<OrgUnitMembership> given = invocation.getArgument(0);
+            Set<UUID> ids = new LinkedHashSet<>();
+            for (OrgUnitMembership row : given) {
+              ids.add(row.getId().getOrgUnitId());
+              if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
+                ids.add(CHILD_C);
+              }
+            }
+            return ids;
+          });
 
       OperationRepository operations = mock(OperationRepository.class);
       when(operations.findById(any())).thenReturn(Optional.empty());
@@ -298,35 +297,32 @@ class OperationAccessPolicyDifferentialTest {
     boolean canSeeOperation(UUID operationId) {
       return operationRepository
           .findById(operationId)
-          .map(
-              o -> {
-                boolean scopeVisible =
-                    o.getOwningOrgUnit() == null
-                        ? authHelper.isMemberOrAbove()
-                        : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId());
-                return scopeVisible || participatedInOperation(operationId);
-              })
+          .map(o -> {
+            boolean scopeVisible =
+                o.getOwningOrgUnit() == null
+                    ? authHelper.isMemberOrAbove()
+                    : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId());
+            return scopeVisible || participatedInOperation(operationId);
+          })
           .orElse(false);
     }
 
     boolean canSeeOperationLedger(UUID operationId) {
       return operationRepository
           .findById(operationId)
-          .map(
-              o ->
-                  o.getOwningOrgUnit() == null
-                      ? authHelper.isMemberOrAbove()
-                      : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId()))
+          .map(o ->
+              o.getOwningOrgUnit() == null
+                  ? authHelper.isMemberOrAbove()
+                  : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 
     boolean canEditOperation(UUID operationId) {
       return operationRepository
           .findById(operationId)
-          .map(
-              o ->
-                  o.getOwningOrgUnit() == null
-                      || accessGateService.canEditSquadron(o.getOwningOrgUnit().getId()))
+          .map(o ->
+              o.getOwningOrgUnit() == null
+                  || accessGateService.canEditSquadron(o.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 

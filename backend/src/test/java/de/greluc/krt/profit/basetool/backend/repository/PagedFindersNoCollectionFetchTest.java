@@ -81,14 +81,13 @@ class PagedFindersNoCollectionFetchTest {
     assertThrows(
         RuntimeException.class,
         () ->
-            transactionTemplate.executeWithoutResult(
-                status ->
-                    entityManager
-                        .createQuery(
-                            "SELECT u FROM User u LEFT JOIN FETCH u.roles r ORDER BY r.name",
-                            Object.class)
-                        .setMaxResults(5)
-                        .getResultList()));
+            transactionTemplate.executeWithoutResult(status ->
+                entityManager
+                    .createQuery(
+                        "SELECT u FROM User u LEFT JOIN FETCH u.roles r ORDER BY r.name",
+                        Object.class)
+                    .setMaxResults(5)
+                    .getResultList()));
   }
 
   /**
@@ -98,83 +97,80 @@ class PagedFindersNoCollectionFetchTest {
    */
   @Test
   void gateIsNarrow_aPagedCollectionFetchOrderedByTheOwnerStillRuns() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          status.setRollbackOnly();
-          List<?> rows =
-              entityManager
-                  .createQuery(
-                      "SELECT u FROM User u LEFT JOIN FETCH u.roles ORDER BY u.username",
-                      Object.class)
-                  .setMaxResults(5)
-                  .getResultList();
-          assertTrue(rows.size() <= 5);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      status.setRollbackOnly();
+      List<?> rows =
+          entityManager
+              .createQuery(
+                  "SELECT u FROM User u LEFT JOIN FETCH u.roles ORDER BY u.username", Object.class)
+              .setMaxResults(5)
+              .getResultList();
+      assertTrue(rows.size() <= 5);
+    });
   }
 
   @Test
   void formerlyGraphedPagedFinders_leaveTheirCollectionsUnfetched() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          status.setRollbackOnly();
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          User user = seedUser("paged-" + tag);
-          Squadron staffel = seedStaffel(tag);
-          seedMission(user);
-          seedJobOrder(staffel, tag);
-          entityManager.flush();
-          entityManager.clear();
+    transactionTemplate.executeWithoutResult(status -> {
+      status.setRollbackOnly();
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      User user = seedUser("paged-" + tag);
+      Squadron staffel = seedStaffel(tag);
+      seedMission(user);
+      seedJobOrder(staffel, tag);
+      entityManager.flush();
+      entityManager.clear();
 
-          assertUnfetched(userRepository.findAll(PAGE).getContent(), User::getRoles);
-          assertUnfetched(userRepository.findAllScoped(null, PAGE).getContent(), User::getRoles);
-          assertUnfetched(
-              userRepository.searchScoped("paged-", null, PAGE).getContent(), User::getRoles);
-          assertUnfetched(
-              userRepository
-                  .findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-                      "paged-", "paged-", PAGE)
-                  .getContent(),
-              User::getRoles);
-          userRepository.findEvaluatableMembers(null, PAGE);
-          assertUnfetched(
-              missionRepository
-                  .searchMissions(
-                      null,
-                      null,
-                      null,
-                      List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
-                      null,
-                      null,
-                      true,
-                      null,
-                      Set.of(),
-                      true,
-                      PAGE)
-                  .getContent(),
-              Mission::getParticipants);
-          List<JobOrderStatus> statuses = List.of(JobOrderStatus.values());
-          List<JobOrder> scoped =
-              jobOrderRepository
-                  .findScopedJobOrders(
-                      statuses,
-                      true,
-                      Set.of(new UUID(0L, 0L)),
-                      false,
-                      Set.of(new UUID(0L, 0L)),
-                      true,
-                      null,
-                      Set.of(),
-                      PAGE)
-                  .getContent();
-          assertUnfetched(scoped, JobOrder::getMaterials);
-          assertUnfetched(scoped, JobOrder::getAssignees);
-          assertUnfetched(scoped, JobOrder::getHandovers);
-          assertUnfetched(
-              jobOrderRepository
-                  .findRequestedOrders(statuses, Set.of(staffel.getId()), PAGE)
-                  .getContent(),
-              JobOrder::getMaterials);
-        });
+      assertUnfetched(userRepository.findAll(PAGE).getContent(), User::getRoles);
+      assertUnfetched(userRepository.findAllScoped(null, PAGE).getContent(), User::getRoles);
+      assertUnfetched(
+          userRepository.searchScoped("paged-", null, PAGE).getContent(), User::getRoles);
+      assertUnfetched(
+          userRepository
+              .findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
+                  "paged-", "paged-", PAGE)
+              .getContent(),
+          User::getRoles);
+      userRepository.findEvaluatableMembers(null, PAGE);
+      assertUnfetched(
+          missionRepository
+              .searchMissions(
+                  null,
+                  null,
+                  null,
+                  List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
+                  null,
+                  null,
+                  true,
+                  null,
+                  Set.of(),
+                  true,
+                  PAGE)
+              .getContent(),
+          Mission::getParticipants);
+      List<JobOrderStatus> statuses = List.of(JobOrderStatus.values());
+      List<JobOrder> scoped =
+          jobOrderRepository
+              .findScopedJobOrders(
+                  statuses,
+                  true,
+                  Set.of(new UUID(0L, 0L)),
+                  false,
+                  Set.of(new UUID(0L, 0L)),
+                  true,
+                  null,
+                  Set.of(),
+                  PAGE)
+              .getContent();
+      assertUnfetched(scoped, JobOrder::getMaterials);
+      assertUnfetched(scoped, JobOrder::getAssignees);
+      assertUnfetched(scoped, JobOrder::getHandovers);
+      assertUnfetched(
+          jobOrderRepository
+              .findRequestedOrders(statuses, Set.of(staffel.getId()), PAGE)
+              .getContent(),
+          JobOrder::getMaterials);
+    });
   }
 
   @Test

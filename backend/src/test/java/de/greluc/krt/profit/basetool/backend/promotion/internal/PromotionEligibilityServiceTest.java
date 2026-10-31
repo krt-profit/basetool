@@ -467,14 +467,13 @@ class PromotionEligibilityServiceTest {
     return result.checks().stream()
         .filter(c -> c.requirementId().equals(req.getId()))
         .findFirst()
-        .orElseThrow(
-            () ->
-                new AssertionError(
-                    "no check returned for requirement "
-                        + req.getId()
-                        + " ("
-                        + req.getDescription()
-                        + ")"));
+        .orElseThrow(() ->
+            new AssertionError(
+                "no check returned for requirement "
+                    + req.getId()
+                    + " ("
+                    + req.getDescription()
+                    + ")"));
   }
 
   private PromotionTopic topic(String name) {

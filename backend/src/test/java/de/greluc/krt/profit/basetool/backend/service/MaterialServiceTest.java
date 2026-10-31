@@ -308,12 +308,11 @@ class MaterialServiceTest {
         new MaterialCreateDto(
             "Raw Ouratite", "RAW", "SCU", "manual", null, null, true, false, false, false, false);
     when(materialRepository.save(any(Material.class)))
-        .thenAnswer(
-            inv -> {
-              Material m = inv.getArgument(0);
-              m.setId(UUID.randomUUID());
-              return m;
-            });
+        .thenAnswer(inv -> {
+          Material m = inv.getArgument(0);
+          m.setId(UUID.randomUUID());
+          return m;
+        });
 
     Material saved = materialService.createMaterial(dto);
 

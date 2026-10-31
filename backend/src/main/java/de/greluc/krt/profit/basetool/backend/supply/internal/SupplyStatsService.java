@@ -149,13 +149,12 @@ public class SupplyStatsService {
       }
     }
     return rows.stream()
-        .map(
-            row ->
-                new SupplyStatsDto.DonorTotal(
-                    names.getOrDefault(row.donorUserId(), "—"),
-                    row.entry(),
-                    row.donations(),
-                    row.amount()))
+        .map(row ->
+            new SupplyStatsDto.DonorTotal(
+                names.getOrDefault(row.donorUserId(), "—"),
+                row.entry(),
+                row.donations(),
+                row.amount()))
         .sorted(
             Comparator.comparing(
                     SupplyStatsDto.DonorTotal::donorName, String.CASE_INSENSITIVE_ORDER)

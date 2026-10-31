@@ -187,9 +187,9 @@ class BackendApiClientHappyPathTest {
   }
 
   /**
-   * The one exception, and the reason it is a named method rather than a flag: the Nutzungs-
-   * bedingungen have to be readable before anyone has accepted them, so the consent gate has
-   * something to point at. It is one of the four public backend paths REQ-SEC-052 enumerates.
+   * The one exception, and the reason it is a named method rather than a flag: the
+   * Nutzungs-bedingungen have to be readable before anyone has accepted them, so the consent gate
+   * has something to point at. It is one of the four public backend paths REQ-SEC-052 enumerates.
    *
    * @throws Exception if the request could not be read back from the stub server
    */
@@ -285,10 +285,9 @@ class BackendApiClientHappyPathTest {
       assertEquals(CatalogPages.MAX_CATALOG_PAGES, server.getRequestCount());
       assertTrue(
           appender.list.stream()
-              .anyMatch(
-                  event ->
-                      event.getLevel() == Level.WARN
-                          && event.getFormattedMessage().contains("safety cap")),
+              .anyMatch(event ->
+                  event.getLevel() == Level.WARN
+                      && event.getFormattedMessage().contains("safety cap")),
           "hitting the cap must be loud in the log");
     } finally {
       logger.detachAppender(appender);

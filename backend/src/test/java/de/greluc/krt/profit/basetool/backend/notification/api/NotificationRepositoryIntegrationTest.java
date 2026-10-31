@@ -77,44 +77,41 @@ class NotificationRepositoryIntegrationTest {
    */
   @AfterEach
   void removeSeededRecipients() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          userRepository.deleteAllById(seededRecipients);
-          seededRecipients.clear();
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      userRepository.deleteAllById(seededRecipients);
+      seededRecipients.clear();
+    });
   }
 
   private Notification save(UUID recipient, boolean read, Instant readAt) {
-    return transactionTemplate.execute(
-        status -> {
-          ensureRecipient(recipient);
-          Notification n =
-              Notification.builder()
-                  .recipientUserId(recipient)
-                  .type(NotificationType.JOB_ORDER_CREATED)
-                  .entityType("JOB_ORDER")
-                  .entityId(UUID.randomUUID())
-                  .read(read)
-                  .readAt(readAt)
-                  .build();
-          return repository.save(n);
-        });
+    return transactionTemplate.execute(status -> {
+      ensureRecipient(recipient);
+      Notification n =
+          Notification.builder()
+              .recipientUserId(recipient)
+              .type(NotificationType.JOB_ORDER_CREATED)
+              .entityType("JOB_ORDER")
+              .entityId(UUID.randomUUID())
+              .read(read)
+              .readAt(readAt)
+              .build();
+      return repository.save(n);
+    });
   }
 
   private Notification save(
       UUID recipient, NotificationType type, String entityType, UUID entityId) {
-    return transactionTemplate.execute(
-        status -> {
-          ensureRecipient(recipient);
-          return repository.save(
-              Notification.builder()
-                  .recipientUserId(recipient)
-                  .type(type)
-                  .entityType(entityType)
-                  .entityId(entityId)
-                  .read(false)
-                  .build());
-        });
+    return transactionTemplate.execute(status -> {
+      ensureRecipient(recipient);
+      return repository.save(
+          Notification.builder()
+              .recipientUserId(recipient)
+              .type(type)
+              .entityType(entityType)
+              .entityId(entityId)
+              .read(false)
+              .build());
+    });
   }
 
   @Test
@@ -198,13 +195,12 @@ class NotificationRepositoryIntegrationTest {
    * @param createdAt the creation instant to write
    */
   private void backdateCreatedAt(UUID id, Instant createdAt) {
-    transactionTemplate.executeWithoutResult(
-        status ->
-            entityManager
-                .createNativeQuery("update notification set created_at = :ts where id = :id")
-                .setParameter("ts", createdAt)
-                .setParameter("id", id)
-                .executeUpdate());
+    transactionTemplate.executeWithoutResult(status ->
+        entityManager
+            .createNativeQuery("update notification set created_at = :ts where id = :id")
+            .setParameter("ts", createdAt)
+            .setParameter("id", id)
+            .executeUpdate());
   }
 
   @Test
@@ -279,9 +275,8 @@ class NotificationRepositoryIntegrationTest {
         .containsExactlyInAnyOrder(staffA, staffB);
 
     int deleted =
-        transactionTemplate.execute(
-            status ->
-                repository.deleteByTypeInAndEntity(created, "BANK_BOOKING_REQUEST", requestId));
+        transactionTemplate.execute(status ->
+            repository.deleteByTypeInAndEntity(created, "BANK_BOOKING_REQUEST", requestId));
 
     assertThat(deleted).isEqualTo(2);
     assertThat(repository.findByIdAndRecipientUserId(a.getId(), staffA)).isEmpty();
@@ -326,10 +321,9 @@ class NotificationRepositoryIntegrationTest {
             UUID.randomUUID());
 
     int deleted =
-        transactionTemplate.execute(
-            status ->
-                repository.deleteByTypeInAndEntityForRecipients(
-                    notices, "BANK_BOOKING_REQUEST", requestId, Set.of(formerHolder)));
+        transactionTemplate.execute(status ->
+            repository.deleteByTypeInAndEntityForRecipients(
+                notices, "BANK_BOOKING_REQUEST", requestId, Set.of(formerHolder)));
 
     assertThat(deleted).isEqualTo(2);
     assertThat(repository.findByIdAndRecipientUserId(formerCreated.getId(), formerHolder))

@@ -549,11 +549,10 @@ class ExchangeOrgStockWriteControllerTest {
     assertThat(
             jdbc.queryForMap(
                 "SELECT * FROM exchange_journal WHERE entity_key = ?", existing.toString()))
-        .satisfies(
-            journal -> {
-              assertThat((String) journal.get("before_state")).contains("\"amount\":5.0");
-              assertThat(journal.get("after_state")).isNull();
-            });
+        .satisfies(journal -> {
+          assertThat((String) journal.get("before_state")).contains("\"amount\":5.0");
+          assertThat(journal.get("after_state")).isNull();
+        });
     assertThat(
             jdbc.queryForList(
                 "SELECT after_state FROM exchange_journal WHERE user_id = ? AND before_state IS"
@@ -1145,12 +1144,11 @@ class ExchangeOrgStockWriteControllerTest {
             entry);
     assertThat(audits).hasSize(2);
     assertThat(audits)
-        .allSatisfy(
-            audit -> {
-              assertThat(audit.get("actor_user_id")).isEqualTo(member);
-              assertThat(audit.get("target_user_id")).isEqualTo(holder);
-              assertThat(audit.get("client_id")).isEqualTo(client);
-            });
+        .allSatisfy(audit -> {
+          assertThat(audit.get("actor_user_id")).isEqualTo(member);
+          assertThat(audit.get("target_user_id")).isEqualTo(holder);
+          assertThat(audit.get("client_id")).isEqualTo(client);
+        });
     assertThat(audits.getFirst().get("details")).asString().contains("dim=JOB_ORDER");
     assertThat(
             jdbc.queryForList(

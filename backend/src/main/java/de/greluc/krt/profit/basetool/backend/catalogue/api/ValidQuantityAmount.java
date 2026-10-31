@@ -38,11 +38,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidQuantityAmount {
   /**
-   * Returns message key resolved from {@code messages*.properties}; defaults to a generic invalid-
-   * amount message and is overridden per failure with a more specific key (positive / integer).
+   * Returns message key resolved from {@code messages*.properties}; defaults to a generic
+   * invalid-amount message and is overridden per failure with a more specific key (positive /
+   * integer).
    *
-   * @return message key resolved from {@code messages*.properties}; defaults to a generic invalid-
-   *     amount message and is overridden per failure with a more specific key (positive / integer)
+   * @return message key resolved from {@code messages*.properties}; defaults to a generic
+   *     invalid-amount message and is overridden per failure with a more specific key (positive /
+   *     integer)
    */
   String message() default "{error.validation.quantity_amount_invalid}";
 

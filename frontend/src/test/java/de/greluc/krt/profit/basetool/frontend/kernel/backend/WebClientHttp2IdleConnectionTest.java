@@ -107,16 +107,14 @@ class WebClientHttp2IdleConnectionTest {
         .host("127.0.0.1")
         .port(0)
         .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
-        .secure(
-            spec ->
-                spec.sslContext(
-                    (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
-                        Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
-        .handle(
-            (request, response) -> {
-              request.withConnection(connection -> peers.add(connection.channel().remoteAddress()));
-              return response.header("Content-Type", "text/plain").sendString(Mono.just("ok"));
-            })
+        .secure(spec ->
+            spec.sslContext(
+                (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
+                    Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
+        .handle((request, response) -> {
+          request.withConnection(connection -> peers.add(connection.channel().remoteAddress()));
+          return response.header("Content-Type", "text/plain").sendString(Mono.just("ok"));
+        })
         .bindNow();
   }
 

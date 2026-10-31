@@ -92,13 +92,11 @@ class AdminMaterialCreateInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       AtomicInteger createPosts = new AtomicInteger();
-      page.onRequest(
-          request -> {
-            if ("POST".equals(request.method())
-                && request.url().endsWith("/admin/materials/ajax")) {
-              createPosts.incrementAndGet();
-            }
-          });
+      page.onRequest(request -> {
+        if ("POST".equals(request.method()) && request.url().endsWith("/admin/materials/ajax")) {
+          createPosts.incrementAndGet();
+        }
+      });
       try {
         E2eSupport.navigate(page, baseUrl + "/admin/materials");
         page.waitForLoadState();

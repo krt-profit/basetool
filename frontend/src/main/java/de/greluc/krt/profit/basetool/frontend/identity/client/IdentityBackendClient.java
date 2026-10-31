@@ -741,11 +741,10 @@ public class IdentityBackendClient {
             webClient
                 .get()
                 .uri(uri, uriVariables)
-                .httpRequest(
-                    request -> {
-                      HttpClientRequest nativeRequest = request.getNativeRequest();
-                      nativeRequest.responseTimeout(responseTimeout);
-                    }),
+                .httpRequest(request -> {
+                  HttpClientRequest nativeRequest = request.getNativeRequest();
+                  nativeRequest.responseTimeout(responseTimeout);
+                }),
         spec -> spec.toEntity(byte[].class));
   }
 }

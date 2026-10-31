@@ -109,27 +109,26 @@ class PersonalDataExportOwnershipTest {
   private static List<String> mismatches(
       Map<String, String> owners, DomainMap domainMap, Map<String, List<Section>> byClass) {
     List<String> out = new ArrayList<>();
-    byClass.forEach(
-        (className, sections) -> {
-          String module = domainMap.ruleFor(className).map(DomainMap.Rule::module).orElse("?");
-          for (Section section : sections) {
-            String key = GdprParticipantCoverageTest.exportKey(section.sql(), owners.keySet());
-            String table = key == null ? null : key.substring(0, key.indexOf('.'));
-            String owner = table == null ? null : owners.get(table);
-            if (owner == null || !owner.equals(module)) {
-              out.add(
-                  section.key()
-                      + " filters "
-                      + table
-                      + " (owner "
-                      + owner
-                      + ") but "
-                      + className
-                      + " is in "
-                      + module);
-            }
-          }
-        });
+    byClass.forEach((className, sections) -> {
+      String module = domainMap.ruleFor(className).map(DomainMap.Rule::module).orElse("?");
+      for (Section section : sections) {
+        String key = GdprParticipantCoverageTest.exportKey(section.sql(), owners.keySet());
+        String table = key == null ? null : key.substring(0, key.indexOf('.'));
+        String owner = table == null ? null : owners.get(table);
+        if (owner == null || !owner.equals(module)) {
+          out.add(
+              section.key()
+                  + " filters "
+                  + table
+                  + " (owner "
+                  + owner
+                  + ") but "
+                  + className
+                  + " is in "
+                  + module);
+        }
+      }
+    });
     return out;
   }
 
@@ -142,11 +141,10 @@ class PersonalDataExportOwnershipTest {
           .lines()
           .map(String::strip)
           .filter(line -> !line.isEmpty())
-          .forEach(
-              line -> {
-                String[] parts = line.split("\\s+");
-                owners.put(parts[0], parts[1]);
-              });
+          .forEach(line -> {
+            String[] parts = line.split("\\s+");
+            owners.put(parts[0], parts[1]);
+          });
     } catch (IOException e) {
       throw new IllegalStateException(e);
     }

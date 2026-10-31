@@ -127,26 +127,24 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
     User holder = row.getUser();
     List<ExchangeOrgStockEntryRow.JobOrder> jobOrders =
         row.getJobOrderAllocations().stream()
-            .map(
-                slice -> {
-                  JobOrderAllocationDto dto = inventoryItemMapper.jobOrderAllocationToDto(slice);
-                  return new ExchangeOrgStockEntryRow.JobOrder(
-                      slice.getJobOrderId(),
-                      dto == null ? null : dto.jobOrderDisplayId(),
-                      amountOf(slice.getAmount()),
-                      Boolean.TRUE.equals(slice.getDelivered()));
-                })
+            .map(slice -> {
+              JobOrderAllocationDto dto = inventoryItemMapper.jobOrderAllocationToDto(slice);
+              return new ExchangeOrgStockEntryRow.JobOrder(
+                  slice.getJobOrderId(),
+                  dto == null ? null : dto.jobOrderDisplayId(),
+                  amountOf(slice.getAmount()),
+                  Boolean.TRUE.equals(slice.getDelivered()));
+            })
             .toList();
     List<ExchangeOrgStockEntryRow.Mission> missions =
         row.getMissionAllocations().stream()
-            .map(
-                slice -> {
-                  MissionAllocationDto dto = inventoryItemMapper.missionAllocationToDto(slice);
-                  return new ExchangeOrgStockEntryRow.Mission(
-                      slice.getMissionId(),
-                      dto == null ? null : dto.missionName(),
-                      amountOf(slice.getAmount()));
-                })
+            .map(slice -> {
+              MissionAllocationDto dto = inventoryItemMapper.missionAllocationToDto(slice);
+              return new ExchangeOrgStockEntryRow.Mission(
+                  slice.getMissionId(),
+                  dto == null ? null : dto.missionName(),
+                  amountOf(slice.getAmount()));
+            })
             .toList();
     Long version = row.getVersion();
     return new ExchangeOrgStockEntryRow(
@@ -215,12 +213,9 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   @Override
   public @NotNull List<LinkedStockRow> gameItemRowsOfOrder(@NotNull UUID jobOrderId) {
     return inventoryRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId).stream()
-        .map(
-            item ->
-                linkedRow(
-                    item,
-                    jobOrderId,
-                    inventoryItemMapper.gameItemToReferenceDto(item.getGameItem())))
+        .map(item ->
+            linkedRow(
+                item, jobOrderId, inventoryItemMapper.gameItemToReferenceDto(item.getGameItem())))
         .toList();
   }
 
@@ -239,15 +234,13 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
       @NotNull Set<UUID> requiredGameItemIds) {
     return Stream.concat(
             inventoryRepository.findByJobOrderIdOrdered(jobOrderId).stream()
-                .filter(
-                    item ->
-                        item.getMaterial() == null
-                            || !requiredMaterialIds.contains(item.getMaterial().getId())),
+                .filter(item ->
+                    item.getMaterial() == null
+                        || !requiredMaterialIds.contains(item.getMaterial().getId())),
             inventoryRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId).stream()
-                .filter(
-                    item ->
-                        item.getGameItem() == null
-                            || !requiredGameItemIds.contains(item.getGameItem().getId())))
+                .filter(item ->
+                    item.getGameItem() == null
+                        || !requiredGameItemIds.contains(item.getGameItem().getId())))
         .map(inventoryItemMapper::toDto)
         .toList();
   }

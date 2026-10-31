@@ -172,10 +172,9 @@ class WebClientConfinementTest {
     for (JavaClass type : classes) {
       boolean builds =
           type.getMethodCallsFromSelf().stream()
-              .anyMatch(
-                  call ->
-                      call.getTargetOwner().isEquivalentTo(WebClient.class)
-                          && Set.of("builder", "create", "mutate").contains(call.getName()));
+              .anyMatch(call ->
+                  call.getTargetOwner().isEquivalentTo(WebClient.class)
+                      && Set.of("builder", "create", "mutate").contains(call.getName()));
       boolean usesBuilder =
           type.getDirectDependenciesFromSelf().stream()
               .anyMatch(d -> d.getTargetClass().isEquivalentTo(WebClient.Builder.class));
@@ -204,10 +203,9 @@ class WebClientConfinementTest {
               .anyMatch(p -> p.isEquivalentTo(WebClient.class));
       boolean bean =
           type.getMethods().stream()
-              .anyMatch(
-                  m ->
-                      m.isAnnotatedWith(Bean.class)
-                          && m.getRawReturnType().isEquivalentTo(WebClient.class));
+              .anyMatch(m ->
+                  m.isAnnotatedWith(Bean.class)
+                      && m.getRawReturnType().isEquivalentTo(WebClient.class));
       if (field || constructor || bean) {
         found.add(outermost(type).getName());
       }
@@ -225,10 +223,9 @@ class WebClientConfinementTest {
     Set<String> found = new TreeSet<>();
     for (JavaClass type : classes) {
       if (type.getDirectDependenciesFromSelf().stream()
-          .anyMatch(
-              d ->
-                  d.getTargetClass().isEquivalentTo(HttpServiceProxyFactory.class)
-                      || d.getTargetClass().isEquivalentTo(WebClientAdapter.class))) {
+          .anyMatch(d ->
+              d.getTargetClass().isEquivalentTo(HttpServiceProxyFactory.class)
+                  || d.getTargetClass().isEquivalentTo(WebClientAdapter.class))) {
         found.add(outermost(type).getName());
       }
     }
@@ -297,11 +294,10 @@ class WebClientConfinementTest {
   }
 
   private static boolean isCaching(Stream<JavaClass> annotationTypes) {
-    return annotationTypes.anyMatch(
-        t ->
-            t.isEquivalentTo(Cacheable.class)
-                || t.isEquivalentTo(CachePut.class)
-                || t.isEquivalentTo(CacheEvict.class));
+    return annotationTypes.anyMatch(t ->
+        t.isEquivalentTo(Cacheable.class)
+            || t.isEquivalentTo(CachePut.class)
+            || t.isEquivalentTo(CacheEvict.class));
   }
 
   private static Optional<String> absoluteUrl(Set<? extends JavaAnnotation<?>> annotations) {

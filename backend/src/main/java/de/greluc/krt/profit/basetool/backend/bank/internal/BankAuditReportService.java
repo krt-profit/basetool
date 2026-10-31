@@ -83,17 +83,14 @@ public class BankAuditReportService {
 
     List<AuditLogPdfFormat.Row> rows =
         events.stream()
-            .map(
-                e ->
-                    new AuditLogPdfFormat.Row(
-                        e.getOccurredAt(),
-                        HandleAnonymisation.humaniseRequired(
-                            e.getActorHandle(), label("general.anonymisedHandle")),
-                        e.getEventType().name(),
-                        e.getAccountId() != null
-                            ? accountNos.getOrDefault(e.getAccountId(), "—")
-                            : "—",
-                        e.getDetails() != null ? e.getDetails() : ""))
+            .map(e ->
+                new AuditLogPdfFormat.Row(
+                    e.getOccurredAt(),
+                    HandleAnonymisation.humaniseRequired(
+                        e.getActorHandle(), label("general.anonymisedHandle")),
+                    e.getEventType().name(),
+                    e.getAccountId() != null ? accountNos.getOrDefault(e.getAccountId(), "—") : "—",
+                    e.getDetails() != null ? e.getDetails() : ""))
             .toList();
 
     byte[] pdf =
@@ -128,10 +125,9 @@ public class BankAuditReportService {
     Map<UUID, String> accountNos = resolveAccountNos(events);
     List<BankAuditEventDto> dtos =
         events.stream()
-            .map(
-                e ->
-                    bankAuditEventMapper.toDto(
-                        e, e.getAccountId() == null ? null : accountNos.get(e.getAccountId())))
+            .map(e ->
+                bankAuditEventMapper.toDto(
+                    e, e.getAccountId() == null ? null : accountNos.get(e.getAccountId())))
             .toList();
     bankAuditService.record(
         BankAuditEventType.AUDIT_LOG_EXPORTED,

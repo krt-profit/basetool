@@ -77,12 +77,11 @@ public class ManagementPortSecurityConfig {
     if (properties.isConfigured()) {
       http.userDetailsService(MonitoringScrapeSecurityConfig.scrapeUsers(properties))
           .httpBasic(Customizer.withDefaults())
-          .authorizeHttpRequests(
-              auth ->
-                  auth.requestMatchers(HEALTH_ENDPOINTS)
-                      .permitAll()
-                      .anyRequest()
-                      .hasRole(MonitoringScrapeSecurityConfig.MONITORING_ROLE));
+          .authorizeHttpRequests(auth ->
+              auth.requestMatchers(HEALTH_ENDPOINTS)
+                  .permitAll()
+                  .anyRequest()
+                  .hasRole(MonitoringScrapeSecurityConfig.MONITORING_ROLE));
     } else {
       http.authorizeHttpRequests(
           auth -> auth.requestMatchers(HEALTH_ENDPOINTS).permitAll().anyRequest().denyAll());

@@ -89,10 +89,8 @@ class UserAccountErasureSeamTest {
       UUID ghost = UUID.randomUUID();
       assertThat(failureOf(() -> accountErasure.deleteAccount(ghost, presence)))
           .isEqualTo(
-              failureOf(
-                  () ->
-                      userDeletionService.deleteUser(
-                          ghost, UserDeletionService.toCheck(presence))));
+              failureOf(() ->
+                  userDeletionService.deleteUser(ghost, UserDeletionService.toCheck(presence))));
     }
   }
 
@@ -105,10 +103,9 @@ class UserAccountErasureSeamTest {
       User direct = member(true);
       String seamFailure = failureOf(() -> accountErasure.deleteAccount(viaSeam.getId(), presence));
       String directFailure =
-          failureOf(
-              () ->
-                  userDeletionService.deleteUser(
-                      direct.getId(), UserDeletionService.toCheck(presence)));
+          failureOf(() ->
+              userDeletionService.deleteUser(
+                  direct.getId(), UserDeletionService.toCheck(presence)));
       assertThat(seamFailure).startsWith("BadRequestException:").isEqualTo(directFailure);
       assertThat(userRepository.existsById(viaSeam.getId())).isTrue();
     }
@@ -133,9 +130,8 @@ class UserAccountErasureSeamTest {
         failureOf(
             () -> accountErasure.deleteAccount(liveViaSeam.getId(), KeycloakPresence.ENFORCED));
     String directFailure =
-        failureOf(
-            () ->
-                userDeletionService.deleteUser(liveDirect.getId(), KeycloakPresenceCheck.ENFORCED));
+        failureOf(() ->
+            userDeletionService.deleteUser(liveDirect.getId(), KeycloakPresenceCheck.ENFORCED));
     assertThat(seamFailure).startsWith("BadRequestException:").isEqualTo(directFailure);
 
     assertSameDeletion(KeycloakPresence.ENFORCED);
@@ -164,15 +160,14 @@ class UserAccountErasureSeamTest {
     return auditEventRepository.findAll().stream()
         .sorted(Comparator.comparing(AuditEvent::getOccurredAt))
         .skip(skip)
-        .map(
-            e ->
-                e.getDomain()
-                    + "|"
-                    + e.getEventType()
-                    + "|"
-                    + mask(String.valueOf(e.getSubjectLabel()), userId)
-                    + "|"
-                    + mask(String.valueOf(e.getDetails()), userId))
+        .map(e ->
+            e.getDomain()
+                + "|"
+                + e.getEventType()
+                + "|"
+                + mask(String.valueOf(e.getSubjectLabel()), userId)
+                + "|"
+                + mask(String.valueOf(e.getDetails()), userId))
         .toList();
   }
 
@@ -195,13 +190,12 @@ class UserAccountErasureSeamTest {
     Role adminRole =
         roleRepository
             .findByNameIgnoreCase("ADMIN")
-            .orElseGet(
-                () -> {
-                  Role fresh = new Role();
-                  fresh.setName("ADMIN");
-                  fresh.setCode("ADMIN");
-                  return roleRepository.save(fresh);
-                });
+            .orElseGet(() -> {
+              Role fresh = new Role();
+              fresh.setName("ADMIN");
+              fresh.setCode("ADMIN");
+              return roleRepository.save(fresh);
+            });
     User admin = new User();
     admin.setId(UUID.randomUUID());
     admin.setUsername("erasure-admin-" + admin.getId());

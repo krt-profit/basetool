@@ -138,31 +138,30 @@ class JobOrderServicePriorityAndStatusTest {
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
-        .thenAnswer(
-            inv -> {
-              JobOrder o = inv.getArgument(0);
-              return new JobOrderDto(
-                  o.getId(),
-                  o.getDisplayId(),
-                  null,
-                  null,
-                  o.getHandle(),
-                  o.getComment(),
-                  o.getPriority(),
-                  o.getStatus(),
-                  JobOrderType.MATERIAL,
-                  o.isCountBlueprintsWithVariants(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  null,
-                  o.getVersion(),
-                  null,
-                  false);
-            });
+        .thenAnswer(inv -> {
+          JobOrder o = inv.getArgument(0);
+          return new JobOrderDto(
+              o.getId(),
+              o.getDisplayId(),
+              null,
+              null,
+              o.getHandle(),
+              o.getComment(),
+              o.getPriority(),
+              o.getStatus(),
+              JobOrderType.MATERIAL,
+              o.isCountBlueprintsWithVariants(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              null,
+              o.getVersion(),
+              null,
+              false);
+        });
 
     Squadron testSquadron = new Squadron();
     testSquadron.setShorthand("Alpha");
@@ -229,11 +228,10 @@ class JobOrderServicePriorityAndStatusTest {
           .map(
               de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent.class
                   ::cast)
-          .filter(
-              e ->
-                  e.eventType()
-                      == de.greluc.krt.profit.basetool.backend.notification.api
-                          .NotificationEventType.JOB_ORDER_FINISHED)
+          .filter(e ->
+              e.eventType()
+                  == de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
+                      .JOB_ORDER_FINISHED)
           .findFirst()
           .orElseThrow();
     }
@@ -277,12 +275,10 @@ class JobOrderServicePriorityAndStatusTest {
 
       verify(eventPublisher, never())
           .publishEvent(
-              org.mockito.ArgumentMatchers.<Object>argThat(
-                  e ->
-                      e
-                          instanceof
-                          de.greluc.krt.profit.basetool.backend.notification.api.events
-                              .NoticeEvent));
+              org.mockito.ArgumentMatchers.<Object>argThat(e ->
+                  e
+                      instanceof
+                      de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent));
     }
 
     @Test

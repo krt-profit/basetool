@@ -128,11 +128,10 @@ class ExchangeInstallationControllerTest {
             installationRepository.touch(
                 "versekit-inst", MEMBER, KEY, later, later.minusSeconds(1)))
         .singleElement()
-        .satisfies(
-            t -> {
-              assertThat(t.getInserted()).as("a later touch updates, it does not create").isFalse();
-              assertThat(t.getId()).isEqualTo(first.getFirst().getId());
-            });
+        .satisfies(t -> {
+          assertThat(t.getInserted()).as("a later touch updates, it does not create").isFalse();
+          assertThat(t.getId()).isEqualTo(first.getFirst().getId());
+        });
   }
 
   @Test

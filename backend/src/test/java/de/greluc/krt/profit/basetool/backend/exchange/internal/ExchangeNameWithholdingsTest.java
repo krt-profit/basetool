@@ -85,12 +85,11 @@ class ExchangeNameWithholdingsTest {
     when(userRepository.existsById(USER)).thenReturn(true);
     when(repository.findById(USER)).thenReturn(Optional.empty());
     when(repository.saveAndFlush(any(ExchangeNameWithholding.class)))
-        .thenAnswer(
-            invocation -> {
-              ExchangeNameWithholding saved = invocation.getArgument(0);
-              saved.setVersion(0L);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          ExchangeNameWithholding saved = invocation.getArgument(0);
+          saved.setVersion(0L);
+          return saved;
+        });
 
     ExchangeNameWithholdings.Snapshot result = withholdings.update(USER, true, 0L);
 

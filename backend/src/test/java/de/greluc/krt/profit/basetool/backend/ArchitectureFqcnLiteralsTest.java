@@ -85,10 +85,9 @@ class ArchitectureFqcnLiteralsTest {
       return paths
           .filter(Files::isRegularFile)
           .filter(p -> p.toString().endsWith(".java"))
-          .filter(
-              p ->
-                  p.getFileName().toString().startsWith("Architecture")
-                      || p.toString().replace('\\', '/').contains("/architecture/fixtures/"))
+          .filter(p ->
+              p.getFileName().toString().startsWith("Architecture")
+                  || p.toString().replace('\\', '/').contains("/architecture/fixtures/"))
           .sorted()
           .toList();
     } catch (IOException e) {

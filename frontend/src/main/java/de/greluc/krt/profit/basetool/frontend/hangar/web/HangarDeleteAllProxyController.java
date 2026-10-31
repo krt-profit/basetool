@@ -52,11 +52,10 @@ public class HangarDeleteAllProxyController {
   @DeleteMapping("/all")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Void> deleteAllShips() {
-    withBackendStatus(
-        () -> {
-          hangarClient.deleteAllShips();
-          return null;
-        });
+    withBackendStatus(() -> {
+      hangarClient.deleteAllShips();
+      return null;
+    });
     return ResponseEntity.noContent().build();
   }
 }

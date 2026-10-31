@@ -353,12 +353,11 @@ class MissionServiceSectionPatchTest {
     when(userRepository.findPlainById(newOwnerId)).thenReturn(Optional.of(newOwner));
     when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.empty());
     when(missionOwnershipRepository.saveAndFlush(any(MissionOwnership.class)))
-        .thenAnswer(
-            inv -> {
-              MissionOwnership row = inv.getArgument(0);
-              ownerAtEachFlush.add(row.getOwner().getId());
-              return flushOwnership(row);
-            });
+        .thenAnswer(inv -> {
+          MissionOwnership row = inv.getArgument(0);
+          ownerAtEachFlush.add(row.getOwner().getId());
+          return flushOwnership(row);
+        });
 
     Mission result = missionService.updateMissionOwner(missionId, newOwnerId, 0L);
 

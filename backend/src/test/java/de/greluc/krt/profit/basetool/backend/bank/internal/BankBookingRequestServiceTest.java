@@ -156,9 +156,8 @@ class BankBookingRequestServiceTest {
     Authentication caller = new TestingAuthenticationToken("employee", "n/a");
     when(bankSecurityService.isManagement()).thenReturn(true);
     when(bankSecurityService.confirmCheck(caller))
-        .thenReturn(
-            (type, accountId) ->
-                type == BankBookingRequestType.DEPOSIT && accountId.equals(grantedAccount));
+        .thenReturn((type, accountId) ->
+            type == BankBookingRequestType.DEPOSIT && accountId.equals(grantedAccount));
     when(requestRepository.findByStatusIn(any(), any(Pageable.class)))
         .thenReturn(
             new PageImpl<>(
@@ -250,12 +249,11 @@ class BankBookingRequestServiceTest {
                 new OrgUnitMembershipOptionDto(
                     orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
     when(requestRepository.save(any(BankBookingRequest.class)))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest saved = invocation.getArgument(0);
-              saved.setId(UUID.randomUUID());
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest saved = invocation.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
 
     BankBookingRequestDto dto =
         service.create(
@@ -358,12 +356,11 @@ class BankBookingRequestServiceTest {
     user.setUsername("officer");
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(user));
     when(requestRepository.save(any(BankBookingRequest.class)))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest saved = invocation.getArgument(0);
-              saved.setId(UUID.randomUUID());
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest saved = invocation.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
 
     BankBookingRequestDto dto =
         service.create(
@@ -408,12 +405,11 @@ class BankBookingRequestServiceTest {
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
     ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
     when(requestRepository.save(saved.capture()))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest r = invocation.getArgument(0);
-              r.setId(UUID.randomUUID());
-              return r;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest r = invocation.getArgument(0);
+          r.setId(UUID.randomUUID());
+          return r;
+        });
 
     service.create(
         accountId,
@@ -501,12 +497,11 @@ class BankBookingRequestServiceTest {
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
     ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
     when(requestRepository.save(saved.capture()))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest r = invocation.getArgument(0);
-              r.setId(UUID.randomUUID());
-              return r;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest r = invocation.getArgument(0);
+          r.setId(UUID.randomUUID());
+          return r;
+        });
 
     service.create(
         accountId,
@@ -536,12 +531,11 @@ class BankBookingRequestServiceTest {
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
     ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
     when(requestRepository.save(saved.capture()))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest r = invocation.getArgument(0);
-              r.setId(UUID.randomUUID());
-              return r;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest r = invocation.getArgument(0);
+          r.setId(UUID.randomUUID());
+          return r;
+        });
 
     service.create(
         accountId,

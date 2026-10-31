@@ -152,15 +152,14 @@ class OwnerScopeServiceTest {
         .when(
             orgUnitCascadeService.expandWithDescendants(
                 org.mockito.ArgumentMatchers.anyCollection()))
-        .thenAnswer(
-            invocation -> {
-              java.util.Collection<OrgUnitMembership> rows = invocation.getArgument(0);
-              java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
-              for (OrgUnitMembership row : rows) {
-                ids.add(row.getId().getOrgUnitId());
-              }
-              return ids;
-            });
+        .thenAnswer(invocation -> {
+          java.util.Collection<OrgUnitMembership> rows = invocation.getArgument(0);
+          java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+          for (OrgUnitMembership row : rows) {
+            ids.add(row.getId().getOrgUnitId());
+          }
+          return ids;
+        });
 
     StaffelMembershipResolver realResolver =
         new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
@@ -1471,11 +1470,10 @@ class OwnerScopeServiceTest {
           .when(request.getAttribute(anyString()))
           .thenAnswer(inv -> requestAttributes.get(inv.getArgument(0, String.class)));
       lenient()
-          .doAnswer(
-              inv -> {
-                requestAttributes.put(inv.getArgument(0), inv.getArgument(1));
-                return null;
-              })
+          .doAnswer(inv -> {
+            requestAttributes.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+          })
           .when(request)
           .setAttribute(anyString(), any());
     }

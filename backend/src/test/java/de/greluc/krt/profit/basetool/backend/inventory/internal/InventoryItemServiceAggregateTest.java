@@ -353,33 +353,32 @@ class InventoryItemServiceAggregateTest {
   private void stubRefMapper() {
     lenient()
         .when(inventoryItemMapper.toDto(any(InventoryItem.class)))
-        .thenAnswer(
-            invocation -> {
-              InventoryItem probe = invocation.getArgument(0);
-              Material m = probe.getMaterial();
-              Location l = probe.getLocation();
-              return new InventoryItemDto(
-                  null,
-                  null,
-                  m != null
-                      ? new MaterialReferenceDto(m.getId(), m.getName(), m.getQuantityType())
-                      : null,
-                  null,
-                  l != null ? new LocationReferenceDto(l.getId(), l.getName()) : null,
-                  probe.getQuality(),
-                  null,
-                  probe.getPersonal(),
-                  false,
-                  java.util.List.of(),
-                  0.0,
-                  java.util.List.of(),
-                  0.0,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null);
-            });
+        .thenAnswer(invocation -> {
+          InventoryItem probe = invocation.getArgument(0);
+          Material m = probe.getMaterial();
+          Location l = probe.getLocation();
+          return new InventoryItemDto(
+              null,
+              null,
+              m != null
+                  ? new MaterialReferenceDto(m.getId(), m.getName(), m.getQuantityType())
+                  : null,
+              null,
+              l != null ? new LocationReferenceDto(l.getId(), l.getName()) : null,
+              probe.getQuality(),
+              null,
+              probe.getPersonal(),
+              false,
+              java.util.List.of(),
+              0.0,
+              java.util.List.of(),
+              0.0,
+              null,
+              null,
+              null,
+              null,
+              null);
+        });
   }
 
   private static InventoryStackAggregate agg(

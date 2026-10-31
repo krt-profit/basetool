@@ -109,18 +109,17 @@ class MaterialClaimConcurrencyTest {
     if (fixture == null) {
       return;
     }
-    transactionTemplate.executeWithoutResult(
-        st -> {
-          materialClaimRepository.deleteAll(
-              materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId()));
-          jobOrderRepository.deleteById(fixture.orderId());
-          squadronRepository.deleteById(fixture.squadronId());
-          if (fixture.squadronBId() != null) {
-            squadronRepository.deleteById(fixture.squadronBId());
-          }
-          specialCommandRepository.deleteById(fixture.skId());
-          materialRepository.deleteById(fixture.materialId());
-        });
+    transactionTemplate.executeWithoutResult(st -> {
+      materialClaimRepository.deleteAll(
+          materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId()));
+      jobOrderRepository.deleteById(fixture.orderId());
+      squadronRepository.deleteById(fixture.squadronId());
+      if (fixture.squadronBId() != null) {
+        squadronRepository.deleteById(fixture.squadronBId());
+      }
+      specialCommandRepository.deleteById(fixture.skId());
+      materialRepository.deleteById(fixture.materialId());
+    });
     fixture = null;
   }
 
@@ -149,24 +148,23 @@ class MaterialClaimConcurrencyTest {
       for (int i = 0; i < THREADS; i++) {
         final CreateClaimDto payload = payloads.get(i);
         futures.add(
-            pool.submit(
-                () -> {
-                  SecurityContextHolder.setContext(adminContext);
-                  try {
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrorCount.incrementAndGet();
-                      return;
-                    }
-                    materialClaimService.upsertClaim(fixture.orderId(), payload);
-                    successCount.incrementAndGet();
-                  } catch (Throwable t) {
-                    otherErrorCount.incrementAndGet();
-                    unexpectedErrors.add(t);
-                  } finally {
-                    SecurityContextHolder.clearContext();
-                  }
-                }));
+            pool.submit(() -> {
+              SecurityContextHolder.setContext(adminContext);
+              try {
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrorCount.incrementAndGet();
+                  return;
+                }
+                materialClaimService.upsertClaim(fixture.orderId(), payload);
+                successCount.incrementAndGet();
+              } catch (Throwable t) {
+                otherErrorCount.incrementAndGet();
+                unexpectedErrors.add(t);
+              } finally {
+                SecurityContextHolder.clearContext();
+              }
+            }));
       }
 
       assertThat(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -210,43 +208,42 @@ class MaterialClaimConcurrencyTest {
    * @return the created fixture ids
    */
   private Fixture seed() {
-    return transactionTemplate.execute(
-        status -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          SpecialCommand sk = new SpecialCommand();
-          sk.setName("ClaimRace-SK-" + tag);
-          sk.setShorthand("S" + tag);
-          sk.setProfitEligible(true);
-          sk = specialCommandRepository.save(sk);
+    return transactionTemplate.execute(status -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      SpecialCommand sk = new SpecialCommand();
+      sk.setName("ClaimRace-SK-" + tag);
+      sk.setShorthand("S" + tag);
+      sk.setProfitEligible(true);
+      sk = specialCommandRepository.save(sk);
 
-          Squadron sq = new Squadron();
-          sq.setName("ClaimRace-A-" + tag);
-          sq.setShorthand("A" + tag);
-          sq.setProfitEligible(true);
-          sq = squadronRepository.save(sq);
+      Squadron sq = new Squadron();
+      sq.setName("ClaimRace-A-" + tag);
+      sq.setShorthand("A" + tag);
+      sq.setProfitEligible(true);
+      sq = squadronRepository.save(sq);
 
-          Material mat = new Material();
-          mat.setName("ClaimRaceMat-" + tag);
-          mat.setType(MaterialType.RAW);
-          mat = materialRepository.save(mat);
+      Material mat = new Material();
+      mat.setName("ClaimRaceMat-" + tag);
+      mat.setType(MaterialType.RAW);
+      mat = materialRepository.save(mat);
 
-          JobOrder order =
-              JobOrder.builder()
-                  .responsibleOrgUnit(sk)
-                  .requestingOrgUnit(sq)
-                  .handle("claim-race")
-                  .status(JobOrderStatus.OPEN)
-                  .build();
-          order.addMaterial(
-              JobOrderMaterial.builder()
-                  .material(mat)
-                  .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
-                  .amount(REQUIRED_AMOUNT)
-                  .build());
-          order = jobOrderRepository.save(order);
+      JobOrder order =
+          JobOrder.builder()
+              .responsibleOrgUnit(sk)
+              .requestingOrgUnit(sq)
+              .handle("claim-race")
+              .status(JobOrderStatus.OPEN)
+              .build();
+      order.addMaterial(
+          JobOrderMaterial.builder()
+              .material(mat)
+              .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
+              .amount(REQUIRED_AMOUNT)
+              .build());
+      order = jobOrderRepository.save(order);
 
-          return new Fixture(order.getId(), mat.getId(), sq.getId(), null, sk.getId());
-        });
+      return new Fixture(order.getId(), mat.getId(), sq.getId(), null, sk.getId());
+    });
   }
 
   /**
@@ -279,26 +276,25 @@ class MaterialClaimConcurrencyTest {
       for (int i = 0; i < THREADS; i++) {
         final CreateClaimDto payload = payloads.get(i);
         futures.add(
-            pool.submit(
-                () -> {
-                  SecurityContextHolder.setContext(adminContext);
-                  try {
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrorCount.incrementAndGet();
-                      return;
-                    }
-                    materialClaimService.upsertClaim(fixture.orderId(), payload);
-                    successCount.incrementAndGet();
-                  } catch (BadRequestException overclaim) {
-                    overclaimRejectedCount.incrementAndGet();
-                  } catch (Throwable t) {
-                    otherErrorCount.incrementAndGet();
-                    unexpectedErrors.add(t);
-                  } finally {
-                    SecurityContextHolder.clearContext();
-                  }
-                }));
+            pool.submit(() -> {
+              SecurityContextHolder.setContext(adminContext);
+              try {
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrorCount.incrementAndGet();
+                  return;
+                }
+                materialClaimService.upsertClaim(fixture.orderId(), payload);
+                successCount.incrementAndGet();
+              } catch (BadRequestException overclaim) {
+                overclaimRejectedCount.incrementAndGet();
+              } catch (Throwable t) {
+                otherErrorCount.incrementAndGet();
+                unexpectedErrors.add(t);
+              } finally {
+                SecurityContextHolder.clearContext();
+              }
+            }));
       }
 
       assertThat(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -362,48 +358,47 @@ class MaterialClaimConcurrencyTest {
    * @return the created fixture ids, both squadron ids populated
    */
   private Fixture seedTwoSquadrons() {
-    return transactionTemplate.execute(
-        status -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          SpecialCommand sk = new SpecialCommand();
-          sk.setName("ClaimRace-SK-" + tag);
-          sk.setShorthand("S" + tag);
-          sk.setProfitEligible(true);
-          sk = specialCommandRepository.save(sk);
+    return transactionTemplate.execute(status -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      SpecialCommand sk = new SpecialCommand();
+      sk.setName("ClaimRace-SK-" + tag);
+      sk.setShorthand("S" + tag);
+      sk.setProfitEligible(true);
+      sk = specialCommandRepository.save(sk);
 
-          Squadron sqA = new Squadron();
-          sqA.setName("ClaimRace-A-" + tag);
-          sqA.setShorthand("A" + tag);
-          sqA.setProfitEligible(true);
-          sqA = squadronRepository.save(sqA);
+      Squadron sqA = new Squadron();
+      sqA.setName("ClaimRace-A-" + tag);
+      sqA.setShorthand("A" + tag);
+      sqA.setProfitEligible(true);
+      sqA = squadronRepository.save(sqA);
 
-          Squadron sqB = new Squadron();
-          sqB.setName("ClaimRace-B-" + tag);
-          sqB.setShorthand("B" + tag);
-          sqB.setProfitEligible(true);
-          sqB = squadronRepository.save(sqB);
+      Squadron sqB = new Squadron();
+      sqB.setName("ClaimRace-B-" + tag);
+      sqB.setShorthand("B" + tag);
+      sqB.setProfitEligible(true);
+      sqB = squadronRepository.save(sqB);
 
-          Material mat = new Material();
-          mat.setName("ClaimRaceMat-" + tag);
-          mat.setType(MaterialType.RAW);
-          mat = materialRepository.save(mat);
+      Material mat = new Material();
+      mat.setName("ClaimRaceMat-" + tag);
+      mat.setType(MaterialType.RAW);
+      mat = materialRepository.save(mat);
 
-          JobOrder order =
-              JobOrder.builder()
-                  .responsibleOrgUnit(sk)
-                  .requestingOrgUnit(sqA)
-                  .handle("claim-race")
-                  .status(JobOrderStatus.OPEN)
-                  .build();
-          order.addMaterial(
-              JobOrderMaterial.builder()
-                  .material(mat)
-                  .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
-                  .amount(REQUIRED_AMOUNT)
-                  .build());
-          order = jobOrderRepository.save(order);
+      JobOrder order =
+          JobOrder.builder()
+              .responsibleOrgUnit(sk)
+              .requestingOrgUnit(sqA)
+              .handle("claim-race")
+              .status(JobOrderStatus.OPEN)
+              .build();
+      order.addMaterial(
+          JobOrderMaterial.builder()
+              .material(mat)
+              .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
+              .amount(REQUIRED_AMOUNT)
+              .build());
+      order = jobOrderRepository.save(order);
 
-          return new Fixture(order.getId(), mat.getId(), sqA.getId(), sqB.getId(), sk.getId());
-        });
+      return new Fixture(order.getId(), mat.getId(), sqA.getId(), sqB.getId(), sk.getId());
+    });
   }
 }

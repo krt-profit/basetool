@@ -80,13 +80,12 @@ class TaskMetricsTest {
 
   @Test
   void record_onFailure_countsFailureSwallowsAndPublishesNoLastSuccessGauge() {
-    assertThatCode(
-            () ->
-                taskMetrics.record(
-                    ScheduledJob.UEX_SYNC,
-                    () -> {
-                      throw new IllegalStateException("boom");
-                    }))
+    assertThatCode(() ->
+            taskMetrics.record(
+                ScheduledJob.UEX_SYNC,
+                () -> {
+                  throw new IllegalStateException("boom");
+                }))
         .doesNotThrowAnyException();
 
     assertThat(
@@ -144,13 +143,12 @@ class TaskMetricsTest {
 
   @Test
   void recordCounting_onFailure_countsFailureAndLeavesTheItemsCounterUnregistered() {
-    assertThatCode(
-            () ->
-                taskMetrics.recordCounting(
-                    ScheduledJob.USER_SYNC,
-                    () -> {
-                      throw new IllegalStateException("boom");
-                    }))
+    assertThatCode(() ->
+            taskMetrics.recordCounting(
+                ScheduledJob.USER_SYNC,
+                () -> {
+                  throw new IllegalStateException("boom");
+                }))
         .doesNotThrowAnyException();
 
     assertThat(
@@ -292,13 +290,12 @@ class TaskMetricsTest {
   void recordCountingRethrow_rethrowsAnUncheckedFailureUnwrappedAndCountsIt() {
     RuntimeException boom = new IllegalStateException("boom");
 
-    assertThatThrownBy(
-            () ->
-                taskMetrics.recordCountingRethrow(
-                    ScheduledJob.USER_SYNC,
-                    () -> {
-                      throw boom;
-                    }))
+    assertThatThrownBy(() ->
+            taskMetrics.recordCountingRethrow(
+                ScheduledJob.USER_SYNC,
+                () -> {
+                  throw boom;
+                }))
         .isSameAs(boom);
     assertThat(
             registry
@@ -317,13 +314,12 @@ class TaskMetricsTest {
   void recordCountingRethrow_wrapsACheckedFailureUncheckedAndCountsIt() {
     Exception checked = new Exception("checked");
 
-    assertThatThrownBy(
-            () ->
-                taskMetrics.recordCountingRethrow(
-                    ScheduledJob.USER_SYNC,
-                    () -> {
-                      throw checked;
-                    }))
+    assertThatThrownBy(() ->
+            taskMetrics.recordCountingRethrow(
+                ScheduledJob.USER_SYNC,
+                () -> {
+                  throw checked;
+                }))
         .isInstanceOf(IllegalStateException.class)
         .hasCause(checked);
   }

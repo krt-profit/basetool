@@ -109,18 +109,17 @@ class PersonMentionCatalogueTest {
     List<String> lines = new ArrayList<>();
     new TreeSet<>(
             MentionSourceDeclarations.targets().stream()
-                .map(
-                    t ->
-                        "target|"
-                            + t.area()
-                            + "|"
-                            + t.table()
-                            + "|"
-                            + t.column()
-                            + "|"
-                            + t.idColumn()
-                            + "|"
-                            + t.linkKind())
+                .map(t ->
+                    "target|"
+                        + t.area()
+                        + "|"
+                        + t.table()
+                        + "|"
+                        + t.column()
+                        + "|"
+                        + t.idColumn()
+                        + "|"
+                        + t.linkKind())
                 .toList())
         .forEach(lines::add);
     add(lines, "exempt-column|", MentionSourceDeclarations.exemptColumns());

@@ -98,12 +98,11 @@ class AsyncConfigTest {
       AtomicReference<String> observedUser = new AtomicReference<>();
       CountDownLatch done = new CountDownLatch(1);
 
-      executor.execute(
-          () -> {
-            observedCorrelation.set(MDC.get("correlationId"));
-            observedUser.set(MDC.get("userId"));
-            done.countDown();
-          });
+      executor.execute(() -> {
+        observedCorrelation.set(MDC.get("correlationId"));
+        observedUser.set(MDC.get("userId"));
+        done.countDown();
+      });
 
       assertEquals(
           true,
@@ -129,20 +128,18 @@ class AsyncConfigTest {
 
     MDC.put("correlationId", "first-id");
     CountDownLatch firstDone = new CountDownLatch(1);
-    executor.execute(
-        () -> {
-          firstDone.countDown();
-        });
+    executor.execute(() -> {
+      firstDone.countDown();
+    });
     assertEquals(true, firstDone.await(5, TimeUnit.SECONDS));
     MDC.clear();
 
     AtomicReference<String> leakedCorrelation = new AtomicReference<>("never-written");
     CountDownLatch secondDone = new CountDownLatch(1);
-    executor.execute(
-        () -> {
-          leakedCorrelation.set(MDC.get("correlationId"));
-          secondDone.countDown();
-        });
+    executor.execute(() -> {
+      leakedCorrelation.set(MDC.get("correlationId"));
+      secondDone.countDown();
+    });
     assertEquals(true, secondDone.await(5, TimeUnit.SECONDS));
     assertNull(
         leakedCorrelation.get(),

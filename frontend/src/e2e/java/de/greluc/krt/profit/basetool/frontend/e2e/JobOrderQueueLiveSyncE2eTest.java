@@ -114,12 +114,11 @@ class JobOrderQueueLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().length > 0)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
         E2eSupport.navigate(pageA, baseUrl + "/orders/create");
         pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);

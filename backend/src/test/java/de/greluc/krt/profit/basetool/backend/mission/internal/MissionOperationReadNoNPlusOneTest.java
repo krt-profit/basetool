@@ -131,11 +131,10 @@ class MissionOperationReadNoNPlusOneTest {
     assertThat(many)
         .filteredOn(row -> row.operation() != null)
         .hasSize(MANY)
-        .allSatisfy(
-            row -> {
-              assertThat(row.operation().name()).startsWith("Embed Op");
-              assertThat(row.operation().owningSquadron().id()).isEqualTo(unit.getId());
-            });
+        .allSatisfy(row -> {
+          assertThat(row.operation().name()).startsWith("Embed Op");
+          assertThat(row.operation().owningSquadron().id()).isEqualTo(unit.getId());
+        });
     assertThat(many).filteredOn(row -> row.operation() == null).hasSize(1);
     assertThat(manyStatements)
         .as("statements for " + MANY + " missions against " + FEW + " (N+1)")
@@ -152,12 +151,11 @@ class MissionOperationReadNoNPlusOneTest {
     readOnly.setReadOnly(true);
 
     MissionOperationDto embedded =
-        readOnly.execute(
-            _ -> {
-              Mission loaded = missionRepository.findById(linked.getId()).orElseThrow();
-              MissionDto dto = missionMapper.toDto(loaded);
-              return dto.operation();
-            });
+        readOnly.execute(_ -> {
+          Mission loaded = missionRepository.findById(linked.getId()).orElseThrow();
+          MissionDto dto = missionMapper.toDto(loaded);
+          return dto.operation();
+        });
 
     assertThat(embedded).isNotNull();
     assertThat(embedded.id()).isEqualTo(operation.getId());
@@ -189,12 +187,11 @@ class MissionOperationReadNoNPlusOneTest {
   private List<MissionListDto> listRows(String tag) {
     TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
     readOnly.setReadOnly(true);
-    return readOnly.execute(
-        _ ->
-            missionService
-                .searchMissions(tag, null, null, null, null, null, PageRequest.of(0, 100))
-                .map(mission -> missionMapper.toListDto(mission, 0L, false))
-                .getContent());
+    return readOnly.execute(_ ->
+        missionService
+            .searchMissions(tag, null, null, null, null, null, PageRequest.of(0, 100))
+            .map(mission -> missionMapper.toListDto(mission, 0L, false))
+            .getContent());
   }
 
   private String seed(int linkedMissions) {

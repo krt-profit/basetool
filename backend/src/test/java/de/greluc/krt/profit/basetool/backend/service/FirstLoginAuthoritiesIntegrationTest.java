@@ -62,13 +62,12 @@ class FirstLoginAuthoritiesIntegrationTest {
    */
   @AfterEach
   void removeWhatTheseCasesCreated() {
-    createdSubjects.forEach(
-        id -> {
-          jdbcTemplate.update("DELETE FROM terms_acceptance WHERE user_id = ?", id);
-          jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", id);
-          jdbcTemplate.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", id);
-          jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", id);
-        });
+    createdSubjects.forEach(id -> {
+      jdbcTemplate.update("DELETE FROM terms_acceptance WHERE user_id = ?", id);
+      jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", id);
+      jdbcTemplate.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", id);
+      jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", id);
+    });
     createdSubjects.clear();
   }
 

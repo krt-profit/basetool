@@ -117,11 +117,10 @@ class JobOrderMaterialStockRowQueryDataTest {
     assertThat(rows)
         .as("only rows linked to the order are returned; the unlinked 1000-SCU item is excluded")
         .hasSize(3)
-        .allSatisfy(
-            r -> {
-              assertThat(r.jobOrderId()).isEqualTo(order.getId());
-              assertThat(r.materialId()).isEqualTo(material.getId());
-            });
+        .allSatisfy(r -> {
+          assertThat(r.jobOrderId()).isEqualTo(order.getId());
+          assertThat(r.materialId()).isEqualTo(material.getId());
+        });
     assertThat(rows)
         .extracting(
             JobOrderMaterialStockRow::inventoryItemId,

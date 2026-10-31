@@ -175,11 +175,10 @@ class ScLinkCatalogTest {
                 Arrays.stream(ScLinkCategory.values())
                     .map(category -> "scLinks.category." + category.getKey()),
                 Arrays.stream(ScLink.values())
-                    .flatMap(
-                        link ->
-                            Stream.of(
-                                "scLinks.link." + link.getKey() + ".name",
-                                "scLinks.link." + link.getKey() + ".description")))
+                    .flatMap(link ->
+                        Stream.of(
+                            "scLinks.link." + link.getKey() + ".name",
+                            "scLinks.link." + link.getKey() + ".description")))
             .flatMap(s -> s)
             .toList();
     for (String key : required) {

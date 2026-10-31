@@ -188,16 +188,15 @@ class ExchangeBlueprintControllerTest {
     String cursor = snapshotEnd();
 
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            s -> {
-              jdbc.queryForObject(
-                  "SELECT set_config('basetool.change_source', ?, true)",
-                  String.class,
-                  "client|" + client + "|" + KEY);
-              jdbc.update(
-                  "DELETE FROM personal_blueprint WHERE owner_user_id = ? AND product_key = 's71'",
-                  member);
-            });
+        .executeWithoutResult(s -> {
+          jdbc.queryForObject(
+              "SELECT set_config('basetool.change_source', ?, true)",
+              String.class,
+              "client|" + client + "|" + KEY);
+          jdbc.update(
+              "DELETE FROM personal_blueprint WHERE owner_user_id = ? AND product_key = 's71'",
+              member);
+        });
     blueprint(member, "p4-ar");
 
     read(relayed(get(PATH).param("cursor", cursor), "exchange.blueprints.read"))

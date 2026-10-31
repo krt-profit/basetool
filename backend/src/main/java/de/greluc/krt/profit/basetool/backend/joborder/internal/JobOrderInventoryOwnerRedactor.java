@@ -52,14 +52,13 @@ public class JobOrderInventoryOwnerRedactor {
       return null;
     }
     return groups.stream()
-        .map(
-            g ->
-                new JobOrderItemStockGroupDto(
-                    g.gameItem(),
-                    g.orderedAmount(),
-                    g.manufacturedAmount(),
-                    g.allocatedTotal(),
-                    g.entries().stream().map(this::redactItemStockEntry).toList()))
+        .map(g ->
+            new JobOrderItemStockGroupDto(
+                g.gameItem(),
+                g.orderedAmount(),
+                g.manufacturedAmount(),
+                g.allocatedTotal(),
+                g.entries().stream().map(this::redactItemStockEntry).toList()))
         .toList();
   }
 
@@ -98,20 +97,19 @@ public class JobOrderInventoryOwnerRedactor {
       return null;
     }
     return entries.stream()
-        .map(
-            e ->
-                new MaterialCollectionEntryDto(
-                    e.inventoryEntryId(),
-                    e.version(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    e.materialName(),
-                    e.quality(),
-                    e.quantity(),
-                    e.allocatedQuantity(),
-                    e.delivered()))
+        .map(e ->
+            new MaterialCollectionEntryDto(
+                e.inventoryEntryId(),
+                e.version(),
+                null,
+                null,
+                null,
+                null,
+                e.materialName(),
+                e.quality(),
+                e.quantity(),
+                e.allocatedQuantity(),
+                e.delivered()))
         .toList();
   }
 

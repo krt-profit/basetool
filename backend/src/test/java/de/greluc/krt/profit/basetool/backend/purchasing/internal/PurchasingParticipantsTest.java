@@ -70,13 +70,12 @@ class PurchasingParticipantsTest {
         .extracting(PersonMentionSource.Target::column)
         .containsExactly("name", "org_tag", "conditions_note", "reputation_note");
     assertThat(targets)
-        .allSatisfy(
-            target -> {
-              assertThat(target.area()).isEqualTo("PURCHASING");
-              assertThat(target.table()).isEqualTo("purchasing_partner");
-              assertThat(target.idColumn()).isEqualTo("id");
-              assertThat(target.linkKind()).isNull();
-            });
+        .allSatisfy(target -> {
+          assertThat(target.area()).isEqualTo("PURCHASING");
+          assertThat(target.table()).isEqualTo("purchasing_partner");
+          assertThat(target.idColumn()).isEqualTo("id");
+          assertThat(target.linkKind()).isNull();
+        });
   }
 
   @Test

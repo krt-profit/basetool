@@ -326,15 +326,14 @@ public class MaterialClaimService implements ClaimBucketSource {
         materialClaimRepository
             .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
                 jobOrderId, dto.materialId(), tier.getId(), dto.claimingOrgUnitId())
-            .orElseGet(
-                () -> {
-                  MaterialClaim fresh = new MaterialClaim();
-                  fresh.setJobOrder(order);
-                  fresh.setMaterial(resolveMaterial(order, dto.materialId()));
-                  fresh.setQualityTier(tier);
-                  fresh.setClaimingOrgUnit(resolveClaimingOrgUnit(dto.claimingOrgUnitId()));
-                  return fresh;
-                });
+            .orElseGet(() -> {
+              MaterialClaim fresh = new MaterialClaim();
+              fresh.setJobOrder(order);
+              fresh.setMaterial(resolveMaterial(order, dto.materialId()));
+              fresh.setQualityTier(tier);
+              fresh.setClaimingOrgUnit(resolveClaimingOrgUnit(dto.claimingOrgUnitId()));
+              return fresh;
+            });
     claim.setAmount(amount);
     authHelperService
         .currentUserId()
@@ -442,10 +441,9 @@ public class MaterialClaimService implements ClaimBucketSource {
     Map<Bucket, Double> required = requiredByBucket(order);
     List<MaterialClaim> orphaned =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId()).stream()
-            .filter(
-                c ->
-                    !required.containsKey(
-                        new Bucket(c.getMaterial().getId(), c.getQualityTier().getId())))
+            .filter(c ->
+                !required.containsKey(
+                    new Bucket(c.getMaterial().getId(), c.getQualityTier().getId())))
             .toList();
     if (!orphaned.isEmpty()) {
       materialClaimRepository.deleteAll(orphaned);
@@ -551,10 +549,9 @@ public class MaterialClaimService implements ClaimBucketSource {
     return tiersOf(order).values().stream()
         .filter(t -> t.getCode().equals(code))
         .findFirst()
-        .orElseThrow(
-            () ->
-                new BadRequestException(
-                    "Quality tier " + code + " is not used by order " + order.getId()));
+        .orElseThrow(() ->
+            new BadRequestException(
+                "Quality tier " + code + " is not used by order " + order.getId()));
   }
 
   /**
@@ -666,11 +663,10 @@ public class MaterialClaimService implements ClaimBucketSource {
     OrgUnit orgUnit =
         orgUnitRepository
             .findById(claimingOrgUnitId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "claimingOrgUnitId does not resolve to a known org unit: "
-                            + claimingOrgUnitId));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "claimingOrgUnitId does not resolve to a known org unit: "
+                        + claimingOrgUnitId));
     if (orgUnit.getKind() != OrgUnitKind.SQUADRON) {
       throw new BadRequestException(
           "Only squadrons may claim material; " + claimingOrgUnitId + " is not a squadron.");

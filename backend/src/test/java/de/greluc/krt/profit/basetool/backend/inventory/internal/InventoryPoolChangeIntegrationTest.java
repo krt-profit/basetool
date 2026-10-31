@@ -211,12 +211,10 @@ class InventoryPoolChangeIntegrationTest {
   private @NotNull UUID move(@NotNull UUID row, @NotNull UUID target, Double amount) {
     UUID caller = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     long version = ((Number) column(row, "version")).longValue();
-    return transactionTemplate.execute(
-        _ ->
-            poolChangeService
-                .changePool(
-                    row, new InventoryItemPoolChangeDto(version, target, amount, null), caller)
-                .id());
+    return transactionTemplate.execute(_ ->
+        poolChangeService
+            .changePool(row, new InventoryItemPoolChangeDto(version, target, amount, null), caller)
+            .id());
   }
 
   /**

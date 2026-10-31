@@ -204,11 +204,10 @@ class MemberHangarPageControllerTest {
     verify(backendApiClient)
         .post(
             eq("/api/v1/hangar/admin/users/{userId}/ships"),
-            argThat(
-                (ShipRequestDto r) ->
-                    type.equals(r.shipTypeId())
-                        && unit.equals(r.owningOrgUnitId())
-                        && r.version() == null),
+            argThat((ShipRequestDto r) ->
+                type.equals(r.shipTypeId())
+                    && unit.equals(r.owningOrgUnitId())
+                    && r.version() == null),
             eq(ShipDto.class),
             eq(MEMBER));
   }
@@ -251,9 +250,8 @@ class MemberHangarPageControllerTest {
     verify(backendApiClient)
         .put(
             eq("/api/v1/hangar/admin/users/{userId}/ships/{shipId}"),
-            argThat(
-                (ShipRequestDto r) ->
-                    Long.valueOf(5L).equals(r.version()) && r.owningOrgUnitId() == null),
+            argThat((ShipRequestDto r) ->
+                Long.valueOf(5L).equals(r.version()) && r.owningOrgUnitId() == null),
             eq(ShipDto.class),
             eq(MEMBER),
             eq(SHIP));
@@ -372,10 +370,8 @@ class MemberHangarPageControllerTest {
     verify(backendApiClient)
         .put(
             eq("/api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit"),
-            argThat(
-                (ShipOrgUnitRequestDto r) ->
-                    unit.equals(r.orgUnitId())
-                        && Long.valueOf(2L).equals(r.owningOrgUnitVersion())),
+            argThat((ShipOrgUnitRequestDto r) ->
+                unit.equals(r.orgUnitId()) && Long.valueOf(2L).equals(r.owningOrgUnitVersion())),
             eq(ShipDto.class),
             eq(MEMBER),
             eq(SHIP));
@@ -446,9 +442,8 @@ class MemberHangarPageControllerTest {
     verify(backendApiClient)
         .post(
             eq("/api/v1/hangar/admin/users/{userId}/ships/bulk-org-unit"),
-            argThat(
-                (ShipBulkOrgUnitRequestDto r) ->
-                    r.shipIds().equals(List.of(SHIP, other)) && r.orgUnitId() == null),
+            argThat((ShipBulkOrgUnitRequestDto r) ->
+                r.shipIds().equals(List.of(SHIP, other)) && r.orgUnitId() == null),
             eq(ShipBulkOrgUnitResultDto.class),
             eq(MEMBER));
   }

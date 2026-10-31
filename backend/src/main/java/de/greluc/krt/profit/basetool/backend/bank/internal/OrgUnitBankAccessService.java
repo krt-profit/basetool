@@ -112,13 +112,12 @@ public class OrgUnitBankAccessService {
             .collect(Collectors.groupingBy(grant -> grant.getAccount().getId()));
     List<BankAccount> visible =
         active.stream()
-            .filter(
-                account ->
-                    admin
-                        || canViewInternal(
-                            account,
-                            viewScope,
-                            grantsByAccount.getOrDefault(account.getId(), List.of())))
+            .filter(account ->
+                admin
+                    || canViewInternal(
+                        account,
+                        viewScope,
+                        grantsByAccount.getOrDefault(account.getId(), List.of())))
             .toList();
     if (visible.isEmpty()) {
       return List.of();
@@ -131,29 +130,27 @@ public class OrgUnitBankAccessService {
             .stream()
             .collect(Collectors.groupingBy(limit -> limit.getAccount().getId()));
     return visible.stream()
-        .map(
-            account -> {
-              BigDecimal balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
-              List<BankPostingSlice> slices =
-                  slicesByAccount.getOrDefault(account.getId(), List.of());
-              BigDecimal delta = BankTrendCalculator.windowDelta(slices);
-              boolean canRequest = isRequestCapable(account);
-              boolean approvalExempt = canRequest && isApprovalExempt(account);
-              BigDecimal approvalLimit =
-                  canRequest && !approvalExempt
-                      ? resolveApplicableLimit(
-                          account, limitsByAccount.getOrDefault(account.getId(), List.of()))
-                      : null;
-              return toDto(
-                  account,
-                  balance,
-                  canRequest,
-                  delta,
-                  BankTrendCalculator.sparkline(balance, delta, slices),
-                  canManageSettings(account),
-                  approvalLimit,
-                  approvalExempt);
-            })
+        .map(account -> {
+          BigDecimal balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
+          List<BankPostingSlice> slices = slicesByAccount.getOrDefault(account.getId(), List.of());
+          BigDecimal delta = BankTrendCalculator.windowDelta(slices);
+          boolean canRequest = isRequestCapable(account);
+          boolean approvalExempt = canRequest && isApprovalExempt(account);
+          BigDecimal approvalLimit =
+              canRequest && !approvalExempt
+                  ? resolveApplicableLimit(
+                      account, limitsByAccount.getOrDefault(account.getId(), List.of()))
+                  : null;
+          return toDto(
+              account,
+              balance,
+              canRequest,
+              delta,
+              BankTrendCalculator.sparkline(balance, delta, slices),
+              canManageSettings(account),
+              approvalLimit,
+              approvalExempt);
+        })
         .toList();
   }
 
@@ -394,9 +391,8 @@ public class OrgUnitBankAccessService {
             .map(Bereich::getId)
             .collect(Collectors.toSet());
     return profitBereichIds.stream()
-        .anyMatch(
-            id ->
-                ownerScopeService.currentUserHoldsRoleOnOrgUnit(id, MembershipRole.BEREICHSLEITER));
+        .anyMatch(id ->
+            ownerScopeService.currentUserHoldsRoleOnOrgUnit(id, MembershipRole.BEREICHSLEITER));
   }
 
   /**

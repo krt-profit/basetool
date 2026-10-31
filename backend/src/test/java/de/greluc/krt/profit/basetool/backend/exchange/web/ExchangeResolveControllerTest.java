@@ -293,9 +293,8 @@ class ExchangeResolveControllerTest {
                 .content("{\"kind\":\"ITEM\",\"refs\":[{\"name\":\"x\"}]}")
                 .with(
                     jwt()
-                        .jwt(
-                            token ->
-                                token.subject(MEMBER.toString()).claim("azp", "basetool-frontend"))
+                        .jwt(token ->
+                            token.subject(MEMBER.toString()).claim("azp", "basetool-frontend"))
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isForbidden());
   }

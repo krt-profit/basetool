@@ -254,15 +254,14 @@ class UexItemPriceSyncServiceTest {
     when(gameItemRepository.getReferenceById(item3.getId())).thenReturn(item3);
     when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
     when(gameItemPriceRepository.save(any(GameItemPrice.class)))
-        .thenAnswer(
-            inv -> {
-              GameItemPrice p = inv.getArgument(0);
-              if (p.getGameItem() == item2) {
-                throw new IllegalStateException("simulated save failure for the middle row");
-              }
-              p.setId(p.getGameItem() == item1 ? id1 : id3);
-              return p;
-            });
+        .thenAnswer(inv -> {
+          GameItemPrice p = inv.getArgument(0);
+          if (p.getGameItem() == item2) {
+            throw new IllegalStateException("simulated save failure for the middle row");
+          }
+          p.setId(p.getGameItem() == item1 ? id1 : id3);
+          return p;
+        });
     when(gameItemPriceRepository.findIdsWithLivePrices()).thenReturn(List.of(id1, id3, staleId));
 
     service.syncItemPrices();
@@ -286,14 +285,13 @@ class UexItemPriceSyncServiceTest {
   private void stubSaveAssigningId() {
     lenient()
         .when(gameItemPriceRepository.save(any(GameItemPrice.class)))
-        .thenAnswer(
-            inv -> {
-              GameItemPrice p = inv.getArgument(0);
-              if (p.getId() == null) {
-                p.setId(UUID.randomUUID());
-              }
-              return p;
-            });
+        .thenAnswer(inv -> {
+          GameItemPrice p = inv.getArgument(0);
+          if (p.getId() == null) {
+            p.setId(UUID.randomUUID());
+          }
+          return p;
+        });
   }
 
   private static UexItemPriceDto dto(

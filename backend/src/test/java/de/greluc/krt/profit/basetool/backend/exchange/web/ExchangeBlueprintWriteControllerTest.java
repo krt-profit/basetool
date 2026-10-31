@@ -260,12 +260,11 @@ class ExchangeBlueprintWriteControllerTest {
     String rifle = product("Arrowhead Rifle");
     owns(rifle);
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            s -> {
-              jdbc.queryForObject(
-                  "SELECT set_config('basetool.change_source', 'web', true)", String.class);
-              jdbc.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", member);
-            });
+        .executeWithoutResult(s -> {
+          jdbc.queryForObject(
+              "SELECT set_config('basetool.change_source', 'web', true)", String.class);
+          jdbc.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", member);
+        });
     String add = "{\"ops\":[{\"op\":\"add\",\"ref\":{\"bt\":\"%s\"}%s}]}";
 
     change(add.formatted(rifle, ""), KEY)

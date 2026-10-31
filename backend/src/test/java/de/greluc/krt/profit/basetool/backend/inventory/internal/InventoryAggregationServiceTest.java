@@ -875,36 +875,35 @@ class InventoryAggregationServiceTest {
   private void stubItemRefMapper() {
     lenient()
         .when(inventoryItemMapper.toDto(any(InventoryItem.class)))
-        .thenAnswer(
-            invocation -> {
-              InventoryItem probe = invocation.getArgument(0);
-              GameItem gameItem = probe.getGameItem();
-              Location location = probe.getLocation();
-              return new InventoryItemDto(
-                  null,
-                  null,
-                  null,
-                  gameItem != null
-                      ? new InventoryGameItemReferenceDto(
-                          gameItem.getId(), gameItem.getName(), null, null)
-                      : null,
-                  location != null
-                      ? new LocationReferenceDto(location.getId(), location.getName())
-                      : null,
-                  probe.getQuality(),
-                  null,
-                  probe.getPersonal(),
-                  false,
-                  List.of(),
-                  0.0,
-                  List.of(),
-                  0.0,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null);
-            });
+        .thenAnswer(invocation -> {
+          InventoryItem probe = invocation.getArgument(0);
+          GameItem gameItem = probe.getGameItem();
+          Location location = probe.getLocation();
+          return new InventoryItemDto(
+              null,
+              null,
+              null,
+              gameItem != null
+                  ? new InventoryGameItemReferenceDto(
+                      gameItem.getId(), gameItem.getName(), null, null)
+                  : null,
+              location != null
+                  ? new LocationReferenceDto(location.getId(), location.getName())
+                  : null,
+              probe.getQuality(),
+              null,
+              probe.getPersonal(),
+              false,
+              List.of(),
+              0.0,
+              List.of(),
+              0.0,
+              null,
+              null,
+              null,
+              null,
+              null);
+        });
   }
 
   /**

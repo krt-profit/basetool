@@ -161,77 +161,65 @@ public class HangarPageController {
 
     CompletableFuture<PageResponse<ShipDto>> shipsFuture =
         parallelPageLoader
-            .<PageResponse<ShipDto>>loadAsync(
-                () -> {
-                  PageResponse<ShipDto> p =
-                      hangarClient.myShips(
-                          effectivePage, effectiveSize, fittedFilter, effectiveSearch);
-                  return p != null
-                      ? p
-                      : new PageResponse<>(
-                          List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
-                })
-            .exceptionally(
-                e -> {
-                  log.error("Failed to fetch my ships", e);
-                  shipsFailed.set(true);
-                  model.addAttribute("error", "error.hangar.ships.load");
-                  return new PageResponse<>(
-                      List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
-                });
+            .<PageResponse<ShipDto>>loadAsync(() -> {
+              PageResponse<ShipDto> p =
+                  hangarClient.myShips(effectivePage, effectiveSize, fittedFilter, effectiveSearch);
+              return p != null
+                  ? p
+                  : new PageResponse<>(List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
+            })
+            .exceptionally(e -> {
+              log.error("Failed to fetch my ships", e);
+              shipsFailed.set(true);
+              model.addAttribute("error", "error.hangar.ships.load");
+              return new PageResponse<>(List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
+            });
 
     Boolean counterpartFitted = fittedFilter == null ? Boolean.TRUE : null;
     CompletableFuture<Long> counterpartFuture =
         parallelPageLoader
             .<Long>loadAsync(
                 () -> totalOf(hangarClient.myShips(0, 1, counterpartFitted, effectiveSearch)))
-            .exceptionally(
-                e -> {
-                  log.warn("Failed to count my ships for the readiness counter", e);
-                  return null;
-                });
+            .exceptionally(e -> {
+              log.warn("Failed to count my ships for the readiness counter", e);
+              return null;
+            });
 
     CompletableFuture<Long> unitTypeCountFuture =
         fragmentOnly
             ? CompletableFuture.completedFuture(null)
             : parallelPageLoader
                 .<Long>loadAsync(() -> totalOf(hangarClient.squadronOverview(0, 1, null)))
-                .exceptionally(
-                    e -> {
-                      log.warn("Failed to count the org-unit overview for the hangar tab", e);
-                      return null;
-                    });
+                .exceptionally(e -> {
+                  log.warn("Failed to count the org-unit overview for the hangar tab", e);
+                  return null;
+                });
 
     CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                catalogListLoader.loadPageContent(
-                    CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, "ship types"));
+        parallelPageLoader.loadAsync(() ->
+            catalogListLoader.loadPageContent(
+                CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, "ship types"));
 
     CompletableFuture<List<LocationDto>> locationsFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                catalogListLoader.loadPageContent(
-                    CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, "locations"));
+        parallelPageLoader.loadAsync(() ->
+            catalogListLoader.loadPageContent(
+                CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, "locations"));
 
     CompletableFuture<List<ManufacturerDto>> manufacturersFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                catalogListLoader.loadPageContent(
-                    CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, "manufacturers"));
+        parallelPageLoader.loadAsync(() ->
+            catalogListLoader.loadPageContent(
+                CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, "manufacturers"));
 
     CompletableFuture<List<LocationDto>> homeLocationsFuture =
         parallelPageLoader
-            .<List<LocationDto>>loadAsync(
-                () -> {
-                  List<LocationDto> hl = hangarClient.homeLocations();
-                  return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
-                })
-            .exceptionally(
-                e -> {
-                  log.error("Failed to fetch home locations", e);
-                  return new ArrayList<>();
-                });
+            .<List<LocationDto>>loadAsync(() -> {
+              List<LocationDto> hl = hangarClient.homeLocations();
+              return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
+            })
+            .exceptionally(e -> {
+              log.error("Failed to fetch home locations", e);
+              return new ArrayList<>();
+            });
 
     CompletableFuture.allOf(
             shipsFuture,
@@ -461,11 +449,10 @@ public class HangarPageController {
             ? CompletableFuture.completedFuture(null)
             : parallelPageLoader
                 .<Long>loadAsync(() -> totalOf(hangarClient.myShips(0, 1, null, null)))
-                .exceptionally(
-                    e -> {
-                      log.warn("Failed to count my ships for the hangar tab", e);
-                      return null;
-                    });
+                .exceptionally(e -> {
+                  log.warn("Failed to count my ships for the hangar tab", e);
+                  return null;
+                });
 
     AtomicReference<PageResponse<SquadronShipOverviewDto>> loaded = new AtomicReference<>();
     if (!SectionFallback.run(

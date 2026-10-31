@@ -1296,12 +1296,9 @@ public class MissionController {
     List<UUID> missionIds = missions.getContent().stream().map(Mission::getId).toList();
     Map<UUID, Long> counts = missionService.registeredCounts(missionIds);
     Set<UUID> signedUp = missionService.signedUpMissionIds(missionIds);
-    return missions.map(
-        mission ->
-            missionMapper.toListDto(
-                mission,
-                counts.getOrDefault(mission.getId(), 0L),
-                signedUp.contains(mission.getId())));
+    return missions.map(mission ->
+        missionMapper.toListDto(
+            mission, counts.getOrDefault(mission.getId(), 0L), signedUp.contains(mission.getId())));
   }
 
   /**

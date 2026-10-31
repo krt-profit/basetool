@@ -77,18 +77,17 @@ public class AuditReportService {
     List<AuditEvent> events = auditEventRepository.findForExport(domain, from, to);
     List<AuditLogPdfFormat.Row> rows =
         events.stream()
-            .map(
-                e ->
-                    new AuditLogPdfFormat.Row(
-                        e.getOccurredAt(),
-                        HandleAnonymisation.humaniseRequired(
-                            e.getActorHandle(), label("general.anonymisedHandle")),
-                        e.getEventType().name(),
-                        e.getSubjectLabel() == null
-                            ? "—"
-                            : HandleAnonymisation.humaniseRequired(
-                                e.getSubjectLabel(), label("general.anonymisedHandle")),
-                        e.getDetails() != null ? e.getDetails() : ""))
+            .map(e ->
+                new AuditLogPdfFormat.Row(
+                    e.getOccurredAt(),
+                    HandleAnonymisation.humaniseRequired(
+                        e.getActorHandle(), label("general.anonymisedHandle")),
+                    e.getEventType().name(),
+                    e.getSubjectLabel() == null
+                        ? "—"
+                        : HandleAnonymisation.humaniseRequired(
+                            e.getSubjectLabel(), label("general.anonymisedHandle")),
+                    e.getDetails() != null ? e.getDetails() : ""))
             .toList();
 
     byte[] pdf =

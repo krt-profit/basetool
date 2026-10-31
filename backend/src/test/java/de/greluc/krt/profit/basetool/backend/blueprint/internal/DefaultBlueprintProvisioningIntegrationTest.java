@@ -46,27 +46,25 @@ class DefaultBlueprintProvisioningIntegrationTest {
 
   private UUID createUser(boolean inKeycloak) {
     UUID id = UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User u = new User();
-          u.setId(id);
-          u.setUsername("user-" + id);
-          u.setInKeycloak(inKeycloak);
-          userRepository.save(u);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User u = new User();
+      u.setId(id);
+      u.setUsername("user-" + id);
+      u.setInKeycloak(inKeycloak);
+      userRepository.save(u);
+    });
     return id;
   }
 
   private String createDefault() {
     String key = "test-default-" + UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          DefaultBlueprint d = new DefaultBlueprint();
-          d.setProductKey(key);
-          d.setProductName("Test Default " + key);
-          d.setCreatedBy("system");
-          defaultBlueprintRepository.save(d);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      DefaultBlueprint d = new DefaultBlueprint();
+      d.setProductKey(key);
+      d.setProductName("Test Default " + key);
+      d.setCreatedBy("system");
+      defaultBlueprintRepository.save(d);
+    });
     return key;
   }
 

@@ -549,21 +549,18 @@ public class RequestScopeResolver {
   private Optional<UUID> resolvePersistentSquadronFromUser() {
     return authHelper
         .currentUserId()
-        .flatMap(
-            userId -> {
-              List<OrgUnitMembership> rows =
-                  orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-                      userId, OrgUnitKind.SQUADRON);
-              if (rows.isEmpty()) {
-                return Optional.empty();
-              }
-              Optional<UUID> pinned = readActiveSquadronFromHeader();
-              if (pinned.isPresent()
-                  && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
-                return pinned;
-              }
-              return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream()
-                  .findFirst();
-            });
+        .flatMap(userId -> {
+          List<OrgUnitMembership> rows =
+              orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
+          if (rows.isEmpty()) {
+            return Optional.empty();
+          }
+          Optional<UUID> pinned = readActiveSquadronFromHeader();
+          if (pinned.isPresent()
+              && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
+            return pinned;
+          }
+          return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream().findFirst();
+        });
   }
 }

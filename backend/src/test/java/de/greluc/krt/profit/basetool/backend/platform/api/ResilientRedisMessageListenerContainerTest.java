@@ -53,11 +53,10 @@ class ResilientRedisMessageListenerContainerTest {
       AtomicInteger attempts, long retryIntervalMillis) {
     RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
     when(factory.getConnection())
-        .thenAnswer(
-            invocation -> {
-              attempts.incrementAndGet();
-              throw new RedisConnectionFailureException("Connection refused");
-            });
+        .thenAnswer(invocation -> {
+          attempts.incrementAndGet();
+          throw new RedisConnectionFailureException("Connection refused");
+        });
     ResilientRedisMessageListenerContainer container =
         new ResilientRedisMessageListenerContainer(retryIntervalMillis);
     container.setBeanName("testFanoutContainer");

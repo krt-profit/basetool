@@ -339,40 +339,36 @@ public class ExchangeRelay {
     String token = tokenProvider.currentToken();
     String correlationId = MDC.get(loggingProperties.correlationIdMdcKey());
     String language = sanitizedAcceptLanguage(acceptLanguage);
-    return circuitBreaker.executeSupplier(
-        () -> {
-          RestClient.RequestBodySpec request =
-              backendRestClient
-                  .method(method)
-                  .uri(backendPath)
-                  .headers(
-                      headers -> {
-                        headers.setBearerAuth(token);
-                        headers.set(ON_BEHALF_OF_HEADER, context.member());
-                        headers.set(CLIENT_HEADER, context.clientId());
-                        headers.set(
-                            CAPABILITIES_HEADER,
-                            String.join(",", new TreeSet<>(context.capabilities())));
-                        headers.set(INSTALLATION_HEADER, context.keyThumbprint());
-                        if (context.connectedAt() != null) {
-                          headers.set(CONNECTED_AT_HEADER, Long.toString(context.connectedAt()));
-                        }
-                        headers.setAccept(
-                            List.of(
-                                MediaType.APPLICATION_JSON, MediaType.APPLICATION_PROBLEM_JSON));
-                        if (language != null) {
-                          headers.set(HttpHeaders.ACCEPT_LANGUAGE, language);
-                        }
-                        if (correlationId != null && !correlationId.isBlank()) {
-                          headers.set(loggingProperties.correlationIdHeader(), correlationId);
-                        }
-                      });
-          if (body != null) {
-            request.contentType(MediaType.APPLICATION_JSON).body(body);
-          }
-          return request.exchange(
-              (_, res) -> new Raw(res.getStatusCode().value(), read(res.getBody())));
-        });
+    return circuitBreaker.executeSupplier(() -> {
+      RestClient.RequestBodySpec request =
+          backendRestClient
+              .method(method)
+              .uri(backendPath)
+              .headers(headers -> {
+                headers.setBearerAuth(token);
+                headers.set(ON_BEHALF_OF_HEADER, context.member());
+                headers.set(CLIENT_HEADER, context.clientId());
+                headers.set(
+                    CAPABILITIES_HEADER, String.join(",", new TreeSet<>(context.capabilities())));
+                headers.set(INSTALLATION_HEADER, context.keyThumbprint());
+                if (context.connectedAt() != null) {
+                  headers.set(CONNECTED_AT_HEADER, Long.toString(context.connectedAt()));
+                }
+                headers.setAccept(
+                    List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_PROBLEM_JSON));
+                if (language != null) {
+                  headers.set(HttpHeaders.ACCEPT_LANGUAGE, language);
+                }
+                if (correlationId != null && !correlationId.isBlank()) {
+                  headers.set(loggingProperties.correlationIdHeader(), correlationId);
+                }
+              });
+      if (body != null) {
+        request.contentType(MediaType.APPLICATION_JSON).body(body);
+      }
+      return request.exchange(
+          (_, res) -> new Raw(res.getStatusCode().value(), read(res.getBody())));
+    });
   }
 
   /**

@@ -145,12 +145,11 @@ class MaterialExchangeServiceTest {
         .thenAnswer(call -> Optional.ofNullable(rows.get(call.<UUID>getArgument(0))));
     lenient()
         .when(stockReads.findRowsWithMaterial(any()))
-        .thenAnswer(
-            call ->
-                call.<Collection<UUID>>getArgument(0).stream()
-                    .map(rows::get)
-                    .filter(Objects::nonNull)
-                    .toList());
+        .thenAnswer(call ->
+            call.<Collection<UUID>>getArgument(0).stream()
+                .map(rows::get)
+                .filter(Objects::nonNull)
+                .toList());
     lenient()
         .when(userMapper.toReferenceDto(any()))
         .thenReturn(new UserReferenceDto(ownerId, "Anbieter", "Anbieter", "Anbieter", null));
@@ -258,10 +257,8 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(stockReads.findRow(itemId)).thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
 
-    assertThatThrownBy(
-            () ->
-                service.release(
-                    new MaterialExchangeReleaseRequest(itemId, 120.0, "tausche gegen X")))
+    assertThatThrownBy(() ->
+            service.release(new MaterialExchangeReleaseRequest(itemId, 120.0, "tausche gegen X")))
         .isInstanceOf(AccessDeniedException.class);
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
@@ -370,10 +367,8 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
 
-    assertThatThrownBy(
-            () ->
-                service.updateOffer(
-                    offerId, new MaterialExchangeOfferUpdateRequest(50.0, "neu", 2L)))
+    assertThatThrownBy(() ->
+            service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(50.0, "neu", 2L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     verify(offerRepository, never()).saveAndFlush(any());
   }
@@ -404,9 +399,8 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
 
-    assertThatThrownBy(
-            () ->
-                service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(80.0, "x", 1L)))
+    assertThatThrownBy(() ->
+            service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(80.0, "x", 1L)))
         .isInstanceOf(BadRequestException.class);
     verify(offerRepository, never()).saveAndFlush(any());
   }
@@ -915,9 +909,8 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findById(offerId)).thenReturn(Optional.of(itemOffer));
 
-    assertThatThrownBy(
-            () ->
-                service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(5.0, "x", 1L)))
+    assertThatThrownBy(() ->
+            service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(5.0, "x", 1L)))
         .isInstanceOf(BadRequestException.class);
     verify(offerRepository, never()).saveAndFlush(any());
   }

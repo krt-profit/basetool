@@ -336,116 +336,105 @@ public class SecurityConfig {
 
     http.csrf(AbstractHttpConfigurer::disable)
         .cors(AbstractHttpConfigurer::disable)
-        .headers(
-            headers -> {
-              headers.contentSecurityPolicy(
-                  csp ->
-                      csp.policyDirectives(
-                          "default-src 'none'; frame-ancestors 'none'; base-uri 'none';"
-                              + " form-action 'none'"));
-              headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
-              headers.referrerPolicy(
-                  ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
-              headers.crossOriginOpenerPolicy(
-                  coop ->
-                      coop.policy(
-                          org.springframework.security.web.header.writers
-                              .CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy
-                              .SAME_ORIGIN));
-              headers.crossOriginResourcePolicy(
-                  corp ->
-                      corp.policy(
-                          org.springframework.security.web.header.writers
-                              .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
-                              .SAME_ORIGIN));
-              headers.httpStrictTransportSecurity(
-                  hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
-              headers.addHeaderWriter(
-                  new StaticHeadersWriter(
-                      "Permissions-Policy",
-                      "geolocation=(), camera=(), microphone=(), fullscreen=(),"
-                          + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
-                          + " gyroscope=(), magnetometer=(), display-capture=(),"
-                          + " clipboard-read=(), clipboard-write=(), interest-cohort=()"));
-              headers.contentTypeOptions(Customizer.withDefaults());
-            })
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers("/error")
-                    .permitAll()
-                    .requestMatchers("/v3/api-docs*", "/v3/api-docs/**")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers("/actuator/health", "/actuator/health/**")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/actuator/loggers/**")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers("/internal/**")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
-                    .permitAll()
-                    .requestMatchers(
-                        "/api/v1/*/admin/**",
-                        "/api/v1/announcements/current/admin",
-                        "/api/v1/roles",
-                        "/api/v1/roles/**")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
-                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    .requestMatchers("/api/v1/users/lookup")
-                    .hasAnyRole(
-                        Roles.ADMIN,
-                        Roles.OFFICER,
-                        Roles.KRT_MEMBER,
-                        Roles.BANK_MANAGEMENT,
-                        Roles.BANK_EMPLOYEE)
-                    .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/users")
-                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
-                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers("/api/v1/users/**")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/hangar/ships")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.PUT, "/api/v1/hangar/ships/*")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.DELETE, "/api/v1/hangar/ships/*")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/ships")
-                    .authenticated()
-                    .requestMatchers("/api/v1/hangar/**")
-                    .hasAnyAuthority(
-                        Permissions.HANGAR_READ,
-                        Permissions.HANGAR_WRITE,
-                        Roles.authority(Roles.ADMIN))
-                    .requestMatchers(
-                        "/api/v1/inventory/my-inventory", "/api/v1/inventory/my-inventory/**")
-                    .authenticated()
-                    .requestMatchers("/api/v1/inventory", "/api/v1/inventory/**")
-                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.LOGISTICIAN, Roles.KRT_MEMBER)
-                    .requestMatchers("/api/v1/personal-inventory", "/api/v1/personal-inventory/**")
-                    .authenticated()
-                    .requestMatchers("/api/v1/uex/locations/**")
-                    .authenticated()
-                    .requestMatchers("/api/v1/audit/**")
-                    .hasRole(Roles.ADMIN)
-                    .anyRequest()
-                    .authenticated())
-        .exceptionHandling(
-            ex ->
-                ex.authenticationEntryPoint(securityProblemResponseHandler)
-                    .accessDeniedHandler(securityProblemResponseHandler))
-        .oauth2ResourceServer(
-            oauth2 ->
-                oauth2
-                    .authenticationEntryPoint(securityProblemResponseHandler)
-                    .accessDeniedHandler(securityProblemResponseHandler)
-                    .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
+        .headers(headers -> {
+          headers.contentSecurityPolicy(csp ->
+              csp.policyDirectives(
+                  "default-src 'none'; frame-ancestors 'none'; base-uri 'none';"
+                      + " form-action 'none'"));
+          headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
+          headers.referrerPolicy(ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
+          headers.crossOriginOpenerPolicy(coop ->
+              coop.policy(
+                  org.springframework.security.web.header.writers
+                      .CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy.SAME_ORIGIN));
+          headers.crossOriginResourcePolicy(corp ->
+              corp.policy(
+                  org.springframework.security.web.header.writers
+                      .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
+                      .SAME_ORIGIN));
+          headers.httpStrictTransportSecurity(
+              hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
+          headers.addHeaderWriter(
+              new StaticHeadersWriter(
+                  "Permissions-Policy",
+                  "geolocation=(), camera=(), microphone=(), fullscreen=(),"
+                      + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
+                      + " gyroscope=(), magnetometer=(), display-capture=(),"
+                      + " clipboard-read=(), clipboard-write=(), interest-cohort=()"));
+          headers.contentTypeOptions(Customizer.withDefaults());
+        })
+        .authorizeHttpRequests(auth ->
+            auth.requestMatchers("/error")
+                .permitAll()
+                .requestMatchers("/v3/api-docs*", "/v3/api-docs/**")
+                .hasRole(Roles.ADMIN)
+                .requestMatchers("/actuator/health", "/actuator/health/**")
+                .permitAll()
+                .requestMatchers(HttpMethod.POST, "/actuator/loggers/**")
+                .hasRole(Roles.ADMIN)
+                .requestMatchers("/internal/**")
+                .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
+                .permitAll()
+                .requestMatchers(
+                    "/api/v1/*/admin/**",
+                    "/api/v1/announcements/current/admin",
+                    "/api/v1/roles",
+                    "/api/v1/roles/**")
+                .hasRole(Roles.ADMIN)
+                .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
+                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                .requestMatchers("/api/v1/users/lookup")
+                .hasAnyRole(
+                    Roles.ADMIN,
+                    Roles.OFFICER,
+                    Roles.KRT_MEMBER,
+                    Roles.BANK_MANAGEMENT,
+                    Roles.BANK_EMPLOYEE)
+                .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
+                .authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/users")
+                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
+                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
+                .hasRole(Roles.ADMIN)
+                .requestMatchers("/api/v1/users/**")
+                .hasRole(Roles.ADMIN)
+                .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
+                .authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/hangar/ships")
+                .authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/v1/hangar/ships/*")
+                .authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/hangar/ships/*")
+                .authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/ships")
+                .authenticated()
+                .requestMatchers("/api/v1/hangar/**")
+                .hasAnyAuthority(
+                    Permissions.HANGAR_READ, Permissions.HANGAR_WRITE, Roles.authority(Roles.ADMIN))
+                .requestMatchers(
+                    "/api/v1/inventory/my-inventory", "/api/v1/inventory/my-inventory/**")
+                .authenticated()
+                .requestMatchers("/api/v1/inventory", "/api/v1/inventory/**")
+                .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.LOGISTICIAN, Roles.KRT_MEMBER)
+                .requestMatchers("/api/v1/personal-inventory", "/api/v1/personal-inventory/**")
+                .authenticated()
+                .requestMatchers("/api/v1/uex/locations/**")
+                .authenticated()
+                .requestMatchers("/api/v1/audit/**")
+                .hasRole(Roles.ADMIN)
+                .anyRequest()
+                .authenticated())
+        .exceptionHandling(ex ->
+            ex.authenticationEntryPoint(securityProblemResponseHandler)
+                .accessDeniedHandler(securityProblemResponseHandler))
+        .oauth2ResourceServer(oauth2 ->
+            oauth2
+                .authenticationEntryPoint(securityProblemResponseHandler)
+                .accessDeniedHandler(securityProblemResponseHandler)
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
         .addFilterAfter(
             new ApiClientMetricsFilter(clientAttribution, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication

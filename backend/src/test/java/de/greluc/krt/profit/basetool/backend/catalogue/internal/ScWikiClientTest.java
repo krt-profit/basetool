@@ -412,11 +412,9 @@ class ScWikiClientTest {
 
     List<ScWikiClient.FetchResult<ScWikiCommodityDto>> captured = new ArrayList<>();
     List<ILoggingEvent> events =
-        captureClientLog(
-            () ->
-                captured.add(
-                    client.fetchAllPagesResult(
-                        "/api/commodities", commodityTypeRef(), "commodities")));
+        captureClientLog(() ->
+            captured.add(
+                client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")));
 
     assertTrue(
         captured.get(0).complete(),
@@ -439,11 +437,9 @@ class ScWikiClientTest {
 
     List<ScWikiClient.FetchResult<ScWikiCommodityDto>> captured = new ArrayList<>();
     List<ILoggingEvent> events =
-        captureClientLog(
-            () ->
-                captured.add(
-                    client.fetchAllPagesResult(
-                        "/api/commodities", commodityTypeRef(), "commodities")));
+        captureClientLog(() ->
+            captured.add(
+                client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")));
 
     assertFalse(
         captured.get(0).complete(),
@@ -452,10 +448,8 @@ class ScWikiClientTest {
     assertEquals(4, captured.get(0).data().size(), "the rows that did arrive are still returned");
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("only 3 distinct")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN && e.getFormattedMessage().contains("only 3 distinct")),
         "the repeated row must WARN with both counts: " + messages(events));
     assertEquals(
         1.0,
@@ -498,27 +492,24 @@ class ScWikiClientTest {
     server.enqueue(jsonOk(pageBodyWithTotalWithoutLastPage(205, rows(3))));
 
     List<ILoggingEvent> events =
-        captureClientLog(
-            () ->
-                assertFalse(
-                    client
-                        .fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")
-                        .complete(),
-                    "a walk with two census problems is not a complete census"));
+        captureClientLog(() ->
+            assertFalse(
+                client
+                    .fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")
+                    .complete(),
+                "a walk with two census problems is not a complete census"));
 
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("no pagination metadata")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("no pagination metadata")),
         "the missing-last_page problem must still WARN: " + messages(events));
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("meta.total reports")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("meta.total reports")),
         "the total-mismatch problem must still WARN: " + messages(events));
     assertEquals(
         1.0,
@@ -533,27 +524,24 @@ class ScWikiClientTest {
     server.enqueue(new MockResponse().setResponseCode(503));
 
     List<ILoggingEvent> events =
-        captureClientLog(
-            () ->
-                assertFalse(
-                    client
-                        .fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")
-                        .complete(),
-                    "a walk abandoned on page 2 of 3 is not a complete census"));
+        captureClientLog(() ->
+            assertFalse(
+                client
+                    .fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")
+                    .complete(),
+                "a walk abandoned on page 2 of 3 is not a complete census"));
 
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("failed mid-pagination")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("failed mid-pagination")),
         "the dropped page must still WARN: " + messages(events));
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("meta.total reports")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("meta.total reports")),
         "the resulting total mismatch must still WARN: " + messages(events));
     assertEquals(
         1.0,

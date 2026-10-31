@@ -63,48 +63,43 @@ class FrontendClientAuthenticationConfigTest {
     contextRunner
         .withPropertyValues(
             "spring.security.oauth2.client.registration.keycloak.client-secret=test-client-secret")
-        .run(
-            context -> {
-              ClientRegistration registration =
-                  context
-                      .getBean(ClientRegistrationRepository.class)
-                      .findByRegistrationId("keycloak");
-
-              assertThat(registration.getClientAuthenticationMethod())
-                  .isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
-              assertThat(registration.getClientSecret()).isEqualTo("test-client-secret");
-              assertThat(registration.getClientSettings().isRequireProofKey())
-                  .as("PKCE stays on for the confidential client: Keycloak requires S256")
-                  .isTrue();
-            });
-  }
-
-  @Test
-  void withoutASecretTheFrontendStaysThePublicClientItAlwaysWas() {
-    contextRunner.run(
-        context -> {
+        .run(context -> {
           ClientRegistration registration =
               context.getBean(ClientRegistrationRepository.class).findByRegistrationId("keycloak");
 
           assertThat(registration.getClientAuthenticationMethod())
-              .isEqualTo(ClientAuthenticationMethod.NONE);
-          assertThat(registration.getClientSecret()).isEmpty();
-          assertThat(registration.getClientSettings().isRequireProofKey()).isTrue();
+              .isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+          assertThat(registration.getClientSecret()).isEqualTo("test-client-secret");
+          assertThat(registration.getClientSettings().isRequireProofKey())
+              .as("PKCE stays on for the confidential client: Keycloak requires S256")
+              .isTrue();
         });
+  }
+
+  @Test
+  void withoutASecretTheFrontendStaysThePublicClientItAlwaysWas() {
+    contextRunner.run(context -> {
+      ClientRegistration registration =
+          context.getBean(ClientRegistrationRepository.class).findByRegistrationId("keycloak");
+
+      assertThat(registration.getClientAuthenticationMethod())
+          .isEqualTo(ClientAuthenticationMethod.NONE);
+      assertThat(registration.getClientSecret()).isEmpty();
+      assertThat(registration.getClientSettings().isRequireProofKey()).isTrue();
+    });
   }
 
   @Test
   void aBlankSecretIsNoSecret() {
     contextRunner
         .withPropertyValues("spring.security.oauth2.client.registration.keycloak.client-secret=  ")
-        .run(
-            context ->
-                assertThat(
-                        context
-                            .getBean(ClientRegistrationRepository.class)
-                            .findByRegistrationId("keycloak")
-                            .getClientAuthenticationMethod())
-                    .isEqualTo(ClientAuthenticationMethod.NONE));
+        .run(context ->
+            assertThat(
+                    context
+                        .getBean(ClientRegistrationRepository.class)
+                        .findByRegistrationId("keycloak")
+                        .getClientAuthenticationMethod())
+                .isEqualTo(ClientAuthenticationMethod.NONE));
   }
 
   @Test

@@ -107,15 +107,14 @@ class DiscordGuildNicknameReaderTest {
   @Test
   void timeout_isEmpty() throws IOException {
     HttpServer server =
-        start(
-            exchange -> {
-              try {
-                Thread.sleep(2000);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-              writeResponse(exchange, 200, "{\"nick\":\"too slow\"}");
-            });
+        start(exchange -> {
+          try {
+            Thread.sleep(2000);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          writeResponse(exchange, 200, "{\"nick\":\"too slow\"}");
+        });
     try {
       assertTrue(read(server, Duration.ofMillis(300)).isEmpty());
     } finally {

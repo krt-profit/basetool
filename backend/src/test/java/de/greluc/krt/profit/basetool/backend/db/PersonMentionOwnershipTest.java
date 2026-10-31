@@ -101,21 +101,20 @@ class PersonMentionOwnershipTest {
   private static List<String> mismatches(
       Map<String, String> owners, DomainMap domainMap, Map<String, PersonMentionSource> byClass) {
     List<String> out = new ArrayList<>();
-    byClass.forEach(
-        (className, source) -> {
-          String module = domainMap.ruleFor(className).map(DomainMap.Rule::module).orElse("?");
-          List<String> tables = new ArrayList<>();
-          source.targets().forEach(t -> tables.add(t.table()));
-          source.exemptColumns().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
-          source.exemptButMayHoldNames().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
-          tables.addAll(source.exemptTables());
-          for (String table : tables) {
-            String owner = owners.get(table);
-            if (!module.equals(owner)) {
-              out.add(table + " is owned by " + owner + " but " + className + " is in " + module);
-            }
-          }
-        });
+    byClass.forEach((className, source) -> {
+      String module = domainMap.ruleFor(className).map(DomainMap.Rule::module).orElse("?");
+      List<String> tables = new ArrayList<>();
+      source.targets().forEach(t -> tables.add(t.table()));
+      source.exemptColumns().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
+      source.exemptButMayHoldNames().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
+      tables.addAll(source.exemptTables());
+      for (String table : tables) {
+        String owner = owners.get(table);
+        if (!module.equals(owner)) {
+          out.add(table + " is owned by " + owner + " but " + className + " is in " + module);
+        }
+      }
+    });
     return out;
   }
 
@@ -128,11 +127,10 @@ class PersonMentionOwnershipTest {
           .lines()
           .map(String::strip)
           .filter(line -> !line.isEmpty())
-          .forEach(
-              line -> {
-                String[] parts = line.split("\\s+");
-                owners.put(parts[0], parts[1]);
-              });
+          .forEach(line -> {
+            String[] parts = line.split("\\s+");
+            owners.put(parts[0], parts[1]);
+          });
     } catch (IOException e) {
       throw new IllegalStateException(e);
     }

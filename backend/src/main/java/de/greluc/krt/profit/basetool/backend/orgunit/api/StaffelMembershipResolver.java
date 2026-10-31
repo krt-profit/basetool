@@ -91,16 +91,15 @@ public class StaffelMembershipResolver {
     Map<UUID, Squadron> staffelnById =
         staffelIds.isEmpty() ? Map.of() : loadStaffelnById(staffelIds);
     Map<UUID, List<Squadron>> result = new HashMap<>();
-    squadronRowsByUser.forEach(
-        (userId, rows) ->
-            result.put(
-                userId,
-                rows.stream()
-                    .map(r -> staffelnById.get(r.getId().getOrgUnitId()))
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .sorted(BY_NAME)
-                    .toList()));
+    squadronRowsByUser.forEach((userId, rows) ->
+        result.put(
+            userId,
+            rows.stream()
+                .map(r -> staffelnById.get(r.getId().getOrgUnitId()))
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(BY_NAME)
+                .toList()));
     return result;
   }
 

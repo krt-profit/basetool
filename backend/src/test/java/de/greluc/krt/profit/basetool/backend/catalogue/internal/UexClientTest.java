@@ -546,10 +546,9 @@ class UexClientTest {
 
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("envelope status 'error'")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("envelope status 'error'")),
         "a self-declared upstream failure must WARN even with no data: " + messages(events));
     assertEquals(
         1.0, fetchErrorCount(), "a non-ok envelope status counts regardless of the data field");
@@ -563,10 +562,9 @@ class UexClientTest {
 
     assertTrue(
         events.stream()
-            .anyMatch(
-                e ->
-                    e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("envelope status 'error'")),
+            .anyMatch(e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("envelope status 'error'")),
         "a self-declared upstream failure must WARN: " + messages(events));
     assertEquals(1.0, fetchErrorCount(), "a non-ok envelope status must count as a fetch error");
 

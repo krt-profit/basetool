@@ -178,11 +178,10 @@ class ExchangeStockWriteControllerTest {
         .containsExactly(client);
     assertThat(journalRepository.findAllByUserIdOrderByRecordedAtAsc(member))
         .singleElement()
-        .satisfies(
-            e -> {
-              assertThat(e.getAction().name()).isEqualTo("STOCK_SET_QUANTITY");
-              assertThat(e.getAfterState()).contains("12.5");
-            });
+        .satisfies(e -> {
+          assertThat(e.getAction().name()).isEqualTo("STOCK_SET_QUANTITY");
+          assertThat(e.getAfterState()).contains("12.5");
+        });
   }
 
   @Test
@@ -210,15 +209,14 @@ class ExchangeStockWriteControllerTest {
       List<Future<String>> answers = new ArrayList<>();
       for (String target : List.of("6", "4")) {
         answers.add(
-            pool.submit(
-                () -> {
-                  start.await();
-                  return set(laranite, place, 500, target, "10", "SCU")
-                      .andExpect(status().isOk())
-                      .andReturn()
-                      .getResponse()
-                      .getContentAsString();
-                }));
+            pool.submit(() -> {
+              start.await();
+              return set(laranite, place, 500, target, "10", "SCU")
+                  .andExpect(status().isOk())
+                  .andReturn()
+                  .getResponse()
+                  .getContentAsString();
+            }));
       }
       start.countDown();
       List<String> bodies = new ArrayList<>();
@@ -435,12 +433,11 @@ class ExchangeStockWriteControllerTest {
     UUID area18 = location(null);
     row(laranite, area18, 500, 4, null);
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            s -> {
-              jdbc.queryForObject(
-                  "SELECT set_config('basetool.change_source', 'web', true)", String.class);
-              jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
-            });
+        .executeWithoutResult(s -> {
+          jdbc.queryForObject(
+              "SELECT set_config('basetool.change_source', 'web', true)", String.class);
+          jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
+        });
 
     set(laranite, locationName(area18), 500, "4", "0", "SCU")
         .andExpect(jsonPath("$.results[0].reason").value("REMOVED_ELSEWHERE"));

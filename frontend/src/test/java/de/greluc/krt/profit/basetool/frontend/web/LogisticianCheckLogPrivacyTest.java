@@ -113,12 +113,11 @@ class LogisticianCheckLogPrivacyTest {
       String hash = Integer.toHexString(Objects.hashCode(PRINCIPAL_NAME));
       assertThat(appender.list).isNotEmpty();
       assertThat(appender.list)
-          .allSatisfy(
-              e -> {
-                assertThat(e.getFormattedMessage()).doesNotContain(PRINCIPAL_NAME);
-                assertThat(e.getFormattedMessage()).doesNotContain(hash);
-                assertThat(e.getFormattedMessage()).doesNotContain("u-");
-              });
+          .allSatisfy(e -> {
+            assertThat(e.getFormattedMessage()).doesNotContain(PRINCIPAL_NAME);
+            assertThat(e.getFormattedMessage()).doesNotContain(hash);
+            assertThat(e.getFormattedMessage()).doesNotContain("u-");
+          });
     } finally {
       logger.detachAppender(appender);
       logger.setLevel(original);

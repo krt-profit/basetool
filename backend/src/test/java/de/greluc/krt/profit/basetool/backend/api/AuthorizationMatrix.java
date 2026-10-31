@@ -131,26 +131,24 @@ final class AuthorizationMatrix {
   static List<Operation> operations(
       Map<RequestMappingInfo, HandlerMethod> handlerMethods, List<SecurityFilterChain> chains) {
     List<Operation> operations = new ArrayList<>();
-    handlerMethods.forEach(
-        (info, handler) -> {
-          Set<String> verbs = new TreeSet<>();
-          for (RequestMethod method : info.getMethodsCondition().getMethods()) {
-            verbs.add(method.name());
-          }
-          if (verbs.isEmpty()) {
-            verbs.addAll(VERBLESS_EXPANSION);
-          }
-          Class<?> beanType = handler.getBeanType();
-          Method method = handler.getMethod();
-          String handlerName = beanType.getSimpleName() + "#" + method.getName();
-          String gate = effectiveGate(method, beanType);
-          for (String path : info.getPatternValues()) {
-            for (String verb : verbs) {
-              operations.add(
-                  new Operation(verb, path, handlerName, gate, urlRule(chains, verb, path)));
-            }
-          }
-        });
+    handlerMethods.forEach((info, handler) -> {
+      Set<String> verbs = new TreeSet<>();
+      for (RequestMethod method : info.getMethodsCondition().getMethods()) {
+        verbs.add(method.name());
+      }
+      if (verbs.isEmpty()) {
+        verbs.addAll(VERBLESS_EXPANSION);
+      }
+      Class<?> beanType = handler.getBeanType();
+      Method method = handler.getMethod();
+      String handlerName = beanType.getSimpleName() + "#" + method.getName();
+      String gate = effectiveGate(method, beanType);
+      for (String path : info.getPatternValues()) {
+        for (String verb : verbs) {
+          operations.add(new Operation(verb, path, handlerName, gate, urlRule(chains, verb, path)));
+        }
+      }
+    });
     operations.sort(Operation.ORDER);
     return operations;
   }

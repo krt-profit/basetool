@@ -181,12 +181,11 @@ class ExchangeStockUnshareControllerTest {
         .containsExactly(client);
     assertThat(journalRepository.findAllByUserIdOrderByRecordedAtAsc(member))
         .singleElement()
-        .satisfies(
-            e -> {
-              assertThat(e.getAction().name()).isEqualTo("STOCK_UNSHARE");
-              assertThat(e.getEntityKey()).isEqualTo(key);
-              assertThat(e.isRemoval()).isFalse();
-            });
+        .satisfies(e -> {
+          assertThat(e.getAction().name()).isEqualTo("STOCK_UNSHARE");
+          assertThat(e.getEntityKey()).isEqualTo(key);
+          assertThat(e.isRemoval()).isFalse();
+        });
     assertThat(writes("applied")).isEqualTo(1.0);
   }
 

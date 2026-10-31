@@ -61,11 +61,10 @@ class OrphanedAccountRepositoryIntegrationTest {
    */
   @AfterEach
   void removeSeededUsers() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          userRepository.deleteAllById(seeded);
-          seeded.clear();
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      userRepository.deleteAllById(seeded);
+      seeded.clear();
+    });
   }
 
   /**
@@ -77,15 +76,14 @@ class OrphanedAccountRepositoryIntegrationTest {
    */
   private UUID user(boolean inKeycloak, Instant absentSince) {
     UUID id = UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User u = new User();
-          u.setId(id);
-          u.setUsername("orphan-probe-" + id);
-          u.setInKeycloak(inKeycloak);
-          u.setKeycloakAbsentSince(absentSince);
-          userRepository.save(u);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User u = new User();
+      u.setId(id);
+      u.setUsername("orphan-probe-" + id);
+      u.setInKeycloak(inKeycloak);
+      u.setKeycloakAbsentSince(absentSince);
+      userRepository.save(u);
+    });
     seeded.add(id);
     return id;
   }
@@ -121,15 +119,12 @@ class OrphanedAccountRepositoryIntegrationTest {
     UUID present = user(true, null);
     Instant observed = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
-    transactionTemplate.executeWithoutResult(
-        status ->
-            assertThat(userRepository.markMissingUsers(rosterWithout(null), observed)).isZero());
+    transactionTemplate.executeWithoutResult(status ->
+        assertThat(userRepository.markMissingUsers(rosterWithout(null), observed)).isZero());
     assertThat(reload(gone).getKeycloakAbsentSince()).isNull();
 
-    transactionTemplate.executeWithoutResult(
-        status ->
-            assertThat(userRepository.markMissingUsers(rosterWithout(gone), observed))
-                .isEqualTo(1));
+    transactionTemplate.executeWithoutResult(status ->
+        assertThat(userRepository.markMissingUsers(rosterWithout(gone), observed)).isEqualTo(1));
 
     User flagged = reload(gone);
     assertThat(flagged.isInKeycloak()).isFalse();
@@ -183,13 +178,12 @@ class OrphanedAccountRepositoryIntegrationTest {
   void clearingTheFlagAlsoClearsTheStamp() {
     UUID returning = user(false, Instant.now().minus(10, ChronoUnit.DAYS));
 
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User u = userRepository.findById(returning).orElseThrow();
-          u.setInKeycloak(true);
-          u.setKeycloakAbsentSince(null);
-          userRepository.save(u);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User u = userRepository.findById(returning).orElseThrow();
+      u.setInKeycloak(true);
+      u.setKeycloakAbsentSince(null);
+      userRepository.save(u);
+    });
 
     User back = reload(returning);
     assertThat(back.isInKeycloak()).isTrue();
@@ -202,15 +196,14 @@ class OrphanedAccountRepositoryIntegrationTest {
    * @param username the generated username, in whatever casing the test is about
    */
   private void serviceAccount(String username) {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User machine = new User();
-          machine.setId(UUID.randomUUID());
-          machine.setUsername(username);
-          machine.setInKeycloak(false);
-          machine.setKeycloakAbsentSince(Instant.now().minusSeconds(86_400L * 30));
-          seeded.add(machine.getId());
-          userRepository.save(machine);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User machine = new User();
+      machine.setId(UUID.randomUUID());
+      machine.setUsername(username);
+      machine.setInKeycloak(false);
+      machine.setKeycloakAbsentSince(Instant.now().minusSeconds(86_400L * 30));
+      seeded.add(machine.getId());
+      userRepository.save(machine);
+    });
   }
 }

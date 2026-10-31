@@ -49,60 +49,52 @@ public class ResilienceEventLogger {
   void subscribe() {
     circuitBreakerRegistry
         .getAllCircuitBreakers()
-        .forEach(
-            cb ->
-                cb.getEventPublisher()
-                    .onStateTransition(
-                        e ->
-                            log.warn(
-                                "CircuitBreaker[{}] state transition {} -> {}",
-                                cb.getName(),
-                                e.getStateTransition().getFromState(),
-                                e.getStateTransition().getToState()))
-                    .onCallNotPermitted(
-                        _ -> log.debug("CircuitBreaker[{}] call not permitted", cb.getName()))
-                    .onError(
-                        e ->
-                            log.info(
-                                "CircuitBreaker[{}] call failed: {}",
-                                cb.getName(),
-                                e.getThrowable().getClass().getSimpleName())));
+        .forEach(cb ->
+            cb.getEventPublisher()
+                .onStateTransition(e ->
+                    log.warn(
+                        "CircuitBreaker[{}] state transition {} -> {}",
+                        cb.getName(),
+                        e.getStateTransition().getFromState(),
+                        e.getStateTransition().getToState()))
+                .onCallNotPermitted(
+                    _ -> log.debug("CircuitBreaker[{}] call not permitted", cb.getName()))
+                .onError(e ->
+                    log.info(
+                        "CircuitBreaker[{}] call failed: {}",
+                        cb.getName(),
+                        e.getThrowable().getClass().getSimpleName())));
 
     retryRegistry
         .getAllRetries()
-        .forEach(
-            retry ->
-                retry
-                    .getEventPublisher()
-                    .onRetry(
-                        e ->
-                            log.info(
-                                "Retry[{}] attempt {} after {}: {}",
-                                retry.getName(),
-                                e.getNumberOfRetryAttempts(),
-                                e.getWaitInterval(),
-                                e.getLastThrowable() != null
-                                    ? e.getLastThrowable().getClass().getSimpleName()
-                                    : "n/a"))
-                    .onError(
-                        e ->
-                            log.warn(
-                                "Retry[{}] exhausted after {} attempts",
-                                retry.getName(),
-                                e.getNumberOfRetryAttempts())));
+        .forEach(retry ->
+            retry
+                .getEventPublisher()
+                .onRetry(e ->
+                    log.info(
+                        "Retry[{}] attempt {} after {}: {}",
+                        retry.getName(),
+                        e.getNumberOfRetryAttempts(),
+                        e.getWaitInterval(),
+                        e.getLastThrowable() != null
+                            ? e.getLastThrowable().getClass().getSimpleName()
+                            : "n/a"))
+                .onError(e ->
+                    log.warn(
+                        "Retry[{}] exhausted after {} attempts",
+                        retry.getName(),
+                        e.getNumberOfRetryAttempts())));
 
     bulkheadRegistry
         .getAllBulkheads()
-        .forEach(
-            bh ->
-                bh.getEventPublisher()
-                    .onCallRejected(_ -> log.warn("Bulkhead[{}] call rejected", bh.getName())));
+        .forEach(bh ->
+            bh.getEventPublisher()
+                .onCallRejected(_ -> log.warn("Bulkhead[{}] call rejected", bh.getName())));
 
     timeLimiterRegistry
         .getAllTimeLimiters()
-        .forEach(
-            tl ->
-                tl.getEventPublisher()
-                    .onTimeout(_ -> log.warn("TimeLimiter[{}] call timed out", tl.getName())));
+        .forEach(tl ->
+            tl.getEventPublisher()
+                .onTimeout(_ -> log.warn("TimeLimiter[{}] call timed out", tl.getName())));
   }
 }

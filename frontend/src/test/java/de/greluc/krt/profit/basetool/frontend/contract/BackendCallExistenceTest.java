@@ -326,11 +326,10 @@ class BackendCallExistenceTest {
    */
   private static List<String> missingProbes(Map<String, String> probes, BackendOperations index) {
     return probes.entrySet().stream()
-        .filter(
-            e -> {
-              String template = BackendCallScanner.canonical(e.getValue());
-              return !BackendCallScanner.isResolved(template) || !index.exists("GET", template);
-            })
+        .filter(e -> {
+          String template = BackendCallScanner.canonical(e.getValue());
+          return !BackendCallScanner.isResolved(template) || !index.exists("GET", template);
+        })
         .map(e -> e.getKey() + " GET " + e.getValue())
         .sorted()
         .toList();

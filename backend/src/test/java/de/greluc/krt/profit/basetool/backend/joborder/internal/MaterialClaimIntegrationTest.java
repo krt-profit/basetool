@@ -69,50 +69,49 @@ class MaterialClaimIntegrationTest {
   private record Fixture(UUID orderId, UUID materialId, UUID squadronAId, UUID squadronBId) {}
 
   private Fixture seed() {
-    return transactionTemplate.execute(
-        status -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          SpecialCommand sk = new SpecialCommand();
-          sk.setName("Claim-SK-" + tag);
-          sk.setShorthand("S" + tag);
-          sk.setProfitEligible(true);
-          sk = specialCommandRepository.save(sk);
+    return transactionTemplate.execute(status -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      SpecialCommand sk = new SpecialCommand();
+      sk.setName("Claim-SK-" + tag);
+      sk.setShorthand("S" + tag);
+      sk.setProfitEligible(true);
+      sk = specialCommandRepository.save(sk);
 
-          Squadron sqA = new Squadron();
-          sqA.setName("Claim-A-" + tag);
-          sqA.setShorthand("A" + tag);
-          sqA.setProfitEligible(true);
-          sqA = squadronRepository.save(sqA);
+      Squadron sqA = new Squadron();
+      sqA.setName("Claim-A-" + tag);
+      sqA.setShorthand("A" + tag);
+      sqA.setProfitEligible(true);
+      sqA = squadronRepository.save(sqA);
 
-          Squadron sqB = new Squadron();
-          sqB.setName("Claim-B-" + tag);
-          sqB.setShorthand("B" + tag);
-          sqB.setProfitEligible(true);
-          sqB = squadronRepository.save(sqB);
+      Squadron sqB = new Squadron();
+      sqB.setName("Claim-B-" + tag);
+      sqB.setShorthand("B" + tag);
+      sqB.setProfitEligible(true);
+      sqB = squadronRepository.save(sqB);
 
-          Material mat = new Material();
-          mat.setName("ClaimMat-" + tag);
-          mat.setType(MaterialType.RAW);
-          mat = materialRepository.save(mat);
+      Material mat = new Material();
+      mat.setName("ClaimMat-" + tag);
+      mat.setType(MaterialType.RAW);
+      mat = materialRepository.save(mat);
 
-          JobOrder order =
-              JobOrder.builder()
-                  .responsibleOrgUnit(sk)
-                  .requestingOrgUnit(sqA)
-                  .handle("claim-test")
-                  .status(JobOrderStatus.OPEN)
-                  .build();
-          JobOrderMaterial line =
-              JobOrderMaterial.builder()
-                  .material(mat)
-                  .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
-                  .amount(10.0)
-                  .build();
-          order.addMaterial(line);
-          order = jobOrderRepository.save(order);
+      JobOrder order =
+          JobOrder.builder()
+              .responsibleOrgUnit(sk)
+              .requestingOrgUnit(sqA)
+              .handle("claim-test")
+              .status(JobOrderStatus.OPEN)
+              .build();
+      JobOrderMaterial line =
+          JobOrderMaterial.builder()
+              .material(mat)
+              .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
+              .amount(10.0)
+              .build();
+      order.addMaterial(line);
+      order = jobOrderRepository.save(order);
 
-          return new Fixture(order.getId(), mat.getId(), sqA.getId(), sqB.getId());
-        });
+      return new Fixture(order.getId(), mat.getId(), sqA.getId(), sqB.getId());
+    });
   }
 
   @Test
@@ -138,10 +137,9 @@ class MaterialClaimIntegrationTest {
     Fixture f = seed();
     materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 8.0));
 
-    assertThatThrownBy(
-            () ->
-                materialClaimService.upsertClaim(
-                    f.orderId(), claim(f.materialId(), f.squadronBId(), 5.0)))
+    assertThatThrownBy(() ->
+            materialClaimService.upsertClaim(
+                f.orderId(), claim(f.materialId(), f.squadronBId(), 5.0)))
         .isInstanceOf(BadRequestException.class);
   }
 
@@ -149,19 +147,17 @@ class MaterialClaimIntegrationTest {
   void nonProfitSquadron_cannotClaim() {
     Fixture f = seed();
     UUID nonProfitSquadronId =
-        transactionTemplate.execute(
-            status -> {
-              String tag = UUID.randomUUID().toString().substring(0, 8);
-              Squadron sq = new Squadron();
-              sq.setName("NonProfit-" + tag);
-              sq.setShorthand("N" + tag);
-              return squadronRepository.save(sq).getId();
-            });
+        transactionTemplate.execute(status -> {
+          String tag = UUID.randomUUID().toString().substring(0, 8);
+          Squadron sq = new Squadron();
+          sq.setName("NonProfit-" + tag);
+          sq.setShorthand("N" + tag);
+          return squadronRepository.save(sq).getId();
+        });
 
-    assertThatThrownBy(
-            () ->
-                materialClaimService.upsertClaim(
-                    f.orderId(), claim(f.materialId(), nonProfitSquadronId, 5.0)))
+    assertThatThrownBy(() ->
+            materialClaimService.upsertClaim(
+                f.orderId(), claim(f.materialId(), nonProfitSquadronId, 5.0)))
         .isInstanceOf(BadRequestException.class);
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId())).isEmpty();
   }
@@ -207,47 +203,46 @@ class MaterialClaimIntegrationTest {
   void updateJobOrder_droppingABucket_withdrawsOrphanClaimsWithoutConflict() {
     record Setup(UUID orderId, UUID matA, UUID matB, UUID sqA, UUID sqB) {}
     Setup s =
-        transactionTemplate.execute(
-            st -> {
-              String tag = UUID.randomUUID().toString().substring(0, 8);
-              SpecialCommand sk = new SpecialCommand();
-              sk.setName("Orph-SK-" + tag);
-              sk.setShorthand("O" + tag);
-              sk.setProfitEligible(true);
-              sk = specialCommandRepository.save(sk);
-              Squadron sqA = new Squadron();
-              sqA.setName("Orph-A-" + tag);
-              sqA.setShorthand("A" + tag);
-              sqA.setProfitEligible(true);
-              sqA = squadronRepository.save(sqA);
-              Squadron sqB = new Squadron();
-              sqB.setName("Orph-B-" + tag);
-              sqB.setShorthand("B" + tag);
-              sqB.setProfitEligible(true);
-              sqB = squadronRepository.save(sqB);
-              Material matA = new Material();
-              matA.setName("OrphMatA-" + tag);
-              matA.setType(MaterialType.RAW);
-              matA = materialRepository.save(matA);
-              Material matB = new Material();
-              matB.setName("OrphMatB-" + tag);
-              matB.setType(MaterialType.RAW);
-              matB = materialRepository.save(matB);
-              JobOrder order =
-                  JobOrder.builder()
-                      .responsibleOrgUnit(sk)
-                      .requestingOrgUnit(sqA)
-                      .handle("orph")
-                      .status(JobOrderStatus.OPEN)
-                      .build();
-              QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
-              order.addMaterial(
-                  JobOrderMaterial.builder().material(matA).qualityTier(good).amount(10.0).build());
-              order.addMaterial(
-                  JobOrderMaterial.builder().material(matB).qualityTier(good).amount(8.0).build());
-              order = jobOrderRepository.save(order);
-              return new Setup(order.getId(), matA.getId(), matB.getId(), sqA.getId(), sqB.getId());
-            });
+        transactionTemplate.execute(st -> {
+          String tag = UUID.randomUUID().toString().substring(0, 8);
+          SpecialCommand sk = new SpecialCommand();
+          sk.setName("Orph-SK-" + tag);
+          sk.setShorthand("O" + tag);
+          sk.setProfitEligible(true);
+          sk = specialCommandRepository.save(sk);
+          Squadron sqA = new Squadron();
+          sqA.setName("Orph-A-" + tag);
+          sqA.setShorthand("A" + tag);
+          sqA.setProfitEligible(true);
+          sqA = squadronRepository.save(sqA);
+          Squadron sqB = new Squadron();
+          sqB.setName("Orph-B-" + tag);
+          sqB.setShorthand("B" + tag);
+          sqB.setProfitEligible(true);
+          sqB = squadronRepository.save(sqB);
+          Material matA = new Material();
+          matA.setName("OrphMatA-" + tag);
+          matA.setType(MaterialType.RAW);
+          matA = materialRepository.save(matA);
+          Material matB = new Material();
+          matB.setName("OrphMatB-" + tag);
+          matB.setType(MaterialType.RAW);
+          matB = materialRepository.save(matB);
+          JobOrder order =
+              JobOrder.builder()
+                  .responsibleOrgUnit(sk)
+                  .requestingOrgUnit(sqA)
+                  .handle("orph")
+                  .status(JobOrderStatus.OPEN)
+                  .build();
+          QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
+          order.addMaterial(
+              JobOrderMaterial.builder().material(matA).qualityTier(good).amount(10.0).build());
+          order.addMaterial(
+              JobOrderMaterial.builder().material(matB).qualityTier(good).amount(8.0).build());
+          order = jobOrderRepository.save(order);
+          return new Setup(order.getId(), matA.getId(), matB.getId(), sqA.getId(), sqB.getId());
+        });
 
     materialClaimService.upsertClaim(
         s.orderId(), new CreateClaimDto(s.matA(), "GOOD", s.sqA(), 5.0));

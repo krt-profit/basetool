@@ -72,10 +72,8 @@ public class BankHolderService {
         holderPostingRepository.holderTotals().stream()
             .collect(Collectors.toMap(BankHolderBalance::holderId, BankHolderBalance::amount));
     return holderRepository.findAllWithUser().stream()
-        .map(
-            holder ->
-                bankHolderMapper.toDto(
-                    holder, totals.getOrDefault(holder.getId(), BigDecimal.ZERO)))
+        .map(holder ->
+            bankHolderMapper.toDto(holder, totals.getOrDefault(holder.getId(), BigDecimal.ZERO)))
         .sorted(Comparator.comparing(BankHolderDto::handle, String.CASE_INSENSITIVE_ORDER))
         .toList();
   }

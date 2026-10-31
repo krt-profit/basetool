@@ -96,12 +96,11 @@ class InventoryStockCommandsTest {
     user.setId(MEMBER);
     when(userRepository.findById(MEMBER)).thenReturn(Optional.of(user));
     when(inventoryRepository.save(any(InventoryItem.class)))
-        .thenAnswer(
-            invocation -> {
-              InventoryItem item = invocation.getArgument(0);
-              item.setId(UUID.randomUUID());
-              return item;
-            });
+        .thenAnswer(invocation -> {
+          InventoryItem item = invocation.getArgument(0);
+          item.setId(UUID.randomUUID());
+          return item;
+        });
     Material material = new Material();
     material.setId(UUID.randomUUID());
     material.setName("Quantainium");

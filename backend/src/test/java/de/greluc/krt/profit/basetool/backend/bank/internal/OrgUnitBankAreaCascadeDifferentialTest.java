@@ -127,11 +127,10 @@ class OrgUnitBankAreaCascadeDifferentialTest {
   private static boolean formerHubVerdict(UUID bereichId, List<OrgUnitMembership> memberships) {
     List<UUID> childIds = CHILDREN.get(bereichId);
     return memberships.stream()
-        .anyMatch(
-            m -> {
-              UUID ou = m.getId().getOrgUnitId();
-              return ou.equals(bereichId) || childIds.contains(ou);
-            });
+        .anyMatch(m -> {
+          UUID ou = m.getId().getOrgUnitId();
+          return ou.equals(bereichId) || childIds.contains(ou);
+        });
   }
 
   /**

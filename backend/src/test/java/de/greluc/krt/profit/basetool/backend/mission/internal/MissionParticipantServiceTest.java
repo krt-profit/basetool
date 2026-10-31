@@ -97,10 +97,9 @@ class MissionParticipantServiceTest {
   void passNamesThroughUnresolved() {
     lenient()
         .when(participantTargetResolver.resolve(any(), any(), any()))
-        .thenAnswer(
-            inv ->
-                new ParticipantTargetResolver.ParticipantTarget(
-                    inv.getArgument(0), inv.getArgument(1)));
+        .thenAnswer(inv ->
+            new ParticipantTargetResolver.ParticipantTarget(
+                inv.getArgument(0), inv.getArgument(1)));
   }
 
   @Nested

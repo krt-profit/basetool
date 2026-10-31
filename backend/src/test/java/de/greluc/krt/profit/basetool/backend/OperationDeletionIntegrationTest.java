@@ -203,10 +203,9 @@ class OperationDeletionIntegrationTest {
     InventoryMissionAllocation survivedAllocation =
         survivedItem.getMissionAllocations().stream()
             .findFirst()
-            .orElseThrow(
-                () ->
-                    new AssertionError(
-                        "inventory item must keep its mission link when the operation is deleted"));
+            .orElseThrow(() ->
+                new AssertionError(
+                    "inventory item must keep its mission link when the operation is deleted"));
     assertEquals(missionId, survivedAllocation.getMissionId());
 
     RefineryOrder survivedOrder = refineryOrderRepository.findById(orderId).orElseThrow();

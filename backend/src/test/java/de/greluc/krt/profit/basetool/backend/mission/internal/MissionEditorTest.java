@@ -135,10 +135,9 @@ class MissionEditorTest {
     when(missionAccessPolicy.canEdit(mission, MissionGate.MANAGE, caller)).thenReturn(true);
     when(missionRepository.bumpStepsVersionIfMatches(missionId, 2L)).thenReturn(0);
 
-    assertThatThrownBy(
-            () ->
-                editor.editSection(
-                    missionId, MissionGate.MANAGE, MissionSection.STEPS, 2L, stepAdded()))
+    assertThatThrownBy(() ->
+            editor.editSection(
+                missionId, MissionGate.MANAGE, MissionSection.STEPS, 2L, stepAdded()))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
     assertThat(mutations).hasValue(0);
@@ -152,10 +151,9 @@ class MissionEditorTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(missionAccessPolicy.canEdit(mission, MissionGate.MANAGE, caller)).thenReturn(false);
 
-    assertThatThrownBy(
-            () ->
-                editor.editSection(
-                    missionId, MissionGate.MANAGE, MissionSection.STEPS, 3L, stepAdded()))
+    assertThatThrownBy(() ->
+            editor.editSection(
+                missionId, MissionGate.MANAGE, MissionSection.STEPS, 3L, stepAdded()))
         .isInstanceOf(AccessDeniedException.class);
 
     assertThat(mutations).hasValue(0);

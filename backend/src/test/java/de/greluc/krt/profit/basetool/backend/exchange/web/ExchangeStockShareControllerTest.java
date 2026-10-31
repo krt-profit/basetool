@@ -193,12 +193,11 @@ class ExchangeStockShareControllerTest {
         .noneMatch(details -> details.contains("stock-sharer-"));
     assertThat(journalRepository.findAllByUserIdOrderByRecordedAtAsc(member))
         .singleElement()
-        .satisfies(
-            e -> {
-              assertThat(e.getAction().name()).isEqualTo("STOCK_SHARE");
-              assertThat(e.getEntityKey()).isEqualTo(key);
-              assertThat(e.isRemoval()).isFalse();
-            });
+        .satisfies(e -> {
+          assertThat(e.getAction().name()).isEqualTo("STOCK_SHARE");
+          assertThat(e.getEntityKey()).isEqualTo(key);
+          assertThat(e.isRemoval()).isFalse();
+        });
   }
 
   @Test

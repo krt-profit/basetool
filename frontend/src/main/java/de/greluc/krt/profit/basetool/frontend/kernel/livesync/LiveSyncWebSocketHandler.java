@@ -238,12 +238,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         new LiveSyncSubscriptions(
             rooms, rateLimiter, authorizer, authExecutor, objectMapper, meterRegistry);
     this.reaper =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "livesync-reaper");
-              t.setDaemon(true);
-              return t;
-            });
+        Executors.newSingleThreadScheduledExecutor(r -> {
+          Thread t = new Thread(r, "livesync-reaper");
+          t.setDaemon(true);
+          return t;
+        });
     this.reaper.scheduleAtFixedRate(
         this::tickReaper,
         REAPER_INTERVAL.toSeconds(),

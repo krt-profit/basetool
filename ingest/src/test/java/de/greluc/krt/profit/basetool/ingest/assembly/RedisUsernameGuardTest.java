@@ -51,15 +51,13 @@ class RedisUsernameGuardTest {
 
   @Test
   void prodAsTheDefaultUserOrABlankOneRefusesToStart() throws IOException {
-    assertThatThrownBy(
-            () ->
-                new RedisUsernameGuard(shipped(Map.of("REDIS_USERNAME", "default"), "prod"))
-                    .afterPropertiesSet())
+    assertThatThrownBy(() ->
+            new RedisUsernameGuard(shipped(Map.of("REDIS_USERNAME", "default"), "prod"))
+                .afterPropertiesSet())
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(
-            () ->
-                new RedisUsernameGuard(shipped(Map.of("REDIS_USERNAME", "  "), "prod"))
-                    .afterPropertiesSet())
+    assertThatThrownBy(() ->
+            new RedisUsernameGuard(shipped(Map.of("REDIS_USERNAME", "  "), "prod"))
+                .afterPropertiesSet())
         .isInstanceOf(IllegalStateException.class);
   }
 

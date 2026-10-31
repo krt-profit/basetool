@@ -497,11 +497,10 @@ class ArchitectureTest {
           c ->
               WEB_CONTROLLERS.test(c)
                   && c.tryGetAnnotationOfType(RequestMapping.class)
-                      .map(
-                          mapping ->
-                              Stream.concat(
-                                      Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
-                                  .anyMatch(path -> path.startsWith(EXCHANGE_RELAY_PREFIX)))
+                      .map(mapping ->
+                          Stream.concat(
+                                  Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
+                              .anyMatch(path -> path.startsWith(EXCHANGE_RELAY_PREFIX)))
                       .orElse(false));
 
   /**
@@ -967,10 +966,8 @@ class ArchitectureTest {
     for (Method allowed : PERMIT_ALL_ALLOWED_METHODS) {
       assertThat(declarations)
           .as("the allow-listed handler %s must still declare permitAll()", allowed)
-          .anyMatch(
-              d ->
-                  d.startsWith(
-                      allowed.getDeclaringClass().getName() + "." + allowed.getName() + "("));
+          .anyMatch(d ->
+              d.startsWith(allowed.getDeclaringClass().getName() + "." + allowed.getName() + "("));
     }
     permitAllRule(PERMIT_ALL_ALLOWED_METHODS, PERMIT_ALL_ALLOWED_CONTROLLERS).check(CLASSES);
   }
@@ -1558,19 +1555,18 @@ class ArchitectureTest {
                     .filter(f -> !f.getModifiers().contains(JavaModifier.STATIC))
                     .map(JavaField::getName)
                     .filter(FORBIDDEN_MISSION_REQUEST_COMPONENTS::contains)
-                    .forEach(
-                        name ->
-                            events.add(
-                                SimpleConditionEvent.violated(
-                                    clazz,
-                                    clazz.getFullName()
-                                        + " declares record component `"
-                                        + name
-                                        + "` — that field is server-managed (audit finding C-4)."
-                                        + " Stamp it inside MissionService, not from the request"
-                                        + " body. If it is legitimately client-supplied, carve it"
-                                        + " out of FORBIDDEN_MISSION_REQUEST_COMPONENTS and give"
-                                        + " the reason in the commit message and the PR.")));
+                    .forEach(name ->
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                clazz,
+                                clazz.getFullName()
+                                    + " declares record component `"
+                                    + name
+                                    + "` — that field is server-managed (audit finding C-4)."
+                                    + " Stamp it inside MissionService, not from the request"
+                                    + " body. If it is legitimately client-supplied, carve it"
+                                    + " out of FORBIDDEN_MISSION_REQUEST_COMPONENTS and give"
+                                    + " the reason in the commit message and the PR.")));
               }
             })
         .because(
@@ -1972,11 +1968,10 @@ class ArchitectureTest {
           c ->
               WEB_CONTROLLERS.test(c)
                   && c.tryGetAnnotationOfType(RequestMapping.class)
-                      .map(
-                          mapping ->
-                              Stream.concat(
-                                      Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
-                                  .anyMatch(path -> path.startsWith(ORG_UNIT_BANK_PREFIX)))
+                      .map(mapping ->
+                          Stream.concat(
+                                  Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
+                              .anyMatch(path -> path.startsWith(ORG_UNIT_BANK_PREFIX)))
                       .orElse(false));
 
   /**
@@ -2712,18 +2707,15 @@ class ArchitectureTest {
         Set<String> protectedByHandler = protectedDtosOf(method, piiDtos);
         boolean callsALocalHelperThatRedacts =
             method.getMethodCallsFromSelf().stream()
-                .filter(
-                    call ->
-                        call.getTargetOwner().getFullName().equals(method.getOwner().getFullName()))
+                .filter(call ->
+                    call.getTargetOwner().getFullName().equals(method.getOwner().getFullName()))
                 .flatMap(call -> call.getTarget().resolveMember().stream())
-                .filter(
-                    target ->
-                        !Collections.disjoint(protectedDtosOf(target, piiDtos), protectedByHandler))
-                .anyMatch(
-                    target ->
-                        target.getAccessesFromSelf().stream()
-                            .map(access -> access.getTarget().getName())
-                            .anyMatch(ArchitectureTest::isGuestRedactionHelperName));
+                .filter(target ->
+                    !Collections.disjoint(protectedDtosOf(target, piiDtos), protectedByHandler))
+                .anyMatch(target ->
+                    target.getAccessesFromSelf().stream()
+                        .map(access -> access.getTarget().getName())
+                        .anyMatch(ArchitectureTest::isGuestRedactionHelperName));
         if (callsALocalHelperThatRedacts) {
           return;
         }
@@ -2796,20 +2788,19 @@ class ArchitectureTest {
         method.getMethodCallsFromSelf().stream()
             .filter(call -> call.getTarget().getOwner().isEquivalentTo(missionRepository))
             .filter(call -> call.getTarget().getName().startsWith("save"))
-            .forEach(
-                call ->
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            method,
-                            method.getFullName()
-                                + " calls "
-                                + call.getTarget().getOwner().getSimpleName()
-                                + "#"
-                                + call.getTarget().getName()
-                                + " — that dirties the parent Mission row and re-opens"
-                                + " optimistic-locking failures on concurrent participant"
-                                + " signups. Persist the new participant via"
-                                + " missionParticipantRepository.save(participant) instead.")));
+            .forEach(call ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        method,
+                        method.getFullName()
+                            + " calls "
+                            + call.getTarget().getOwner().getSimpleName()
+                            + "#"
+                            + call.getTarget().getName()
+                            + " — that dirties the parent Mission row and re-opens"
+                            + " optimistic-locking failures on concurrent participant"
+                            + " signups. Persist the new participant via"
+                            + " missionParticipantRepository.save(participant) instead.")));
       }
     };
   }

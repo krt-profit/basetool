@@ -108,27 +108,26 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   void signInAsAdmin() {
     String tag = UUID.randomUUID().toString().substring(0, 6);
     TransactionTemplate tx = new TransactionTemplate(transactionManager);
-    tx.executeWithoutResult(
-        _ -> {
-          User user = new User();
-          user.setId(UUID.randomUUID());
-          user.setUsername("orgunits-admin-" + tag);
-          admin = userRepository.save(user);
-          OrgUnitMembership membership = new OrgUnitMembership();
-          membership.setId(new OrgUnitMembershipId(admin.getId(), Squadron.IRIDIUM_ID));
-          membership.setUser(admin);
-          membership.setKind(OrgUnitKind.SQUADRON);
-          membership.setJoinedAt(Instant.now());
-          membershipRepository.save(membership);
-          Squadron squadron = new Squadron();
-          squadron.setName("Roster Staffel " + tag);
-          squadron.setShorthand("R" + tag);
-          staffel = squadronRepository.save(squadron);
-          SpecialCommand specialCommand = new SpecialCommand();
-          specialCommand.setName("Roster Kommando " + tag);
-          specialCommand.setShorthand("K" + tag);
-          command = specialCommandRepository.save(specialCommand);
-        });
+    tx.executeWithoutResult(_ -> {
+      User user = new User();
+      user.setId(UUID.randomUUID());
+      user.setUsername("orgunits-admin-" + tag);
+      admin = userRepository.save(user);
+      OrgUnitMembership membership = new OrgUnitMembership();
+      membership.setId(new OrgUnitMembershipId(admin.getId(), Squadron.IRIDIUM_ID));
+      membership.setUser(admin);
+      membership.setKind(OrgUnitKind.SQUADRON);
+      membership.setJoinedAt(Instant.now());
+      membershipRepository.save(membership);
+      Squadron squadron = new Squadron();
+      squadron.setName("Roster Staffel " + tag);
+      squadron.setShorthand("R" + tag);
+      staffel = squadronRepository.save(squadron);
+      SpecialCommand specialCommand = new SpecialCommand();
+      specialCommand.setName("Roster Kommando " + tag);
+      specialCommand.setShorthand("K" + tag);
+      command = specialCommandRepository.save(specialCommand);
+    });
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(
@@ -143,19 +142,17 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   void signOutAndCleanUp() {
     SecurityContextHolder.clearContext();
     TransactionTemplate tx = new TransactionTemplate(transactionManager);
-    tx.executeWithoutResult(
-        _ -> {
-          for (UUID id : missionIds) {
-            missionRepository.deleteById(id);
-          }
-          missionRepository.flush();
-          membershipRepository.deleteById(
-              new OrgUnitMembershipId(admin.getId(), Squadron.IRIDIUM_ID));
-          membershipRepository.flush();
-          userRepository.deleteById(admin.getId());
-          squadronRepository.deleteById(staffel.getId());
-          specialCommandRepository.deleteById(command.getId());
-        });
+    tx.executeWithoutResult(_ -> {
+      for (UUID id : missionIds) {
+        missionRepository.deleteById(id);
+      }
+      missionRepository.flush();
+      membershipRepository.deleteById(new OrgUnitMembershipId(admin.getId(), Squadron.IRIDIUM_ID));
+      membershipRepository.flush();
+      userRepository.deleteById(admin.getId());
+      squadronRepository.deleteById(staffel.getId());
+      specialCommandRepository.deleteById(command.getId());
+    });
     missionIds.clear();
   }
 
@@ -300,15 +297,14 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   }
 
   private Target firstParticipantOf(UUID missionId) {
-    return inReadOnlyTransaction(
-        () -> {
-          MissionParticipant first =
-              missionRepository.findById(missionId).orElseThrow().getParticipants().stream()
-                  .filter(participant -> "Guest 0".equals(participant.getGuestName()))
-                  .findFirst()
-                  .orElseThrow();
-          return new Target(missionId, first.getId(), first.getVersion());
-        });
+    return inReadOnlyTransaction(() -> {
+      MissionParticipant first =
+          missionRepository.findById(missionId).orElseThrow().getParticipants().stream()
+              .filter(participant -> "Guest 0".equals(participant.getGuestName()))
+              .findFirst()
+              .orElseThrow();
+      return new Target(missionId, first.getId(), first.getVersion());
+    });
   }
 
   private record Target(UUID missionId, UUID participantId, Long version) {}
@@ -320,10 +316,9 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   }
 
   private MissionDto redactedDetail(UUID missionId) {
-    return inReadOnlyTransaction(
-        () ->
-            missionPeerRedactor.cleanupMissionForPeer(
-                missionMapper.toDto(missionRepository.findById(missionId).orElseThrow())));
+    return inReadOnlyTransaction(() ->
+        missionPeerRedactor.cleanupMissionForPeer(
+            missionMapper.toDto(missionRepository.findById(missionId).orElseThrow())));
   }
 
   private <T> T inReadOnlyTransaction(Supplier<T> work) {
@@ -362,22 +357,20 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   private UUID seed(int participants) {
     TransactionTemplate tx = new TransactionTemplate(transactionManager);
     UUID id =
-        tx.execute(
-            _ -> {
-              Mission mission = new Mission();
-              mission.setName("Roster " + UUID.randomUUID());
-              mission.setStatus("PLANNED");
-              mission.setOwningOrgUnit(
-                  squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
-              for (int i = 0; i < participants; i++) {
-                MissionParticipant participant = new MissionParticipant();
-                participant.setMission(mission);
-                participant.setGuestName("Guest " + i);
-                participant.setOrgUnits(i % 2 == 0 ? List.of(staffel, command) : List.of(command));
-                mission.getParticipants().add(participant);
-              }
-              return missionRepository.save(mission).getId();
-            });
+        tx.execute(_ -> {
+          Mission mission = new Mission();
+          mission.setName("Roster " + UUID.randomUUID());
+          mission.setStatus("PLANNED");
+          mission.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
+          for (int i = 0; i < participants; i++) {
+            MissionParticipant participant = new MissionParticipant();
+            participant.setMission(mission);
+            participant.setGuestName("Guest " + i);
+            participant.setOrgUnits(i % 2 == 0 ? List.of(staffel, command) : List.of(command));
+            mission.getParticipants().add(participant);
+          }
+          return missionRepository.save(mission).getId();
+        });
     missionIds.add(id);
     return id;
   }

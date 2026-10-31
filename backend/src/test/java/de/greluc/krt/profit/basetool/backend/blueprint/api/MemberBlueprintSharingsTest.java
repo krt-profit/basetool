@@ -84,12 +84,11 @@ class MemberBlueprintSharingsTest {
     when(userRepository.existsById(USER)).thenReturn(true);
     when(repository.findById(USER)).thenReturn(Optional.empty());
     when(repository.saveAndFlush(any(MemberBlueprintSharing.class)))
-        .thenAnswer(
-            invocation -> {
-              MemberBlueprintSharing saved = invocation.getArgument(0);
-              saved.setVersion(0L);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          MemberBlueprintSharing saved = invocation.getArgument(0);
+          saved.setVersion(0L);
+          return saved;
+        });
 
     MemberBlueprintSharings.Snapshot result = sharings.update(USER, true, 0L);
 

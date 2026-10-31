@@ -136,16 +136,15 @@ public class ExchangeDepartureService {
     attempt(
         "audit",
         () ->
-            requiresNew.executeWithoutResult(
-                _ ->
-                    auditRecorder.record(
-                        AuditEventType.EXCHANGE_MEMBER_DEPARTED,
-                        null,
-                        null,
-                        member,
-                        AuditDetails.of("reason", event.reason())
-                            .with("clients", clients.size())
-                            .with("complete", !incomplete))));
+            requiresNew.executeWithoutResult(_ ->
+                auditRecorder.record(
+                    AuditEventType.EXCHANGE_MEMBER_DEPARTED,
+                    null,
+                    null,
+                    member,
+                    AuditDetails.of("reason", event.reason())
+                        .with("clients", clients.size())
+                        .with("complete", !incomplete))));
     meterRegistry
         .counter(
             MetricNames.EXCHANGE_DEPARTURES,

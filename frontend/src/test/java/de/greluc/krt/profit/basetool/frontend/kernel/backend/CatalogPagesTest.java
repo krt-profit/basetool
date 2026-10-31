@@ -50,11 +50,10 @@ class CatalogPagesTest {
     AtomicInteger calls = new AtomicInteger();
 
     CompleteCatalog<String> catalog =
-        CatalogPages.fetchAll(
-            p -> {
-              calls.incrementAndGet();
-              return page(pages.get(p), p, 5, 3);
-            });
+        CatalogPages.fetchAll(p -> {
+          calls.incrementAndGet();
+          return page(pages.get(p), p, 5, 3);
+        });
 
     assertEquals(List.of("a", "b", "c", "d", "e"), catalog.items());
     assertEquals(5L, catalog.totalElements());
@@ -67,11 +66,10 @@ class CatalogPagesTest {
     AtomicInteger calls = new AtomicInteger();
 
     CompleteCatalog<String> catalog =
-        CatalogPages.fetchAll(
-            p -> {
-              calls.incrementAndGet();
-              return page(List.of("only"), p, 1, 1);
-            });
+        CatalogPages.fetchAll(p -> {
+          calls.incrementAndGet();
+          return page(List.of("only"), p, 1, 1);
+        });
 
     assertEquals(List.of("only"), catalog.items());
     assertEquals(1, calls.get(), "the common case must stay a single round-trip");
@@ -84,11 +82,10 @@ class CatalogPagesTest {
     AtomicInteger calls = new AtomicInteger();
 
     CompleteCatalog<String> catalog =
-        CatalogPages.fetchAll(
-            p -> {
-              calls.incrementAndGet();
-              return page(List.of("row-" + p), p, reportedPages, reportedPages);
-            });
+        CatalogPages.fetchAll(p -> {
+          calls.incrementAndGet();
+          return page(List.of("row-" + p), p, reportedPages, reportedPages);
+        });
 
     assertTrue(catalog.truncated(), "stopping at the cap must be loud, never silent");
     assertEquals(CatalogPages.MAX_CATALOG_PAGES, calls.get(), "the walk must stop at the cap");
@@ -113,11 +110,10 @@ class CatalogPagesTest {
     AtomicInteger calls = new AtomicInteger();
 
     CompleteCatalog<String> catalog =
-        CatalogPages.fetchAll(
-            p -> {
-              calls.incrementAndGet();
-              return page(List.of(), p, 3, 3);
-            });
+        CatalogPages.fetchAll(p -> {
+          calls.incrementAndGet();
+          return page(List.of(), p, 3, 3);
+        });
 
     assertTrue(catalog.items().isEmpty());
     assertEquals(1, calls.get(), "an empty page must terminate the walk");
@@ -139,10 +135,9 @@ class CatalogPagesTest {
         assertThrows(
             RuntimeException.class,
             () ->
-                CatalogPages.fetchAll(
-                    p -> {
-                      throw boom;
-                    }));
+                CatalogPages.fetchAll(p -> {
+                  throw boom;
+                }));
     assertEquals(boom, thrown, "the walk must not swallow or wrap fetch failures");
   }
 

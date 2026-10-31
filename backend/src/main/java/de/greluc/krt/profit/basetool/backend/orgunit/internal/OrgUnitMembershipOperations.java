@@ -57,10 +57,9 @@ public class OrgUnitMembershipOperations implements MembershipOperations {
     membershipService.reconcileStaffelMemberships(
         user,
         desired.stream()
-            .map(
-                a ->
-                    new MembershipDeltaRequest.StaffelChange(
-                        a.squadronId(), a.isLogistician(), a.isMissionManager()))
+            .map(a ->
+                new MembershipDeltaRequest.StaffelChange(
+                    a.squadronId(), a.isLogistician(), a.isMissionManager()))
             .toList());
   }
 

@@ -131,19 +131,17 @@ class ExchangeDemandDetailsControllerTest {
 
   @AfterEach
   void tearDown() {
-    orders.forEach(
-        id -> {
-          jdbc.update("DELETE FROM job_order_assignees WHERE job_order_id = ?", id);
-          jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", id);
-          jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-        });
+    orders.forEach(id -> {
+      jdbc.update("DELETE FROM job_order_assignees WHERE job_order_id = ?", id);
+      jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", id);
+      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
+    });
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
-    users.forEach(
-        id -> {
-          jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
-          jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
-          jdbc.update("DELETE FROM app_user WHERE id = ?", id);
-        });
+    users.forEach(id -> {
+      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
+      jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
+      jdbc.update("DELETE FROM app_user WHERE id = ?", id);
+    });
     orgUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
     ExchangeSettings settings =
@@ -406,24 +404,23 @@ class ExchangeDemandDetailsControllerTest {
       double amount,
       @Nullable String comment) {
     UUID id =
-        transactionTemplate.execute(
-            status -> {
-              JobOrder order =
-                  JobOrder.builder()
-                      .responsibleOrgUnit(orgUnitRepository.getReferenceById(unit))
-                      .requestingOrgUnit(orgUnitRepository.getReferenceById(requesting))
-                      .handle("demand-requester")
-                      .comment(comment)
-                      .status(JobOrderStatus.OPEN)
-                      .build();
-              order.addMaterial(
-                  JobOrderMaterial.builder()
-                      .material(materialRepository.getReferenceById(material))
-                      .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
-                      .amount(amount)
-                      .build());
-              return jobOrderRepository.save(order).getId();
-            });
+        transactionTemplate.execute(status -> {
+          JobOrder order =
+              JobOrder.builder()
+                  .responsibleOrgUnit(orgUnitRepository.getReferenceById(unit))
+                  .requestingOrgUnit(orgUnitRepository.getReferenceById(requesting))
+                  .handle("demand-requester")
+                  .comment(comment)
+                  .status(JobOrderStatus.OPEN)
+                  .build();
+          order.addMaterial(
+              JobOrderMaterial.builder()
+                  .material(materialRepository.getReferenceById(material))
+                  .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
+                  .amount(amount)
+                  .build());
+          return jobOrderRepository.save(order).getId();
+        });
     orders.add(Objects.requireNonNull(id));
     return id;
   }

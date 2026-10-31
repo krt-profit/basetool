@@ -99,10 +99,9 @@ class ExchangeClientSessionResourceTest {
             mockConstruction(UserSessionManager.class)) {
       resource.endClientSessions(USER_ID, CLIENT_ID);
 
-      manager.verify(
-          () ->
-              AuthenticationManager.backchannelLogoutUserSessionFromClient(
-                  eq(session), eq(realm), eq(shared), eq(client), any(), any()));
+      manager.verify(() ->
+          AuthenticationManager.backchannelLogoutUserSessionFromClient(
+              eq(session), eq(realm), eq(shared), eq(client), any(), any()));
       manager.verify(
           () ->
               AuthenticationManager.backchannelLogoutUserSessionFromClient(

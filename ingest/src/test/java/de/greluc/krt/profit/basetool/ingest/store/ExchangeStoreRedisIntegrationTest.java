@@ -283,10 +283,8 @@ class ExchangeStoreRedisIntegrationTest {
   @Test
   void parallelReservationsNeverOvershootAMembersBudget() throws Exception {
     List<Boolean> admitted =
-        parallel(
-            index ->
-                budget.reserve(
-                    "a", "m1", "ingest:xch:pending:" + index, 500L, Duration.ofMinutes(5)));
+        parallel(index ->
+            budget.reserve("a", "m1", "ingest:xch:pending:" + index, 500L, Duration.ofMinutes(5)));
 
     assertThat(admitted.stream().filter(Boolean::booleanValue).count())
         .as("4096 bytes hold four entries of 1012")
@@ -300,14 +298,13 @@ class ExchangeStoreRedisIntegrationTest {
   void parallelReservationsOfManyMembersNeverOvershootTheClientsOrTheTotalBudget()
       throws Exception {
     List<Boolean> admitted =
-        parallel(
-            index ->
-                budget.reserve(
-                    index % 2 == 0 ? "a" : "b",
-                    "m" + index,
-                    "ingest:xch:pending:" + index,
-                    1500L,
-                    Duration.ofMinutes(5)));
+        parallel(index ->
+            budget.reserve(
+                index % 2 == 0 ? "a" : "b",
+                "m" + index,
+                "ingest:xch:pending:" + index,
+                1500L,
+                Duration.ofMinutes(5)));
 
     assertThat(admitted.stream().filter(Boolean::booleanValue).count())
         .as("12288 bytes hold six entries of 2012, at most four per 8192-byte client")
@@ -332,12 +329,11 @@ class ExchangeStoreRedisIntegrationTest {
 
     assertThat(idempotency.sizeOf(namespace, stored)).isPositive();
     assertThat(idempotency.find(namespace))
-        .hasValueSatisfying(
-            found -> {
-              assertThat(found.fingerprint()).isEqualTo("fp");
-              assertThat(found.status()).isEqualTo(200);
-              assertThat(found.body()).isEqualTo("{\"ok\":1}");
-            });
+        .hasValueSatisfying(found -> {
+          assertThat(found.fingerprint()).isEqualTo("fp");
+          assertThat(found.status()).isEqualTo(200);
+          assertThat(found.body()).isEqualTo("{\"ok\":1}");
+        });
     assertThat(idempotency.claim(namespace)).isPresent();
     assertThat(observer.getExpire(ExchangeIdempotency.PREFIX + namespace)).isPositive();
   }
@@ -657,11 +653,10 @@ class ExchangeStoreRedisIntegrationTest {
       for (int i = 0; i < THREADS; i++) {
         int index = i;
         futures.add(
-            pool.submit(
-                () -> {
-                  start.await();
-                  return task.run(index);
-                }));
+            pool.submit(() -> {
+              start.await();
+              return task.run(index);
+            }));
       }
       start.countDown();
       List<T> results = new ArrayList<>();

@@ -135,10 +135,9 @@ class ArchitectureTest {
   void noControllerHoldsARawWebClient() {
     List<String> offenders =
         controllers().stream()
-            .filter(
-                c ->
-                    c.getAllFields().stream()
-                        .anyMatch(f -> f.getRawType().isEquivalentTo(WebClient.class)))
+            .filter(c ->
+                c.getAllFields().stream()
+                    .anyMatch(f -> f.getRawType().isEquivalentTo(WebClient.class)))
             .map(JavaClass::getSimpleName)
             .sorted()
             .toList();

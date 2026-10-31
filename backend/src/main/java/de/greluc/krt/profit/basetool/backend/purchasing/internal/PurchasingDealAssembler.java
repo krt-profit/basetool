@@ -146,21 +146,20 @@ class PurchasingDealAssembler {
     UUID caller = authHelperService.currentUserId().orElse(null);
     Instant now = Instant.now();
     return deals.stream()
-        .map(
-            deal ->
-                assemble(
-                    deal,
-                    tranches.getOrDefault(deal.getId(), List.of()),
-                    deliveries.getOrDefault(deal.getId(), List.of()),
-                    settlements.get(deal.getId()),
-                    partners.get(deal.getPartnerId()),
-                    unitNames,
-                    userNames,
-                    locationNames,
-                    readNotes,
-                    governing,
-                    caller,
-                    now))
+        .map(deal ->
+            assemble(
+                deal,
+                tranches.getOrDefault(deal.getId(), List.of()),
+                deliveries.getOrDefault(deal.getId(), List.of()),
+                settlements.get(deal.getId()),
+                partners.get(deal.getPartnerId()),
+                unitNames,
+                userNames,
+                locationNames,
+                readNotes,
+                governing,
+                caller,
+                now))
         .toList();
   }
 

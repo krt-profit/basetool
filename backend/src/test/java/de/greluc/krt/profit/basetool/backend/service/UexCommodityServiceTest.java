@@ -327,14 +327,13 @@ class UexCommodityServiceTest {
     when(materialRepository.findByName("Good")).thenReturn(Optional.empty());
 
     when(materialRepository.save(any()))
-        .thenAnswer(
-            invocation -> {
-              Material m = invocation.getArgument(0);
-              if ("Bad".equals(m.getName())) {
-                throw new RuntimeException("DB hiccup");
-              }
-              return m;
-            });
+        .thenAnswer(invocation -> {
+          Material m = invocation.getArgument(0);
+          if ("Bad".equals(m.getName())) {
+            throw new RuntimeException("DB hiccup");
+          }
+          return m;
+        });
 
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
@@ -468,14 +467,13 @@ class UexCommodityServiceTest {
     when(materialRepository.findByIdCommodity(123)).thenReturn(Optional.empty());
     when(materialRepository.findByName("NewStuff")).thenReturn(Optional.empty());
     when(materialRepository.save(any(Material.class)))
-        .thenAnswer(
-            invocation -> {
-              Material m = invocation.getArgument(0);
-              if (m.getId() == null) {
-                m.setId(UUID.randomUUID());
-              }
-              return m;
-            });
+        .thenAnswer(invocation -> {
+          Material m = invocation.getArgument(0);
+          if (m.getId() == null) {
+            m.setId(UUID.randomUUID());
+          }
+          return m;
+        });
     stubPriceSaveAssignsId();
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
@@ -514,15 +512,14 @@ class UexCommodityServiceTest {
     when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
     when(materialRepository.getReferenceById(m1)).thenReturn(badMaterial);
     when(materialPriceRepository.save(any()))
-        .thenAnswer(
-            invocation -> {
-              MaterialPrice mp = invocation.getArgument(0);
-              if (mp.getMaterial() == badMaterial) {
-                throw new RuntimeException("row refused");
-              }
-              mp.setId(UUID.randomUUID());
-              return mp;
-            });
+        .thenAnswer(invocation -> {
+          MaterialPrice mp = invocation.getArgument(0);
+          if (mp.getMaterial() == badMaterial) {
+            throw new RuntimeException("row refused");
+          }
+          mp.setId(UUID.randomUUID());
+          return mp;
+        });
 
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
@@ -547,12 +544,11 @@ class UexCommodityServiceTest {
     when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(1, terminalId)));
     when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
     when(materialPriceRepository.save(any(MaterialPrice.class)))
-        .thenAnswer(
-            invocation -> {
-              MaterialPrice mp = invocation.getArgument(0);
-              mp.setId(assignedPriceId);
-              return mp;
-            });
+        .thenAnswer(invocation -> {
+          MaterialPrice mp = invocation.getArgument(0);
+          mp.setId(assignedPriceId);
+          return mp;
+        });
     when(materialPriceRepository.findIdsWithLivePrices())
         .thenReturn(List.of(assignedPriceId, stalePriceId));
 
@@ -587,14 +583,13 @@ class UexCommodityServiceTest {
    */
   private void stubPriceSaveAssignsId() {
     when(materialPriceRepository.save(any(MaterialPrice.class)))
-        .thenAnswer(
-            invocation -> {
-              MaterialPrice mp = invocation.getArgument(0);
-              if (mp.getId() == null) {
-                mp.setId(UUID.randomUUID());
-              }
-              return mp;
-            });
+        .thenAnswer(invocation -> {
+          MaterialPrice mp = invocation.getArgument(0);
+          if (mp.getId() == null) {
+            mp.setId(UUID.randomUUID());
+          }
+          return mp;
+        });
   }
 
   private static UexCommodityDto commodity(

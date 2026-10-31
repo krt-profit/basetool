@@ -96,23 +96,21 @@ public abstract class RequestProblemHandlers extends SecurityProblemHandlers {
     List<String> logSummary = new ArrayList<>();
     ex.getBindingResult()
         .getFieldErrors()
-        .forEach(
-            fieldError -> {
-              String field = fieldError.getField();
-              String message = fieldError.getDefaultMessage();
-              errorsByField.put(field, message);
-              Map<String, String> entry = new HashMap<>();
-              entry.put("field", field);
-              entry.put("message", message);
-              errors.add(entry);
-              logSummary.add(field + "=" + message + " (code=" + fieldError.getCode() + ")");
-            });
+        .forEach(fieldError -> {
+          String field = fieldError.getField();
+          String message = fieldError.getDefaultMessage();
+          errorsByField.put(field, message);
+          Map<String, String> entry = new HashMap<>();
+          entry.put("field", field);
+          entry.put("message", message);
+          errors.add(entry);
+          logSummary.add(field + "=" + message + " (code=" + fieldError.getCode() + ")");
+        });
     ex.getBindingResult()
         .getGlobalErrors()
-        .forEach(
-            globalError ->
-                logSummary.add(
-                    "[" + globalError.getObjectName() + "] " + globalError.getDefaultMessage()));
+        .forEach(globalError ->
+            logSummary.add(
+                "[" + globalError.getObjectName() + "] " + globalError.getDefaultMessage()));
     ProblemDetail pd =
         problem(
             HttpStatus.BAD_REQUEST,
@@ -147,15 +145,14 @@ public abstract class RequestProblemHandlers extends SecurityProblemHandlers {
     List<Map<String, String>> errors = new ArrayList<>();
     List<String> logSummary = new ArrayList<>();
     ex.getConstraintViolations()
-        .forEach(
-            v -> {
-              String field = v.getPropertyPath() != null ? v.getPropertyPath().toString() : "";
-              Map<String, String> entry = new HashMap<>();
-              entry.put("field", field);
-              entry.put("message", v.getMessage());
-              errors.add(entry);
-              logSummary.add(field + "=" + v.getMessage());
-            });
+        .forEach(v -> {
+          String field = v.getPropertyPath() != null ? v.getPropertyPath().toString() : "";
+          Map<String, String> entry = new HashMap<>();
+          entry.put("field", field);
+          entry.put("message", v.getMessage());
+          errors.add(entry);
+          logSummary.add(field + "=" + v.getMessage());
+        });
     ProblemDetail pd =
         problem(
             HttpStatus.BAD_REQUEST,
@@ -202,17 +199,16 @@ public abstract class RequestProblemHandlers extends SecurityProblemHandlers {
       if (rootCause instanceof DatabindException jme && jme.getPath() != null) {
         StringBuilder path = new StringBuilder();
         jme.getPath()
-            .forEach(
-                ref -> {
-                  if (ref.getPropertyName() != null) {
-                    if (path.length() > 0) {
-                      path.append('.');
-                    }
-                    path.append(ref.getPropertyName());
-                  } else if (ref.getIndex() >= 0) {
-                    path.append('[').append(ref.getIndex()).append(']');
-                  }
-                });
+            .forEach(ref -> {
+              if (ref.getPropertyName() != null) {
+                if (path.length() > 0) {
+                  path.append('.');
+                }
+                path.append(ref.getPropertyName());
+              } else if (ref.getIndex() >= 0) {
+                path.append('[').append(ref.getIndex()).append(']');
+              }
+            });
         if (path.length() > 0) {
           extra.put("jsonPath", path.toString());
         }

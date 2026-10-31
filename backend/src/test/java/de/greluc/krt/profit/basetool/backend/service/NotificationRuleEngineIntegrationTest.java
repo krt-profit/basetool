@@ -183,27 +183,26 @@ class NotificationRuleEngineIntegrationTest {
   void createFromEventPersistsRowForSpecificUserRule() {
     UUID recipient = UUID.randomUUID();
     NotificationRule extraRule =
-        transactionTemplate.execute(
-            status -> {
-              User target = new User();
-              target.setId(recipient);
-              target.setUsername("specific-user-" + recipient);
-              userRepository.save(target);
-              NotificationRule rule =
-                  NotificationRule.builder()
-                      .eventType(NotificationEventType.JOB_ORDER_CREATED)
-                      .notificationType(NotificationType.JOB_ORDER_CREATED)
-                      .description("integration-test specific-user rule")
-                      .enabled(true)
-                      .excludeActor(false)
-                      .build();
-              rule.addSelector(
-                  NotificationRuleSelector.builder()
-                      .kind(SelectorKind.SPECIFIC_USER)
-                      .userId(recipient)
-                      .build());
-              return notificationRuleRepository.saveAndFlush(rule);
-            });
+        transactionTemplate.execute(status -> {
+          User target = new User();
+          target.setId(recipient);
+          target.setUsername("specific-user-" + recipient);
+          userRepository.save(target);
+          NotificationRule rule =
+              NotificationRule.builder()
+                  .eventType(NotificationEventType.JOB_ORDER_CREATED)
+                  .notificationType(NotificationType.JOB_ORDER_CREATED)
+                  .description("integration-test specific-user rule")
+                  .enabled(true)
+                  .excludeActor(false)
+                  .build();
+          rule.addSelector(
+              NotificationRuleSelector.builder()
+                  .kind(SelectorKind.SPECIFIC_USER)
+                  .userId(recipient)
+                  .build());
+          return notificationRuleRepository.saveAndFlush(rule);
+        });
 
     try {
       JobOrderCreatedEvent event = eventForRandomUnits();
@@ -212,18 +211,16 @@ class NotificationRuleEngineIntegrationTest {
       assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientUserId(recipient, Pageable.unpaged()))
           .singleElement()
-          .satisfies(
-              n -> {
-                assertThat(n.getType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
-                assertThat(n.getEntityId()).isEqualTo(event.entityId());
-                assertThat(n.isRead()).isFalse();
-              });
-    } finally {
-      transactionTemplate.executeWithoutResult(
-          status -> {
-            notificationRuleRepository.deleteById(extraRule.getId());
-            userRepository.deleteById(recipient);
+          .satisfies(n -> {
+            assertThat(n.getType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
+            assertThat(n.getEntityId()).isEqualTo(event.entityId());
+            assertThat(n.isRead()).isFalse();
           });
+    } finally {
+      transactionTemplate.executeWithoutResult(status -> {
+        notificationRuleRepository.deleteById(extraRule.getId());
+        userRepository.deleteById(recipient);
+      });
     }
   }
 
@@ -231,16 +228,15 @@ class NotificationRuleEngineIntegrationTest {
   void discordRegistrationPendingRuleNotifiesEveryAdmin() {
     UUID adminSub = UUID.randomUUID();
     UUID newUserId = UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          Role admin = roleRepository.findByNameIgnoreCase("Admin").orElseThrow();
-          User u = new User();
-          u.setId(adminSub);
-          u.setUsername("it-admin-" + adminSub);
-          u.setApprovalStatus(ApprovalStatus.ACTIVE);
-          u.setRoles(new HashSet<>(Set.of(admin)));
-          userRepository.saveAndFlush(u);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      Role admin = roleRepository.findByNameIgnoreCase("Admin").orElseThrow();
+      User u = new User();
+      u.setId(adminSub);
+      u.setUsername("it-admin-" + adminSub);
+      u.setApprovalStatus(ApprovalStatus.ACTIVE);
+      u.setRoles(new HashSet<>(Set.of(admin)));
+      userRepository.saveAndFlush(u);
+    });
 
     try {
       NotificationRule seeded =
@@ -254,11 +250,10 @@ class NotificationRuleEngineIntegrationTest {
       assertThat(seeded.isExcludeActor()).isFalse();
       assertThat(seeded.getSelectors())
           .singleElement()
-          .satisfies(
-              s -> {
-                assertThat(s.getKind()).isEqualTo(SelectorKind.ROLE);
-                assertThat(s.getRoleCode()).isEqualTo("ADMIN");
-              });
+          .satisfies(s -> {
+            assertThat(s.getKind()).isEqualTo(SelectorKind.ROLE);
+            assertThat(s.getRoleCode()).isEqualTo("ADMIN");
+          });
 
       Set<UUID> recipients =
           notificationCreationService.createFromEvent(
@@ -267,14 +262,12 @@ class NotificationRuleEngineIntegrationTest {
       assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
           .singleElement()
-          .satisfies(
-              n -> {
-                assertThat(n.getType()).isEqualTo(NotificationType.DISCORD_REGISTRATION_PENDING);
-                assertThat(n.getEntityType())
-                    .isEqualTo(DiscordRegistrationPendingEvent.ENTITY_TYPE);
-                assertThat(n.getEntityId()).isEqualTo(newUserId);
-                assertThat(n.isRead()).isFalse();
-              });
+          .satisfies(n -> {
+            assertThat(n.getType()).isEqualTo(NotificationType.DISCORD_REGISTRATION_PENDING);
+            assertThat(n.getEntityType()).isEqualTo(DiscordRegistrationPendingEvent.ENTITY_TYPE);
+            assertThat(n.getEntityId()).isEqualTo(newUserId);
+            assertThat(n.isRead()).isFalse();
+          });
 
       Set<UUID> cleared =
           notificationCreationService.createFromEvent(
@@ -284,35 +277,30 @@ class NotificationRuleEngineIntegrationTest {
       assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
           .isEmpty();
     } finally {
-      transactionTemplate.executeWithoutResult(
-          status -> {
-            notificationRepository
-                .findAllByRecipientUserId(adminSub, Pageable.unpaged())
-                .forEach(n -> notificationRepository.deleteById(n.getId()));
-            userRepository.deleteById(adminSub);
-          });
+      transactionTemplate.executeWithoutResult(status -> {
+        notificationRepository
+            .findAllByRecipientUserId(adminSub, Pageable.unpaged())
+            .forEach(n -> notificationRepository.deleteById(n.getId()));
+        userRepository.deleteById(adminSub);
+      });
     }
   }
 
   @Test
   void ruleCrudRoundTripsThroughRepository() {
     UUID id =
-        transactionTemplate.execute(
-            status -> {
-              NotificationRule rule =
-                  NotificationRule.builder()
-                      .eventType(NotificationEventType.JOB_ORDER_CREATED)
-                      .notificationType(NotificationType.JOB_ORDER_CREATED)
-                      .enabled(true)
-                      .excludeActor(true)
-                      .build();
-              rule.addSelector(
-                  NotificationRuleSelector.builder()
-                      .kind(SelectorKind.ROLE)
-                      .roleCode("ADMIN")
-                      .build());
-              return notificationRuleRepository.saveAndFlush(rule).getId();
-            });
+        transactionTemplate.execute(status -> {
+          NotificationRule rule =
+              NotificationRule.builder()
+                  .eventType(NotificationEventType.JOB_ORDER_CREATED)
+                  .notificationType(NotificationType.JOB_ORDER_CREATED)
+                  .enabled(true)
+                  .excludeActor(true)
+                  .build();
+          rule.addSelector(
+              NotificationRuleSelector.builder().kind(SelectorKind.ROLE).roleCode("ADMIN").build());
+          return notificationRuleRepository.saveAndFlush(rule).getId();
+        });
 
     assertThat(notificationRuleRepository.findByIdWithSelectors(id))
         .get()

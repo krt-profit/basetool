@@ -173,11 +173,10 @@ class OperationMissionManagerFlagTest {
   private org.springframework.test.web.servlet.request.RequestPostProcessor jwtFor(
       User user, Collection<GrantedAuthority> authorities) {
     return jwt()
-        .jwt(
-            builder ->
-                builder
-                    .subject(user.getId().toString())
-                    .claim("preferred_username", user.getUsername()))
+        .jwt(builder ->
+            builder
+                .subject(user.getId().toString())
+                .claim("preferred_username", user.getUsername()))
         .authorities(authorities);
   }
 }

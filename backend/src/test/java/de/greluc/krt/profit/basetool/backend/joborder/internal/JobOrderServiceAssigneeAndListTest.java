@@ -164,31 +164,30 @@ class JobOrderServiceAssigneeAndListTest {
             null);
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
-        .thenAnswer(
-            inv -> {
-              JobOrder o = inv.getArgument(0);
-              return new JobOrderDto(
-                  o.getId(),
-                  o.getDisplayId(),
-                  null,
-                  null,
-                  o.getHandle(),
-                  o.getComment(),
-                  o.getPriority(),
-                  o.getStatus(),
-                  JobOrderType.MATERIAL,
-                  o.isCountBlueprintsWithVariants(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  List.of(),
-                  null,
-                  o.getVersion(),
-                  null,
-                  false);
-            });
+        .thenAnswer(inv -> {
+          JobOrder o = inv.getArgument(0);
+          return new JobOrderDto(
+              o.getId(),
+              o.getDisplayId(),
+              null,
+              null,
+              o.getHandle(),
+              o.getComment(),
+              o.getPriority(),
+              o.getStatus(),
+              JobOrderType.MATERIAL,
+              o.isCountBlueprintsWithVariants(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              null,
+              o.getVersion(),
+              null,
+              false);
+        });
     lenient().when(orderLinkedStockRows.materialStockOfOrders(any())).thenReturn(List.of());
     lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
   }

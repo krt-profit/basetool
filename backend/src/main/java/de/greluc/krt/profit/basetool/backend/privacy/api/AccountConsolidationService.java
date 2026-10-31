@@ -111,10 +111,8 @@ public class AccountConsolidationService {
     assertTargetCanTakeTheLink(target, link.orElse(null));
     String guildNickname = duplicate.getDiscordGuildNickname();
 
-    link.ifPresent(
-        resolved ->
-            keycloakService.linkDiscordIdentity(
-                targetUserId, resolved.userId(), resolved.userName()));
+    link.ifPresent(resolved ->
+        keycloakService.linkDiscordIdentity(targetUserId, resolved.userId(), resolved.userName()));
     User result =
         selfProvider
             .getObject()
@@ -159,14 +157,12 @@ public class AccountConsolidationService {
   private Optional<KeycloakService.DiscordLink> resolveDiscordLink(@NotNull User duplicate) {
     return keycloakService
         .readDiscordLink(duplicate.getId())
-        .or(
-            () -> {
-              String local = duplicate.getDiscordUserId();
-              return local == null || local.isBlank()
-                  ? Optional.empty()
-                  : Optional.of(
-                      new KeycloakService.DiscordLink(local.trim(), duplicate.getUsername()));
-            });
+        .or(() -> {
+          String local = duplicate.getDiscordUserId();
+          return local == null || local.isBlank()
+              ? Optional.empty()
+              : Optional.of(new KeycloakService.DiscordLink(local.trim(), duplicate.getUsername()));
+        });
   }
 
   /**
@@ -196,11 +192,10 @@ public class AccountConsolidationService {
       userAccountMergeService.merge(duplicateId, targetUserId, adminId);
       userRepository
           .findById(duplicateId)
-          .ifPresent(
-              emptied -> {
-                emptied.setInKeycloak(false);
-                userRepository.saveAndFlush(emptied);
-              });
+          .ifPresent(emptied -> {
+            emptied.setInKeycloak(false);
+            userRepository.saveAndFlush(emptied);
+          });
       userDeletionService.deleteUser(
           duplicateId,
           UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);

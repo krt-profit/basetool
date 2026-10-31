@@ -158,9 +158,8 @@ class ExchangeStockWritePathCharacterisationTest {
     assertThat(result.applied()).isZero();
     assertThat(result.results())
         .singleElement()
-        .satisfies(
-            skipped ->
-                assertThat(skipped.reason()).isEqualTo(ExchangeStockWriteService.STOCK_EARMARKED));
+        .satisfies(skipped ->
+            assertThat(skipped.reason()).isEqualTo(ExchangeStockWriteService.STOCK_EARMARKED));
     assertThat(rows()).containsExactly(List.of("2.000", "false"), List.of("3.000", "false"));
   }
 
@@ -175,9 +174,8 @@ class ExchangeStockWritePathCharacterisationTest {
     assertThat(stale.applied()).isZero();
     assertThat(stale.results())
         .singleElement()
-        .satisfies(
-            skipped ->
-                assertThat(skipped.reason()).isEqualTo(ExchangeStockWriteService.VERSION_CONFLICT));
+        .satisfies(skipped ->
+            assertThat(skipped.reason()).isEqualTo(ExchangeStockWriteService.VERSION_CONFLICT));
     assertThat(total()).isEqualByComparingTo("6");
   }
 

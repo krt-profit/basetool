@@ -203,40 +203,38 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
     UUID member = scope.member();
     String clientId = scope.clientId();
     Map<String, List<ExchangeJournalEntry>> byInstallation = new LinkedHashMap<>();
-    links.forEach(
-        entry ->
-            byInstallation
-                .computeIfAbsent(entry.getInstallationKey(), _ -> new ArrayList<>())
-                .add(entry));
-    byInstallation.forEach(
-        (installation, entries) -> {
-          UUID shipId = UUID.fromString(entries.getFirst().getEntityKey());
-          String made = readLink(entries.getFirst().getAfterState());
-          String replaced = readLink(entries.getLast().getBeforeState());
-          linkRepository
-              .findByUserIdAndClientIdAndInstallationKeyAndShipId(
-                  member, clientId, installation, shipId)
-              .filter(link -> link.getExternalId().equals(made))
-              .ifPresent(linkRepository::delete);
-          linkRepository.flush();
-          if (replaced != null
-              && shipRepository.existsByIdAndOwnerId(shipId, member)
-              && linkRepository
-                  .findByUserIdAndClientIdAndInstallationKeyAndExternalId(
-                      member, clientId, installation, replaced)
-                  .isEmpty()) {
-            linkRepository.save(
-                ExchangeShipLink.builder()
-                    .id(UUID.randomUUID())
-                    .userId(member)
-                    .clientId(clientId)
-                    .installationKey(installation)
-                    .externalId(replaced)
-                    .shipId(shipId)
-                    .createdAt(clock.instant())
-                    .build());
-          }
-        });
+    links.forEach(entry ->
+        byInstallation
+            .computeIfAbsent(entry.getInstallationKey(), _ -> new ArrayList<>())
+            .add(entry));
+    byInstallation.forEach((installation, entries) -> {
+      UUID shipId = UUID.fromString(entries.getFirst().getEntityKey());
+      String made = readLink(entries.getFirst().getAfterState());
+      String replaced = readLink(entries.getLast().getBeforeState());
+      linkRepository
+          .findByUserIdAndClientIdAndInstallationKeyAndShipId(
+              member, clientId, installation, shipId)
+          .filter(link -> link.getExternalId().equals(made))
+          .ifPresent(linkRepository::delete);
+      linkRepository.flush();
+      if (replaced != null
+          && shipRepository.existsByIdAndOwnerId(shipId, member)
+          && linkRepository
+              .findByUserIdAndClientIdAndInstallationKeyAndExternalId(
+                  member, clientId, installation, replaced)
+              .isEmpty()) {
+        linkRepository.save(
+            ExchangeShipLink.builder()
+                .id(UUID.randomUUID())
+                .userId(member)
+                .clientId(clientId)
+                .installationKey(installation)
+                .externalId(replaced)
+                .shipId(shipId)
+                .createdAt(clock.instant())
+                .build());
+      }
+    });
   }
 
   /**

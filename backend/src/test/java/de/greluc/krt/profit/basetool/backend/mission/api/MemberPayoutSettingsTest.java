@@ -81,12 +81,11 @@ class MemberPayoutSettingsTest {
     when(userRepository.existsById(USER)).thenReturn(true);
     when(repository.findById(USER)).thenReturn(Optional.empty());
     when(repository.saveAndFlush(any(MemberPayoutSetting.class)))
-        .thenAnswer(
-            invocation -> {
-              MemberPayoutSetting saved = invocation.getArgument(0);
-              saved.setVersion(0L);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          MemberPayoutSetting saved = invocation.getArgument(0);
+          saved.setVersion(0L);
+          return saved;
+        });
 
     MemberPayoutSettings.Snapshot result = settings.update(USER, PayoutPreference.DONATE, 0L);
 

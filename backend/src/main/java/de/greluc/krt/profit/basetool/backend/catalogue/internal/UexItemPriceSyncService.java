@@ -90,12 +90,11 @@ public class UexItemPriceSyncService {
 
     Instant now = Instant.now();
     UexMatrixLookups lookups =
-        chunkWriter.inNewTransaction(
-            () ->
-                new UexMatrixLookups(
-                    gameItemRepository.findUexItemRefs(),
-                    terminalRepository.findUexTerminalRefs(),
-                    gameItemPriceRepository.findPriceKeyRefs()));
+        chunkWriter.inNewTransaction(() ->
+            new UexMatrixLookups(
+                gameItemRepository.findUexItemRefs(),
+                terminalRepository.findUexTerminalRefs(),
+                gameItemPriceRepository.findPriceKeyRefs()));
     SyncChunkWriter.Outcome<UUID> outcome =
         chunkWriter.write(
             dtos,
@@ -114,12 +113,11 @@ public class UexItemPriceSyncService {
           dtos.size());
     } else {
       int cleared =
-          chunkWriter.inNewTransaction(
-              () ->
-                  StalePriceSweep.clearStale(
-                      gameItemPriceRepository.findIdsWithLivePrices(),
-                      seenPriceIds,
-                      gameItemPriceRepository::clearPricesByIds));
+          chunkWriter.inNewTransaction(() ->
+              StalePriceSweep.clearStale(
+                  gameItemPriceRepository.findIdsWithLivePrices(),
+                  seenPriceIds,
+                  gameItemPriceRepository::clearPricesByIds));
       if (cleared > 0) {
         log.info("Cleared prices on {} game_item_price row(s) no longer returned by UEX.", cleared);
       }

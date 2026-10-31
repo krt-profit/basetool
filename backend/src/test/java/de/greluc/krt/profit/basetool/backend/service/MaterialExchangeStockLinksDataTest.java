@@ -83,13 +83,12 @@ class MaterialExchangeStockLinksDataTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(
-            () ->
-                stolenMarkService.mark(
-                    row.getId(),
-                    new InventoryItemStolenMarkDto(row.getVersion(), true, 30.0),
-                    row.getUser().getId(),
-                    true))
+    assertThatThrownBy(() ->
+            stolenMarkService.mark(
+                row.getId(),
+                new InventoryItemStolenMarkDto(row.getVersion(), true, 30.0),
+                row.getUser().getId(),
+                true))
         .isInstanceOf(BusinessConflictException.class)
         .hasMessage("error.inventory.stolen.belowOffer");
     assertThat(amountOf(row)).isEqualTo(100.0);

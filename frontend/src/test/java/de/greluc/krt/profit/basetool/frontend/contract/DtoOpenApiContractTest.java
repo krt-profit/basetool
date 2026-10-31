@@ -149,12 +149,11 @@ class DtoOpenApiContractTest {
           backendEnums.stream()
               .filter(mirror::equals)
               .findFirst()
-              .orElseGet(
-                  () ->
-                      backendEnums.stream()
-                          .filter(candidate -> candidate.containsAll(mirror))
-                          .max(Comparator.comparingInt(Set::size))
-                          .orElse(null));
+              .orElseGet(() ->
+                  backendEnums.stream()
+                      .filter(candidate -> candidate.containsAll(mirror))
+                      .max(Comparator.comparingInt(Set::size))
+                      .orElse(null));
       if (backend == null) {
         continue;
       }

@@ -127,11 +127,10 @@ class ExchangeDemandControllerTest {
 
   @AfterEach
   void tearDown() {
-    orders.forEach(
-        id -> {
-          jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", id);
-          jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-        });
+    orders.forEach(id -> {
+      jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", id);
+      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
+    });
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", member);
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
@@ -267,24 +266,23 @@ class ExchangeDemandControllerTest {
    */
   private void openOrder(@NotNull UUID unit, @NotNull UUID material, double amount) {
     UUID id =
-        transactionTemplate.execute(
-            status -> {
-              OrgUnit responsible = orgUnitRepository.getReferenceById(unit);
-              JobOrder order =
-                  JobOrder.builder()
-                      .responsibleOrgUnit(responsible)
-                      .requestingOrgUnit(responsible)
-                      .handle("demand-test")
-                      .status(JobOrderStatus.OPEN)
-                      .build();
-              order.addMaterial(
-                  JobOrderMaterial.builder()
-                      .material(materialRepository.getReferenceById(material))
-                      .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
-                      .amount(amount)
-                      .build());
-              return jobOrderRepository.save(order).getId();
-            });
+        transactionTemplate.execute(status -> {
+          OrgUnit responsible = orgUnitRepository.getReferenceById(unit);
+          JobOrder order =
+              JobOrder.builder()
+                  .responsibleOrgUnit(responsible)
+                  .requestingOrgUnit(responsible)
+                  .handle("demand-test")
+                  .status(JobOrderStatus.OPEN)
+                  .build();
+          order.addMaterial(
+              JobOrderMaterial.builder()
+                  .material(materialRepository.getReferenceById(material))
+                  .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
+                  .amount(amount)
+                  .build());
+          return jobOrderRepository.save(order).getId();
+        });
     orders.add(Objects.requireNonNull(id));
   }
 }

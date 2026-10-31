@@ -646,12 +646,11 @@ class PurchasingTrancheServiceTest {
             JUSTIFICATION))
         .thenReturn(REQUEST_ID);
     when(trancheRepository.saveAndFlush(any(PurchasingDealTranche.class)))
-        .thenAnswer(
-            invocation -> {
-              PurchasingDealTranche saved = invocation.getArgument(0);
-              saved.setId(TRANCHE_ID);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          PurchasingDealTranche saved = invocation.getArgument(0);
+          saved.setId(TRANCHE_ID);
+          return saved;
+        });
     when(assembler.toDto(deal)).thenReturn(dto);
   }
 

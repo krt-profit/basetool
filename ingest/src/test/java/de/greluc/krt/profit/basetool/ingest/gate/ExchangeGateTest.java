@@ -170,14 +170,13 @@ class ExchangeGateTest {
   void theGateTagsTheRequestBeforeItsOwnChecksRun() throws Exception {
     AtomicReference<String> seen = new AtomicReference<>();
     when(revocationReader.isDenied(anyString()))
-        .thenAnswer(
-            invocation -> {
-              seen.set(
-                  MDC.get(ExchangeLogContext.CLIENT_KEY)
-                      + " | "
-                      + MDC.get(ExchangeLogContext.ROUTE_KEY));
-              return true;
-            });
+        .thenAnswer(invocation -> {
+          seen.set(
+              MDC.get(ExchangeLogContext.CLIENT_KEY)
+                  + " | "
+                  + MDC.get(ExchangeLogContext.ROUTE_KEY));
+          return true;
+        });
 
     call(HttpMethod.GET, STOCK).andExpect(status().isUnauthorized());
 

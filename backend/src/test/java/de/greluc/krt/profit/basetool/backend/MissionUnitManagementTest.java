@@ -209,11 +209,10 @@ class MissionUnitManagementTest {
 
     assertTrue(
         updated.getAssignedUnits().stream()
-            .anyMatch(
-                u ->
-                    "Participant Unit".equals(u.getName())
-                        && u.getShip() != null
-                        && ship.getId().equals(u.getShip().getId())));
+            .anyMatch(u ->
+                "Participant Unit".equals(u.getName())
+                    && u.getShip() != null
+                    && ship.getId().equals(u.getShip().getId())));
   }
 
   @Test

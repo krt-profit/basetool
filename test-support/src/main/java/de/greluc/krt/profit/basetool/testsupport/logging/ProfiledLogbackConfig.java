@@ -129,11 +129,10 @@ public final class ProfiledLogbackConfig {
   static boolean matches(@NotNull String expression, @NotNull Set<String> activeProfiles) {
     return Arrays.stream(expression.split(","))
         .map(String::trim)
-        .anyMatch(
-            entry ->
-                entry.startsWith("!")
-                    ? !activeProfiles.contains(entry.substring(1).trim())
-                    : activeProfiles.contains(entry));
+        .anyMatch(entry ->
+            entry.startsWith("!")
+                ? !activeProfiles.contains(entry.substring(1).trim())
+                : activeProfiles.contains(entry));
   }
 
   /**

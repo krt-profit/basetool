@@ -48,13 +48,12 @@ public class ExchangeOrgUnitService {
   public @NotNull ExchangeOrgUnitListDto orgUnits(@NotNull UUID member) {
     return new ExchangeOrgUnitListDto(
         membershipQueryService.listDirectMembershipOptions(member).stream()
-            .map(
-                option ->
-                    new ExchangeOrgUnitDto(
-                        option.orgUnitId(),
-                        option.orgUnitName(),
-                        option.orgUnitShorthand(),
-                        option.kind()))
+            .map(option ->
+                new ExchangeOrgUnitDto(
+                    option.orgUnitId(),
+                    option.orgUnitName(),
+                    option.orgUnitShorthand(),
+                    option.kind()))
             .toList());
   }
 

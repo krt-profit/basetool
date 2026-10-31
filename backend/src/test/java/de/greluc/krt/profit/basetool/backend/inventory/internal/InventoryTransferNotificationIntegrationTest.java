@@ -85,10 +85,9 @@ class InventoryTransferNotificationIntegrationTest {
     Material quantanium = material("Quantanium", QuantityType.SCU);
     InventoryItem row = row(owner, quantanium, from, 640, 10.0);
 
-    transactionTemplate.executeWithoutResult(
-        _ ->
-            checkoutService.bookOutInventoryItem(
-                row.getId(), transfer(4.0, receiver.getId(), to.getId()), owner.getId(), false));
+    transactionTemplate.executeWithoutResult(_ ->
+        checkoutService.bookOutInventoryItem(
+            row.getId(), transfer(4.0, receiver.getId(), to.getId()), owner.getId(), false));
 
     List<Map<String, Object>> received = awaitNotifications(receiver.getId(), 1);
     assertThat(received.getFirst().get("type")).isEqualTo("INVENTORY_TRANSFERRED_TO_USER");
@@ -108,10 +107,9 @@ class InventoryTransferNotificationIntegrationTest {
     Material medpen = material("Medpen", QuantityType.PIECE);
     InventoryItem row = row(owner, medpen, from, 500, 6.0);
 
-    transactionTemplate.executeWithoutResult(
-        _ ->
-            checkoutService.bookOutInventoryItem(
-                row.getId(), transfer(6.0, receiver.getId(), null), logistician.getId(), true));
+    transactionTemplate.executeWithoutResult(_ ->
+        checkoutService.bookOutInventoryItem(
+            row.getId(), transfer(6.0, receiver.getId(), null), logistician.getId(), true));
 
     List<Map<String, Object>> received = awaitNotifications(receiver.getId(), 1);
     assertThat(received.getFirst().get("type")).isEqualTo("INVENTORY_TRANSFERRED_TO_USER");
@@ -137,17 +135,16 @@ class InventoryTransferNotificationIntegrationTest {
     InventoryItem ore = row(owner, laranite, from, 800, 12.5);
     InventoryItem kits = row(owner, kit, from, 300, 3.0);
 
-    transactionTemplate.executeWithoutResult(
-        _ ->
-            checkoutService.bulkRebook(
-                new BulkRebookRequest(
-                    List.of(ore.getId(), kits.getId()),
-                    BulkRebookMode.LOCATION,
-                    receiver.getId(),
-                    null,
-                    null,
-                    null),
-                owner.getId()));
+    transactionTemplate.executeWithoutResult(_ ->
+        checkoutService.bulkRebook(
+            new BulkRebookRequest(
+                List.of(ore.getId(), kits.getId()),
+                BulkRebookMode.LOCATION,
+                receiver.getId(),
+                null,
+                null,
+                null),
+            owner.getId()));
 
     List<Map<String, Object>> received = awaitNotifications(receiver.getId(), 1);
     assertThat(received).hasSize(1);
@@ -170,20 +167,17 @@ class InventoryTransferNotificationIntegrationTest {
     InventoryItem moved = row(owner, material, from, 500, 5.0);
     InventoryItem controlRow = row(owner, material, from, 500, 5.0);
 
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          checkoutService.bookOutInventoryItem(
-              rolledBack.getId(), transfer(5.0, receiver.getId(), null), owner.getId(), false);
-          status.setRollbackOnly();
-        });
-    transactionTemplate.executeWithoutResult(
-        _ ->
-            checkoutService.bookOutInventoryItem(
-                moved.getId(), transfer(5.0, null, to.getId()), owner.getId(), false));
-    transactionTemplate.executeWithoutResult(
-        _ ->
-            checkoutService.bookOutInventoryItem(
-                controlRow.getId(), transfer(5.0, control.getId(), null), owner.getId(), false));
+    transactionTemplate.executeWithoutResult(status -> {
+      checkoutService.bookOutInventoryItem(
+          rolledBack.getId(), transfer(5.0, receiver.getId(), null), owner.getId(), false);
+      status.setRollbackOnly();
+    });
+    transactionTemplate.executeWithoutResult(_ ->
+        checkoutService.bookOutInventoryItem(
+            moved.getId(), transfer(5.0, null, to.getId()), owner.getId(), false));
+    transactionTemplate.executeWithoutResult(_ ->
+        checkoutService.bookOutInventoryItem(
+            controlRow.getId(), transfer(5.0, control.getId(), null), owner.getId(), false));
 
     awaitNotifications(control.getId(), 1);
     assertThat(notifications(receiver.getId())).isEmpty();

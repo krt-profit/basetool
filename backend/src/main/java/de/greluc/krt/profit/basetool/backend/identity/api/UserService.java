@@ -444,13 +444,12 @@ public class UserService {
       return ActorRef.system();
     }
     return current
-        .map(
-            user ->
-                new ActorRef(
-                    user.getId(),
-                    Objects.requireNonNullElse(
-                        StringNormalization.trimToNull(user.getEffectiveName()),
-                        ActorRef.UNKNOWN_NAME)))
+        .map(user ->
+            new ActorRef(
+                user.getId(),
+                Objects.requireNonNullElse(
+                    StringNormalization.trimToNull(user.getEffectiveName()),
+                    ActorRef.UNKNOWN_NAME)))
         .orElseGet(ActorRef::system);
   }
 
@@ -500,10 +499,8 @@ public class UserService {
       membershipOperations.reconcileStaffelMemberships(
           user,
           delta.staffeln().stream()
-              .map(
-                  c ->
-                      new StaffelAssignment(
-                          c.squadronId(), c.isLogistician(), c.isMissionManager()))
+              .map(c ->
+                  new StaffelAssignment(c.squadronId(), c.isLogistician(), c.isMissionManager()))
               .toList());
     }
     if (delta.specialCommands() != null) {

@@ -73,21 +73,20 @@ class JobOrderToProcessMvcTest {
   @BeforeEach
   void seed() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    transactionTemplate.executeWithoutResult(
-        _ -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          Squadron sqA = newSquadron("Proc-A-" + tag, "PA" + tag);
-          Squadron sqB = newSquadron("Proc-B-" + tag, "PB" + tag);
-          SpecialCommand sk = new SpecialCommand();
-          sk.setName("Proc-SK-" + tag);
-          sk.setShorthand("PS" + tag);
-          sk.setProfitEligible(true);
-          specialCommandRepository.save(sk);
-          squadronAId = sqA.getId();
-          orderRespA = newOrder(sqA, sqB).getId();
-          orderRespB = newOrder(sqB, sqA).getId();
-          orderRespSk = newOrder(sk, sqA).getId();
-        });
+    transactionTemplate.executeWithoutResult(_ -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      Squadron sqA = newSquadron("Proc-A-" + tag, "PA" + tag);
+      Squadron sqB = newSquadron("Proc-B-" + tag, "PB" + tag);
+      SpecialCommand sk = new SpecialCommand();
+      sk.setName("Proc-SK-" + tag);
+      sk.setShorthand("PS" + tag);
+      sk.setProfitEligible(true);
+      specialCommandRepository.save(sk);
+      squadronAId = sqA.getId();
+      orderRespA = newOrder(sqA, sqB).getId();
+      orderRespB = newOrder(sqB, sqA).getId();
+      orderRespSk = newOrder(sk, sqA).getId();
+    });
   }
 
   @Test

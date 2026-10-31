@@ -162,12 +162,11 @@ public class ConnectedAppsConfirmRelayController {
       @NotNull ConnectedAppMassChangeRequestDto request) {
     Map<String, String> kept = new HashMap<>();
     kept(session)
-        .forEach(
-            (id, json) -> {
-              if (live(json) != null) {
-                kept.put(id, json);
-              }
-            });
+        .forEach((id, json) -> {
+          if (live(json) != null) {
+            kept.put(id, json);
+          }
+        });
     kept.put(handoffId, MAPPER.writeValueAsString(request));
     session.setAttribute(SESSION_KEY, kept);
   }

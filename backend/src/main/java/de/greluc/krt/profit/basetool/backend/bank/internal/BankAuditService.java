@@ -150,10 +150,9 @@ public class BankAuditService implements RetentionParticipant {
             ? Map.of()
             : accountRepository.findAllById(accountIds).stream()
                 .collect(Collectors.toMap(BankAccount::getId, BankAccount::getAccountNo));
-    return page.map(
-        event ->
-            bankAuditEventMapper.toDto(
-                event, event.getAccountId() == null ? null : accountNos.get(event.getAccountId())));
+    return page.map(event ->
+        bankAuditEventMapper.toDto(
+            event, event.getAccountId() == null ? null : accountNos.get(event.getAccountId())));
   }
 
   /**

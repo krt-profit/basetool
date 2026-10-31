@@ -194,10 +194,9 @@ class FrontendDtoContractTest {
         OPENAPI_CANDIDATES.stream()
             .filter(Files::isRegularFile)
             .findFirst()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "openapi.json not found; looked at " + OPENAPI_CANDIDATES));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "openapi.json not found; looked at " + OPENAPI_CANDIDATES));
     JsonNode schemas =
         new ObjectMapper().readTree(path.toFile()).path("components").path("schemas");
     assertThat(schemas.isObject())

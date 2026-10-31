@@ -40,11 +40,8 @@ public record PageResponse<T>(
   public static <T> PageResponse<T> of(@NotNull Page<T> page) {
     List<String> sort =
         page.getSort().stream()
-            .map(
-                order ->
-                    order.getProperty()
-                        + ","
-                        + order.getDirection().name().toLowerCase(Locale.ROOT))
+            .map(order ->
+                order.getProperty() + "," + order.getDirection().name().toLowerCase(Locale.ROOT))
             .toList();
     return new PageResponse<>(
         page.getContent(),

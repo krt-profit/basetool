@@ -220,12 +220,11 @@ class MissionSectionLockDbEnforcementTest {
   private void forceImmediateConstraintCheck() {
     entityManager
         .unwrap(Session.class)
-        .doWork(
-            connection -> {
-              try (var statement = connection.createStatement()) {
-                statement.execute("SET CONSTRAINTS ALL IMMEDIATE");
-              }
-            });
+        .doWork(connection -> {
+          try (var statement = connection.createStatement()) {
+            statement.execute("SET CONSTRAINTS ALL IMMEDIATE");
+          }
+        });
   }
 
   /** Returns {@code true} if {@code needle} appears anywhere in the throwable's cause chain. */

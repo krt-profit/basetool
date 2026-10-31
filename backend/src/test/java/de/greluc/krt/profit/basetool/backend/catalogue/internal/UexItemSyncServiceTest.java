@@ -485,16 +485,15 @@ class UexItemSyncServiceTest {
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(colliding, surviving));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
-        .thenAnswer(
-            inv -> {
-              GameItem candidate = inv.getArgument(0);
-              if (Integer.valueOf(100).equals(candidate.getUexItemId())) {
-                throw new DataIntegrityViolationException(
-                    "duplicate key value violates unique constraint"
-                        + " \"uk_game_item_external_uuid\"");
-              }
-              return candidate;
-            });
+        .thenAnswer(inv -> {
+          GameItem candidate = inv.getArgument(0);
+          if (Integer.valueOf(100).equals(candidate.getUexItemId())) {
+            throw new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint"
+                    + " \"uk_game_item_external_uuid\"");
+          }
+          return candidate;
+        });
 
     int upserted = assertDoesNotThrow(service::syncItems);
 

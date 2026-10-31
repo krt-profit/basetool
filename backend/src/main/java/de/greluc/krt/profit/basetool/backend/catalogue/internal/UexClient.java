@@ -421,27 +421,26 @@ public class UexClient {
       request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
     }
     try {
-      return request.exchangeForRequiredValue(
-          (_, response) -> {
-            if (response.getStatusCode().value() == 304) {
-              log.info(
-                  "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
-                      + " nothing to re-import.",
-                  resourceLabel);
-              return FetchResult.<T>unchanged();
-            }
-            if (!response.getStatusCode().is2xxSuccessful()) {
-              throw response.createException();
-            }
-            String etag = response.getHeaders().getETag();
-            if (etag != null && !etag.isBlank()) {
-              etagByEndpoint.put(endpoint, etag);
-            }
-            UexResponseDto<T> body = response.bodyTo(typeRef);
-            return body == null
-                ? FetchResult.<T>partial(Collections.emptyList())
-                : unwrapEnvelope(body, resourceLabel);
-          });
+      return request.exchangeForRequiredValue((_, response) -> {
+        if (response.getStatusCode().value() == 304) {
+          log.info(
+              "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
+                  + " nothing to re-import.",
+              resourceLabel);
+          return FetchResult.<T>unchanged();
+        }
+        if (!response.getStatusCode().is2xxSuccessful()) {
+          throw response.createException();
+        }
+        String etag = response.getHeaders().getETag();
+        if (etag != null && !etag.isBlank()) {
+          etagByEndpoint.put(endpoint, etag);
+        }
+        UexResponseDto<T> body = response.bodyTo(typeRef);
+        return body == null
+            ? FetchResult.<T>partial(Collections.emptyList())
+            : unwrapEnvelope(body, resourceLabel);
+      });
     } catch (RuntimeException e) {
       log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
       recordFetchError();

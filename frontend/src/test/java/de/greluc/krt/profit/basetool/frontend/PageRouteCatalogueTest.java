@@ -78,10 +78,9 @@ class PageRouteCatalogueTest {
   private Set<String> routedPageCandidates() {
     return EndpointEnumeration.patterns(context, HttpMethod.GET).stream()
         .filter(pattern -> !pattern.contains("{") && !pattern.contains("*"))
-        .filter(
-            pattern ->
-                FrontendPageRoutes.NOT_SWEPT_ROOTS.stream()
-                    .noneMatch(root -> EndpointEnumeration.isUnder(pattern, root)))
+        .filter(pattern ->
+            FrontendPageRoutes.NOT_SWEPT_ROOTS.stream()
+                .noneMatch(root -> EndpointEnumeration.isUnder(pattern, root)))
         .collect(TreeSet::new, Set::add, Set::addAll);
   }
 

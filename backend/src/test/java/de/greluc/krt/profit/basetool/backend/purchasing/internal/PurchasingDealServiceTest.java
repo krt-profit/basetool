@@ -309,15 +309,14 @@ class PurchasingDealServiceTest {
 
   private void savingAssignsIds() {
     when(dealRepository.saveAndFlush(any(PurchasingDeal.class)))
-        .thenAnswer(
-            invocation -> {
-              PurchasingDeal saved = invocation.getArgument(0);
-              if (saved.getId() == null) {
-                saved.setId(DEAL_ID);
-                saved.setDealNo(42L);
-              }
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          PurchasingDeal saved = invocation.getArgument(0);
+          if (saved.getId() == null) {
+            saved.setId(DEAL_ID);
+            saved.setDealNo(42L);
+          }
+          return saved;
+        });
   }
 
   private double counted(String event) {

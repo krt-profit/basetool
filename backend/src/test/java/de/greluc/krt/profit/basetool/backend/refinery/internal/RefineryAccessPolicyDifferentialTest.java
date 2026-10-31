@@ -209,18 +209,17 @@ class RefineryAccessPolicyDifferentialTest {
 
       OrgUnitCascadeService cascade = mock(OrgUnitCascadeService.class);
       when(cascade.expandWithDescendants(anyCollection()))
-          .thenAnswer(
-              invocation -> {
-                Collection<OrgUnitMembership> given = invocation.getArgument(0);
-                Set<UUID> ids = new LinkedHashSet<>();
-                for (OrgUnitMembership row : given) {
-                  ids.add(row.getId().getOrgUnitId());
-                  if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
-                    ids.add(CHILD_C);
-                  }
-                }
-                return ids;
-              });
+          .thenAnswer(invocation -> {
+            Collection<OrgUnitMembership> given = invocation.getArgument(0);
+            Set<UUID> ids = new LinkedHashSet<>();
+            for (OrgUnitMembership row : given) {
+              ids.add(row.getId().getOrgUnitId());
+              if (row.getId().getOrgUnitId().equals(BEREICH_X)) {
+                ids.add(CHILD_C);
+              }
+            }
+            return ids;
+          });
 
       RefineryOrderRepository repository = mock(RefineryOrderRepository.class);
       when(repository.findById(any())).thenReturn(Optional.empty());
@@ -358,11 +357,10 @@ class RefineryAccessPolicyDifferentialTest {
       }
       return memberships.findAllByIdUserId(targetUserId).stream()
           .map(m -> m.getId().getOrgUnitId())
-          .anyMatch(
-              unit ->
-                  edit
-                      ? accessGateService.canEditSquadron(unit)
-                      : accessGateService.canSeeSquadron(unit));
+          .anyMatch(unit ->
+              edit
+                  ? accessGateService.canEditSquadron(unit)
+                  : accessGateService.canSeeSquadron(unit));
     }
   }
 }

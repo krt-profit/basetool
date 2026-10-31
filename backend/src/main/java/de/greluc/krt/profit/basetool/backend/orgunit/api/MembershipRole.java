@@ -125,9 +125,9 @@ public enum MembershipRole {
   }
 
   /**
-   * Whether this rank is an area rank or OL membership — the set used for the cartel-wide special-
-   * account view and (from Phase 2) the {@code isAreaOrOlSeat} classifier. Excludes squadron ranks
-   * and {@link #SK_LEAD}.
+   * Whether this rank is an area rank or OL membership — the set used for the cartel-wide
+   * special-account view and (from Phase 2) the {@code isAreaOrOlSeat} classifier. Excludes
+   * squadron ranks and {@link #SK_LEAD}.
    *
    * @return {@code true} for the three area ranks and {@link #OL_MEMBER}; {@code false} otherwise.
    */

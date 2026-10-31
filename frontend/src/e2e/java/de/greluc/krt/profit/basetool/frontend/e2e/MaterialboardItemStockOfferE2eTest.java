@@ -54,8 +54,8 @@ class MaterialboardItemStockOfferE2eTest {
   private static Browser browser;
 
   /**
-   * Launches the browser and, for the ephemeral stack, seeds the actor's membership, a blueprint-
-   * bearing game item and a game-item stock row of it at a fresh location.
+   * Launches the browser and, for the ephemeral stack, seeds the actor's membership, a
+   * blueprint-bearing game item and a game-item stock row of it at a fresh location.
    */
   @BeforeAll
   static void setUp() {

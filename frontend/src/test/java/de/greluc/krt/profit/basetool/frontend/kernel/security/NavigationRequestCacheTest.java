@@ -81,11 +81,10 @@ class NavigationRequestCacheTest {
     assertThat(navigationRequestCache.getRequest(result.getRequest(), result.getResponse()))
         .as("and the target is the page the member asked for")
         .isNotNull()
-        .satisfies(
-            saved ->
-                assertThat(saved.getRedirectUrl())
-                    .endsWith(PROTECTED_PATH + "?continue")
-                    .contains(PROTECTED_PATH));
+        .satisfies(saved ->
+            assertThat(saved.getRedirectUrl())
+                .endsWith(PROTECTED_PATH + "?continue")
+                .contains(PROTECTED_PATH));
   }
 
   @Test

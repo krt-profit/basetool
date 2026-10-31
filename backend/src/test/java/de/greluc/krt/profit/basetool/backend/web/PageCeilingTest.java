@@ -68,18 +68,16 @@ class PageCeilingTest {
   @NotNull
   private static Set<String> optOuts(@NotNull JavaClasses classes) {
     Set<String> callers = new TreeSet<>();
-    classes.forEach(
-        javaClass ->
-            javaClass.getFieldAccessesFromSelf().stream()
-                .filter(access -> access.getTargetOwner().isEquivalentTo(PageCeiling.class))
-                .filter(access -> access.getTarget().getName().equals(PageCeiling.LOAD_ALL.name()))
-                .filter(access -> !access.getOriginOwner().isEquivalentTo(PageCeiling.class))
-                .forEach(
-                    access ->
-                        callers.add(
-                            access.getOriginOwner().getName().substring(BACKEND_PACKAGE.length())
-                                + "."
-                                + access.getOrigin().getName())));
+    classes.forEach(javaClass ->
+        javaClass.getFieldAccessesFromSelf().stream()
+            .filter(access -> access.getTargetOwner().isEquivalentTo(PageCeiling.class))
+            .filter(access -> access.getTarget().getName().equals(PageCeiling.LOAD_ALL.name()))
+            .filter(access -> !access.getOriginOwner().isEquivalentTo(PageCeiling.class))
+            .forEach(access ->
+                callers.add(
+                    access.getOriginOwner().getName().substring(BACKEND_PACKAGE.length())
+                        + "."
+                        + access.getOrigin().getName())));
     return callers;
   }
 

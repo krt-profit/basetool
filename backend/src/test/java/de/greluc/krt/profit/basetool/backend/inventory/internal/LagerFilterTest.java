@@ -88,44 +88,36 @@ class LagerFilterTest {
 
     assertThatThrownBy(() -> item.minQuality(500).build().requireMatchingCatalog())
         .isInstanceOf(BadRequestException.class);
-    assertThatThrownBy(
-            () ->
-                item.minQuality(null)
-                    .missionIds(List.of(UUID.randomUUID()))
-                    .build()
-                    .requireMatchingCatalog())
+    assertThatThrownBy(() ->
+            item.minQuality(null)
+                .missionIds(List.of(UUID.randomUUID()))
+                .build()
+                .requireMatchingCatalog())
         .isInstanceOf(BadRequestException.class);
-    assertThatThrownBy(
-            () ->
-                item.missionIds(null)
-                    .materialIds(List.of(UUID.randomUUID()))
-                    .build()
-                    .requireMatchingCatalog())
+    assertThatThrownBy(() ->
+            item.missionIds(null)
+                .materialIds(List.of(UUID.randomUUID()))
+                .build()
+                .requireMatchingCatalog())
         .isInstanceOf(BadRequestException.class);
-    assertThatCode(
-            () ->
-                LagerFilter.builder()
-                    .catalog(InventoryCatalog.ITEM)
-                    .build()
-                    .requireMatchingCatalog())
+    assertThatCode(() ->
+            LagerFilter.builder().catalog(InventoryCatalog.ITEM).build().requireMatchingCatalog())
         .doesNotThrowAnyException();
   }
 
   @Test
   void materialCatalogRejectsItemOnlyFilters() {
-    assertThatThrownBy(
-            () ->
-                LagerFilter.builder()
-                    .gameItemIds(List.of(UUID.randomUUID()))
-                    .build()
-                    .requireMatchingCatalog())
+    assertThatThrownBy(() ->
+            LagerFilter.builder()
+                .gameItemIds(List.of(UUID.randomUUID()))
+                .build()
+                .requireMatchingCatalog())
         .isInstanceOf(BadRequestException.class);
-    assertThatThrownBy(
-            () ->
-                LagerFilter.builder()
-                    .kinds(List.of(GameItemKind.values()[0]))
-                    .build()
-                    .requireMatchingCatalog())
+    assertThatThrownBy(() ->
+            LagerFilter.builder()
+                .kinds(List.of(GameItemKind.values()[0]))
+                .build()
+                .requireMatchingCatalog())
         .isInstanceOf(BadRequestException.class);
     assertThatCode(() -> LagerFilter.builder().minQuality(500).build().requireMatchingCatalog())
         .doesNotThrowAnyException();

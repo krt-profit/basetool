@@ -176,11 +176,10 @@ class CacheableEntityRulesTest {
 
   private static boolean callsASetterOn(JavaMethod method, JavaClass entity) {
     return method.getMethodCallsFromSelf().stream()
-        .anyMatch(
-            call ->
-                call.getName().startsWith("set")
-                    && (call.getTargetOwner().isAssignableTo(entity.getName())
-                        || entity.isAssignableTo(call.getTargetOwner().getName())));
+        .anyMatch(call ->
+            call.getName().startsWith("set")
+                && (call.getTargetOwner().isAssignableTo(entity.getName())
+                    || entity.isAssignableTo(call.getTargetOwner().getName())));
   }
 
   /**

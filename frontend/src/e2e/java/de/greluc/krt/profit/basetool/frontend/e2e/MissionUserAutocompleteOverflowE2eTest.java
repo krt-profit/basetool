@@ -92,15 +92,14 @@ class MissionUserAutocompleteOverflowE2eTest {
    */
   private static String roster(int count) {
     return IntStream.range(0, count)
-        .mapToObj(
-            i ->
-                "{\"id\":\""
-                    + UUID.randomUUID()
-                    + "\",\"username\":\"overflow"
-                    + i
-                    + "\",\"effectiveName\":\"Overflow Pilot "
-                    + i
-                    + "\"}")
+        .mapToObj(i ->
+            "{\"id\":\""
+                + UUID.randomUUID()
+                + "\",\"username\":\"overflow"
+                + i
+                + "\",\"effectiveName\":\"Overflow Pilot "
+                + i
+                + "\"}")
         .collect(Collectors.joining(",", "[", "]"));
   }
 

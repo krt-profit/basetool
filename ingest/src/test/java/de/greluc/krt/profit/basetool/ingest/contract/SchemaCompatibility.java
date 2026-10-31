@@ -114,12 +114,11 @@ final class SchemaCompatibility {
       Set<JsonNode> kept = new HashSet<>();
       cur.path("enum").forEach(kept::add);
       base.get("enum")
-          .forEach(
-              value -> {
-                if (!kept.contains(value)) {
-                  out.add(path + "/enum: value " + value + " removed");
-                }
-              });
+          .forEach(value -> {
+            if (!kept.contains(value)) {
+              out.add(path + "/enum: value " + value + " removed");
+            }
+          });
     }
     for (String key : UPPER_BOUNDS) {
       bound(base, cur, key, -1, path, out);

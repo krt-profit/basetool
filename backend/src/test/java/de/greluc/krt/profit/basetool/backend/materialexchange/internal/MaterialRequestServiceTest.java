@@ -332,10 +332,8 @@ class MaterialRequestServiceTest {
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(blueprintProductService.resolveByProductKey("nope")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                service.createItemRequest(
-                    new MaterialItemRequestCreateRequest("nope", null, 1, "")))
+    assertThatThrownBy(() ->
+            service.createItemRequest(new MaterialItemRequestCreateRequest("nope", null, 1, "")))
         .isInstanceOf(NotFoundException.class);
     verify(requestRepository, never()).saveAndFlush(any());
   }
@@ -346,10 +344,8 @@ class MaterialRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
 
-    assertThatThrownBy(
-            () ->
-                service.updateRequest(
-                    requestId, new MaterialRequestUpdateRequest(50.0, 500, "x", 0L)))
+    assertThatThrownBy(() ->
+            service.updateRequest(requestId, new MaterialRequestUpdateRequest(50.0, 500, "x", 0L)))
         .isInstanceOf(AccessDeniedException.class);
     verify(requestRepository, never()).saveAndFlush(any());
   }
@@ -361,10 +357,9 @@ class MaterialRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
 
-    assertThatThrownBy(
-            () ->
-                service.updateRequest(
-                    requestId, new MaterialRequestUpdateRequest(50.0, 500, "neu", 2L)))
+    assertThatThrownBy(() ->
+            service.updateRequest(
+                requestId, new MaterialRequestUpdateRequest(50.0, 500, "neu", 2L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     verify(requestRepository, never()).saveAndFlush(any());
   }
@@ -393,10 +388,8 @@ class MaterialRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(requestRepository.findById(requestId)).thenReturn(Optional.of(itemReq));
 
-    assertThatThrownBy(
-            () ->
-                service.updateRequest(
-                    requestId, new MaterialRequestUpdateRequest(2.5, null, "x", 1L)))
+    assertThatThrownBy(() ->
+            service.updateRequest(requestId, new MaterialRequestUpdateRequest(2.5, null, "x", 1L)))
         .isInstanceOf(BadRequestException.class);
     verify(requestRepository, never()).saveAndFlush(any());
   }

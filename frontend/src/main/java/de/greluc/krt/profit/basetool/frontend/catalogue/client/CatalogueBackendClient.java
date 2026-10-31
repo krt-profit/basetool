@@ -727,12 +727,11 @@ public class CatalogueBackendClient {
         webClient ->
             webClient
                 .post()
-                .uri(
-                    uriBuilder ->
-                        uriBuilder
-                            .path(JOBS_URI + "/{id}/apply")
-                            .queryParam("seedNew", seedNew)
-                            .build(id)),
+                .uri(uriBuilder ->
+                    uriBuilder
+                        .path(JOBS_URI + "/{id}/apply")
+                        .queryParam("seedNew", seedNew)
+                        .build(id)),
         spec -> spec.bodyToMono(P4kImportJobDto.class));
   }
 

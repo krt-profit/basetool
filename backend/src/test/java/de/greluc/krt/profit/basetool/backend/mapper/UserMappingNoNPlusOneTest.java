@@ -121,13 +121,12 @@ class UserMappingNoNPlusOneTest {
 
     assertEquals(3, dto.participants().size());
     dto.participants()
-        .forEach(
-            p -> {
-              UserDto user = p.user();
-              assertEquals(2, user.squadrons().size(), "both Staffeln survive the primer");
-              assertEquals(user.squadrons().getFirst(), user.squadron(), "primary = first");
-              assertTrue(user.isLogistician(), "flag OR across the Staffel rows");
-            });
+        .forEach(p -> {
+          UserDto user = p.user();
+          assertEquals(2, user.squadrons().size(), "both Staffeln survive the primer");
+          assertEquals(user.squadrons().getFirst(), user.squadron(), "primary = first");
+          assertTrue(user.isLogistician(), "flag OR across the Staffel rows");
+        });
   }
 
   @Test

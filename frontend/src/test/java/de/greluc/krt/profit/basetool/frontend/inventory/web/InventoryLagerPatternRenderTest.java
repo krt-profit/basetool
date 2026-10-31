@@ -96,17 +96,15 @@ class InventoryLagerPatternRenderTest {
   private @NotNull String render(@NotNull String path, @NotNull String urlPart, Object body)
       throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              return url.contains(urlPart) ? body : Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains(urlPart) ? body : Collections.emptyList();
+        });
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              return url.contains(urlPart) ? body : Collections.emptyList();
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains(urlPart) ? body : Collections.emptyList();
+        });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

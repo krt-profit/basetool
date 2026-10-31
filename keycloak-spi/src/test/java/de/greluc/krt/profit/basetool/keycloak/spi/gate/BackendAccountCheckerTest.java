@@ -111,15 +111,14 @@ class BackendAccountCheckerTest {
   @Test
   void timeout_failsOpenUnknown() throws IOException {
     HttpServer server =
-        start(
-            exchange -> {
-              try {
-                Thread.sleep(2000);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-              writeResponse(exchange, 200, "{\"exists\":true}");
-            });
+        start(exchange -> {
+          try {
+            Thread.sleep(2000);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          writeResponse(exchange, 200, "{\"exists\":true}");
+        });
     try (LogCapture log = LogCapture.of(BackendAccountChecker.class)) {
       assertEquals(Result.UNKNOWN, check(server, Duration.ofMillis(300)));
       assertTrue(log.logged(Level.WARNING));
@@ -133,14 +132,12 @@ class BackendAccountCheckerTest {
     AtomicReference<String> secretHeader = new AtomicReference<>();
     AtomicReference<String> body = new AtomicReference<>();
     HttpServer server =
-        start(
-            exchange -> {
-              secretHeader.set(
-                  exchange.getRequestHeaders().getFirst(BackendAccountChecker.SECRET_HEADER));
-              body.set(
-                  new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-              writeResponse(exchange, 200, "{\"exists\":false}");
-            });
+        start(exchange -> {
+          secretHeader.set(
+              exchange.getRequestHeaders().getFirst(BackendAccountChecker.SECRET_HEADER));
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeResponse(exchange, 200, "{\"exists\":false}");
+        });
     try {
       Result result =
           new BackendAccountChecker(HttpClient.newHttpClient(), Duration.ofSeconds(2))
@@ -160,12 +157,10 @@ class BackendAccountCheckerTest {
   void omitsBlankCandidateFields() throws IOException {
     AtomicReference<String> body = new AtomicReference<>();
     HttpServer server =
-        start(
-            exchange -> {
-              body.set(
-                  new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-              writeResponse(exchange, 200, "{\"exists\":false}");
-            });
+        start(exchange -> {
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeResponse(exchange, 200, "{\"exists\":false}");
+        });
     try {
       new BackendAccountChecker(HttpClient.newHttpClient(), Duration.ofSeconds(2))
           .check(baseUrl(server), SECRET, "Maverick", null, "  ");

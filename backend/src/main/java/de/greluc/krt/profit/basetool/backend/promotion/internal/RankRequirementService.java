@@ -136,12 +136,11 @@ public class RankRequirementService {
     Squadron squadron =
         ownerScopeService
             .currentSquadron()
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "No active squadron context — admins in 'all squadrons' mode must focus a"
-                            + " squadron via the sidebar switcher before creating a rank"
-                            + " requirement."));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "No active squadron context — admins in 'all squadrons' mode must focus a"
+                        + " squadron via the sidebar switcher before creating a rank"
+                        + " requirement."));
     RankRequirement entity = mapper.toEntity(request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());

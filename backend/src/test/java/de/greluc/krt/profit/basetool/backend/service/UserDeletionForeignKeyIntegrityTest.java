@@ -109,13 +109,12 @@ class UserDeletionForeignKeyIntegrityTest {
     Role adminRole =
         roleRepository
             .findByNameIgnoreCase("ADMIN")
-            .orElseGet(
-                () -> {
-                  Role fresh = new Role();
-                  fresh.setName("ADMIN");
-                  fresh.setCode("ADMIN");
-                  return roleRepository.save(fresh);
-                });
+            .orElseGet(() -> {
+              Role fresh = new Role();
+              fresh.setName("ADMIN");
+              fresh.setCode("ADMIN");
+              return roleRepository.save(fresh);
+            });
     User admin = new User();
     admin.setId(UUID.randomUUID());
     admin.setUsername("fk-admin-" + tag);
@@ -192,11 +191,10 @@ class UserDeletionForeignKeyIntegrityTest {
     entityManager.clear();
 
     assertThatNoException()
-        .isThrownBy(
-            () -> {
-              userDeletionService.deleteUser(exMemberId);
-              entityManager.flush();
-            });
+        .isThrownBy(() -> {
+          userDeletionService.deleteUser(exMemberId);
+          entityManager.flush();
+        });
     entityManager.clear();
 
     assertThat(userRepository.findById(exMemberId)).isEmpty();
@@ -229,13 +227,12 @@ class UserDeletionForeignKeyIntegrityTest {
     Role adminRole =
         roleRepository
             .findByNameIgnoreCase("ADMIN")
-            .orElseGet(
-                () -> {
-                  Role fresh = new Role();
-                  fresh.setName("ADMIN");
-                  fresh.setCode("ADMIN");
-                  return roleRepository.save(fresh);
-                });
+            .orElseGet(() -> {
+              Role fresh = new Role();
+              fresh.setName("ADMIN");
+              fresh.setCode("ADMIN");
+              return roleRepository.save(fresh);
+            });
     User admin = new User();
     admin.setId(UUID.randomUUID());
     admin.setUsername("mem-admin-" + tag);
@@ -274,11 +271,10 @@ class UserDeletionForeignKeyIntegrityTest {
 
     final UUID deletedId = exMemberId;
     assertThatNoException()
-        .isThrownBy(
-            () -> {
-              userDeletionService.deleteUser(deletedId);
-              entityManager.flush();
-            });
+        .isThrownBy(() -> {
+          userDeletionService.deleteUser(deletedId);
+          entityManager.flush();
+        });
     entityManager.clear();
 
     assertThat(userRepository.findById(exMemberId)).isEmpty();
@@ -297,13 +293,12 @@ class UserDeletionForeignKeyIntegrityTest {
     Role adminRole =
         roleRepository
             .findByNameIgnoreCase("ADMIN")
-            .orElseGet(
-                () -> {
-                  Role fresh = new Role();
-                  fresh.setName("ADMIN");
-                  fresh.setCode("ADMIN");
-                  return roleRepository.save(fresh);
-                });
+            .orElseGet(() -> {
+              Role fresh = new Role();
+              fresh.setName("ADMIN");
+              fresh.setCode("ADMIN");
+              return roleRepository.save(fresh);
+            });
     User admin = new User();
     admin.setId(UUID.randomUUID());
     admin.setUsername("purge-admin-" + tag);
@@ -350,11 +345,10 @@ class UserDeletionForeignKeyIntegrityTest {
         .hasSize(1);
 
     assertThatNoException()
-        .isThrownBy(
-            () -> {
-              userDeletionService.deleteUser(exMemberId);
-              entityManager.flush();
-            });
+        .isThrownBy(() -> {
+          userDeletionService.deleteUser(exMemberId);
+          entityManager.flush();
+        });
     entityManager.clear();
 
     assertThat(userRepository.findById(exMemberId)).isEmpty();

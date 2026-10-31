@@ -237,11 +237,10 @@ class MaterialExchangeRepositoryDataTest {
     assertThat(interestRepository.countByOfferId(offer.getId())).isEqualTo(2);
     assertThat(interestRepository.countByOfferIdIn(List.of(offer.getId())))
         .singleElement()
-        .satisfies(
-            c -> {
-              assertThat(c.offerId()).isEqualTo(offer.getId());
-              assertThat(c.count()).isEqualTo(2L);
-            });
+        .satisfies(c -> {
+          assertThat(c.offerId()).isEqualTo(offer.getId());
+          assertThat(c.count()).isEqualTo(2L);
+        });
     assertThat(interestRepository.findOfferIdsInterestedByViewer(a.getId(), List.of(offer.getId())))
         .containsExactly(offer.getId());
 

@@ -91,15 +91,14 @@ class OperationPayoutStatusConcurrencyTest {
     if (fixture == null) {
       return;
     }
-    transactionTemplate.executeWithoutResult(
-        st -> {
-          payoutStatusRepository.deleteAll(
-              payoutStatusRepository.findByOperationId(fixture.operationId()));
-          missionParticipantRepository.deleteById(fixture.participantId());
-          missionRepository.deleteById(fixture.missionId());
-          operationRepository.deleteById(fixture.operationId());
-          userRepository.deleteById(fixture.userId());
-        });
+    transactionTemplate.executeWithoutResult(st -> {
+      payoutStatusRepository.deleteAll(
+          payoutStatusRepository.findByOperationId(fixture.operationId()));
+      missionParticipantRepository.deleteById(fixture.participantId());
+      missionRepository.deleteById(fixture.missionId());
+      operationRepository.deleteById(fixture.operationId());
+      userRepository.deleteById(fixture.userId());
+    });
     fixture = null;
   }
 
@@ -127,25 +126,23 @@ class OperationPayoutStatusConcurrencyTest {
     try {
       for (int i = 0; i < THREADS; i++) {
         futures.add(
-            pool.submit(
-                () -> {
-                  SecurityContextHolder.setContext(adminContext);
-                  try {
-                    ready.countDown();
-                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                      otherErrorCount.incrementAndGet();
-                      return;
-                    }
-                    operationPayoutService.setPayoutStatus(
-                        fixture.operationId(), participantKey, true);
-                    successCount.incrementAndGet();
-                  } catch (Throwable t) {
-                    otherErrorCount.incrementAndGet();
-                    unexpectedErrors.add(t);
-                  } finally {
-                    SecurityContextHolder.clearContext();
-                  }
-                }));
+            pool.submit(() -> {
+              SecurityContextHolder.setContext(adminContext);
+              try {
+                ready.countDown();
+                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                  otherErrorCount.incrementAndGet();
+                  return;
+                }
+                operationPayoutService.setPayoutStatus(fixture.operationId(), participantKey, true);
+                successCount.incrementAndGet();
+              } catch (Throwable t) {
+                otherErrorCount.incrementAndGet();
+                unexpectedErrors.add(t);
+              } finally {
+                SecurityContextHolder.clearContext();
+              }
+            }));
       }
 
       assertThat(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -191,37 +188,36 @@ class OperationPayoutStatusConcurrencyTest {
    * @return the created fixture ids
    */
   private Fixture seed() {
-    return transactionTemplate.execute(
-        status -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
+    return transactionTemplate.execute(status -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
 
-          User user = new User();
-          user.setId(UUID.randomUUID());
-          user.setUsername("PayoutRace-" + tag);
-          user = userRepository.save(user);
+      User user = new User();
+      user.setId(UUID.randomUUID());
+      user.setUsername("PayoutRace-" + tag);
+      user = userRepository.save(user);
 
-          Operation operation = new Operation();
-          operation.setName("PayoutRace-Op-" + tag);
-          operation.setStatus(OperationStatus.COMPLETED);
-          operation = operationRepository.save(operation);
+      Operation operation = new Operation();
+      operation.setName("PayoutRace-Op-" + tag);
+      operation.setStatus(OperationStatus.COMPLETED);
+      operation = operationRepository.save(operation);
 
-          Mission mission = new Mission();
-          mission.setName("PayoutRace-Mission-" + tag);
-          mission.setStatus("COMPLETED");
-          mission.setOperationId(operation.getId());
-          mission.setActualStartTime(ACTUAL_START);
-          mission.setActualEndTime(ACTUAL_END);
-          mission = missionRepository.save(mission);
+      Mission mission = new Mission();
+      mission.setName("PayoutRace-Mission-" + tag);
+      mission.setStatus("COMPLETED");
+      mission.setOperationId(operation.getId());
+      mission.setActualStartTime(ACTUAL_START);
+      mission.setActualEndTime(ACTUAL_END);
+      mission = missionRepository.save(mission);
 
-          MissionParticipant participant = new MissionParticipant();
-          participant.setMission(mission);
-          participant.setUser(user);
-          participant.setStartTime(ACTUAL_START);
-          participant.setEndTime(ACTUAL_END);
-          participant.setPayoutPreference(PayoutPreference.PAYOUT);
-          participant = missionParticipantRepository.save(participant);
+      MissionParticipant participant = new MissionParticipant();
+      participant.setMission(mission);
+      participant.setUser(user);
+      participant.setStartTime(ACTUAL_START);
+      participant.setEndTime(ACTUAL_END);
+      participant.setPayoutPreference(PayoutPreference.PAYOUT);
+      participant = missionParticipantRepository.save(participant);
 
-          return new Fixture(operation.getId(), mission.getId(), participant.getId(), user.getId());
-        });
+      return new Fixture(operation.getId(), mission.getId(), participant.getId(), user.getId());
+    });
   }
 }

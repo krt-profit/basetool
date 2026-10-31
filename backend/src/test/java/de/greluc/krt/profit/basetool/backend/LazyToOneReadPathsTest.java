@@ -165,12 +165,10 @@ class LazyToOneReadPathsTest {
 
     StringBuilder table =
         new StringBuilder("\n[BE-PERF-11] statements per request, 3 vs 12 rows\n");
-    smallCounts.forEach(
-        (endpoint, count) ->
-            table
-                .append(
-                    String.format("  %-48s %4d  %4d", endpoint, count, largeCounts.get(endpoint)))
-                .append('\n'));
+    smallCounts.forEach((endpoint, count) ->
+        table
+            .append(String.format("  %-48s %4d  %4d", endpoint, count, largeCounts.get(endpoint)))
+            .append('\n'));
     System.out.println(table);
 
     for (Map.Entry<String, Long> entry : smallCounts.entrySet()) {
@@ -196,27 +194,25 @@ class LazyToOneReadPathsTest {
 
     materialService
         .getAllMaterials(PageRequest.of(0, 500))
-        .forEach(
-            m -> {
-              if (m.category() != null) {
-                assertThat(m.category().name()).isNotNull();
-              }
-              if (m.refinedMaterial() != null) {
-                assertThat(m.refinedMaterial().name()).isNotNull();
-              }
-            });
+        .forEach(m -> {
+          if (m.category() != null) {
+            assertThat(m.category().name()).isNotNull();
+          }
+          if (m.refinedMaterial() != null) {
+            assertThat(m.refinedMaterial().name()).isNotNull();
+          }
+        });
 
     assertThat(locationService.getLocation(seed.locationId).name()).startsWith("Lazy Station");
     assertThat(shipTypeService.getShipType(seed.shipTypeId).manufacturer().name())
         .startsWith("Lazy Works");
     shipTypeService
         .getAllShipTypes(PageRequest.of(0, 500), true)
-        .forEach(
-            t -> {
-              if (t.manufacturer() != null) {
-                assertThat(t.manufacturer().name()).isNotNull();
-              }
-            });
+        .forEach(t -> {
+          if (t.manufacturer() != null) {
+            assertThat(t.manufacturer().name()).isNotNull();
+          }
+        });
     assertThat(jobTypeService.getJobTypes(null)).isNotEmpty();
   }
 
@@ -313,116 +309,115 @@ class LazyToOneReadPathsTest {
   private Seed seed(int rows) {
     Seed seed = new Seed();
     seeds.add(seed);
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          String tag = UUID.randomUUID().toString().substring(0, 8);
-          User admin = newUser("lazy-admin-" + tag, seed);
-          seed.adminId = admin.getId();
+    transactionTemplate.executeWithoutResult(status -> {
+      String tag = UUID.randomUUID().toString().substring(0, 8);
+      User admin = newUser("lazy-admin-" + tag, seed);
+      seed.adminId = admin.getId();
 
-          City city = new City();
-          city.setName("Lazy City " + tag);
-          seed.cityId = cityRepository.save(city).getId();
-          Location location = new Location();
-          location.setName("Lazy Station " + tag);
-          location.setCity(city);
-          seed.locationId = locationRepository.save(location).getId();
+      City city = new City();
+      city.setName("Lazy City " + tag);
+      seed.cityId = cityRepository.save(city).getId();
+      Location location = new Location();
+      location.setName("Lazy Station " + tag);
+      location.setCity(city);
+      seed.locationId = locationRepository.save(location).getId();
 
-          Manufacturer manufacturer = new Manufacturer();
-          manufacturer.setName("Lazy Works " + tag);
-          manufacturer.setAbbreviation("LW" + tag.substring(0, 3));
-          seed.manufacturerId = manufacturerRepository.save(manufacturer).getId();
-          ShipType shipType = new ShipType();
-          shipType.setName("Lazy Hull " + tag);
-          shipType.setManufacturer(manufacturer);
-          seed.shipTypeId = shipTypeRepository.save(shipType).getId();
+      Manufacturer manufacturer = new Manufacturer();
+      manufacturer.setName("Lazy Works " + tag);
+      manufacturer.setAbbreviation("LW" + tag.substring(0, 3));
+      seed.manufacturerId = manufacturerRepository.save(manufacturer).getId();
+      ShipType shipType = new ShipType();
+      shipType.setName("Lazy Hull " + tag);
+      shipType.setManufacturer(manufacturer);
+      seed.shipTypeId = shipTypeRepository.save(shipType).getId();
 
-          MaterialCategory category = new MaterialCategory();
-          category.setName("Lazy Ores " + tag);
-          seed.categoryId = materialCategoryRepository.save(category).getId();
+      MaterialCategory category = new MaterialCategory();
+      category.setName("Lazy Ores " + tag);
+      seed.categoryId = materialCategoryRepository.save(category).getId();
 
-          JobType pilot = new JobType();
-          pilot.setName("Lazy Pilot " + tag);
-          pilot.setArchetype(JobTypeArchetype.CREW);
-          seed.jobTypeIds.add(jobTypeRepository.save(pilot).getId());
+      JobType pilot = new JobType();
+      pilot.setName("Lazy Pilot " + tag);
+      pilot.setArchetype(JobTypeArchetype.CREW);
+      seed.jobTypeIds.add(jobTypeRepository.save(pilot).getId());
 
-          Mission mission = new Mission();
-          mission.setName("Lazy Mission " + tag);
-          mission.setStatus("PLANNED");
-          mission.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
+      Mission mission = new Mission();
+      mission.setName("Lazy Mission " + tag);
+      mission.setStatus("PLANNED");
+      mission.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
 
-          for (int i = 0; i < rows; i++) {
-            Material refined = new Material();
-            refined.setName("Lazy Refined " + tag + "-" + i);
-            refined.setType(MaterialType.REFINED);
-            refined.setCategory(category);
-            materialRepository.save(refined);
-            Material raw = new Material();
-            raw.setName("Lazy Raw " + tag + "-" + i);
-            raw.setType(MaterialType.RAW);
-            raw.setCategory(category);
-            raw.setRefinedMaterial(refined);
-            materialRepository.save(raw);
-            seed.materialIds.add(raw.getId());
-            seed.materialIds.add(refined.getId());
-            seed.rawMaterialIds.add(raw.getId());
+      for (int i = 0; i < rows; i++) {
+        Material refined = new Material();
+        refined.setName("Lazy Refined " + tag + "-" + i);
+        refined.setType(MaterialType.REFINED);
+        refined.setCategory(category);
+        materialRepository.save(refined);
+        Material raw = new Material();
+        raw.setName("Lazy Raw " + tag + "-" + i);
+        raw.setType(MaterialType.RAW);
+        raw.setCategory(category);
+        raw.setRefinedMaterial(refined);
+        materialRepository.save(raw);
+        seed.materialIds.add(raw.getId());
+        seed.materialIds.add(refined.getId());
+        seed.rawMaterialIds.add(raw.getId());
 
-            Ship ship = new Ship();
-            ship.setName("Lazy Ship " + tag + "-" + i);
-            ship.setShipType(shipType);
-            ship.setInsurance("LTI");
-            ship.setLocation(location);
-            ship.setOwner(admin);
-            seed.shipIds.add(shipRepository.save(ship).getId());
+        Ship ship = new Ship();
+        ship.setName("Lazy Ship " + tag + "-" + i);
+        ship.setShipType(shipType);
+        ship.setInsurance("LTI");
+        ship.setLocation(location);
+        ship.setOwner(admin);
+        seed.shipIds.add(shipRepository.save(ship).getId());
 
-            InventoryItem item = new InventoryItem();
-            item.setUser(admin);
-            item.setMaterial(raw);
-            item.setLocation(location);
-            item.setQuality(500);
-            item.setAmount(10.0);
-            seed.inventoryIds.add(inventoryItemRepository.save(item).getId());
+        InventoryItem item = new InventoryItem();
+        item.setUser(admin);
+        item.setMaterial(raw);
+        item.setLocation(location);
+        item.setQuality(500);
+        item.setAmount(10.0);
+        seed.inventoryIds.add(inventoryItemRepository.save(item).getId());
 
-            RefineryOrder order = new RefineryOrder();
-            order.setOwner(admin);
-            order.setLocation(location);
-            order.setMissionId(mission.getId());
-            order.setDurationMinutes(60L);
-            order.setExpenses(100.0);
-            RefineryGood good = new RefineryGood();
-            good.setInputMaterial(raw);
-            good.setInputQuantity(100);
-            good.setOutputMaterial(refined);
-            good.setOutputQuantity(50);
-            good.setRefineryOrder(order);
-            order.getGoods().add(good);
-            seed.pendingOrders.add(order);
+        RefineryOrder order = new RefineryOrder();
+        order.setOwner(admin);
+        order.setLocation(location);
+        order.setMissionId(mission.getId());
+        order.setDurationMinutes(60L);
+        order.setExpenses(100.0);
+        RefineryGood good = new RefineryGood();
+        good.setInputMaterial(raw);
+        good.setInputQuantity(100);
+        good.setOutputMaterial(refined);
+        good.setOutputQuantity(50);
+        good.setRefineryOrder(order);
+        order.getGoods().add(good);
+        seed.pendingOrders.add(order);
 
-            User member = newUser("lazy-member-" + tag + "-" + i, seed);
-            MissionParticipant participant = new MissionParticipant();
-            participant.setMission(mission);
-            participant.setUser(member);
-            participant.setDesiredMissionJobType(pilot);
-            participant.setPlannedMissionJobType(pilot);
-            mission.getParticipants().add(participant);
+        User member = newUser("lazy-member-" + tag + "-" + i, seed);
+        MissionParticipant participant = new MissionParticipant();
+        participant.setMission(mission);
+        participant.setUser(member);
+        participant.setDesiredMissionJobType(pilot);
+        participant.setPlannedMissionJobType(pilot);
+        mission.getParticipants().add(participant);
 
-            MissionUnit unit = new MissionUnit();
-            unit.setMission(mission);
-            unit.setShipType(shipType);
-            unit.setShip(ship);
-            unit.setResponsibleUser(member);
-            unit.setName("Lazy Unit " + i);
-            MissionCrew crew = new MissionCrew();
-            crew.setMissionUnit(unit);
-            crew.setParticipant(participant);
-            unit.getCrew().add(crew);
-            mission.getAssignedUnits().add(unit);
-          }
-          seed.missionId = missionRepository.save(mission).getId();
-          for (RefineryOrder order : seed.pendingOrders) {
-            seed.orderIds.add(refineryOrderRepository.save(order).getId());
-          }
-          seed.pendingOrders.clear();
-        });
+        MissionUnit unit = new MissionUnit();
+        unit.setMission(mission);
+        unit.setShipType(shipType);
+        unit.setShip(ship);
+        unit.setResponsibleUser(member);
+        unit.setName("Lazy Unit " + i);
+        MissionCrew crew = new MissionCrew();
+        crew.setMissionUnit(unit);
+        crew.setParticipant(participant);
+        unit.getCrew().add(crew);
+        mission.getAssignedUnits().add(unit);
+      }
+      seed.missionId = missionRepository.save(mission).getId();
+      for (RefineryOrder order : seed.pendingOrders) {
+        seed.orderIds.add(refineryOrderRepository.save(order).getId());
+      }
+      seed.pendingOrders.clear();
+    });
     return seed;
   }
 

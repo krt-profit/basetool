@@ -143,12 +143,11 @@ class QualityTierServiceTest {
     when(repository.findByCode("EXCELLENT")).thenReturn(Optional.empty());
     when(repository.findByMinQuality(900)).thenReturn(Optional.empty());
     when(repository.saveAndFlush(any(QualityTier.class)))
-        .thenAnswer(
-            inv -> {
-              QualityTier tier = inv.getArgument(0);
-              tier.setId(UUID.randomUUID());
-              return tier;
-            });
+        .thenAnswer(inv -> {
+          QualityTier tier = inv.getArgument(0);
+          tier.setId(UUID.randomUUID());
+          return tier;
+        });
 
     var dto =
         service.create(
@@ -186,11 +185,9 @@ class QualityTierServiceTest {
     when(repository.findByMinQuality(700)).thenReturn(Optional.empty());
     when(repository.countReferences(good.getId())).thenReturn(3L);
 
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    good.getId(),
-                    new QualityTierWriteDto("GOOD", 700, "Gut", "Good", 650, true, 0L)))
+    assertThatThrownBy(() ->
+            service.update(
+                good.getId(), new QualityTierWriteDto("GOOD", 700, "Gut", "Good", 650, true, 0L)))
         .isInstanceOf(BusinessConflictException.class);
     verify(repository, never()).saveAndFlush(any());
   }
@@ -199,11 +196,9 @@ class QualityTierServiceTest {
   void update_staleVersion_isAConflict() {
     when(repository.findById(good.getId())).thenReturn(Optional.of(good));
 
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    good.getId(),
-                    new QualityTierWriteDto("GOOD", 650, "Gut", "Good", 650, true, 7L)))
+    assertThatThrownBy(() ->
+            service.update(
+                good.getId(), new QualityTierWriteDto("GOOD", 650, "Gut", "Good", 650, true, 7L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
   }
 

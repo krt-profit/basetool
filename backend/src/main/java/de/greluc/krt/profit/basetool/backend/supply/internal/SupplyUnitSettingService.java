@@ -81,19 +81,18 @@ public class SupplyUnitSettingService {
     boolean admin = accessPolicy.isAdmin();
     return orgUnitRepository.findAll().stream()
         .filter(OrgUnit::isActive)
-        .map(
-            unit -> {
-              SupplyUnitSetting setting = settings.get(unit.getId());
-              return new SupplyUnitDto(
-                  unit.getId(),
-                  unit.getName(),
-                  unit.getShorthand(),
-                  unit.getKind(),
-                  setting != null && setting.isMayRaiseNeeds(),
-                  setting != null && setting.isAcceptsDonations(),
-                  admin || managed.contains(unit.getId()),
-                  setting == null ? null : setting.getVersion());
-            })
+        .map(unit -> {
+          SupplyUnitSetting setting = settings.get(unit.getId());
+          return new SupplyUnitDto(
+              unit.getId(),
+              unit.getName(),
+              unit.getShorthand(),
+              unit.getKind(),
+              setting != null && setting.isMayRaiseNeeds(),
+              setting != null && setting.isAcceptsDonations(),
+              admin || managed.contains(unit.getId()),
+              setting == null ? null : setting.getVersion());
+        })
         .filter(dto -> !onlyConfigured || dto.mayRaiseNeeds() || dto.acceptsDonations())
         .sorted(Comparator.comparing(SupplyUnitDto::name, String.CASE_INSENSITIVE_ORDER))
         .toList();

@@ -141,9 +141,8 @@ class GatedSelfInvocationTest {
         CLASSES.stream()
             .filter(c -> c.getSimpleName().endsWith("Service"))
             .flatMap(c -> c.getMethods().stream())
-            .filter(
-                m ->
-                    m.isAnnotatedWith(PreAuthorize.class) || m.isAnnotatedWith(PostAuthorize.class))
+            .filter(m ->
+                m.isAnnotatedWith(PreAuthorize.class) || m.isAnnotatedWith(PostAuthorize.class))
             .count();
     assertThat(serviceGates)
         .as("the service-level gates this rule protects")
@@ -234,15 +233,14 @@ class GatedSelfInvocationTest {
           call.getTarget()
               .resolveMember()
               .filter(GatedSelfInvocationTest::isGated)
-              .ifPresent(
-                  target ->
-                      events.add(
-                          SimpleConditionEvent.violated(
-                              call,
-                              call.getDescription()
-                                  + " calls the gated "
-                                  + target.getFullName()
-                                  + " of its own class, bypassing the proxy")));
+              .ifPresent(target ->
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          call,
+                          call.getDescription()
+                              + " calls the gated "
+                              + target.getFullName()
+                              + " of its own class, bypassing the proxy")));
         }
       }
     };

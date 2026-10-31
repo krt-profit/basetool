@@ -111,12 +111,11 @@ class OperationLiveSyncE2eTest {
 
         pageB.evaluate("window.__krtNoReload = true;");
 
-        pageB.waitForCondition(
-            () ->
-                Boolean.TRUE.equals(
-                    pageB.evaluate(
-                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                            + " && window.krtLiveSync.subscribedTopics().length > 0)")));
+        pageB.waitForCondition(() ->
+            Boolean.TRUE.equals(
+                pageB.evaluate(
+                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                        + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
         pageA.locator("[data-testid='operation-edit']").click();
         pageA.locator("#op-name").fill(RENAMED);

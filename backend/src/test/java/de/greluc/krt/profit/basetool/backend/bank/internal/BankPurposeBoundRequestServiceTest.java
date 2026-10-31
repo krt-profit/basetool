@@ -121,12 +121,11 @@ class BankPurposeBoundRequestServiceTest {
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
     when(requestRepository.save(any(BankBookingRequest.class)))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest saved = invocation.getArgument(0);
-              saved.setId(requestId);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest saved = invocation.getArgument(0);
+          saved.setId(requestId);
+          return saved;
+        });
 
     BankBookingRequestDto dto =
         service.create(
@@ -154,12 +153,11 @@ class BankPurposeBoundRequestServiceTest {
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
     when(requestRepository.save(any(BankBookingRequest.class)))
-        .thenAnswer(
-            invocation -> {
-              BankBookingRequest saved = invocation.getArgument(0);
-              saved.setId(requestId);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          BankBookingRequest saved = invocation.getArgument(0);
+          saved.setId(requestId);
+          return saved;
+        });
 
     BankBookingRequestDto dto =
         service.create(

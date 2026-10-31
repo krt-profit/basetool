@@ -49,24 +49,23 @@ public final class ReferenceResolvingEntityManager {
     EntityManager entityManager = mock(EntityManager.class);
     lenient()
         .when(entityManager.getReference(ArgumentMatchers.<Class<Object>>any(), any()))
-        .thenAnswer(
-            invocation -> {
-              Object id = invocation.getArgument(1);
-              Class<?> type = invocation.getArgument(0);
-              Object existing = byId.get(id);
-              if (existing != null) {
-                return existing;
-              }
-              Object fresh = type.getDeclaredConstructor().newInstance();
-              for (java.lang.reflect.Method setter : type.getMethods()) {
-                if (setter.getName().equals("setId") && setter.getParameterCount() == 1) {
-                  setter.invoke(fresh, id);
-                  break;
-                }
-              }
-              byId.put(id, fresh);
-              return fresh;
-            });
+        .thenAnswer(invocation -> {
+          Object id = invocation.getArgument(1);
+          Class<?> type = invocation.getArgument(0);
+          Object existing = byId.get(id);
+          if (existing != null) {
+            return existing;
+          }
+          Object fresh = type.getDeclaredConstructor().newInstance();
+          for (java.lang.reflect.Method setter : type.getMethods()) {
+            if (setter.getName().equals("setId") && setter.getParameterCount() == 1) {
+              setter.invoke(fresh, id);
+              break;
+            }
+          }
+          byId.put(id, fresh);
+          return fresh;
+        });
     return entityManager;
   }
 }

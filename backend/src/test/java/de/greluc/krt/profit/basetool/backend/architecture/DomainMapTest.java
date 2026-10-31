@@ -78,11 +78,9 @@ class DomainMapTest {
 
     assertThat(implementations).hasSizeGreaterThanOrEqualTo(MAPPER_FLOOR);
     assertThat(implementations)
-        .allSatisfy(
-            implementation ->
-                assertThat(
-                        ModuleSubjects.subjectOf(implementation, CLASSES).getSimpleName() + "Impl")
-                    .isEqualTo(implementation.getSimpleName()));
+        .allSatisfy(implementation ->
+            assertThat(ModuleSubjects.subjectOf(implementation, CLASSES).getSimpleName() + "Impl")
+                .isEqualTo(implementation.getSimpleName()));
   }
 
   @Test
@@ -92,9 +90,8 @@ class DomainMapTest {
 
     assertThat(nested).isNotEmpty();
     assertThat(nested)
-        .allSatisfy(
-            javaClass ->
-                assertThat(javaClass.getName())
-                    .startsWith(ModuleSubjects.subjectOf(javaClass, CLASSES).getName() + "$"));
+        .allSatisfy(javaClass ->
+            assertThat(javaClass.getName())
+                .startsWith(ModuleSubjects.subjectOf(javaClass, CLASSES).getName() + "$"));
   }
 }

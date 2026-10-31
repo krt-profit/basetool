@@ -128,38 +128,32 @@ public class MemberHangarPageController {
     CompletableFuture<UserDto> memberFuture =
         parallelPageLoader
             .<UserDto>loadAsync(() -> hangarClient.member(userId))
-            .exceptionally(
-                e -> {
-                  log.warn("Failed to read the member for the admin member hangar", e);
-                  return null;
-                });
+            .exceptionally(e -> {
+              log.warn("Failed to read the member for the admin member hangar", e);
+              return null;
+            });
     CompletableFuture<List<OrgUnitMembershipOptionDto>> unitsFuture =
         parallelPageLoader
-            .<List<OrgUnitMembershipOptionDto>>loadAsync(
-                () -> {
-                  List<OrgUnitMembershipOptionDto> units = hangarClient.memberOrgUnits(userId);
-                  return units != null ? units : List.of();
-                })
-            .exceptionally(
-                e -> {
-                  log.warn("Failed to read the member's org units for the admin member hangar", e);
-                  return List.of();
-                });
+            .<List<OrgUnitMembershipOptionDto>>loadAsync(() -> {
+              List<OrgUnitMembershipOptionDto> units = hangarClient.memberOrgUnits(userId);
+              return units != null ? units : List.of();
+            })
+            .exceptionally(e -> {
+              log.warn("Failed to read the member's org units for the admin member hangar", e);
+              return List.of();
+            });
     CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                catalogListLoader.loadPageContent(
-                    CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, "ship types"));
+        parallelPageLoader.loadAsync(() ->
+            catalogListLoader.loadPageContent(
+                CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, "ship types"));
     CompletableFuture<List<LocationDto>> locationsFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                catalogListLoader.loadPageContent(
-                    CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, "locations"));
+        parallelPageLoader.loadAsync(() ->
+            catalogListLoader.loadPageContent(
+                CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, "locations"));
     CompletableFuture<List<ManufacturerDto>> manufacturersFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                catalogListLoader.loadPageContent(
-                    CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, "manufacturers"));
+        parallelPageLoader.loadAsync(() ->
+            catalogListLoader.loadPageContent(
+                CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, "manufacturers"));
     CompletableFuture.allOf(
             memberFuture, unitsFuture, shipTypesFuture, locationsFuture, manufacturersFuture)
         .join();

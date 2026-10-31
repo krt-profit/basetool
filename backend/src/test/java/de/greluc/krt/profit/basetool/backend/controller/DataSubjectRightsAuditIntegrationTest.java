@@ -92,12 +92,11 @@ class DataSubjectRightsAuditIntegrationTest {
   /** Removes what this class committed into the container the whole suite shares. */
   @AfterEach
   void cleanUp() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          auditEventRepository.deleteAll(rowsOfThisActor());
-          userRepository.deleteAllById(seededUsers);
-          seededUsers.clear();
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      auditEventRepository.deleteAll(rowsOfThisActor());
+      userRepository.deleteAllById(seededUsers);
+      seededUsers.clear();
+    });
   }
 
   @Test
@@ -106,22 +105,20 @@ class DataSubjectRightsAuditIntegrationTest {
         .perform(get("/api/v1/users/me/export").with(member(actor)).accept(FRONTEND_ACCEPT))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-        .andExpect(
-            result -> {
-              assertThat(result.getResponse().getHeader("Content-Disposition"))
-                  .startsWith("attachment")
-                  .contains("Datenexport");
-              assertThat(result.getResponse().getContentAsString()).contains("\n  \"subjectId\"");
-            });
+        .andExpect(result -> {
+          assertThat(result.getResponse().getHeader("Content-Disposition"))
+              .startsWith("attachment")
+              .contains("Datenexport");
+          assertThat(result.getResponse().getContentAsString()).contains("\n  \"subjectId\"");
+        });
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .as("one export row, recorded by the subject themselves")
         .hasSize(1)
-        .allSatisfy(
-            event -> {
-              assertThat(event.getTargetUserId()).isEqualTo(actor);
-              assertThat(event.getDetails()).contains("format=json").contains("bySelf=true");
-            });
+        .allSatisfy(event -> {
+          assertThat(event.getTargetUserId()).isEqualTo(actor);
+          assertThat(event.getDetails()).contains("format=json").contains("bySelf=true");
+        });
   }
 
   @Test
@@ -133,11 +130,10 @@ class DataSubjectRightsAuditIntegrationTest {
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .hasSize(1)
-        .allSatisfy(
-            event -> {
-              assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=true");
-              assertThat(event.getDetails()).doesNotContain("rows=-1");
-            });
+        .allSatisfy(event -> {
+          assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=true");
+          assertThat(event.getDetails()).doesNotContain("rows=-1");
+        });
   }
 
   @Test
@@ -153,9 +149,8 @@ class DataSubjectRightsAuditIntegrationTest {
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .as("bySelf=false is the distinction the trail exists to make")
         .hasSize(1)
-        .allSatisfy(
-            event ->
-                assertThat(event.getDetails()).contains("format=json").contains("bySelf=false"));
+        .allSatisfy(event ->
+            assertThat(event.getDetails()).contains("format=json").contains("bySelf=false"));
   }
 
   @Test
@@ -170,11 +165,10 @@ class DataSubjectRightsAuditIntegrationTest {
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .hasSize(1)
-        .allSatisfy(
-            event -> {
-              assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=false");
-              assertThat(event.getDetails()).doesNotContain("rows=-1");
-            });
+        .allSatisfy(event -> {
+          assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=false");
+          assertThat(event.getDetails()).doesNotContain("rows=-1");
+        });
   }
 
   @Test
@@ -186,13 +180,12 @@ class DataSubjectRightsAuditIntegrationTest {
 
     assertThat(auditRows(AuditEventType.PERSON_SEARCH_PERFORMED))
         .hasSize(1)
-        .allSatisfy(
-            event -> {
-              assertThat(event.getDetails()).contains("termLength=" + SEARCH_TERM.length());
-              assertThat(event.getDetails())
-                  .as("the term is somebody's name and must not reach the trail")
-                  .doesNotContain(SEARCH_TERM);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.getDetails()).contains("termLength=" + SEARCH_TERM.length());
+          assertThat(event.getDetails())
+              .as("the term is somebody's name and must not reach the trail")
+              .doesNotContain(SEARCH_TERM);
+        });
   }
 
   /**
@@ -249,13 +242,12 @@ class DataSubjectRightsAuditIntegrationTest {
    */
   private UUID user(String username) {
     UUID id = UUID.randomUUID();
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User user = new User();
-          user.setId(id);
-          user.setUsername(username);
-          userRepository.save(user);
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      User user = new User();
+      user.setId(id);
+      user.setUsername(username);
+      userRepository.save(user);
+    });
     seededUsers.add(id);
     return id;
   }

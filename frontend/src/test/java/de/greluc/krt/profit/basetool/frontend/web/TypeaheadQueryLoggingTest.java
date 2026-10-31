@@ -78,11 +78,10 @@ class TypeaheadQueryLoggingTest {
     logger.addAppender(appender);
     Level previous = logger.getLevel();
     logger.setLevel(Level.DEBUG);
-    detachers.add(
-        () -> {
-          logger.detachAppender(appender);
-          logger.setLevel(previous);
-        });
+    detachers.add(() -> {
+      logger.detachAppender(appender);
+      logger.setLevel(previous);
+    });
     return appender;
   }
 
@@ -96,13 +95,10 @@ class TypeaheadQueryLoggingTest {
   private static void assertSanitisedAt(ListAppender<ILoggingEvent> appender, Level expected) {
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.getLevel()).isEqualTo(expected);
-              assertThat(event.getFormattedMessage())
-                  .doesNotContain("quantanium")
-                  .doesNotContain("\n");
-            });
+        .satisfies(event -> {
+          assertThat(event.getLevel()).isEqualTo(expected);
+          assertThat(event.getFormattedMessage()).doesNotContain("quantanium").doesNotContain("\n");
+        });
   }
 
   @Test

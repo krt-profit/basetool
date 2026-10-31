@@ -449,10 +449,9 @@ public class ExchangeRegistryService {
   private static @NotNull String requireDisplayName(@NotNull String displayName) {
     String stripped = displayName.strip();
     ExchangeDisplayNames.violation(stripped)
-        .ifPresent(
-            key -> {
-              throw new BadRequestException(key);
-            });
+        .ifPresent(key -> {
+          throw new BadRequestException(key);
+        });
     return stripped;
   }
 

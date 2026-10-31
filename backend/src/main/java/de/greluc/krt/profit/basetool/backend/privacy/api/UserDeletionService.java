@@ -205,18 +205,15 @@ public class UserDeletionService implements AccountErasure {
         userRepository.findAllAdmins().stream()
             .filter(u -> !u.getId().equals(userId))
             .findFirst()
-            .orElseGet(
-                () ->
-                    userService
-                        .getCurrentUser()
-                        .filter(u -> !u.getId().equals(userId))
-                        .filter(
-                            u ->
-                                u.getRoles().stream()
-                                    .anyMatch(r -> r.getName().equalsIgnoreCase(Roles.ADMIN)))
-                        .orElseThrow(
-                            () ->
-                                new IllegalStateException("No admin user found to reassign data")));
+            .orElseGet(() ->
+                userService
+                    .getCurrentUser()
+                    .filter(u -> !u.getId().equals(userId))
+                    .filter(u ->
+                        u.getRoles().stream()
+                            .anyMatch(r -> r.getName().equalsIgnoreCase(Roles.ADMIN)))
+                    .orElseThrow(
+                        () -> new IllegalStateException("No admin user found to reassign data")));
 
     Map<Erased, Integer> erased = new EnumMap<>(Erased.class);
     for (UserErasureParticipant participant : inRunOrder()) {

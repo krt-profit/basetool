@@ -120,11 +120,10 @@ class ExternalClientConcurrencyLimitTest {
         List<Future<?>> done = new ArrayList<>();
         for (int i = 0; i < callers; i++) {
           done.add(
-              pool.submit(
-                  () -> {
-                    start.await();
-                    return client.getStarSystems();
-                  }));
+              pool.submit(() -> {
+                start.await();
+                return client.getStarSystems();
+              }));
         }
         start.countDown();
         for (Future<?> future : done) {

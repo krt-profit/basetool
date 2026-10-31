@@ -280,12 +280,10 @@ public class PersonalInventoryItemService {
   private PersonalInventoryItem loadOwn(@NotNull UUID ownerUserId, @NotNull UUID id) {
     return repository
         .findByIdAndOwnerUserId(id, ownerUserId)
-        .orElseThrow(
-            () -> {
-              log.warn(
-                  "Access denied or not found: ownerUserId={} requested id={}", ownerUserId, id);
-              return new NotFoundException("PersonalInventoryItem not found: " + id);
-            });
+        .orElseThrow(() -> {
+          log.warn("Access denied or not found: ownerUserId={} requested id={}", ownerUserId, id);
+          return new NotFoundException("PersonalInventoryItem not found: " + id);
+        });
   }
 
   @NotNull

@@ -109,15 +109,14 @@ class ExchangeRelaySeamParityTest {
   @Test
   void theRelayHeadersAreTheSeamsHeaders() {
     assertRelayHeaders(ExchangeSeam.RELAY_HEADERS);
-    assertThatThrownBy(
-            () ->
-                assertRelayHeaders(
-                    List.of(
-                        "X-Ingest-On-Behalf-Of",
-                        "X-Exchange-Client",
-                        "X-Exchange-Capability",
-                        "X-Exchange-Installation",
-                        "X-Exchange-Connected-At")))
+    assertThatThrownBy(() ->
+            assertRelayHeaders(
+                List.of(
+                    "X-Ingest-On-Behalf-Of",
+                    "X-Exchange-Client",
+                    "X-Exchange-Capability",
+                    "X-Exchange-Installation",
+                    "X-Exchange-Connected-At")))
         .isInstanceOf(AssertionError.class);
   }
 

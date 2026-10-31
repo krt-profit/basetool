@@ -1100,25 +1100,23 @@ public class InventoryCheckoutService {
       return;
     }
     final String actorName = actorName(actorId, moves);
-    toNewOwner.forEach(
-        (newOwnerId, owned) ->
-            eventPublisher.publishEvent(
-                new InventoryTransferredToUserEvent(
-                    newOwnerId,
-                    actorId,
-                    actorName,
-                    owned.getFirst().sourceRowId(),
-                    owned.stream().map(TransferMove::toLot).toList())));
-    fromPreviousOwner.forEach(
-        (pair, owned) ->
-            eventPublisher.publishEvent(
-                new InventoryTransferredFromUserEvent(
-                    pair.getFirst(),
-                    actorId,
-                    actorName,
-                    effectiveName(owned.getFirst().to()),
-                    owned.getFirst().sourceRowId(),
-                    owned.stream().map(TransferMove::fromLot).toList())));
+    toNewOwner.forEach((newOwnerId, owned) ->
+        eventPublisher.publishEvent(
+            new InventoryTransferredToUserEvent(
+                newOwnerId,
+                actorId,
+                actorName,
+                owned.getFirst().sourceRowId(),
+                owned.stream().map(TransferMove::toLot).toList())));
+    fromPreviousOwner.forEach((pair, owned) ->
+        eventPublisher.publishEvent(
+            new InventoryTransferredFromUserEvent(
+                pair.getFirst(),
+                actorId,
+                actorName,
+                effectiveName(owned.getFirst().to()),
+                owned.getFirst().sourceRowId(),
+                owned.stream().map(TransferMove::fromLot).toList())));
   }
 
   /**
@@ -1203,10 +1201,8 @@ public class InventoryCheckoutService {
     if (targetPersonal) {
       final long earmarked =
           movable.stream()
-              .filter(
-                  row ->
-                      !row.getJobOrderAllocations().isEmpty()
-                          || !row.getMissionAllocations().isEmpty())
+              .filter(row ->
+                  !row.getJobOrderAllocations().isEmpty() || !row.getMissionAllocations().isEmpty())
               .count();
       if (earmarked > 0) {
         throw new BadRequestException(

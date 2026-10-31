@@ -75,15 +75,13 @@ class UserServiceReservedNameTest {
 
   @Test
   void theSentinelIsRejectedInAnyCase() {
-    assertThatThrownBy(
-            () ->
-                service.updateUserDescription(
-                    SELF, null, HandleAnonymisation.SENTINEL.toLowerCase(Locale.ROOT), null))
+    assertThatThrownBy(() ->
+            service.updateUserDescription(
+                SELF, null, HandleAnonymisation.SENTINEL.toLowerCase(Locale.ROOT), null))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(
-            () ->
-                service.updateUserDescription(
-                    SELF, null, "  " + HandleAnonymisation.SENTINEL + "  ", null))
+    assertThatThrownBy(() ->
+            service.updateUserDescription(
+                SELF, null, "  " + HandleAnonymisation.SENTINEL + "  ", null))
         .as("trimmed before the comparison")
         .isInstanceOf(IllegalArgumentException.class);
   }

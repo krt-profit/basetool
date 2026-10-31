@@ -62,13 +62,12 @@ public final class MissionEditorFixture {
         .thenAnswer(i -> real.edit(i.getArgument(0), i.getArgument(1), i.getArgument(2)));
     lenient()
         .when(editorMock.editSection(any(), any(), any(), any(), any()))
-        .thenAnswer(
-            i ->
-                real.editSection(
-                    i.getArgument(0),
-                    i.getArgument(1),
-                    i.getArgument(2),
-                    i.getArgument(3),
-                    i.getArgument(4)));
+        .thenAnswer(i ->
+            real.editSection(
+                i.getArgument(0),
+                i.getArgument(1),
+                i.getArgument(2),
+                i.getArgument(3),
+                i.getArgument(4)));
   }
 }

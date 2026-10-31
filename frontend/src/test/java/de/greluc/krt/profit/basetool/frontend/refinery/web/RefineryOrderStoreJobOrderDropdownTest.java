@@ -149,14 +149,13 @@ class RefineryOrderStoreJobOrderDropdownTest {
             eq("/api/v1/refinery-orders/settings"), eq(RefinerySettingsDto.class)))
         .thenReturn(new RefinerySettingsDto("UP"));
     when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenAnswer(
-            inv -> {
-              String url = inv.getArgument(0);
-              if (url.contains("/orders/lookup")) {
-                return List.of(matching, unrelated);
-              }
-              return null;
-            });
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          if (url.contains("/orders/lookup")) {
+            return List.of(matching, unrelated);
+          }
+          return null;
+        });
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();
     claims.put(

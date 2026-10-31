@@ -131,20 +131,18 @@ public class SupplyNeedService {
     }
     if (materialId != null) {
       spec =
-          spec.and(
-              (root, query, cb) ->
-                  cb.equal(root.join("material", JoinType.LEFT).get("id"), materialId));
+          spec.and((root, query, cb) ->
+              cb.equal(root.join("material", JoinType.LEFT).get("id"), materialId));
     }
     if (!seesAll) {
       spec =
-          spec.and(
-              (root, query, cb) -> {
-                var open = cb.equal(root.get("status"), NeedStatus.OPEN);
-                if (managed.isEmpty()) {
-                  return open;
-                }
-                return cb.or(open, root.get("orgUnitId").in(managed));
-              });
+          spec.and((root, query, cb) -> {
+            var open = cb.equal(root.get("status"), NeedStatus.OPEN);
+            if (managed.isEmpty()) {
+              return open;
+            }
+            return cb.or(open, root.get("orgUnitId").in(managed));
+          });
     }
     Page<SupplyNeed> page = needRepository.findAll(spec, pageable);
     SupplyMapper.NeedContext context = mapper.needContext(page.getContent());
@@ -181,11 +179,9 @@ public class SupplyNeedService {
         unitSettingRepository
             .findById(request.orgUnitId())
             .filter(SupplyUnitSetting::isMayRaiseNeeds)
-            .orElseThrow(
-                () ->
-                    new SupplyProblemException(
-                        SupplyProblemCode.SUPPLY_UNIT_CANNOT_RAISE,
-                        "The unit may not raise needs"));
+            .orElseThrow(() ->
+                new SupplyProblemException(
+                    SupplyProblemCode.SUPPLY_UNIT_CANNOT_RAISE, "The unit may not raise needs"));
     SupplyNeed need = new SupplyNeed();
     need.setOrgUnitId(setting.getId());
     applyCatalogue(need, request.materialId(), request.gameItemId(), request.qualityTierId());
@@ -517,10 +513,9 @@ public class SupplyNeedService {
     return jobOrderRepository
         .findByResponsibleOrgUnitsAndStatuses(LINKABLE_ORDER_STATUSES, units)
         .stream()
-        .map(
-            order ->
-                new NeedJobOrderOptionDto(
-                    order.getId(), order.getResponsibleOrgUnit().getId(), order.getDisplayId()))
+        .map(order ->
+            new NeedJobOrderOptionDto(
+                order.getId(), order.getResponsibleOrgUnit().getId(), order.getDisplayId()))
         .toList();
   }
 
@@ -560,11 +555,10 @@ public class SupplyNeedService {
     List<SupplyNeed> needs =
         needRepository.findAll(
             fetchCatalogue()
-                .and(
-                    (root, query, cb) ->
-                        cb.and(
-                            cb.equal(root.get("orgUnitId"), orgUnitId),
-                            cb.equal(root.get("status"), NeedStatus.OPEN))));
+                .and((root, query, cb) ->
+                    cb.and(
+                        cb.equal(root.get("orgUnitId"), orgUnitId),
+                        cb.equal(root.get("status"), NeedStatus.OPEN))));
     SupplyMapper.NeedContext context = mapper.needContext(needs);
     List<NeedDto> dtos = new ArrayList<>();
     for (SupplyNeed need : needs) {

@@ -118,13 +118,12 @@ class DataExportScrubCoverageTest {
   void everyExemptionStatesAReason() {
     for (Section section : ExportSectionDeclarations.inReadingOrder()) {
       assertThat(section.unscrubbedPersonColumns())
-          .allSatisfy(
-              (column, reason) ->
-                  assertThat(reason)
-                      .as("reason for " + section.key() + "." + column)
-                      .isNotBlank()
-                      .hasSizeGreaterThan(30)
-                      .doesNotContainIgnoringCase("todo"));
+          .allSatisfy((column, reason) ->
+              assertThat(reason)
+                  .as("reason for " + section.key() + "." + column)
+                  .isNotBlank()
+                  .hasSizeGreaterThan(30)
+                  .doesNotContainIgnoringCase("todo"));
     }
   }
 
@@ -143,25 +142,23 @@ class DataExportScrubCoverageTest {
   @Test
   void everySectionStatesWhyItCarriesItsLegalBasis() {
     assertThat(ExportSectionDeclarations.inReadingOrder())
-        .allSatisfy(
-            section ->
-                assertThat(section.rationale())
-                    .as("rationale for section " + section.key())
-                    .isNotBlank()
-                    .hasSizeGreaterThan(20)
-                    .doesNotContainIgnoringCase("todo"));
+        .allSatisfy(section ->
+            assertThat(section.rationale())
+                .as("rationale for section " + section.key())
+                .isNotBlank()
+                .hasSizeGreaterThan(20)
+                .doesNotContainIgnoringCase("todo"));
   }
 
   @Test
   void everySectionCarriesALegalBasisAndAStatementOverTheSubject() {
     assertThat(ExportSectionDeclarations.inReadingOrder())
-        .allSatisfy(
-            section -> {
-              assertThat(section.legalBasis()).as("legal basis of " + section.key()).isNotNull();
-              assertThat(section.sql())
-                  .as("statement of " + section.key())
-                  .containsIgnoringCase(":userId");
-            });
+        .allSatisfy(section -> {
+          assertThat(section.legalBasis()).as("legal basis of " + section.key()).isNotNull();
+          assertThat(section.sql())
+              .as("statement of " + section.key())
+              .containsIgnoringCase(":userId");
+        });
   }
 
   /**
@@ -180,9 +177,7 @@ class DataExportScrubCoverageTest {
             .anyMatch(t -> tables.contains(t.table()) && t.column().equals(column));
     return searched
         || tables.stream()
-            .anyMatch(
-                table ->
-                    MentionSourceDeclarations.exemptButMayHoldNames()
-                        .contains(table + "." + column));
+            .anyMatch(table ->
+                MentionSourceDeclarations.exemptButMayHoldNames().contains(table + "." + column));
   }
 }

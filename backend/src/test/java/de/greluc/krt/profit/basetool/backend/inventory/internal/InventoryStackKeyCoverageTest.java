@@ -67,33 +67,30 @@ class InventoryStackKeyCoverageTest {
 
     assertThat(groupings).as("the sweep found the stack groupings").hasSizeGreaterThanOrEqualTo(4);
     assertThat(groupings)
-        .allSatisfy(
-            q ->
-                assertThat(groupByClause(q[1]))
-                    .as(q[0] + " groups by personal and must group by stolen too")
-                    .contains("i.stolen"));
+        .allSatisfy(q ->
+            assertThat(groupByClause(q[1]))
+                .as(q[0] + " groups by personal and must group by stolen too")
+                .contains("i.stolen"));
   }
 
   @Test
   void everyStackKeyMatchCarriesTheMarker() {
     List<String[]> matches =
         queries().stream()
-            .filter(
-                q ->
-                    q[1].contains("i.personal = :personal")
-                        || (q[1].contains("ORDER BY i.createdAt")
-                            && q[1].contains("i.location.id = :locationId")))
+            .filter(q ->
+                q[1].contains("i.personal = :personal")
+                    || (q[1].contains("ORDER BY i.createdAt")
+                        && q[1].contains("i.location.id = :locationId")))
             .toList();
 
     assertThat(matches)
         .as("the sweep found the entries and merge-group lookups")
         .hasSizeGreaterThanOrEqualTo(5);
     assertThat(matches)
-        .allSatisfy(
-            q ->
-                assertThat(q[1])
-                    .as(q[0] + " selects one stack and must match the marker")
-                    .contains("i.stolen = :stolen"));
+        .allSatisfy(q ->
+            assertThat(q[1])
+                .as(q[0] + " selects one stack and must match the marker")
+                .contains("i.stolen = :stolen"));
   }
 
   @Test

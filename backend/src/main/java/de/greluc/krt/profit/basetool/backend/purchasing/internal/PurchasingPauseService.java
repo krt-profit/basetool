@@ -73,16 +73,15 @@ public class PurchasingPauseService {
     PurchasingSetting setting = settingsService.current();
     List<PauseStateDto.UnitPause> units =
         unitPauseRepository.findAll().stream()
-            .map(
-                pause ->
-                    new PauseStateDto.UnitPause(
-                        pause.getOrgUnitId(),
-                        orgUnitRepository
-                            .findById(pause.getOrgUnitId())
-                            .map(OrgUnit::getName)
-                            .orElse("—"),
-                        pause.getReason(),
-                        pause.getPausedAt()))
+            .map(pause ->
+                new PauseStateDto.UnitPause(
+                    pause.getOrgUnitId(),
+                    orgUnitRepository
+                        .findById(pause.getOrgUnitId())
+                        .map(OrgUnit::getName)
+                        .orElse("—"),
+                    pause.getReason(),
+                    pause.getPausedAt()))
             .toList();
     return new PauseStateDto(
         setting.isPaused(), setting.getPauseReason(), setting.getPausedAt(), units);
@@ -208,11 +207,10 @@ public class PurchasingPauseService {
         Entities.require(orgUnitRepository.findById(request.orgUnitId()), "Org unit not found");
     unitPauseRepository
         .findByOrgUnitId(unit.getId())
-        .ifPresent(
-            pause -> {
-              unitPauseRepository.delete(pause);
-              unitPauseRepository.flush();
-            });
+        .ifPresent(pause -> {
+          unitPauseRepository.delete(pause);
+          unitPauseRepository.flush();
+        });
     auditRecorder.record(
         AuditEventType.PURCHASING_RESUMED,
         unit.getId(),

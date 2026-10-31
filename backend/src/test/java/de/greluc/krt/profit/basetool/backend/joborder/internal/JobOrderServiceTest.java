@@ -275,17 +275,16 @@ class JobOrderServiceTest {
 
   private void stubTierResolution() {
     when(qualityTierService.resolveForRequirement(any(), any(), any()))
-        .thenAnswer(
-            inv -> {
-              Integer floor = inv.getArgument(1);
-              if (floor == null) {
-                return QualityTierFixtures.none();
-              }
-              if (floor == 650) {
-                return QualityTierFixtures.good();
-              }
-              throw new BadRequestException("No quality tier has the floor " + floor);
-            });
+        .thenAnswer(inv -> {
+          Integer floor = inv.getArgument(1);
+          if (floor == null) {
+            return QualityTierFixtures.none();
+          }
+          if (floor == 650) {
+            return QualityTierFixtures.good();
+          }
+          throw new BadRequestException("No quality tier has the floor " + floor);
+        });
   }
 
   private void stubLinkedStock(Integer quality, double amount) {
@@ -301,12 +300,11 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
-        .thenAnswer(
-            i -> {
-              JobOrder saved = i.getArgument(0);
-              saved.setId(orderId);
-              return saved;
-            });
+        .thenAnswer(i -> {
+          JobOrder saved = i.getArgument(0);
+          saved.setId(orderId);
+          return saved;
+        });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
@@ -385,12 +383,11 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
-        .thenAnswer(
-            i -> {
-              JobOrder saved = i.getArgument(0);
-              saved.setId(orderId);
-              return saved;
-            });
+        .thenAnswer(i -> {
+          JobOrder saved = i.getArgument(0);
+          saved.setId(orderId);
+          return saved;
+        });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     stubTierResolution();
     stubLinkedStock(700, 25.0);
@@ -426,12 +423,11 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
-        .thenAnswer(
-            i -> {
-              JobOrder saved = i.getArgument(0);
-              saved.setId(orderId);
-              return saved;
-            });
+        .thenAnswer(i -> {
+          JobOrder saved = i.getArgument(0);
+          saved.setId(orderId);
+          return saved;
+        });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
@@ -440,14 +436,12 @@ class JobOrderServiceTest {
     verify(qualityTierService).resolveForRequirement(null, 650, Set.of());
     verify(jobOrderRepository)
         .save(
-            argThat(
-                jo ->
-                    jo.getMaterials().stream()
-                        .allMatch(
-                            m ->
-                                m.getQualityTier() != null
-                                    && m.getQualityTier().getMinQuality() == 650
-                                    && "GOOD".equals(m.getQualityTier().getCode()))));
+            argThat(jo ->
+                jo.getMaterials().stream()
+                    .allMatch(m ->
+                        m.getQualityTier() != null
+                            && m.getQualityTier().getMinQuality() == 650
+                            && "GOOD".equals(m.getQualityTier().getCode()))));
   }
 
   @Test
@@ -461,12 +455,11 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
-        .thenAnswer(
-            i -> {
-              JobOrder saved = i.getArgument(0);
-              saved.setId(orderId);
-              return saved;
-            });
+        .thenAnswer(i -> {
+          JobOrder saved = i.getArgument(0);
+          saved.setId(orderId);
+          return saved;
+        });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
@@ -474,11 +467,9 @@ class JobOrderServiceTest {
 
     verify(jobOrderRepository)
         .save(
-            argThat(
-                jo ->
-                    jo.getMaterials().stream()
-                        .allMatch(
-                            m -> m.getQualityTier() != null && m.getQualityTier().isBaseTier())));
+            argThat(jo ->
+                jo.getMaterials().stream()
+                    .allMatch(m -> m.getQualityTier() != null && m.getQualityTier().isBaseTier())));
   }
 
   @Test
@@ -489,12 +480,11 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
-        .thenAnswer(
-            i -> {
-              JobOrder saved = i.getArgument(0);
-              saved.setId(orderId);
-              return saved;
-            });
+        .thenAnswer(i -> {
+          JobOrder saved = i.getArgument(0);
+          saved.setId(orderId);
+          return saved;
+        });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
@@ -1960,31 +1950,30 @@ class JobOrderServiceTest {
       lenient().when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
       lenient()
           .when(jobOrderMapper.toDto(any(JobOrder.class)))
-          .thenAnswer(
-              inv -> {
-                JobOrder o = inv.getArgument(0);
-                return new JobOrderDto(
-                    o.getId(),
-                    1,
-                    null,
-                    null,
-                    null,
-                    null,
-                    1,
-                    JobOrderStatus.OPEN,
-                    JobOrderType.ITEM,
-                    o.isCountBlueprintsWithVariants(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    Instant.now(),
-                    o.getVersion(),
-                    null,
-                    false);
-              });
+          .thenAnswer(inv -> {
+            JobOrder o = inv.getArgument(0);
+            return new JobOrderDto(
+                o.getId(),
+                1,
+                null,
+                null,
+                null,
+                null,
+                1,
+                JobOrderStatus.OPEN,
+                JobOrderType.ITEM,
+                o.isCountBlueprintsWithVariants(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                Instant.now(),
+                o.getVersion(),
+                null,
+                false);
+          });
     }
 
     @Test

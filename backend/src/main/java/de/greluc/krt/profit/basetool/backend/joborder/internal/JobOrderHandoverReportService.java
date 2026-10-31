@@ -95,16 +95,15 @@ public class JobOrderHandoverReportService {
 
     List<ItemRow> rows =
         handover.getItems().stream()
-            .map(
-                item ->
-                    new ItemRow(
-                        item.getMaterial() != null ? item.getMaterial().getName() : "-",
-                        item.getLocationName() != null ? item.getLocationName() : "-",
-                        item.getAmount(),
-                        Objects.requireNonNull(item.getQuality()),
-                        item.getMaterial() != null && item.getMaterial().getQuantityType() != null
-                            ? item.getMaterial().getQuantityType().name()
-                            : null))
+            .map(item ->
+                new ItemRow(
+                    item.getMaterial() != null ? item.getMaterial().getName() : "-",
+                    item.getLocationName() != null ? item.getLocationName() : "-",
+                    item.getAmount(),
+                    Objects.requireNonNull(item.getQuality()),
+                    item.getMaterial() != null && item.getMaterial().getQuantityType() != null
+                        ? item.getMaterial().getQuantityType().name()
+                        : null))
             .sorted(ITEM_COMPARATOR)
             .toList();
 
@@ -126,14 +125,13 @@ public class JobOrderHandoverReportService {
 
     List<ItemRow> rows =
         dto.items().stream()
-            .map(
-                item ->
-                    new ItemRow(
-                        item.materialName(),
-                        item.locationName() != null ? item.locationName() : "-",
-                        item.amount(),
-                        item.quality(),
-                        item.quantityType()))
+            .map(item ->
+                new ItemRow(
+                    item.materialName(),
+                    item.locationName() != null ? item.locationName() : "-",
+                    item.amount(),
+                    item.quality(),
+                    item.quantityType()))
             .sorted(ITEM_COMPARATOR)
             .toList();
 

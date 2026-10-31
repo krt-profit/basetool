@@ -77,12 +77,11 @@ class KommandoGroupServiceTest {
     when(orgUnitRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
     when(kommandoGroupRepository.countBySquadronId(squadronId)).thenReturn(2L);
     when(kommandoGroupRepository.saveAndFlush(any(KommandoGroup.class)))
-        .thenAnswer(
-            inv -> {
-              KommandoGroup g = inv.getArgument(0);
-              g.setId(UUID.randomUUID());
-              return g;
-            });
+        .thenAnswer(inv -> {
+          KommandoGroup g = inv.getArgument(0);
+          g.setId(UUID.randomUUID());
+          return g;
+        });
 
     KommandoGroupDto dto =
         service.createGroup(squadronId, new CreateKommandoGroupRequest("  Jagd  "));

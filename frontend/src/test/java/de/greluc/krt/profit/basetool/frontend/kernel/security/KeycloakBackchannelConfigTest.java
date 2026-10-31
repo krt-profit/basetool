@@ -83,18 +83,17 @@ class KeycloakBackchannelConfigTest {
                 + "/protocol/openid-connect/auth",
             PROPERTY + "provider.keycloak.token-uri=" + ISSUER + "/protocol/openid-connect/token")
         .withBean(KeycloakBackchannelProperties.class, () -> new KeycloakBackchannelProperties(""))
-        .run(
-            context -> {
-              assertThat(
-                      context
-                          .getBean(ClientRegistrationRepository.class)
-                          .findByRegistrationId(FrontendClientAuthenticationConfig.REGISTRATION_ID)
-                          .getProviderDetails()
-                          .getTokenUri())
-                  .isEqualTo(ISSUER + "/protocol/openid-connect/token");
-              assertThat(context).doesNotHaveBean(JwtDecoderFactory.class);
-              assertThat(context).doesNotHaveBean(OAuth2UserService.class);
-            });
+        .run(context -> {
+          assertThat(
+                  context
+                      .getBean(ClientRegistrationRepository.class)
+                      .findByRegistrationId(FrontendClientAuthenticationConfig.REGISTRATION_ID)
+                      .getProviderDetails()
+                      .getTokenUri())
+              .isEqualTo(ISSUER + "/protocol/openid-connect/token");
+          assertThat(context).doesNotHaveBean(JwtDecoderFactory.class);
+          assertThat(context).doesNotHaveBean(OAuth2UserService.class);
+        });
   }
 
   @Test
@@ -105,22 +104,21 @@ class KeycloakBackchannelConfigTest {
             PROPERTY + "provider.keycloak.issuer-uri=" + ISSUER)
         .withBean(
             KeycloakBackchannelProperties.class, () -> new KeycloakBackchannelProperties(INTERNAL))
-        .run(
-            context -> {
-              assertThat(context).hasNotFailed();
-              assertThat(context).hasSingleBean(OAuth2ClientProperties.class);
-              ClientRegistration registration =
-                  context
-                      .getBean(ClientRegistrationRepository.class)
-                      .findByRegistrationId(FrontendClientAuthenticationConfig.REGISTRATION_ID);
-              assertThat(registration).isNotNull();
-              assertThat(registration.getClientId()).isEqualTo("basetool-frontend");
-              assertThat(registration.getProviderDetails().getIssuerUri()).isEqualTo(ISSUER);
-              assertThat(registration.getProviderDetails().getTokenUri())
-                  .isEqualTo(INTERNAL + "/protocol/openid-connect/token");
-              assertThat(context).hasSingleBean(JwtDecoderFactory.class);
-              assertThat(context).hasSingleBean(OAuth2UserService.class);
-            });
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context).hasSingleBean(OAuth2ClientProperties.class);
+          ClientRegistration registration =
+              context
+                  .getBean(ClientRegistrationRepository.class)
+                  .findByRegistrationId(FrontendClientAuthenticationConfig.REGISTRATION_ID);
+          assertThat(registration).isNotNull();
+          assertThat(registration.getClientId()).isEqualTo("basetool-frontend");
+          assertThat(registration.getProviderDetails().getIssuerUri()).isEqualTo(ISSUER);
+          assertThat(registration.getProviderDetails().getTokenUri())
+              .isEqualTo(INTERNAL + "/protocol/openid-connect/token");
+          assertThat(context).hasSingleBean(JwtDecoderFactory.class);
+          assertThat(context).hasSingleBean(OAuth2UserService.class);
+        });
   }
 
   @Test

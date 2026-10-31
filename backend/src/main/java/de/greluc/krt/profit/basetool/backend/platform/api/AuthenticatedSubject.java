@@ -111,13 +111,12 @@ public final class AuthenticatedSubject {
    */
   public static Optional<UUID> idOf(@Nullable Authentication authentication) {
     return of(authentication)
-        .flatMap(
-            subject -> {
-              try {
-                return Optional.of(UUID.fromString(subject));
-              } catch (IllegalArgumentException notAnId) {
-                return Optional.empty();
-              }
-            });
+        .flatMap(subject -> {
+          try {
+            return Optional.of(UUID.fromString(subject));
+          } catch (IllegalArgumentException notAnId) {
+            return Optional.empty();
+          }
+        });
   }
 }

@@ -393,14 +393,13 @@ class ExchangeWireContractTest {
 
   @Test
   void theSchemaCheckRefusesAnAnswerTheGatewayWouldTurnIntoABadGateway() {
-    assertThatThrownBy(
-            () ->
-                assertMatches(
-                    "page.schema.json#/$defs/shipPage",
-                    "{\"items\":[{\"shipId\":\"s\",\"shipType\":{\"bt\":\"b\",\"name\":\"n\"},"
-                        + "\"insurance\":{\"kind\":\"LTI\"},\"fitted\":false}],"
-                        + "\"removed\":[],\"hasMore\":false}",
-                    "a ship without its version"))
+    assertThatThrownBy(() ->
+            assertMatches(
+                "page.schema.json#/$defs/shipPage",
+                "{\"items\":[{\"shipId\":\"s\",\"shipType\":{\"bt\":\"b\",\"name\":\"n\"},"
+                    + "\"insurance\":{\"kind\":\"LTI\"},\"fitted\":false}],"
+                    + "\"removed\":[],\"hasMore\":false}",
+                "a ship without its version"))
         .isInstanceOf(AssertionError.class);
   }
 
@@ -649,14 +648,13 @@ class ExchangeWireContractTest {
       List<String> nulls = new ArrayList<>();
       object
           .propertyNames()
-          .forEach(
-              name -> {
-                if (object.get(name).isNull()) {
-                  nulls.add(name);
-                } else {
-                  strip(object.get(name));
-                }
-              });
+          .forEach(name -> {
+            if (object.get(name).isNull()) {
+              nulls.add(name);
+            } else {
+              strip(object.get(name));
+            }
+          });
       nulls.forEach(object::remove);
     } else if (node.isArray()) {
       node.forEach(ExchangeWireContractTest::strip);

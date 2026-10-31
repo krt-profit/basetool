@@ -115,14 +115,13 @@ class PurchasingPartnerServiceTest {
 
   private void stubSave() {
     when(partnerRepository.saveAndFlush(any(PurchasingPartner.class)))
-        .thenAnswer(
-            invocation -> {
-              PurchasingPartner saved = invocation.getArgument(0);
-              if (saved.getId() == null) {
-                saved.setId(UUID.randomUUID());
-              }
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          PurchasingPartner saved = invocation.getArgument(0);
+          if (saved.getId() == null) {
+            saved.setId(UUID.randomUUID());
+          }
+          return saved;
+        });
   }
 
   private void assertAuditCarriesNoPartnerText(AuditEventType type, String... forbidden) {
@@ -320,17 +319,16 @@ class PurchasingPartnerServiceTest {
   void creatingIsRefusedForACallerWhoMaintainsNoPartners() {
     when(accessPolicy.canMaintainPartners()).thenReturn(false);
 
-    assertThatThrownBy(
-            () ->
-                service.create(
-                    new CreatePartnerRequest(
-                        PartnerKind.ORG,
-                        NAME,
-                        null,
-                        PartnerChannel.OTHER,
-                        null,
-                        null,
-                        PartnerContact.OTHER)))
+    assertThatThrownBy(() ->
+            service.create(
+                new CreatePartnerRequest(
+                    PartnerKind.ORG,
+                    NAME,
+                    null,
+                    PartnerChannel.OTHER,
+                    null,
+                    null,
+                    PartnerContact.OTHER)))
         .isInstanceOf(AccessDeniedException.class);
 
     verifyNoInteractions(partnerRepository, auditRecorder);
@@ -379,12 +377,11 @@ class PurchasingPartnerServiceTest {
     PurchasingPartner partner = partner(PartnerKind.ORG, NAME, 5L);
     when(partnerRepository.findById(partner.getId())).thenReturn(Optional.of(partner));
 
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    partner.getId(),
-                    new UpdatePartnerRequest(
-                        "Other", null, PartnerChannel.OTHER, null, null, PartnerContact.OTHER, 4L)))
+    assertThatThrownBy(() ->
+            service.update(
+                partner.getId(),
+                new UpdatePartnerRequest(
+                    "Other", null, PartnerChannel.OTHER, null, null, PartnerContact.OTHER, 4L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
     verify(partnerRepository, never()).saveAndFlush(any());
@@ -398,18 +395,17 @@ class PurchasingPartnerServiceTest {
     partner.setErased(true);
     when(partnerRepository.findById(partner.getId())).thenReturn(Optional.of(partner));
 
-    assertThatThrownBy(
-            () ->
-                service.update(
-                    partner.getId(),
-                    new UpdatePartnerRequest(
-                        "Back Again",
-                        null,
-                        PartnerChannel.OTHER,
-                        null,
-                        null,
-                        PartnerContact.OTHER,
-                        1L)))
+    assertThatThrownBy(() ->
+            service.update(
+                partner.getId(),
+                new UpdatePartnerRequest(
+                    "Back Again",
+                    null,
+                    PartnerChannel.OTHER,
+                    null,
+                    null,
+                    PartnerContact.OTHER,
+                    1L)))
         .isInstanceOf(BadRequestException.class);
 
     verify(partnerRepository, never()).saveAndFlush(any());

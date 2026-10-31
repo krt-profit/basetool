@@ -235,15 +235,14 @@ public class OrgUnitBankApprovalLimitService {
               approvalLimitRepository.findByAccountIdAndGranteeKind(account.getId(), kind);
         };
     BankAccountApprovalLimit limit =
-        existing.orElseGet(
-            () -> {
-              BankAccountApprovalLimit fresh = new BankAccountApprovalLimit();
-              fresh.setAccount(account);
-              fresh.setGranteeKind(kind);
-              fresh.setRoleCode(roleCode);
-              fresh.setGranteeUserId(userId);
-              return fresh;
-            });
+        existing.orElseGet(() -> {
+          BankAccountApprovalLimit fresh = new BankAccountApprovalLimit();
+          fresh.setAccount(account);
+          fresh.setGranteeKind(kind);
+          fresh.setRoleCode(roleCode);
+          fresh.setGranteeUserId(userId);
+          return fresh;
+        });
     limit.setLimitAmount(amount);
     approvalLimitRepository.save(limit);
   }

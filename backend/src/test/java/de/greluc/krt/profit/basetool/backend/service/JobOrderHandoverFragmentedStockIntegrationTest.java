@@ -85,100 +85,99 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
       List<Double> ouratiteAmounts) {}
 
   private Fixture prepareFixture() {
-    return transactionTemplate.execute(
-        status -> {
-          User user = new User();
-          user.setId(UUID.randomUUID());
-          user.setUsername("logistiker-" + UUID.randomUUID());
-          userRepository.save(user);
+    return transactionTemplate.execute(status -> {
+      User user = new User();
+      user.setId(UUID.randomUUID());
+      user.setUsername("logistiker-" + UUID.randomUUID());
+      userRepository.save(user);
 
-          Location location = new Location();
-          location.setName("Hub-" + UUID.randomUUID());
-          location = locationRepository.save(location);
+      Location location = new Location();
+      location.setName("Hub-" + UUID.randomUUID());
+      location = locationRepository.save(location);
 
-          Material aslarite = new Material();
-          aslarite.setName("Aslarite-" + UUID.randomUUID());
-          aslarite.setType(MaterialType.RAW);
-          aslarite = materialRepository.save(aslarite);
+      Material aslarite = new Material();
+      aslarite.setName("Aslarite-" + UUID.randomUUID());
+      aslarite.setType(MaterialType.RAW);
+      aslarite = materialRepository.save(aslarite);
 
-          Material ouratite = new Material();
-          ouratite.setName("Ouratite-" + UUID.randomUUID());
-          ouratite.setType(MaterialType.RAW);
-          ouratite = materialRepository.save(ouratite);
+      Material ouratite = new Material();
+      ouratite.setName("Ouratite-" + UUID.randomUUID());
+      ouratite.setType(MaterialType.RAW);
+      ouratite = materialRepository.save(ouratite);
 
-          JobOrder jobOrder =
-              JobOrder.builder()
-                  .responsibleOrgUnit(
-                      squadronRepository
-                          .findById(
-                              de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                          .orElseThrow())
-                  .requestingOrgUnit(
-                      squadronRepository
-                          .findById(
-                              de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                          .orElseThrow())
-                  .handle("requester")
-                  .status(JobOrderStatus.OPEN)
-                  .build();
+      JobOrder jobOrder =
+          JobOrder.builder()
+              .responsibleOrgUnit(
+                  squadronRepository
+                      .findById(
+                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+                      .orElseThrow())
+              .requestingOrgUnit(
+                  squadronRepository
+                      .findById(
+                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+                      .orElseThrow())
+              .handle("requester")
+              .status(JobOrderStatus.OPEN)
+              .build();
 
-          QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
-          JobOrderMaterial m1 =
-              JobOrderMaterial.builder()
-                  .material(aslarite)
-                  .qualityTier(good)
-                  .amount(ASLARITE_REQUIRED)
-                  .build();
-          JobOrderMaterial m2 =
-              JobOrderMaterial.builder()
-                  .material(ouratite)
-                  .qualityTier(good)
-                  .amount(OURATITE_REQUIRED)
-                  .build();
-          jobOrder.addMaterial(m1);
-          jobOrder.addMaterial(m2);
-          jobOrder = jobOrderRepository.save(jobOrder);
+      QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
+      JobOrderMaterial m1 =
+          JobOrderMaterial.builder()
+              .material(aslarite)
+              .qualityTier(good)
+              .amount(ASLARITE_REQUIRED)
+              .build();
+      JobOrderMaterial m2 =
+          JobOrderMaterial.builder()
+              .material(ouratite)
+              .qualityTier(good)
+              .amount(OURATITE_REQUIRED)
+              .build();
+      jobOrder.addMaterial(m1);
+      jobOrder.addMaterial(m2);
+      jobOrder = jobOrderRepository.save(jobOrder);
 
-          List<Double> aslariteAmounts = splitEvenly(ASLARITE_REQUIRED, STACKS_PER_MATERIAL);
-          List<Double> ouratiteAmounts = splitEvenly(OURATITE_REQUIRED, STACKS_PER_MATERIAL);
+      List<Double> aslariteAmounts = splitEvenly(ASLARITE_REQUIRED, STACKS_PER_MATERIAL);
+      List<Double> ouratiteAmounts = splitEvenly(OURATITE_REQUIRED, STACKS_PER_MATERIAL);
 
-          List<UUID> aslariteIds = new ArrayList<>();
-          for (double a : aslariteAmounts) {
-            InventoryItem inv = new InventoryItem();
-            inv.setOwningOrgUnit(
-                squadronRepository
-                    .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                    .orElseThrow());
-            inv.setUser(user);
-            inv.setLocation(location);
-            inv.setMaterial(aslarite);
-            inv.setQuality(800);
-            inv.setAmount(a);
-            InventoryAllocations.addJobOrder(inv, jobOrder.getId(), a, false);
-            inv = inventoryItemRepository.save(inv);
-            aslariteIds.add(inv.getId());
-          }
+      List<UUID> aslariteIds = new ArrayList<>();
+      for (double a : aslariteAmounts) {
+        InventoryItem inv = new InventoryItem();
+        inv.setOwningOrgUnit(
+            squadronRepository
+                .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+                .orElseThrow());
+        inv.setUser(user);
+        inv.setLocation(location);
+        inv.setMaterial(aslarite);
+        inv.setQuality(800);
+        inv.setAmount(a);
+        InventoryAllocations.addJobOrder(inv, jobOrder.getId(), a, false);
+        inv = inventoryItemRepository.save(inv);
+        aslariteIds.add(inv.getId());
+      }
 
-          List<UUID> ouratiteIds = new ArrayList<>();
-          for (double a : ouratiteAmounts) {
-            InventoryItem inv = new InventoryItem();
-            inv.setOwningOrgUnit(
-                squadronRepository
-                    .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                    .orElseThrow());
-            inv.setUser(user);
-            inv.setLocation(location);
-            inv.setMaterial(ouratite);
-            inv.setQuality(900);
-            inv.setAmount(a);
-            InventoryAllocations.addJobOrder(inv, jobOrder.getId(), a, false);
-            inv = inventoryItemRepository.save(inv);
-            ouratiteIds.add(inv.getId());
-          }
+      List<UUID> ouratiteIds = new ArrayList<>();
+      for (double a : ouratiteAmounts) {
+        InventoryItem inv = new InventoryItem();
+        inv.setOwningOrgUnit(
+            squadronRepository
+                .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+                .orElseThrow());
+        inv.setUser(user);
+        inv.setLocation(location);
+        inv.setMaterial(ouratite);
+        inv.setQuality(900);
+        inv.setAmount(a);
+        InventoryAllocations.addJobOrder(inv, jobOrder.getId(), a, false);
+        inv = inventoryItemRepository.save(inv);
+        ouratiteIds.add(inv.getId());
+      }
 
-          return new Fixture(
-              jobOrder.getId(), aslariteIds, ouratiteIds, aslariteAmounts, ouratiteAmounts);
-        });
+      return new Fixture(
+          jobOrder.getId(), aslariteIds, ouratiteIds, aslariteAmounts, ouratiteAmounts);
+    });
   }
 
   /**
@@ -231,39 +230,36 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
 
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
-          assertEquals(
-              JobOrderStatus.COMPLETED,
-              reloaded.getStatus(),
-              "JobOrder must be COMPLETED after fragmented-stock handover");
-          for (JobOrderMaterial m : reloaded.getMaterials()) {
-            assertTrue(
-                m.getAmount() <= 0.0001,
-                "All required materials must be fulfilled, but "
-                    + m.getMaterial().getName()
-                    + " is still "
-                    + m.getAmount());
-          }
-          for (UUID id : f.aslariteInvIds()) {
-            inventoryItemRepository
-                .findById(id)
-                .ifPresent(
-                    inv ->
-                        assertTrue(
-                            inv.getAmount() <= 0.0001,
-                            "Aslarite inventory row " + id + " should be (effectively) empty"));
-          }
-          for (UUID id : f.ouratiteInvIds()) {
-            inventoryItemRepository
-                .findById(id)
-                .ifPresent(
-                    inv ->
-                        assertTrue(
-                            inv.getAmount() <= 0.0001,
-                            "Ouratite inventory row " + id + " should be (effectively) empty"));
-          }
-        });
+    transactionTemplate.executeWithoutResult(status -> {
+      JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
+      assertEquals(
+          JobOrderStatus.COMPLETED,
+          reloaded.getStatus(),
+          "JobOrder must be COMPLETED after fragmented-stock handover");
+      for (JobOrderMaterial m : reloaded.getMaterials()) {
+        assertTrue(
+            m.getAmount() <= 0.0001,
+            "All required materials must be fulfilled, but "
+                + m.getMaterial().getName()
+                + " is still "
+                + m.getAmount());
+      }
+      for (UUID id : f.aslariteInvIds()) {
+        inventoryItemRepository
+            .findById(id)
+            .ifPresent(inv ->
+                assertTrue(
+                    inv.getAmount() <= 0.0001,
+                    "Aslarite inventory row " + id + " should be (effectively) empty"));
+      }
+      for (UUID id : f.ouratiteInvIds()) {
+        inventoryItemRepository
+            .findById(id)
+            .ifPresent(inv ->
+                assertTrue(
+                    inv.getAmount() <= 0.0001,
+                    "Ouratite inventory row " + id + " should be (effectively) empty"));
+      }
+    });
   }
 }

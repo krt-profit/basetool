@@ -127,24 +127,21 @@ class WebClientHttp2NegotiationTest {
         .host("127.0.0.1")
         .port(0)
         .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
-        .secure(
-            spec ->
-                spec.sslContext(
-                    (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
-                        Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
-        .handle(
-            (request, response) -> {
-              request.withConnection(
-                  connection -> {
-                    negotiated.set(WebClientTestSupport.applicationProtocol(connection.channel()));
-                    peers.add(connection.channel().remoteAddress());
-                  });
-              Mono<String> body = Mono.just("ok");
-              if (SLOW_PATH.equals(request.path()) || request.uri().endsWith(SLOW_PATH)) {
-                body = body.delayElement(HOLD);
-              }
-              return response.header("Content-Type", "text/plain").sendString(body);
-            })
+        .secure(spec ->
+            spec.sslContext(
+                (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
+                    Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
+        .handle((request, response) -> {
+          request.withConnection(connection -> {
+            negotiated.set(WebClientTestSupport.applicationProtocol(connection.channel()));
+            peers.add(connection.channel().remoteAddress());
+          });
+          Mono<String> body = Mono.just("ok");
+          if (SLOW_PATH.equals(request.path()) || request.uri().endsWith(SLOW_PATH)) {
+            body = body.delayElement(HOLD);
+          }
+          return response.header("Content-Type", "text/plain").sendString(body);
+        })
         .bindNow();
   }
 

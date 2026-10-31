@@ -160,10 +160,9 @@ class ChangeSourceTransactionManagerIntegrationTest {
     TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
     readOnly.setReadOnly(true);
     String inReadOnly =
-        readOnly.execute(
-            s ->
-                jdbc.queryForObject(
-                    "SELECT current_setting('basetool.change_source', true)", String.class));
+        readOnly.execute(s ->
+            jdbc.queryForObject(
+                "SELECT current_setting('basetool.change_source', true)", String.class));
 
     assertThat(inReadOnly).isNullOrEmpty();
   }
@@ -175,17 +174,16 @@ class ChangeSourceTransactionManagerIntegrationTest {
    */
   private void write(@NotNull String productKey) {
     new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            s ->
-                jdbc.update(
-                    """
-                    INSERT INTO personal_blueprint (id, owner_user_id, product_key, product_name)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    UUID.randomUUID(),
-                    member,
-                    productKey,
-                    productKey));
+        .executeWithoutResult(s ->
+            jdbc.update(
+                """
+                INSERT INTO personal_blueprint (id, owner_user_id, product_key, product_name)
+                VALUES (?, ?, ?, ?)
+                """,
+                UUID.randomUUID(),
+                member,
+                productKey,
+                productKey));
   }
 
   /**

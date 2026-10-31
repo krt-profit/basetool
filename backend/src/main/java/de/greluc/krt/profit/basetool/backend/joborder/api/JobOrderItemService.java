@@ -217,25 +217,23 @@ public class JobOrderItemService {
       }
     }
     return sums.entrySet().stream()
-        .map(
-            e -> {
-              Material material = Objects.requireNonNull(materials.get(e.getKey().materialId()));
-              QualityTier tier = Objects.requireNonNull(tiers.get(e.getKey().tierId()));
-              return new AggregatedMaterialDto(
-                  materialMapper.toDto(material),
-                  tier.getCode(),
-                  qualityTierMapper.toDto(tier),
-                  QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
-                  null,
-                  List.of(),
-                  null);
-            })
+        .map(e -> {
+          Material material = Objects.requireNonNull(materials.get(e.getKey().materialId()));
+          QualityTier tier = Objects.requireNonNull(tiers.get(e.getKey().tierId()));
+          return new AggregatedMaterialDto(
+              materialMapper.toDto(material),
+              tier.getCode(),
+              qualityTierMapper.toDto(tier),
+              QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
+              null,
+              List.of(),
+              null);
+        })
         .sorted(
-            Comparator.<AggregatedMaterialDto, Integer>comparing(
-                    a ->
-                        a.material() != null && "SCU".equalsIgnoreCase(a.material().quantityType())
-                            ? 0
-                            : 1)
+            Comparator.<AggregatedMaterialDto, Integer>comparing(a ->
+                    a.material() != null && "SCU".equalsIgnoreCase(a.material().quantityType())
+                        ? 0
+                        : 1)
                 .thenComparing(
                     a ->
                         a.material() != null && a.material().name() != null
@@ -308,15 +306,14 @@ public class JobOrderItemService {
                 Comparator.comparing(
                     m -> m.getMaterial() != null ? m.getMaterial().getName() : "",
                     String.CASE_INSENSITIVE_ORDER))
-            .map(
-                m ->
-                    new JobOrderItemMaterialDto(
-                        m.getId(),
-                        materialMapper.toDto(m.getMaterial()),
-                        m.getRequiredQuantity(),
-                        m.getQualityTier().getCode(),
-                        qualityTierMapper.toDto(m.getQualityTier()),
-                        m.getVersion()))
+            .map(m ->
+                new JobOrderItemMaterialDto(
+                    m.getId(),
+                    materialMapper.toDto(m.getMaterial()),
+                    m.getRequiredQuantity(),
+                    m.getQualityTier().getCode(),
+                    qualityTierMapper.toDto(m.getQualityTier()),
+                    m.getVersion()))
             .toList();
     GameItem gameItem = item.getGameItem();
     Blueprint blueprint = item.getBlueprint();

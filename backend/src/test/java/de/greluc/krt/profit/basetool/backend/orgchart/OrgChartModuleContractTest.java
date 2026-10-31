@@ -191,10 +191,9 @@ class OrgChartModuleContractTest {
     TransactionTemplate withoutTransaction = new TransactionTemplate(transactionManager);
     withoutTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
 
-    assertThatThrownBy(
-            () ->
-                withoutTransaction.executeWithoutResult(
-                    _ -> observer.onUnitMembershipRemoved(UUID.randomUUID(), UUID.randomUUID())))
+    assertThatThrownBy(() ->
+            withoutTransaction.executeWithoutResult(
+                _ -> observer.onUnitMembershipRemoved(UUID.randomUUID(), UUID.randomUUID())))
         .isInstanceOf(IllegalTransactionStateException.class);
   }
 

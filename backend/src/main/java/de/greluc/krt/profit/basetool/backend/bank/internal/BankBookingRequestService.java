@@ -307,10 +307,9 @@ public class BankBookingRequestService {
         orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
             .filter(option -> option.orgUnitId().equals(orgUnitId))
             .findFirst()
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "The selected org unit is not one of the counterparty's memberships"));
+            .orElseThrow(() ->
+                new BadRequestException(
+                    "The selected org unit is not one of the counterparty's memberships"));
     return new CounterpartySnapshot(
         user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
   }
@@ -368,11 +367,10 @@ public class BankBookingRequestService {
   public List<BankBookingRequestDto> listForCurrentRequester() {
     return authHelperService
         .currentUserId()
-        .map(
-            sub ->
-                requestRepository.findByRequestedByOrderByCreatedAtDesc(sub).stream()
-                    .map(this::toDto)
-                    .toList())
+        .map(sub ->
+            requestRepository.findByRequestedByOrderByCreatedAtDesc(sub).stream()
+                .map(this::toDto)
+                .toList())
         .orElseGet(List::of);
   }
 
@@ -637,12 +635,11 @@ public class BankBookingRequestService {
     UUID callerId = authHelperService.currentUserId().orElse(null);
     boolean admin = authHelperService.isAdmin();
     return pageQueue(statuses, pageable)
-        .map(
-            request ->
-                toDto(
-                    request,
-                    callerMayConfirm(request, confirmCheck)
-                        && !isBoundByFourEyes(request, callerId, admin)));
+        .map(request ->
+            toDto(
+                request,
+                callerMayConfirm(request, confirmCheck)
+                    && !isBoundByFourEyes(request, callerId, admin)));
   }
 
   /**

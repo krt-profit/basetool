@@ -213,10 +213,9 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       }
     }
     List<CraftabilitySlice> slices = new ArrayList<>();
-    pooled.forEach(
-        (materialId, byQuality) ->
-            byQuality.forEach(
-                (quality, scu) -> slices.add(new CraftabilitySlice(materialId, quality, scu))));
+    pooled.forEach((materialId, byQuality) ->
+        byQuality.forEach(
+            (quality, scu) -> slices.add(new CraftabilitySlice(materialId, quality, scu))));
     return slices;
   }
 
@@ -505,11 +504,10 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       order.getGoods().clear();
       details
           .getGoods()
-          .forEach(
-              good -> {
-                resolveGood(good, order);
-                order.getGoods().add(good);
-              });
+          .forEach(good -> {
+            resolveGood(good, order);
+            order.getGoods().add(good);
+          });
     }
 
     RefineryOrder saved = refineryOrderRepository.save(order);

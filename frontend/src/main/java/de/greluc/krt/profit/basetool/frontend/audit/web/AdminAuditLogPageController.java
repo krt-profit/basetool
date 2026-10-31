@@ -547,15 +547,14 @@ public class AdminAuditLogPageController {
     }
     List<AuditRowView> rows =
         page.content().stream()
-            .map(
-                e ->
-                    new AuditRowView(
-                        e.occurredAt(),
-                        e.actorHandle(),
-                        prefix + e.eventType(),
-                        e.accountNo() != null ? e.accountNo() : "—",
-                        e.details(),
-                        e.clientId()))
+            .map(e ->
+                new AuditRowView(
+                    e.occurredAt(),
+                    e.actorHandle(),
+                    prefix + e.eventType(),
+                    e.accountNo() != null ? e.accountNo() : "—",
+                    e.details(),
+                    e.clientId()))
             .toList();
     return new PageResponse<>(
         rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());
@@ -576,15 +575,14 @@ public class AdminAuditLogPageController {
     }
     List<AuditRowView> rows =
         page.content().stream()
-            .map(
-                e ->
-                    new AuditRowView(
-                        e.occurredAt(),
-                        e.actorHandle(),
-                        prefix + e.eventType(),
-                        e.subjectLabel() != null ? e.subjectLabel() : "—",
-                        e.details(),
-                        e.clientId()))
+            .map(e ->
+                new AuditRowView(
+                    e.occurredAt(),
+                    e.actorHandle(),
+                    prefix + e.eventType(),
+                    e.subjectLabel() != null ? e.subjectLabel() : "—",
+                    e.details(),
+                    e.clientId()))
             .toList();
     return new PageResponse<>(
         rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());

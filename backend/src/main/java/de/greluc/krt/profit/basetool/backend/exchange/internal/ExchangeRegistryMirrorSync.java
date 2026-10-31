@@ -219,18 +219,17 @@ public class ExchangeRegistryMirrorSync {
     }
     try {
       Boolean written =
-          requiresNew.execute(
-              _ -> {
-                lockSettings();
-                ExchangeRegistrySnapshot truth = load();
-                clientGauges.update(truth);
-                Optional<ExchangeRegistrySnapshot> mirrored = mirror.read();
-                if (mirrored.filter(value -> value.equals(truth)).isPresent()) {
-                  return false;
-                }
-                mirror.write(truth, settingsRepository.nextRevision());
-                return true;
-              });
+          requiresNew.execute(_ -> {
+            lockSettings();
+            ExchangeRegistrySnapshot truth = load();
+            clientGauges.update(truth);
+            Optional<ExchangeRegistrySnapshot> mirrored = mirror.read();
+            if (mirrored.filter(value -> value.equals(truth)).isPresent()) {
+              return false;
+            }
+            mirror.write(truth, settingsRepository.nextRevision());
+            return true;
+          });
       boolean wrote = Boolean.TRUE.equals(written);
       count(phase, wrote ? MetricNames.OUTCOME_WRITTEN : MetricNames.OUTCOME_UNCHANGED);
       return wrote;

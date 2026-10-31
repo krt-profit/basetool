@@ -63,17 +63,16 @@ public final class BoundProperties {
   public static <T> T bind(@NotNull Class<T> type, @NotNull Map<String, ?> values) {
     String prefix = prefixOf(type);
     Map<String, Object> source = new LinkedHashMap<>();
-    values.forEach(
-        (key, value) -> {
-          if (value instanceof Collection<?> list) {
-            int i = 0;
-            for (Object element : list) {
-              source.put(prefix + "." + key + "[" + i++ + "]", String.valueOf(element));
-            }
-          } else {
-            source.put(prefix + "." + key, String.valueOf(value));
-          }
-        });
+    values.forEach((key, value) -> {
+      if (value instanceof Collection<?> list) {
+        int i = 0;
+        for (Object element : list) {
+          source.put(prefix + "." + key + "[" + i++ + "]", String.valueOf(element));
+        }
+      } else {
+        source.put(prefix + "." + key, String.valueOf(value));
+      }
+    });
     return new Binder(new MapConfigurationPropertySource(source))
         .bindOrCreate(prefix, Bindable.of(type));
   }

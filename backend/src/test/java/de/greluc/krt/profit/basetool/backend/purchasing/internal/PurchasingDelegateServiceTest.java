@@ -161,12 +161,11 @@ class PurchasingDelegateServiceTest {
         .thenReturn(Optional.empty());
     when(authHelperService.currentUserId()).thenReturn(Optional.of(actor));
     when(delegateRepository.saveAndFlush(any(PurchasingDelegate.class)))
-        .thenAnswer(
-            invocation -> {
-              PurchasingDelegate saved = invocation.getArgument(0);
-              saved.setId(delegateId);
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          PurchasingDelegate saved = invocation.getArgument(0);
+          saved.setId(delegateId);
+          return saved;
+        });
     when(userRepository.findAllById(any())).thenReturn(List.of(user(memberId, "Alice")));
     Instant until = Instant.now().plus(Duration.ofDays(30));
 
@@ -212,14 +211,13 @@ class PurchasingDelegateServiceTest {
         .thenReturn(Optional.of(expired));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(actor));
     when(delegateRepository.saveAndFlush(any(PurchasingDelegate.class)))
-        .thenAnswer(
-            invocation -> {
-              PurchasingDelegate saved = invocation.getArgument(0);
-              if (saved.getId() == null) {
-                saved.setId(UUID.randomUUID());
-              }
-              return saved;
-            });
+        .thenAnswer(invocation -> {
+          PurchasingDelegate saved = invocation.getArgument(0);
+          if (saved.getId() == null) {
+            saved.setId(UUID.randomUUID());
+          }
+          return saved;
+        });
 
     service.appoint(new AppointDelegateRequest(memberId, null, null));
 

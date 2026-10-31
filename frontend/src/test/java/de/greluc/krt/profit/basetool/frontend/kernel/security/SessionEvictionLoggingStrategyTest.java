@@ -90,11 +90,10 @@ class SessionEvictionLoggingStrategyTest {
     assertThat(response.getContentAsString()).isEqualTo(SPRING_DEFAULT_EXPIRED_BODY);
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            logged -> {
-              assertThat(logged.getLevel()).isEqualTo(Level.WARN);
-              assertThat(logged.getFormattedMessage()).contains(String.valueOf(CAP)).contains(sub);
-            });
+        .satisfies(logged -> {
+          assertThat(logged.getLevel()).isEqualTo(Level.WARN);
+          assertThat(logged.getFormattedMessage()).contains(String.valueOf(CAP)).contains(sub);
+        });
   }
 
   /**
@@ -113,13 +112,12 @@ class SessionEvictionLoggingStrategyTest {
 
     assertThat(appender.list)
         .singleElement()
-        .satisfies(
-            logged -> {
-              assertThat(logged.getFormattedMessage())
-                  .doesNotContain("PilotCallsign")
-                  .doesNotContain("session-id-4711");
-              assertThat(logged.getFormattedMessage()).contains("unknown");
-            });
+        .satisfies(logged -> {
+          assertThat(logged.getFormattedMessage())
+              .doesNotContain("PilotCallsign")
+              .doesNotContain("session-id-4711");
+          assertThat(logged.getFormattedMessage()).contains("unknown");
+        });
   }
 
   private static SessionInformationExpiredEvent event(MockHttpServletResponse response) {

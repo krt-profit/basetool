@@ -234,8 +234,8 @@ public abstract class InventoryItemMapper {
   }
 
   /**
-   * The still-unallocated mission remainder of an entry ({@code amount − Σ slice amounts}), SCU-
-   * rounded; the value the UI renders as the mission rest-chip.
+   * The still-unallocated mission remainder of an entry ({@code amount − Σ slice amounts}),
+   * SCU-rounded; the value the UI renders as the mission rest-chip.
    *
    * @param item the entry whose mission remainder to compute; never {@code null}.
    * @return the rounded remainder.

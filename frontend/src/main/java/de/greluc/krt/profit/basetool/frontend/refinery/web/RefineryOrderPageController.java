@@ -513,10 +513,9 @@ public class RefineryOrderPageController {
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
     var seedNamesFuture =
-        parallelPageLoader.loadAsync(
-            () ->
-                resolveSeedUserNames(
-                    boundForm.getOwnerId() == null ? List.of() : List.of(boundForm.getOwnerId())));
+        parallelPageLoader.loadAsync(() ->
+            resolveSeedUserNames(
+                boundForm.getOwnerId() == null ? List.of() : List.of(boundForm.getOwnerId())));
     var roundingFuture = parallelPageLoader.loadAsync(this::fetchRoundingMode);
     var yieldsFuture =
         parallelPageLoader.loadAsync(() -> fetchYieldsForLocation(preselectedLocationId));
@@ -1163,11 +1162,10 @@ public class RefineryOrderPageController {
     log.debug("Reachable authorities: {}", reachableAuthorities);
     boolean result =
         reachableAuthorities.stream()
-            .anyMatch(
-                a ->
-                    a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                        || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+            .anyMatch(a ->
+                a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
+                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
+                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
       UserDto me =
           SectionFallback.load(log, "refinery-logistician-flag", refineryClient::currentUser, null);
