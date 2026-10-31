@@ -37,7 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface over the single shared announcement: public {@code GET}, {@code GET /admin} that
- * returns the record even when blank, and ADMIN/OFFICER-only PUT/DELETE. The class-level {@code
+ * returns the record even when blank, and ADMIN-only PUT/DELETE. The class-level {@code
  * isAuthenticated()} gate is the floor for every endpoint (REQ-SEC-052).
  */
 @RestController

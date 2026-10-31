@@ -46,8 +46,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the job-type reference table. Reads need authentication; mutations are
- * OFFICER/ADMIN; activate is ADMIN-only.
+ * REST surface for the job-type reference table. Reads need authentication; mutations and activate
+ * are ADMIN-only.
  *
  * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
  * gate takes precedence (REQ-SEC-052).

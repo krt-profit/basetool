@@ -2016,11 +2016,10 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void officer_canAccess() {
+    void withoutAnOversightSeat_isDenied() {
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
 
-      assertTrue(service.canAccessBlueprintOverview());
+      assertFalse(service.canAccessBlueprintOverview());
     }
 
     @Test
@@ -2029,7 +2028,6 @@ class OwnerScopeServiceTest {
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
@@ -2042,7 +2040,6 @@ class OwnerScopeServiceTest {
       OrgUnitMembership logisticianStaffel = staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID);
       logisticianStaffel.setLogistician(true);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(logisticianStaffel));
@@ -2053,7 +2050,6 @@ class OwnerScopeServiceTest {
     @Test
     void anonymous_isDenied() {
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.empty());
 
       assertFalse(service.canAccessBlueprintOverview());
@@ -2064,7 +2060,6 @@ class OwnerScopeServiceTest {
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
       bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(bereichSeat));
@@ -2076,7 +2071,6 @@ class OwnerScopeServiceTest {
     void olMember_canAccess() {
       OrgUnitMembership olSeat = olMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(olSeat));
@@ -2088,7 +2082,6 @@ class OwnerScopeServiceTest {
     void flaglessBereichSeat_isDenied() {
       OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(flaglessBereich));
