@@ -249,6 +249,8 @@
 /api/proxy/supply/donations/{id}/decline POST -> SupplyProxyController#decline gate=class:isAuthenticated() layout=no
 /api/proxy/supply/donations/{id}/receive POST -> SupplyProxyController#receive gate=class:isAuthenticated() layout=no
 /api/proxy/supply/donations/{id}/withdraw POST -> SupplyProxyController#withdraw gate=class:isAuthenticated() layout=no
+/api/proxy/supply/me/donation-sources GET -> SupplyProxyController#donationSources gate=class:isAuthenticated() layout=no
+/api/proxy/supply/me/donation-targets GET -> SupplyProxyController#donationTargets gate=class:isAuthenticated() layout=no
 /api/proxy/supply/needs POST -> SupplyProxyController#createNeed gate=class:isAuthenticated() layout=no
 /api/proxy/supply/needs/{id} PUT -> SupplyProxyController#updateNeed gate=class:isAuthenticated() layout=no
 /api/proxy/supply/needs/{id}/pause POST -> SupplyProxyController#pauseNeed gate=class:isAuthenticated() layout=no
