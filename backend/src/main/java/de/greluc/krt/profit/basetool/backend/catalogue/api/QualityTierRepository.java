@@ -55,7 +55,8 @@ public interface QualityTierRepository extends JpaRepository<QualityTier, UUID> 
   Optional<QualityTier> findByMinQuality(int minQuality);
 
   /**
-   * Counts every requirement line, item material and claim that references the tier.
+   * Counts every requirement line, item material, claim and minimum stock level that references the
+   * tier.
    *
    * @param tierId the tier
    * @return the number of references; {@code 0} means the tier may be deleted
@@ -65,6 +66,7 @@ public interface QualityTierRepository extends JpaRepository<QualityTier, UUID> 
       SELECT (SELECT COUNT(m) FROM JobOrderMaterial m WHERE m.qualityTier.id = :tierId)
            + (SELECT COUNT(im) FROM JobOrderItemMaterial im WHERE im.qualityTier.id = :tierId)
            + (SELECT COUNT(c) FROM MaterialClaim c WHERE c.qualityTier.id = :tierId)
+           + (SELECT COUNT(l) FROM StockLevel l WHERE l.qualityTier.id = :tierId)
       FROM QualityTier t WHERE t.id = :tierId
       """)
   Long countReferences(@Param("tierId") UUID tierId);

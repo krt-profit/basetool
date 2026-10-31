@@ -1,7 +1,8 @@
 # ADR-0302 — Minimum stock levels allocate free stock exclusively, top tier down
 
-- **Status:** Accepted — implementation pending (the table, its migration and the requirements it
-  drives are not built yet).
+- **Status:** Accepted — partly implemented: the table, material levels, the allocation, the API
+  and the „Mindestbestände“ tab are built; game items, the requested amount, the lifecycle, the
+  notification and the gauge are pending.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** REQ-INV-067 · REQ-INV-068 · REQ-NOTIF-030 · spec [`supply.md`](../specs/supply.md)

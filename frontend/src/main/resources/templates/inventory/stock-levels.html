@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{inventory.stockLevels.title} + ' - ' + ${appTitle}">Mindestbest&auml;nde - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/inventory/stock-levels.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{inventory.stockLevels.title},
+        count=null, actions=~{::stock-level-actions})}">
+        <th:block th:ref="stock-level-actions">
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(active='stock-levels')}"></th:block>
+            <button type="button" class="btn btn--cta" data-trigger="stock-level-open-create" data-testid="stock-level-create"
+                    th:if="${!#lists.isEmpty(maintainableUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{inventory.stockLevels.create}">Mindestbestand anlegen</span></button>
+        </th:block>
+    </th:block>
+
+    <div id="stock-level-results">
+    <th:block th:fragment="stockLevelResults">
+        <div th:if="${stockLevelsFailed}" class="alert alert-danger" role="alert" th:text="#{inventory.stockLevels.loadError}">Die Mindestbest&auml;nde konnten nicht geladen werden.</div>
+        <section th:each="group : ${unitLevels}" class="card card--flush stock-level-unit" data-testid="stock-level-unit"
+                 th:data-unit-id="${group.unit().id()}">
+            <h2 class="stock-level-unit__title" th:text="${group.unit().name()}">Spezialkommando ARGON</h2>
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{inventory.stockLevels.col.material}">Material</th>
+                            <th th:text="#{inventory.stockLevels.col.tier}">Qualit&auml;tsstufe</th>
+                            <th class="num" th:text="#{inventory.stockLevels.col.minimum}">Minimum</th>
+                            <th class="num" th:text="#{inventory.stockLevels.col.target}">Ziel</th>
+                            <th class="num" th:text="#{inventory.stockLevels.col.free}">Frei</th>
+                            <th th:text="#{inventory.stockLevels.col.fill}">F&uuml;llstand</th>
+                            <th class="cell-status" th:text="#{inventory.stockLevels.col.status}">Status</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{inventory.stockLevels.col.actions}">Aktionen</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="l : ${group.levels()}" data-testid="stock-level-row" th:data-level-id="${l.id()}"
+                            th:with="qt=${l.material().quantityType()}">
+                            <td><span class="cell-title" th:text="${l.material().name()}">Quantanium</span></td>
+                            <td th:attr="data-label=#{inventory.stockLevels.col.tier}">
+                                <span th:if="${l.qualityTier() == null}" th:text="#{inventory.stockLevels.anyTier}">Jede Qualit&auml;t</span>
+                                <span th:if="${l.qualityTier() != null}" th:text="${l.qualityTier().label(#locale)}">Gut (650+)</span>
+                                <span th:if="${l.tierInactive()}" class="chip chip--muted" data-testid="stock-level-tier-inactive"
+                                      th:text="#{inventory.stockLevels.tierInactive}">Stufe inaktiv</span>
+                            </td>
+                            <td class="num" th:attr="data-label=#{inventory.stockLevels.col.minimum}"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.minimum()}, ${qt})}">10 SCU</th:block></td>
+                            <td class="num" th:attr="data-label=#{inventory.stockLevels.col.target}"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.target()}, ${qt})}">20 SCU</th:block></td>
+                            <td class="num" th:attr="data-label=#{inventory.stockLevels.col.free}" data-testid="stock-level-free"><th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.allocated()}, ${qt})}">6 SCU</th:block></td>
+                            <td th:attr="data-label=#{inventory.stockLevels.col.fill}">
+                                <div class="meter stock-level-meter" aria-hidden="true">
+                                    <i th:if="${l.low()}" class="meter__fill--danger" th:attr="data-krtm-width=${l.fillPercent()}"></i>
+                                    <i th:unless="${l.low()}" class="meter__fill--success" th:attr="data-krtm-width=${l.fillPercent() > 100 ? 100 : l.fillPercent()}"></i>
+                                </div>
+                                <span class="cell-sub" th:text="#{inventory.stockLevels.fillPercent(${l.fillPercent()})}">60 %</span>
+                                <span th:if="${l.shortfall() > 0}" class="cell-sub" data-testid="stock-level-shortfall"><span th:text="#{inventory.stockLevels.shortfall}">Fehlmenge</span> <th:block th:replace="~{inventory/fragments/stock-amount :: stockAmount(${l.shortfall()}, ${qt})}">4 SCU</th:block></span>
+                            </td>
+                            <td class="cell-status">
+                                <span th:if="${l.low()}" class="chip chip--danger" data-testid="stock-level-low" th:text="#{inventory.stockLevels.status.low}">Niedrig</span>
+                                <span th:unless="${l.low()}" class="chip chip--success" th:text="#{inventory.stockLevels.status.ok}">Ausreichend</span>
+                            </td>
+                            <td class="cell-actions">
+                                <div class="stock-level-actions" th:if="${l.editable()}">
+                                    <button type="button" class="btn btn-ghost btn-icon" data-trigger="stock-level-edit" data-testid="stock-level-edit"
+                                            th:data-level-id="${l.id()}" th:data-version="${l.version()}"
+                                            th:data-tier-id="${l.qualityTier() != null ? l.qualityTier().id() : ''}"
+                                            th:data-minimum="${l.minimum()}" th:data-target="${l.target()}"
+                                            th:data-entry="${l.material().name()}"
+                                            th:attr="title=#{inventory.stockLevels.edit},aria-label=#{inventory.stockLevels.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                    <button type="button" class="btn btn-ghost btn-icon" data-trigger="stock-level-delete" data-testid="stock-level-delete"
+                                            th:data-level-id="${l.id()}" th:data-version="${l.version()}"
+                                            th:attr="title=#{inventory.stockLevels.delete},aria-label=#{inventory.stockLevels.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <th:block th:if="${#lists.isEmpty(unitLevels) and !stockLevelsFailed}">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.stockLevels.empty.title', textKey='inventory.stockLevels.empty.text')}"></th:block>
+        </th:block>
+    </th:block>
+    </div>
+
+    <th:block th:if="${!#lists.isEmpty(maintainableUnits)}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='stock-level-modal', titleKey='inventory.stockLevels.modal.title', titleId='stock-level-modal-title', body=~{::stock-level-modal-body})}">
+        <th:block th:ref="stock-level-modal-body">
+            <form id="stock-level-form" class="no-track" novalidate>
+                <div class="krt-modal-body">
+                    <input type="hidden" id="stock-level-id">
+                    <input type="hidden" id="stock-level-version">
+                    <p id="stock-level-entry" class="stock-level-entry" hidden></p>
+                    <div class="form-group" id="stock-level-unit-row">
+                        <label for="stock-level-unit" th:text="#{inventory.stockLevels.field.unit}">Einheit</label>
+                        <select id="stock-level-unit" required>
+                            <option th:each="u : ${maintainableUnits}" th:value="${u.id()}" th:text="${u.name()}">ARGON</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="stock-level-material-row">
+                        <label for="stock-level-material" th:text="#{inventory.stockLevels.field.material}">Material</label>
+                        <select id="stock-level-material" required>
+                            <option th:each="m : ${materials}" th:value="${m.id()}" th:text="${m.name()}">Quantanium</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stock-level-tier" th:text="#{inventory.stockLevels.field.tier}">Qualit&auml;tsstufe</label>
+                        <select id="stock-level-tier">
+                            <option value="" th:text="#{inventory.stockLevels.anyTier}">Jede Qualit&auml;t</option>
+                            <option th:each="t : ${tiers}" th:value="${t.id()}" th:text="${t.label(#locale)}">Gut (650+)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stock-level-minimum" th:text="#{inventory.stockLevels.field.minimum}">Minimum</label>
+                        <input type="text" data-number-input id="stock-level-minimum" min="0.001" step="any" inputmode="decimal" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="stock-level-target" th:text="#{inventory.stockLevels.field.target}">Ziel</label>
+                        <input type="text" data-number-input id="stock-level-target" min="0.001" step="any" inputmode="decimal">
+                        <p class="form-hint" th:text="#{inventory.stockLevels.field.target.hint}">Leer lassen, um das Minimum als Ziel zu nehmen.</p>
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="stock-level-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="stock-level-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.stockLevels.save}">Speichern</span></button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+    </th:block>
+</main>
+</th:block>
+
+<th:block th:fragment="pageTail">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    var stockLevelI18n = {
+        saved:         /*[[#{inventory.stockLevels.saved}]]*/ 'Mindestbestand gespeichert.',
+        deleted:       /*[[#{inventory.stockLevels.deleted}]]*/ 'Mindestbestand entfernt.',
+        error:         /*[[#{inventory.stockLevels.error}]]*/ 'Der Mindestbestand konnte nicht gespeichert werden.',
+        deleteTitle:   /*[[#{inventory.stockLevels.delete.confirm.title}]]*/ 'Mindestbestand entfernen?',
+        deleteText:    /*[[#{inventory.stockLevels.delete.confirm.text}]]*/ 'Der Mindestbestand wird entfernt.',
+        deleteAction:  /*[[#{inventory.stockLevels.delete}]]*/ 'Entfernen',
+        refreshError:  /*[[#{inventory.stockLevels.loadError}]]*/ 'Die Mindestbestände konnten nicht geladen werden.'
+    };
+    var stockLevelConflict = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+</script>
+<script type="module" th:src="@{/js/inventory/stock-levels.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>
