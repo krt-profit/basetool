@@ -450,7 +450,7 @@
                                                 th:data-participant-id="${p?.id}"
                                                 th:data-original-value="${p?.payoutPreference?.name()}"
                                                 data-trigger="mission-update-payout"
-                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
+                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
                                             <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
                                             <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
                                         </select>

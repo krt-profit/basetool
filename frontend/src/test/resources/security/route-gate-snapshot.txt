@@ -388,12 +388,12 @@
 /missions/{id}/finance-entries/{entryId}/ajax PUT produces=[application/json] -> MissionFinancePageController#updateFinanceEntryAjax gate=class:isAuthenticated() layout=yes
 /missions/{id}/finance-entries/{entryId}/delete POST -> MissionFinancePageController#deleteFinanceEntry gate=class:isAuthenticated() layout=yes
 /missions/{id}/finance-entries/{entryId}/update POST -> MissionFinancePageController#updateFinanceEntry gate=class:isAuthenticated() layout=yes
-/missions/{id}/frequencies POST -> MissionWriteController#addOrUpdateFrequency gate=method:hasRole('MISSION_MANAGER') layout=yes
-/missions/{id}/frequencies/ajax PUT produces=[application/json] -> MissionWriteController#addOrUpdateFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
-/missions/{id}/frequencies/custom/ajax POST produces=[application/json] -> MissionWriteController#addCustomFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
-/missions/{id}/frequencies/custom/{frequencyId}/ajax PUT produces=[application/json] -> MissionWriteController#updateCustomFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
-/missions/{id}/frequencies/{frequencyId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
-/missions/{id}/frequencies/{frequencyId}/delete POST -> MissionWriteController#deleteFrequency gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/frequencies POST -> MissionWriteController#addOrUpdateFrequency gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/ajax PUT produces=[application/json] -> MissionWriteController#addOrUpdateFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/custom/ajax POST produces=[application/json] -> MissionWriteController#addCustomFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/custom/{frequencyId}/ajax PUT produces=[application/json] -> MissionWriteController#updateCustomFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/{frequencyId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/{frequencyId}/delete POST -> MissionWriteController#deleteFrequency gate=method:@missionManagerGate.isGranted() layout=yes
 /missions/{id}/managers/{userId} DELETE -> MissionWriteController#removeManager gate=class:isAuthenticated() layout=yes
 /missions/{id}/managers/{userId} POST -> MissionWriteController#addManager gate=class:isAuthenticated() layout=yes
 /missions/{id}/objectives/ajax POST produces=[application/json] -> MissionWriteController#addObjectiveAjax gate=class:isAuthenticated() layout=yes
@@ -443,16 +443,16 @@
 /notifications/{id} DELETE headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#delete gate=class:isAuthenticated() layout=yes
 /notifications/{id}/read POST headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#markRead gate=class:isAuthenticated() layout=yes
 /operations GET -> OperationPageController#listOperations gate=class:isAuthenticated() layout=yes
-/operations/create POST -> OperationPageController#createOperation gate=method:hasRole('MISSION_MANAGER') layout=yes
-/operations/create POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#createOperationAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/operations/create POST -> OperationPageController#createOperation gate=method:@missionManagerGate.isGranted() layout=yes
+/operations/create POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#createOperationAjax gate=method:@missionManagerGate.isGranted() layout=yes
 /operations/markdown-preview POST produces=[text/html] -> OperationPageController#markdownPreview gate=class:isAuthenticated() layout=yes
 /operations/{id} GET -> OperationPageController#operationDetails gate=class:isAuthenticated() layout=yes
 /operations/{id}/delete POST -> OperationPageController#deleteOperation gate=method:hasRole('ADMIN') layout=yes
 /operations/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#deleteOperationAjax gate=method:hasRole('ADMIN') layout=yes
 /operations/{id}/finance/{missionId} GET -> OperationPageController#operationMissionFinance gate=class:isAuthenticated() layout=yes
-/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:hasRole('MISSION_MANAGER') layout=yes
-/operations/{id}/update POST -> OperationPageController#updateOperation gate=method:hasRole('MISSION_MANAGER') layout=yes
-/operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:@missionManagerGate.isGranted() layout=yes
+/operations/{id}/update POST -> OperationPageController#updateOperation gate=method:@missionManagerGate.isGranted() layout=yes
+/operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:@missionManagerGate.isGranted() layout=yes
 /orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
 /orders/create GET -> JobOrderPageController#viewCreateForm gate=class:isAuthenticated() layout=yes
 /orders/create POST -> JobOrderWriteController#createOrder gate=class:isAuthenticated() layout=yes
@@ -465,6 +465,7 @@
 /orders/material-demand GET -> JobOrderMaterialDemandPageController#viewMaterialDemand gate=method:isAuthenticated() layout=yes
 /orders/{id} DELETE -> JobOrderWriteController#deleteOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/{id} GET -> JobOrderPageController#viewOrderDetail gate=class:isAuthenticated() layout=yes
+/orders/{id}/assignee-candidates GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderAssigneeCandidateProxyController#assigneeCandidates gate=class:isAuthenticated() layout=no
 /orders/{id}/assignees POST -> JobOrderWriteController#addAssignee gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId} DELETE -> JobOrderWriteController#removeAssignee gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId}/note DELETE -> JobOrderWriteController#deleteAssigneeNote gate=class:isAuthenticated() layout=yes

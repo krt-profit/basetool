@@ -122,6 +122,7 @@ class OrdersListPatternRenderTest {
             Instant.now(),
             1L,
             null,
+            null,
             false);
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
   }

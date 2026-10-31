@@ -50,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -95,7 +94,6 @@ public class MaterialClaimService implements ClaimBucketSource {
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
-  private final OrgUnitAccessPolicy orgUnitAccessPolicy;
   private final AuditRecorder auditRecorder;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
@@ -600,12 +598,13 @@ public class MaterialClaimService implements ClaimBucketSource {
 
   /**
    * Enforces the claim permission matrix: an admin or a logistician (incl. lead) of the responsible
-   * SK may manage any claim on the order; others only claims for a squadron they may edit.
+   * SK may manage any claim on the order; others only claims for a squadron they are Logistician
+   * of.
    *
    * @param order the order whose responsible SK defines the elevated authority.
    * @param claimingOrgUnitId the squadron the claim is for.
    * @throws AccessDeniedException when the caller is neither a logistician/lead of the responsible
-   *     SK nor allowed to act for this squadron.
+   *     SK nor Logistician of this squadron.
    */
   private void assertCanManage(JobOrder order, UUID claimingOrgUnitId) {
     if (authHelperService.isAdmin()) {
@@ -614,7 +613,7 @@ public class MaterialClaimService implements ClaimBucketSource {
     UUID responsibleSkId = order.getResponsibleOrgUnit().getId();
     boolean managesResponsibleSk =
         ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");
-    boolean managesOwnSquadron = orgUnitAccessPolicy.canEditOrgUnit(claimingOrgUnitId);
+    boolean managesOwnSquadron = ownerScopeService.canActAsLogisticianIn(claimingOrgUnitId);
     if (!managesResponsibleSk && !managesOwnSquadron) {
       throw new AccessDeniedException(
           "You may only manage claims for your own squadron, or any claim as a logistician or lead"

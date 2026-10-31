@@ -266,8 +266,9 @@ public class JobOrderPageController {
 
   /**
    * Renders the order detail page ({@code /orders/{id}}). Loads the order plus the auxiliary
-   * material-status and assignee lists and exposes the role-derived edit flags so the template
-   * stays free of inline expression checks.
+   * material-status and assignee lists and exposes the per-order edit flags so the template stays
+   * free of inline expression checks. The backend decides per order who may read it, an assignee
+   * outside the order's unit included (REQ-ORDERS-047); a refused read redirects to the list.
    *
    * @return the {@code order-detail} view name
    */
@@ -275,18 +276,9 @@ public class JobOrderPageController {
   @GetMapping("/{id}")
   public String viewOrderDetail(
       @PathVariable UUID id,
-      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       Model model,
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
-    boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
-    if (!canViewJobOrders && !canViewOwnJobOrders) {
-      return fragment != null
-          ? "joborder/orders-detail :: fragmentError"
-          : "redirect:/orders/create";
-    }
-    model.addAttribute("requesterView", requesterView);
     if (!SectionFallback.run(
         log, "job-order-detail", () -> addOrderDetail(id, model, principal, fragment))) {
       if (fragment != null) {
@@ -337,6 +329,7 @@ public class JobOrderPageController {
 
     boolean canAssign = detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
+    model.addAttribute("canManageAssignees", !requesterView && order.callerMayManageAssignees());
     if (requesterView || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }

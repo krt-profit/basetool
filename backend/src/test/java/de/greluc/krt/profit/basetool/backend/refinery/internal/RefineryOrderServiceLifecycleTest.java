@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -62,6 +63,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -242,7 +244,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getUserRefineryOrdersScoped_adminAllScope_forwardsAdminAllScopeToScopedQuery() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, true, null, Set.of(), pageable))
           .thenReturn(page);
@@ -253,10 +255,10 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
-    void getUserRefineryOrdersScoped_nonAdminMemberUnion_forwardsOnlyTheCallersOrgUnits() {
+    void getUserRefineryOrdersScoped_nonAdmin_forwardsOnlyTheLogisticianUnits() {
       UUID callerStaffelA = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffelA)));
       when(refineryOrderRepository.findByOwnerIdScoped(
               OWNER_ID, false, null, Set.of(callerStaffelA), pageable))
@@ -271,7 +273,7 @@ class RefineryOrderServiceLifecycleTest {
     void getUserRefineryOrdersScoped_pinnedCaller_forwardsActiveOrgUnitId() {
       UUID pinned = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, pinned, Set.of()));
       when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, false, pinned, Set.of(), pageable))
           .thenReturn(page);
@@ -343,33 +345,40 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
-    void getMissionRefineryOrdersScoped_passesCallerScope_soForeignSquadronOrdersAreUnreachable() {
+    void getMissionRefineryOrdersForCaller_listsTheLogisticianUnitsAndTheCallersOwnOrdersOnce() {
       UUID squadronA = UUID.randomUUID();
-      UUID squadronB = UUID.randomUUID();
-      ScopePredicate squadronAscope = new ScopePredicate(false, null, Set.of(squadronA));
-      when(ownerScopeService.currentScopePredicate()).thenReturn(squadronAscope);
-      RefineryOrder squadronAorder = new RefineryOrder();
+      when(ownerScopeService.currentLogisticianScope())
+          .thenReturn(new ScopePredicate(false, null, Set.of(squadronA)));
+      RefineryOrder inUnitA = orderWithId();
+      RefineryOrder ownElsewhere = orderWithId();
       when(refineryOrderRepository.findByMissionIdScoped(
               MISSION_ID, false, null, Set.of(squadronA)))
-          .thenReturn(List.of(squadronAorder));
+          .thenReturn(List.of(inUnitA));
+      when(refineryOrderRepository.findByMissionIdAndOwnerId(MISSION_ID, OWNER_ID))
+          .thenReturn(List.of(inUnitA, ownElsewhere));
 
-      List<RefineryOrder> result = service.getMissionRefineryOrdersScoped(MISSION_ID);
+      List<RefineryOrder> result = service.getMissionRefineryOrdersForCaller(MISSION_ID, OWNER_ID);
 
-      assertEquals(List.of(squadronAorder), result);
-      verify(refineryOrderRepository)
-          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronA));
-      verify(refineryOrderRepository, never())
-          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronB));
-      verify(refineryOrderRepository, never()).findByMissionId(any(UUID.class));
+      assertEquals(List.of(inUnitA, ownElsewhere), result);
     }
 
     @Test
-    void getMissionRefineryOrders_filteredByOwner_delegatesToCombinedQuery() {
-      RefineryOrder o = new RefineryOrder();
+    void getMissionRefineryOrdersForCaller_withoutALogisticianGrant_returnsOnlyTheOwnOrders() {
+      when(ownerScopeService.currentLogisticianScope())
+          .thenReturn(new ScopePredicate(false, null, Set.of()));
+      RefineryOrder own = orderWithId();
       when(refineryOrderRepository.findByMissionIdAndOwnerId(MISSION_ID, OWNER_ID))
-          .thenReturn(List.of(o));
+          .thenReturn(List.of(own));
 
-      assertEquals(List.of(o), service.getMissionRefineryOrders(MISSION_ID, OWNER_ID));
+      assertEquals(List.of(own), service.getMissionRefineryOrdersForCaller(MISSION_ID, OWNER_ID));
+      verify(refineryOrderRepository, never())
+          .findByMissionIdScoped(any(), anyBoolean(), any(), any());
+    }
+
+    private static RefineryOrder orderWithId() {
+      RefineryOrder order = new RefineryOrder();
+      order.setId(UUID.randomUUID());
+      return order;
     }
   }
 
@@ -432,6 +441,59 @@ class RefineryOrderServiceLifecycleTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
+    }
+
+    @Test
+    void onBehalf_stampedUnitWithoutALogisticianGrant_isRefused() {
+      Squadron unitB = new Squadron();
+      unitB.setId(UUID.randomUUID());
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
+          .thenReturn(unitB);
+      doThrow(new AccessDeniedException("no"))
+          .when(ownerScopeService)
+          .requireLogisticianInOwner(unitB);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () ->
+              service.createRefineryOrderOnBehalf(
+                  OWNER_ID, freshOrderWithLocation(), unitB.getId()));
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void onBehalf_ownerlessStampForANonAdmin_isRefused() {
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, null)).thenReturn(null);
+      doThrow(new AccessDeniedException("no"))
+          .when(ownerScopeService)
+          .requireLogisticianInOwner(null);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () -> service.createRefineryOrderOnBehalf(OWNER_ID, freshOrderWithLocation(), null));
+    }
+
+    @Test
+    void onBehalf_stampedUnitWithALogisticianGrant_isCreated() {
+      Squadron unitA = new Squadron();
+      unitA.setId(UUID.randomUUID());
+      Location cityLoc = new Location();
+      cityLoc.setId(LOCATION_ID);
+      City city = new City();
+      city.setHasRefineryTerminal(true);
+      cityLoc.setCity(city);
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitA.getId()))
+          .thenReturn(unitA);
+      when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
+      when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      RefineryOrder result =
+          service.createRefineryOrderOnBehalf(OWNER_ID, freshOrderWithLocation(), unitA.getId());
+
+      assertSame(unitA, result.getOwningOrgUnit());
     }
 
     @Test

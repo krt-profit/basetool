@@ -67,7 +67,7 @@
                             </td>
                             <td class="cell-actions">
                                 <div class="stock-level-actions" th:if="${l.editable()}">
-                                    <th:block th:if="${l.low()}">
+                                    <th:block th:if="${l.low() and l.material() != null}">
                                         <a class="btn btn-outline btn-xs" data-testid="stock-level-order"
                                            th:href="@{/orders/create(materialId=${l.material().id()},minQuality=${l.qualityTier() != null ? l.qualityTier().minQuality() : 0},amount=${l.shortfall()},requestingOrgUnitId=${l.orgUnit().id()})}"
                                            th:text="#{inventory.stockLevels.action.order}">Auftrag anlegen</a>

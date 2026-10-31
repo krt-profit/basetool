@@ -357,9 +357,7 @@ public class OperationController {
    */
   @PutMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
-      "hasRole('"
-          + Roles.MISSION_MANAGER
-          + "') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or"
+      "@operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or"
           + " @operationAccessPolicy.canClearPayout(#id))")
   @Operation(
       summary = "Toggle the per-participant paid-out flag for an operation",
@@ -402,8 +400,12 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize(Roles.HAS_ROLE_MISSION_MANAGER)
-  @Operation(summary = "Create a new operation")
+  @PreAuthorize("@ownerScopeService.canActAsMissionManagerInActiveContext()")
+  @Operation(
+      summary = "Create a new operation",
+      description =
+          "Requires the MISSION_MANAGER grant in the unit that will own the operation; without a"
+              + " unit, in an Organisationsleitung or Bereich unit.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -426,8 +428,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize(
-      "hasRole('" + Roles.MISSION_MANAGER + "') and @operationAccessPolicy.canEditOperation(#id)")
+  @PreAuthorize("@operationAccessPolicy.canEditOperation(#id)")
   @Operation(
       summary = "Update an existing operation",
       description =

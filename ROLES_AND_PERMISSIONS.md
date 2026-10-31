@@ -472,6 +472,8 @@ somebody's Art. 15 request than to the member themselves.
 | Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Read the **cross-order material demand** (`/orders/material-demand`, REQ-ORDERS-034) (`isAuthenticated()` + `canViewJobOrders`)                                                                                                                                                                                                                                          |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician)                                                                                                                                                                                                                                                             |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
+| Enter **any active account** as an editor through the picker (members of the processing unit first, every other account marked with its unit), remove other editors, change their notes (`canManageAssignees`: the Logistician grant of the order's unit + `canEditJobOrder`; a Logistician of another unit who is a member of the order's unit does not qualify, REQ-ORDERS-014/047) |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Read a job order you are an **editor** of — in full, also outside your unit and without profit access; on it only your own note and removing yourself (the assignee grant of `canSeeJobOrder`, REQ-ORDERS-047) |   ✅⁶   |  ✅⁶  | ✅⁶  |   ✅⁶    |   ✅   |
 | Read the **blueprint coverage** of an item order (`canSeeJobOrderBlueprintOwners`)                                                                                                                                                                                                                                                                                       |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
 | Material overview / material collection / item stock / claim buckets of a job order (`isAuthenticated()` + `canSeeJobOrder`)                                                                                                                                                                                                                                             |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | View and — while fully undelivered — limitedly edit an order **your own org unit requested** (`GET /orders/requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`; `canViewOwnJobOrders` / `canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester`, REQ-ORDERS-023)                                                                                         |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
@@ -517,8 +519,16 @@ via the public queue gets `403`; the frontend hides the section. Admins without 
 with a pin only for the matching unit.
 ⁵ Self-or-Logistician rule (`verifyAssigneeAccess`): anyone who sees the job order
 may add/remove **themselves** and maintain **their own** note (max. 500
-characters); other people's entries/notes may only be changed by a Logistician+.
+characters); other people's entries/notes may only be changed by a Logistician of the order
+(`canManageAssignees`: the Logistician grant of the order's unit, within its edit scope).
 Notes are visible to everyone who sees the job order.
+⁶ The **assignee grant** (ADR-0301): an editor entry opens that one order to its holder, whatever
+the responsible unit, the profit gate, their memberships or the pin, for as long as the entry
+exists — a status change or leaving the unit does not end it. It shows the order in its detail and
+in „Alle", never in „Zu bearbeiten", and widens no other list. Every other write — status, lines,
+claims, handovers, production, someone else's entry — answers `403`; the owner panels stay
+redacted. Adding or removing an editor who is not a direct member of the processing unit is
+audited as `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `_REMOVED`.
 
 ### 3.4 Refinery
 
@@ -569,7 +579,8 @@ caller below `Member` on this surface: an account whose realm roles map to nothi
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
-³ Mission-Manager additionally only within their own Staffel scope (`canEditMission`); an
+³ A Mission-Manager grant counts only for the unit that owns the mission (`canEditMission`); an
+ownerless mission needs a grant in an Organisationsleitung or Bereich unit. An
 Officer's owner change needs officer reach in the mission's owning unit (`canChangeOwner`,
 REQ-SEC-065). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
 does not (§1.3). Which missions are in scope is `canSeeMission` — own Staffel, or any non-internal
@@ -618,8 +629,8 @@ of the manage row above.
 | Read operation (list/detail) (`isAuthenticated()` [+ `canSeeOperation`])                  |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read payout breakdown (`canSeeOperation`; escape-only caller sees **only their own row**) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read finances / finance-summary (`canSeeOperationLedger` — **scope only**, ADR-0150)      |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
-| Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])               |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)           |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| Create/edit operation (Mission Manager grant in the owning unit: `canEditOperation`) |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Mark payout as paid-out** (`canEditOperation`)                                          |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
 | **Revoke** paid-out (additionally `canClearPayout`: officer reach in the operation's unit)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
 | **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
@@ -641,10 +652,11 @@ of the manage row above.
 > (`canSeeOperationLedger`), and `/payouts` reduces an escape-only caller to their own row. Before
 > 2026-08-30 that caller received every participant's callsign, percentage, expenses, share,
 > donation, transfer fee, net payout and confirming officer.
-> Creating an ownerless operation is open to any Mission-Manager **without**
-> org unit (Bereichsleitung); editing it is allowed for any Mission-Manager,
-> deleting it for any admin (`canEditOperation` is a no-op for ownerless
-> operations, the endpoint's role gate carries the restriction).
+> Mission Manager powers apply **per unit**: a grant in unit A (own flag, officer rank or the cascaded
+> reach of a Bereich or Organisationsleitung seat) creates, edits and marks payouts for A's operations
+> only; creating stamps the pinned or picked unit and needs the grant there. An ownerless
+> (Bereichsleitung) operation or mission is managed only with a Mission Manager grant in an
+> Organisationsleitung or Bereich unit — a squadron Mission Manager does not — and deleted by admins.
 
 ### 3.7 Mission finances & profit
 
@@ -1233,7 +1245,7 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
 |:-------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------|:-------------------------------------------------------------------------------|
 | Home, Notifications, Profile (`/`, `/notifications`, `/profile`, `/profile/deletion-request`, `/profile/notification-preferences`, `/me/**`)                              | `isAuthenticated()` (`/` is public, §1)                                 | always                                                                         |
-| Missions, Operations (`/missions/**`, `/operations/**`), mission finance (`/missions/{id}/finance-entries`)                          | `isAuthenticated()`; mission delete `ADMIN`; operation create/edit/payout `MISSION_MANAGER`, delete `ADMIN`; frequency writes `MISSION_MANAGER` | always                                                                         |
+| Missions, Operations (`/missions/**`, `/operations/**`), mission finance (`/missions/{id}/finance-entries`)                          | `isAuthenticated()`; mission delete `ADMIN`; operation create/edit/payout `MISSION_MANAGER` grant in the owning unit, delete `ADMIN`; frequency writes `MISSION_MANAGER` (pin-aware flag) | always                                                                         |
 | Hangar, both tabs „Meine Schiffe" · „Org-Einheit" (`/hangar`, `/hangar/squadron`), Lager (`/inventory/**`), Raffinerie (`/refinery-orders/**`) | `isAuthenticated()`; Lager wipe `ADMIN`                                 | always                                                                         |
 | Materialbörse (`/materialboerse`)                                                                                                    | `hasRole('KRT_MEMBER')`                                                 | `KRT_MEMBER`                                                                   |
 | Aufträge (`/orders/**`, `/orders/material-demand`, item / material collection)                                                      | `isAuthenticated()`; order edit/claims `LOGISTICIAN`, handovers/unlink Logistician+ | „Aufträge" + „Materialbedarf" if `canViewJobOrders`, else „Meine Aufträge" if `canViewOwnJobOrders`, else „Auftrag anlegen" |
@@ -1282,21 +1294,13 @@ backend serves every member) but no control that writes.
   at least one unit (REQ-ROLE-007). The bank's global
   `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).
 
-### 7.2 External assignee of a job order (ADR-0301, REQ-ORDERS-047)
+### 7.2 Navigation of an external assignee (ADR-0301, REQ-ORDERS-040)
 
-A Logistician with access to an order may enter any active account as its assignee (Bearbeiter). An
-**external assignee** reaches the order only through that entry:
+The assignee grant itself is built (§3.3, footnote ⁶). Still planned:
 
 | Function | External assignee |
 | --- | --- |
-| Read the full order (materials, progress, assignees) | ✅ |
-| Edit their own assignee note | ✅ |
-| Remove themselves as assignee | ✅ |
-| Change status, lines or handovers; anything else on the order | ❌ |
 | See the „Aufträge“ link, with only the „Ich bearbeite“ segment, without profit access | ✅ |
-
-The grant lasts as long as the assignee entry exists, whatever the order's status; leaving the unit
-does not end it.
 
 ### 7.3 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 

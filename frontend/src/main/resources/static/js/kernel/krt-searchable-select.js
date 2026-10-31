@@ -783,7 +783,10 @@ function autoConfig(select) {
         hintText: d.comboboxHint || i18n.hint,
         invalidText: d.comboboxInvalid || i18n.invalid,
         loadingText: d.comboboxLoading || i18n.loading,
-        remoteSource: typeof remoteSource === 'function' ? remoteSource : undefined,
+        remoteSource:
+            typeof remoteSource === 'function'
+                ? (/** @type {string} */ query) => remoteSource(query, select)
+                : undefined,
     };
 }
 

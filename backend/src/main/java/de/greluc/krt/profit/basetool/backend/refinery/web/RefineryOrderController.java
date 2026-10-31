@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.refinery.web;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapper;
@@ -74,7 +74,7 @@ public class RefineryOrderController {
   private final RefineryOrderService refineryOrderService;
   private final UserService userService;
   private final RefineryOrderMapper mapper;
-  private final AuthHelperService authHelperService;
+  private final RefineryAccessPolicy refineryAccessPolicy;
 
   /**
    * Lists the calling user's own refinery orders, one page under the list filters
@@ -127,8 +127,8 @@ public class RefineryOrderController {
   }
 
   /**
-   * Lists refinery orders linked to a mission: logisticians see every order within their org-unit
-   * scope, other users only their own.
+   * Lists refinery orders linked to a mission: a caller sees their own orders and every order of
+   * the units in which they are Logistician.
    *
    * <p>Refinery is strict-staffel, so a foreign squadron's orders stay hidden even on a mission
    * that is visible to other squadrons.
@@ -140,14 +140,8 @@ public class RefineryOrderController {
   @Transactional(readOnly = true)
   public List<RefineryOrderListDto> getMissionRefineryOrders(
       @AuthenticationPrincipal Jwt jwt, @RequestParam @NotNull UUID missionId) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
-    if (isLogistician) {
-      return refineryOrderService.getMissionRefineryOrdersScoped(missionId).stream()
-          .map(mapper::toListDto)
-          .toList();
-    }
     return refineryOrderService
-        .getMissionRefineryOrders(missionId, userService.getUserIdFromJwt(jwt))
+        .getMissionRefineryOrdersForCaller(missionId, userService.getUserIdFromJwt(jwt))
         .stream()
         .map(mapper::toListDto)
         .toList();
@@ -175,8 +169,8 @@ public class RefineryOrderController {
 
   /**
    * Updates a refinery order. Non-logistician callers must be the owner (HTTP-boundary check
-   * because the rule is per-resource and {@code @PreAuthorize} can't see the order's owner).
-   * Logisticians may edit any order.
+   * because the rule is per-resource and {@code @PreAuthorize} can't see the order's owner). A
+   * Logistician of the order's unit may edit it.
    *
    * @param jwt the caller's token
    * @param id the order to update
@@ -192,7 +186,7 @@ public class RefineryOrderController {
     UUID callerId = userService.getUserIdFromJwt(jwt);
     RefineryOrder existing = refineryOrderService.getRefineryOrder(id);
 
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    boolean isLogistician = refineryAccessPolicy.isLogisticianOfOrder(id);
 
     UUID targetUserId = callerId;
     if (isLogistician) {
@@ -221,7 +215,7 @@ public class RefineryOrderController {
   public void deleteMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     refineryOrderService.deleteRefineryOrder(
-        userService.getUserIdFromJwt(jwt), id, authHelperService.isLogisticianOrAbove());
+        userService.getUserIdFromJwt(jwt), id, refineryAccessPolicy.isLogisticianOfOrder(id));
   }
 
   /**
@@ -235,7 +229,7 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull RefineryOrderStoreDto dto) {
     refineryOrderService.storeRefineryOrder(
-        userService.getUserIdFromJwt(jwt), id, dto, authHelperService.isLogisticianOrAbove());
+        userService.getUserIdFromJwt(jwt), id, dto, refineryAccessPolicy.isLogisticianOfOrder(id));
   }
 
   /**
@@ -318,7 +312,7 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID userId,
       @RequestBody @Valid @NotNull RefineryOrderCreateRequest request) {
     RefineryOrder saved =
-        refineryOrderService.createRefineryOrder(
+        refineryOrderService.createRefineryOrderOnBehalf(
             userId, mapper.toEntity(request), request.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
@@ -336,7 +330,8 @@ public class RefineryOrderController {
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
-          + "') and @refineryAccessPolicy.canEditRefineryOrder(#orderId)")
+          + "') and @refineryAccessPolicy.canEditRefineryOrder(#orderId)"
+          + " and @refineryAccessPolicy.isLogisticianOfOrder(#orderId)")
   public RefineryOrderDto updateUserRefineryOrder(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
@@ -352,7 +347,8 @@ public class RefineryOrderController {
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
-          + "') and @refineryAccessPolicy.canEditRefineryOrder(#orderId)")
+          + "') and @refineryAccessPolicy.canEditRefineryOrder(#orderId)"
+          + " and @refineryAccessPolicy.isLogisticianOfOrder(#orderId)")
   public void deleteUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
     refineryOrderService.deleteRefineryOrder(userId, orderId, true);

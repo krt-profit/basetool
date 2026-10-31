@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,9 @@ class MissionUnitFrequencyTest {
   @Autowired private UserRepository userRepository;
 
   @Autowired private MissionRepository missionRepository;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository squadronRepository;
 
   @Autowired private ShipRepository shipRepository;
 
@@ -98,6 +102,10 @@ class MissionUnitFrequencyTest {
     mission = new Mission();
     mission.setName("Test Mission Frequency");
     mission.setStatus("PLANNED");
+    mission.setOwningOrgUnit(
+        squadronRepository
+            .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+            .orElseThrow());
     mission = missionRepository.save(mission);
 
     missionParticipantService.addParticipant(
@@ -120,6 +128,10 @@ class MissionUnitFrequencyTest {
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
                             new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority(
+                                "MISSION_MANAGER",
+                                de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron
+                                    .IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -146,6 +158,10 @@ class MissionUnitFrequencyTest {
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
                             new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority(
+                                "MISSION_MANAGER",
+                                de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron
+                                    .IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -171,6 +187,10 @@ class MissionUnitFrequencyTest {
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
                             new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority(
+                                "MISSION_MANAGER",
+                                de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron
+                                    .IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -196,6 +216,10 @@ class MissionUnitFrequencyTest {
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
                             new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority(
+                                "MISSION_MANAGER",
+                                de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron
+                                    .IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
