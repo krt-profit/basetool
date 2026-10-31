@@ -4,7 +4,7 @@
 
 This file records why a dependency version is **held** behind upstream, **pinned** to match another
 component, or **floored** / overridden for a security advisory — the standing reasons the version
-catalog and the build scripts no longer carry as comments ([ADR-0214](adr/0214-code-carries-no-comments-besides-javadoc.md)).
+catalog and the build scripts do not carry as comments ([ADR-0214](adr/0214-code-carries-no-comments-besides-javadoc.md)).
 A pull request that changes, drops or adds such an entry updates its row here in the same PR; why a
 bump was *taken* belongs in that PR's body, not here.
 
