@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -62,6 +63,13 @@ public class OrgUnitCascadeService {
   private static final RequestMemo.Key<Map<Set<OrgUnitMembershipId>, Set<UUID>>>
       CACHE_KEY_CASCADED_REACH =
           RequestMemo.Key.of(OrgUnitCascadeService.class, "cascadedOfficerReach");
+
+  /**
+   * Request memo for {@link #unitsBelow(Collection)}, keyed by the grant-unit set so one
+   * principal's reach is never served to another.
+   */
+  private static final RequestMemo.Key<Map<Set<UUID>, Set<UUID>>> CACHE_KEY_UNITS_BELOW =
+      RequestMemo.Key.of(OrgUnitCascadeService.class, "unitsBelow");
 
   private final OrgUnitRepository orgUnitRepository;
 
@@ -133,6 +141,68 @@ public class OrgUnitCascadeService {
       }
     }
     return reach;
+  }
+
+  /**
+   * Resolves the org units a role grant held in {@code grantUnitIds} reaches below those units: a
+   * grant in the Organisationsleitung reaches every org unit, a grant in a Bereich the Staffeln and
+   * Spezialkommandos below it, a grant in any other unit nothing further (REQ-SEC-005). The units
+   * in {@code grantUnitIds} themselves are not part of the result. Memoised per request.
+   *
+   * <p>The one resolution behind every per-unit Logistician and Mission Manager gate and list
+   * scope, for the request's principal and for the exchange's acting member alike.
+   *
+   * @param grantUnitIds the units in which the caller holds the grant; never {@code null}
+   * @return the units reached below them; never {@code null}, possibly empty, insertion-ordered
+   */
+  @NotNull
+  public Set<UUID> unitsBelow(@NotNull Collection<UUID> grantUnitIds) {
+    if (grantUnitIds.isEmpty()) {
+      return new LinkedHashSet<>();
+    }
+    Map<Set<UUID>, Set<UUID>> memo = RequestMemo.getIfBound(CACHE_KEY_UNITS_BELOW, HashMap::new);
+    Set<UUID> key = new LinkedHashSet<>(grantUnitIds);
+    if (memo == null) {
+      return computeUnitsBelow(key);
+    }
+    return new LinkedHashSet<>(memo.computeIfAbsent(key, this::computeUnitsBelow));
+  }
+
+  /**
+   * Resolves the org units held in {@code memberships} as a role grant: the own units for which
+   * {@code grants} holds, plus {@linkplain #unitsBelow(Collection) the units below them}.
+   *
+   * @param memberships the member's membership rows; never {@code null}
+   * @param grants whether a membership confers the role on its own unit; never {@code null}
+   * @return the granted units including the cascade; never {@code null}, insertion-ordered
+   */
+  @NotNull
+  public Set<UUID> grantedUnits(
+      @NotNull Collection<OrgUnitMembership> memberships,
+      @NotNull Predicate<OrgUnitMembership> grants) {
+    Set<UUID> own = new LinkedHashSet<>();
+    for (OrgUnitMembership m : memberships) {
+      if (grants.test(m)) {
+        own.add(m.getId().getOrgUnitId());
+      }
+    }
+    Set<UUID> granted = new LinkedHashSet<>(own);
+    granted.addAll(unitsBelow(own));
+    return granted;
+  }
+
+  /**
+   * Computes {@link #unitsBelow(Collection)} without caching.
+   *
+   * @param grantUnitIds the units in which the caller holds the grant; never {@code null} or empty
+   * @return a freshly-allocated set; never {@code null}
+   */
+  @NotNull
+  private Set<UUID> computeUnitsBelow(@NotNull Set<UUID> grantUnitIds) {
+    if (!orgUnitRepository.findOrganisationsleitungIdsAmong(grantUnitIds).isEmpty()) {
+      return new LinkedHashSet<>(orgUnitRepository.findAllOrgUnitIds());
+    }
+    return new LinkedHashSet<>(orgUnitRepository.findChildOrgUnitIdsIn(grantUnitIds));
   }
 
   /**
