@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [v1.20.2](https://github.com/krt-profit/basetool/releases/tag/v1.20.2) - 2026-10-31
+
+### Added
+
+- **Bedarf & Spenden.** Ein Bedarf lässt sich beim Anlegen und Bearbeiten mit einem offenen Auftrag
+  der Einheit verknüpfen. Leitung und Logistiker sehen am Bedarf, wie viel der Auftrag schon im
+  Bestand hat, mit dem Hinweis „Auftrag gedeckt“. Der Bestand zählt weiterhin nicht als Spende.
+
+- **Bedarf & Spenden.** Leitung und Logistiker einer Einheit bekommen eine Benachrichtigung, sobald
+  der mit einem offenen Bedarf verknüpfte Auftrag das Material im Bestand hat. Die Meldung
+  verschwindet, wenn der Bedarf erfüllt oder zurückgezogen wird.
+
+- **Bedarf & Spenden.** Im Fenster „Spende anmelden“ lässt sich direkt ein Bestand aus dem eigenen
+  Lager auswählen, mit Ort, Qualität und freier Menge. Der Bestand bleibt vorgemerkt bei dir und wird
+  erst umgebucht, wenn die Einheit die Spende annimmt.
+
+- **Lager.** Beim Umbuchen gibt es die Umbuchungsart „Als Spende für einen Bedarf“. Sie meldet den
+  Bestand als Spende für einen passenden offenen Bedarf an; umgebucht wird erst, wenn die Einheit die
+  Spende annimmt, und erst dann zählt sie für den Bedarf.
+
+- **Benachrichtigungen.** Ein Klick auf eine Benachrichtigung – in der Glocke oder unter
+  „Benachrichtigungen" – öffnet direkt die betroffene Stelle, etwa den fertigen Raffinerieauftrag,
+  und markiert die Benachrichtigung dabei als gelesen. Auf Listenseiten wird der Eintrag angesprungen
+  und hervorgehoben.
+
+### Changed
+
+- Abhängigkeiten: Spring Boot 4.1.2 (mit Tomcat 11.0.27 und Netty 4.2.19), Flyway 13.12, springdoc 3.2, Jackson 2.22.4/3.2.4 sowie aktuelle Images für Grafana, Tempo, Alloy, Alertmanager, redis_exporter, lego, PostgreSQL 18, Redis 8, Keycloak 26.8 und Temurin 25. Keine Änderung an Oberfläche oder Konfiguration.
+
+- Build und CI: Gradle 9.8.2, Node.js 26 LTS für die Frontend-Werkzeuge und Redoc 3 für die Exchange-API-Referenz.
+
+### Fixed
+
+- Profit calculation: the result table is marked busy (`aria-busy`) while a calculation loads, so screen readers wait for the rows and the phone-layout check measures the finished table.
+
 ## [v1.20.1](https://github.com/krt-profit/basetool/releases/tag/v1.20.1) - 2026-10-26
 
 ### Security
