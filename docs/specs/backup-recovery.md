@@ -154,11 +154,9 @@ as clean. A restore for hardware loss / accidental deletion (no compromise suspe
   realm/users/clients.
 - [ ] The restore runbook documents that a **compromise-driven** restore must be followed by
   rotating the restored secrets; a non-compromise restore need not.
-- [ ] The restore runbook documents restoring a snapshot taken **before the host-layout migration**
-  (ADR-0319): the timestamped directory is found by name, `config/dotenv` and `config/realm-export.json`
-  are rewritten with `scripts/migrate-host-env.py` before use, and the restored Keycloak dump (realm
-  `iri`) is renamed with `scripts/rename-keycloak-realm.py` before the apps start
-  ([`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](../HOST_LAYOUT_MIGRATION_RUNBOOK.md) § 8).
+- [ ] The restore runbook states that a snapshot taken **before the host-layout migration** (ADR-0319)
+  predates the current keys, paths and realm and is not restored with these steps: the pointer is
+  `git show v1.20.2:docs/HOST_LAYOUT_MIGRATION_RUNBOOK.md`, § 8, and the tools of that tag.
 
 **Enforced by:** `scripts/backup.sh` (capture list) · **Runbook:** [`docs/backup.md`](../backup.md) → *What is and isn't backed up*, *Rotate secrets after a compromise-driven restore*
 

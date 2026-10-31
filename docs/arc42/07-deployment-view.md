@@ -36,9 +36,8 @@ out of every config-tree swap ([`docs/deployment.md`](../deployment.md)). SELinu
 split (`ADR-0319`): everything a container bind-mounts is `container_file_t`, the scripts `bin_t`, the
 deploy account's credentials and state `etc_t` / `var_lib_t`, and the host-script logs stay `var_log_t`
 so logrotate can rotate them — do not "fix" `/var/log/basetool` to a single label. The move from the
-former single tree is the one-time migration in
-[`HOST_LAYOUT_MIGRATION_RUNBOOK.md`](../HOST_LAYOUT_MIGRATION_RUNBOOK.md); this section describes the host
-from that cutover on.
+former single tree was a one-time migration (the tag `v1.20.2` still carries its tools); this section
+describes the host as it is now.
 
 **The uid translation is the fact that surprises everyone.** A rootless container's uid *N* appears
 on the host as `subuid_base + N − 1`. With a base of 100000 that makes nginx's 101 → `100100`,

@@ -243,8 +243,10 @@ its subuid range, the `deploy` account and its sudoers rule, the directory tree,
 operational units), and `/etc/basetool/deploy/{backup.env,rclone.conf}` and the GHCR pull token are in place.
 This restores *data + config* onto it. Run the steps as root, from `/`
 ([`deployment.md` → *Shell conventions*](deployment.md#shell-conventions-used-below)).
-A snapshot taken before the host-layout migration needs three extra steps, in
-[`HOST_LAYOUT_MIGRATION_RUNBOOK.md` § 8](HOST_LAYOUT_MIGRATION_RUNBOOK.md#8-restoring-a-backup-taken-before-the-migration).
+A snapshot taken before the host-layout migration (ADR-0319) predates the current keys, paths and realm
+and is not restored with these steps: read
+`git show v1.20.2:docs/HOST_LAYOUT_MIGRATION_RUNBOOK.md`, § 8 (*Restoring a backup taken before the
+migration*), and use the tools of that tag.
 
 > [!important] Container uids are translated on disk
 > Under rootless Podman a container's uid `N` is stored on the host as `100000 + N - 1` (container
