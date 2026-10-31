@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -88,6 +89,8 @@ class JobOrderModuleContractTest {
 
   private Squadron home;
 
+  private Squadron foreign;
+
   private User insider;
 
   private User outsider;
@@ -100,7 +103,8 @@ class JobOrderModuleContractTest {
     String tag = UUID.randomUUID().toString().substring(0, 6);
     home = squadron("JobHome-" + tag, "J" + tag);
     insider = member("job-insider", home);
-    outsider = member("job-outsider", squadron("JobForeign-" + tag, "K" + tag));
+    foreign = squadron("JobForeign-" + tag, "K" + tag);
+    outsider = member("job-outsider", foreign);
     ore = new Material();
     ore.setName("Job Ore " + tag);
     ore.setType(MaterialType.REFINED);
@@ -118,7 +122,7 @@ class JobOrderModuleContractTest {
         .perform(
             put(ORDERS + "/" + id + "/priority")
                 .param("priority", "3")
-                .with(as(insider, MEMBER, LOGISTICIAN)))
+                .with(asLogistician(insider, home)))
         .andExpect(status().isOk());
     assertThat(events(id)).contains("JOB_ORDER_PRIORITY_CHANGED");
 
@@ -132,7 +136,7 @@ class JobOrderModuleContractTest {
     mockMvc
         .perform(
             put(ORDERS + "/" + id + "/status")
-                .with(as(insider, MEMBER, LOGISTICIAN))
+                .with(asLogistician(insider, home))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":" + version + "}"))
         .andExpect(status().isOk());
@@ -149,7 +153,7 @@ class JobOrderModuleContractTest {
     UUID id = UUID.fromString(create().get("id").asString());
     String order = ORDERS + "/" + id;
     RequestPostProcessor reader = as(outsider, MEMBER);
-    RequestPostProcessor writer = as(outsider, MEMBER, LOGISTICIAN);
+    RequestPostProcessor writer = asLogistician(outsider, foreign);
 
     for (String path :
         List.of(
@@ -234,6 +238,15 @@ class JobOrderModuleContractTest {
     membership.setJoinedAt(Instant.now());
     orgUnitMembershipRepository.save(membership);
     return user;
+  }
+
+  private static RequestPostProcessor asLogistician(User user, Squadron unit) {
+    return jwt()
+        .jwt(builder -> builder.subject(user.getId().toString()))
+        .authorities(
+            new SimpleGrantedAuthority(MEMBER),
+            new SimpleGrantedAuthority(LOGISTICIAN),
+            new OrgUnitContextualAuthority("LOGISTICIAN", unit.getId()));
   }
 
   private static RequestPostProcessor as(User user, String... authorities) {

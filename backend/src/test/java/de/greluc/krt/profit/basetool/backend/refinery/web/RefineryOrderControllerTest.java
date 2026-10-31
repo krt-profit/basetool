@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,9 +35,9 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapper;
@@ -71,7 +72,7 @@ class RefineryOrderControllerTest {
   @Mock private RefineryOrderService service;
   @Mock private UserService userService;
   @Mock private RefineryOrderMapper mapper;
-  @Mock private AuthHelperService authHelperService;
+  @Mock private RefineryAccessPolicy refineryAccessPolicy;
   @Mock private Jwt jwt;
 
   @InjectMocks private RefineryOrderController controller;
@@ -92,7 +93,7 @@ class RefineryOrderControllerTest {
     void logistician_routesToTheExistingOwner() {
       RefineryOrder existing = newOrder(OTHER_USER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
       RefineryOrder mapped = new RefineryOrder();
@@ -120,7 +121,7 @@ class RefineryOrderControllerTest {
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
@@ -143,7 +144,7 @@ class RefineryOrderControllerTest {
     void nonLogistician_andCallerIsOwner_passesThrough() {
       RefineryOrder existing = newOrder(CALLER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
@@ -163,7 +164,7 @@ class RefineryOrderControllerTest {
     void nonLogistician_andCallerIsNotOwner_throwsAccessDenied() {
       RefineryOrder existing = newOrder(OTHER_USER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
 
@@ -179,7 +180,7 @@ class RefineryOrderControllerTest {
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
 
@@ -259,25 +260,14 @@ class RefineryOrderControllerTest {
     private final UUID missionId = UUID.randomUUID();
 
     @Test
-    void logistician_routesToOrgUnitScopedQuery() {
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-      when(service.getMissionRefineryOrdersScoped(missionId)).thenReturn(java.util.List.of());
+    void anyCaller_getsTheMissionOrdersOfTheirOwnAndOfTheirLogisticianUnits() {
+      RefineryOrder order = new RefineryOrder();
+      RefineryOrderListDto dto = mock(RefineryOrderListDto.class);
+      when(service.getMissionRefineryOrdersForCaller(missionId, CALLER_ID))
+          .thenReturn(List.of(order));
+      when(mapper.toListDto(order)).thenReturn(dto);
 
-      controller.getMissionRefineryOrders(jwt, missionId);
-
-      verify(service).getMissionRefineryOrdersScoped(missionId);
-      verify(service, never()).getMissionRefineryOrders(any(UUID.class), any(UUID.class));
-    }
-
-    @Test
-    void nonLogistician_seesOnlyOwnOrdersOnMission() {
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-      when(service.getMissionRefineryOrders(missionId, CALLER_ID)).thenReturn(java.util.List.of());
-
-      controller.getMissionRefineryOrders(jwt, missionId);
-
-      verify(service).getMissionRefineryOrders(missionId, CALLER_ID);
-      verify(service, never()).getMissionRefineryOrdersScoped(any(UUID.class));
+      assertEquals(List.of(dto), controller.getMissionRefineryOrders(jwt, missionId));
     }
   }
 
@@ -286,7 +276,7 @@ class RefineryOrderControllerTest {
 
     @Test
     void deleteMyRefineryOrder_delegatesWithLogisticianFlag() {
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       controller.deleteMyRefineryOrder(jwt, ORDER_ID);
 
@@ -304,12 +294,13 @@ class RefineryOrderControllerTest {
     void createUserRefineryOrder_admin_alwaysAttributesToPathUserId() {
       RefineryOrderCreateRequest incoming = createRequest(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
+      when(service.createRefineryOrderOnBehalf(any(), any(), any()))
+          .thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.createUserRefineryOrder(OTHER_USER_ID, incoming);
 
-      verify(service).createRefineryOrder(eq(OTHER_USER_ID), any(), any());
+      verify(service).createRefineryOrderOnBehalf(eq(OTHER_USER_ID), any(), any());
     }
 
     @Test
@@ -330,7 +321,7 @@ class RefineryOrderControllerTest {
 
     @Test
     void storeMyRefineryOrder_delegatesWithLogisticianFlag() {
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+      when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
       de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto dto =
           new de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto(
               java.util.List.of());
