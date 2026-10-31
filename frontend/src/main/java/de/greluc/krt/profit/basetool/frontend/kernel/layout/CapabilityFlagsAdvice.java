@@ -57,8 +57,8 @@ public class CapabilityFlagsAdvice {
       return CapabilitiesResponse.NONE;
     }
     if (authHelper.isAdmin()) {
-      return new CapabilitiesResponse(
-          true, true, true, layoutContextLoader.load(request).capabilities().canMarkStolen());
+      return CapabilitiesResponse.admin(
+          layoutContextLoader.load(request).capabilities().canMarkStolen());
     }
     return layoutContextLoader.load(request).capabilities();
   }
@@ -113,6 +113,75 @@ public class CapabilityFlagsAdvice {
   }
 
   /**
+   * Whether the caller holds officer reach in the active context: the pinned unit, or any unit when
+   * none is pinned (REQ-SEC-047). Presentation only; the backend re-checks the owning unit.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend reports officer reach in the active context
+   */
+  @ModelAttribute("hasOfficerReach")
+  public boolean hasOfficerReach(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.hasOfficerReach();
+  }
+
+  /**
+   * Whether the Leitung page is offered in the active context.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend offers the Leitung page
+   */
+  @ModelAttribute("canOpenLeitung")
+  public boolean canOpenLeitung(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canOpenLeitung();
+  }
+
+  /**
+   * Whether promotion management is offered in the active context.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend offers promotion management
+   */
+  @ModelAttribute("canManagePromotions")
+  public boolean canManagePromotions(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canManagePromotions();
+  }
+
+  /**
+   * Whether hangar owner details are offered in the active context.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend offers hangar owner details
+   */
+  @ModelAttribute("canSeeHangarOwnerDetails")
+  public boolean canSeeHangarOwnerDetails(
+      @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canSeeHangarOwnerDetails();
+  }
+
+  /**
+   * Whether the officer job-order writes are offered in the active context.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend offers the officer job-order writes
+   */
+  @ModelAttribute("canManageJobOrders")
+  public boolean canManageJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canManageJobOrders();
+  }
+
+  /**
+   * Whether mission finance and owner change are offered in the active context.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend offers mission finance and owner change
+   */
+  @ModelAttribute("canManageMissionFinance")
+  public boolean canManageMissionFinance(
+      @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canManageMissionFinance();
+  }
+
+  /**
    * Computes whether the promotion subsystem is exposed to the caller, based on the active
    * squadron.
    *
@@ -144,15 +213,42 @@ public class CapabilityFlagsAdvice {
    *     (REQ-ORDERS-023)
    * @param canMarkStolen whether stock may be booked in as, marked or unmarked „gestohlen"
    *     (REQ-INV-053); a server switch, the same for every caller
+   * @param hasOfficerReach whether the caller holds officer reach in the active context
+   * @param canOpenLeitung whether the Leitung page is offered in the active context
+   * @param canManagePromotions whether promotion management is offered in the active context
+   * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
+   * @param canManageJobOrders whether the officer job-order writes are offered in the active
+   *     context
+   * @param canManageMissionFinance whether mission finance and owner change are offered in the
+   *     active context
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
       boolean canViewJobOrders,
       boolean canViewOwnJobOrders,
-      boolean canMarkStolen) {
+      boolean canMarkStolen,
+      boolean hasOfficerReach,
+      boolean canOpenLeitung,
+      boolean canManagePromotions,
+      boolean canSeeHangarOwnerDetails,
+      boolean canManageJobOrders,
+      boolean canManageMissionFinance) {
 
     /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
     public static final CapabilitiesResponse NONE =
-        new CapabilitiesResponse(false, false, false, false);
+        new CapabilitiesResponse(
+            false, false, false, false, false, false, false, false, false, false);
+
+    /**
+     * Every role-derived capability on, as an admin passes each gate; the server switch stays the
+     * backend's.
+     *
+     * @param canMarkStolen the backend's „gestohlen" switch
+     * @return the admin's capability flags
+     */
+    public static CapabilitiesResponse admin(boolean canMarkStolen) {
+      return new CapabilitiesResponse(
+          true, true, true, canMarkStolen, true, true, true, true, true, true);
+    }
   }
 }

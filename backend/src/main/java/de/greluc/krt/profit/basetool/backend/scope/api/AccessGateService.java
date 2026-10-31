@@ -105,6 +105,21 @@ public class AccessGateService {
   }
 
   /**
+   * Checks whether the caller holds officer reach in {@code orgUnitId}, the unit that owns the
+   * target (REQ-SEC-015, ADR-0300); admins always pass.
+   *
+   * @param orgUnitId the target's owning org unit; never {@code null}
+   * @return {@code true} iff the caller is an admin or {@code orgUnitId} is one of {@link
+   *     RequestScopeResolver#currentOfficerOrgUnitIds()}
+   */
+  public boolean canActAsOfficerIn(@NotNull UUID orgUnitId) {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    return requestScopeResolver.currentOfficerOrgUnitIds().contains(orgUnitId);
+  }
+
+  /**
    * Access check for a personal row without an owning org unit: allowed for an admin without an
    * active pin and for the row's own owner.
    *

@@ -169,6 +169,8 @@ class NavigationRenderMvcTest {
 
     assertThat(member)
         .contains("data-entries-url=\"/quick-access/entries\"")
+        .contains("data-entity-search-url=\"/quick-access/search\"")
+        .contains("data-prefix-kind=\"mission\"")
         .contains("data-testid=\"palette-action-create-order\"")
         .contains("data-testid=\"palette-action-create-mission\"")
         .contains("data-testid=\"palette-action-create-refinery\"")

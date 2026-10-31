@@ -2737,10 +2737,12 @@ label**, a tag, an MDC field or a log line.
 - `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
   `InventoryBusinessGauges`: the number of minimum stock levels that are low (REQ-INV-067). A count
   only, no unit, material or tier label. The metric is named after the module that owns the levels.
-- `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's quick-access search
-  (REQ-UI-033), one increment per entity type per search. `kind` ∈ the eight entity types
-  (`mission`, `operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`);
-  `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed).
+- *Shipped:* `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's
+  quick-access search (REQ-UI-033, `QuickAccessSearchMetrics`), one increment per entity type per
+  search, every pair registered at zero. `kind` ∈ the `QuickAccessSearchKind` keys — today
+  `mission`, `operation`, `material`; `blueprint`, `ship`, `org_unit`, `job_order`, `member` join
+  with their contributors; `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed),
+  `timeout` (a contributor that did not answer within 2 s).
 - `basetool_notification_created_total{notification_type}` and
   `basetool_notification_muted_total{notification_type}` gain `INVENTORY_STOCK_LEVEL_LOW`, and
   `basetool_notification_timed_produced_total{kind}` the producer kind `stock_level_low`
@@ -2760,16 +2762,16 @@ the low minimum stock levels.
 
 **Alerts** in `monitoring/prometheus/alerts/apps.yml`, each with a promtool test and a runbook row:
 
-- `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search` above 1 s for
-  10 min.
+- *Shipped:* `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search`
+  above 1 s for 10 min, pinned by `monitoring/prometheus/tests/quick_access_search_slow_test.yml`.
 - `NavigationEndpointsErroring` (warning): the 5xx share of the preference and widget endpoints
   above 5 % for 10 min.
 
 A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 
-**Enforced by (to be added):** `NavigationMetricsTest`, `NavigationBusinessGaugesTest`,
-`InventoryBusinessGaugesTest`, `QuickAccessSearchMetricsTest`, `AlertedMeterPresenceTest`,
-`navigation_alerts_test.yml`
+**Enforced by:** `QuickAccessSearchMetricsTest`, `quick_access_search_slow_test.yml` · **To be
+added:** `NavigationMetricsTest`, `NavigationBusinessGaugesTest`, `InventoryBusinessGaugesTest`,
+`AlertedMeterPresenceTest`, `navigation_alerts_test.yml`
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 

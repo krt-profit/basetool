@@ -120,6 +120,7 @@ public class MeController {
    * @return the caller's UI capability flags
    */
   private @NotNull CapabilitiesResponse capabilities() {
+    boolean officerHere = ownerScopeService.canActAsOfficerInActiveContext();
     return new CapabilitiesResponse(
         ownerScopeService.canAccessBlueprintOverview(),
         ownerScopeService.canViewJobOrders(),
@@ -129,7 +130,13 @@ public class MeController {
         authHelperService.isLogisticianOrAbove(),
         authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)),
         authHelperService.isAdmin(),
-        inventoryProperties.stolenMarkingEnabled());
+        inventoryProperties.stolenMarkingEnabled(),
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere);
   }
 
   /**
@@ -231,6 +238,15 @@ public class MeController {
    * @param isAdmin whether the caller holds {@code ADMIN}
    * @param canMarkStolen whether stock may be booked in as, marked or unmarked „gestohlen" now
    *     (REQ-INV-053); a server switch, the same for every caller
+   * @param hasOfficerReach whether the caller holds officer reach in the active context: in the
+   *     pinned unit, or in any unit when none is pinned; {@code true} for an admin (REQ-SEC-047)
+   * @param canOpenLeitung whether the Leitung page is offered in the active context
+   * @param canManagePromotions whether promotion management is offered in the active context
+   * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
+   * @param canManageJobOrders whether the officer job-order writes are offered in the active
+   *     context
+   * @param canManageMissionFinance whether mission finance and owner change are offered in the
+   *     active context
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -241,7 +257,13 @@ public class MeController {
       boolean isLogisticianOrAbove,
       boolean isMissionManagerOrAbove,
       boolean isAdmin,
-      boolean canMarkStolen) {}
+      boolean canMarkStolen,
+      boolean hasOfficerReach,
+      boolean canOpenLeitung,
+      boolean canManagePromotions,
+      boolean canSeeHangarOwnerDetails,
+      boolean canManageJobOrders,
+      boolean canManageMissionFinance) {}
 
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.

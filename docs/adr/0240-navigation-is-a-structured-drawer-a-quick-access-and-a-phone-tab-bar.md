@@ -5,7 +5,9 @@
   sidebar and an icon rail are **partially superseded by
   [ADR-0297](0297-the-navigation-is-one-task-grouped-default-with-desktop-modes-a-configurable-tab-bar-and-a-scoped-entity-search.md)**
   (2026-10-20): task-grouped default and admin hub, three desktop modes, a configurable tab bar
-  and a backend-scoped entity search. Decision 1 and decision 4 for pages stand.
+  and a backend-scoped entity search. Decision 4 is superseded for entities in effect: the quick
+  access finds missions, operations and materials through `GET /quick-access/search`
+  (REQ-UI-033). Decision 1 and decision 4 for pages stand.
 - **Date:** 2026-10-03
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (`REQ-UI-026`, `REQ-UI-009`,
