@@ -299,7 +299,7 @@ class OrdersDetailPatternRenderTest {
         List.of(),
         Instant.now(),
         1L,
-        null,
+        !redacted,
         redacted);
   }
 

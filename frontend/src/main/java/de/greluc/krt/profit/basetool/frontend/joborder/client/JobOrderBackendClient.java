@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportPreviewRequestDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeCandidateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
@@ -114,6 +115,9 @@ public class JobOrderBackendClient {
 
   private static final ParameterizedTypeReference<List<LinkedStockAttributionDto>>
       LIST_OF_STOCK_ATTRIBUTION = new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<JobOrderAssigneeCandidateDto>>
+      LIST_OF_ASSIGNEE_CANDIDATE = new ParameterizedTypeReference<>() {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -298,6 +302,23 @@ public class JobOrderBackendClient {
   public List<LinkedStockAttributionDto> stockAttribution(@NotNull UUID id, @NotNull UUID matId) {
     return backendApiClient.get(
         "/api/v1/orders/{id}/materials/{matId}/attribution", LIST_OF_STOCK_ATTRIBUTION, id, matId);
+  }
+
+  /**
+   * Searches the accounts a Logistician of the order may assign (REQ-ORDERS-047).
+   *
+   * @param id the order
+   * @param query the handle fragment, possibly empty
+   * @return the candidates, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<JobOrderAssigneeCandidateDto> assigneeCandidates(
+      @NotNull UUID id, @NotNull String query) {
+    return backendApiClient.get(
+        "/api/v1/orders/{id}/assignee-candidates?query={query}",
+        LIST_OF_ASSIGNEE_CANDIDATE,
+        id,
+        query);
   }
 
   /**

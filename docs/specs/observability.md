@@ -1769,7 +1769,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   rate cannot separate one member's polling tab from a locked-out membership, and the event this one
   exists for — a realm-side role rename — happens at 03:00 when the request rate is near zero.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
-  (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
+  (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse; the two
+  `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 count under `JOB_ORDER`). Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
@@ -2746,8 +2747,7 @@ label**, a tag, an MDC field or a log line.
   `basetool_notification_timed_produced_total{kind}` the producer kind `stock_level_low`
   (REQ-NOTIF-030).
 - `basetool_audit_events_total{domain}` counts the four `MIN_STOCK_LEVEL_*` events under
-  `INVENTORY` and the two `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events under `JOB_ORDER`;
-  `basetool_bank_audit_events_total{event_type}` counts the `GRANT_REVOKED` rows of the
+  `INVENTORY`; `basetool_bank_audit_events_total{event_type}` counts the `GRANT_REVOKED` rows of the
   special-account grant removal (REQ-AUDIT-001). No new label value is needed for either.
 - The new endpoints — preferences, widgets, `/quick-access/search`, the stock-level API — are
   covered by `http_server_requests` by route template; the dashboard's ten-minute widget poll and

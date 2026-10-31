@@ -55,4 +55,15 @@ public record JobOrderDto(
     Instant createdAt,
     Long version,
     Boolean canEdit,
-    boolean redacted) {}
+    boolean redacted) {
+
+  /**
+   * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is
+   * {@code false} for a caller who reads the order only through an assignee entry (REQ-ORDERS-047).
+   *
+   * @return {@code true} iff {@code canEdit} is {@code true}
+   */
+  public boolean callerMayEdit() {
+    return Boolean.TRUE.equals(canEdit);
+  }
+}

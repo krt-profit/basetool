@@ -95,6 +95,11 @@ class JobOrderPageReaderTest {
 
   private static JobOrderDto order(
       String type, boolean redacted, List<JobOrderItemHandoverDto> handovers) {
+    return order(type, redacted, handovers, !redacted);
+  }
+
+  private static JobOrderDto order(
+      String type, boolean redacted, List<JobOrderItemHandoverDto> handovers, boolean canEdit) {
     return new JobOrderDto(
         ID,
         7,
@@ -114,7 +119,7 @@ class JobOrderPageReaderTest {
         handovers,
         Instant.now(),
         1L,
-        null,
+        canEdit,
         redacted);
   }
 
@@ -291,6 +296,19 @@ class JobOrderPageReaderTest {
     assertThat(detail.itemStockByGameItem().value()).containsEntry(gameItemId, group);
     assertThat(detail.orphanedInventory().value()).isEmpty();
     assertThat(appender.list).isEmpty();
+  }
+
+  @Test
+  void aLogisticianWhoReadsTheOrderOnlyAsItsAssigneeMayNotAssign() {
+    when(client.order(ID)).thenReturn(order("MATERIAL", false, List.of(), false));
+    when(client.settings()).thenReturn(new JobOrderSettingsDto(5, 6));
+    when(client.orphanedInventory(ID)).thenReturn(List.of());
+
+    JobOrderPageReader.OrderDetailPage detail = reader.readOrderDetail(ID, logistician(), null);
+
+    assertThat(detail.canAssign()).isFalse();
+    assertThat(detail.squadrons()).isEmpty();
+    assertThat(detail.requestingOptions()).isEmpty();
   }
 
   @Test

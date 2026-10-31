@@ -38,7 +38,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -98,6 +100,11 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   }
 
   private static JobOrderDto materialOrder(UUID id, long version) {
+    return materialOrder(id, version, List.of());
+  }
+
+  private static JobOrderDto materialOrder(
+      UUID id, long version, List<JobOrderAssigneeDto> assignees) {
     return new JobOrderDto(
         id,
         7,
@@ -112,7 +119,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         List.of(),
         List.of(),
         List.of(),
-        List.of(),
+        assignees,
         List.of(),
         List.of(),
         Instant.now(),
@@ -691,6 +698,47 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
     String html = result.getResponse().getContentAsString();
     assertThat(html).as("assignees section fragment root").contains("id=\"assignees-section\"");
     assertThat(html).as("no page chrome in the section fragment").doesNotContain("<main");
+  }
+
+  @Test
+  void viewOrderDetail_GrantOnlyAssignee_SeesOnlyTheOwnNoteAndSelfRemovalControls()
+      throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID otherId = UUID.randomUUID();
+    JobOrderDto order =
+        materialOrder(orderId, 1L, List.of(assignee(userId, "Self"), assignee(otherId, "Other")));
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(JobOrderPageStubs.detail(order).currentUserId(userId).build());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "assignees")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("no picker for a grant-only viewer").doesNotContain("od-assignee-add");
+    assertThat(html)
+        .as("own entry keeps note edit and self-removal")
+        .containsPattern("data-trigger=\"oa-edit-note\"\\s+data-user-id=\"" + userId)
+        .containsPattern("data-trigger=\"oa-remove-assignee\"\\s+data-user-id=\"" + userId);
+    assertThat(html)
+        .as("another entry offers no control")
+        .doesNotContain("data-user-id=\"" + otherId + "\"");
+  }
+
+  private static JobOrderAssigneeDto assignee(UUID id, String name) {
+    return new JobOrderAssigneeDto(
+        new UserDto(
+            id, name, null, name, null, null, null, null, null, null, null, null, null, null, null,
+            null, null, null),
+        null,
+        0L);
   }
 
   @Test

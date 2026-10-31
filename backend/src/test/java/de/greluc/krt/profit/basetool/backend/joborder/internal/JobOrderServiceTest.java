@@ -178,7 +178,9 @@ class JobOrderServiceTest {
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null);
+            null,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
@@ -368,7 +370,16 @@ class JobOrderServiceTest {
     assertTrue(result.isEmpty());
     verify(jobOrderRepository, never())
         .findScopedJobOrders(
-            any(), anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(), any());
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            any(),
+            any(),
+            any());
     verify(ownerScopeService, never()).currentScopePredicate();
   }
 

@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,10 +33,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -55,7 +60,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -101,6 +109,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private MaterialClaimService materialClaimService;
 
   @Mock private AuditService auditService;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
   private JobOrderAssigneeService jobOrderAssigneeService;
@@ -111,6 +120,7 @@ class JobOrderServiceAssigneeAndListTest {
 
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();
+  private static final UUID PROCESSING_UNIT_ID = UUID.randomUUID();
 
   @BeforeEach
   void stubMapperEchoingEmptyMaterials() {
@@ -118,6 +128,7 @@ class JobOrderServiceAssigneeAndListTest {
         new JobOrderAssigneeService(
             jobOrderRepository,
             userRepository,
+            orgUnitMembershipRepository,
             auditService,
             jobOrderStockProjectionService,
             org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
@@ -161,7 +172,9 @@ class JobOrderServiceAssigneeAndListTest {
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null);
+            null,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(inv -> {
@@ -218,6 +231,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -234,6 +248,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -249,6 +264,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -264,6 +280,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -279,6 +296,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -294,6 +312,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -310,6 +329,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -325,6 +345,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -341,6 +362,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -356,6 +378,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -376,6 +399,7 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               null,
               union,
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -391,6 +415,7 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               null,
               union,
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -414,6 +439,7 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               null,
               union,
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -430,6 +456,7 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               null,
               union,
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -448,6 +475,7 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               pinned,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -464,6 +492,7 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               pinned,
               Set.of(),
+              new UUID(0L, 0L),
               pageable);
     }
 
@@ -501,6 +530,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(page);
 
@@ -525,6 +555,7 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               null,
               Set.of(),
+              new UUID(0L, 0L),
               pageable))
           .thenReturn(new PageImpl<>(List.of(order)));
       when(jobOrderMapper.toDto(order))
@@ -585,7 +616,7 @@ class JobOrderServiceAssigneeAndListTest {
     void ordersOutOfScope_areFilteredOut() {
       JobOrder o = newJobOrder(JobOrderStatus.OPEN);
       when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-      when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(false);
+      when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(false);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
       assertTrue(queryService.findAllActiveReference(false).isEmpty());
@@ -596,7 +627,7 @@ class JobOrderServiceAssigneeAndListTest {
       JobOrder o = newJobOrder(JobOrderStatus.OPEN);
       o.setMaterials(null);
       when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-      when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
+      when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
       List<JobOrderReferenceDto> result = queryService.findAllActiveReference(false);
@@ -615,7 +646,7 @@ class JobOrderServiceAssigneeAndListTest {
       mat.setMaterial(new de.greluc.krt.profit.basetool.backend.catalogue.api.Material());
       o.setMaterials(new HashSet<>(Set.of(mat)));
       when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-      when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
+      when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
       when(jobOrderMapper.toDto(mat))
           .thenReturn(
@@ -682,6 +713,74 @@ class JobOrderServiceAssigneeAndListTest {
     }
 
     @Test
+    void externalAssignee_addingANonMemberOfTheProcessingUnitRecordsTheExternalEvent() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      order.setResponsibleOrgUnit(processingUnit());
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(newUser(USER_ID)));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+      when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(USER_ID, PROCESSING_UNIT_ID))
+          .thenReturn(false);
+
+      service.addAssignee(JOB_ORDER_ID, USER_ID);
+
+      verify(auditService)
+          .record(
+              eq(AuditEventType.JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED),
+              eq(JOB_ORDER_ID),
+              any(),
+              eq(USER_ID),
+              argThat(
+                  d -> AuditDetails.of("assignee", USER_ID).toString().equals(String.valueOf(d))));
+    }
+
+    @Test
+    void externalAssignee_addingADirectMemberRecordsTheRegularEvent() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      order.setResponsibleOrgUnit(processingUnit());
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(newUser(USER_ID)));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+      when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(USER_ID, PROCESSING_UNIT_ID))
+          .thenReturn(true);
+
+      service.addAssignee(JOB_ORDER_ID, USER_ID);
+
+      verify(auditService)
+          .record(
+              eq(AuditEventType.JOB_ORDER_ASSIGNEE_ADDED),
+              eq(JOB_ORDER_ID),
+              any(),
+              eq(USER_ID),
+              argThat(
+                  d -> AuditDetails.of("assignee", USER_ID).toString().equals(String.valueOf(d))));
+    }
+
+    @Test
+    void addingAnInactiveAccount_isRejected() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      User pending = newUser(USER_ID);
+      pending.setApprovalStatus(ApprovalStatus.PENDING);
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+
+      assertThrows(BadRequestException.class, () -> service.addAssignee(JOB_ORDER_ID, USER_ID));
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void addingAnAccountGoneFromKeycloak_isRejected() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      User gone = newUser(USER_ID);
+      gone.setEnabledInKeycloak(false);
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(gone));
+
+      assertThrows(BadRequestException.class, () -> service.addAssignee(JOB_ORDER_ID, USER_ID));
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void notFoundJobOrder_throwsBeforeUserLookup() {
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.empty());
 
@@ -733,6 +832,28 @@ class JobOrderServiceAssigneeAndListTest {
 
       assertTrue(order.getAssignees().isEmpty());
       verify(jobOrderRepository).saveAndFlush(order);
+    }
+
+    @Test
+    void externalAssignee_removingANonMemberOfTheProcessingUnitRecordsTheExternalEvent() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      order.setResponsibleOrgUnit(processingUnit());
+      assigneeEdge(order, newUser(USER_ID));
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+      when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(USER_ID, PROCESSING_UNIT_ID))
+          .thenReturn(false);
+
+      service.removeAssignee(JOB_ORDER_ID, USER_ID);
+
+      verify(auditService)
+          .record(
+              eq(AuditEventType.JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED),
+              eq(JOB_ORDER_ID),
+              any(),
+              eq(USER_ID),
+              argThat(
+                  d -> AuditDetails.of("assignee", USER_ID).toString().equals(String.valueOf(d))));
     }
 
     @Test
@@ -922,6 +1043,12 @@ class JobOrderServiceAssigneeAndListTest {
         order.getVersion(),
         null,
         false);
+  }
+
+  private Squadron processingUnit() {
+    Squadron unit = new Squadron();
+    unit.setId(PROCESSING_UNIT_ID);
+    return unit;
   }
 
   private User newUser(UUID id) {

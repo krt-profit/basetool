@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -28,7 +27,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
@@ -56,7 +54,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlu
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -73,15 +70,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Pure-Mockito unit tests for {@link JobOrderController}.
  *
  * <ul>
- *   <li>{@link JobOrderController#addAssignee} / {@link JobOrderController#removeAssignee}: self
- *       assignment always works, assigning others needs LOGISTICIAN or above.
  *   <li>{@link JobOrderController#downloadHandoverReport}: an invalid {@code X-User-Time-Zone} is
  *       dropped, and the PDF headers are pinned.
  *   <li>{@link JobOrderController#getAllJobOrders}: an empty status filter reaches the service as
@@ -99,8 +93,6 @@ class JobOrderControllerTest {
   @Mock private JobOrderHandoverService jobOrderHandoverService;
   @Mock private JobOrderItemProductionService jobOrderItemProductionService;
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
-  @Mock private UserService userService;
-  @Mock private AuthHelperService authHelperService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
@@ -147,7 +139,7 @@ class JobOrderControllerTest {
     JobOrderDto result = controller.createJobOrder(request);
 
     assertThat(result).isSameAs(created);
-    verifyNoInteractions(userService, authHelperService);
+    verifyNoInteractions(jobOrderAccessPolicy);
   }
 
   @Test
@@ -511,163 +503,6 @@ class JobOrderControllerTest {
     controller.unlinkInventoryItem(jobOrderId, inventoryItemId);
 
     verify(jobOrderService).unlinkInventoryItem(jobOrderId, inventoryItemId);
-  }
-
-  @Test
-  void addAssignee_self_doesNotConsultRoleHelper() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderDto persisted = jobOrderDto(jobOrderId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(jobOrderService.addAssignee(jobOrderId, callerId)).thenReturn(persisted);
-
-    JobOrderDto result = controller.addAssignee(jobOrderId, callerId, jwt);
-
-    assertThat(result).isSameAs(persisted);
-    verify(authHelperService, never()).isLogisticianOrAbove();
-  }
-
-  @Test
-  void addAssignee_otherUser_logistician_isAllowed() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderDto persisted = jobOrderDto(jobOrderId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(jobOrderService.addAssignee(jobOrderId, targetUserId)).thenReturn(persisted);
-
-    JobOrderDto result = controller.addAssignee(jobOrderId, targetUserId, jwt);
-
-    assertThat(result).isSameAs(persisted);
-  }
-
-  @Test
-  void addAssignee_otherUser_nonLogistician_throws403() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-
-    assertThatThrownBy(() -> controller.addAssignee(jobOrderId, targetUserId, jwt))
-        .isInstanceOf(AccessDeniedException.class);
-    verify(jobOrderService, never()).addAssignee(any(), any());
-  }
-
-  @Test
-  void removeAssignee_self_doesNotConsultRoleHelper() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderDto persisted = jobOrderDto(jobOrderId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(jobOrderService.removeAssignee(jobOrderId, callerId)).thenReturn(persisted);
-
-    JobOrderDto result = controller.removeAssignee(jobOrderId, callerId, jwt);
-
-    assertThat(result).isSameAs(persisted);
-    verify(authHelperService, never()).isLogisticianOrAbove();
-  }
-
-  @Test
-  void removeAssignee_otherUser_logistician_isAllowed() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderDto persisted = jobOrderDto(jobOrderId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(jobOrderService.removeAssignee(jobOrderId, targetUserId)).thenReturn(persisted);
-
-    JobOrderDto result = controller.removeAssignee(jobOrderId, targetUserId, jwt);
-
-    assertThat(result).isSameAs(persisted);
-  }
-
-  @Test
-  void removeAssignee_otherUser_nonLogistician_throws403() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-
-    assertThatThrownBy(() -> controller.removeAssignee(jobOrderId, targetUserId, jwt))
-        .isInstanceOf(AccessDeniedException.class);
-    verify(jobOrderService, never()).removeAssignee(any(), any());
-  }
-
-  @Test
-  void setAssigneeNote_self_doesNotConsultRoleHelper() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderDto persisted = jobOrderDto(jobOrderId);
-    JobOrderController.AssigneeNoteRequest body =
-        new JobOrderController.AssigneeNoteRequest("works Friday", 2L);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(jobOrderService.updateAssigneeNote(jobOrderId, callerId, "works Friday", 2L))
-        .thenReturn(persisted);
-
-    JobOrderDto result = controller.setAssigneeNote(jobOrderId, callerId, body, jwt);
-
-    assertThat(result).isSameAs(persisted);
-    verify(authHelperService, never()).isLogisticianOrAbove();
-  }
-
-  @Test
-  void setAssigneeNote_otherUser_logistician_isAllowed() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderDto persisted = jobOrderDto(jobOrderId);
-    JobOrderController.AssigneeNoteRequest body =
-        new JobOrderController.AssigneeNoteRequest("note", null);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(jobOrderService.updateAssigneeNote(jobOrderId, targetUserId, "note", null))
-        .thenReturn(persisted);
-
-    JobOrderDto result = controller.setAssigneeNote(jobOrderId, targetUserId, body, jwt);
-
-    assertThat(result).isSameAs(persisted);
-  }
-
-  @Test
-  void setAssigneeNote_otherUser_nonLogistician_throws403() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderController.AssigneeNoteRequest body =
-        new JobOrderController.AssigneeNoteRequest("note", null);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-
-    assertThatThrownBy(() -> controller.setAssigneeNote(jobOrderId, targetUserId, body, jwt))
-        .isInstanceOf(AccessDeniedException.class);
-    verify(jobOrderService, never()).updateAssigneeNote(any(), any(), any(), any());
-  }
-
-  @Test
-  void deleteAssigneeNote_otherUser_nonLogistician_throws403() {
-    Jwt jwt = jwt("alice-sub");
-    UUID callerId = UUID.randomUUID();
-    UUID targetUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-
-    assertThatThrownBy(() -> controller.deleteAssigneeNote(jobOrderId, targetUserId, 1L, jwt))
-        .isInstanceOf(AccessDeniedException.class);
-    verify(jobOrderService, never()).deleteAssigneeNote(any(), any(), any());
   }
 
   @Test

@@ -20,9 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
@@ -55,7 +53,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlu
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
@@ -67,7 +64,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Size;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -81,10 +77,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -121,8 +114,6 @@ public class JobOrderController {
   private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
-  private final UserService userService;
-  private final AuthHelperService authHelperService;
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
@@ -962,117 +953,6 @@ public class JobOrderController {
   public void unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(id, inventoryItemId);
   }
-
-  /**
-   * Adds a user as assignee. Self-assignment works for everyone; assigning someone else requires
-   * LOGISTICIAN or above (enforced by {@link #verifyAssigneeAccess} at the HTTP boundary so the
-   * service stays free of {@code SecurityContextHolder} reads).
-   *
-   * @param id job-order id
-   * @param userId target user id
-   * @param jwt caller's JWT
-   * @return the persisted DTO
-   */
-  @PostMapping("/{id}/assignees/{userId}")
-  @Operation(summary = "Add an assignee", description = "Adds a user to the job order.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  public JobOrderDto addAssignee(
-      @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-    verifyAssigneeAccess(jwt, userId);
-    return jobOrderService.addAssignee(id, userId);
-  }
-
-  /**
-   * Removes a user as assignee. Same self-or-logistician rule as {@link #addAssignee}.
-   *
-   * @param id job-order id
-   * @param userId target user id
-   * @param jwt caller's JWT
-   * @return the persisted DTO
-   */
-  @DeleteMapping("/{id}/assignees/{userId}")
-  @Operation(summary = "Remove an assignee", description = "Removes a user from the job order.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  public JobOrderDto removeAssignee(
-      @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-    verifyAssigneeAccess(jwt, userId);
-    return jobOrderService.removeAssignee(id, userId);
-  }
-
-  /**
-   * Enforces the self-or-logistician rule for assignee mutations. Throws {@link
-   * AccessDeniedException} when a non-LOGISTICIAN caller tries to modify someone else's assignment.
-   *
-   * @param targetUserId user id being added/removed
-   * @param jwt caller's JWT
-   */
-  private void verifyAssigneeAccess(Jwt jwt, UUID targetUserId) {
-    UUID currentUserId = userService.getUserIdFromJwt(jwt);
-    if (!currentUserId.equals(targetUserId) && !authHelperService.isLogisticianOrAbove()) {
-      throw new AccessDeniedException("Not allowed to modify other users' assignments");
-    }
-  }
-
-  /**
-   * Sets or replaces the note on an assignee entry. Same self-or-logistician rule as {@link
-   * #addAssignee}; optimistic-locked on the assignee edge's own version.
-   *
-   * @param id job-order id
-   * @param userId the assignee whose note is changed
-   * @param body the new note + the edge version last seen by the client
-   * @param jwt caller's JWT
-   * @return the persisted DTO with the refreshed assignee list
-   */
-  @PutMapping("/{id}/assignees/{userId}/note")
-  @Operation(
-      summary = "Set an assignee note",
-      description = "Creates or replaces the note on a user's assignee entry.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  public JobOrderDto setAssigneeNote(
-      @PathVariable UUID id,
-      @PathVariable UUID userId,
-      @RequestBody @Valid AssigneeNoteRequest body,
-      @AuthenticationPrincipal Jwt jwt) {
-    verifyAssigneeAccess(jwt, userId);
-    return jobOrderService.updateAssigneeNote(id, userId, body.note(), body.version());
-  }
-
-  /**
-   * Clears the note on an assignee entry. Same self-or-logistician rule and optimistic-locking
-   * semantics as {@link #setAssigneeNote}.
-   *
-   * @param id job-order id
-   * @param userId the assignee whose note is cleared
-   * @param jwt caller's JWT
-   * @param version the assignee edge version last seen by the client, or {@code null} to skip the
-   *     check
-   * @return the persisted DTO with the refreshed assignee list
-   */
-  @DeleteMapping("/{id}/assignees/{userId}/note")
-  @Operation(
-      summary = "Delete an assignee note",
-      description = "Clears the note on a user's assignee entry.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  public JobOrderDto deleteAssigneeNote(
-      @PathVariable UUID id,
-      @PathVariable UUID userId,
-      @RequestParam(required = false) Long version,
-      @AuthenticationPrincipal Jwt jwt) {
-    verifyAssigneeAccess(jwt, userId);
-    return jobOrderService.deleteAssigneeNote(id, userId, version);
-  }
-
-  /**
-   * Request body for the assignee-note PUT endpoint.
-   *
-   * @param note the new note text (at most {@value
-   *     de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee#NOTE_MAX_LENGTH}
-   *     characters; blank/{@code null} clears the note)
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the
-   *     optimistic-lock check
-   */
-  public record AssigneeNoteRequest(
-      @Size(max = JobOrderAssignee.NOTE_MAX_LENGTH) String note, Long version) {}
 
   /**
    * Peer-shapes every assignee's nested user record of a job order.

@@ -153,7 +153,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.of(null)));
     Model model = new ExtendedModelMap();
 
-    assertThat(controller.viewOrderDetail(ID, true, false, model, null, null))
+    assertThat(controller.viewOrderDetail(ID, model, null, null))
         .isEqualTo("joborder/orders-detail");
 
     assertThat(model.asMap())
@@ -187,7 +187,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent()));
 
-    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, "items"))
+    assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "items"))
         .isEqualTo("joborder/orders-detail :: itemsSection");
 
     verify(reader).readOrderDetail(eq(ID), any(), eq("items"));
@@ -197,7 +197,7 @@ class JobOrderPageControllerReaderTest {
   void aFailedDetailReadSendsTheUserBackToTheList() {
     when(reader.readOrderDetail(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
 
-    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, null))
+    assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, null))
         .isEqualTo("redirect:/orders");
   }
 
@@ -205,7 +205,7 @@ class JobOrderPageControllerReaderTest {
   void aFailedDetailFragmentReadAnswersTheErrorFragment() {
     when(reader.readOrderDetail(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
 
-    assertThat(controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, "kpi"))
+    assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "kpi"))
         .isEqualTo("joborder/orders-detail :: fragmentError");
   }
 
@@ -306,8 +306,7 @@ class JobOrderPageControllerReaderTest {
         .thenThrow(
             new ReauthenticationRequiredException("lost", new IllegalStateException("expired")));
 
-    assertThatThrownBy(
-            () -> controller.viewOrderDetail(ID, true, false, new ExtendedModelMap(), null, null))
+    assertThatThrownBy(() -> controller.viewOrderDetail(ID, new ExtendedModelMap(), null, null))
         .isInstanceOf(ReauthenticationRequiredException.class);
   }
 }

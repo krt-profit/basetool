@@ -38,7 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
  * and of the requester side, evaluated on the scope kernel (plan §5.4, ADR-0236). It also decides
  * the Lager's earmarked stock of an order ({@link EarmarkTargetPolicy}).
  *
- * <p>The list-side half of the rule is {@link JobOrderScope#PREDICATE}; both widen together.
+ * <p>The list-side half of the scope rule is {@link JobOrderScope#PREDICATE}; the queue list adds
+ * the assignee grant beside it ({@code JobOrderRepository#findScopedJobOrders}), so list and gate
+ * widen together.
  *
  * <p>{@link JobOrderEditor} asks {@link #canEdit} on the loaded order; the remaining endpoints
  * invoke the id-based gates from SpEL as {@code @jobOrderAccessPolicy}. Unknown ids are refused.
@@ -60,9 +62,9 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
 
   /**
-   * Checks whether the caller may read job order {@code jobOrderId}: the caller must reach the
-   * queue, then an order without a responsible unit or of a Spezialkommando is public, any other
-   * order is visible within the caller's read scope (REQ-ORG-003).
+   * Checks whether the caller may read job order {@code jobOrderId}: the caller holds an assignee
+   * entry on it (REQ-ORDERS-047), or sees it within the tenancy scope ({@link
+   * #canSeeJobOrderInScope}).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may read the order
@@ -78,6 +80,19 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
    * @return {@code true} iff the caller may read the order
    */
   public boolean canSeeJobOrder(@NotNull JobOrder order) {
+    return isAssigneeRow(order) || canSeeJobOrderInScope(order);
+  }
+
+  /**
+   * Checks whether the caller sees the order within the tenancy scope, without the assignee grant:
+   * the caller must reach the queue, then an order without a responsible unit or of a
+   * Spezialkommando is public, any other order is visible within the caller's read scope
+   * (REQ-ORG-003).
+   *
+   * @param order the order to inspect; never {@code null}
+   * @return {@code true} iff the order is in the caller's read scope
+   */
+  public boolean canSeeJobOrderInScope(@NotNull JobOrder order) {
     if (!ownerScopeService.canViewJobOrders()) {
       return false;
     }
@@ -120,7 +135,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
 
   /**
    * Checks whether the caller may edit job order {@code jobOrderId}: like {@link
-   * #canSeeJobOrder(UUID)} with the edit scope.
+   * #canSeeJobOrderInScope} with the edit scope; the assignee grant opens no edit.
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order
@@ -168,9 +183,35 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
         .orElse(false);
   }
 
+  /**
+   * Checks whether the caller may add, remove or annotate other users' assignee entries of job
+   * order {@code jobOrderId}: a Logistician of the order, i.e. a Logistician-or-above within its
+   * edit scope (REQ-ORDERS-014), the same rule as the order's {@code canEdit} row flag. The
+   * assignee grant alone never qualifies (REQ-ORDERS-047).
+   *
+   * @param jobOrderId the order to inspect; never {@code null}
+   * @return {@code true} iff the caller may manage the order's assignees
+   */
+  public boolean canManageAssignees(@NotNull UUID jobOrderId) {
+    return isLogisticianOfOrder(jobOrderId);
+  }
+
   @Override
   public boolean mayEditJobOrderEarmarks(@NotNull UUID jobOrderId) {
+    return isLogisticianOfOrder(jobOrderId);
+  }
+
+  private boolean isLogisticianOfOrder(@NotNull UUID jobOrderId) {
     return authHelper.isLogisticianOrAbove() && canEditJobOrder(jobOrderId);
+  }
+
+  private boolean isAssigneeRow(@NotNull JobOrder order) {
+    return authHelper
+        .currentUserId()
+        .map(callerId ->
+            order.getAssignees().stream()
+                .anyMatch(a -> a.getUser() != null && callerId.equals(a.getUser().getId())))
+        .orElse(false);
   }
 
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
