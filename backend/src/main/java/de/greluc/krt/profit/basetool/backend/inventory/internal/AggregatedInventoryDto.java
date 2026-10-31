@@ -34,8 +34,8 @@ import org.jetbrains.annotations.Nullable;
  * @param maxQuality highest single-entry quality; {@code 0.0} without stock, {@code null} for a
  *     game-item row
  * @param amount total quantity in stock
- * @param lowStock whether a minimum stock level of the material is low in the caller's scope
- *     (REQ-INV-068)
+ * @param lowStock whether a minimum stock level of the material or game item is low in the caller's
+ *     scope (REQ-INV-068)
  */
 public record AggregatedInventoryDto(
     @Nullable MaterialDto material,

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
@@ -111,18 +112,25 @@ public class StockLevelService {
   }
 
   /**
-   * Lists the materials with at least one low level in the caller's Lager scope, for the „niedrig"
-   * marker of the aggregated Lager.
+   * Lists the materials and game items with at least one low level in the caller's Lager scope, for
+   * the „niedrig" marker of the aggregated Lager.
    *
-   * @return the material ids
+   * @return the material ids and the game item ids
    */
   @Transactional(readOnly = true)
-  public @NotNull Set<UUID> lowMaterialIds() {
-    return list(null, true, null).stream()
-        .map(StockLevelDto::material)
-        .filter(Objects::nonNull)
-        .map(MaterialReferenceDto::id)
-        .collect(Collectors.toUnmodifiableSet());
+  public @NotNull LowStockSubjects lowSubjects() {
+    List<StockLevelDto> low = list(null, true, null);
+    return new LowStockSubjects(
+        low.stream()
+            .map(StockLevelDto::material)
+            .filter(Objects::nonNull)
+            .map(MaterialReferenceDto::id)
+            .collect(Collectors.toUnmodifiableSet()),
+        low.stream()
+            .map(StockLevelDto::gameItem)
+            .filter(Objects::nonNull)
+            .map(GameItemReferenceDto::id)
+            .collect(Collectors.toUnmodifiableSet()));
   }
 
   /**

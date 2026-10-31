@@ -119,6 +119,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_WITHDRAWN` | none (no rule) | — | supersedes the pledge notices | REQ-SUP-016 |
+| `INVENTORY_STOCK_LEVEL_LOW` | `INVENTORY_STOCK_LEVEL_LOW` | V315 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the level's unit, no cascade); raised once per low, re-armed at the target, by the `stock_level_low` timed producer | REQ-NOTIF-030 |
 | `SUPPLY_NEED_ORDER_COVERED` | `SUPPLY_NEED_ORDER_COVERED` | V312 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); raised once per link by the `supply_order_covered` timed producer | REQ-SUP-024 |
 | `SUPPLY_NEED_CLOSED` | none (no rule) | — | supersedes the need's covered-order notices when it is fulfilled or withdrawn | REQ-SUP-024 |
 | `PURCHASING_NEED_RELEASED` | `PURCHASING_NEED_RELEASED` | V289 | `EVENT_RECIPIENTS` (the active Handelsbeauftragten); the only purchasing notice a member can mute | REQ-PUR-024 |
@@ -1170,9 +1171,6 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 
 ### REQ-NOTIF-030 — A minimum stock level that falls low tells the unit's Logisticians
 
-> **Status: planned** (ADR-0302, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 A minimum stock level (REQ-INV-067) whose allocated free stock drops below its minimum raises the
 notification type `INVENTORY_STOCK_LEVEL_LOW`.
 
@@ -1193,32 +1191,39 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
 - **Silent lifecycle.** Deleting a level or its material, and deactivating its tier, send no
   notice; a level of an inactive unit or catalogue entry raises none while it is hidden
   (REQ-INV-068).
-- **Payload.** The unit, the material or item and the tier as ids and coded parameters, the minimum
-  and the allocated amount; no member name.
+- **Payload.** The unit and the material or item name (with the tier code), the minimum and the
+  allocated amount; the level is the loose entity, and no member name is carried. Game-item levels
+  notify the same way.
 - **Observable.** `basetool_notification_created_total{notification_type}` and
   `basetool_notification_timed_produced_total{kind}` count it (REQ-OBS-011). A low level is a
   notice, never an alert.
 
 **Acceptance**
 
-- [ ] A level falling below its minimum notifies its unit's direct Logisticians and seat holders
-  once; a Bereich lead above the unit is not notified.
-- [ ] Stock rising above the minimum but below the target and falling again sends nothing; reaching
-  the target and falling low again sends a second notice.
-- [ ] A member who muted the type gets nothing.
-- [ ] Deleting the level or its material, deactivating the unit or the catalogue entry, and
-  deactivating the tier send nothing.
-- [ ] A Logistician's edit of a level does not 409 against the producer's marker.
+- [x] A level falling below its minimum notifies its unit's direct Logisticians and seat holders
+  once; a Bereich lead above the unit is not notified. *`StockLevelNoticeIntegrationTest`,
+  `SeededNotificationRulesIntegrationTest`.*
+- [x] Stock rising above the minimum but below the target and falling again sends nothing; reaching
+  the target and falling low again sends a second notice. *`StockLevelNoticeProducerTest`,
+  `StockLevelNoticeIntegrationTest`.*
+- [x] A member who muted the type gets nothing. *`StockLevelNoticeIntegrationTest`.*
+- [x] Deleting the level or its material, deactivating the unit or the catalogue entry, and
+  deactivating the tier send nothing; a level of an inactive unit or entry notifies once it returns.
+  *`StockLevelNoticeIntegrationTest`.*
+- [x] A Logistician's edit of a level does not 409 against the producer's marker.
+  *`StockLevelNoticeIntegrationTest`.*
 
-**Enforced by (to be added):** `StockLevelNoticeProducerTest`, `StockLevelNoticeIntegrationTest`,
-`NotificationPreferenceGroupsTest`, `NotificationTypeMessageCoverageTest` · **Code:** to be added
-(`NotificationType#INVENTORY_STOCK_LEVEL_LOW`, the inventory module's producer) · **Related:**
+**Enforced by:** `StockLevelNoticeProducerTest`, `StockLevelNoticeIntegrationTest`,
+`SeededNotificationRulesIntegrationTest`, `NotificationPreferenceGroupsTest`,
+`NotificationTypeMessageCoverageTest`, `NotificationTargetsTest` · **Code:**
+`NotificationType#INVENTORY_STOCK_LEVEL_LOW`, `inventory/internal/StockLevelNoticeProducer`,
+`StockLevelStates`, `InventoryNotices#stockLevelLow`, migration V315 · **Related:**
 REQ-INV-067, REQ-INV-068, REQ-NOTIF-024, REQ-NOTIF-026, REQ-NOTIF-027 · **Decision:** ADR-0302
 
 ### REQ-NOTIF-031 — Amounts in a notification carry thousands separators
 
 The backend stores an amount parameter locale-free (`3000000`, `12.50`). The web inbox and bell
-render the parameters `amount`, `fee`, `balance`, `total`, `open` and `donation` with the
+render the parameters `amount`, `fee`, `balance`, `total`, `open`, `donation` and `minimum` with the
 thousands and decimal separators of the member's language: `3.000.000` and `12,50` in German,
 `3,000,000` and `12.50` in English. Every other parameter — an account number, a deal number, a count, a name — renders as
 stored, and so does a value that is not a plain decimal. Lists the producer pre-renders (`lots`,
@@ -1290,6 +1295,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
 | `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
 | `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory/my` (the notice names a source row, not the recipient's) |
+| `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
 | `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |
 | `BLUEPRINT_CHANGED_BY_ADMIN`, `BLUEPRINT_PURGED_BY_ADMIN` | `/personal-inventory/blueprints` |
 | `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile#profile-deletion-host` |

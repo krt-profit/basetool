@@ -37,8 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * @param averageQuality amount-weighted mean quality; {@code null} for a game-item group
  * @param maxQuality highest quality across the stacks; {@code null} for a game-item group
  * @param stacks the per-stock-identity stacks of this group
- * @param lowStock whether a minimum stock level of this material is low in the caller's scope
- *     (REQ-INV-068)
+ * @param lowStock whether a minimum stock level of this material or game item is low in the
+ *     caller's scope (REQ-INV-068)
  */
 public record GroupedInventoryDto(
     @Nullable MaterialReferenceDto material,

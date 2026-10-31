@@ -146,6 +146,12 @@ class NotificationTargetsTest {
   }
 
   @Test
+  void aLowStockLevelOpensTheMinimumLevelsTab() {
+    assertEquals(
+        "/inventory/stock-levels", target("INVENTORY_STOCK_LEVEL_LOW", "INVENTORY_STOCK_LEVEL"));
+  }
+
+  @Test
   void listSubjectsAreFocusedOnTheirListPage() {
     assertEquals(
         "/supply/donations/incoming?focus=" + ID,
