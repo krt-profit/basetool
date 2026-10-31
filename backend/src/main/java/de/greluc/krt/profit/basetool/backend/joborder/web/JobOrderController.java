@@ -142,8 +142,6 @@ public class JobOrderController {
       "(hasRole('"
           + Roles.LOGISTICIAN
           + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
           + Roles.ADMIN
           + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderHandoverDto createHandover(
@@ -168,8 +166,6 @@ public class JobOrderController {
   @PreAuthorize(
       "(hasRole('"
           + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.OFFICER
           + "') or hasRole('"
           + Roles.ADMIN
           + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
@@ -224,8 +220,6 @@ public class JobOrderController {
       "(hasRole('"
           + Roles.LOGISTICIAN
           + "') or hasRole('"
-          + Roles.OFFICER
-          + "') or hasRole('"
           + Roles.ADMIN
           + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderItemDto bookProduction(
@@ -257,8 +251,6 @@ public class JobOrderController {
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
           + "') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
@@ -299,8 +291,6 @@ public class JobOrderController {
       "hasAnyRole('"
           + Roles.LOGISTICIAN
           + "', '"
-          + Roles.OFFICER
-          + "', '"
           + Roles.ADMIN
           + "') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
@@ -336,8 +326,6 @@ public class JobOrderController {
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
           + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
@@ -932,8 +920,7 @@ public class JobOrderController {
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
     @ApiResponse(responseCode = "404", description = "Job order or material not found")
   })
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
   public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
@@ -957,8 +944,7 @@ public class JobOrderController {
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
     @ApiResponse(responseCode = "404", description = "Job order or inventory item not found")
   })
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
   public void unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(id, inventoryItemId);
   }

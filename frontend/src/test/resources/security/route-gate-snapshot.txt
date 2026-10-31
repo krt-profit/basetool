@@ -1,11 +1,12 @@
 / GET -> HomeController#home gate=none layout=yes
+/admin GET -> AdminHubPageController#hub gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement GET -> AdminAnnouncementPageController#showAnnouncementPage gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/delete POST -> AdminAnnouncementPageController#deleteAnnouncement gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#deleteAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/update POST -> AdminAnnouncementPageController#updateAnnouncement gate=class:hasRole('ADMIN') layout=yes
 /admin/announcement/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#updateAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/audit-log GET -> AdminAuditLogPageController#auditLog gate=class:hasRole('ADMIN') layout=yes
-/admin/bank GET -> AdminBankPageController#bankAdmin gate=class:hasRole('ADMIN') layout=yes
+/admin/bank GET headers=[!X-Requested-With] -> LegacyAdminRedirectController#bank gate=class:hasRole('ADMIN') layout=yes
 /admin/bank-audit GET -> AdminBankPageController#bankAuditRedirect gate=class:hasRole('ADMIN') layout=yes
 /admin/bank/wipe-reset POST -> AdminBankPageController#wipeReset gate=class:hasRole('ADMIN') layout=yes
 /admin/bank/wipe-reset POST headers=[X-Requested-With=XMLHttpRequest] -> AdminBankPageController#wipeResetAjax gate=class:hasRole('ADMIN') layout=yes
@@ -67,6 +68,7 @@
 /admin/members/{userId}/hangar/{shipId}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#changeShipOrgUnit gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/update POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#updateShip gate=class:hasRole('ADMIN') layout=no
 /admin/mission-data GET -> AdminMissionDataPageController#listData gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data GET params=[kind=squadrons] headers=[!X-Requested-With] -> LegacyAdminRedirectController#squadrons gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/frequency-types POST -> AdminMissionDataPageController#createFrequencyType gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/frequency-types POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#createFrequencyTypeAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/frequency-types/reorder POST -> AdminMissionDataPageController#reorderFrequencyTypes gate=class:hasRole('ADMIN') layout=yes
@@ -84,14 +86,6 @@
 /admin/mission-data/job-types/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#deleteJobTypeAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/job-types/{id}/update POST -> AdminMissionDataPageController#updateJobType gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/job-types/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#updateJobTypeAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons POST -> AdminMissionDataPageController#createSquadron gate=class:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#createSquadronAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons/{id}/activate POST -> AdminMissionDataPageController#activateSquadron gate=method:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#activateSquadronAjax gate=method:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons/{id}/delete POST -> AdminMissionDataPageController#deleteSquadron gate=class:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#deleteSquadronAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons/{id}/update POST -> AdminMissionDataPageController#updateSquadron gate=class:hasRole('ADMIN') layout=yes
-/admin/mission-data/squadrons/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#updateSquadronAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/notification-rules GET -> AdminNotificationRulePageController#page gate=class:hasRole('ADMIN') layout=yes
 /admin/notification-rules POST headers=[X-Requested-With=XMLHttpRequest] -> AdminNotificationRulePageController#create gate=class:hasRole('ADMIN') layout=yes
 /admin/notification-rules/{id} DELETE headers=[X-Requested-With=XMLHttpRequest] -> AdminNotificationRulePageController#delete gate=class:hasRole('ADMIN') layout=yes
@@ -101,6 +95,15 @@
 /admin/org-structure/bereiche POST headers=[X-Requested-With=XMLHttpRequest] -> AdminOrgStructurePageController#createBereich gate=class:hasRole('ADMIN') layout=yes
 /admin/org-structure/org-units/{id}/parent PATCH headers=[X-Requested-With=XMLHttpRequest] -> AdminOrgStructurePageController#setParent gate=class:hasRole('ADMIN') layout=yes
 /admin/org-structure/organisationsleitung POST headers=[X-Requested-With=XMLHttpRequest] -> AdminOrgStructurePageController#createOrganisationsleitung gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons GET -> AdminSquadronsPageController#listSquadrons gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons POST -> AdminSquadronsPageController#createSquadron gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSquadronsPageController#createSquadronAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons/{id}/activate POST -> AdminSquadronsPageController#activateSquadron gate=method:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSquadronsPageController#activateSquadronAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons/{id}/delete POST -> AdminSquadronsPageController#deleteSquadron gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSquadronsPageController#deleteSquadronAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons/{id}/update POST -> AdminSquadronsPageController#updateSquadron gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/squadrons/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSquadronsPageController#updateSquadronAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import GET -> AdminP4kImportPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs GET -> AdminP4kImportPageController#listJobs gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs POST consumes=[multipart/form-data] -> AdminP4kImportPageController#enqueuePreview gate=class:hasRole('ADMIN') layout=yes
@@ -127,6 +130,7 @@
 /admin/settings GET -> AdminSettingsPageController#viewSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/settings/danger-zone GET -> AdminDangerZonePageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands GET -> AdminSpecialCommandsPageController#listSpecialCommands gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST -> AdminSpecialCommandsPageController#createSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#createSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
@@ -357,7 +361,7 @@
 /materials GET -> MaterialsPageController#listMaterials gate=class:isAuthenticated() layout=yes
 /materials/overview GET -> MaterialsPageController#getMatrixOverview gate=class:isAuthenticated() layout=yes
 /materials/overview/data GET -> MaterialsPageController#getMatrixData gate=class:isAuthenticated() layout=yes
-/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN') layout=yes
+/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'ADMIN') layout=yes
 /materials/{id} GET -> MaterialsPageController#getMaterialDetail gate=class:isAuthenticated() layout=yes
 /me/active-org-unit POST -> MeFrontendController#setActiveOrgUnit gate=class:isAuthenticated() layout=yes
 /members GET -> MemberManagementController#listMembers gate=class:hasRole('ADMIN') layout=yes
@@ -369,6 +373,7 @@
 /members/{id}/edit GET -> MemberManagementController#editMember gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/edit POST -> MemberManagementController#updateMember gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/edit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberManagementController#updateMemberAjax gate=class:hasRole('ADMIN') layout=yes
+/members/{id}/export GET -> MemberManagementController#memberExport gate=class:hasRole('ADMIN') layout=yes
 /missions GET -> MissionPageController#listMissions gate=class:isAuthenticated() layout=yes
 /missions POST -> MissionWriteController#createMission gate=class:isAuthenticated() layout=yes
 /missions/new GET -> MissionPageController#createMissionForm gate=class:isAuthenticated() layout=yes
@@ -445,7 +450,7 @@
 /operations/{id}/delete POST -> OperationPageController#deleteOperation gate=method:hasRole('ADMIN') layout=yes
 /operations/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#deleteOperationAjax gate=method:hasRole('ADMIN') layout=yes
 /operations/{id}/finance/{missionId} GET -> OperationPageController#operationMissionFinance gate=class:isAuthenticated() layout=yes
-/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:hasRole('MISSION_MANAGER') and (#request.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) layout=yes
+/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:hasRole('MISSION_MANAGER') layout=yes
 /operations/{id}/update POST -> OperationPageController#updateOperation gate=method:hasRole('MISSION_MANAGER') layout=yes
 /operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
 /orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
@@ -468,17 +473,17 @@
 /orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/delete POST -> JobOrderWriteController#deleteOrder gate=class:isAuthenticated() layout=yes
-/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
-/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
+/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
 /orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
-/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
+/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
+/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes

@@ -95,7 +95,7 @@ class AdminPersonSearchPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
     assertThat(html.split("btn--cta", -1)).hasSize(2);

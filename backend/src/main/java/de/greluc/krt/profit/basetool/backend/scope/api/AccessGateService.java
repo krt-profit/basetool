@@ -120,6 +120,17 @@ public class AccessGateService {
   }
 
   /**
+   * {@link #canActAsOfficerIn(UUID)} for a target that may have no owning unit: such a target is
+   * reserved to admins.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds officer reach in {@code orgUnitId}
+   */
+  public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
+    return orgUnitId == null ? authHelper.isAdmin() : canActAsOfficerIn(orgUnitId);
+  }
+
+  /**
    * Access check for a personal row without an owning org unit: allowed for an admin without an
    * active pin and for the row's own owner.
    *

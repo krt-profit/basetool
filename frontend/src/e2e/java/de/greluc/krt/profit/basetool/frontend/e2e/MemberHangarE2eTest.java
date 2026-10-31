@@ -93,7 +93,7 @@ class MemberHangarE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, baseUrl + "/members/" + memberId + "/edit");
-        page.getByTestId("member-edit-hangar").click();
+        page.getByTestId("member-tab-link-hangar").click();
         page.waitForURL("**/admin/members/" + memberId + "/hangar");
         hideFooter(page);
         page.evaluate("window.__krtNoReload = true;");

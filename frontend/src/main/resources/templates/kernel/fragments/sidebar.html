@@ -67,6 +67,11 @@
                     <th:block th:replace="~{kernel/fragments/nav-entries :: group(${navigation.personal()}, #{${navigation.personal().group().labelKey()}}, true)}" />
                 </div>
                 <div class="nav-mode nav-mode-admin" data-nav-mode="admin" th:unless="${navigation.admin().isEmpty()}">
+                    <div class="nav-top" th:data-nav-group="#{nav.admin.crumb}">
+                        <th:block th:each="entry : ${navigation.adminTop().links()}">
+                            <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-top-link', null, ${entry.icon()}, false)}" />
+                        </th:block>
+                    </div>
                     <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
                         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false)}" />
                     </th:block>
@@ -121,7 +126,7 @@
                     <span class="nav-user-text">
                         <span class="nav-user-name" sec:authentication="name">greluc</span>
                         <span class="nav-user-meta">
-                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">ALPHA</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN) and hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.member}">Mitglied</span>
+                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">ALPHA</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${hasOfficerReach}" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:unless="${hasOfficerReach}" th:text="#{nav.user.role.member}">Mitglied</span>
                         </span>
                     </span>
                     <svg class="krt-icon nav-user-chevron" aria-hidden="true"><use href="#krt-icon-chevron-up"></use></svg>

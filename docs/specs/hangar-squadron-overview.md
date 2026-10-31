@@ -14,7 +14,7 @@
 ## Context & goal
 
 The unit hangar tab (`/hangar/squadron`, formerly the page „Org-Einheitsübersicht") aggregates the scoped fleet into one
-row per ship type (count + fitted count, with an ADMIN/OFFICER-only per-ship drill-down). The page
+row per ship type (count + fitted count, with a per-ship drill-down for callers with officer reach). The page
 originally fetched up to 1000 rows in one request and filtered them client-side, which stops scaling
 once a fleet grows past a screenful and silently truncates beyond the fetch cap. This spec pins the
 listing contract after the rework to true server-side pagination: the table pages across **all**
@@ -58,8 +58,10 @@ writes; the overview does not tell them apart.
   distinct empty states for "no ships in scope" vs. "no match for this search", and the filter
   stays clearable when a search yields nothing.
 - [ ] Each ship type is one tree row — chevron, type and manufacturer, count, a readiness bar
-  „fitted of total"; for ADMIN/OFFICER the chevron opens indented owner rows (owner, readiness,
-  location) without a table head of their own. The tab count is the number of ship types in scope
+  „fitted of total"; for a caller with officer reach (`canSeeHangarOwnerDetails`) the chevron opens
+  indented owner rows (owner, readiness, location) without a table head of their own, listing only the
+  ships of units in which the caller holds that reach (an admin sees all; a ship without a unit is
+  admin-only). The tab count is the number of ship types in scope
   (`totalElements`; on this tab narrowed by an active search, on „Meine Schiffe" unsearched), because
   a ship total in scope has no backend read.
 - [ ] The scope rules and the role-shaped owner drill-down of
@@ -97,8 +99,9 @@ single Staffel:
 
 An **active unit pin** still narrows the overview to the pinned unit for every caller (owner
 decision) — the cross-unit/OL widening applies only when no unit is pinned, exactly like every other
-scoped surface. The per-ship owner/location/fitted drill-down stays ADMIN/OFFICER-only, so a member /
-BL / OL sees the complete counts but not the per-owner breakdown.
+scoped surface. The per-ship owner/location/fitted drill-down is gated by officer reach in the ship's owning
+unit (REQ-SEC-015), so a member without it sees the complete counts but not the per-owner breakdown;
+a Bereich or OL seat holder gets the breakdown for the units its reach covers.
 
 A ship created through the exchange (REQ-XCH-017) belongs to the member's single direct membership,
 or to no unit for a member of none or of several (owner decision 2026-09-27), and a ship without a

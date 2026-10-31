@@ -37,9 +37,11 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipPledgeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -397,6 +399,8 @@ class HangarPagePatternRenderTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void rendersTheOrgUnitTreeWithOwnerRowsForOfficers() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
     SquadronShipOverviewDto cutlass =
         new SquadronShipOverviewDto(
             type("Cutlass Black", "Drake"),

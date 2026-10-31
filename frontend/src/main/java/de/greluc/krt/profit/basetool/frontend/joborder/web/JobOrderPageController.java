@@ -860,8 +860,7 @@ public class JobOrderPageController {
         reachableAuthorities.stream()
             .anyMatch(a ->
                 a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
     log.debug("JobOrder: Is logistician: {}", result);
     return result;
   }

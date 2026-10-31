@@ -100,20 +100,9 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class InventoryItemController {
 
-  /**
-   * Role gate of the squadron-wide inventory endpoints: ADMIN, OFFICER, LOGISTICIAN (implied by the
-   * first two) or KRT_MEMBER, the same set as the {@code /api/v1/inventory/**} URL rule.
-   */
+  /** Role gate of the squadron-wide inventory endpoints: ADMIN, LOGISTICIAN or KRT_MEMBER. */
   public static final String INVENTORY_ACCESS =
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "','"
-          + Roles.OFFICER
-          + "','"
-          + Roles.LOGISTICIAN
-          + "','"
-          + Roles.KRT_MEMBER
-          + "')";
+      "hasAnyRole('" + Roles.ADMIN + "','" + Roles.LOGISTICIAN + "','" + Roles.KRT_MEMBER + "')";
 
   /** Default page size for a stack-entries drill-down when the caller does not specify one. */
   private static final int STACK_ENTRIES_DEFAULT_SIZE = 20;
@@ -1029,8 +1018,8 @@ public class InventoryItemController {
 
   /**
    * Admin-only: removes every non-personal inventory item ("globales Lager leeren"). Personal
-   * entries are deliberately left untouched. Gated by {@code hasRole('ADMIN')} so neither {@code
-   * OFFICER} nor {@code LOGISTICIAN} can trigger the squadron-wide wipe.
+   * entries are deliberately left untouched. Gated by {@code hasRole('ADMIN')} so neither an
+   * officer nor a {@code LOGISTICIAN} can trigger the squadron-wide wipe.
    *
    * @return 204 No Content
    */

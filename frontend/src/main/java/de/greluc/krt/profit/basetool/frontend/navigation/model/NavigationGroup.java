@@ -30,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * @param labelKey the message key of the heading, which is also the quick-access breadcrumb
  * @param icon the sprite icon name of the heading, or {@code null} for a zone without one
  * @param gate the condition under which any of the group's entries renders
+ * @param collapsed whether the group starts collapsed until the member opens it
  * @param entries the entries in their default order
  */
 public record NavigationGroup(
@@ -37,6 +38,7 @@ public record NavigationGroup(
     @NotNull String labelKey,
     @Nullable String icon,
     @NotNull NavigationGate gate,
+    boolean collapsed,
     @NotNull List<NavigationEntry> entries) {
 
   /**
@@ -46,6 +48,7 @@ public record NavigationGroup(
    * @param labelKey the message key of the heading
    * @param icon the heading icon, or {@code null}
    * @param gate the group's condition
+   * @param collapsed whether the group starts collapsed
    * @param entries the entries in their default order
    */
   public NavigationGroup {
@@ -67,7 +70,7 @@ public record NavigationGroup(
       @NotNull String labelKey,
       @Nullable String icon,
       @NotNull NavigationEntry... entries) {
-    return new NavigationGroup(key, labelKey, icon, NavigationGate.ALWAYS, List.of(entries));
+    return new NavigationGroup(key, labelKey, icon, NavigationGate.ALWAYS, false, List.of(entries));
   }
 
   /**
@@ -89,6 +92,17 @@ public record NavigationGroup(
    */
   @NotNull
   public NavigationGroup gate(@NotNull NavigationGate condition) {
-    return new NavigationGroup(key, labelKey, icon, condition, entries);
+    return new NavigationGroup(key, labelKey, icon, condition, collapsed, entries);
+  }
+
+  /**
+   * This group starting collapsed; the member's own choice and the group holding the current page
+   * still win.
+   *
+   * @return the changed group
+   */
+  @NotNull
+  public NavigationGroup startCollapsed() {
+    return new NavigationGroup(key, labelKey, icon, gate, true, entries);
   }
 }

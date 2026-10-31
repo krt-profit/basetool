@@ -114,10 +114,10 @@ class AdminAnnouncementPageControllerMvcTest {
   }
 
   /**
-   * The page renders on the form pattern: a page head under the "Benutzer &amp; Inhalte" eyebrow
-   * with the delete as a danger entry of its overflow menu, the text as the numbered section of a
-   * form card with the Markdown hint and a character counter seeded from the stored text, and one
-   * sticky primary action.
+   * The page renders on the form pattern: a page head under the "Mitglieder &amp; Organisation"
+   * eyebrow with the delete as a danger entry of its overflow menu, the text as the numbered
+   * section of a form card with the Markdown hint and a character counter seeded from the stored
+   * text, and one sticky primary action.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
@@ -135,7 +135,7 @@ class AdminAnnouncementPageControllerMvcTest {
 
     assertThat(html)
         .contains("data-testid=\"page-head\"")
-        .containsPattern("<span class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("<span class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .contains("<h1>Information bearbeiten</h1>")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
