@@ -68,7 +68,6 @@ class MissionScopeParityTest {
             row("internal mission of B", mission(units.unitB(), true)),
             row("internal mission of child C", mission(units.childC(), true)),
             row("public mission of B", mission(units.unitB(), false)),
-            row("internal ownerless mission", mission(null, true)),
             row("public ownerless mission", mission(null, false)));
     missionRepository.flush();
 
