@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.Locale;
@@ -254,7 +255,8 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("missions.list"), 1),
                 new HiddenResponse(List.of(), 0),
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
 
     assertThat(home(member())).doesNotContain("data-testid=\"dashboard-hint\"");
   }
@@ -302,7 +304,8 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(), 0),
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
     assertThat(widget("favourites"))
         .contains("data-testid=\"dashboard-favourites-empty\"")
         .contains("Du hast noch keine Favoriten");
@@ -312,7 +315,8 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("missions.list"), 1),
                 new HiddenResponse(List.of(), 0),
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
     assertThat(widget("favourites"))
         .contains("data-entry-key=\"missions.list\"")
         .doesNotContain("dashboard-favourites-empty");
