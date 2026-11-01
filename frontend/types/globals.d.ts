@@ -787,6 +787,8 @@ interface KrtComboboxI18n extends Partial<Record<string, unknown>> {
  * `detail` shape.
  */
 interface DocumentEventMap {
+    /** Fired for every notification the notification stream delivers. */
+    'krt:notification': CustomEvent<null>;
     /**
      * Fired after `krtFetch.swap` replaced a container's content, so progressive enhancement can
      * re-run on the new markup.

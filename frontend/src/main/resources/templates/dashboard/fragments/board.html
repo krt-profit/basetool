@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="board" id="dashboard-board" class="dash-board" data-testid="dashboard-board"
+     th:attr="data-mode=${dashboard.mode().slug()},data-version=${dashboard.version()},data-customised=${dashboard.customised()},data-loaded=${dashboard.loaded()},data-max=${dashboard.max()},data-widget-error=#{dashboard.item.error},data-retry=#{dashboard.retry},data-conflict=#{dashboard.conflict},data-save-error=#{dashboard.saveError},data-count=${dashboard.wide().size() + dashboard.narrow().size()}">
+    <div th:unless="${dashboard.loaded()}" class="card dash-state" role="alert" data-testid="dashboard-load-error">
+        <p class="m-0" th:text="#{dashboard.loadError}">Das Dashboard konnte nicht geladen werden.</p>
+        <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-reload" th:text="#{dashboard.retry}">Erneut versuchen</button>
+    </div>
+    <div th:if="${dashboard.loaded()}" class="card dash-state dash-empty" data-dashboard-empty data-testid="dashboard-empty"
+         th:classappend="${!dashboard.empty()} ? 'is-hidden'">
+        <h2 class="home-card-title" th:text="#{dashboard.empty.title}">Das Dashboard ist leer</h2>
+        <p class="m-0" th:text="#{dashboard.empty.text}">Füge ein Widget hinzu.</p>
+        <button type="button" class="btn btn-xs" data-trigger="dashboard-add" th:text="#{dashboard.add}">Widget hinzufügen</button>
+    </div>
+    <div th:if="${dashboard.loaded()}" class="dash-columns">
+        <div class="dash-column dash-column--wide" data-dashboard-column="WIDE" role="group"
+             th:aria-label="#{dashboard.column.wide}">
+            <th:block th:each="item : ${dashboard.wide()}">
+                <th:block th:replace="~{dashboard/fragments/board :: item(${item})}"></th:block>
+            </th:block>
+        </div>
+        <div class="dash-column dash-column--narrow" data-dashboard-column="NARROW" role="group"
+             th:aria-label="#{dashboard.column.narrow}">
+            <th:block th:each="item : ${dashboard.narrow()}">
+                <th:block th:replace="~{dashboard/fragments/board :: item(${item})}"></th:block>
+            </th:block>
+        </div>
+    </div>
+</div>
+
+<section th:fragment="item(item)" class="card card--flush dash-widget" data-dashboard-item
+         th:with="widget=${item.widget()}, type=${item.widget().type()}, title=${item.widget().type().name() == 'UPCOMING_DAYS'} ? #{dashboard.widget.upcoming-days.title(${item.widget().days()})} : #{${item.widget().type().labelKey()}}"
+         th:classappend="${!item.available()} ? 'is-unavailable'"
+         th:data-testid="|dashboard-widget-${type.slug()}|"
+         th:attr="data-id=${item.key()},data-widget-id=${item.storedId()},data-widget-type=${type.name()},data-widget-slug=${type.slug()},data-column=${widget.column().name()},data-options-version=${widget.optionsVersion()},data-options=${type.optionsAttribute()},data-unit=${widget.orgUnitId()},data-days=${widget.days()},data-rows=${widget.rows()},data-status=${widget.status()},data-reorder-name=${title},data-available=${item.available()}">
+    <header class="home-card-head dash-widget__head">
+        <h2 class="home-card-title" th:text="${title}">Nächste 7 Tage</h2>
+        <span class="chip" data-testid="dashboard-widget-unit" th:if="${item.unitName() != null}"
+              th:text="#{dashboard.item.unit(${item.unitName()})}">Einheit: ALPHA</span>
+        <span class="grow"></span>
+        <span class="dash-widget__edit" data-dashboard-edit>
+            <th:block th:replace="~{kernel/fragments/components :: reorderControls(itemName=${title}, first=false, last=false)}"></th:block>
+            <button type="button" class="btn btn-ghost btn-icon" data-trigger="dashboard-move-column"
+                    data-testid="dashboard-move-column"
+                    th:attr="aria-label=${widget.column().name() == 'WIDE'} ? #{dashboard.item.moveNarrow(${title})} : #{dashboard.item.moveWide(${title})},title=${widget.column().name() == 'WIDE'} ? #{dashboard.item.moveNarrow(${title})} : #{dashboard.item.moveWide(${title})},data-label-wide=#{dashboard.item.moveWide(${title})},data-label-narrow=#{dashboard.item.moveNarrow(${title})}"
+                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg></button>
+            <button type="button" class="btn btn-ghost btn-icon" data-trigger="dashboard-options"
+                    data-testid="dashboard-options" th:if="${!type.options.isEmpty()}"
+                    th:attr="aria-label=#{dashboard.item.options(${title})},title=#{dashboard.item.options(${title})}"
+                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg></button>
+            <button type="button" class="btn btn-ghost btn-icon" data-trigger="dashboard-remove"
+                    data-testid="dashboard-remove"
+                    th:attr="aria-label=#{dashboard.item.remove(${title})},title=#{dashboard.item.remove(${title})}"
+                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+        </span>
+    </header>
+    <div class="dash-widget__body" data-widget-body aria-live="polite">
+        <p th:unless="${item.available()}" class="home-notifs__empty" data-testid="dashboard-widget-unavailable"
+           th:text="${item.unitName() != null} ? #{dashboard.item.unavailable(${item.unitName()})} : #{dashboard.item.unavailable.generic}">In ALPHA nicht verfügbar</p>
+    </div>
+</section>
+
+</body>
+</html>

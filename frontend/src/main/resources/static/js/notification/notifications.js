@@ -801,6 +801,7 @@ function startSse() {
         source.addEventListener('notification', () => {
             markSseHealthy();
             refreshUnreadCount();
+            document.dispatchEvent(new CustomEvent('krt:notification'));
             const dropdown = document.getElementById('notification-dropdown');
             if (dropdown && !dropdown.classList.contains('notification-dropdown-hidden')) {
                 loadDropdown();

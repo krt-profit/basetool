@@ -4524,7 +4524,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/favourites\", status=~\"5..\"}[5m]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/favourites|/dashboard/.*\", status=~\"5..\"}[5m]))",
           "refId": "A",
           "legendFormat": "5xx/s",
           "datasource": {

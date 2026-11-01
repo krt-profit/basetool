@@ -21,6 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.client;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardLayoutRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardOptionsRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardPruneRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -43,6 +50,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @RequiredArgsConstructor
 public class DashboardBackendClient {
+
+  /** The backend's dashboard endpoint of a mode. */
+  private static final String DASHBOARD = "/api/v1/navigation/dashboards/{mode}";
 
   /** The backend's announcement endpoint. */
   private static final String ANNOUNCEMENT = "/api/v1/announcements/current";
@@ -78,6 +88,82 @@ public class DashboardBackendClient {
             .build()
             .toUriString();
     return backendApiClient.get(uri, MISSION_PAGE);
+  }
+
+  /**
+   * Reads the caller's dashboard of a mode; the default while the caller never changed it.
+   *
+   * @param mode the mode
+   * @return the dashboard, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse dashboard(@NotNull DashboardMode mode) {
+    return backendApiClient.get(DASHBOARD, DashboardResponse.class, mode.slug());
+  }
+
+  /**
+   * Replaces the caller's layout of a mode.
+   *
+   * @param mode the mode
+   * @param request the instances in display order and the layout version the caller last saw
+   * @return the stored dashboard, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse replaceLayout(
+      @NotNull DashboardMode mode, @NotNull DashboardLayoutRequest request) {
+    return backendApiClient.put(
+        DASHBOARD + "/layout", request, DashboardResponse.class, mode.slug());
+  }
+
+  /**
+   * Replaces the options of one instance.
+   *
+   * @param mode the mode
+   * @param widgetId the instance
+   * @param request the new options and the option version the caller last saw
+   * @return the stored instance, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardWidgetResponse replaceOptions(
+      @NotNull DashboardMode mode,
+      @NotNull UUID widgetId,
+      @NotNull DashboardOptionsRequest request) {
+    return backendApiClient.put(
+        DASHBOARD + "/widgets/{widgetId}/options",
+        request,
+        DashboardWidgetResponse.class,
+        mode.slug(),
+        widgetId);
+  }
+
+  /**
+   * Restores the default dashboard of a mode.
+   *
+   * @param mode the mode
+   * @param version the layout version the caller last saw
+   * @return the default dashboard, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse resetDashboard(@NotNull DashboardMode mode, long version) {
+    return backendApiClient.delete(
+        DASHBOARD + "?version={version}", DashboardResponse.class, mode.slug(), version);
+  }
+
+  /**
+   * Deletes the instances of widget types the caller may no longer use.
+   *
+   * @param mode the mode
+   * @param types the widget types
+   * @return the dashboard after the deletion, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse pruneDashboard(
+      @NotNull DashboardMode mode, @NotNull List<DashboardWidgetType> types) {
+    return backendApiClient.post(
+        DASHBOARD + "/prune",
+        new DashboardPruneRequest(types),
+        DashboardResponse.class,
+        mode.slug());
   }
 
   /**
