@@ -169,6 +169,7 @@ public final class FrontendPageRoutes {
           "/notifications/unread-count",
           "/quick-access/entries",
           "/quick-access/search",
+          "/navigation/favourites",
           "/orders/item-search",
           "/pending-approval/status",
           "/personal-inventory/blueprints/craftability",

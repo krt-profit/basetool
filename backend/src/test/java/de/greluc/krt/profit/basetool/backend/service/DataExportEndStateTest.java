@@ -329,6 +329,12 @@ class DataExportEndStateTest {
           owner.getId(),
           squadron.getId(),
           material.getId());
+      jdbc.update("INSERT INTO navigation_preferences (user_id) VALUES (?)", owner.getId());
+      jdbc.update(
+          "INSERT INTO navigation_favourite (preferences_id, order_index, entry_key)"
+              + " VALUES (?, 0, ?)",
+          owner.getId(),
+          "missions.list");
     }
     UUID partner = UUID.randomUUID();
     jdbc.update(

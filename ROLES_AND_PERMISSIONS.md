@@ -1304,3 +1304,8 @@ Favourites, hidden entries, order, tab bar, „Darstellung“, the dashboard and
 admin reset, and the preferences are not audited. They are part of the data export — the admin
 export for somebody who cannot sign in included (REQ-SEC-058) — and of the admin account merge,
 where the surviving account's choices win (REQ-SEC-046).
+
+The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`
+and `POST /api/v1/navigation/preferences/prune` need only a signed-in user; the owner is always the
+token's subject, no endpoint takes a member id, and a favourite is a key of a page the user already
+sees — the entry's own gate stays authoritative.

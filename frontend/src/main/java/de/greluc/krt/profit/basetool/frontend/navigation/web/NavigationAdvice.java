@@ -20,10 +20,15 @@
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
@@ -38,8 +43,9 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
- * Exposes {@code navigation}, the caller's {@link NavigationMenu}, to every page that renders the
- * layout; the navigation fragments render nothing but it.
+ * Exposes {@code navigation}, the caller's {@link NavigationMenu}, and {@code
+ * navigationFavourites}, the caller's {@link NavigationFavourites}, to every page that renders the
+ * layout; the navigation fragments render nothing but them.
  *
  * <p>Roles are read through the role hierarchy, as {@code sec:authorize} reads them; the flags come
  * from the other layout advices' model attributes and fail closed when one is missing.
@@ -52,8 +58,12 @@ public class NavigationAdvice {
 
   private final RoleHierarchy roleHierarchy;
 
+  private final NavigationFavouritesReader favouritesReader;
+
+  private final FrontendAuthHelperService authHelper;
+
   /**
-   * Resolves the navigation for the current request.
+   * Resolves what the caller brings to the navigation gates of the current request.
    *
    * @param authentication the caller's authentication, or {@code null} for a signed-out visitor
    * @param locale the request locale
@@ -61,11 +71,11 @@ public class NavigationAdvice {
    * @param supplyEnabled whether the supply surface is on
    * @param purchasingEnabled whether the purchasing surface is on
    * @param promotionEnabled whether the promotion subsystem is exposed
-   * @return the caller's navigation; never {@code null}
+   * @return the caller's roles and flags; never {@code null}
    */
-  @ModelAttribute("navigation")
+  @ModelAttribute("navigationAccess")
   @NotNull
-  public NavigationMenu navigation(
+  public NavigationAccess access(
       @Nullable Authentication authentication,
       @NotNull Locale locale,
       @Nullable @ModelAttribute(name = "meCapabilities", binding = false)
@@ -90,7 +100,57 @@ public class NavigationAdvice {
     addIf(flags, Boolean.TRUE.equals(promotionEnabled), NavigationFlag.PROMOTION);
     addIf(flags, "de".equals(locale.getLanguage()), NavigationFlag.LANGUAGE_DE);
     addIf(flags, "en".equals(locale.getLanguage()), NavigationFlag.LANGUAGE_EN);
-    return NavigationMenu.resolve(registry, new NavigationAccess(roles(authentication), flags));
+    return new NavigationAccess(roles(authentication), flags);
+  }
+
+  /**
+   * Resolves the navigation for the current request.
+   *
+   * @param access the caller's roles and flags
+   * @return the caller's navigation; never {@code null}
+   */
+  @ModelAttribute("navigation")
+  @NotNull
+  public NavigationMenu navigation(
+      @ModelAttribute(name = "navigationAccess", binding = false) @NotNull
+          NavigationAccess access) {
+    return NavigationMenu.resolve(registry, access);
+  }
+
+  /**
+   * Resolves the page or tab the request shows, for the header star.
+   *
+   * @param menu the caller's navigation
+   * @param requestUri the path and query of the current request
+   * @return the entry the caller can favourite here, or {@code null} on a detail page or any other
+   *     URI that is no entry
+   */
+  @ModelAttribute("navigationCurrent")
+  @Nullable
+  public NavigationEntry current(
+      @ModelAttribute(name = "navigation", binding = false) @NotNull NavigationMenu menu,
+      @ModelAttribute(name = "currentRequestUri", binding = false) @NotNull String requestUri) {
+    return menu.currentEntry(requestUri).orElse(null);
+  }
+
+  /**
+   * Reads the caller's favourites for the navigation, once per request that renders a layout model;
+   * a signed-out visitor and a handler that renders no model get none.
+   *
+   * @param request the current request
+   * @param access the caller's roles and flags
+   * @return the favourites to render; never {@code null}
+   */
+  @ModelAttribute("navigationFavourites")
+  @NotNull
+  public NavigationFavourites favourites(
+      @NotNull HttpServletRequest request,
+      @ModelAttribute(name = "navigationAccess", binding = false) @NotNull
+          NavigationAccess access) {
+    if (!authHelper.isAuthenticated() || !LayoutContextLoader.needsLayoutModel(request)) {
+      return NavigationFavourites.NOT_LOADED;
+    }
+    return favouritesReader.read(access);
   }
 
   @NotNull

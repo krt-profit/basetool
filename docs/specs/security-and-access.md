@@ -2278,6 +2278,7 @@ family decides, so a sub-family can differ from its parent.
 | --- | --- |
 | `/api/v1/bank/**` (the org-unit slice `/api/v1/bank/org-units/**` included) | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
+| `/api/v1/navigation/**` | **new** — one member's own navigation preferences (REQ-UI-032) |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
 | `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
@@ -3693,10 +3694,11 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 `DiscordRegistrationAdminController#merge` ·
 **Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
 
-#### Planned amendment (ADR-0298)
+#### Amendment (ADR-0298)
 
-> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
-> current code stays authoritative.
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row and the
+> favourites (`NavigationUserReassignment`, position 210, `navigation_preferences.user_id`). The
+> sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
 merge. The `navigation` module declares their columns as following the member in a
@@ -3715,10 +3717,11 @@ The source's rows that the result does not take over are removed with the merge;
 stays on the emptied account. The rows moved and removed count in the `USER_MERGED` details like
 any participant's. The merge never refuses on account of the preferences.
 
-**Enforced by (to be added):** `UserAccountMergeEndStateTest` (the favourite union with its order
-and cut, hidden entries minus favourites, the target's order, tab bar, „Darstellung" and
-dashboards), `UserReassignmentOrderTest`, `UserAccountMergeCoverageTest` · **Related:** REQ-UI-032,
-REQ-UI-034, REQ-DATA-021, ADR-0298, ADR-0299
+**Enforced by:** `NavigationUserReassignmentTest` and `FavouritesMergeTest` (the favourite union
+with its order and cut, the emptied account's rows removed), `UserReassignmentOrderTest`,
+`UserAccountMergeCoverageTest`; **to be added:** the hidden entries minus favourites, the target's
+order, tab bar, „Darstellung" and dashboards · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021,
+ADR-0298, ADR-0299
 
 ### REQ-SEC-047 — A client is told its authorisation, never left to derive it
 
@@ -5146,10 +5149,11 @@ links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
-#### Planned amendment (ADR-0298)
+#### Amendment (ADR-0298)
 
-> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
-> current code stays authoritative.
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
+> favourites (`preference_section`, `position`, `entry_key` per row). The sections that follow and
+> the dashboards are planned and join the same statement.
 
 - **The navigation preferences and the home dashboards are part of the export, in their own
   section** `navigationPreferences`, declared by the `navigation` module as a
@@ -5163,10 +5167,10 @@ links, beside the separate deletion card) · **Decision:**
 - The section has its `pdf.export.section.*` label in all three backend bundles, and its columns
   count for REQ-DATA-021 like every other section's.
 
-**Enforced by (to be added):** `PersonalDataExportCatalogueTest` and `DataExportEndStateTest` (the
-`navigationPreferences` section with a seeded favourite, hidden entry and dashboard instance),
-`PersonalDataExportOwnershipTest`, `DataExportPdfSectionLabelCoverageTest`,
-`GdprParticipantCoverageTest` · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
+**Enforced by:** `PersonalDataExportCatalogueTest` and `DataExportEndStateTest` (the
+`navigationPreferences` section with a seeded favourite), `PersonalDataExportOwnershipTest`,
+`DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`; **to be added:** the
+further sections with a seeded hidden entry and dashboard instance · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
 ADR-0299
 
 ### REQ-SEC-059 — A half-finished account deletion is observable

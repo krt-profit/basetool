@@ -1,0 +1,91 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.navigation.internal;
+
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+
+/**
+ * The caller's own navigation preferences (REQ-UI-032, ADR-0298): owner-only, unaudited and not
+ * pushed live. Every write is counted once it has committed or been refused, so the service itself
+ * holds no transaction.
+ */
+@Service
+@RequiredArgsConstructor
+public class NavigationPreferencesService {
+
+  private final NavigationPreferencesWriter writer;
+  private final NavigationMetrics metrics;
+
+  /**
+   * Reads the caller's sections.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @return every section with its version
+   */
+  public @NotNull NavigationPreferencesResponse read(@NotNull UUID userId) {
+    return writer.read(userId);
+  }
+
+  /**
+   * Replaces the caller's favourites.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param request the new keys and the version the caller last saw
+   * @return the stored favourites with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when a key repeats
+   */
+  public @NotNull FavouritesResponse replaceFavourites(
+      @NotNull UUID userId, @NotNull FavouritesUpdateRequest request) {
+    try {
+      FavouritesResponse stored =
+          writer.replaceFavourites(userId, request.keys(), request.version());
+      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.OK);
+      return stored;
+    } catch (ObjectOptimisticLockingFailureException e) {
+      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.CONFLICT);
+      throw e;
+    } catch (BadRequestException e) {
+      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
+      throw e;
+    }
+  }
+
+  /**
+   * Deletes entry keys the caller may no longer see from every section.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param keys the entry keys to delete
+   * @return the caller's sections after the deletion
+   */
+  public @NotNull NavigationPreferencesResponse prune(
+      @NotNull UUID userId, @NotNull List<String> keys) {
+    if (writer.prune(userId, keys)) {
+      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.OK);
+    }
+    return writer.read(userId);
+  }
+}

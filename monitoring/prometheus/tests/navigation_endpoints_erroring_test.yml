@@ -1,0 +1,47 @@
+rule_files:
+  - ../alerts/apps.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - a third of the preference writes fail with a 500
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="basetool-backend", uri="/api/v1/navigation/preferences/favourites", status="200"}'
+        values: "0+20x40"
+      - series: 'http_server_requests_seconds_count{application="basetool-backend", uri="/api/v1/navigation/preferences/favourites", status="500"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: NavigationEndpointsErroring
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: NavigationEndpointsErroring
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Navigation preference endpoints answering 5xx"
+              description: "More than 5 % of the navigation preference requests (/api/v1/navigation/* on the backend, /navigation/favourites on the frontend) failed with a 5xx for 10 minutes (REQ-UI-032). The pages still render with the defaults and the stars off, but members cannot save favourites. Runbook: sum by (application, uri, status) (rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/favourites\", status=~\"5..\"}[10m])) names the failing route; check the backend log for the correlation id and the database connection pool."
+
+  - name: silent - the preference endpoints answer without a server error
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="basetool-backend", uri="/api/v1/navigation/preferences", status="200"}'
+        values: "0+20x40"
+      - series: 'http_server_requests_seconds_count{application="basetool-frontend", uri="/navigation/favourites", status="409"}'
+        values: "0+5x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: NavigationEndpointsErroring
+        exp_alerts: []
+
+  - name: silent - no preference traffic at all
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="basetool-backend", uri="/api/v1/missions", status="500"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: NavigationEndpointsErroring
+        exp_alerts: []

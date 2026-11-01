@@ -138,3 +138,5 @@ terms_acceptance identity
 uex_category catalogue
 user_approval_event identity
 user_roles identity
+navigation_preferences navigation
+navigation_favourite navigation

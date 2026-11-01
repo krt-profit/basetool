@@ -202,18 +202,21 @@ declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13
   an undeclared module.
 
 A module without an `api` package keeps all its types in its base package, which is its unnamed
-interface: `kernel` today. A module that publishes nothing yet keeps every type below its base
+interface: `kernel` today. A module that publishes nothing keeps every type below its base
 package and outside an `api` package, so it exposes no type at all; no declaration allows it,
-and Spring Modulith reports any module that reaches into it: `dashboard`, `orgchart`,
-`personalinventory` and `promotion` today, which no other module uses. Its dependents allow it by bare name (`"kernel"`, not
+and Spring Modulith reports any module that reaches into it: `dashboard`, `navigation`,
+`orgchart`, `personalinventory` and `promotion` today, which no other module uses. Such a leaf
+module is laid out in `internal` and `web` only and consumes the `api` of other modules alone;
+`navigation` is leaf by design, since the frontend reaches it over REST. For a module that
+keeps its types in the base package, its dependents allow it by bare name (`"kernel"`, not
 `"kernel::api"`), it publishes no named interface, and no type lies below its base package. A
 module that may depend on no declared module says so with `allowedDependencies = {}`: the
 annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
 
-Declared on `main`: `admin`, `audit`, `bank`, `catalogue`, `dashboard`, `exchange`, `identity`,
-`inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`, `mission`, `notification`,
-`operation`, `orgchart`, `orgunit`, `personalinventory`, `platform`, `privacy`, `promotion`,
-`refinery`, `scope` (floor 23). `mission` publishes `mission.api.MissionCommands`, its first
+Declared on `main`: `admin`, `app`, `audit`, `bank`, `blueprint`, `catalogue`, `dashboard`,
+`exchange`, `hangar`, `identity`, `inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`,
+`mission`, `navigation`, `notification`, `operation`, `orgchart`, `orgunit`, `personalinventory`,
+`platform`, `privacy`, `promotion`, `purchasing`, `refinery`, `scope`, `supply` (floor 29). `mission` publishes `mission.api.MissionCommands`, its first
 command (`detachFromOperation`, plan §5.3). `bank.api` carries `BankAmounts` and `BankBookingRequestType`, which its
 events and its conflict exception expose.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
@@ -227,7 +230,7 @@ wire records sit in `exchange.internal.dto`.
 **Acceptance**
 
 - [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
-      which equals the detected Modulith modules, with a floor of 23.
+      which equals the detected Modulith modules, with a floor of 29.
 - [x] Each declared module's only named interface is `api`, and it contains every top-level type
       of the module's `api` package tree and nothing outside it — except `kernel`, whose types all
       lie in its base package, and a module that publishes nothing, which has no named interface
@@ -241,32 +244,26 @@ wire records sit in `exchange.internal.dto`.
 
 **Enforced by:** `ModularityTest` · **Fixture:** `architecturefixture.modulithapi`
 
-#### Planned amendment (ADR-0298)
+#### The navigation module (ADR-0298)
 
-> **Status: planned** (ADR-0298, map #2800). Until it ships, the current text above / the current
-> code stays authoritative.
+The navigation preference store is the module `navigation`:
 
-The navigation preference store becomes the module `navigation`, declared in the same pull request
-that creates its package:
-
-- the domain map gains `module navigation 1` and a `package navigation` rule; rank 1 lets it depend
-  on `kernel` and `platform` only, and no `allow` row is added;
+- the domain map has `module navigation 1` and a `package navigation` rule; rank 1 lets it depend
+  on `kernel` and `platform` only, and no `allow` row exists;
 - its `package-info` declares `@ApplicationModule` with `allowedDependencies = {"kernel",
-  "platform::api"}`, and it is laid out in `navigation.api`, `navigation.internal` and
-  `navigation.web`;
+  "platform::api"}`; it is a leaf module without an `api` package, laid out in `navigation.internal`
+  and `navigation.web`, and it is listed with the modules that publish nothing (`ModularityTest`);
 - no domain module depends on it; the composition root `app` may, like on every module;
-- account deletion reaches its tables through the `app_user` foreign key with `ON DELETE CASCADE`,
-  so the module names neither `identity` nor `platform.api.UserErasureParticipant`;
+- account deletion reaches its tables through the foreign key of its root table to `app_user` with
+  `ON DELETE CASCADE`, whose child tables cascade from the root, so the module names neither
+  `identity` nor `platform.api.UserErasureParticipant`;
 - it takes part in the Art. 15 / Art. 20 export (REQ-SEC-058) and the account merge (REQ-SEC-046)
   by implementing `platform.api.PersonalDataExportSection` and
   `platform.api.UserReassignmentParticipant`. Both SPIs are owned by `platform` and lie in its
   `api`, which `platform::api` already allows, so the allowed dependencies stay as listed; the
   orchestrators that run them collect the participants as beans and are not a dependency.
 
-The module count of REQ-MOD-001 and the declared floor of REQ-MOD-006 and `ModularityTest` each grow
-by one when it lands.
-
-**Enforced by:** `ModularityTest`, `DomainMapTest` (the new module's entries, to be added)
+**Enforced by:** `ModularityTest`, `DomainMapTest`, `TableOwnershipTest`
 
 ## Out of scope
 
