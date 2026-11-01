@@ -21,6 +21,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** How often a widget without a live topic reloads while the tab is visible (REQ-UI-034). */
 const POLL_INTERVAL_MS = 10 * 60 * 1000;
@@ -32,13 +33,36 @@ const POLL_STAGGER_MS = 1500;
 const POLL_STAGGER_SLOTS = 8;
 
 /** The widget types a live channel updates; every other type polls. */
-const LIVE_TYPES = new Set(['UPCOMING_DAYS', 'NEXT_MISSION', 'NOTIFICATIONS', 'HANGAR_READINESS']);
+const LIVE_TYPES = new Set([
+    'UPCOMING_DAYS',
+    'NEXT_MISSION',
+    'NOTIFICATIONS',
+    'HANGAR_READINESS',
+    'ASSIGNED_ORDERS',
+    'LOW_STOCK',
+    'BANK',
+]);
+
+/**
+ * The global live-sync rooms that reload the instances of a widget type, each with the section of
+ * the room that carries the change (REQ-FE-015).
+ *
+ * @type {Record<string, { topic: string, section: string }>}
+ */
+const LIVE_ROOMS = {
+    ASSIGNED_ORDERS: { topic: 'orders', section: 'queue' },
+    LOW_STOCK: { topic: 'inventory', section: 'stock-levels' },
+    BANK: { topic: 'orgunit-bank', section: 'orgUnitBank' },
+};
 
 /** The options a widget request carries, as the item's data attributes name them. */
 const OPTION_PARAMS = ['unit', 'days', 'rows', 'status'];
 
 /** The document event the notification stream raises for every new notification. */
 const NOTIFICATION_EVENT = 'krt:notification';
+
+/** The confirmation dialog of the announcement's removal. */
+const INFO_DELETE_MODAL = 'dashboard-info-delete-modal';
 
 /** @type {Set<number>} the pending first-poll timers and poll intervals */
 const timers = new Set();
@@ -182,6 +206,29 @@ function followHangarRoom(topic) {
     });
 }
 
+/** @type {Set<string>} the widget types whose room already has a receiver */
+const followedRooms = new Set();
+
+/**
+ * Listens to the global room of a widget type once, from the first instance of the type on, and
+ * reloads the type's instances when the room announces a change.
+ *
+ * @param {string} type the widget type name
+ */
+function followRoom(type) {
+    const room = LIVE_ROOMS[type];
+    if (!room || followedRooms.has(type)) return;
+    followedRooms.add(type);
+    krtLiveSync.createReceiver({
+        topic: room.topic,
+        sections: { [room.section]: { container: `[data-widget-type="${type}"]` } },
+        coalesceMs: 1500,
+        refresh() {
+            reloadType(type);
+        },
+    });
+}
+
 /**
  * Loads one instance's body from its own endpoint; a failure shows that instance's error state and
  * leaves the others alone. An instance the active context does not offer loads nothing.
@@ -204,6 +251,8 @@ export async function loadWidget(item) {
             return;
         }
         krtFetch.setTrustedHtml(body, await response.text());
+        document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: body } }));
+        followRoom(item.dataset.widgetType ?? '');
         const content = body.querySelector('[data-widget-content]');
         if (item.dataset.widgetType === 'NOTIFICATIONS' && content instanceof HTMLElement) {
             await fillNotifications(content);
@@ -330,13 +379,28 @@ function setInfoEditing(trigger, editing) {
 }
 
 /**
- * Registers the delegated handlers of the widgets: the announcement's expander, its read marker and
- * inline editor, and the retry of a failed instance.
+ * Registers the delegated handlers of the widgets: the announcement's expander, its read marker,
+ * inline editor and removal, and the retry of a failed instance.
  */
 export function initWidgetActions() {
     krtEvents.on('click', 'dashboard-info-toggle', toggleInfo);
     krtEvents.on('click', 'dashboard-info-edit', (trigger) => setInfoEditing(trigger, true));
     krtEvents.on('click', 'dashboard-info-cancel', (trigger) => setInfoEditing(trigger, false));
+    krtEvents.on('click', 'dashboard-info-delete', () => krtModal.open(INFO_DELETE_MODAL));
+    krtEvents.on('click', 'dashboard-info-delete-confirm', () => {
+        krtFetch.write({
+            method: 'POST',
+            url: '/admin/announcement/delete',
+            toast: false,
+            errorMessage:
+                document.querySelector('[data-info-editor]')?.getAttribute('data-error') ??
+                undefined,
+            onSuccess() {
+                krtModal.close(INFO_DELETE_MODAL);
+                reloadType('INFORMATION');
+            },
+        });
+    });
     krtEvents.on('click', 'dashboard-widget-retry', (trigger) => {
         const item = trigger.closest('[data-dashboard-item]');
         if (item instanceof HTMLElement) loadWidget(item);

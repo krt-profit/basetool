@@ -105,9 +105,67 @@ class DashboardServiceTest {
   }
 
   @Test
-  @DisplayName("the admin default is empty until the admin widgets exist")
-  void readsAnEmptyAdminDefault() {
-    assertThat(service.read(member(), DashboardMode.ADMIN).widgets()).isEmpty();
+  @DisplayName("the admin default is the hub in the wide column and four admin widgets")
+  void readsTheAdminDefault() {
+    DashboardResponse read = service.read(member(), DashboardMode.ADMIN);
+
+    assertThat(read.customised()).isFalse();
+    assertThat(read.widgets())
+        .extracting(DashboardWidgetResponse::type, DashboardWidgetResponse::column)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.ADMIN_HUB, DashboardColumn.WIDE),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.DELETION_REQUESTS, DashboardColumn.NARROW),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.DISCORD_REGISTRATIONS, DashboardColumn.NARROW),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.SYNC_STATUS, DashboardColumn.NARROW),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.OPEN_TERMS, DashboardColumn.NARROW));
+    assertThat(read.widgets().get(3).days()).isEqualTo(7);
+    assertThat(read.widgets().get(1).rows()).isEqualTo(5);
+  }
+
+  @Test
+  @DisplayName("an admin widget in the member dashboard is refused")
+  void refusesAnAdminWidgetInTheMemberMode() {
+    UUID owner = member();
+    DashboardLayoutRequest request =
+        new DashboardLayoutRequest(List.of(item(DashboardWidgetType.OPEN_TERMS)), 0L);
+
+    assertThatThrownBy(() -> service.replaceLayout(owner, MEMBER, request))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  @DisplayName("the sync status takes the ranges 1, 7 and 30 days and no other")
+  void theSyncStatusTakesOnlyItsRanges() {
+    UUID owner = member();
+    DashboardWidgetResponse widget =
+        service
+            .replaceLayout(
+                owner,
+                DashboardMode.ADMIN,
+                new DashboardLayoutRequest(List.of(item(DashboardWidgetType.SYNC_STATUS)), 0L))
+            .widgets()
+            .getFirst();
+
+    DashboardWidgetResponse updated =
+        service.replaceOptions(
+            owner,
+            DashboardMode.ADMIN,
+            widget.id(),
+            new DashboardOptionsRequest(null, 30, null, null, widget.optionsVersion()));
+
+    assertThat(updated.days()).isEqualTo(30);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                DashboardMode.ADMIN,
+                widget.id(),
+                new DashboardOptionsRequest(null, 14, null, null, updated.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
   }
 
   @Test
@@ -391,6 +449,129 @@ class DashboardServiceTest {
     assertThat(service.read(member(), MEMBER).widgets())
         .extracting(DashboardWidgetResponse::type)
         .doesNotContain(DashboardWidgetType.NEXT_MISSION, DashboardWidgetType.HANGAR_READINESS);
+  }
+
+  @Test
+  @DisplayName("the work widgets start with the matrix defaults")
+  void addsTheWorkWidgetsWithTheirDefaults() {
+    UUID owner = member();
+
+    DashboardResponse written =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(
+                    item(DashboardWidgetType.ASSIGNED_ORDERS),
+                    item(DashboardWidgetType.LOW_STOCK),
+                    item(DashboardWidgetType.BANK)),
+                0L));
+
+    DashboardWidgetResponse assigned = written.widgets().get(0);
+    assertThat(assigned.rows()).isEqualTo(5);
+    assertThat(assigned.status()).isEqualTo(DashboardStatus.OPEN_ACTIVE);
+    assertThat(assigned.orgUnitId()).isNull();
+    DashboardWidgetResponse low = written.widgets().get(1);
+    assertThat(low.rows()).isEqualTo(5);
+    assertThat(low.status()).isNull();
+    DashboardWidgetResponse bank = written.widgets().get(2);
+    assertThat(bank.rows()).isEqualTo(3);
+    assertThat(bank.status()).isNull();
+    assertThat(bank.orgUnitId()).isNull();
+  }
+
+  @Test
+  @DisplayName("the work widgets are not part of the member default")
+  void theWorkWidgetsAreNotInTheDefault() {
+    assertThat(service.read(member(), MEMBER).widgets())
+        .extracting(DashboardWidgetResponse::type)
+        .doesNotContain(
+            DashboardWidgetType.ASSIGNED_ORDERS,
+            DashboardWidgetType.LOW_STOCK,
+            DashboardWidgetType.BANK);
+  }
+
+  @Test
+  @DisplayName("each widget accepts only the statuses of its own filter")
+  void acceptsOnlyTheStatusesOfTheWidgetsOwnFilter() {
+    UUID owner = member();
+    DashboardResponse written =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(
+                    item(DashboardWidgetType.ASSIGNED_ORDERS),
+                    item(DashboardWidgetType.NOTIFICATIONS)),
+                0L));
+    DashboardWidgetResponse assigned = written.widgets().get(0);
+    DashboardWidgetResponse notifications = written.widgets().get(1);
+
+    DashboardWidgetResponse updated =
+        service.replaceOptions(
+            owner,
+            MEMBER,
+            assigned.id(),
+            new DashboardOptionsRequest(
+                null, null, 10, DashboardStatus.IN_PROGRESS, assigned.optionsVersion()));
+
+    assertThat(updated.status()).isEqualTo(DashboardStatus.IN_PROGRESS);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                assigned.id(),
+                new DashboardOptionsRequest(
+                    null, null, 5, DashboardStatus.UNREAD, updated.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                notifications.id(),
+                new DashboardOptionsRequest(
+                    null, null, 5, DashboardStatus.OPEN, notifications.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  @DisplayName("the bank widget offers rows only and the stock widget a unit besides")
+  void offersTheOptionsOfTheMatrix() {
+    UUID owner = member();
+    DashboardResponse written =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(item(DashboardWidgetType.BANK), item(DashboardWidgetType.LOW_STOCK)), 0L));
+    DashboardWidgetResponse bank = written.widgets().get(0);
+    DashboardWidgetResponse low = written.widgets().get(1);
+    UUID unit = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                bank.id(),
+                new DashboardOptionsRequest(unit, null, 3, null, bank.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                low.id(),
+                new DashboardOptionsRequest(
+                    null, null, 5, DashboardStatus.ALL, low.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+    assertThat(
+            service
+                .replaceOptions(
+                    owner,
+                    MEMBER,
+                    bank.id(),
+                    new DashboardOptionsRequest(null, null, 10, null, bank.optionsVersion()))
+                .rows())
+        .isEqualTo(10);
   }
 
   @Test

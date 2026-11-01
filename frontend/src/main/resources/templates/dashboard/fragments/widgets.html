@@ -90,6 +90,8 @@
         <div class="home-card-foot dash-info__admin">
             <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-info-edit"
                     data-testid="dashboard-info-edit" th:text="#{dashboard.info.edit}">Bearbeiten</button>
+            <button type="button" class="btn btn-ghost btn-xs" data-trigger="dashboard-info-delete"
+                    data-testid="dashboard-info-delete" th:if="${announcement}" th:text="#{dashboard.info.delete}">Entfernen</button>
         </div>
         <form class="dash-info__editor is-hidden" data-trigger="dashboard-info-save" data-info-editor
               th:attr="data-version=${adminAnnouncement != null ? adminAnnouncement.version : null},data-error=#{dashboard.info.error}">

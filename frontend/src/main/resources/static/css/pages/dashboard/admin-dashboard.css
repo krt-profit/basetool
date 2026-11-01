@@ -1,0 +1,38 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .admin-hub {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: var(--space-4);
+    }
+    .admin-hub__title {
+        margin: 0 0 var(--space-2);
+    }
+    .admin-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        align-items: baseline;
+        justify-content: space-between;
+    }
+    .admin-row.is-stale .cell-title {
+        color: var(--color-gray-2-text);
+    }
+    .admin-hub-links {
+        display: grid;
+        gap: var(--space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .admin-hub-links a {
+        display: block;
+        padding-block: var(--space-2);
+    }
+    @media (width <= 1024px), (pointer: coarse) {
+        .admin-hub-links a {
+            min-height: var(--touch-target);
+        }
+    }
+}

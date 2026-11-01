@@ -169,6 +169,47 @@
         color: var(--color-gray-2-text);
     }
 
+    .dash-link .cell-title {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        align-items: center;
+    }
+
+    .dash-meter,
+    .dash-bank__target {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        margin-top: var(--space-2);
+    }
+
+    .dash-bank__top,
+    .dash-bank__trend {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .dash-bank__balance {
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .dash-bank__trend {
+        margin-top: var(--space-2);
+    }
+
+    .dash-bank__spark polyline {
+        stroke: var(--color-primary);
+    }
+
+    .dash-bank__spark polyline.is-flat {
+        stroke: var(--color-gray-2);
+    }
+
     .dash-catalogue {
         display: flex;
         flex-direction: column;

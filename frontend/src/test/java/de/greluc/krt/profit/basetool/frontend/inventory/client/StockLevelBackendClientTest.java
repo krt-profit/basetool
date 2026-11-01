@@ -63,6 +63,18 @@ class StockLevelBackendClientTest {
   }
 
   @Test
+  void readsTheLowLevelsOfTheScopeOrOfOneUnit() {
+    backend.answerJson("[]");
+    backend.answerJson("[]");
+
+    assertThat(client.lowLevels(null)).isEmpty();
+    assertThat(client.lowLevels(UNIT)).isEmpty();
+
+    backend.expect("GET", "/api/v1/inventory/stock-levels?lowOnly=true");
+    backend.expect("GET", "/api/v1/inventory/stock-levels?lowOnly=true&orgUnitId=" + UNIT);
+  }
+
+  @Test
   void writesCarryTheBodyAndTheEchoedVersion() {
     backend.answerJson("{}");
     backend.answerJson("{}");

@@ -1815,7 +1815,7 @@ its former sibling pages become tabs of it.
 
 **Admin mode: the admin dashboard plus 13 links in 3 groups, collapsed by default.** The admin
 dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four current admin groups.
-*Shipped:* `/admin` is the hub until the dashboard widgets exist, the groups start collapsed (the
+*Shipped:* `/admin` is the admin dashboard (REQ-UI-034), the groups start collapsed (the
 member's own choice and the group holding the current page win), and every merged page shows a tab
 bar of its sibling pages (`NavigationPageTabs` in the registry). The old four admin groups are gone;
 the former admin pages that became tabs keep their URLs, and the URLs that merged redirect
@@ -1843,8 +1843,7 @@ Page merges this needs:
 - „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the bank
   wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
 - „Informationen" (the home-page announcement) is edited inline in its dashboard widget; it has no
-  admin link. Until the widget exists (REQ-UI-034), `/admin/announcement` stays reachable from the
-  admin hub and the quick access.
+  admin link, and `/admin/announcement` redirects to the dashboard (page `GET` only).
 
 **One default for every role; visibility follows the active context.**
 
@@ -2582,10 +2581,11 @@ ADR-0282, ADR-0297
 > default, the framework (two columns, up/down, column switch, remove, catalogue and options
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
-> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Information
-> (with the inline editor for administrators), Favoriten and Benachrichtigungen, with the options
-> of the matrix below. Planned: the other catalogue widgets and their options, the admin dashboard
-> and the start page; until they ship, the current code stays authoritative for them.
+> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
+> bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
+> Favoriten and Benachrichtigungen, with the options of the matrix below, and the admin
+> dashboard with its five widgets. Planned: the other catalogue widgets and their options and
+> the start page; until they ship, the current code stays authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2691,8 +2691,16 @@ versions, owner isolation, deletion by widget type, the write counters),
 instances, the empty and error states, deletion on role loss, the hint, the catalogue),
 `DashboardUpcomingDaysWidgetMvcTest`, `DashboardSummaryWidgetsMvcTest` (Nächster Einsatz and
 Hangar-Bereitschaft: the rows and their rows option, the counts, the empty states, the member's hangar room),
+`DashboardWorkWidgetsMvcTest` (Ich bearbeite, Bestand niedrig and Bank: the read per option, the
+page total as count, the rows, the unit label, the target bar and trend, the empty states),
+`DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
+widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
+`NavigationLegacyRedirectMvcTest` (`/admin/announcement`),
 `DashboardLayoutControllerTest`, `DashboardLayoutBackendClientTest`, `DashboardBackendClientTest`
-(the two summary reads), `DashboardE2eTest` (edit mode, catalogue and options, restore, the summary
+(the two summary reads), `OrgUnitBankAccountsBackendClientTest` and `StockLevelBackendClientTest`
+(the two work reads), `AdminDashboardE2eTest` (the admin default, edit mode and range on the
+admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, catalogue and
+options, restore, the summary and work
 widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
 the hint, deletion on role loss), the export
 and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** `StartPageRedirectMvcTest` (start

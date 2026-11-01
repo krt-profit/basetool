@@ -84432,7 +84432,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK" ]
           }
         },
         "required" : [ "column", "type" ]
@@ -84473,7 +84473,7 @@
           },
           "status" : {
             "type" : "string",
-            "enum" : [ "UNREAD", "ALL" ]
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ]
           },
           "version" : {
             "type" : "integer",
@@ -84490,7 +84490,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS" ]
+              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK" ]
             },
             "maxItems" : 32,
             "minItems" : 0
@@ -84549,11 +84549,11 @@
           },
           "status" : {
             "type" : "string",
-            "enum" : [ "UNREAD", "ALL" ]
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ]
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK" ]
           }
         }
       },

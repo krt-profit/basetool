@@ -275,7 +275,37 @@ class DashboardRenderMvcTest {
         .contains("data-testid=\"dashboard-add-notifications\"")
         .doesNotContain("data-testid=\"dashboard-add-upcoming-days\"")
         .doesNotContain("data-testid=\"dashboard-add-next-mission\"")
-        .contains("data-testid=\"dashboard-add-hangar-readiness\"");
+        .contains("data-testid=\"dashboard-add-hangar-readiness\"")
+        .contains("data-testid=\"dashboard-add-assigned-orders\"")
+        .doesNotContain("data-testid=\"dashboard-add-low-stock\"")
+        .doesNotContain("data-testid=\"dashboard-add-bank\"");
+  }
+
+  @Test
+  @DisplayName("a member may add the work widgets, whose options dialog offers their own statuses")
+  void offersTheWorkWidgetsWithTheirOptions() throws Exception {
+    stored(
+        true,
+        1,
+        widget(
+            DashboardWidgetType.ASSIGNED_ORDERS, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(DashboardWidgetType.LOW_STOCK, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(DashboardWidgetType.BANK, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(DashboardWidgetType.NOTIFICATIONS, DashboardColumn.NARROW, UUID.randomUUID(), null));
+
+    String html = home(member());
+
+    assertThat(html)
+        .contains("data-testid=\"dashboard-add-assigned-orders\"")
+        .contains("data-testid=\"dashboard-add-low-stock\"")
+        .contains("data-testid=\"dashboard-add-bank\"")
+        .contains("data-widget-slug=\"assigned-orders\"")
+        .contains("data-widget-slug=\"low-stock\"")
+        .contains("data-widget-slug=\"bank\"")
+        .contains("data-status-choices=\"OPEN_ACTIVE OPEN IN_PROGRESS\"")
+        .contains("data-status-choices=\"UNREAD ALL\"")
+        .contains("data-options=\"unit rows\"")
+        .contains("data-options=\"rows\"");
   }
 
   @Test

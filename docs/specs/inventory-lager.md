@@ -1775,8 +1775,8 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 ### REQ-INV-068 — Minimum stock levels: maintenance, API, the „Mindestbestände" tab and the widget
 
 > Maintenance of material and game-item levels, the API with `lowOnly` / `limit`, the tab, the „niedrig" badge,
-> the shortcuts, the audit events, the live update, the lifecycle and the notice are built. Still
-> planned (ADR-0302): the widget.
+> the shortcuts, the audit events, the live update, the lifecycle, the notice and the widget are
+> built (ADR-0302).
 
 - **Who maintains.** A Logistician of the unit, the lead included (`hasRoleInOrgUnit(unit,
   LOGISTICIAN)`, an admin passes); any other write answers `403`. **Who sees:** everyone who can see
@@ -1816,7 +1816,8 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 - **Widget „Bestand niedrig"** (REQ-UI-034). Option „Einheit": follows the active context by default
   and shows the union, each row labelled with its unit, when nothing is pinned; it can be fixed to
   one unit. A row-count option; sorted by fill ratio, empty levels first; „alle anzeigen" opens the
-  tab. It reads `lowOnly=true` and offers no action buttons.
+  tab. It reads `lowOnly=true` without `limit`, counts the list and shows its first rows, and
+  offers no action buttons.
 - **Live update.** A level write announces itself on the existing `inventory_all` room under the new
   section `stock-levels` (`LiveSyncTopicClass.INVENTORY_ALL`, backend and frontend registries in
   parity); the tab also re-reads on the room's `stock` section, since a stock write changes the free
