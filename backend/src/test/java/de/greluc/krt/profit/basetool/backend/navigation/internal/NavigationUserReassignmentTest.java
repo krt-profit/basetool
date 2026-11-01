@@ -41,6 +41,7 @@ class NavigationUserReassignmentTest {
   @Autowired private NavigationUserReassignment participant;
   @Autowired private NavigationPreferencesService service;
   @Autowired private NavigationPreferencesRepository repository;
+  @Autowired private DashboardService dashboards;
   @Autowired private UserRepository userRepository;
 
   private UUID member() {
@@ -151,5 +152,41 @@ class NavigationUserReassignmentTest {
     assertThat(service.read(target).tabBars().member().slots())
         .containsExactly("t.one", null, null);
     assertThat(repository.findById(source)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("the target keeps its start pages and dashboard, the source's are dropped")
+  void thetargetsAppearanceAndDashboardWin() {
+    UUID source = member();
+    UUID target = member();
+    service.replaceStartPage(
+        source, NavigationMode.MEMBER, new StartPageUpdateRequest("s.source", 0L));
+    service.replaceStartPage(
+        target, NavigationMode.MEMBER, new StartPageUpdateRequest("t.target", 0L));
+    dashboards.replaceLayout(
+        source,
+        DashboardMode.MEMBER,
+        new DashboardLayoutRequest(
+            List.of(
+                new DashboardLayoutItem(
+                    null, DashboardWidgetType.INFORMATION, DashboardColumn.WIDE)),
+            0L));
+    dashboards.replaceLayout(
+        target,
+        DashboardMode.MEMBER,
+        new DashboardLayoutRequest(
+            List.of(
+                new DashboardLayoutItem(
+                    null, DashboardWidgetType.FAVOURITES, DashboardColumn.NARROW)),
+            0L));
+    store(source, "a.one");
+
+    participant.reassign(source, target);
+
+    assertThat(repository.findById(source)).isEmpty();
+    assertThat(service.read(target).appearance().startPageMember()).isEqualTo("t.target");
+    assertThat(dashboards.read(target, DashboardMode.MEMBER).widgets())
+        .extracting(DashboardWidgetResponse::type)
+        .containsExactly(DashboardWidgetType.FAVOURITES);
   }
 }

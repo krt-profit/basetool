@@ -1240,9 +1240,8 @@ aggregated counts and bounded `app`/`host` labels.
 
 ### REQ-OBS-011 — Business metrics (`basetool_*`)
 
-> **Status: planned** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, map #2800) for the signals
-> in the planned amendment at the end of this requirement. Until they ship, the current text below /
-> the current code stays authoritative.
+> **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, map #2800) for the signals
+> of the amendment at the end of this requirement.
 
 The three modules expose custom `basetool_*` business metrics on existing choke points so
 operations can alarm on regressions, security signals and work-queue backlog without scraping
@@ -2719,63 +2718,60 @@ panel on dashboard `07` — 42 session evictions, 43 client errors by `kind`, 44
 `source`). Adding, renaming or removing one of these metrics keeps its alert in
 `monitoring/prometheus/alerts/business.yml` in sync in the same change.
 
-#### Planned amendment (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302)
+#### Amendment (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302)
 
 The navigation concept, the home dashboard, the assignee grant and minimum stock levels add these
 signals. Every label is bounded by REQ-OBS-006; **the quick-access search term never reaches a
 label**, a tag, an MDC field or a log line.
 
-- *Shipped for `favourites`, `hidden`, `order`, `display`, `tabbar` and `dashboard`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
+- `basetool_navigation_preference_writes_total{section, outcome}` counter in
   the `navigation` module (`NavigationMetrics`), one increment per preference or dashboard write
   (REQ-UI-032, REQ-UI-034). `section` ∈ `favourites`, `hidden`, `order`, `tabbar`, `display`,
   `dashboard`; `outcome` ∈ `ok`, `conflict` (the `409` of a stale section version), `rejected` (a
   `400` / `403` / `422`). A reset counts once per section it wrote, and a write that moves a page
   between the favourites and the hidden pages counts once for each of the two. The `tabbar` label
   covers the bars of both modes. Registered at zero
-  for every pair; today the `section` values that exist are registered, and each further section
-  adds its own.
-- *Shipped for `favourites`, `hidden`, `order`, `display`, `tabbar` and `dashboard`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
+  for every pair.
+- `basetool_navigation_personalised_accounts{section}` gauge, sampled by
   the `navigation` module's `BusinessGaugeSource` (`NavigationBusinessGauges`) on the
   business-metrics timer: the number of accounts holding a non-default value in that section (for
   `display`: a desktop mode other than the drawer, or the shortcuts switched off; for `dashboard`
   a layout changed from the default), same `section` values. It is the data base for deciding a
   second personalisation round; it carries no
   account label.
-- *Shipped:* `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
+- `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
   `InventoryBusinessGauges`: the number of minimum stock levels of active units and listed
   catalogue entries that are low (REQ-INV-067), from the real allocation and not from the notice
   marker. A count only, no unit, material or tier label. The metric is named after the module that
   owns the levels.
-- *Shipped:* `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's
+- `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's
   quick-access search (REQ-UI-033, `QuickAccessSearchMetrics`), one increment per entity type per
   search, every pair registered at zero. `kind` ∈ the `QuickAccessSearchKind` keys
   (`mission`, `operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`);
   `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed),
   `timeout` (a contributor that did not answer within 2 s).
-- *Shipped:* `basetool_notification_created_total{notification_type}` and
+- `basetool_notification_created_total{notification_type}` and
   `basetool_notification_muted_total{notification_type}` gain `INVENTORY_STOCK_LEVEL_LOW`, and
   `basetool_notification_timed_produced_total{kind}` the producer kind `stock_level_low`
   (REQ-NOTIF-030).
 - `basetool_audit_events_total{domain}` counts the four `MIN_STOCK_LEVEL_*` events under
-  `INVENTORY`; `basetool_bank_audit_events_total{event_type}` counts the `GRANT_REVOKED` rows of the
-  special-account grant removal (REQ-AUDIT-001). No new label value is needed for either.
+  `INVENTORY` (REQ-AUDIT-001). No new label value is needed. The one-time migrations that retire the
+  special-account grant buckets write their `bank_audit_event` rows without incrementing
+  `basetool_bank_audit_events_total`, which counts runtime events only.
 - The new endpoints — preferences, widgets, `/quick-access/search`, the stock-level API — are
   covered by `http_server_requests` by route template; the dashboard's ten-minute widget poll and
   the `assignedToMe` read need no metric of their own.
 
-**Dashboard.** `07-basetool-operations.json` gains the row „Navigation & Dashboard": preference
-writes by section and outcome, personalised accounts by section, quick-access searches by kind and
-outcome, the p95 of `/quick-access/search`, the 5xx rate of the preference and widget endpoints, and
-the low minimum stock levels. *Shipped:* the panel „Minimum stock levels below their minimum"
-(`basetool_inventory_minimum_levels_below`) and the panels „Navigation preference writes/hour by
-section and outcome", „Personalised navigation accounts by section" and „Navigation endpoints 5xx
-rate" on the Operations dashboard.
+**Dashboard.** `07-basetool-operations.json` carries the panels „Minimum stock levels below their
+minimum" (`basetool_inventory_minimum_levels_below`), „Navigation preference writes/hour by section
+and outcome", „Personalised navigation accounts by section", „Navigation endpoints 5xx rate",
+„Quick-access searches/hour by kind and outcome" and „Quick-access search p95 (seconds)".
 
 **Alerts** in `monitoring/prometheus/alerts/apps.yml`, each with a promtool test and a runbook row:
 
-- *Shipped:* `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search`
+- `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search`
   above 1 s for 10 min, pinned by `monitoring/prometheus/tests/quick_access_search_slow_test.yml`.
-- *Shipped:* `NavigationEndpointsErroring` (warning): the 5xx share of the preference endpoints
+- `NavigationEndpointsErroring` (warning): the 5xx share of the preference endpoints
   (`/api/v1/navigation/*` on the backend, `/navigation/*` on the frontend) above 5 % for
   10 min, pinned by `monitoring/prometheus/tests/navigation_endpoints_erroring_test.yml`; the
   dashboard's widget and layout endpoints (`/dashboard/*` on the frontend) are in its route
@@ -2785,8 +2781,7 @@ A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 
 **Enforced by:** `QuickAccessSearchMetricsTest`, `quick_access_search_slow_test.yml`,
 `StockLevelNoticeIntegrationTest`, `InventoryBusinessGaugesTest`, `NavigationMetricsTest`,
-`navigation_endpoints_erroring_test.yml` · **To be added:** `AlertedMeterPresenceTest` entries for
-the dashboard widgets
+`navigation_endpoints_erroring_test.yml`
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 

@@ -66,8 +66,8 @@ unit and needs to know where a member is an officer.
 - An officer acts only where they hold a seat; the cross-unit gap closes, and the role can no longer
   drift from the org chart.
 - REQ-ROLE-002, REQ-ROLE-007 (dropping its out-of-scope line), REQ-SEC-004, REQ-SEC-015,
-  REQ-SEC-047, REQ-SEC-065, REQ-ORG-029, REQ-BANK-037 and the role matrix are amended, and
-  lose their planned markers with the cut.
+  REQ-SEC-047, REQ-SEC-065, REQ-ORG-029, REQ-BANK-037 and the role matrix are amended with the
+  cut.
 - The implementation also amends every other requirement that names the `OFFICER` role or
   `ADMIN_OR_OFFICER`: REQ-ROLE-004; REQ-SEC-002a, -005, -006, -007, -009, -020, -037, -040, -042,
   -053, -058, -060, -061, -072, -083, -085; REQ-ORG-005, -015, -017, -021; REQ-BANK-008, -010,

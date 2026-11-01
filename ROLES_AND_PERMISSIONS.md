@@ -1263,12 +1263,12 @@ backend serves every member) but no control that writes.
 
 ---
 
-## 7. Planned (ADR-0300, ADR-0301, ADR-0302)
+## 7. ADR-0300, ADR-0301, ADR-0302
 
-> **Status:** §7.1 is shipped (ADR-0300). §7.2–§7.4 are planned (map #2800): the decisions are
-> accepted and not implemented, and until they ship the code stays authoritative for them.
+> **Status:** shipped (map #2800): §7.1 officer reach, §7.2 minimum stock levels, §7.3 navigation
+> preferences.
 
-### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007) — shipped
+### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007)
 
 - **Officer reach is derived per org unit from leadership seats only:** a Staffel leadership rank
   (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign) and an SK lead reach
@@ -1288,9 +1288,9 @@ backend serves every member) but no control that writes.
 
 ### 7.2 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 
-**Shipped for materials and game items:** setting, changing and removing a unit's levels and the
-„Mindestbestände“ tab, the shortcuts, the „niedrig“ badge and the notification follow the rows
-below (`StockLevelAccessPolicy`, the Lager `ScopePredicate`). The widget is still planned.
+Setting, changing and removing a unit's levels for materials and game items, the
+„Mindestbestände“ tab, the shortcuts, the „niedrig“ badge, the notification and the dashboard widget
+„Bestand niedrig“ follow the rows below (`StockLevelAccessPolicy`, the Lager `ScopePredicate`).
 
 | Function | Who |
 | --- | --- |
@@ -1305,9 +1305,13 @@ Favourites, hidden entries, order, tab bar, „Darstellung“, the dashboard and
 admin reset, and the preferences are not audited. They are part of the data export — the admin
 export for somebody who cannot sign in included (REQ-SEC-058) — and of the admin account merge,
 where the surviving account's choices win (REQ-SEC-046). A dashboard widget renders only for a
-user who may read its data: „Nächste Tage“ needs the member role (the mission list is for members
-and above), the others every signed-in user; losing the role deletes the widget's instances on the
-next load, and the admin mode's dashboard is for `ADMIN` only (REQ-UI-034).
+user who may read its data: „Nächste Tage“, „Nächster Einsatz“, „Bestand niedrig“ and „Bank“
+need the member role (the mission list, the Lager and the org-unit bank are for members and above),
+the others every signed-in user („Ich bearbeite“ lists only the orders the caller is an assignee
+of, REQ-ORDERS-047); losing the role deletes the widget's instances on the next load, and the admin mode's dashboard is
+for `ADMIN` only (REQ-UI-034). „Bank“ lists the accounts the caller may see by the bank's own
+rules, and „Nächster Einsatz“ shows an internal mission only to members of its unit (REQ-MISSION-031,
+REQ-MISSION-008).
 
 The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
 `PUT .../hidden`, `PUT .../favourites-and-hidden`, `PUT .../order/{mode}/{scope}`,

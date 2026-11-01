@@ -28,9 +28,8 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-> **Status: planned** (ADR-0298, ADR-0300, ADR-0302, map #2800) for the coverage additions
-> in the planned amendment at the end of this requirement. Until they ship, the current text below /
-> the current code stays authoritative.
+> **Status: shipped** (ADR-0298, ADR-0300, ADR-0302, map #2800) for the coverage additions of the
+> amendment at the end of this requirement.
 
 Every state-mutating activity in the generic areas writes exactly **one** row to an **append-only**
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated except
@@ -431,7 +430,7 @@ per-domain emission assertions in the service tests (for the external assignee
 `audit/web/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)
 
-#### Planned amendment (ADR-0298, ADR-0300, ADR-0302)
+#### Amendment (ADR-0298, ADR-0300, ADR-0302)
 
 The coverage list gains:
 
@@ -446,9 +445,8 @@ The coverage list gains:
   system as actor. Those rows come from the SQL migration and are not counted by
   `basetool_bank_audit_events_total`.
 
-The new types join the viewer's per-area event-type lists and the DE/EN labels, and are counted
-by `basetool_audit_events_total{domain}` / `basetool_bank_audit_events_total{event_type}`
-(REQ-OBS-011).
+The new Lager types join the viewer's per-area event-type list and the DE/EN labels, and are
+counted by `basetool_audit_events_total{domain}` (REQ-OBS-011).
 
 **Deliberately not audited:** navigation preferences (favourites, hidden entries, order, tab-bar
 slots, display mode) and the home dashboard (widgets, options, start page), including their resets.
@@ -456,8 +454,8 @@ They are an account's own presentation choices, owner-only and read by nobody el
 trail of them would record personal habits without serving any oversight. They are counted, not
 audited (`basetool_navigation_preference_writes_total`, REQ-OBS-011).
 
-**Enforced by (to be added):** `StockLevelServiceTest`, the bank grant migration test,
-`AdminAuditLogPageControllerTest`
+**Enforced by:** `StockLevelIntegrationTest`, `OfficerCutMigrationTest`,
+`SonderkontoBucketRetirementMigrationTest`, `AdminAuditLogPageControllerTest`
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
