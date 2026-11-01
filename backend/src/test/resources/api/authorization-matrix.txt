@@ -157,6 +157,7 @@ PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#update
 PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit | HangarController#changeUserShipOrgUnit | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/hangar/import/ships | HangarController#importShips | pre=isAuthenticated() | url=POST /api/v1/hangar/import/ships -> authenticated
 GET /api/v1/hangar/my-ships | HangarController#getMyShips | pre=isAuthenticated() | url=GET /api/v1/hangar/my-ships -> authenticated
+GET /api/v1/hangar/my-ships/readiness | HangarController#getMyReadiness | pre=isAuthenticated() | url=GET /api/v1/hangar/my-ships/readiness -> authenticated
 DELETE /api/v1/hangar/ships | HangarController#deleteAllMyShips | pre=hasAuthority('HANGAR_WRITE') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 GET /api/v1/hangar/ships | HangarController#getAllShips | pre=hasAuthority('HANGAR_READ') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships | HangarController#addShip | pre=isAuthenticated() | url=POST /api/v1/hangar/ships -> authenticated
@@ -272,6 +273,7 @@ GET /api/v1/missions/lookup | MissionController#lookupMissions | pre=isAuthentic
 GET /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#getMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#updateMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/missions/next | MissionController#getNextMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+GET /api/v1/missions/next/summary | MissionNextSummaryController#getNextMissionSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id} | MissionController#deleteMission | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/missions/{id} | MissionController#getMissionById | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/missions/{id}/core | MissionController#patchMissionCore | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated

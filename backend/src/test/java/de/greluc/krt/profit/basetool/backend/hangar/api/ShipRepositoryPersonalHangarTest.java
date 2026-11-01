@@ -155,6 +155,23 @@ class ShipRepositoryPersonalHangarTest {
         .containsExactly("s-C");
   }
 
+  /** The readiness counts only the owner's ships, and a hangar without ships reads zero. */
+  @Test
+  void readinessOf_countsTheOwnersShipsAndTheFittedOnes() {
+    saveShip("s-A", avenger, "LTI", true, area18);
+    saveShip("s-C", avenger, "LTI", false, area18);
+    saveShip("s-G", gladius, "LTI", true, area18);
+    saveShipFor(otherOwner, "s-foreign", cutlass, "LTI", true, area18);
+
+    ShipReadinessDto mine = shipRepository.readinessOf(owner.getId());
+
+    assertThat(mine.total()).isEqualTo(3L);
+    assertThat(mine.fitted()).isEqualTo(2L);
+    ShipReadinessDto none = shipRepository.readinessOf(UUID.randomUUID());
+    assertThat(none.total()).isZero();
+    assertThat(none.fitted()).isZero();
+  }
+
   @Test
   void findByOwnerIdFiltered_paginatesAcrossTheWholeOrderedSet() {
     saveShip("s-A", avenger, "LTI", true, area18);

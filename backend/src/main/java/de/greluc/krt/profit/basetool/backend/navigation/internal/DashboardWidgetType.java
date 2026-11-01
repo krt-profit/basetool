@@ -66,7 +66,23 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.UNREAD));
+      new DashboardOptions(null, null, 5, DashboardStatus.UNREAD)),
+
+  /** The member's next mission. */
+  NEXT_MISSION(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.noneOf(DashboardOption.class),
+      DashboardOptions.NONE),
+
+  /** The readiness of the member's hangar. */
+  HANGAR_READINESS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.noneOf(DashboardOption.class),
+      DashboardOptions.NONE);
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */
   public static final Set<Integer> DAY_CHOICES = Set.of(3, 7, 14);

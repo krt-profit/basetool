@@ -250,6 +250,83 @@ class DashboardE2eTest {
         });
   }
 
+  /**
+   * The catalogue adds the next-mission and hangar-readiness widgets; each loads its own body and
+   * offers no options.
+   */
+  @Test
+  void theSummaryWidgetsLoadTheirBodiesAndOfferNoOptions() {
+    run(
+        memberState,
+        1440,
+        "dashboard-summary-widgets",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/");
+          page.getByTestId("dashboard-customise").click();
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-next-mission").click();
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-hangar-readiness").click();
+
+          assertThat(page.getByTestId("dashboard-widget-next-mission")).hasCount(1);
+          assertThat(page.getByTestId("dashboard-widget-hangar-readiness")).hasCount(1);
+          assertThat(
+                  page.getByTestId("dashboard-widget-next-mission")
+                      .locator(
+                          "[data-testid='home-mission'],"
+                              + " [data-testid='dashboard-next-mission-empty']"))
+              .isVisible();
+          assertThat(
+                  page.getByTestId("dashboard-widget-hangar-readiness")
+                      .locator(
+                          "[data-testid='dashboard-hangar-summary'],"
+                              + " [data-testid='dashboard-hangar-empty']"))
+              .isVisible();
+          assertThat(
+                  page.getByTestId("dashboard-widget-next-mission")
+                      .getByTestId("dashboard-options"))
+              .hasCount(0);
+          assertThat(
+                  page.getByTestId("dashboard-widget-hangar-readiness")
+                      .getByTestId("dashboard-options"))
+              .hasCount(0);
+
+          page.reload();
+          assertThat(page.getByTestId("dashboard-widget-next-mission")).hasCount(1);
+          assertThat(page.getByTestId("dashboard-widget-hangar-readiness")).hasCount(1);
+        });
+  }
+
+  /**
+   * An option change after a reorder is saved without a conflict: the two versions are separate.
+   */
+  @Test
+  void anOptionChangeAfterAReorderDoesNotConflict() {
+    run(
+        memberState,
+        1440,
+        "dashboard-options-after-reorder",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/");
+          page.getByTestId("dashboard-customise").click();
+
+          page.getByTestId("dashboard-widget-information").getByTestId("reorder-up").click();
+          assertThat(page.locator(WIDE).first()).hasAttribute("data-widget-type", "INFORMATION");
+          page.getByTestId("dashboard-widget-upcoming-days")
+              .getByTestId("dashboard-options")
+              .click();
+          page.locator("#dashboard-option-rows").selectOption("3");
+          page.getByTestId("dashboard-options-save").click();
+
+          assertThat(page.getByTestId("dashboard-widget-upcoming-days"))
+              .hasAttribute("data-rows", "3");
+          page.reload();
+          assertThat(page.locator(WIDE).first()).hasAttribute("data-widget-type", "INFORMATION");
+          assertThat(page.getByTestId("dashboard-widget-upcoming-days"))
+              .hasAttribute("data-rows", "3");
+        });
+  }
+
   /** At twelve instances the catalogue explains why nothing can be added. */
   @Test
   void theCatalogueIsClosedAtTheCap() {

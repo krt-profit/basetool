@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -236,6 +237,16 @@ public class HangarService {
     String normalizedSearch =
         search == null || search.isBlank() ? null : LikePatterns.escape(search.trim());
     return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, fitted, pageable);
+  }
+
+  /**
+   * Returns how many ships the user owns and how many of them are fitted (REQ-HANGAR-016).
+   *
+   * @param userId owner id
+   * @return the user's hangar readiness
+   */
+  public ShipReadinessDto getMyReadiness(@NotNull UUID userId) {
+    return shipRepository.readinessOf(userId);
   }
 
   /**

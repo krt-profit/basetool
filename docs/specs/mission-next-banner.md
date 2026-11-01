@@ -204,6 +204,30 @@ row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip),
 `MissionController` `/api/v1/missions` endpoint; the only new backend surfaces are the
 kind-agnostic own-membership id lookup and the per-caller `signedUp` field on its rows.
 
+### REQ-MISSION-031 — The next mission is also served as a list row
+
+`GET /api/v1/missions/next/summary` returns the mission of the `/next` lookup as one `MissionListDto`
+row — the shape of `GET /api/v1/missions` — or `204 No Content` when none is upcoming. It is the
+read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
+
+- **Same selection.** The mission is the one `GET /api/v1/missions/next` returns: only `PLANNED` or
+  `ACTIVE` missions (REQ-MISSION-003), within the caller's org-unit scope and the pin of the active
+  context (REQ-MISSION-008). The summary widens nothing.
+- **Row content.** The row carries the per-caller `signedUp` flag and the registered count from the
+  same batched reads as the list (REQ-MISSION-012, REQ-DATA-003); it holds no participant or unit
+  data, so it needs no peer redaction.
+- **Gate.** Authenticated member or above, like `/next`.
+
+**Acceptance**
+
+- [x] The summary names the mission `/next` names and says whether the caller is signed up.
+- [x] With no upcoming mission in scope the endpoint answers 204 and reads nothing further.
+
+**Enforced by:** `MissionNextSummaryControllerTest`,
+`DashboardBackendClientTest` (`nextMissionReadsTheSummaryRowAndNothingWhenNoneIsUpcoming`),
+`DashboardSummaryWidgetsMvcTest` · **Code:** `MissionNextSummaryController#getNextMissionSummary` ·
+**Related:** REQ-MISSION-003, REQ-MISSION-008, REQ-UI-034
+
 ## Out of scope
 
 - The peer field redaction applied to the returned mission DTO, and who may reach the page at all —

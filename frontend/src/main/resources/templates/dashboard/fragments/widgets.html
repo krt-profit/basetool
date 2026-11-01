@@ -2,33 +2,35 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 
+<a th:fragment="missionRow(mission)" class="home-mission" data-testid="home-mission" th:href="@{/missions/{id}(id=${mission.id})}"
+   th:with="start=${@relativeDays.local(mission.plannedStartTime)}, meet=${@relativeDays.local(mission.meetingTime)}">
+    <span class="home-date" aria-hidden="true" th:if="${start != null}">
+        <span class="home-date__dow" th:text="${#temporals.format(start, 'EE')}">Sa</span>
+        <span class="home-date__day" th:text="${#temporals.format(start, 'dd')}">03</span>
+        <span class="home-date__mon" th:text="${#temporals.format(start, 'MMM')}">Okt</span>
+    </span>
+    <span class="home-mission__main">
+        <span class="cell-title" th:text="${mission.name}">Einsatz</span>
+        <span class="cell-sub">
+            <th:block th:if="${meet != null}"><span th:text="#{home.mission.ts(${#temporals.format(meet, 'HH:mm')})}">TS 13:30</span> · </th:block><th:block th:if="${start != null}"><span th:text="#{home.mission.join(${#temporals.format(start, 'HH:mm')})}">Join 14:00</span></th:block><th:block th:if="${mission.meetingPoint != null and !#strings.isEmpty(mission.meetingPoint)}"> · <span th:text="${mission.meetingPoint}">GrimHEX</span></th:block>
+            · <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
+        </span>
+    </span>
+    <span class="home-mission__status">
+        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
+              th:text="#{${'mission.status.' + #strings.toLowerCase(mission.status)}}">GEPLANT</span>
+        <span th:if="${mission.signedUp}" class="chip chip--success" data-testid="home-mission-signed-up"
+              th:text="#{home.upcoming.signed_up}">Angemeldet</span>
+        <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}"
+              class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
+    </span>
+    <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+</a>
+
 <div th:fragment="upcomingDays" data-widget-content>
     <ul th:if="${not #lists.isEmpty(upcomingMissions)}" class="home-missions">
-        <li th:each="mission : ${upcomingMissions}"
-            th:with="start=${@relativeDays.local(mission.plannedStartTime)}, meet=${@relativeDays.local(mission.meetingTime)}">
-            <a class="home-mission" data-testid="home-mission" th:href="@{/missions/{id}(id=${mission.id})}">
-                <span class="home-date" aria-hidden="true" th:if="${start != null}">
-                    <span class="home-date__dow" th:text="${#temporals.format(start, 'EE')}">Sa</span>
-                    <span class="home-date__day" th:text="${#temporals.format(start, 'dd')}">03</span>
-                    <span class="home-date__mon" th:text="${#temporals.format(start, 'MMM')}">Okt</span>
-                </span>
-                <span class="home-mission__main">
-                    <span class="cell-title" th:text="${mission.name}">Einsatz</span>
-                    <span class="cell-sub">
-                        <th:block th:if="${meet != null}"><span th:text="#{home.mission.ts(${#temporals.format(meet, 'HH:mm')})}">TS 13:30</span> · </th:block><th:block th:if="${start != null}"><span th:text="#{home.mission.join(${#temporals.format(start, 'HH:mm')})}">Join 14:00</span></th:block><th:block th:if="${mission.meetingPoint != null and !#strings.isEmpty(mission.meetingPoint)}"> · <span th:text="${mission.meetingPoint}">GrimHEX</span></th:block>
-                        · <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
-                    </span>
-                </span>
-                <span class="home-mission__status">
-                    <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
-                          th:text="#{${'mission.status.' + #strings.toLowerCase(mission.status)}}">GEPLANT</span>
-                    <span th:if="${mission.signedUp}" class="chip chip--success" data-testid="home-mission-signed-up"
-                          th:text="#{home.upcoming.signed_up}">Angemeldet</span>
-                    <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}"
-                          class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
-                </span>
-                <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-            </a>
+        <li th:each="mission : ${upcomingMissions}">
+            <th:block th:replace="~{dashboard/fragments/widgets :: missionRow(${mission})}"></th:block>
         </li>
     </ul>
     <p th:if="${#lists.isEmpty(upcomingMissions)}" class="home-notifs__empty" data-testid="home-upcoming-empty"
@@ -36,6 +38,31 @@
     <div class="home-card-foot dash-widget__foot">
         <span class="count-badge count-badge--sm" data-testid="home-upcoming-count" th:text="${upcomingTotal}">4</span>
         <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>
+    </div>
+</div>
+
+<div th:fragment="nextMission" data-widget-content data-testid="dashboard-next-mission">
+    <ul th:if="${nextMission != null}" class="home-missions">
+        <li><th:block th:replace="~{dashboard/fragments/widgets :: missionRow(${nextMission})}"></th:block></li>
+    </ul>
+    <p th:if="${nextMission == null}" class="home-notifs__empty" data-testid="dashboard-next-mission-empty"
+       th:text="#{dashboard.nextMission.empty}">Kein Einsatz geplant.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>
+    </div>
+</div>
+
+<div th:fragment="hangarReadiness" data-widget-content data-testid="dashboard-hangar-readiness"
+     th:attr="data-live-sync-topic=${hangarLiveSyncTopic}">
+    <th:block th:if="${hangarTotal > 0}">
+        <p class="dash-figure m-0" data-testid="dashboard-hangar-fitted" th:text="${hangarFitted}">9</p>
+        <p class="cell-sub m-0" data-testid="dashboard-hangar-summary"
+           th:text="#{dashboard.hangar.summary(${hangarTotal})}">von 13 Schiffen einsatzbereit</p>
+    </th:block>
+    <p th:if="${hangarTotal == 0}" class="home-notifs__empty" data-testid="dashboard-hangar-empty"
+       th:text="#{dashboard.hangar.empty}">Dein Hangar ist leer.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <a class="home-card-link" th:href="@{/hangar}" th:text="#{dashboard.hangar.all}">Zum Hangar →</a>
     </div>
 </div>
 
