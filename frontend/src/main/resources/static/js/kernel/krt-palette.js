@@ -21,6 +21,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { NAV_RENDERED_EVENT } from '/js/kernel/nav-preferences.js';
 import {
     KRT_SEARCH_PREFIXES,
     krtSearchFind,
@@ -674,6 +675,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let extraRequested = false;
+
+    document.addEventListener(NAV_RENDERED_EVENT, () => {
+        index.length = 0;
+        seen.clear();
+        buildIndex();
+        extraRequested = false;
+    });
 
     /**
      * Loads, once per page, the pages whose access the server decides with a backend read, and

@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -56,22 +58,51 @@ public class NavigationPreferencesService {
    * @param request the new keys and the version the caller last saw
    * @return the stored favourites with the new version
    * @throws ObjectOptimisticLockingFailureException when the version is stale
-   * @throws BadRequestException when a key repeats
+   * @throws BadRequestException when a key repeats or is hidden
    */
   public @NotNull FavouritesResponse replaceFavourites(
       @NotNull UUID userId, @NotNull FavouritesUpdateRequest request) {
-    try {
-      FavouritesResponse stored =
-          writer.replaceFavourites(userId, request.keys(), request.version());
-      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.OK);
-      return stored;
-    } catch (ObjectOptimisticLockingFailureException e) {
-      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.CONFLICT);
-      throw e;
-    } catch (BadRequestException e) {
-      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
-      throw e;
-    }
+    return counted(
+        Set.of(NavigationSection.FAVOURITES),
+        () -> writer.replaceFavourites(userId, request.keys(), request.version()));
+  }
+
+  /**
+   * Replaces the caller's hidden pages.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param request the new keys and the version the caller last saw
+   * @return the stored hidden pages with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when a key repeats or is a favourite
+   */
+  public @NotNull HiddenResponse replaceHidden(
+      @NotNull UUID userId, @NotNull HiddenUpdateRequest request) {
+    return counted(
+        Set.of(NavigationSection.HIDDEN),
+        () -> writer.replaceHidden(userId, request.keys(), request.version()));
+  }
+
+  /**
+   * Replaces the caller's favourites and hidden pages in one write that checks both versions.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param request both sections' new keys and the versions the caller last saw
+   * @return both sections with their new versions
+   * @throws ObjectOptimisticLockingFailureException when either version is stale
+   * @throws BadRequestException when a key repeats or sits in both lists
+   */
+  public @NotNull NavigationPreferencesResponse replaceFavouritesAndHidden(
+      @NotNull UUID userId, @NotNull FavouritesAndHiddenUpdateRequest request) {
+    return counted(
+        Set.of(NavigationSection.FAVOURITES, NavigationSection.HIDDEN),
+        () ->
+            writer.replaceFavouritesAndHidden(
+                userId,
+                request.favourites().keys(),
+                request.favourites().version(),
+                request.hidden().keys(),
+                request.hidden().version()));
   }
 
   /**
@@ -83,9 +114,25 @@ public class NavigationPreferencesService {
    */
   public @NotNull NavigationPreferencesResponse prune(
       @NotNull UUID userId, @NotNull List<String> keys) {
-    if (writer.prune(userId, keys)) {
-      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.OK);
-    }
+    writer.prune(userId, keys).forEach(this::countOk);
     return writer.read(userId);
+  }
+
+  private <T> T counted(Set<NavigationSection> sections, Supplier<T> write) {
+    try {
+      T stored = write.get();
+      sections.forEach(this::countOk);
+      return stored;
+    } catch (ObjectOptimisticLockingFailureException e) {
+      sections.forEach(s -> metrics.recordWrite(s, NavigationWriteOutcome.CONFLICT));
+      throw e;
+    } catch (BadRequestException e) {
+      sections.forEach(s -> metrics.recordWrite(s, NavigationWriteOutcome.REJECTED));
+      throw e;
+    }
+  }
+
+  private void countOk(NavigationSection section) {
+    metrics.recordWrite(section, NavigationWriteOutcome.OK);
   }
 }

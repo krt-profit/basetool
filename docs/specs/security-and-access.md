@@ -3696,8 +3696,9 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 
 #### Amendment (ADR-0298)
 
-> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row and the
-> favourites (`NavigationUserReassignment`, position 210, `navigation_preferences.user_id`). The
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row, the
+> favourites and the hidden entries (`NavigationUserReassignment`, position 210,
+> `navigation_preferences.user_id`). The
 > sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
@@ -3719,8 +3720,8 @@ any participant's. The merge never refuses on account of the preferences.
 
 **Enforced by:** `NavigationUserReassignmentTest` and `FavouritesMergeTest` (the favourite union
 with its order and cut, the emptied account's rows removed), `UserReassignmentOrderTest`,
-`UserAccountMergeCoverageTest`; **to be added:** the hidden entries minus favourites, the target's
-order, tab bar, „Darstellung" and dashboards · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021,
+`UserAccountMergeCoverageTest`, the hidden entries minus favourites in `NavigationUserReassignmentTest`;
+**to be added:** the target's order, tab bar, „Darstellung" and dashboards · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021,
 ADR-0298, ADR-0299
 
 ### REQ-SEC-047 — A client is told its authorisation, never left to derive it
@@ -5152,7 +5153,8 @@ links, beside the separate deletion card) · **Decision:**
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
-> favourites (`preference_section`, `position`, `entry_key` per row). The sections that follow and
+> favourites and the hidden entries (`preference_section`, `position`, `entry_key` per row). The
+> sections that follow and
 > the dashboards are planned and join the same statement.
 
 - **The navigation preferences and the home dashboards are part of the export, in their own
@@ -5168,9 +5170,9 @@ links, beside the separate deletion card) · **Decision:**
   count for REQ-DATA-021 like every other section's.
 
 **Enforced by:** `PersonalDataExportCatalogueTest` and `DataExportEndStateTest` (the
-`navigationPreferences` section with a seeded favourite), `PersonalDataExportOwnershipTest`,
+`navigationPreferences` section with a seeded favourite and hidden entry), `PersonalDataExportOwnershipTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`; **to be added:** the
-further sections with a seeded hidden entry and dashboard instance · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
+further sections with a seeded dashboard instance · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
 ADR-0299
 
 ### REQ-SEC-059 — A half-finished account deletion is observable
