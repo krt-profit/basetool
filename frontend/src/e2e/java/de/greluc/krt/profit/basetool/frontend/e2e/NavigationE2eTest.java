@@ -723,7 +723,7 @@ class NavigationE2eTest {
             page.mouse().move(900, 500);
             page.waitForTimeout(600);
             assertThat(flyout).isVisible();
-            page.mouse().click(900, 500);
+            page.locator("[data-testid='page-head'] h1").click();
             assertThat(flyout).isHidden();
 
             button.focus();
