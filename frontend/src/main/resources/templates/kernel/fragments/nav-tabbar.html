@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<th:block th:fragment="editor(mode)" th:with="bar=${navigationTabBars.get(mode)}">
+<section th:if="${bar.loaded()}" class="nav-tabbar-edit" th:data-tabbar-mode="${mode}" data-testid="nav-tabbar-edit">
+    <h3 class="nav-tabbar-title" th:text="#{nav.tabbar.title}">Tab-Leiste</h3>
+    <p class="nav-tabbar-state" data-testid="nav-tabbar-state"
+       th:text="${bar.automatic()} ? (${mode == 'admin'} ? #{nav.tabbar.automaticAdmin} : #{nav.tabbar.automatic}) : #{nav.tabbar.fixed}">Automatisch belegt</p>
+    <div class="nav-tabbar-slot" th:each="index : ${#numbers.sequence(0, 2)}" th:with="slot=${bar.slotAt(index)}">
+        <label class="nav-tabbar-slot-label" th:for="|tabbar-${mode}-slot-${index}|"
+               th:text="#{nav.tabbar.slot(${index + 1})}">Platz 1</label>
+        <select class="nav-tabbar-select" th:id="|tabbar-${mode}-slot-${index}|"
+                data-trigger="tabbar-set" th:data-slot-index="${index}"
+                th:data-testid="|nav-tabbar-slot-${index}|" th:aria-label="#{nav.tabbar.slot.aria(${index + 1})}">
+            <optgroup th:unless="${bar.favouriteChoices().isEmpty()}" th:label="#{nav.tabbar.favourites}">
+                <option th:each="entry : ${bar.favouriteChoices()}" th:value="${entry.key()}"
+                        th:selected="${slot != null and slot.entry().key() == entry.key()}"
+                        th:text="#{${entry.labelKey()}}">Seite</option>
+            </optgroup>
+            <optgroup th:label="#{nav.tabbar.pages}">
+                <option th:each="entry : ${bar.otherChoices()}" th:value="${entry.key()}"
+                        th:selected="${slot != null and slot.entry().key() == entry.key()}"
+                        th:text="#{${entry.labelKey()}}">Seite</option>
+            </optgroup>
+        </select>
+        <button type="button" class="btn btn-ghost btn-icon nav-tabbar-swap" data-trigger="tabbar-swap"
+                th:data-slot-index="${index}" data-direction="-1" th:disabled="${index == 0}"
+                th:data-testid="|nav-tabbar-left-${index}|"
+                th:aria-label="#{nav.tabbar.swapLeft(${index + 1})}" th:title="#{nav.tabbar.swapLeft(${index + 1})}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"></use></svg>
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon nav-tabbar-swap" data-trigger="tabbar-swap"
+                th:data-slot-index="${index}" data-direction="1" th:disabled="${index == 2}"
+                th:data-testid="|nav-tabbar-right-${index}|"
+                th:aria-label="#{nav.tabbar.swapRight(${index + 1})}" th:title="#{nav.tabbar.swapRight(${index + 1})}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-right"></use></svg>
+        </button>
+    </div>
+    <p class="nav-tabbar-fixed" th:text="#{nav.tabbar.fixedSlots}">Platz 4 und 5 sind fest.</p>
+    <button type="button" class="btn btn-ghost nav-edit-reset-btn" data-trigger="tabbar-reset"
+            data-testid="nav-tabbar-reset" th:disabled="${bar.automatic()}"
+            th:text="#{nav.tabbar.reset}">Tab-Leiste zurücksetzen</button>
+</section>
+</th:block>
+
+<th:block th:fragment="pickers">
+    <div data-nav-swap="tabbar-picker-member">
+        <th:block th:replace="~{kernel/fragments/nav-tabbar :: picker('member')}" />
+    </div>
+    <div data-nav-swap="tabbar-picker-admin" th:unless="${navigation.admin().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/nav-tabbar :: picker('admin')}" />
+    </div>
+</th:block>
+
+<div th:fragment="picker(mode)" th:with="bar=${navigationTabBars.get(mode)}" class="tabbar-picker"
+     role="menu" hidden th:data-tabbar-mode="${mode}" data-testid="tabbar-picker"
+     th:aria-label="#{nav.tabbar.title}" th:data-swaps="#{nav.tabbar.picker.swaps('{slot}')}">
+    <th:block th:if="${bar.loaded()}">
+        <p class="tabbar-picker-title" data-tabbar-picker-title
+           th:data-pattern="#{nav.tabbar.picker.title('{slot}')}"></p>
+        <th:block th:unless="${bar.favouriteChoices().isEmpty()}">
+            <p class="tabbar-picker-group" th:text="#{nav.tabbar.favourites}">Favoriten</p>
+            <button type="button" role="menuitemradio" class="tabbar-picker-item" data-trigger="tabbar-pick"
+                    th:each="entry : ${bar.favouriteChoices()}" th:data-entry-key="${entry.key()}"
+                    th:text="#{${entry.labelKey()}}">Seite</button>
+        </th:block>
+        <p class="tabbar-picker-group" th:text="#{nav.tabbar.pages}">Seiten und Tabs</p>
+        <button type="button" role="menuitemradio" class="tabbar-picker-item" data-trigger="tabbar-pick"
+                th:each="entry : ${bar.otherChoices()}" th:data-entry-key="${entry.key()}"
+                th:text="#{${entry.labelKey()}}">Seite</button>
+        <button type="button" class="btn btn-ghost tabbar-picker-close" data-trigger="tabbar-picker-close"
+                th:text="#{nav.tabbar.picker.close}">Schließen</button>
+    </th:block>
+</div>
+</body>
+</html>

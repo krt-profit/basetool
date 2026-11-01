@@ -34,15 +34,13 @@ class NavigationMenuTest {
 
   private final NavigationRegistry registry = new NavigationRegistry();
 
-  /** A member without the Job-Order area gets „Auftrag anlegen" in the menu and in the tab bar. */
+  /** A member without the Job-Order area gets „Auftrag anlegen" in the menu. */
   @Test
   void memberWithoutOrdersGetsTheCreateLink() {
     NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
 
     assertThat(keys(menu, "logistics"))
         .containsExactly("storage.overview", "refinery.orders", "orders.create");
-    assertThat(menu.tabs().get(2).entry().key()).isEqualTo("orders.create");
-    assertThat(menu.tabs().get(2).path()).isEqualTo("/orders");
   }
 
   /** The own-unit view stands in for the Job-Order area and its tab opens the orders page. */
@@ -51,7 +49,6 @@ class NavigationMenuTest {
     NavigationMenu menu = resolve(Set.of(), Set.of(NavigationFlag.OWN_JOB_ORDERS));
 
     assertThat(keys(menu, "logistics")).contains("orders.own").doesNotContain("orders.create");
-    assertThat(menu.tabs().get(2).entry().href()).isEqualTo("/orders");
   }
 
   /** An assignee without any order list gets the „Aufträge" link and its tab opens the list. */
@@ -60,8 +57,6 @@ class NavigationMenuTest {
     NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.ASSIGNED_JOB_ORDERS));
 
     assertThat(keys(menu, "logistics")).contains("orders.assigned", "orders.create");
-    assertThat(menu.tabs().get(2).entry().key()).isEqualTo("orders.assigned");
-    assertThat(menu.tabs().get(2).path()).isEqualTo("/orders");
   }
 
   /** A member who already reaches an order list gets no second „Aufträge" link for the entry. */

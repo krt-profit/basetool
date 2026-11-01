@@ -37,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const userToggleEl = sidebarEl ? sidebarEl.querySelector('.nav-user-toggle') : null;
     const langBtnEl = sidebarEl ? sidebarEl.querySelector('.nav-lang-btn') : null;
     const langMenuEl = document.getElementById('nav-lang-menu');
-    const tabEls = Array.from(document.querySelectorAll('.mobile-tab[data-tab-path]'));
 
     /** @type {HTMLElement | null} */
     let returnFocusEl = null;
@@ -231,6 +230,11 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebarEl.classList.toggle('is-filtering', filtering);
         sidebarEl.classList.toggle('is-admin-mode', adminMode);
         if (adminBarEl instanceof HTMLElement) adminBarEl.hidden = filtering || !adminMode;
+        document.querySelectorAll('.mobile-tab-slots[data-tabbar-mode]').forEach((slots) => {
+            if (slots instanceof HTMLElement) {
+                slots.hidden = (slots.dataset.tabbarMode === 'admin') !== adminMode;
+            }
+        });
         let anyHit = false;
         groups.forEach((group) => {
             const filterOnly = group.classList.contains('nav-group-filter-only');
@@ -297,22 +301,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (langBtnEl) langBtnEl.setAttribute('aria-expanded', String(open));
     };
 
-    const markActiveTab = function () {
+    /**
+     * Finds the tab that marks the area of the page being shown: the one whose own path, or one of
+     * the paths of the tabbed page it opens, is the longest prefix of the current path.
+     *
+     * @returns {Element | null} the tab, or null when no tab covers the page
+     */
+    const findActiveTab = function () {
         const here = window.location.pathname;
         /** @type {Element | null} */
         let best = null;
         let bestLen = -1;
-        tabEls.forEach((tab) => {
-            const path = tab.getAttribute('data-tab-path') || '';
-            if ((here === path || here.indexOf(`${path}/`) === 0) && path.length > bestLen) {
-                best = tab;
-                bestLen = path.length;
-            }
+        document.querySelectorAll('.mobile-tab[data-tab-path]').forEach((tab) => {
+            const paths = [
+                tab.getAttribute('data-tab-path') || '',
+                ...(tab.getAttribute('data-nav-paths') || '').split(' '),
+            ].filter((path) => path.length > 0);
+            paths.forEach((path) => {
+                if ((here === path || here.indexOf(`${path}/`) === 0) && path.length > bestLen) {
+                    best = tab;
+                    bestLen = path.length;
+                }
+            });
         });
         return best;
     };
-    const activeTab = /** @type {Element | null} */ (markActiveTab());
-
+    /** @type {Element | null} */
+    let activeTab = findActiveTab();
     /**
      * Mirrors the drawer state on its openers and on the tab bar.
      *
@@ -407,6 +422,8 @@ document.addEventListener('DOMContentLoaded', () => {
         markActive();
         bindGroups(previous);
         renderList();
+        activeTab = findActiveTab();
+        setOpeners(isOpen());
     });
     document.addEventListener(NAV_EDIT_EVENT, renderList);
 

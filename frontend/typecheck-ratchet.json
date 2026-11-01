@@ -145,6 +145,7 @@
       "kernel/nav-edit.js",
       "kernel/nav-favourites.js",
       "kernel/nav-preferences.js",
+      "kernel/nav-tabbar.js",
       "kernel/safe-url.js",
       "kernel/scu-decimal-input.js",
       "kernel/sidebar.js",

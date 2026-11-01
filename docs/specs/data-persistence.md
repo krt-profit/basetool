@@ -1113,7 +1113,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `orgchart` | 1 | `org_chart_position` |
 | `promotion` | 5 | `member_evaluation`, `promotion_category`, `promotion_level_content`, `promotion_topic`, `rank_requirement` |
 | `personalinventory` | 1 | `personal_inventory_item` |
-| `navigation` | 3 | `navigation_favourite`, `navigation_hidden`, `navigation_preferences` |
+| `navigation` | 4 | `navigation_favourite`, `navigation_hidden`, `navigation_preferences`, `navigation_tab_bar` |
 | `hangar` | 1 | `ship` |
 | `blueprint` | 3 | `blueprint_external_alias`, `default_blueprint`, `personal_blueprint` |
 | `inventory` | 4 | `inventory_item`, `inventory_item_donation_allocation`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
@@ -1206,12 +1206,12 @@ implementations, `UserAccountMergeService`, the `UserReassignmentParticipant` im
 #### The navigation module (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root table, the
-> favourites and the hidden pages. The sections of REQ-UI-032 that follow, and the dashboards of REQ-UI-034, join the
+> favourites, the hidden pages and the phone tab bars. The sections of REQ-UI-032 that follow, and the dashboards of REQ-UI-034, join the
 > same root.
 
 The `navigation` module keeps one root row per member, `navigation_preferences`, which references
 `app_user (id)` with `ON DELETE CASCADE` and carries the version counter of every section. Every
-further preference table (today `navigation_favourite` and `navigation_hidden`) references that root, never `app_user`,
+further preference table (today `navigation_favourite`, `navigation_hidden` and `navigation_tab_bar`) references that root, never `app_user`,
 with `ON DELETE CASCADE`, in a column that is not named like a member column. The root takes a
 disposition in all three registries: **erasure** by the cascade; **export** in the one section
 `navigationPreferences` (REQ-SEC-058); **merge** as the column

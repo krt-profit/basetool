@@ -1707,8 +1707,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
   longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
-  safe area) holds Einsätze · Lager · Aufträge · Meldungen (with the unread count) · Menü; the current
-  area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
+  safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
+  default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
   accordion with the current page's group open, the legal links, the handbook and the version at the
   end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
   shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
@@ -1759,7 +1759,7 @@ ADR-0282
 #### Planned amendment (ADR-0297)
 
 **What it replaces.** The *List* zone and the admin groups of „The drawer" and „Information
-architecture", the 769 px drawer threshold, the tab-bar line of „Phones" and the „No data,
+architecture", the 769 px drawer threshold and the „No data,
 nothing mutates" bullet (preferences are written, REQ-UI-032). The header, the context and foot
 zones, the menu filter, tolerant matching, „Rights stay on the server" and accessibility stay; the
 quick access is extended by REQ-UI-033.
@@ -1892,17 +1892,20 @@ stored mode is kept.
 - **Icons** are 24 × 24 with stroke 2 in the sprite's style; missing ones go into the design
   system's sprite.
 
-**Phone tab bar: five slots.** Slots 1–3 are configurable (REQ-UI-032), slot 4 is the fixed
-„Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
-navigation. One bar per mode.
+**Phone tab bar: five slots** (shipped). Slots 1–3 are configurable (REQ-UI-032), slot 4 is the
+fixed „Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
+navigation. One bar per mode: the member bar shows in member mode, the admin bar in admin mode.
+Every slot is at least 44 px wide and tall and shows the icon of its entry.
 
 | Mode | Default slots 1–3 |
 |---|---|
 | Member | Missionen · Lager · Aufträge |
 | Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
 
-**Enforced by (admin mode shipped):** `AdminNavigationRenderMvcTest` (hub, three collapsed groups,
-13 links, tab bar) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
+**Enforced by (admin mode and phone tab bar shipped):** `AdminNavigationRenderMvcTest` (hub, three
+collapsed groups, 13 links, tab bar) · `NavigationTabBarMvcTest`, `NavigationTabBarResolverTest`
+(the default slots per mode, the fill from the favourites, the stand-in) ·
+`NavigationTabBarE2eTest` (the phone bar at 375 px) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
 tab, in-place requests are not redirected) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
 bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, the tab bar).
 
@@ -1910,7 +1913,7 @@ bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, t
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
 „Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
 tab) · `NavigationE2eTest` (the three desktop modes and their width fallbacks, rail flyouts by
-hover, click and keyboard, the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
+hover, click and keyboard) · **Related:** REQ-UI-032, REQ-UI-033,
 REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
@@ -2281,9 +2284,10 @@ page use it; positions there count the reorderable rows of the rendered page.
 > **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store, the
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
-> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the privacy flows and the
-> metrics. Planned: the order and the up/down controls of „Anpassen", the tab bar, „Darstellung"
-> and the full reset; until they ship, the current code stays authoritative for them.
+> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the phone tab bar with
+> its „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the privacy flows
+> and the metrics. Planned: the order and the up/down controls of „Anpassen", „Darstellung" and
+> the full reset; until they ship, the current code stays authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
@@ -2416,7 +2420,11 @@ the quick access, no hide control on personal pages, the relays), `NavigationReg
 entries are pages, which tabs leave with a page), `NavigationMenuTest`,
 `NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint, hiding with focus and
 announcement, favourite and hidden excluding each other, the resets, 44 px controls up to 1024 px
-and 32 px above), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
+and 32 px above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the
+frozen bar, the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest`
+(the bar per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a
+taken entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin
+bar), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
 full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 

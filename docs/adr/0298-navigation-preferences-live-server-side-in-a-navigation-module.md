@@ -1,7 +1,7 @@
 # ADR-0298 — Navigation preferences live server-side in a navigation module
 
 - **Status:** Accepted — partly implemented: the module, its root table and the favourites section
-  and the hidden-pages section exist; the other sections and the dashboards follow.
+  the hidden-pages section and the phone tab-bar sections exist; the other sections and the dashboards follow.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-032, REQ-UI-034,

@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBacken
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import java.util.Map;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -110,6 +113,29 @@ public class NavigationPreferencesController {
     return relayed(
         "replace navigation favourites and hidden pages (ajax)",
         () -> client.replaceFavouritesAndHidden(request));
+  }
+
+  /**
+   * Replaces the caller's phone tab bar of one mode.
+   *
+   * @param mode the path segment of the mode, {@code member} or {@code admin}
+   * @param request the three slots and the mode's tab-bar version the caller last saw
+   * @return {@code 200} with the stored bar and its version, {@code 404} for an unknown mode,
+   *     {@code 422} with code {@code VALIDATION} for an incomplete payload, or the relayed backend
+   *     {@code problem+json}, a {@code 409} for a stale version included
+   */
+  @PutMapping(value = "/tab-bar/{mode}", headers = AJAX)
+  public ResponseEntity<Object> replaceTabBar(
+      @PathVariable String mode, @RequestBody @Nullable TabBarUpdateRequest request) {
+    NavigationMode target = NavigationMode.fromSegment(mode).orElse(null);
+    if (target == null) {
+      return ResponseEntity.notFound().build();
+    }
+    if (request == null || request.slots() == null || request.version() == null) {
+      return validationError();
+    }
+    return relayed(
+        "replace the navigation tab bar (ajax)", () -> client.replaceTabBar(target, request));
   }
 
   private static boolean complete(@Nullable FavouritesUpdateRequest request) {
