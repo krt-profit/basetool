@@ -2491,8 +2491,10 @@ status and the date as its breadcrumb.
 counts, however it was reached; entry keys only; each visit decays over about 30 days. It ranks
 typed results and fills the empty state; the navigation never reorders itself by use. A visit
 weighs 1 and falls linearly to 0 over 30 days; an entry is „häufig" from a summed weight of 2.
-The store keeps at most 30 visits per entry and 200 entries, and every storage access is wrapped
-in a try/catch.
+In the ranking the weighted sum lifts a page by up to 1.5 match steps (full lift from a sum of 10), so a
+frequently used weaker match can pass a slightly better unused one and a match two steps better
+still wins. The store keeps at most 30 visits per entry and 200 entries, and every storage access
+is wrapped in a try/catch.
 
 **Empty state.** Favoriten, then Häufig (at most 5), then Zuletzt (`krt.recent`, at most 4),
 without duplicates: an entry shown in a higher section is left out of the lower ones. Entries are

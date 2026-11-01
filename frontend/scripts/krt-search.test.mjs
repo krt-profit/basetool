@@ -183,20 +183,36 @@ assert.equal(
     '/org-chart',
 );
 
-const ranked2 = rank(
-    [
-        { ...item('Hangar Alpha', '', false), frequency: 0 },
-        { ...item('Hangar Beta', '', false), frequency: 3 },
-        { ...item('Hangar Gamma', '', false), frequency: 1 },
-        { ...item('Hangar-Check', '', true), frequency: 9 },
-        { ...item('Mein Hangar', '', false), frequency: 99 },
-    ],
-    fold('hangar'),
+const byUse = (label, rest, frequency, fromServer = false) => ({
+    ...item(label, rest, fromServer),
+    frequency,
+});
+const labelsOf = (list) => Array.from(list, (r) => r.label);
+const q2 = fold('hangar');
+assert.deepEqual(
+    labelsOf(rank([byUse('Hangar Alpha', '', 0), byUse('Mein Hangar', '', 10)], q2)),
+    ['Mein Hangar', 'Hangar Alpha'],
+    'a frequently used weaker match overtakes a slightly better unused one',
 );
 assert.deepEqual(
-    Array.from(ranked2, (r) => r.label),
-    ['Hangar Beta', 'Hangar Gamma', 'Hangar Alpha', 'Hangar-Check', 'Mein Hangar'],
-    'a more used page leads within its match quality, a server hit stays behind pages',
+    labelsOf(rank([byUse('Hangar Alpha', '', 0), byUse('Mein Hangar', '', 3)], q2)),
+    ['Hangar Alpha', 'Mein Hangar'],
+    'a little use does not lift a weaker match over a better one',
+);
+assert.deepEqual(
+    labelsOf(rank([byUse('Hangar Alpha', '', 0), byUse('Lager', 'Hangar Bestand', 500)], q2)),
+    ['Hangar Alpha', 'Lager'],
+    'a much better match still wins however often the other page is used',
+);
+assert.deepEqual(
+    labelsOf(rank([byUse('Hangar Alpha', '', 2), byUse('Hangar Beta', '', 6)], q2)),
+    ['Hangar Beta', 'Hangar Alpha'],
+    'within one match quality the more used page leads',
+);
+assert.deepEqual(
+    labelsOf(rank([byUse('Hangar-Check', '', 0, true), byUse('Hangar Zulu', '', 0)], q2)),
+    ['Hangar Zulu', 'Hangar-Check'],
+    'a page stays ahead of a server hit of the same quality',
 );
 
 const DAY = 24 * 60 * 60 * 1000;

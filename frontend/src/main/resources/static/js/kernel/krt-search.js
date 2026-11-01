@@ -164,10 +164,29 @@ export function krtSearchScore(foldLabel, foldRest, q) {
 /** The score of a server hit whose label the folded query does not match. */
 const SERVER_MATCH_SCORE = 3;
 
+/** How far the use of a page can lift it: more than one match step, less than two. */
+const FREQUENCY_BOOST_MAX = 1.5;
+
+/** The summed visit weight at which a page has the full boost. */
+const FREQUENCY_BOOST_SATURATION = 10;
+
 /**
- * Ranks pages and server hits into one list: by score, a page before a server hit of the same
- * score, the more often used page first, then in the given order. Server hits always stay, since
- * the server matched them.
+ * The match score of a page minus its use boost, so a much used page can pass the next better
+ * match step but never a match two steps better.
+ *
+ * @param {number} score the match score, 0 best
+ * @param {number | undefined} frequency the page's summed visit weight
+ * @returns {number} the score to sort by, lower first
+ */
+function boostedScore(score, frequency) {
+    const used = Math.min(frequency || 0, FREQUENCY_BOOST_SATURATION);
+    return score - (FREQUENCY_BOOST_MAX * used) / FREQUENCY_BOOST_SATURATION;
+}
+
+/**
+ * Ranks pages and server hits into one list by match quality plus the use of the page (REQ-UI-033),
+ * a page before a server hit of the same score, then in the given order. Server hits always stay,
+ * since the server matched them.
  *
  * @template {{ foldLabel: string, foldRest: string, fromServer?: boolean, frequency?: number }} T
  * @param {T[]} items the candidates
@@ -178,16 +197,16 @@ export function krtSearchRank(items, q) {
     return items
         .map((item, i) => {
             const s = krtSearchScore(item.foldLabel, item.foldRest, q);
-            return { item, i, s: s < 0 && item.fromServer ? SERVER_MATCH_SCORE : s };
+            const score = s < 0 && item.fromServer ? SERVER_MATCH_SCORE : s;
+            return { item, i, s: score, sort: boostedScore(score, item.frequency) };
         })
         .filter((x) => {
             return x.s >= 0;
         })
         .sort((a, b) => {
             return (
-                a.s - b.s ||
+                a.sort - b.sort ||
                 Number(!!a.item.fromServer) - Number(!!b.item.fromServer) ||
-                (b.item.frequency || 0) - (a.item.frequency || 0) ||
                 a.i - b.i
             );
         })
