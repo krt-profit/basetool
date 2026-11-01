@@ -41,10 +41,18 @@ class QuickAccessSearchMetricsTest {
   void registersEveryPairAtZero() {
     List<Meter> meters = List.copyOf(registry.find(MetricNames.QUICK_ACCESS_SEARCH).meters());
 
-    assertThat(meters).hasSize(3 * 4);
+    assertThat(meters).hasSize(QuickAccessSearchKind.values().length * 4);
     assertThat(meters)
         .extracting(m -> m.getId().getTag(MetricNames.TAG_KIND))
-        .containsOnly("mission", "operation", "material");
+        .containsOnly(
+            "mission",
+            "operation",
+            "material",
+            "blueprint",
+            "ship",
+            "org_unit",
+            "job_order",
+            "member");
     assertThat(meters)
         .extracting(m -> m.getId().getTag(MetricNames.TAG_OUTCOME))
         .containsOnly("hits", "empty", "error", "timeout");

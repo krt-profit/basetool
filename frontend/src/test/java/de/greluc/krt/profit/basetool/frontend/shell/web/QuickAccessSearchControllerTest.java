@@ -106,9 +106,10 @@ class QuickAccessSearchControllerTest {
                 "Mission",
                 "clipboard-check",
                 "PLANNED",
-                start),
+                start,
+                null),
             new QuickAccessSearchItem(
-                "material", "/materials/2", "Mining laser", "Material", "swap", null, null));
+                "material", "/materials/2", "Mining laser", "Material", "swap", null, null, null));
   }
 
   /** The contributors run at the same time, not one after the other. */
@@ -151,6 +152,23 @@ class QuickAccessSearchControllerTest {
     assertThat(controller.search(" a ", null)).isEmpty();
     assertThat(controller.search(null, null)).isEmpty();
     assertThat(calls).hasValue(0);
+  }
+
+  /** A single character asks only the type that searches by number. */
+  @Test
+  void aSingleCharacterAsksOnlyTheNumberSearch() {
+    QuickAccessSearchController controller =
+        controller(
+            contributor(
+                QuickAccessSearchKind.MISSION,
+                (q, limit) -> List.of(new QuickAccessHit("/missions/1", "m", null, null))),
+            contributor(
+                QuickAccessSearchKind.JOB_ORDER,
+                (q, limit) -> List.of(new QuickAccessHit("/orders/1", "#7", null, null))));
+
+    assertThat(controller.search("7", null))
+        .extracting(QuickAccessSearchItem::kind)
+        .containsExactly("job_order");
   }
 
   /** The contributor gets the trimmed term and a limit of five, and more than five are cut. */

@@ -63,8 +63,8 @@ public class QuickAccessSearchController {
   /** The endpoint path; mirrored by {@code data-entity-search-url} in {@code palette.html}. */
   public static final String PATH = "/quick-access/search";
 
-  /** The shortest term that is searched. */
-  static final int MIN_TERM_LENGTH = 2;
+  /** The shortest term any type is searched with. */
+  static final int MIN_TERM_LENGTH = 1;
 
   /** The longest term that is searched; a longer one answers nothing. */
   static final int MAX_TERM_LENGTH = 100;
@@ -91,6 +91,7 @@ public class QuickAccessSearchController {
    * @param icon the sprite symbol without its {@code krt-icon-} prefix
    * @param status the entity's status, or {@code null}
    * @param date the entity's date, or {@code null}
+   * @param adminHref the page the hit opens in administration mode, or {@code null}
    */
   public record QuickAccessSearchItem(
       @NotNull String kind,
@@ -99,7 +100,8 @@ public class QuickAccessSearchController {
       @NotNull String crumb,
       @NotNull String icon,
       @Nullable String status,
-      @Nullable Instant date) {}
+      @Nullable Instant date,
+      @Nullable String adminHref) {}
 
   /**
    * Creates the controller with the default per-type timeout.
@@ -143,8 +145,8 @@ public class QuickAccessSearchController {
   /**
    * Searches the entity types the caller may open.
    *
-   * @param q the search term; shorter than two or longer than 100 characters after trimming answers
-   *     nothing
+   * @param q the search term; a type is asked only when the trimmed term has at least its minimum
+   *     length, and one longer than 100 characters answers nothing
    * @param kind the type keys to narrow to, or {@code null} for every type
    * @return at most five hits per type, in contributor order
    * @throws ReauthenticationRequiredException when the session can no longer reach the backend
@@ -160,7 +162,10 @@ public class QuickAccessSearchController {
     }
     Set<QuickAccessSearchKind> wanted = wantedKinds(kind);
     List<QuickAccessSearchContributor> asked =
-        contributors.stream().filter(c -> wanted.contains(c.kind())).toList();
+        contributors.stream()
+            .filter(c -> wanted.contains(c.kind()))
+            .filter(c -> term.length() >= c.kind().minTermLength())
+            .toList();
     List<CompletableFuture<List<QuickAccessHit>>> futures =
         asked.stream()
             .map(c ->
@@ -222,7 +227,8 @@ public class QuickAccessSearchController {
                 h.statusKey() == null
                     ? null
                     : messageSource.getMessage(h.statusKey(), null, h.statusKey(), locale),
-                h.date()))
+                h.date(),
+                h.adminHref()))
         .toList();
   }
 

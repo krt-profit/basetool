@@ -46,6 +46,7 @@
             <div class="oc-tree oc-tree--ol" role="tree" th:aria-label="#{orgChart.ol.title}">
                 <div class="oc-col">
                     <div class="oc-unit-box oc-unit-box--ol" role="treeitem" tabindex="-1" aria-level="1"
+                         th:data-oc-key="${ol.orgUnitId()}"
                          th:aria-label="${ol.name()}">
                         <span class="sh" th:text="${ol.shorthand()}">OL</span>
                         <span class="nm" th:text="${ol.name()}">Organisationsleitung</span>

@@ -134,6 +134,19 @@ export function krtSearchParse(raw) {
 }
 
 /**
+ * The page a server hit opens: its administration page in administration mode when it has one.
+ *
+ * @param {{ href: string, adminHref?: string | null }} hit the hit as the search answered it
+ * @param {boolean} adminMode whether the navigation is in administration mode
+ * @returns {string} the path to open
+ */
+export function krtSearchHitHref(hit, adminMode) {
+    return adminMode && typeof hit.adminHref === 'string' && hit.adminHref.charAt(0) === '/'
+        ? hit.adminHref
+        : hit.href;
+}
+
+/**
  * How well an entry matches a folded query: a label that starts with it, a label that contains it,
  * then a breadcrumb or search term that contains it.
  *
