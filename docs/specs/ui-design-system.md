@@ -2395,20 +2395,22 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
 
-> **Status: partially shipped** (ADR-0297, map #2800). Shipped: the entity search for missions,
-> operations and materials, the limits, the prefixes with their help, the mixed ranking by match
-> quality and the kept highlight. Still planned, with the current code and the quick-access text
-> of REQ-UI-026 authoritative until they ship: the other five entity types, „Häufig", the empty
-> state, filtering of hidden pages, the additional actions and the dialog keys.
+> **Status: partially shipped** (ADR-0297, map #2800). Shipped: the entity search for all eight
+> types, the limits, the prefixes with their help, the mixed ranking by match quality and the kept
+> highlight. Still planned, with the current code and the quick-access text of REQ-UI-026
+> authoritative until they ship: „Häufig", the empty state, filtering of hidden pages, the
+> additional actions and the dialog keys, and a member hit that opens the member edit page in admin
+> mode (a member hit opens the org chart for everyone).
 
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
 (`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
 each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
-backend list that backs the page its hits open (missions and operations over every period,
-materials from the visible catalogue), so a hit is exactly an entity that list would show the
-caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
+backend read that backs the page its hits open (missions and operations over every period,
+materials from the visible catalogue, blueprints from the availability overview, ship types from
+the unit hangar overview, job orders from the scoped number lookup of REQ-ORDERS-048, org units and
+members from the org chart), so a hit is exactly an entity that page would show the caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
 caller to the login. An optional repeatable `kind` parameter (the type keys `mission`,
 `operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`) narrows the
 search; an unknown key asks no type. Each hit is `{kind, href, label, crumb, icon, status, date}`,
@@ -2426,9 +2428,15 @@ with `crumb` the type's name and `status` localized.
 | Member | name | org chart with the person highlighted; in admin mode the member edit page |
 
 - A hit carries a slim projection (id, name, status, date). A member finds exactly the people the
-  org chart shows them, with the same fields; no search reveals more than the page it opens.
+  org chart shows them, by the name it shows (display name, the username only when none is set),
+  with the rank they hold there as status; no search reveals more than the page it opens. A job
+  order hit shows the number only (`#12`) with its status and creation date.
 - **Limits:** debounced (250 ms), at least 2 characters (1 digit for a job-order number), at most
-  100 characters, 5 hits per type, aborted when the user types on.
+  100 characters, 5 hits per type, aborted when the user types on. Each type carries its own
+  minimum (`QuickAccessSearchKind.minTermLength`); a type is asked only when the term reaches it.
+- **Highlight:** the org chart marks and scrolls to the unit or person named by its `highlight`
+  query parameter (an org unit id, a user id, or the seat id of a holder without an account).
+  Blueprint and ship hits open the overview or unit hangar filtered by the name (`search`).
 - **The term stays a query parameter;** it never reaches a path, an MDC field or a metric label.
 
 **Prefixes.** Symbol and word are equivalent; both languages' words are accepted in either UI
@@ -2485,11 +2493,13 @@ only while the dialog is open).
 **Enforced by:** `QuickAccessSearchControllerTest` (parallel contributors, fail closed per type,
 limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTest` ·
 `MissionQuickAccessSearchContributorTest`, `OperationQuickAccessSearchContributorTest`,
-`MaterialQuickAccessSearchContributorTest` (the list read the page uses) · `:frontend:testSearchJs`
+`MaterialQuickAccessSearchContributorTest`, `BlueprintQuickAccessSearchContributorTest`,
+`ShipQuickAccessSearchContributorTest`, `OrgUnitQuickAccessSearchContributorTest`,
+`MemberQuickAccessSearchContributorTest` (exactly the chart's people),
+`JobOrderQuickAccessSearchContributorTest` (the read the page uses) · `QuickAccessFoldTest` · `:frontend:testSearchJs`
 (prefix parsing, ranking) · `QuickAccessSearchE2eTest` (every type found, entity names kept out of
 `krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
-`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:** one
-`…QuickAccessSearchContributorTest` per remaining type (member visibility equal to the org chart) ·
+`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:**
 `:frontend:testSearchJs` (decay, empty-state de-duplication) · `NavigationE2eTest` (Ctrl+Enter,
 Tab, Ctrl+D, hidden pages filtered) · **Code:** `shell/web/QuickAccessSearchController.java`,
 `shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,

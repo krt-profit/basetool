@@ -63,8 +63,8 @@ public class QuickAccessSearchController {
   /** The endpoint path; mirrored by {@code data-entity-search-url} in {@code palette.html}. */
   public static final String PATH = "/quick-access/search";
 
-  /** The shortest term that is searched. */
-  static final int MIN_TERM_LENGTH = 2;
+  /** The shortest term any type is searched with. */
+  static final int MIN_TERM_LENGTH = 1;
 
   /** The longest term that is searched; a longer one answers nothing. */
   static final int MAX_TERM_LENGTH = 100;
@@ -143,8 +143,8 @@ public class QuickAccessSearchController {
   /**
    * Searches the entity types the caller may open.
    *
-   * @param q the search term; shorter than two or longer than 100 characters after trimming answers
-   *     nothing
+   * @param q the search term; a type is asked only when the trimmed term has at least its minimum
+   *     length, and one longer than 100 characters answers nothing
    * @param kind the type keys to narrow to, or {@code null} for every type
    * @return at most five hits per type, in contributor order
    * @throws ReauthenticationRequiredException when the session can no longer reach the backend
@@ -160,7 +160,10 @@ public class QuickAccessSearchController {
     }
     Set<QuickAccessSearchKind> wanted = wantedKinds(kind);
     List<QuickAccessSearchContributor> asked =
-        contributors.stream().filter(c -> wanted.contains(c.kind())).toList();
+        contributors.stream()
+            .filter(c -> wanted.contains(c.kind()))
+            .filter(c -> term.length() >= c.kind().minTermLength())
+            .toList();
     List<CompletableFuture<List<QuickAccessHit>>> futures =
         asked.stream()
             .map(c ->

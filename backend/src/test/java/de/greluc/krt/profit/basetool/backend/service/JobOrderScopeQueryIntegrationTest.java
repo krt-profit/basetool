@@ -315,6 +315,67 @@ class JobOrderScopeQueryIntegrationTest {
     assertThat(jobOrderRepository.existsByAssigneesUserId(newUser().getId())).isFalse();
   }
 
+  @Test
+  void numberPrefix_findsTheScopedOrderByItsNumber() {
+    ScopePredicate memberOfA = new ScopePredicate(false, null, Set.of(squadronAId));
+
+    assertThat(numberHits(numberOf(orderRespA), true, memberOfA, NIL)).contains(orderRespA);
+    assertThat(numberHits(numberOf(orderRespSk), true, memberOfA, NIL)).contains(orderRespSk);
+    assertThat(numberHits(numberOf(orderRespB), true, memberOfA, NIL)).doesNotContain(orderRespB);
+  }
+
+  @Test
+  void numberPrefix_matchesAnOrderWhoseNumberStartsWithTheDigits() {
+    String number = numberOf(orderRespA);
+    ScopePredicate admin = new ScopePredicate(true, null, Set.of());
+
+    assertThat(numberHits(number.substring(0, 1), true, admin, NIL)).contains(orderRespA);
+    assertThat(numberHits(number + "9", true, admin, NIL)).doesNotContain(orderRespA);
+  }
+
+  @Test
+  void numberPrefix_withoutTheOrderWorkflowStillFindsAssignedOrders() {
+    UUID assigneeId = assignNewUser(orderRespB);
+    ScopePredicate none = new ScopePredicate(false, null, Set.of());
+
+    assertThat(numberHits(numberOf(orderRespB), false, none, assigneeId)).contains(orderRespB);
+    assertThat(numberHits(numberOf(orderRespSk), false, none, assigneeId))
+        .doesNotContain(orderRespSk);
+  }
+
+  @Test
+  void numberPrefix_assigneeGrantIsPersonal() {
+    assignNewUser(orderRespB);
+    UUID unitMateId = newUser().getId();
+
+    assertThat(
+            numberHits(
+                numberOf(orderRespB),
+                true,
+                new ScopePredicate(false, null, Set.of(squadronAId)),
+                unitMateId))
+        .doesNotContain(orderRespB);
+  }
+
+  private String numberOf(UUID orderId) {
+    return String.valueOf(jobOrderRepository.findById(orderId).orElseThrow().getDisplayId());
+  }
+
+  private Set<UUID> numberHits(String prefix, boolean scoped, ScopePredicate scope, UUID callerId) {
+    return jobOrderRepository
+        .findVisibleByNumberPrefix(
+            prefix,
+            scoped,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds().isEmpty() ? Set.of(NIL) : scope.memberOrgUnitIds(),
+            callerId,
+            ALL_ROWS)
+        .stream()
+        .map(JobOrder::getId)
+        .collect(Collectors.toSet());
+  }
+
   private void assign(UUID userId, UUID orderId) {
     transactionTemplate.executeWithoutResult(_ -> {
       JobOrder order = jobOrderRepository.findById(orderId).orElseThrow();

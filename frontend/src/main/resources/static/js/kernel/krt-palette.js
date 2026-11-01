@@ -36,6 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const SEARCH_DEBOUNCE_MS = 250;
     const SEARCH_MIN_LENGTH = 2;
+    const SEARCH_MIN_NUMBER_LENGTH = 1;
+    const NUMBER_TERM = /^[0-9]+$/;
     const LOCAL_KINDS = ['action', 'page'];
     const CRUMB_SEPARATOR = ' · ';
 
@@ -630,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Debounces the backend search for the current query; a query of a local kind, the help or a
-     * term shorter than two characters asks nothing.
+     * term shorter than two characters, or one digit for an order number, asks nothing.
      */
     const scheduleSearch = function () {
         const parsed = krtSearchParse(paletteInput.value);
@@ -640,7 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
             !data.entitySearchUrl ||
             parsed.help ||
             (parsed.kind !== null && LOCAL_KINDS.includes(parsed.kind)) ||
-            parsed.term.length < SEARCH_MIN_LENGTH
+            parsed.term.length <
+                (NUMBER_TERM.test(parsed.term) ? SEARCH_MIN_NUMBER_LENGTH : SEARCH_MIN_LENGTH)
         ) {
             return;
         }

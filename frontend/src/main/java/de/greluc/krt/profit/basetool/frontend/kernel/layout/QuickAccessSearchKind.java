@@ -40,14 +40,37 @@ public enum QuickAccessSearchKind {
   OPERATION("operation", "clipboard-check"),
 
   /** Materials of the visible catalogue, opening the material detail. */
-  MATERIAL("material", "swap");
+  MATERIAL("material", "swap"),
+
+  /** Blueprints of the availability overview, opening it filtered to the product. */
+  BLUEPRINT("blueprint", "database"),
+
+  /** Ship types of the unit hangar, opening the hangar filtered to the type. */
+  SHIP("ship", "swap"),
+
+  /** Org units of the org chart, opening it with the unit highlighted. */
+  ORG_UNIT("org_unit", "users"),
+
+  /** Job orders by their number, opening the order. */
+  JOB_ORDER("job_order", "clipboard-check", 1),
+
+  /** Members shown on the org chart, opening it with the person highlighted. */
+  MEMBER("member", "user");
+
+  private static final int DEFAULT_MIN_TERM_LENGTH = 2;
 
   private final String key;
   private final String icon;
+  private final int minTermLength;
 
   QuickAccessSearchKind(@NotNull String key, @NotNull String icon) {
+    this(key, icon, DEFAULT_MIN_TERM_LENGTH);
+  }
+
+  QuickAccessSearchKind(@NotNull String key, @NotNull String icon, int minTermLength) {
     this.key = key;
     this.icon = icon;
+    this.minTermLength = minTermLength;
   }
 
   /**
@@ -66,6 +89,15 @@ public enum QuickAccessSearchKind {
    */
   public @NotNull String icon() {
     return icon;
+  }
+
+  /**
+   * The shortest term this type is searched with.
+   *
+   * @return the character count, one for a number and two otherwise
+   */
+  public int minTermLength() {
+    return minTermLength;
   }
 
   /**

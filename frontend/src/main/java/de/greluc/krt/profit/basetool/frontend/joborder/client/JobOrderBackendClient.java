@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderNumberHitDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
@@ -119,6 +120,9 @@ public class JobOrderBackendClient {
 
   private static final ParameterizedTypeReference<List<JobOrderAssigneeCandidateDto>>
       LIST_OF_ASSIGNEE_CANDIDATE = new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<JobOrderNumberHitDto>> LIST_OF_NUMBER_HIT =
+      new ParameterizedTypeReference<>() {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -223,6 +227,22 @@ public class JobOrderBackendClient {
   public List<InventoryItemDto> orphanedInventory(@NotNull UUID id) {
     return backendApiClient.get(
         "/api/v1/orders/{id}/allocations/orphaned", LIST_OF_INVENTORY_ITEM, id);
+  }
+
+  /**
+   * Finds the orders whose number starts with the given digits among those the caller may open.
+   *
+   * @param digits the digits the number starts with
+   * @param limit the most hits
+   * @return the hits by ascending number, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<JobOrderNumberHitDto> ordersByNumber(@NotNull String digits, int limit) {
+    return backendApiClient.get(
+        "/api/v1/orders/by-number?number={number}&limit={limit}",
+        LIST_OF_NUMBER_HIT,
+        digits,
+        limit);
   }
 
   /**

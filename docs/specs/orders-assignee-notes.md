@@ -138,6 +138,24 @@ visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, A
 REQ-ORDERS-013, REQ-ORDERS-014, REQ-ORDERS-040, REQ-ORDERS-043, REQ-ORG-003, REQ-AUDIT-001 ·
 **Decision:** ADR-0301
 
+### REQ-ORDERS-048 — Job orders are found by number
+
+`GET /api/v1/orders/by-number?number=<digits>&limit=<n>` (`isAuthenticated()`) returns the orders
+whose `displayId` starts with the one to nine digits, by ascending number, at most `limit` (1–20,
+default 5), each as `JobOrderNumberHitDto {id, displayId, status, createdAt}`. Any other `number`
+is a 400.
+
+- The result is exactly what the caller may open from the order list: for a caller inside the order
+  workflow the scoped orders of `JobOrderScope.PREDICATE` (REQ-DATA-010), and for every caller the
+  orders they hold an assignee entry on (REQ-ORDERS-047). A caller outside the workflow therefore
+  finds only their assigned orders; an unidentified caller finds none.
+- The quick access (REQ-UI-033) is the only consumer; it shows the number only.
+
+**Enforced by:** `JobOrderScopeQueryIntegrationTest` (scope, prefix, assignee grant),
+`JobOrderQueryServiceNumberLookupTest`, `JobOrderNumberLookupControllerTest`, `authorization-matrix.txt` ·
+**Code:** `JobOrderNumberLookupController.findByNumber`, `JobOrderQueryService.findByNumberPrefix`,
+`JobOrderRepository.findVisibleByNumberPrefix` · **Related:** REQ-ORDERS-047, REQ-UI-033
+
 ## Out of scope
 
 - The assignee enroll/unenroll rules themselves (who may add/remove a Bearbeiter) — unchanged
