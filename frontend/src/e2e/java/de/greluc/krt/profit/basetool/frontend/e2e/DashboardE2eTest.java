@@ -337,8 +337,10 @@ class DashboardE2eTest {
           page.getByTestId("dashboard-customise").click();
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-assigned-orders").click();
+          assertThat(page.getByTestId("dashboard-widget-assigned-orders")).hasCount(1);
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-low-stock").click();
+          assertThat(page.getByTestId("dashboard-widget-low-stock")).hasCount(1);
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-bank").click();
 
