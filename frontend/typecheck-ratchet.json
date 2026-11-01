@@ -53,7 +53,6 @@
       "catalogue/uex.js"
     ],
     "dashboard": [
-      "dashboard/announcement.js",
       "dashboard/dashboard-edit.js",
       "dashboard/dashboard-widgets.js",
       "dashboard/index.js"

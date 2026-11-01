@@ -61,4 +61,16 @@ public class LegacyAdminRedirectController {
   public String squadrons() {
     return "redirect:/admin/org-structure/squadrons";
   }
+
+  /**
+   * The former announcement editor, now the inline editor of the Information widget on the
+   * dashboard.
+   *
+   * @return a redirect to the dashboard
+   */
+  @NotNull
+  @GetMapping(value = "/admin/announcement", headers = PAGE_ONLY)
+  public String announcement() {
+    return "redirect:/";
+  }
 }

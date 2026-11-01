@@ -105,9 +105,67 @@ class DashboardServiceTest {
   }
 
   @Test
-  @DisplayName("the admin default is empty until the admin widgets exist")
-  void readsAnEmptyAdminDefault() {
-    assertThat(service.read(member(), DashboardMode.ADMIN).widgets()).isEmpty();
+  @DisplayName("the admin default is the hub in the wide column and four admin widgets")
+  void readsTheAdminDefault() {
+    DashboardResponse read = service.read(member(), DashboardMode.ADMIN);
+
+    assertThat(read.customised()).isFalse();
+    assertThat(read.widgets())
+        .extracting(DashboardWidgetResponse::type, DashboardWidgetResponse::column)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.ADMIN_HUB, DashboardColumn.WIDE),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.DELETION_REQUESTS, DashboardColumn.NARROW),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.DISCORD_REGISTRATIONS, DashboardColumn.NARROW),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.SYNC_STATUS, DashboardColumn.NARROW),
+            org.assertj.core.groups.Tuple.tuple(
+                DashboardWidgetType.OPEN_TERMS, DashboardColumn.NARROW));
+    assertThat(read.widgets().get(3).days()).isEqualTo(7);
+    assertThat(read.widgets().get(1).rows()).isEqualTo(5);
+  }
+
+  @Test
+  @DisplayName("an admin widget in the member dashboard is refused")
+  void refusesAnAdminWidgetInTheMemberMode() {
+    UUID owner = member();
+    DashboardLayoutRequest request =
+        new DashboardLayoutRequest(List.of(item(DashboardWidgetType.OPEN_TERMS)), 0L);
+
+    assertThatThrownBy(() -> service.replaceLayout(owner, MEMBER, request))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  @DisplayName("the sync status takes the ranges 1, 7 and 30 days and no other")
+  void theSyncStatusTakesOnlyItsRanges() {
+    UUID owner = member();
+    DashboardWidgetResponse widget =
+        service
+            .replaceLayout(
+                owner,
+                DashboardMode.ADMIN,
+                new DashboardLayoutRequest(List.of(item(DashboardWidgetType.SYNC_STATUS)), 0L))
+            .widgets()
+            .getFirst();
+
+    DashboardWidgetResponse updated =
+        service.replaceOptions(
+            owner,
+            DashboardMode.ADMIN,
+            widget.id(),
+            new DashboardOptionsRequest(null, 30, null, null, widget.optionsVersion()));
+
+    assertThat(updated.days()).isEqualTo(30);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                DashboardMode.ADMIN,
+                widget.id(),
+                new DashboardOptionsRequest(null, 14, null, null, updated.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
   }
 
   @Test

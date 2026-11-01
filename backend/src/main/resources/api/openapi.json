@@ -83925,7 +83925,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
           }
         },
         "required" : [ "column", "type" ]
@@ -83983,7 +83983,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS" ]
+              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
             },
             "maxItems" : 32,
             "minItems" : 0
@@ -84046,7 +84046,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
           }
         }
       },

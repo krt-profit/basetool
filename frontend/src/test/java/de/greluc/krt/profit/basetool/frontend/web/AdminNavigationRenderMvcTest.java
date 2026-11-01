@@ -20,13 +20,21 @@
 package de.greluc.krt.profit.basetool.frontend.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardColumn;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,8 +49,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders admin mode: the hub link, three collapsed groups with 13 links, the hub page and the
- * redirect of the former bank page (REQ-UI-026).
+ * Renders admin mode: the dashboard link, three collapsed groups with 13 links, the admin dashboard
+ * with its hub widget and the redirect of the former bank page (REQ-UI-026).
  */
 @SpringBootTest
 class AdminNavigationRenderMvcTest {
@@ -103,12 +111,30 @@ class AdminNavigationRenderMvcTest {
   }
 
   /**
-   * The hub page lists the groups and a non-admin cannot reach it.
+   * The admin dashboard is the board of the admin mode and a non-admin cannot reach it.
    *
    * @throws Exception if the page cannot be rendered
    */
   @Test
-  void hubPageListsTheLinksForAdministratorsOnly() throws Exception {
+  void adminDashboardIsForAdministratorsOnly() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/navigation/dashboards/{mode}"), eq(DashboardResponse.class), eq("admin")))
+        .thenReturn(
+            new DashboardResponse(
+                DashboardMode.ADMIN,
+                0,
+                false,
+                List.of(
+                    new DashboardWidgetResponse(
+                        null,
+                        DashboardWidgetType.ADMIN_HUB,
+                        DashboardColumn.WIDE,
+                        0,
+                        null,
+                        null,
+                        null,
+                        null))));
+
     String html =
         mockMvc
             .perform(
@@ -119,13 +145,45 @@ class AdminNavigationRenderMvcTest {
             .getResponse()
             .getContentAsString();
     assertThat(html)
-        .contains("data-testid=\"admin-hub\"")
-        .contains("href=\"/admin/audit-log\"")
-        .contains("href=\"/admin/person-search\"");
+        .contains("data-testid=\"dashboard-board\"")
+        .contains("data-mode=\"admin\"")
+        .contains("data-widget-type=\"ADMIN_HUB\"")
+        .contains("data-testid=\"dashboard-customise\"");
 
     mockMvc
         .perform(
             get("/admin")
+                .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isForbidden());
+  }
+
+  /**
+   * The hub widget lists the groups of admin links and is for administrators only.
+   *
+   * @throws Exception if the fragment cannot be rendered
+   */
+  @Test
+  void hubWidgetListsTheLinksForAdministratorsOnly() throws Exception {
+    String html =
+        mockMvc
+            .perform(
+                get("/dashboard/widgets/admin-hub")
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains("data-testid=\"admin-hub\"")
+        .contains("href=\"/admin/audit-log\"")
+        .contains("href=\"/admin/person-search\"")
+        .doesNotContain("/admin/announcement");
+
+    mockMvc
+        .perform(
+            get("/dashboard/widgets/admin-hub")
+                .header("X-Requested-With", "XMLHttpRequest")
                 .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }

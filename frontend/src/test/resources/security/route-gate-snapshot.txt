@@ -1,10 +1,8 @@
 / GET -> HomeController#home gate=none layout=yes
-/admin GET -> AdminHubPageController#hub gate=class:hasRole('ADMIN') layout=yes
-/admin/announcement GET -> AdminAnnouncementPageController#showAnnouncementPage gate=class:hasRole('ADMIN') layout=yes
-/admin/announcement/delete POST -> AdminAnnouncementPageController#deleteAnnouncement gate=class:hasRole('ADMIN') layout=yes
-/admin/announcement/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#deleteAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/announcement/update POST -> AdminAnnouncementPageController#updateAnnouncement gate=class:hasRole('ADMIN') layout=yes
-/admin/announcement/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#updateAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
+/admin GET -> AdminDashboardController#dashboard gate=class:hasRole('ADMIN') layout=yes
+/admin/announcement GET headers=[!X-Requested-With] -> LegacyAdminRedirectController#announcement gate=class:hasRole('ADMIN') layout=yes
+/admin/announcement/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#deleteAnnouncementAjax gate=class:hasRole('ADMIN') layout=no
+/admin/announcement/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#updateAnnouncementAjax gate=class:hasRole('ADMIN') layout=no
 /admin/audit-log GET -> AdminAuditLogPageController#auditLog gate=class:hasRole('ADMIN') layout=yes
 /admin/bank GET headers=[!X-Requested-With] -> LegacyAdminRedirectController#bank gate=class:hasRole('ADMIN') layout=yes
 /admin/bank-audit GET -> AdminBankPageController#bankAuditRedirect gate=class:hasRole('ADMIN') layout=yes
@@ -284,12 +282,17 @@
 /connected-apps/{clientId} DELETE headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#disconnectClient gate=class:isAuthenticated() layout=no
 /connected-apps/{clientId}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#undo gate=class:isAuthenticated() layout=no
 /csrf GET -> CsrfTokenController#csrf gate=class:isAuthenticated() layout=no
-/dashboard/member/board GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardBoardController#board gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/admin-hub GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#adminHub gate=class:hasRole('ADMIN') layout=yes
+/dashboard/widgets/deletion-requests GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#deletionRequests gate=class:hasRole('ADMIN') layout=yes
+/dashboard/widgets/discord-registrations GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#discordRegistrations gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/favourites GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#favourites gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/information GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#information gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/notifications GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#notifications gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/open-terms GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#openTerms gate=class:hasRole('ADMIN') layout=yes
+/dashboard/widgets/sync-status GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#syncStatus gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/upcoming-days GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#upcomingDays gate=class:isAuthenticated() layout=yes
 /dashboard/{mode} DELETE headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#reset gate=class:isAuthenticated() layout=no
+/dashboard/{mode}/board GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardBoardController#board gate=class:isAuthenticated() and (#mode != 'admin' or hasRole('ADMIN')) layout=yes
 /dashboard/{mode}/layout PUT headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#replaceLayout gate=class:isAuthenticated() layout=no
 /dashboard/{mode}/widgets/{widgetId}/options PUT headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#replaceOptions gate=class:isAuthenticated() layout=no
 /error * -> BasicErrorController#error gate=none layout=no

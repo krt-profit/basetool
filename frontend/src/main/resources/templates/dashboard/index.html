@@ -1,49 +1,44 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
-    <title th:text="${appTitle}">Profit Basetool</title>
+    <title th:text="${dashboard?.mode()?.name() == 'ADMIN'} ? #{nav.admin.dashboard} + ' - ' + ${appTitle} : ${appTitle}">Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/dashboard/index.css}">
+<link rel="stylesheet" th:if="${dashboard?.mode()?.name() == 'ADMIN'}" th:href="@{/css/pages/dashboard/admin-dashboard.css}">
     </th:block>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
     <div class="home-top">
-        <div class="greeting home-head" data-testid="home-head">
+        <div class="greeting home-head" data-testid="home-head" th:unless="${dashboard.mode().name() == 'ADMIN'}">
             <span class="page-eyebrow" data-testid="home-eyebrow"
                   th:text="${activeOrgUnit != null} ? ${activeOrgUnit.orgUnitName()} + ' · ' + ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')} : ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')}">ALPHA · Samstag, 03.10.</span>
             <h1 th:if="${username}" th:text="#{home.welcome(${currentUser != null ? currentUser.effectiveName : username})}">Willkommen, Pilot</h1>
             <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Willkommen beim Profit Basetool!</h1>
         </div>
-        <div class="home-top__actions" th:if="${dashboard.loaded()}">
-            <button type="button" class="btn btn-secondary" data-trigger="dashboard-customise" aria-pressed="false"
-                    aria-controls="dashboard-board" data-testid="dashboard-customise"
-                    th:attr="data-label-customise=#{dashboard.customise},data-label-done=#{dashboard.customise.done}"
-                    th:text="#{dashboard.customise}">Anpassen</button>
+        <div class="greeting home-head" data-testid="admin-dashboard-head" th:if="${dashboard.mode().name() == 'ADMIN'}">
+            <span class="page-eyebrow" th:text="#{nav.administration}">Administration</span>
+            <h1 th:text="#{nav.admin.dashboard}">Admin-Dashboard</h1>
         </div>
+        <th:block th:replace="~{dashboard/fragments/controls :: customise}"></th:block>
     </div>
 
     <div class="dash-hint" role="note" hidden data-dashboard-hint data-testid="dashboard-hint"
-         th:if="${dashboard.loaded() and !dashboard.customised() and navigationFavourites.keys().isEmpty()}">
+         th:if="${dashboard.mode().name() != 'ADMIN' and dashboard.loaded() and !dashboard.customised() and navigationFavourites.keys().isEmpty()}">
         <p class="m-0" th:text="#{dashboard.hint}">Mit „Anpassen“ stellst du dein Dashboard zusammen.</p>
         <button type="button" class="btn btn-ghost btn-icon" data-trigger="dashboard-hint-dismiss"
                 data-testid="dashboard-hint-dismiss" th:attr="aria-label=#{dashboard.hint.dismiss},title=#{dashboard.hint.dismiss}"
                 ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
     </div>
 
-    <div class="dash-toolbar is-hidden" data-dashboard-toolbar data-testid="dashboard-toolbar" th:if="${dashboard.loaded()}">
-        <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-add" data-testid="dashboard-add"
-                th:text="#{dashboard.add}">Widget hinzufügen</button>
-        <button type="button" class="btn btn-ghost btn-xs" data-trigger="dashboard-reset" data-testid="dashboard-reset"
-                th:text="#{dashboard.reset}">Standard wiederherstellen</button>
-    </div>
+    <th:block th:replace="~{dashboard/fragments/controls :: toolbar}"></th:block>
 
     <th:block th:replace="~{dashboard/fragments/board :: board}"></th:block>
 
     <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
 
-    <th:block th:replace="~{shell/fragments/fankit :: band}" />
+    <th:block th:unless="${dashboard.mode().name() == 'ADMIN'}" th:replace="~{shell/fragments/fankit :: band}" />
 
     <th:block th:if="${dashboard.loaded()}">
         <th:block th:replace="~{dashboard/fragments/dialogs :: dialogs}"></th:block>

@@ -82,6 +82,20 @@ class NavigationLegacyRedirectMvcTest {
   }
 
   /**
+   * The former announcement editor leads to the dashboard, where the Information widget edits
+   * inline.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void announcementPageRedirectsToTheDashboard() throws Exception {
+    mockMvc
+        .perform(get("/admin/announcement").with(admin()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/"));
+  }
+
+  /**
    * The Staffeln list of the mission data leads to the Staffeln tab of the organisation structure.
    *
    * @throws Exception if the request fails

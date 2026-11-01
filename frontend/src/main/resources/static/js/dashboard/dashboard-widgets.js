@@ -21,6 +21,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** How often a widget without a live topic reloads while the tab is visible (REQ-UI-034). */
 const POLL_INTERVAL_MS = 10 * 60 * 1000;
@@ -39,6 +40,9 @@ const OPTION_PARAMS = ['unit', 'days', 'rows', 'status'];
 
 /** The document event the notification stream raises for every new notification. */
 const NOTIFICATION_EVENT = 'krt:notification';
+
+/** The confirmation dialog of the announcement's removal. */
+const INFO_DELETE_MODAL = 'dashboard-info-delete-modal';
 
 /** @type {Set<number>} the pending first-poll timers and poll intervals */
 const timers = new Set();
@@ -293,13 +297,28 @@ function setInfoEditing(trigger, editing) {
 }
 
 /**
- * Registers the delegated handlers of the widgets: the announcement's expander, its read marker and
- * inline editor, and the retry of a failed instance.
+ * Registers the delegated handlers of the widgets: the announcement's expander, its read marker,
+ * inline editor and removal, and the retry of a failed instance.
  */
 export function initWidgetActions() {
     krtEvents.on('click', 'dashboard-info-toggle', toggleInfo);
     krtEvents.on('click', 'dashboard-info-edit', (trigger) => setInfoEditing(trigger, true));
     krtEvents.on('click', 'dashboard-info-cancel', (trigger) => setInfoEditing(trigger, false));
+    krtEvents.on('click', 'dashboard-info-delete', () => krtModal.open(INFO_DELETE_MODAL));
+    krtEvents.on('click', 'dashboard-info-delete-confirm', () => {
+        krtFetch.write({
+            method: 'POST',
+            url: '/admin/announcement/delete',
+            toast: false,
+            errorMessage:
+                document.querySelector('[data-info-editor]')?.getAttribute('data-error') ??
+                undefined,
+            onSuccess() {
+                krtModal.close(INFO_DELETE_MODAL);
+                reloadType('INFORMATION');
+            },
+        });
+    });
     krtEvents.on('click', 'dashboard-widget-retry', (trigger) => {
         const item = trigger.closest('[data-dashboard-item]');
         if (item instanceof HTMLElement) loadWidget(item);
