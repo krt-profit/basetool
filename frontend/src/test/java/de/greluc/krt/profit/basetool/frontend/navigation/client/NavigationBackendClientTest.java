@@ -1,0 +1,83 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.navigation.client;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/** Pins the requests {@link NavigationBackendClient} sends: verb, path and body. */
+class NavigationBackendClientTest {
+
+  private BackendClientHarness backend;
+  private NavigationBackendClient client;
+
+  @BeforeEach
+  void setUp() {
+    backend = BackendClientHarness.start();
+    client = new NavigationBackendClient(backend.backendApiClient());
+  }
+
+  @AfterEach
+  void tearDown() {
+    backend.close();
+  }
+
+  @Test
+  void readsTheSections() {
+    backend.answerJson("{\"favourites\":{\"keys\":[\"missions.list\"],\"version\":3}}");
+
+    NavigationPreferencesResponse read = client.preferences();
+
+    assertThat(read.favourites()).isEqualTo(new FavouritesResponse(List.of("missions.list"), 3));
+    backend.expect("GET", "/api/v1/navigation/preferences");
+  }
+
+  @Test
+  void putsTheFavouritesWithTheirVersion() {
+    backend.answerJson("{\"keys\":[\"missions.list\",\"orders.list\"],\"version\":4}");
+
+    FavouritesResponse stored =
+        client.replaceFavourites(
+            new FavouritesUpdateRequest(List.of("missions.list", "orders.list"), 3L));
+
+    assertThat(stored.version()).isEqualTo(4);
+    backend.expect(
+        "PUT",
+        "/api/v1/navigation/preferences/favourites",
+        "{\"keys\":[\"missions.list\",\"orders.list\"],\"version\":3}");
+  }
+
+  @Test
+  void postsTheKeysToDelete() {
+    backend.answerJson("{\"favourites\":{\"keys\":[],\"version\":5}}");
+
+    client.prune(List.of("admin.terms"));
+
+    backend.expect("POST", "/api/v1/navigation/preferences/prune", "{\"keys\":[\"admin.terms\"]}");
+  }
+}

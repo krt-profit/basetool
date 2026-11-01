@@ -2278,8 +2278,11 @@ page use it; positions there count the reorderable rows of the rendered page.
 
 ### REQ-UI-032 — Navigation personalisation: favourites, „Mehr", order and the tab bar
 
-> **Status: planned** (ADR-0297, ADR-0298, map #2800). Until it ships, the current code stays
-> authoritative.
+> **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store and the
+> Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
+> on load, the 409 hint), the privacy flows and the metrics. Planned: hiding and „Mehr", the order,
+> the tab bar, „Darstellung", „Anpassen" with its resets and the full reset; until they ship, the
+> current code stays authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
@@ -2363,7 +2366,9 @@ optimistic-lock version, so an edit in one never 409s another:
 | Tab-Leiste | slots 1–3 (none = automatic) | per mode, own version each |
 | Darstellung | desktop mode, `shortcutsEnabled` (REQ-UI-035), start page per mode | once per user |
 
-- Relational tables, Flyway-owned, each `REFERENCES app_user (id) ON DELETE CASCADE`, so account
+- Relational tables, Flyway-owned: one root table `navigation_preferences` per user, which
+  `REFERENCES app_user (id) ON DELETE CASCADE` and carries the version counter of every section,
+  and every further preference table references that root with `ON DELETE CASCADE`, so account
   erasure removes them (REQ-DATA-021).
 - **Data export and account merge:** the preferences are part of the Art. 15 / Art. 20 export in
   their own section `navigationPreferences` (REQ-SEC-058) and of the admin account merge
@@ -2397,15 +2402,17 @@ optimistic-lock version, so an edit in one never 409s another:
 
 **Monitoring:** `basetool_navigation_preference_writes_total{section,outcome}` and
 `basetool_navigation_personalised_accounts{section}` (REQ-OBS-011); the endpoints count in
-`http_server_requests` by route template, and their 5xx rate alerts above 5 %.
+`http_server_requests` by route template, and their 5xx rate alerts above 5 %
+(`NavigationEndpointsErroring`).
 
-**Enforced by (to be added):** `NavigationPreferenceServiceTest` (cap of 12, mutual exclusion in
-one write, per-section and per-mode versions, owner-only, deletion of unknown-permission keys) ·
-`NavigationPreferenceControllerTest` (owner gate, 409 per section) · `NavigationRenderMvcTest`
-(Favoriten, greyed favourites, „Mehr", stored order with unknown keys, tab-bar filling and
-stand-ins) · `NavigationPersonalisationE2eTest` (edit mode, resets, the full reset's confirmation,
-44 px controls up to 1024 px, the 409 hint) · the export and merge tests of REQ-SEC-058 and
-REQ-SEC-046 · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+**Enforced by:** `NavigationPreferencesServiceTest` (order, the version per section,
+duplicate keys, owner isolation, deletion of entries), `NavigationPreferencesControllerTest` (the
+cap of 12, the key format, the owner from the token, 409), `NavigationFavouritesMvcTest` (Favoriten,
+the greyed favourite, the star, the deletion on load, failing closed, the relay),
+`NavigationFavouritesReaderTest`, `NavigationCurrentEntryTest`, `NavigationBackendClientTest`,
+`NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint), the export and merge
+tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** its edit mode, resets, the full reset's
+confirmation and 44 px controls up to 1024 px, and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use

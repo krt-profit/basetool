@@ -119,10 +119,19 @@ public record NavigationGate(
    *     flag is
    */
   public boolean permits(@NotNull NavigationAccess access) {
-    boolean roleHeld = anyRole.isEmpty() || anyRole.stream().anyMatch(access.roles()::contains);
-    return roleHeld
+    return permitsRoles(access)
         && access.flags().containsAll(required)
         && excluded.stream().noneMatch(access.flags()::contains);
+  }
+
+  /**
+   * Whether a caller passes this gate's role condition alone, whatever the per-request flags say.
+   *
+   * @param access the caller's reachable roles and flags
+   * @return {@code true} iff no role is required or the caller holds one of them
+   */
+  public boolean permitsRoles(@NotNull NavigationAccess access) {
+    return anyRole.isEmpty() || anyRole.stream().anyMatch(access.roles()::contains);
   }
 
   @NotNull

@@ -40,6 +40,7 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAvailability;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
@@ -48,6 +49,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -148,6 +150,24 @@ public class NavigationRegistry {
           .flatMap(group -> group.entries().stream().map(entry -> Map.entry(entry.key(), group)))
           .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
+  @Getter(AccessLevel.NONE)
+  private final Set<String> adminKeys = keysOf(admin);
+
+  @Getter(AccessLevel.NONE)
+  private final Set<String> starrableKeys =
+      Stream.concat(
+              keysOf(main).stream(),
+              Stream.concat(keysOf(List.of(personal)).stream(), adminKeys.stream()))
+          .collect(Collectors.toUnmodifiableSet());
+
+  @NotNull
+  private static Set<String> keysOf(@NotNull List<NavigationGroup> groups) {
+    return groups.stream()
+        .flatMap(group -> group.entries().stream())
+        .map(NavigationEntry::key)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
   /**
    * Every group of the registry, each once.
    *
@@ -197,6 +217,52 @@ public class NavigationRegistry {
   public boolean permits(@NotNull NavigationEntry entry, @NotNull NavigationAccess access) {
     NavigationGroup group = groupByKey.get(entry.key());
     return group != null && group.permits(entry, access);
+  }
+
+  /**
+   * Looks up an entry a member can favourite: a page or tab of a member group, the personal pages
+   * or an administration group.
+   *
+   * @param key the entry key
+   * @return the entry, or empty for an unknown key or an entry that cannot be a favourite
+   */
+  @NotNull
+  public Optional<NavigationEntry> starrable(@NotNull String key) {
+    return entry(key).filter(_ -> starrableKeys.contains(key));
+  }
+
+  /**
+   * Whether a starrable entry belongs to the administration mode.
+   *
+   * @param key the entry key
+   * @return {@code true} iff the key is an entry of an administration group
+   */
+  public boolean isAdminEntry(@NotNull String key) {
+    return adminKeys.contains(key);
+  }
+
+  /**
+   * Tells whether an entry is open to a caller, or why not.
+   *
+   * @param entry a registered entry
+   * @param access the caller's reachable roles and flags
+   * @return {@link NavigationAvailability#AVAILABLE} when the gates pass, {@link
+   *     NavigationAvailability#CONTEXT} when only a per-request flag refuses, {@link
+   *     NavigationAvailability#GONE} when a role condition fails
+   */
+  @NotNull
+  public NavigationAvailability availability(
+      @NotNull NavigationEntry entry, @NotNull NavigationAccess access) {
+    NavigationGroup group = groupByKey.get(entry.key());
+    if (group == null) {
+      return NavigationAvailability.GONE;
+    }
+    if (group.permits(entry, access)) {
+      return NavigationAvailability.AVAILABLE;
+    }
+    return group.gate().permitsRoles(access) && entry.gate().permitsRoles(access)
+        ? NavigationAvailability.CONTEXT
+        : NavigationAvailability.GONE;
   }
 
   @NotNull

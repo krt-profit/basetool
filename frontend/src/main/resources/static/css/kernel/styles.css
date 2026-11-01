@@ -2943,6 +2943,70 @@
         font-weight: var(--fw-bold);
         box-shadow: inset 3px 0 0 var(--color-primary);
     }
+    .nav-favourites-group {
+        margin-top: var(--space-2);
+    }
+
+    .nav-favourites-head {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        height: 32px;
+        padding: 0 1.25rem;
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-2xs);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .sidebar.is-filtering .nav-favourites {
+        display: none;
+    }
+
+    .nav-link.is-unavailable {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--color-gray-2-text);
+        cursor: not-allowed;
+    }
+
+    .nav-link.is-unavailable:hover {
+        background-color: transparent;
+        color: var(--color-gray-2-text);
+    }
+
+    .nav-unavailable-hint {
+        font-size: var(--fs-2xs);
+        line-height: 1.3;
+    }
+
+    .nav-star {
+        flex: none;
+        color: var(--color-gray-2-text);
+    }
+
+    .nav-star:hover:not(:disabled),
+    .nav-star[aria-pressed='true'] {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+
+    .nav-star:disabled {
+        cursor: not-allowed;
+        opacity: 0.4;
+    }
+
+    .nav-star .nav-star-on,
+    .nav-star[aria-pressed='true'] .nav-star-off {
+        display: none;
+    }
+
+    .nav-star[aria-pressed='true'] .nav-star-on {
+        display: inline-block;
+    }
 
     .nav-admin-bar {
         display: flex;
@@ -3801,6 +3865,18 @@
 
         .nav-group-links {
             padding-bottom: 0.4rem;
+        }
+        .nav-favourites-group {
+            border-bottom: var(--border-hairline);
+        }
+
+        .nav-favourites-head {
+            gap: var(--space-3);
+            height: 48px;
+            padding: 0 var(--space-4);
+            color: var(--color-gray-1);
+            font-size: 0.85rem;
+            letter-spacing: var(--tracking-display);
         }
 
         .nav-link {

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<div th:fragment="state" hidden data-favourites-state
+     th:data-loaded="${navigationFavourites.loaded()}" th:data-version="${navigationFavourites.version()}"
+     th:data-keys="${navigationFavourites.keysAttribute()}" th:data-max="${navigationFavourites.max()}"
+     th:data-error="#{nav.favourites.error}" th:data-conflict="#{nav.favourites.conflict}"
+     th:data-full="#{nav.favourites.full}"></div>
+
+<div th:fragment="block(mode)" class="nav-favourites" th:data-favourites-mode="${mode}"
+     th:with="items=${mode == 'admin'} ? ${navigationFavourites.admin()} : ${navigationFavourites.member()}">
+    <section th:unless="${#lists.isEmpty(items)}" class="nav-favourites-group" data-testid="nav-favourites">
+        <div class="nav-favourites-head">
+            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-star"></use></svg>
+            <span class="nav-group-label" th:text="#{nav.favourites.title}">Favoriten</span>
+        </div>
+        <div class="nav-group-links">
+            <th:block th:each="item : ${items}">
+                <a th:if="${item.available()}" class="nav-link" data-nav-skip="true"
+                   th:href="@{${item.entry().href()}}" th:data-entry-key="${item.entry().key()}"
+                   th:data-testid="|nav-favourite-${item.entry().key()}|"
+                   th:text="#{${item.entry().labelKey()}}">Seite</a>
+                <span th:unless="${item.available()}" class="nav-link is-unavailable" data-nav-skip="true"
+                      th:data-entry-key="${item.entry().key()}"
+                      th:data-testid="|nav-favourite-${item.entry().key()}|"
+                      aria-disabled="true">
+                    <span class="nav-link-label" th:text="#{${item.entry().labelKey()}}">Seite</span>
+                    <span class="nav-unavailable-hint"
+                          th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">In Einheit nicht verfügbar</span>
+                </span>
+            </th:block>
+        </div>
+    </section>
+</div>
+
+<th:block th:fragment="both">
+    <th:block th:replace="~{kernel/fragments/nav-favourites :: state}" />
+    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('member')}" />
+    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('admin')}" />
+</th:block>
+
+<button th:fragment="star(entry)" type="button" class="btn btn-ghost btn-icon nav-star"
+        data-favourite-toggle data-trigger="nav-favourite-toggle" data-testid="nav-star"
+        th:with="label=#{__${entry.labelKey()}__}, pressed=${navigationFavourites.isFavourite(entry.key())}"
+        th:data-entry-key="${entry.key()}" th:aria-pressed="${pressed}"
+        th:disabled="${!navigationFavourites.loaded() or (!pressed and navigationFavourites.full())}"
+        th:data-label-add="#{nav.favourites.add(${label})}" th:data-label-remove="#{nav.favourites.remove(${label})}"
+        th:aria-label="${pressed} ? #{nav.favourites.remove(${label})} : #{nav.favourites.add(${label})}"
+        th:title="${!pressed and navigationFavourites.full()} ? #{nav.favourites.full} : (${pressed} ? #{nav.favourites.remove(${label})} : #{nav.favourites.add(${label})})">
+    <svg class="krt-icon nav-star-off" aria-hidden="true"><use href="#krt-icon-star"></use></svg>
+    <svg class="krt-icon nav-star-on" aria-hidden="true"><use href="#krt-icon-star-filled"></use></svg>
+</button>
+</body>
+</html>

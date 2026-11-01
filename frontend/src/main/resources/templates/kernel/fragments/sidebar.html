@@ -47,6 +47,7 @@
         </div>
         <div class="nav-list" id="nav-list">
             <th:block sec:authorize="isAuthenticated()">
+                <th:block th:replace="~{kernel/fragments/nav-favourites :: state}" />
                 <div class="nav-admin-bar" hidden
                      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <button type="button" class="nav-admin-back" data-testid="nav-admin-back">
@@ -56,6 +57,7 @@
                     <span class="admin-mode-chip" th:text="#{nav.adminMode.chip}">ADMIN</span>
                 </div>
                 <div class="nav-mode nav-mode-main" data-nav-mode="main">
+                    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('member')}" />
                     <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty()}">
                         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, #{${item.group().labelKey()}}, false)}" />
                     </th:block>
@@ -67,6 +69,7 @@
                             <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-top-link', null, ${entry.icon()}, false)}" />
                         </th:block>
                     </div>
+                    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('admin')}" />
                     <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
                         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false)}" />
                     </th:block>
@@ -161,6 +164,7 @@
     </th:block>
     <script type="module" th:src="@{/js/kernel/sidebar.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/krt-palette.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-favourites.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />
     <th:block th:replace="~{kernel/fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{kernel/fragments/footer :: footer}" />

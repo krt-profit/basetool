@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
@@ -131,6 +132,44 @@ public record NavigationMenu(
     return Stream.concat(main.stream(), admin.stream())
         .flatMap(group -> group.palettePages().stream())
         .toList();
+  }
+
+  /**
+   * The page or tab a request shows, if it is one the caller can favourite: an entry whose path is
+   * the request's exactly and whose query parameters the request carries. The entry with the most
+   * query parameters wins; between equal ones the registry order decides.
+   *
+   * @param requestUri the current request URI, with or without a query
+   * @return the entry, or empty for a detail page or any other URI that is no entry of the caller
+   */
+  @NotNull
+  public Optional<NavigationEntry> currentEntry(@NotNull String requestUri) {
+    String[] parts = requestUri.split("\\?", 2);
+    String path = withoutTrailingSlash(parts[0]);
+    Set<String> parameters = parts.length > 1 ? Set.of(parts[1].split("&")) : Set.of();
+    return starrableEntries()
+        .filter(entry -> showsRequest(entry.href(), path, parameters))
+        .max(Comparator.comparingInt(entry -> entry.href().split("\\?", 2).length));
+  }
+
+  @NotNull
+  private Stream<NavigationEntry> starrableEntries() {
+    return Stream.concat(
+        Stream.concat(main.stream(), admin.stream())
+            .flatMap(group -> Stream.concat(group.links().stream(), group.palettePages().stream())),
+        personal.links().stream());
+  }
+
+  private static boolean showsRequest(
+      @NotNull String href, @NotNull String path, @NotNull Set<String> parameters) {
+    String[] parts = href.split("\\?", 2);
+    return withoutTrailingSlash(parts[0]).equals(path)
+        && (parts.length == 1 || parameters.containsAll(Set.of(parts[1].split("&"))));
+  }
+
+  @NotNull
+  private static String withoutTrailingSlash(@NotNull String path) {
+    return path.length() > 1 && path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
   }
 
   /**
