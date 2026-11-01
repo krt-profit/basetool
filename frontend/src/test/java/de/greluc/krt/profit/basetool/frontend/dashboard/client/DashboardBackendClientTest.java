@@ -90,6 +90,28 @@ class DashboardBackendClientTest {
   }
 
   @Test
+  void nextMissionReadsTheSummaryRowAndNothingWhenNoneIsUpcoming() {
+    backend.answerJson("{\"id\":\"" + ID + "\",\"name\":\"Konvoi\",\"signedUp\":true}");
+    backend.answerEmpty();
+
+    assertThat(client.nextMission().name()).isEqualTo("Konvoi");
+    assertThat(client.nextMission()).isNull();
+
+    backend.expect("GET", "/api/v1/missions/next/summary");
+    backend.expect("GET", "/api/v1/missions/next/summary");
+  }
+
+  @Test
+  void hangarReadinessReadsTheOwnersCounts() {
+    backend.answerJson("{\"total\":13,\"fitted\":9}");
+
+    assertThat(client.hangarReadiness())
+        .isEqualTo(new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto(13, 9));
+
+    backend.expect("GET", "/api/v1/hangar/my-ships/readiness");
+  }
+
+  @Test
   void profileAndMemberships() {
     backend.answerJson("{}");
     backend.answerJson("[\"" + ID + "\"]");

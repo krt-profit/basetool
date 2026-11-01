@@ -286,7 +286,9 @@
 /csrf GET -> CsrfTokenController#csrf gate=class:isAuthenticated() layout=no
 /dashboard/member/board GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardBoardController#board gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/favourites GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#favourites gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/hangar-readiness GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#hangarReadiness gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/information GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#information gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/next-mission GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#nextMission gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/notifications GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#notifications gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/upcoming-days GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#upcomingDays gate=class:isAuthenticated() layout=yes
 /dashboard/{mode} DELETE headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#reset gate=class:isAuthenticated() layout=no

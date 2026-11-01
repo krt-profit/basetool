@@ -452,6 +452,17 @@ public enum LiveSyncTopicClass {
   }
 
   /**
+   * Names the room of one resource of this class.
+   *
+   * @param resourceId the resource's id text
+   * @return {@code <prefix>:<resourceId>}
+   */
+  @NotNull
+  public String topic(@NotNull String resourceId) {
+    return prefix + ":" + resourceId;
+  }
+
+  /**
    * Reports whether a concrete topic of this class carries a resource UUID (a resource room) rather
    * than being the bare prefix (a global room).
    *

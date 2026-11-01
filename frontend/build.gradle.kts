@@ -907,6 +907,24 @@ val testNumberFormatJs =
     outputs.upToDateWhen { false }
   }
 
+val testNotificationBellLabelJs =
+  tasks.register<NodeTask>("testNotificationBellLabelJs") {
+    group = "verification"
+    description =
+      "Regression tests for the notification bell's accessible name: the unread count, the 99+ cap and the plain label."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/notification-bell-label.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/notification-bell-label.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/notification/notification-bell-label.js",
+      ),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testBlueprintStatsJs =
   tasks.register<NodeTask>("testBlueprintStatsJs") {
     group = "verification"
@@ -1053,6 +1071,7 @@ tasks.named("check").configure {
     testShortcutsJs,
     testSearchJs,
     testNumberFormatJs,
+    testNotificationBellLabelJs,
     testBlueprintStatsJs,
     testEslintBans,
     testTypecheckRatchet,

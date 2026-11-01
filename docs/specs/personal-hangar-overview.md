@@ -386,6 +386,29 @@ format is detected from the payload, like the other formats (REQ-HANGAR-014 keep
 `ShipRepository#lockAllOwnedByOrderById`, `ShipMapper#toOwnerDto`, `ShipProductionStatus`,
 `V309__add_ship_pledge_and_production_status.sql`, `hangar/fragments/ship-meta.html`.
 
+### REQ-HANGAR-016 — The readiness of the own hangar is served as one summary
+
+`GET /api/v1/hangar/my-ships/readiness` returns `{ total, fitted }` for the calling member: the ships
+they own and how many of those are fitted („einsatzbereit"). It is the read of the dashboard's
+„Hangar-Bereitschaft" widget (REQ-UI-034), which would otherwise page the whole hangar.
+
+- **Own ships only.** The owner comes from the JWT, never from the URL (as `/my-ships`); the counts
+  come from one aggregate statement, and a member without ships reads `0` / `0`.
+- **Gate.** Any authenticated caller, like `/my-ships`: no hangar permission is needed.
+- **Not cached.** The response is personal data and is served `no-store` with the rest of
+  `/api/v1/hangar/**` (REQ-SEC-031).
+
+**Acceptance**
+
+- [x] The counts cover exactly the caller's ships; another member's ships never count.
+- [x] A caller holding only `ROLE_KRT_MEMBER` (no hangar permission) is admitted.
+
+**Enforced by:** `ShipRepositoryPersonalHangarTest` (`readinessOf_*`), `HangarServiceTest`
+(`getMyReadiness_*`), `HangarControllerTest` (`getMyReadiness_*`), `HangarUserEndpointsSecurityTest`
+(`testMyReadiness_*`), `DashboardSummaryWidgetsMvcTest` · **Code:** `HangarController#getMyReadiness`,
+`HangarService#getMyReadiness`, `ShipRepository#readinessOf`, `ShipReadinessDto` · **Related:**
+REQ-HANGAR-002, REQ-UI-034
+
 ## Out of scope
 
 - The **squadron** hangar overview (`/hangar/squadron`) — REQ-HANGAR-001 — and the **admin per-user**

@@ -126,6 +126,20 @@ class HangarControllerTest {
   }
 
   @Test
+  void getMyReadiness_resolvesOwnerFromJwt() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(hangarService.getMyReadiness(ownerId))
+        .thenReturn(new de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto(5, 2));
+
+    var result = controller.getMyReadiness(jwt);
+
+    assertThat(result.total()).isEqualTo(5L);
+    assertThat(result.fitted()).isEqualTo(2L);
+  }
+
+  @Test
   void getMyShips_forwardsSearchTermToService() {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();

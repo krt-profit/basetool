@@ -273,7 +273,32 @@ class DashboardRenderMvcTest {
     assertThat(html)
         .contains("data-testid=\"dashboard-add-information\"")
         .contains("data-testid=\"dashboard-add-notifications\"")
-        .doesNotContain("data-testid=\"dashboard-add-upcoming-days\"");
+        .doesNotContain("data-testid=\"dashboard-add-upcoming-days\"")
+        .doesNotContain("data-testid=\"dashboard-add-next-mission\"")
+        .contains("data-testid=\"dashboard-add-hangar-readiness\"");
+  }
+
+  @Test
+  @DisplayName(
+      "a member may add the next-mission and hangar-readiness widgets, which have no options")
+  void offersTheSummaryWidgetsWithoutAnOptionsButton() throws Exception {
+    stored(
+        true,
+        1,
+        widget(DashboardWidgetType.NEXT_MISSION, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(
+            DashboardWidgetType.HANGAR_READINESS, DashboardColumn.NARROW, UUID.randomUUID(), null));
+
+    String html = home(member());
+
+    assertThat(html)
+        .contains("data-testid=\"dashboard-add-next-mission\"")
+        .contains("data-testid=\"dashboard-add-hangar-readiness\"")
+        .contains("data-testid=\"dashboard-widget-next-mission\"")
+        .contains("data-testid=\"dashboard-widget-hangar-readiness\"")
+        .contains("data-widget-slug=\"next-mission\"")
+        .contains("data-widget-slug=\"hangar-readiness\"")
+        .doesNotContain("data-testid=\"dashboard-options\"");
   }
 
   @Test

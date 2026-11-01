@@ -305,6 +305,79 @@ class DashboardServiceTest {
   }
 
   @Test
+  @DisplayName("an option write after a reorder needs no new option version")
+  void anOptionWriteDoesNotConflictWithAReorder() {
+    UUID owner = member();
+    DashboardResponse layout =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(
+                    item(DashboardWidgetType.UPCOMING_DAYS), item(DashboardWidgetType.FAVOURITES)),
+                0L));
+    DashboardWidgetResponse widget = layout.widgets().getFirst();
+    service.replaceLayout(
+        owner,
+        MEMBER,
+        new DashboardLayoutRequest(
+            List.of(stored(layout.widgets().get(1)), stored(widget)), layout.version()));
+
+    DashboardWidgetResponse updated =
+        service.replaceOptions(
+            owner,
+            MEMBER,
+            widget.id(),
+            new DashboardOptionsRequest(null, 14, 3, null, widget.optionsVersion()));
+
+    assertThat(updated.days()).isEqualTo(14);
+    assertThat(service.read(owner, MEMBER).widgets().get(1).days()).isEqualTo(14);
+  }
+
+  @Test
+  @DisplayName("the next-mission and hangar-readiness widgets are added without options")
+  void addsTheSummaryWidgetsWithoutOptions() {
+    UUID owner = member();
+
+    DashboardResponse written =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(
+                    item(DashboardWidgetType.NEXT_MISSION),
+                    item(DashboardWidgetType.HANGAR_READINESS)),
+                0L));
+
+    assertThat(written.widgets())
+        .extracting(DashboardWidgetResponse::type)
+        .containsExactly(DashboardWidgetType.NEXT_MISSION, DashboardWidgetType.HANGAR_READINESS);
+    assertThat(written.widgets())
+        .allSatisfy(widget -> {
+          assertThat(widget.days()).isNull();
+          assertThat(widget.rows()).isNull();
+          assertThat(widget.status()).isNull();
+          assertThat(widget.orgUnitId()).isNull();
+        });
+    DashboardWidgetResponse next = written.widgets().getFirst();
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                next.id(),
+                new DashboardOptionsRequest(null, null, 5, null, next.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  @DisplayName("the summary widgets are not part of the member default")
+  void theSummaryWidgetsAreNotInTheDefault() {
+    assertThat(service.read(member(), MEMBER).widgets())
+        .extracting(DashboardWidgetResponse::type)
+        .doesNotContain(DashboardWidgetType.NEXT_MISSION, DashboardWidgetType.HANGAR_READINESS);
+  }
+
+  @Test
   @DisplayName("a stale option version is rejected")
   void rejectsAStaleOptionVersion() {
     UUID owner = member();

@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvic
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
@@ -91,6 +92,7 @@ class NavigationRenderMvcTest {
         .contains("data-testid=\"palette-open\"")
         .contains("data-testid=\"mobile-search-open\"")
         .contains("id=\"notification-bell\"")
+        .containsPattern("id=\"notification-badge\"[^>]*aria-hidden=\"true\"")
         .contains("id=\"hamburger\"");
     assertThat(sidebar)
         .startsWith("<div id=\"sidebar\" class=\"sidebar\" inert")
@@ -232,6 +234,30 @@ class NavigationRenderMvcTest {
         .contains("data-frequent=\"")
         .contains("data-live-favourite-added=\"")
         .contains("data-palette-live");
+  }
+
+  /**
+   * The bell's accessible name carries the unread count while the visible badge stays out of it,
+   * and it is the plain label without unread notifications.
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void bellAccessibleNameCarriesTheUnreadCount() throws Exception {
+    String quiet = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(
+            new LayoutContextLoader.MeLayoutResponse(
+                null, List.of(), CapabilitiesResponse.NONE, 7L));
+    String unread = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+
+    assertThat(section(HEADER, quiet))
+        .containsPattern("id=\"notification-toggle\"[^>]*aria-label=\"Benachrichtigungen öffnen\"");
+    assertThat(section(HEADER, unread))
+        .containsPattern(
+            "id=\"notification-toggle\"[^>]*aria-label=\"Benachrichtigungen öffnen, 7 ungelesen\"")
+        .containsPattern("id=\"notification-badge\"[^>]*aria-hidden=\"true\"")
+        .contains("data-bell-open-unread=\"Benachrichtigungen öffnen, {0} ungelesen\"");
   }
 
   /**

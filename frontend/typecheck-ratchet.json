@@ -180,6 +180,7 @@
       "mission/missions.js"
     ],
     "notification": [
+      "notification/notification-bell-label.js",
       "notification/notification-rules.js",
       "notification/notifications-page.js",
       "notification/notifications.js"
