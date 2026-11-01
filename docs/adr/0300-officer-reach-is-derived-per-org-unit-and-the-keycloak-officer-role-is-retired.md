@@ -51,6 +51,8 @@ unit and needs to know where a member is an officer.
    notice becomes "seat holder without `KRT Member`"; the `GLOBAL_ROLE OFFICER` view-grant bucket
    on the special accounts is removed, its grants deleted by a migration that writes one
    `bank_audit_event` per removed grant with the system as actor.
+   The `LOGISTICIAN` and `MISSION_MANAGER` buckets of the special accounts are retired the same way,
+   because a Sonderkonto has no owning unit to resolve a per-unit grant against.
 6. **The Keycloak role is retired by a hard cut in one release:** the code reads only derived reach,
    `UserReconciliationService` ignores `OFFICER`, a migration removes the seeded role and its
    permissions, the provisioning script deletes the realm role afterwards, and the test, e2e and

@@ -42,9 +42,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * End-to-end visibility matrix for org-unit bank account responsibility (REQ-BANK-034..038), driven
  * through the real Keycloak login and JWT-to-authority chain.
  *
- * <p>Covers {@code ORG_UNIT} and {@code SPECIAL} accounts across all four grantee kinds plus the
- * admin override; the {@code CARTEL} singletons stay with the unit tests. Asserts that the {@code
- * OFFICER} role without a Bereich/OL membership does not auto-see a Sonderkonto (REQ-BANK-037).
+ * <p>Covers {@code ORG_UNIT} and {@code SPECIAL} accounts across the grantee kinds plus the admin
+ * override; the {@code CARTEL} singletons stay with the unit tests. Asserts that only a Bereich or
+ * OL seat auto-sees a Sonderkonto, that a Sonderkonto offers no role buckets, and that individual
+ * and all-members grants open it (REQ-BANK-037).
  */
 @Tag("e2e")
 class OrgUnitBankVisibilityMatrixE2eTest {
@@ -58,8 +59,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   private static final String MGMT_PASSWORD = "test-bank-management-pw";
   private static final String BEREICH_USER = "test-bereich";
   private static final String BEREICH_PASSWORD = "test-bereich-pw";
-  private static final String OFFICER_USER = "test-officer";
-  private static final String OFFICER_PASSWORD = "test-officer-pw";
   private static final String MEMBER_USER = "test-member";
   private static final String MEMBER_PASSWORD = "test-member-pw";
   private static final String NONVIEWER_USER = "test-none";
@@ -103,7 +102,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Sonderkonto", "SPECIAL");
 
     memberUserId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
-    seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
   }
 
   @AfterAll
@@ -117,13 +115,10 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   }
 
   @Test
-  void specialAutoViewIsMembershipBasedNotOfficerRole() {
+  void specialAutoViewIsSeatBased() {
     assertTrue(
         balancesContain(BEREICH_USER, BEREICH_PASSWORD, specialAccountId),
         "a Bereichsleiter auto-sees the Sonderkonto");
-    assertFalse(
-        balancesContain(OFFICER_USER, OFFICER_PASSWORD, specialAccountId),
-        "an OFFICER without a Bereich/OL seat must NOT auto-see the Sonderkonto");
     assertFalse(
         balancesContain(MEMBER_USER, MEMBER_PASSWORD, specialAccountId),
         "a plain member must NOT auto-see the Sonderkonto");
@@ -136,8 +131,8 @@ class OrgUnitBankVisibilityMatrixE2eTest {
     assertEquals(
         403,
         seeder.attemptGetStatus(
-            OFFICER_USER, OFFICER_PASSWORD, "/api/v1/bank/org-units/accounts/" + specialAccountId),
-        "an OFFICER without a Bereich/OL seat is denied the Sonderkonto drill-in");
+            MEMBER_USER, MEMBER_PASSWORD, "/api/v1/bank/org-units/accounts/" + specialAccountId),
+        "a plain member is denied the Sonderkonto drill-in");
   }
 
   @Test
@@ -186,30 +181,42 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   }
 
   @Test
-  void globalRoleAndAllMembersGrantsOnSpecial() {
+  void individualAndAllMembersGrantsOnSpecialAndNoRoleBuckets() {
     String special =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Grant SK", "SPECIAL");
     String detail = "/api/v1/bank/org-units/accounts/" + special;
 
     assertEquals(
-        200,
-        seeder.postForStatus(MGMT_USER, MGMT_PASSWORD, detail + "/visibility/role/OFFICER", "{}"),
-        "bank management may grant the OFFICER global-role bucket on a Sonderkonto");
-    assertTrue(
-        balancesContain(OFFICER_USER, OFFICER_PASSWORD, special),
-        "an OFFICER now sees the Sonderkonto via the global-role grant");
+        400,
+        seeder.postForStatus(
+            MGMT_USER, MGMT_PASSWORD, detail + "/visibility/role/LOGISTICIAN", "{}"),
+        "a Sonderkonto offers no Logistician role bucket");
+    assertEquals(
+        400,
+        seeder.postForStatus(
+            MGMT_USER, MGMT_PASSWORD, detail + "/visibility/role/MISSION_MANAGER", "{}"),
+        "a Sonderkonto offers no Mission Manager role bucket");
     assertFalse(
         balancesContain(MEMBER_USER, MEMBER_PASSWORD, special),
-        "a plain member still does not see it (the grant was OFFICER, not all-members)");
+        "a plain member does not see the Sonderkonto before a grant");
+
+    assertEquals(
+        200,
+        seeder.postForStatus(
+            MGMT_USER, MGMT_PASSWORD, detail + "/visibility/user/" + memberUserId, "{}"),
+        "bank management may grant an individual user view of a Sonderkonto");
+    assertTrue(
+        balancesContain(MEMBER_USER, MEMBER_PASSWORD, special),
+        "the individually granted member now sees the Sonderkonto");
+    assertFalse(
+        balancesContain(NONVIEWER_USER, NONVIEWER_PASSWORD, special),
+        "a user without a grant still does not see it");
 
     assertEquals(
         200,
         seeder.putForStatus(
             MGMT_USER, MGMT_PASSWORD, detail + "/visibility/all-members/true", "{}"),
         "bank management may grant the all-members bucket on a Sonderkonto");
-    assertTrue(
-        balancesContain(MEMBER_USER, MEMBER_PASSWORD, special),
-        "any member now sees the Sonderkonto via the all-members grant");
   }
 
   @Test
@@ -239,7 +246,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.postForStatus(
             BEREICH_USER,
             BEREICH_PASSWORD,
-            "/api/v1/bank/org-units/accounts/" + special + "/visibility/role/OFFICER",
+            "/api/v1/bank/org-units/accounts/" + special + "/visibility/user/" + memberUserId,
             "{}"),
         "a Bereichsleiter may not configure a Sonderkonto's visibility");
     assertEquals(
@@ -247,7 +254,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.postForStatus(
             MGMT_USER,
             MGMT_PASSWORD,
-            "/api/v1/bank/org-units/accounts/" + special + "/visibility/role/OFFICER",
+            "/api/v1/bank/org-units/accounts/" + special + "/visibility/user/" + memberUserId,
             "{}"),
         "bank management may configure a Sonderkonto's visibility");
   }

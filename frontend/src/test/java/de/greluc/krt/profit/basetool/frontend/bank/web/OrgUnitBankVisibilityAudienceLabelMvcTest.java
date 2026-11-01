@@ -132,7 +132,6 @@ class OrgUnitBankVisibilityAudienceLabelMvcTest {
             true,
             true,
             false,
-            "SPECIAL".equals(accountType),
             List.of(),
             List.of(),
             false,

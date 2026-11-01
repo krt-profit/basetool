@@ -45,7 +45,6 @@ import org.jetbrains.annotations.Nullable;
  * @param allMembersSupported whether the all-members toggle applies
  * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade toggle applies — only
  *     for AREA (Bereichskonto) accounts (REQ-BANK-048)
- * @param roleBucketsGlobal whether {@code availableRoleCodes} are global role codes (Sonderkonto)
  * @param availableRoleCodes the role buckets the caller may toggle, in display order
  * @param grantedRoleCodes the role buckets currently granted
  * @param allMembersGranted whether the all-members grant is set
@@ -69,7 +68,6 @@ public record OrgUnitBankAccountSettingsDto(
     boolean visibilityConfigurable,
     boolean allMembersSupported,
     boolean areaMembersSupported,
-    boolean roleBucketsGlobal,
     List<String> availableRoleCodes,
     List<String> grantedRoleCodes,
     boolean allMembersGranted,

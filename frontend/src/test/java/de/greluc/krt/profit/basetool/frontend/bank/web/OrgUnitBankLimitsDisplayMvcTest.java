@@ -173,7 +173,6 @@ class OrgUnitBankLimitsDisplayMvcTest {
               false,
               false,
               false,
-              false,
               List.of(),
               List.of(),
               false,

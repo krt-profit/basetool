@@ -77,9 +77,8 @@ public class BankAccountViewGrant extends AbstractEntity<UUID> {
   private BankAccountViewGranteeKind granteeKind;
 
   /**
-   * The role this grant addresses: a {@link MembershipRole} name when {@link #granteeKind} is
-   * {@code MEMBERSHIP_ROLE}, a global role code (e.g. {@code LOGISTICIAN}) when {@code
-   * GLOBAL_ROLE}. {@code null} for {@code USER} / {@code ALL_MEMBERS}.
+   * The {@link MembershipRole} name this grant addresses when {@link #granteeKind} is {@code
+   * MEMBERSHIP_ROLE}; {@code null} for every other kind.
    */
   @Nullable
   @Column(name = "role_code", length = 64)
