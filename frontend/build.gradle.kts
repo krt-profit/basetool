@@ -864,13 +864,14 @@ val testSearchJs =
   tasks.register<NodeTask>("testSearchJs") {
     group = "verification"
     description =
-      "Regression tests for the tolerant menu search: case, umlauts, spelled-out umlauts and hit ranges."
+      "Regression tests for the tolerant menu search, the quick-access ranking and the frequent-use decay and the empty-state de-duplication."
     dependsOn(tasks.named("npmSetup"))
     script.set(layout.projectDirectory.file("scripts/krt-search.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/krt-search.test.mjs"))
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-search.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-frequent.js"))
     outputs.upToDateWhen { false }
   }
 

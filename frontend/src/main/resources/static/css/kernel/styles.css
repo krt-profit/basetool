@@ -3649,6 +3649,13 @@
         white-space: nowrap;
     }
 
+    .palette-row-fav {
+        flex: none;
+        width: 14px;
+        height: 14px;
+        color: var(--color-primary);
+    }
+
     .palette-row-enter {
         flex: none;
         visibility: hidden;
@@ -3678,8 +3685,9 @@
     .palette-foot {
         flex: none;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 1.25rem;
+        gap: 0.35rem 1.25rem;
         padding: 0.6rem 1.25rem;
         border-top: var(--border-hairline);
         color: var(--color-gray-2-text);
@@ -3690,6 +3698,7 @@
         display: flex;
         align-items: center;
         gap: 0.4rem;
+        white-space: nowrap;
     }
 
     .mobile-tabbar {

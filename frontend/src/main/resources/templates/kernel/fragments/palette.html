@@ -8,7 +8,7 @@
 </th:block>
 <th:block th:fragment="palette-body">
     <div class="palette"
-         th:attr="data-recent=#{palette.recent},data-results=#{palette.results},data-help=#{palette.help},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries},data-entity-search-url=@{/quick-access/search}">
+         th:attr="data-recent=#{palette.recent},data-favourites=#{palette.favourites},data-frequent=#{palette.frequent},data-action-customise=#{palette.action.customise},data-live-favourite-added=#{palette.live.favouriteAdded('{name}')},data-live-favourite-removed=#{palette.live.favouriteRemoved('{name}')},data-results=#{palette.results},data-help=#{palette.help},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries},data-entity-search-url=@{/quick-access/search}">
         <div class="palette-input-row">
             <svg class="krt-icon palette-input-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
             <input type="text" id="palette-input" class="palette-input" data-testid="palette-input" autofocus
@@ -18,10 +18,13 @@
             <button type="button" class="palette-cancel" th:text="#{mobile.search.cancel}">Abbrechen</button>
         </div>
         <div id="palette-results" class="palette-results" role="listbox" th:aria-label="#{palette.aria}"></div>
+        <p class="visually-hidden" role="status" aria-live="polite" data-palette-live data-testid="palette-live"></p>
         <p class="palette-empty" hidden th:text="#{palette.empty}">Keine Treffer. Signal verloren.</p>
         <div class="palette-foot" aria-hidden="true">
             <span class="palette-hint"><span class="nav-kbd">&uarr; &darr;</span><span th:text="#{palette.hint.navigate}">Navigieren</span></span>
             <span class="palette-hint"><span class="nav-kbd">&crarr;</span><span th:text="#{palette.hint.open}">Öffnen</span></span>
+            <span class="palette-hint"><span class="nav-kbd" th:text="#{palette.kbd.newTab}">Strg &crarr;</span><span th:text="#{palette.hint.newTab}">Neuer Tab</span></span>
+            <span class="palette-hint"><span class="nav-kbd" th:text="#{palette.kbd.favourite}">Strg D</span><span th:text="#{palette.hint.favourite}">Favorit</span></span>
             <span class="palette-hint"><span class="nav-kbd">ESC</span><span th:text="#{palette.hint.close}">Schließen</span></span>
             <span class="palette-hint"><span class="nav-kbd">?</span><span th:text="#{palette.hint.prefixes}">Präfixe</span></span>
         </div>

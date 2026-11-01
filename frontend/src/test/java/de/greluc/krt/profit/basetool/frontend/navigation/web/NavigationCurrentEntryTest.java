@@ -112,4 +112,16 @@ class NavigationCurrentEntryTest {
     assertThat(registry.isAdminEntry("admin.terms")).isTrue();
     assertThat(registry.isAdminEntry("missions.list")).isFalse();
   }
+
+  @Test
+  @DisplayName(
+      "only pages and tabs of the groups are starrable, not the links above them or actions")
+  void marksOnlyGroupPagesAsStarrable() {
+    NavigationMenu menu = menu(Set.of("KRT_MEMBER"), Set.of());
+
+    assertThat(menu.starrable(registry.entry("missions.list").orElseThrow())).isTrue();
+    assertThat(menu.starrable(registry.entry("storage.levels").orElseThrow())).isTrue();
+    assertThat(menu.starrable(registry.entry("home.dashboard").orElseThrow())).isFalse();
+    assertThat(menu.starrable(registry.entry("action.handbook").orElseThrow())).isFalse();
+  }
 }

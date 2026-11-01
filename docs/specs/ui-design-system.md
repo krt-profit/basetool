@@ -17,7 +17,7 @@
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
 > ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned; REQ-UI-033
-> partially shipped) ·
+> shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -2440,12 +2440,6 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
 
-> **Status: partially shipped** (ADR-0297, map #2800). Shipped: the entity search for all eight
-> types, the limits, the prefixes with their help, the mixed ranking by match quality and the kept
-> highlight. Still planned, with the current code and the quick-access text of REQ-UI-026
-> authoritative until they ship: „Häufig", the empty state, filtering of hidden pages, the
-> additional actions and the dialog keys.
-
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
@@ -2511,13 +2505,19 @@ The actions follow in their own group. Entity hits arrive later and the list re-
 highlighted hit stays highlighted and Enter opens exactly it. Each entity row shows the type, the
 status and the date as its breadcrumb.
 
-**„Häufig".** A per-device ranking in `localStorage`: every page or tab visit counts, however it
-was reached; entry keys only; each visit decays over about 30 days. It ranks typed results and
-fills the empty state; the navigation never reorders itself by use.
+**„Häufig".** A per-device ranking in `localStorage` (`krt.frequent`): every page or tab visit
+counts, however it was reached; entry keys only; each visit decays over about 30 days. It ranks
+typed results and fills the empty state; the navigation never reorders itself by use. A visit
+weighs 1 and falls linearly to 0 over 30 days; an entry is „häufig" from a summed weight of 2.
+In the ranking the weighted sum lifts a page by up to 1.5 match steps (full lift from a sum of 10), so a
+frequently used weaker match can pass a slightly better unused one and a match two steps better
+still wins. The store keeps at most 30 visits per entry and 200 entries, and every storage access
+is wrapped in a try/catch.
 
-**Empty state.** Favoriten, then Häufig, then Zuletzt (`krt.recent`), without duplicates: an
-entry shown in a higher section is left out of the lower ones. Entity hits never enter Zuletzt or
-Häufig, so no entity or member name reaches `localStorage`.
+**Empty state.** Favoriten, then Häufig (at most 5), then Zuletzt (`krt.recent`, at most 4),
+without duplicates: an entry shown in a higher section is left out of the lower ones. Entries are
+identified by their stable entry key, a page without an entry by its path. Entity hits never
+enter Zuletzt or Häufig, so no entity or member name reaches `localStorage`.
 
 **Filtering.** A hidden page and its tabs, and every entry unavailable in the active context
 (REQ-UI-026), are left out; entity hits and actions of a hidden page stay.
@@ -2525,14 +2525,19 @@ Häufig, so no entity or member name reaches `localStorage`.
 **Actions** (in addition to those of REQ-UI-026):
 
 - Navigation: favourite / unfavourite this page, hide this page, open „Anpassen" (REQ-UI-032).
+  Each is offered only where the drawer's own control exists (the star of the page, its hide
+  control, the „Anpassen" toggle), and the favourite action is left out at the cap of twelve.
+  A favourite toggle is the favourites write of REQ-UI-032: in place, with its 409 handling.
 - Create actions for the tabbed pages, each gated like the form it opens.
 - **Page context actions:** a page may contribute actions that only navigate or open the dialog or
   form it already has; they never mutate, so confirmation, permission, audit and live update stay
-  on the existing path.
+  on the existing path. A page marks the element with `data-palette-action="<name>"` (and an
+  optional `data-palette-icon`); choosing the action clicks it.
 
-**Keys in the dialog.** Ctrl+Enter opens the highlighted hit in a new browser tab; Tab accepts a
-suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or tab (intercepted
-only while the dialog is open).
+**Keys in the dialog.** Ctrl+Enter (Cmd+Enter on macOS) opens the highlighted hit in a new browser
+tab; Tab accepts a suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or
+tab (intercepted only while the dialog is open). Ctrl+D leaves the dialog open, marks the row with
+a star and says the result in a polite status line.
 
 **Monitoring:** `basetool_quick_access_search_total{kind,outcome}` (REQ-OBS-011); the p95 of
 `/quick-access/search` alerts above 1 s for 10 minutes (`QuickAccessSearchSlow`).
@@ -2544,13 +2549,15 @@ limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTe
 `ShipQuickAccessSearchContributorTest`, `OrgUnitQuickAccessSearchContributorTest`,
 `MemberQuickAccessSearchContributorTest` (exactly the chart's people),
 `JobOrderQuickAccessSearchContributorTest` (the read the page uses) · `QuickAccessFoldTest` · `:frontend:testSearchJs`
-(prefix parsing, ranking, the admin-mode target) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
+(prefix parsing, ranking, the admin-mode target, the decay and the empty-state de-duplication) ·
+`NavigationCurrentEntryTest`, `NavigationRenderMvcTest` (which links can be favourites) ·
+`NavigationE2eTest` (Ctrl+Enter, Tab, Ctrl+D, the empty state without duplicates, hidden pages
+filtered while their hits and actions stay, a page-contributed action) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
 `krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
-`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:**
-`:frontend:testSearchJs` (decay, empty-state de-duplication) · `NavigationE2eTest` (Ctrl+Enter,
-Tab, Ctrl+D, hidden pages filtered) · **Code:** `shell/web/QuickAccessSearchController.java`,
+`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **Code:** `shell/web/QuickAccessSearchController.java`,
 `shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
 `kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
+`static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
 `static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
 ADR-0282, ADR-0297
 
