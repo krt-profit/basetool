@@ -66,6 +66,7 @@ public final class OpenApiDocumentAssertions {
           Map.entry("leadership", 1),
           Map.entry("materialexchange", 21),
           Map.entry("mission", 49),
+          Map.entry("navigation", 3),
           Map.entry("notification", 13),
           Map.entry("operation", 12),
           Map.entry("orgchart", 5),

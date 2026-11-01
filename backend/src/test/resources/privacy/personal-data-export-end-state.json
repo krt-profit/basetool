@@ -571,5 +571,14 @@
       "revoked_at" : null
     } ],
     "truncated" : false
+  }, {
+    "key" : "navigationPreferences",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "preference_section" : "favourites",
+      "position" : 0,
+      "entry_key" : "missions.list"
+    } ],
+    "truncated" : false
   } ]
 }

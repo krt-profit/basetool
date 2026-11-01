@@ -72,6 +72,7 @@ class ModularityTest {
           "livesync",
           "materialexchange",
           "mission",
+          "navigation",
           "notification",
           "operation",
           "orgchart",
@@ -85,7 +86,7 @@ class ModularityTest {
           "scope",
           "supply");
 
-  private static final int DECLARED_MODULE_FLOOR = 27;
+  private static final int DECLARED_MODULE_FLOOR = 29;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their
@@ -98,7 +99,7 @@ class ModularityTest {
    * other module may depend on them and no declaration allows them.
    */
   private static final Set<String> INTERNAL_ONLY_MODULES =
-      Set.of("dashboard", "orgchart", "personalinventory", "promotion");
+      Set.of("dashboard", "navigation", "orgchart", "personalinventory", "promotion");
 
   private static final String API = "api";
 

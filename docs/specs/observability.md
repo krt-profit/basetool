@@ -2725,15 +2725,17 @@ The navigation concept, the home dashboard, the assignee grant and minimum stock
 signals. Every label is bounded by REQ-OBS-006; **the quick-access search term never reaches a
 label**, a tag, an MDC field or a log line.
 
-- `basetool_navigation_preference_writes_total{section, outcome}` counter in the `navigation`
-  module, one increment per preference or dashboard write (REQ-UI-032, REQ-UI-034). `section` ∈
-  `favourites`, `hidden`, `order`, `tabbar`, `display`, `dashboard`; `outcome` ∈ `ok`, `conflict`
-  (the `409` of a stale section version), `rejected` (a `400` / `403` / `422`). A reset counts once
-  per section it wrote. Registered at zero for every pair.
-- `basetool_navigation_personalised_accounts{section}` gauge, sampled by the `navigation` module's
-  `BusinessGaugeSource` (`NavigationBusinessGauges`) on the business-metrics timer: the number of
-  accounts holding a non-default value in that section, same `section` values. It is the data base
-  for deciding a second personalisation round; it carries no account label.
+- *Shipped for `favourites`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
+  the `navigation` module (`NavigationMetrics`), one increment per preference or dashboard write
+  (REQ-UI-032, REQ-UI-034). `section` ∈ `favourites`, `hidden`, `order`, `tabbar`, `display`,
+  `dashboard`; `outcome` ∈ `ok`, `conflict` (the `409` of a stale section version), `rejected` (a
+  `400` / `403` / `422`). A reset counts once per section it wrote. Registered at zero for every
+  pair; today the `section` values that exist are registered, and each further section adds its own.
+- *Shipped for `favourites`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
+  the `navigation` module's `BusinessGaugeSource` (`NavigationBusinessGauges`) on the
+  business-metrics timer: the number of accounts holding a non-default value in that section, same
+  `section` values. It is the data base for deciding a second personalisation round; it carries no
+  account label.
 - *Shipped:* `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
   `InventoryBusinessGauges`: the number of minimum stock levels of active units and listed
   catalogue entries that are low (REQ-INV-067), from the real allocation and not from the notice
@@ -2760,21 +2762,25 @@ label**, a tag, an MDC field or a log line.
 writes by section and outcome, personalised accounts by section, quick-access searches by kind and
 outcome, the p95 of `/quick-access/search`, the 5xx rate of the preference and widget endpoints, and
 the low minimum stock levels. *Shipped:* the panel „Minimum stock levels below their minimum"
-(`basetool_inventory_minimum_levels_below`) on the Operations dashboard.
+(`basetool_inventory_minimum_levels_below`) and the panels „Navigation preference writes/hour by
+section and outcome", „Personalised navigation accounts by section" and „Navigation endpoints 5xx
+rate" on the Operations dashboard.
 
 **Alerts** in `monitoring/prometheus/alerts/apps.yml`, each with a promtool test and a runbook row:
 
 - *Shipped:* `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search`
   above 1 s for 10 min, pinned by `monitoring/prometheus/tests/quick_access_search_slow_test.yml`.
-- `NavigationEndpointsErroring` (warning): the 5xx share of the preference and widget endpoints
-  above 5 % for 10 min.
+- *Shipped:* `NavigationEndpointsErroring` (warning): the 5xx share of the preference endpoints
+  (`/api/v1/navigation/*` on the backend, `/navigation/favourites` on the frontend) above 5 % for
+  10 min, pinned by `monitoring/prometheus/tests/navigation_endpoints_erroring_test.yml`; the widget
+  endpoints join its route pattern with the dashboard.
 
 A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 
 **Enforced by:** `QuickAccessSearchMetricsTest`, `quick_access_search_slow_test.yml`,
-`StockLevelNoticeIntegrationTest`, `InventoryBusinessGaugesTest` · **To be
-added:** `NavigationMetricsTest`, `NavigationBusinessGaugesTest`,
-`AlertedMeterPresenceTest`, `navigation_alerts_test.yml`
+`StockLevelNoticeIntegrationTest`, `InventoryBusinessGaugesTest`, `NavigationMetricsTest`,
+`navigation_endpoints_erroring_test.yml` · **To be added:** `AlertedMeterPresenceTest` entries for
+the dashboard widgets
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 

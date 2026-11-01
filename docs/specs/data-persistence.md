@@ -1096,7 +1096,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 118 tables. Its machine-readable copy is
+The ownership map, 120 tables. Its machine-readable copy is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1113,6 +1113,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `orgchart` | 1 | `org_chart_position` |
 | `promotion` | 5 | `member_evaluation`, `promotion_category`, `promotion_level_content`, `promotion_topic`, `rank_requirement` |
 | `personalinventory` | 1 | `personal_inventory_item` |
+| `navigation` | 2 | `navigation_favourite`, `navigation_preferences` |
 | `hangar` | 1 | `ship` |
 | `blueprint` | 3 | `blueprint_external_alias`, `default_blueprint`, `personal_blueprint` |
 | `inventory` | 4 | `inventory_item`, `inventory_item_donation_allocation`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
@@ -1202,20 +1203,24 @@ listed with its reason:
 implementations, the `PersonalDataExportSection`
 implementations, `UserAccountMergeService`, the `UserReassignmentParticipant` implementations
 
-#### Planned amendment (ADR-0298)
+#### The navigation module (ADR-0298)
 
-> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
-> current code stays authoritative.
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root table and the
+> favourites. The sections of REQ-UI-032 that follow, and the dashboards of REQ-UI-034, join the
+> same root.
 
-The `navigation` module's tables (REQ-UI-032, REQ-UI-034) reference the member through
-`app_user (id)` with `ON DELETE CASCADE` and take a disposition in all three registries:
-**erasure** by the cascade; **export** in the section `navigationPreferences` (REQ-SEC-058);
-**merge** as columns that follow the member, with the navigation-specific overlap rule of
-REQ-SEC-046. None is listed as not exported or not merged. The column counts and selection floors
-above grow with them.
+The `navigation` module keeps one root row per member, `navigation_preferences`, which references
+`app_user (id)` with `ON DELETE CASCADE` and carries the version counter of every section. Every
+further preference table (today `navigation_favourite`) references that root, never `app_user`,
+with `ON DELETE CASCADE`, in a column that is not named like a member column. The root takes a
+disposition in all three registries: **erasure** by the cascade; **export** in the one section
+`navigationPreferences` (REQ-SEC-058); **merge** as the column
+`navigation_preferences.user_id`, which follows the member, with the navigation-specific overlap
+rule of REQ-SEC-046. None is listed as not exported or not merged.
 
-**Enforced by (to be added):** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`
-(the navigation columns classified) · **Related:** REQ-SEC-046, REQ-SEC-058, ADR-0298
+**Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
+`UserIdentityColumnForeignKeyTest`, `NavigationUserReassignmentTest` · **Related:** REQ-SEC-046,
+REQ-SEC-058, ADR-0298
 
 ### REQ-DATA-022 — a cached instance is never edited; caches move to read models
 
