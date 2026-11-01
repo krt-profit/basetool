@@ -36,8 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies live sync on the shared Lager {@code /inventory/all} (REQ-FE-010, REQ-FE-015): an
- * allocation chip added in one browser context appears in a second context with the same stack
+ * Verifies live sync on the shared Lager {@code /inventory?storage=all} (REQ-FE-010, REQ-FE-015):
+ * an allocation chip added in one browser context appears in a second context with the same stack
  * expanded, without a reload.
  */
 @Tag("e2e")
@@ -96,9 +96,10 @@ class InventorySharedLagerLiveSyncE2eTest {
   }
 
   /**
-   * Context A (a logistician) adds a job-order allocation chip on {@code /inventory/all}; context B
-   * — a passive viewer with the same stack expanded that never reloads — must show that chip IN
-   * PLACE, driven purely by the {@code inventory/[stock]} change signal over {@code /ws/sync}.
+   * Context A (a logistician) adds a job-order allocation chip on {@code /inventory?storage=all};
+   * context B — a passive viewer with the same stack expanded that never reloads — must show that
+   * chip IN PLACE, driven purely by the {@code inventory/[stock]} change signal over {@code
+   * /ws/sync}.
    */
   @Test
   void allocationChipAddPropagatesToAnotherViewerLive() {
@@ -155,14 +156,14 @@ class InventorySharedLagerLiveSyncE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/all} and expands the seeded material's group then its single
-   * stack, waiting for the lazily-fetched entry leaf row to load. The material is unique to this
-   * test, so the group / stack / leaf selectors resolve unambiguously by material or item id.
+   * Navigates to {@code /inventory?storage=all} and expands the seeded material's group then its
+   * single stack, waiting for the lazily-fetched entry leaf row to load. The material is unique to
+   * this test, so the group / stack / leaf selectors resolve unambiguously by material or item id.
    *
    * @param page the authenticated page
    */
   private static void expandToLeaf(Page page) {
-    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/all");
+    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory?storage=all");
     page.waitForLoadState();
     page.locator("div.tree-row--group[data-material-id='" + materialId + "']")
         .click(new Locator.ClickOptions().setTimeout(20_000));

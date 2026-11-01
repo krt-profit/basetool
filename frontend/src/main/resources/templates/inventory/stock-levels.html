@@ -9,10 +9,9 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{inventory.stockLevels.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.levels', eyebrowKey='nav.group.logistics', titleText=#{inventory.stockLevels.title},
         count=null, actions=~{::stock-level-actions})}">
         <th:block th:ref="stock-level-actions">
-            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(active='stock-levels')}"></th:block>
             <button type="button" class="btn btn--cta" data-trigger="stock-level-open-create" data-testid="stock-level-create"
                     th:if="${!#lists.isEmpty(maintainableUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{inventory.stockLevels.create}">Mindestbestand anlegen</span></button>
         </th:block>

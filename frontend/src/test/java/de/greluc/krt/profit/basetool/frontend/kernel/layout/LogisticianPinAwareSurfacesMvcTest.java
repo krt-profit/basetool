@@ -89,7 +89,7 @@ class LogisticianPinAwareSurfacesMvcTest {
     backendReports(CapabilitiesResponse.NONE);
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("isLogisticianOrAbove", false));
   }
@@ -100,7 +100,7 @@ class LogisticianPinAwareSurfacesMvcTest {
     backendReports(LayoutResponses.logistician());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("isLogisticianOrAbove", true));
   }

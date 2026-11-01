@@ -95,11 +95,11 @@ class NavigationRenderMvcTest {
     assertThat(sidebar)
         .startsWith("<div id=\"sidebar\" class=\"sidebar\" inert")
         .contains("data-testid=\"nav-filter\"")
-        .contains("data-group-key=\"missions\"")
+        .contains("data-group-key=\"operations\"")
         .contains("data-group-key=\"logistics\"")
         .contains("data-group-key=\"trade\"")
-        .contains("data-group-key=\"organisation\"")
-        .contains("data-group-key=\"resources\"")
+        .contains("data-group-key=\"unit\"")
+        .doesNotContain("data-group-key=\"resources\"")
         .contains("data-group-key=\"admin-members\"")
         .contains("data-group-key=\"admin-masterdata\"")
         .contains("data-group-key=\"admin-operations\"")
@@ -135,7 +135,7 @@ class NavigationRenderMvcTest {
       }
       count++;
     }
-    assertThat(count).as("main, personal and admin groups").isGreaterThanOrEqualTo(10);
+    assertThat(count).as("main, personal and admin groups").isGreaterThanOrEqualTo(8);
   }
 
   /**
@@ -184,8 +184,8 @@ class NavigationRenderMvcTest {
         .contains("data-testid=\"palette-action-book-my\"")
         .contains("data-testid=\"palette-action-handbook\"")
         .contains("href=\"/hangar/squadron\"")
-        .contains("href=\"/inventory/my\"")
-        .contains("href=\"/inventory/all\"")
+        .contains("href=\"/inventory?storage=my\"")
+        .contains("href=\"/inventory?storage=all\"")
         .doesNotContain("data-testid=\"palette-action-book-global\"")
         .doesNotContain("/admin/sync-reports/uex");
     assertThat(member.contains("data-testid=\"palette-action-lang-de\""))

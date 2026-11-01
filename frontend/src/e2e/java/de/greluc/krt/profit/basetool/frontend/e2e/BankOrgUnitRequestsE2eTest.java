@@ -121,7 +121,7 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         assertThat(page.locator("[data-testid='org-unit-bank-card']").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
+        assertThat(page.locator("[data-testid='page-tab-orgunitbank.overview']")).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-officer");
         throw failure;
@@ -134,7 +134,7 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
-        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
+        assertThat(page.locator("[data-testid='page-tab-orgunitbank.overview']")).isVisible();
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-member");

@@ -12,7 +12,7 @@
 <th:block th:fragment="pageContent">
 <main th:with="mineTab=${activeTab != 'unit'}">
     <th:block th:if="${mineTab}">
-        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=~{::hangar-actions})}">
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='hangar.overview', eyebrowKey='nav.group.operations', titleText=#{hangar.title}, count=null, actions=~{::hangar-actions})}">
             <th:block th:ref="hangar-actions">
                 <button type="button" id="fleetview-import-btn" class="btn btn-ghost" data-testid="hangar-import"
                         th:title="#{hangar.import.description}"
@@ -46,7 +46,7 @@
         </th:block>
     </th:block>
     <th:block th:unless="${mineTab}">
-        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=null)}"></th:block>
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='hangar.overview', eyebrowKey='nav.group.operations', titleText=#{hangar.title}, count=null, actions=null)}"></th:block>
     </th:block>
 
     <nav class="tab-nav hangar-tabs" th:aria-label="#{hangar.title}" data-testid="hangar-tabs"

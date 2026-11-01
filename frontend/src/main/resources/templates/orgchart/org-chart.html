@@ -11,7 +11,7 @@
 <main class="oc-page">
     <th:block th:with="ocCanEdit=${orgChart != null and #authorization.expression('hasRole(''ADMIN'')')}">
         <th:block th:if="${ocCanEdit}">
-            <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation', titleText=#{orgChart.title}, actions=~{::oc-head-actions})}">
+            <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orgchart.view', eyebrowKey='nav.section.organisation', titleText=#{orgChart.title}, actions=~{::oc-head-actions})}">
                 <th:block th:ref="oc-head-actions">
                     <button type="button" class="btn btn-ghost oc-edit-toggle" data-trigger="oc-toggle-edit"
                             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
@@ -20,7 +20,7 @@
             </th:block>
         </th:block>
         <th:block th:unless="${ocCanEdit}">
-            <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation', titleText=#{orgChart.title})}"></th:block>
+            <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orgchart.view', eyebrowKey='nav.section.organisation', titleText=#{orgChart.title})}"></th:block>
         </th:block>
     </th:block>
 

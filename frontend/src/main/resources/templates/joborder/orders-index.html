@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=(${requesterView} ? #{nav.orders.own} : #{nav.orders}),
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orders.list', eyebrowKey='nav.group.logistics', titleText=(${requesterView} ? #{nav.orders.own} : #{nav.orders}),
         count=${ordersPage != null ? ordersPage.totalElements() : null}, countId='orders-count', countFor='orders-results', actions=~{::orders-actions})}">
         <th:block th:ref="orders-actions">
             <a th:href="@{/orders/create(source='index')}" class="btn btn--cta" data-testid="orders-create-link"

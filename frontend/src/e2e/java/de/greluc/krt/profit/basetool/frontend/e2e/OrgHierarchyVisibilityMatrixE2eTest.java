@@ -160,8 +160,8 @@ class OrgHierarchyVisibilityMatrixE2eTest {
   }
 
   /**
-   * UI boundary: a Bereichsleiter loading {@code /inventory/all} sees a group row for their own
-   * Bereich's material but none for a foreign Bereich's.
+   * UI boundary: a Bereichsleiter loading {@code /inventory?storage=all} sees a group row for their
+   * own Bereich's material but none for a foreign Bereich's.
    */
   @Test
   void bereichsleiterUiLagerShowsOnlyOwnBereichGroup() {
@@ -171,7 +171,7 @@ class OrgHierarchyVisibilityMatrixE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, BEREICH_USER, BEREICH_PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=all");
         page.waitForLoadState();
         assertThat(page.locator("div.tree-row--group[data-material-id='" + matAId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

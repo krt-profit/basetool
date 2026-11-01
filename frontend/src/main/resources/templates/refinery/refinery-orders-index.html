@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main class="refinery-index">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{refineryorder.index.title}, actions=~{::refinery-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.group.logistics', titleText=#{refineryorder.index.title}, actions=~{::refinery-actions})}">
         <th:block th:ref="refinery-actions">
             <a th:href="@{/refinery-orders/create(source='index')}" class="btn btn--cta" data-testid="refinery-create-link"
                ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.create.btn}">Neuer Auftrag</span></a>

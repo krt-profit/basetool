@@ -204,7 +204,7 @@ class MaterialboersePatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Handel<")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
     String head = html.substring(html.indexOf("class=\"page-actions\""), html.indexOf("mb-tabs"));

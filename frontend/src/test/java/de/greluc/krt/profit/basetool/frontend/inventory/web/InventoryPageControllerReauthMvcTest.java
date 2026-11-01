@@ -48,9 +48,11 @@ class InventoryPageControllerReauthMvcTest {
 
   @BeforeEach
   void setUp() {
+    InventoryCatalogs catalogs = new InventoryCatalogs(client);
     mockMvc =
         ReauthPageMvc.standalone(
-            new InventoryPageController(client, PARALLEL, mock(ItemPickerLabels.class)));
+            new InventoryPageController(client, catalogs, mock(ItemPickerLabels.class)),
+            new InventoryInputPageController(client, PARALLEL, catalogs));
     ReauthPageMvc.signInMember();
   }
 

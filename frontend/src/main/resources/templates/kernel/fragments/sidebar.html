@@ -56,11 +56,6 @@
                     <span class="admin-mode-chip" th:text="#{nav.adminMode.chip}">ADMIN</span>
                 </div>
                 <div class="nav-mode nav-mode-main" data-nav-mode="main">
-                    <div class="nav-top" th:data-nav-group="#{${navigation.top().group().labelKey()}}">
-                        <th:block th:each="entry : ${navigation.top().links()}">
-                            <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-top-link', null, ${entry.icon()}, false)}" />
-                        </th:block>
-                    </div>
                     <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty()}">
                         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, #{${item.group().labelKey()}}, false)}" />
                     </th:block>

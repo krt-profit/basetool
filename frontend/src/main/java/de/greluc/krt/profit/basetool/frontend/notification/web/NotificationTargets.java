@@ -56,7 +56,7 @@ final class NotificationTargets {
   private static final String OPERATIONS = "/operations/";
   private static final String BANK_REQUEST_QUEUE = "/bank/requests";
   private static final String CONNECTED_APPS = "/connected-apps";
-  private static final String MY_LAGER = "/inventory/my";
+  private static final String MY_LAGER = "/inventory?storage=my";
   private static final String STOCK_LEVELS = "/inventory/stock-levels";
   private static final String HANGAR = "/hangar";
   private static final String BLUEPRINTS = "/personal-inventory/blueprints";

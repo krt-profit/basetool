@@ -30,7 +30,7 @@
        th:classappend="${tab.current()} ? 'active'"
        th:attr="aria-current=${tab.current()} ? 'page' : null"
        th:data-entry-key="${tab.entry().key()}" th:data-testid="|page-tab-${tab.entry().key()}|"
-       th:text="#{${tab.entry().labelKey()}}">Tab</a>
+       th:text="#{${tab.entry().tabLabel()}}">Tab</a>
 </nav>
 </th:block>
 </body>

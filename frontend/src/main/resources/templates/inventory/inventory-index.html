@@ -10,10 +10,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{nav.inventory},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.overview', eyebrowKey='nav.group.logistics', titleText=#{nav.inventory},
         count=${inventoryPage != null ? inventoryPage.totalElements() : null}, countId='inventory-count', countFor='inventory-results', actions=~{::inventory-actions})}">
         <th:block th:ref="inventory-actions">
-            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(active='storage')}"></th:block>
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(selected=null)}"></th:block>
         </th:block>
     </th:block>
 
@@ -48,7 +48,7 @@
                 <tbody>
                     <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
                         <td>
-                            <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(materialIds=${item.material.id})}">
+                            <a class="row-link" data-testid="row-link" th:href="@{/inventory(storage='all', materialIds=${item.material.id})}">
                                 <span class="cell-title" th:text="${item.material.name}">Material</span>
                             </a>
                             <span th:if="${item.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
@@ -70,7 +70,7 @@
 
         <th:block th:if="${#lists.isEmpty(aggregated)}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.aggregated.empty', textKey='inventory.aggregated.empty.text',
-                actionHref=@{/inventory/my}, actionKey='inventory.overview.my')}"></th:block>
+                actionHref=@{/inventory(storage='my')}, actionKey='inventory.overview.my')}"></th:block>
         </th:block>
 
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></th:block>
@@ -89,7 +89,7 @@
                 <tbody>
                     <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
                         <td>
-                            <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(view='items', gameItemIds=${item.gameItem.id})}">
+                            <a class="row-link" data-testid="row-link" th:href="@{/inventory(storage='all', view='items', gameItemIds=${item.gameItem.id})}">
                                 <span class="cell-title" th:text="${item.gameItem.name}">Item</span>
                                 <span class="cell-sub" th:text="${item.gameItem.manufacturer} ?: '&mdash;'">Hersteller</span>
                             </a>
@@ -108,7 +108,7 @@
 
         <th:block th:if="${#lists.isEmpty(aggregated)}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.items.aggregated.empty', textKey='inventory.items.aggregated.empty.text',
-                actionHref=@{/inventory/my(view='items')}, actionKey='inventory.overview.my')}"></th:block>
+                actionHref=@{/inventory(storage='my', view='items')}, actionKey='inventory.overview.my')}"></th:block>
         </th:block>
 
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${inventoryPage}, baseUrl='/inventory?view=items')}"></th:block>

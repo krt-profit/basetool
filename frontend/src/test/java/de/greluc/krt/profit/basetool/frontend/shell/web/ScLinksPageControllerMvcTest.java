@@ -132,7 +132,7 @@ class ScLinksPageControllerMvcTest {
   }
 
   @Test
-  void theSidebarLinksThePageUnderResources() throws Exception {
+  void theFooterLinksThePageAndTheQuickAccessIndexesIt() throws Exception {
     String html =
         mockMvc
             .perform(get("/sc-links").with(oidcLogin()).locale(Locale.GERMAN))
@@ -141,12 +141,9 @@ class ScLinksPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    int group = html.indexOf("data-group-key=\"resources\"");
-    assertThat(group).isPositive();
-    String groupHtml = html.substring(group, html.indexOf("</section>", group));
-    assertThat(groupHtml)
-        .contains("Ressourcen")
-        .contains("href=\"/sc-links\"")
-        .contains("data-testid=\"nav-sc-links\"");
+    assertThat(html)
+        .doesNotContain("data-group-key=\"resources\"")
+        .containsPattern("<a [^>]*href=\"/sc-links\"[^>]*data-testid=\"footer-sc-links\"")
+        .containsPattern("<a [^>]*href=\"/sc-links\"[^>]*data-testid=\"nav-sc-links\"");
   }
 }

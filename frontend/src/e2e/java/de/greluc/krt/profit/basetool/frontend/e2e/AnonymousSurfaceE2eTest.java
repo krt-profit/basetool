@@ -66,7 +66,8 @@ class AnonymousSurfaceE2eTest {
       List.of("/missions", "/operations", "/orders", "/orders/create");
 
   /** Pages that were never public, swept the same way. */
-  private static final List<String> NEVER_PUBLIC_PAGES = List.of("/inventory/all", "/hangar");
+  private static final List<String> NEVER_PUBLIC_PAGES =
+      List.of("/inventory?storage=all", "/hangar");
 
   private static Playwright playwright;
   private static Browser browser;

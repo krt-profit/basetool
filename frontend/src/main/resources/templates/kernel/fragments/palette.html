@@ -39,6 +39,9 @@
                 <span data-prefix-kind="org_unit" th:text="#{palette.prefix.unit}">Nur Org-Einheiten</span>
             </div>
             <div class="palette-source-pages" data-testid="palette-source-pages">
+                <th:block th:each="entry : ${navigation.top().links()}">
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, #{${navigation.top().group().labelKey()}}, ${entry.icon()}, false)}" />
+                </th:block>
                 <th:block th:each="item : ${navigation.main()}">
                     <th:block th:each="entry : ${item.palettePages()}">
                         <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, #{${item.group().labelKey()}}, ${item.group().icon()}, false)}" />

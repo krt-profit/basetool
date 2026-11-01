@@ -270,14 +270,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Records the current page: the offered page with exactly this path, otherwise the menu link
-     * the drawer marks as current.
+     * Records the current page: the offered page with exactly this address (path and query, then
+     * path), otherwise the menu link the drawer marks as current.
      */
     const recordVisit = function () {
         const here = window.location.pathname;
-        let entry = index.find((e) => {
-            return e.href === here;
-        });
+        const hereWithQuery = here + window.location.search;
+        let entry =
+            index.find((e) => {
+                return e.href === hereWithQuery;
+            }) ||
+            index.find((e) => {
+                return e.href === here;
+            });
         if (!entry) {
             const sidebar = document.getElementById('sidebar');
             const active = sidebar ? sidebar.querySelector('a.is-active[href]') : null;

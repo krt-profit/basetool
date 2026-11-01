@@ -189,7 +189,7 @@ class InventorySupplyRenderTest {
     stubEntries(entry(List.of()));
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-testid=\"umbuchen-mode-donation\"")))
         .andExpect(content().string(containsString("data-testid=\"supply-lager-need\"")));
@@ -203,7 +203,7 @@ class InventorySupplyRenderTest {
     stubEntries(entry(List.of()));
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("umbuchen-mode-donation"))));
   }

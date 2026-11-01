@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{orders.demand.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orders.demand', eyebrowKey='nav.group.logistics', titleText=#{orders.demand.title},
         count=${demand == null or demand.groups() == null ? null : (demand.groups().isEmpty() ? 0 : #aggregates.sum(demand.groups().![materials() == null ? 0 : materials().size()]))},
         countId='demand-count', countFor='orders-material-demand-results', actions=~{::demand-actions})}">
         <th:block th:ref="demand-actions">

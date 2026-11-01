@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<nav th:fragment="storageSwitch(active)" class="krt-segmented" th:aria-label="#{inventory.overview.switch.aria}">
-    <a th:href="${view == 'items'} ? @{/inventory/all(view='items')} : @{/inventory/all}" class="krt-segmented__item"
+<nav th:fragment="storageSwitch(selected)" class="krt-segmented" th:aria-label="#{inventory.overview.switch.aria}">
+    <a th:href="${view == 'items'} ? @{/inventory(storage='all',view='items')} : @{/inventory(storage='all')}" class="krt-segmented__item"
+       th:classappend="${selected == 'all'} ? ' is-active'" th:attr="aria-current=${selected == 'all'} ? 'page'"
        data-testid="inventory-global-link" th:text="#{inventory.overview.global}">Globales Lager</a>
-    <a th:href="${view == 'items'} ? @{/inventory/my(view='items')} : @{/inventory/my}" class="krt-segmented__item"
+    <a th:href="${view == 'items'} ? @{/inventory(storage='my',view='items')} : @{/inventory(storage='my')}" class="krt-segmented__item"
+       th:classappend="${selected == 'my'} ? ' is-active'" th:attr="aria-current=${selected == 'my'} ? 'page'"
        data-testid="inventory-my-link" th:text="#{inventory.overview.my}">Mein Lager</a>
-    <a th:href="@{/inventory/stock-levels}" class="krt-segmented__item"
-       th:attr="aria-current=${active == 'stock-levels'} ? 'page' : null"
-       data-testid="inventory-stock-levels-link" th:text="#{inventory.stockLevels.tab}">Mindestbest&auml;nde</a>
 </nav>
 </body>
 </html>

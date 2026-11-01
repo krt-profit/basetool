@@ -209,7 +209,7 @@ class OperationPageControllerMvcTest {
 
     assertTrue(html.contains("class=\"page-head\""), "page head");
     assertTrue(
-        Pattern.compile("class=\"page-eyebrow\"[^>]*>Einsatzplanung<").matcher(html).find(),
+        Pattern.compile("class=\"page-eyebrow\"[^>]*>Einsatz &amp; Flotte<").matcher(html).find(),
         "eyebrow names the navigation area");
     assertTrue(
         Pattern.compile("data-testid=\"page-head-count\"[^>]*>1<").matcher(html).find(),

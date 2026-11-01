@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -49,7 +50,8 @@ import org.jetbrains.annotations.Nullable;
  * @param actions the quick access's create and booking actions
  * @param paletteTail the quick access's handbook and language actions
  * @param tabs the phone tab bar's slots that keep a permitted entry
- * @param pageTabs the permitted tabs of each merged page, by the key of each of its entries
+ * @param pageTabs the permitted tab bar of each merged page, by the key of each of its tabs and of
+ *     each entry they cover
  */
 public record NavigationMenu(
     @NotNull Group top,
@@ -63,7 +65,7 @@ public record NavigationMenu(
     @NotNull Group actions,
     @NotNull Group paletteTail,
     @NotNull List<Tab> tabs,
-    @NotNull Map<String, List<NavigationEntry>> pageTabs) {
+    @NotNull Map<String, Bar> pageTabs) {
 
   /**
    * Resolves the registry for one caller.
@@ -93,21 +95,29 @@ public record NavigationMenu(
   /**
    * The tab bar of the page an entry belongs to, with the current tab marked.
    *
-   * @param entryKey the key of any entry of the page's tab bar
+   * @param entryKey the key of any entry of the page's tab bar, or of an entry a tab covers
    * @param requestUri the current request URI, with or without a query
    * @return the permitted tabs in order, or empty when the entry has no tab bar or fewer than two
    *     tabs are permitted
    */
   @NotNull
   public List<PageTab> pageTabs(@NotNull String entryKey, @NotNull String requestUri) {
-    List<NavigationEntry> tabs = pageTabs.getOrDefault(entryKey, List.of());
+    Bar bar = pageTabs.get(entryKey);
+    if (bar == null) {
+      return List.of();
+    }
     String path = requestUri.split("\\?", 2)[0];
     NavigationEntry current =
-        tabs.stream()
+        bar.tabs().stream()
             .filter(tab -> path.equals(tab.href()) || path.startsWith(tab.href() + "/"))
             .max(Comparator.comparingInt(tab -> tab.href().length()))
+            .or(() ->
+                bar.tabs().stream()
+                    .filter(
+                        tab -> tab.key().equals(bar.coveringTab().getOrDefault(entryKey, entryKey)))
+                    .findFirst())
             .orElse(null);
-    return tabs.stream().map(tab -> new PageTab(tab, tab == current)).toList();
+    return bar.tabs().stream().map(tab -> new PageTab(tab, tab == current)).toList();
   }
 
   /**
@@ -127,18 +137,19 @@ public record NavigationMenu(
    * The other paths of the area a menu link opens: the tabs of the merged page behind it.
    *
    * @param link a menu link
-   * @return the space-separated paths of the permitted tabs other than the link's own, or {@code
-   *     null} for a link without tabs
+   * @return the space-separated paths of the permitted tabs and the entries they cover, other than
+   *     the link's own, or {@code null} for a link without tabs
    */
   @Nullable
   public String areaPaths(@NotNull NavigationEntry link) {
     String paths =
         pageTabs.values().stream()
-            .filter(tabs -> tabs.stream().anyMatch(tab -> tab.href().equals(link.href())))
+            .filter(bar -> bar.tabs().stream().anyMatch(tab -> tab.href().equals(link.href())))
             .findFirst()
             .stream()
-            .flatMap(List::stream)
-            .map(NavigationEntry::href)
+            .flatMap(bar ->
+                Stream.concat(
+                    bar.tabs().stream().map(NavigationEntry::href), bar.coveredPaths().stream()))
             .filter(href -> !href.equals(link.href()))
             .distinct()
             .collect(Collectors.joining(" "));
@@ -146,18 +157,32 @@ public record NavigationMenu(
   }
 
   @NotNull
-  private static Map<String, List<NavigationEntry>> resolvePageTabs(
+  private static Map<String, Bar> resolvePageTabs(
       @NotNull NavigationRegistry registry, @NotNull NavigationAccess access) {
-    Map<String, List<NavigationEntry>> byKey = new HashMap<>();
-    for (NavigationPageTabs bar : registry.pageTabs()) {
+    Map<String, Bar> byKey = new HashMap<>();
+    for (NavigationPageTabs page : registry.pageTabs()) {
       List<NavigationEntry> permitted =
-          bar.entryKeys().stream()
+          page.entryKeys().stream()
               .flatMap(key -> registry.entry(key).stream())
               .filter(entry -> registry.permits(entry, access))
               .toList();
-      if (permitted.size() >= 2) {
-        bar.entryKeys().forEach(key -> byKey.put(key, permitted));
+      if (permitted.size() < 2) {
+        continue;
       }
+      Map<String, String> coveringTab = new HashMap<>();
+      List<String> coveredPaths = new ArrayList<>();
+      page.covered()
+          .forEach((tabKey, coveredKeys) ->
+              coveredKeys.stream()
+                  .flatMap(key -> registry.entry(key).stream())
+                  .filter(entry -> registry.permits(entry, access))
+                  .forEach(entry -> {
+                    coveringTab.put(entry.key(), tabKey);
+                    coveredPaths.add(entry.href());
+                  }));
+      Bar bar = new Bar(permitted, Map.copyOf(coveringTab), List.copyOf(coveredPaths));
+      page.entryKeys().forEach(key -> byKey.put(key, bar));
+      coveringTab.keySet().forEach(key -> byKey.put(key, bar));
     }
     return Map.copyOf(byKey);
   }
@@ -194,6 +219,18 @@ public record NavigationMenu(
           permitted.stream().filter(NavigationEntry::paletteOnly).toList());
     }
   }
+
+  /**
+   * The permitted part of one merged page's tab bar.
+   *
+   * @param tabs the permitted tabs in order
+   * @param coveringTab the key of the covering tab, by the key of each permitted covered entry
+   * @param coveredPaths the paths of the permitted covered entries
+   */
+  public record Bar(
+      @NotNull List<NavigationEntry> tabs,
+      @NotNull Map<String, String> coveringTab,
+      @NotNull List<String> coveredPaths) {}
 
   /**
    * One tab of a merged page's tab bar.
