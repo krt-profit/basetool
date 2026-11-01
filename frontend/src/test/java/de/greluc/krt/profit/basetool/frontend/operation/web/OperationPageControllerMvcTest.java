@@ -422,7 +422,7 @@ class OperationPageControllerMvcTest {
                 new BigDecimal("1284500"),
                 List.of(
                     new OperationMissionFinanceDto(
-                        missionId, "Quantanium-Abbau", new BigDecimal("1284500"))),
+                        missionId, "Quantanium-Abbau", new BigDecimal("1284500"), false)),
                 false));
     when(backendApiClient.get(
             eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
@@ -814,13 +814,69 @@ class OperationPageControllerMvcTest {
             eq(missionId)))
         .thenReturn(
             new MissionFinanceSummaryDto(
-                missionId, "Mission A", new BigDecimal("500"), List.of(entry), List.of()));
+                missionId, "Mission A", new BigDecimal("500"), List.of(entry), List.of(), false));
 
     mockMvc
         .perform(get("/operations/" + opId + "/finance/" + missionId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Wave5DetailNote")))
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"ADMIN", "MISSION_MANAGER"})
+  void operationDetail_anonymisedMissionShowsTheNeutralLabelWithoutLinkOrName() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID hiddenId = UUID.fromString("00000000-0000-0000-0000-000000000077");
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Ironclad", "", "ACTIVE", null, 3L, null, null, null));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId)))
+        .thenReturn(
+            new OperationFinanceSummaryDto(
+                opId,
+                new BigDecimal("900"),
+                List.of(
+                    new OperationMissionFinanceDto(hiddenId, null, new BigDecimal("900"), true)),
+                false));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
+        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(html.contains("Interne Mission einer anderen Einheit"));
+    assertFalse(html.contains("/missions/" + hiddenId));
+    assertFalse(html.contains("data-op-finance-mission=\"" + hiddenId));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void operationMissionFinance_anonymisedMission_rendersTheNeutralLabelOnly() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/operations/{id}/finances/{missionId}"),
+            eq(MissionFinanceSummaryDto.class),
+            eq(opId),
+            eq(missionId)))
+        .thenReturn(
+            new MissionFinanceSummaryDto(
+                missionId, null, new BigDecimal("900"), List.of(), List.of(), true));
+
+    mockMvc
+        .perform(get("/operations/" + opId + "/finance/" + missionId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Interne Mission einer anderen Einheit")))
+        .andExpect(content().string(not(containsString("op-fin-table"))));
   }
 
   @Test

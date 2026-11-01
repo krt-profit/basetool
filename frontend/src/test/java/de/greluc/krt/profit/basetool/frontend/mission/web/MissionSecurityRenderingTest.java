@@ -242,7 +242,8 @@ class MissionSecurityRenderingTest {
             1L,
             0,
             1,
-            null,
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto(
+                UUID.randomUUID(), "Alpha", "ALP"),
             null,
             null,
             null,

@@ -73,7 +73,7 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     UUID foreignOther = saveMission(foreign, "2099-01-15T00:00:00Z", "PLANNED", false);
     signUp(signedUpForeign, member);
 
-    List<Mission> rows = upcoming(member, false, null, Set.of(mine.getId()), 10);
+    List<Mission> rows = upcoming(member, false, false, null, Set.of(mine.getId()), 10);
 
     assertThat(rows)
         .extracting(Mission::getId)
@@ -89,7 +89,7 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     UUID both = saveMission(mine, "2099-02-01T00:00:00Z", "PLANNED", false);
     signUp(both, member);
 
-    List<Mission> rows = upcoming(member, false, null, Set.of(mine.getId()), 10);
+    List<Mission> rows = upcoming(member, false, false, null, Set.of(mine.getId()), 10);
 
     assertThat(rows).extracting(Mission::getId).containsExactly(both);
   }
@@ -105,7 +105,7 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     signUp(signedUpDone, member);
     UUID planned = saveMission(mine, "2099-03-01T00:00:00Z", "PLANNED", false);
 
-    List<Mission> rows = upcoming(member, false, null, Set.of(mine.getId()), 10);
+    List<Mission> rows = upcoming(member, false, false, null, Set.of(mine.getId()), 10);
 
     assertThat(rows).extracting(Mission::getId).containsExactly(planned);
   }
@@ -119,7 +119,7 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     UUID hidden = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
     signUp(hidden, member);
 
-    List<Mission> rows = upcoming(member, false, null, Set.of(mine.getId()), 10);
+    List<Mission> rows = upcoming(member, false, false, null, Set.of(mine.getId()), 10);
 
     assertThat(rows).isEmpty();
   }
@@ -136,7 +136,7 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     signUp(signedUpOther, member);
 
     List<Mission> rows =
-        upcoming(member, false, pinned.getId(), Set.of(pinned.getId(), other.getId()), 10);
+        upcoming(member, false, false, pinned.getId(), Set.of(pinned.getId(), other.getId()), 10);
 
     assertThat(rows).extracting(Mission::getId).containsExactly(pinnedMission, signedUpOther);
   }
@@ -150,30 +150,62 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     UUID second = saveMission(mine, "2099-02-02T00:00:00Z", "PLANNED", false);
     saveMission(mine, "2099-02-03T00:00:00Z", "PLANNED", false);
 
-    List<Mission> rows = upcoming(member, false, null, Set.of(mine.getId()), 2);
+    List<Mission> rows = upcoming(member, false, false, null, Set.of(mine.getId()), 2);
 
     assertThat(rows).extracting(Mission::getId).containsExactly(first, second);
   }
 
-  /** A caller with no unit scope sees the organisation-wide upcoming missions. */
+  /** An admin in all-squadrons mode sees the organisation-wide upcoming missions. */
   @Test
-  void aCallerWithoutAScopeSeesTheOrganisationWideMissions() {
-    User member = newUser();
+  void anAdminInAllScopeSeesTheOrganisationWideMissions() {
+    User admin = newUser();
     OrgUnit foreign = newSquadron();
     UUID any = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
 
-    List<Mission> rows = upcoming(member, true, null, Set.of(), 50);
+    List<Mission> rows = upcoming(admin, true, false, null, Set.of(), 50);
 
     assertThat(rows).extracting(Mission::getId).contains(any);
   }
 
+  /** A member without a unit sees public missions, never a foreign internal one. */
+  @Test
+  void aUnitlessMemberSeesPublicMissionsButNoForeignInternalOne() {
+    User member = newUser();
+    OrgUnit foreign = newSquadron();
+    UUID internal = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
+    UUID publicMission = saveMission(foreign, "2099-02-02T00:00:00Z", "PLANNED", false);
+
+    List<Mission> rows = upcoming(member, false, true, null, Set.of(), 50);
+
+    assertThat(rows).extracting(Mission::getId).contains(publicMission).doesNotContain(internal);
+  }
+
+  /** A unitless member's sign-up on a foreign internal mission does not surface it. */
+  @Test
+  void aUnitlessMembersSignUpOnAForeignInternalMissionStaysOut() {
+    User member = newUser();
+    OrgUnit foreign = newSquadron();
+    UUID internal = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
+    signUp(internal, member);
+
+    List<Mission> rows = upcoming(member, false, true, null, Set.of(), 50);
+
+    assertThat(rows).extracting(Mission::getId).doesNotContain(internal);
+  }
+
   private List<Mission> upcoming(
-      User member, boolean orgWide, UUID pin, Set<UUID> memberUnits, int limit) {
+      User member,
+      boolean orgWide,
+      boolean publicOnly,
+      UUID pin,
+      Set<UUID> memberUnits,
+      int limit) {
     return missionRepository.findUpcomingOwnOrSignedUp(
         LOWER_BOUND,
         STATUSES,
         orgWide,
-        false,
+        publicOnly,
+        orgWide,
         pin,
         memberUnits,
         member.getId(),

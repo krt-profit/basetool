@@ -690,11 +690,13 @@
 
                         <fieldset class="form-section" th:if="${isNew or mission.canEdit}">
                             <legend class="form-section__head" th:text="|3 · #{mission.form.section.visibility}|">3 · Sichtbarkeit</legend>
-                            <div class="form-group">
+                            <div class="form-group" th:with="internalNeedsUnit=${isNew ? (ownerOptions == null or ownerOptions.isEmpty()) : mission.owningSquadron == null}">
                                 <label class="krt-switch" for="isInternal">
-                                    <input type="checkbox" role="switch" id="isInternal" th:field="*{isInternal}">
+                                    <input type="checkbox" role="switch" id="isInternal" th:field="*{isInternal}"
+                                           th:disabled="${internalNeedsUnit}">
                                     <span th:text="#{mission.is_internal}">Intern</span>
                                 </label>
+                                <p class="form-hint m-0" th:if="${internalNeedsUnit}" th:text="#{mission.is_internal.requires_unit}">Interne Missionen brauchen eine verantwortliche Einheit.</p>
                             </div>
                             <th:block th:if="${isNew}">
                                 <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
