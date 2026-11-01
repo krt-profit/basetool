@@ -71,7 +71,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * Spring MVC controller for the mutating inventory endpoints under {@code /inventory}: create,
  * book-out, transfer and personal rebooking, bulk checkout and rebooking, allocations, and notes.
  *
- * <p>Validation failures re-render the read views inline via {@link InventoryPageController}.
+ * <p>Validation failures re-render the read views inline via {@link InventoryInputPageController}
+ * and {@link InventoryListPageController}.
  */
 @Controller
 @UsesLayoutModel
@@ -84,11 +85,11 @@ public class InventoryWriteController {
   /** The inventory domain's typed backend client. */
   private final InventoryBackendClient inventoryClient;
 
-  /**
-   * The read half of the inventory area, whose endpoint methods re-render the originating view
-   * inline when a classic form handler fails validation.
-   */
-  private final InventoryPageController inventoryPageController;
+  /** Re-renders the create form inline when a classic form handler fails validation. */
+  private final InventoryInputPageController inputPageController;
+
+  /** Re-renders the originating Lager list inline when a classic form handler fails validation. */
+  private final InventoryListPageController listPageController;
 
   /**
    * Persists a new inventory item.
@@ -124,7 +125,7 @@ public class InventoryWriteController {
     }
 
     if (bindingResult.hasErrors()) {
-      return inventoryPageController.viewInputPage(form.getSource(), model);
+      return inputPageController.viewInputPage(form.getSource(), model);
     }
 
     try {
@@ -385,9 +386,9 @@ public class InventoryWriteController {
       model.addAttribute("errorToast", "error.validation.failed");
       model.addAttribute("showBookOutModal", id);
       if (fromAdminListing) {
-        return inventoryPageController.viewAllInventory(LagerQuery.empty(), false, model);
+        return listPageController.viewAllInventory(LagerQuery.empty(), false, model);
       }
-      return inventoryPageController.viewMyInventory(LagerQuery.empty(), false, model);
+      return listPageController.viewMyInventory(LagerQuery.empty(), false, model);
     }
 
     try {

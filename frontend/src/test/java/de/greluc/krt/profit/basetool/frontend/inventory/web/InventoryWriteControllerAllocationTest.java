@@ -48,11 +48,12 @@ import org.springframework.http.ResponseEntity;
 class InventoryWriteControllerAllocationTest {
 
   @Mock private BackendApiClient backendApiClient;
-  @Mock private InventoryPageController inventoryPageController;
+  @Mock private InventoryInputPageController inputPageController;
+  @Mock private InventoryListPageController listPageController;
 
   private InventoryWriteController controller() {
     return new InventoryWriteController(
-        new InventoryBackendClient(backendApiClient), inventoryPageController);
+        new InventoryBackendClient(backendApiClient), inputPageController, listPageController);
   }
 
   private static InventoryItemDto sentinel() {
