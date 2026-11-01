@@ -86,6 +86,23 @@ class NavigationUserReassignmentTest {
   }
 
   @Test
+  @DisplayName("the hidden pages are unioned minus every page that is a favourite afterwards")
+  void unionsTheHiddenPagesMinusTheFavourites() {
+    UUID source = member();
+    UUID target = member();
+    service.replaceFavourites(target, new FavouritesUpdateRequest(List.of("a.one"), 0L));
+    service.replaceHidden(target, new HiddenUpdateRequest(List.of("b.two"), 0L));
+    service.replaceHidden(source, new HiddenUpdateRequest(List.of("a.one", "c.three"), 0L));
+
+    participant.reassign(source, target);
+
+    NavigationPreferencesResponse merged = service.read(target);
+    assertThat(merged.favourites().keys()).containsExactly("a.one");
+    assertThat(merged.hidden().keys()).containsExactly("b.two", "c.three");
+    assertThat(merged.hidden().version()).isEqualTo(2);
+  }
+
+  @Test
   @DisplayName("a source without a row moves nothing")
   void sourceWithoutARowMovesNothing() {
     UUID target = member();

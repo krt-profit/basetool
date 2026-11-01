@@ -28,7 +28,10 @@ import lombok.RequiredArgsConstructor;
 public enum NavigationSection {
 
   /** The favourites (REQ-UI-032). */
-  FAVOURITES("favourites");
+  FAVOURITES("favourites"),
+
+  /** The hidden pages (REQ-UI-032). */
+  HIDDEN("hidden");
 
   private final String tag;
 }

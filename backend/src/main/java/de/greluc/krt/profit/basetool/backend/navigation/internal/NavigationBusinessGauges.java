@@ -38,6 +38,7 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
   private final NavigationPreferencesRepository repository;
 
   private final AtomicLong favouriteAccounts = new AtomicLong();
+  private final AtomicLong hiddenAccounts = new AtomicLong();
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
@@ -45,10 +46,14 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
             NavigationMetrics.PERSONALISED_ACCOUNTS, favouriteAccounts, AtomicLong::doubleValue)
         .tag(NavigationMetrics.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
         .register(registry);
+    Gauge.builder(NavigationMetrics.PERSONALISED_ACCOUNTS, hiddenAccounts, AtomicLong::doubleValue)
+        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.HIDDEN.getTag())
+        .register(registry);
   }
 
   @Override
   public void sample() {
     favouriteAccounts.set(repository.countWithFavourites());
+    hiddenAccounts.set(repository.countWithHidden());
   }
 }

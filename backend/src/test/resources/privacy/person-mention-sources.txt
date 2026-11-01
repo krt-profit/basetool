@@ -194,6 +194,7 @@ exempt-column|mission_participant.payout_preference
 exempt-column|mission_step.created_by
 exempt-column|mission_step.updated_by
 exempt-column|navigation_favourite.entry_key
+exempt-column|navigation_hidden.entry_key
 exempt-column|notification.entity_type
 exempt-column|notification.params
 exempt-column|notification.type

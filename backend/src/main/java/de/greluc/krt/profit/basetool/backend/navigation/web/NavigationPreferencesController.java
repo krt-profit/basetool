@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.web;
 
+import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.HiddenResponse;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationMetrics;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPreferencesService;
@@ -102,8 +105,50 @@ public class NavigationPreferencesController {
   }
 
   /**
-   * Counts a favourites write that bean validation refused before the service saw it as a rejected
-   * write (REQ-OBS-011), then answers it like every other validation failure.
+   * Replaces the caller's hidden pages.
+   *
+   * @param request the new keys and the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the stored hidden pages with the new version
+   */
+  @PutMapping("/hidden")
+  @Operation(summary = "Replace the caller's hidden pages.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Hidden pages stored."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation failed, a key repeats or a key is a favourite."),
+    @ApiResponse(responseCode = "409", description = "The hidden version is stale.")
+  })
+  public HiddenResponse replaceHidden(
+      @Valid @RequestBody HiddenUpdateRequest request, @CurrentUserId UUID userId) {
+    return service.replaceHidden(userId, request);
+  }
+
+  /**
+   * Replaces the caller's favourites and hidden pages in one request that checks both versions.
+   *
+   * @param request both sections' new keys and the versions the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return both sections with their new versions
+   */
+  @PutMapping("/favourites-and-hidden")
+  @Operation(summary = "Replace the favourites and the hidden pages together.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Both sections stored."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation failed, a key repeats or a key is in both lists."),
+    @ApiResponse(responseCode = "409", description = "Either version is stale.")
+  })
+  public NavigationPreferencesResponse replaceFavouritesAndHidden(
+      @Valid @RequestBody FavouritesAndHiddenUpdateRequest request, @CurrentUserId UUID userId) {
+    return service.replaceFavouritesAndHidden(userId, request);
+  }
+
+  /**
+   * Counts a write that bean validation refused before the service saw it as a rejected write
+   * (REQ-OBS-011), then answers it like every other validation failure.
    *
    * @param ex the validation failure
    * @param request the current request
@@ -112,8 +157,14 @@ public class NavigationPreferencesController {
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ProblemDetail> rejected(
       MethodArgumentNotValidException ex, HttpServletRequest request) {
-    if (ex.getBindingResult().getTarget() instanceof FavouritesUpdateRequest) {
+    Object target = ex.getBindingResult().getTarget();
+    if (target instanceof FavouritesUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
+    } else if (target instanceof HiddenUpdateRequest) {
+      metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
+    } else if (target instanceof FavouritesAndHiddenUpdateRequest) {
+      metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
+      metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
     }
     return problems.handleValidationExceptions(ex, request);
   }
