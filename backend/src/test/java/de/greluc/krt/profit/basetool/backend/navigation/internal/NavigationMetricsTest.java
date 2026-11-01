@@ -74,7 +74,10 @@ class NavigationMetricsTest {
     when(repository.countWithTabBar()).thenReturn(2L);
     NavigationAppearanceRepository appearances = mock(NavigationAppearanceRepository.class);
     when(appearances.countPersonalised()).thenReturn(4L);
-    NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository, appearances);
+    DashboardLayoutRepository layouts = mock(DashboardLayoutRepository.class);
+    when(layouts.countCustomised()).thenReturn(3L);
+    NavigationBusinessGauges gauges =
+        new NavigationBusinessGauges(repository, appearances, layouts);
 
     gauges.register(registry);
     assertThat(gauge(NavigationSection.FAVOURITES)).isZero();
@@ -85,6 +88,7 @@ class NavigationMetricsTest {
     assertThat(gauge(NavigationSection.HIDDEN)).isEqualTo(3);
     assertThat(gauge(NavigationSection.TAB_BAR)).isEqualTo(2);
     assertThat(gauge(NavigationSection.APPEARANCE)).isEqualTo(4);
+    assertThat(gauge(NavigationSection.DASHBOARD)).isEqualTo(3);
   }
 
   private double count(NavigationWriteOutcome outcome) {

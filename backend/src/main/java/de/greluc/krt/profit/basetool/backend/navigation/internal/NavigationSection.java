@@ -37,7 +37,10 @@ public enum NavigationSection {
   APPEARANCE("display"),
 
   /** The phone tab bars of both modes (REQ-UI-032). */
-  TAB_BAR("tabbar");
+  TAB_BAR("tabbar"),
+
+  /** The dashboard layouts and the options of their instances (REQ-UI-034). */
+  DASHBOARD("dashboard");
 
   private final String tag;
 }

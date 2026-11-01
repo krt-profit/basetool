@@ -319,7 +319,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 > **The `navigation` module** (ADR-0298, map #2800). It holds a user's deliberate navigation and
 > dashboard choices under one root row per member and a version counter per section, in
 > `navigation.internal` and `navigation.web` and without an `api` package (REQ-UI-032,
-> REQ-UI-034). Shipped: the favourites, the hidden pages, the appearance (desktop mode) and the phone tab bars; the other sections and the dashboards are planned. It depends
+> REQ-UI-034). Shipped: the favourites, the hidden pages, the appearance (desktop mode), the phone tab bars and the member dashboard (two tables per mode: the layout with its version and the instances with their option versions); the other sections and the admin dashboard are planned. It depends
 > on no domain module: it stores entry keys and checks only their format, while the frontend's
 > entry registry knows each key's permission and asks for the deletion of keys the user may no
 > longer see. Account deletion removes the rows through the `app_user` foreign key

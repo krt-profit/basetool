@@ -40,30 +40,44 @@ public class NavigationExportSections implements PersonalDataExportSection {
             500,
             "navigationPreferences",
             ART_15_20,
-            "Chosen by the member: entry keys of pages, never free text.",
+            "Chosen by the member: entry keys of pages and widget choices, never free text.",
             """
             SELECT 'favourites' AS preference_section, f.order_index AS position,
-                   f.entry_key AS value
+                   f.entry_key AS entry_key, CAST(NULL AS VARCHAR) AS dashboard_mode,
+                   CAST(NULL AS VARCHAR) AS widget_type, CAST(NULL AS VARCHAR) AS column_side,
+                   CAST(NULL AS UUID) AS org_unit_id, CAST(NULL AS INTEGER) AS range_days,
+                   CAST(NULL AS INTEGER) AS row_count, CAST(NULL AS VARCHAR) AS status_filter
             FROM navigation_favourite f
             JOIN navigation_preferences np ON np.user_id = f.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
-            SELECT 'hidden' AS preference_section, 0 AS position, h.entry_key AS value
+            SELECT 'hidden', 0, h.entry_key, CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR),
+                   CAST(NULL AS VARCHAR), CAST(NULL AS UUID), CAST(NULL AS INTEGER),
+                   CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
             FROM navigation_hidden h
             JOIN navigation_preferences np ON np.user_id = h.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
-            SELECT 'tabbar-' || lower(t.mode) AS preference_section, t.slot_index AS position,
-                   t.entry_key AS value
+            SELECT 'tabbar-' || lower(t.mode), t.slot_index, t.entry_key, CAST(NULL AS VARCHAR),
+                   CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR), CAST(NULL AS UUID),
+                   CAST(NULL AS INTEGER), CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
             FROM navigation_tab_bar t
             JOIN navigation_preferences np ON np.user_id = t.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
-            SELECT 'desktopMode', 0, a.desktop_mode
+            SELECT 'desktopMode', 0, a.desktop_mode, CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR),
+                   CAST(NULL AS VARCHAR), CAST(NULL AS UUID), CAST(NULL AS INTEGER),
+                   CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
             FROM navigation_appearance a
             JOIN navigation_preferences np ON np.user_id = a.preferences_id
             WHERE np.user_id = :userId
-            ORDER BY 1, 2, 3
+            UNION ALL
+            SELECT 'dashboard', w.position, CAST(NULL AS VARCHAR), l.mode, w.widget_type,
+                   w.column_side, w.org_unit_id, w.range_days, w.row_count, w.status_filter
+            FROM navigation_dashboard_widget w
+            JOIN navigation_dashboard_layout l ON l.id = w.layout_id
+            WHERE l.preferences_id = :userId
+            ORDER BY preference_section, dashboard_mode, position, entry_key
             """));
   }
 }

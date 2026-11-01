@@ -123,7 +123,10 @@ next-mission banner; the first row is the soonest upcoming mission.
   every unit's public missions via the cross-staffel public escape ([`org-unit-tenancy.md`](org-unit-tenancy.md)) —
   deliberately **wider** than the own-unit-only scope of the `/next` lookup (REQ-MISSION-008). This
   is an explicit, owner-approved product decision: the home overview answers "what is the
-  organisation heading towards in the coming week", not only "my unit".
+  organisation heading towards in the coming week", not only "my unit". A widget pinned to a unit
+  (REQ-UI-034) adds `orgUnitId` to the request: the optional filter of `GET /api/v1/missions` keeps
+  the missions that unit owns, applied by the backend inside the caller's visibility (the same scope
+  predicate, so it never shows a mission the list would not), before paging.
 - **Own-unit highlight.** Because the scope is broad, a tile whose owning org unit is one the
   **authenticated** viewer is **directly assigned to** is flagged with a "Meine Einheit" chip
   (`home.upcoming.my_unit`, the square `.chip--primary`). "Directly assigned" spans **every org-unit

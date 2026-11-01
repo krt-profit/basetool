@@ -317,6 +317,11 @@ GET /api/v1/missions/{missionId}/finance-entries/sum | MissionFinanceEntryContro
 GET /api/v1/missions/{missionId}/finance-entries/summary | MissionFinanceEntryController#getFinanceSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{missionId}/finance-entries/{entryId} | MissionFinanceEntryController#deleteFinanceEntry | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/missions/{missionId}/finance-entries/{entryId} | MissionFinanceEntryController#updateFinanceEntry | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/navigation/dashboards/{mode} | NavigationDashboardController#reset | pre=isAuthenticated() and (#mode.name() != 'ADMIN' or hasRole('ADMIN')) | url=anyRequest -> authenticated
+GET /api/v1/navigation/dashboards/{mode} | NavigationDashboardController#read | pre=isAuthenticated() and (#mode.name() != 'ADMIN' or hasRole('ADMIN')) | url=anyRequest -> authenticated
+PUT /api/v1/navigation/dashboards/{mode}/layout | NavigationDashboardController#replaceLayout | pre=isAuthenticated() and (#mode.name() != 'ADMIN' or hasRole('ADMIN')) | url=anyRequest -> authenticated
+POST /api/v1/navigation/dashboards/{mode}/prune | NavigationDashboardController#prune | pre=isAuthenticated() and (#mode.name() != 'ADMIN' or hasRole('ADMIN')) | url=anyRequest -> authenticated
+PUT /api/v1/navigation/dashboards/{mode}/widgets/{widgetId}/options | NavigationDashboardController#replaceOptions | pre=isAuthenticated() and (#mode.name() != 'ADMIN' or hasRole('ADMIN')) | url=anyRequest -> authenticated
 GET /api/v1/navigation/preferences | NavigationPreferencesController#read | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/navigation/preferences/appearance | NavigationPreferencesController#replaceAppearance | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/navigation/preferences/favourites | NavigationPreferencesController#replaceFavourites | pre=isAuthenticated() | url=anyRequest -> authenticated

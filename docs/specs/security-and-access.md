@@ -5154,9 +5154,9 @@ links, beside the separate deletion card) · **Decision:**
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
-> favourites, the hidden entries, the desktop mode and the tab bars (`preference_section`, `position`, `value` per row; the tab bar of a mode is `tabbar-member` / `tabbar-admin`). The
-> sections that follow and
-> the dashboards are planned and join the same statement.
+> favourites, the hidden entries, the desktop mode, the tab bars and the dashboard instances (`preference_section`, `position`, `entry_key`,
+> `dashboard_mode`, `widget_type`, `column_side`, `org_unit_id`, `range_days`, `row_count`,
+> `status_filter` per row; the tab bar of a mode is `tabbar-member` / `tabbar-admin`). The sections that follow are planned and join the same statement.
 
 - **The navigation preferences and the home dashboards are part of the export, in their own
   section** `navigationPreferences`, declared by the `navigation` module as a
@@ -5171,7 +5171,8 @@ links, beside the separate deletion card) · **Decision:**
   count for REQ-DATA-021 like every other section's.
 
 **Enforced by:** `PersonalDataExportCatalogueTest` and `DataExportEndStateTest` (the
-`navigationPreferences` section with a seeded favourite and hidden entry), `PersonalDataExportOwnershipTest`,
+`navigationPreferences` section with a seeded favourite, hidden entry and dashboard instance),
+`PersonalDataExportOwnershipTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`; **to be added:** the
 further sections with a seeded dashboard instance · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
 ADR-0299

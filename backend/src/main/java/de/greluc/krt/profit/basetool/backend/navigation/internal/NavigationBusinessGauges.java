@@ -30,8 +30,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The navigation module's business gauge: how many members personalised each preference section
- * (REQ-OBS-011).
+ * The navigation module's business gauge: how many members personalised each preference section,
+ * the dashboard counted by its customised layouts (REQ-OBS-011).
  */
 @Component
 public class NavigationBusinessGauges implements BusinessGaugeSource {
@@ -47,13 +47,17 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
    *
    * @param repository the preferences store
    * @param appearances the „Darstellung" store
+   * @param dashboardLayouts the dashboard layout store
    */
   public NavigationBusinessGauges(
-      NavigationPreferencesRepository repository, NavigationAppearanceRepository appearances) {
+      NavigationPreferencesRepository repository,
+      NavigationAppearanceRepository appearances,
+      DashboardLayoutRepository dashboardLayouts) {
     counts.put(NavigationSection.FAVOURITES, repository::countWithFavourites);
     counts.put(NavigationSection.HIDDEN, repository::countWithHidden);
     counts.put(NavigationSection.TAB_BAR, repository::countWithTabBar);
     counts.put(NavigationSection.APPEARANCE, appearances::countPersonalised);
+    counts.put(NavigationSection.DASHBOARD, dashboardLayouts::countCustomised);
     counts.keySet().forEach(section -> accounts.put(section, new AtomicLong()));
   }
 

@@ -183,9 +183,9 @@ public interface MissionRepository
    * Paged mission search by text, date range, status and org-unit scope.
    *
    * <p>Filters are optional ({@code null} removes a clause) except {@code status}, which is always
-   * applied. Scoped by the org-unit scope-predicate triple; public missions stay visible across
-   * units, internal ownerless missions only to members or above. Fetches only {@code
-   * owningOrgUnit}, so pagination stays in SQL.
+   * applied; {@code orgUnitId} keeps the missions that unit owns. Scoped by the org-unit
+   * scope-predicate triple; public missions stay visible across units, internal ownerless missions
+   * only to members or above. Fetches only {@code owningOrgUnit}, so pagination stays in SQL.
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
@@ -197,7 +197,8 @@ public interface MissionRepository
           + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
           + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
           + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operationId"
-          + " = :operationId)")
+          + " = :operationId) AND (CAST(:orgUnitId AS uuid) IS NULL OR m.owningOrgUnit.id ="
+          + " :orgUnitId)")
   Page<Mission> searchMissions(
       @Param("query") @Nullable String query,
       @Param("start") @Nullable Instant start,
@@ -205,6 +206,7 @@ public interface MissionRepository
       @Param("status") @Nullable List<String> status,
       @Param("isInternal") @Nullable Boolean isInternal,
       @Param("operationId") @Nullable UUID operationId,
+      @Param("orgUnitId") @Nullable UUID orgUnitId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,

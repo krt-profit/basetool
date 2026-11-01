@@ -2571,7 +2571,14 @@ ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 
-> **Status: planned** (ADR-0299, map #2800). Until it ships, the current code stays authoritative.
+> **Status: partially shipped** (ADR-0299, map #2800). Shipped: the member dashboard with its
+> default, the framework (two columns, up/down, column switch, remove, catalogue and options
+> dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
+> version per instance, the deletion on role loss, live update or the ten-minute poll, the
+> one-time hint) and the widgets Nächste Tage, Information (with the inline editor for
+> administrators), Favoriten and Benachrichtigungen. Planned: the other catalogue widgets and their
+> options, the admin dashboard and the start page; until they ship, the current code stays
+> authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2670,11 +2677,17 @@ changes the dashboard.
 and alert on a 5xx rate above 5 %; layout and option writes count in
 `basetool_navigation_preference_writes_total` (REQ-OBS-011).
 
-**Enforced by (to be added):** `DashboardLayoutServiceTest` (12-instance cap per mode, layout and
-option versions, owner-only, deletion on role loss) · `DashboardRenderMvcTest` (defaults per mode,
-widgets gated by their data, greyed pinned instances) · `StartPageRedirectMvcTest` (start page per
-mode, deep-link precedence, fallback) · `DashboardE2eTest` (edit mode, catalogue and options,
-phone single column, 10-minute poll on visibility, the hint) · **Related:** REQ-UI-018,
+**Enforced by:** `DashboardServiceTest` (the default, the cap of 12 per mode, layout and option
+versions, owner isolation, deletion by widget type, the write counters),
+`NavigationDashboardControllerTest` (authentication, the admin mode's gate, 409, 404),
+`DashboardReaderTest` and `DashboardRenderMvcTest` (the board per stored layout, greyed pinned
+instances, the empty and error states, deletion on role loss, the hint, the catalogue),
+`DashboardUpcomingDaysWidgetMvcTest`, `DashboardLayoutControllerTest`,
+`DashboardLayoutBackendClientTest`, `DashboardE2eTest` (edit mode, catalogue and options, restore,
+phone single column, the 10-minute poll on visibility, the hint, deletion on role loss), the export
+and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** `StartPageRedirectMvcTest` (start
+page per mode, deep-link precedence, fallback) and the tests of the widgets that follow ·
+**Related:** REQ-UI-018,
 REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-SEC-046,
 REQ-SEC-058, ADR-0299
 

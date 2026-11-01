@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="dialogs">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='dashboard-catalogue-modal', titleKey='dashboard.catalogue.title',
+        body=~{dashboard/fragments/dialogs :: catalogue-body})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='dashboard-options-modal', titleKey='dashboard.options.title',
+        body=~{dashboard/fragments/dialogs :: options-body})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='dashboard-reset-modal', titleKey='dashboard.reset.title',
+        body=~{dashboard/fragments/dialogs :: reset-body})}"></th:block>
+</th:block>
+
+<th:block th:fragment="catalogue-body">
+    <div class="krt-modal-body">
+        <p class="home-notifs__empty is-hidden" data-dashboard-full data-testid="dashboard-catalogue-full"
+           th:text="#{dashboard.catalogue.full}">Das Dashboard hat die Höchstzahl von 12 Widgets erreicht.</p>
+        <ul class="dash-catalogue" data-testid="dashboard-catalogue">
+            <li th:each="type : ${dashboard.catalogue()}" class="dash-catalogue__item">
+                <div class="dash-catalogue__text">
+                    <span class="cell-title" th:text="#{${type.labelKey()}}">Widget</span>
+                    <span class="cell-sub" th:text="#{${type.labelKey() + '.desc'}}">Beschreibung</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-catalogue-add"
+                        th:data-widget-type="${type.name()}" th:data-column="${type.defaultColumn.name()}" th:data-testid="|dashboard-add-${type.slug()}|"
+                        th:attr="aria-label=#{dashboard.catalogue.add(#{${type.labelKey()}})}"
+                        th:text="#{dashboard.add}">Hinzufügen</button>
+            </li>
+        </ul>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="dashboard-catalogue-modal"
+                th:text="#{dashboard.cancel}">Abbrechen</button>
+    </div>
+</th:block>
+
+<th:block th:fragment="options-body">
+    <form data-trigger="dashboard-options-form" data-testid="dashboard-options-form" novalidate>
+        <div class="krt-modal-body">
+            <div class="form-group" data-option="unit">
+                <label class="form-label" for="dashboard-option-unit" th:text="#{dashboard.options.unit}">Einheit</label>
+                <select id="dashboard-option-unit" name="unit" class="form-control">
+                    <option value="" th:text="#{dashboard.options.unit.follow}">Folgt dem aktiven Kontext</option>
+                    <option th:each="unit : ${availableOrgUnits}" th:value="${unit.orgUnitId()}"
+                            th:text="${unit.orgUnitName()}">ALPHA</option>
+                </select>
+            </div>
+            <div class="form-group" data-option="days">
+                <label class="form-label" for="dashboard-option-days" th:text="#{dashboard.options.days}">Zeitraum</label>
+                <select id="dashboard-option-days" name="days" class="form-control">
+                    <option th:each="days : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).DAY_CHOICES}"
+                            th:value="${days}" th:text="#{dashboard.options.days.value(${days})}">7 Tage</option>
+                </select>
+            </div>
+            <div class="form-group" data-option="rows">
+                <label class="form-label" for="dashboard-option-rows" th:text="#{dashboard.options.rows}">Zeilen</label>
+                <select id="dashboard-option-rows" name="rows" class="form-control">
+                    <option th:each="rows : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).ROW_CHOICES}"
+                            th:value="${rows}" th:text="${rows}">5</option>
+                </select>
+            </div>
+            <div class="form-group" data-option="status">
+                <label class="form-label" for="dashboard-option-status" th:text="#{dashboard.options.status}">Status</label>
+                <select id="dashboard-option-status" name="status" class="form-control">
+                    <option th:each="status : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).STATUS_CHOICES}"
+                            th:value="${status.name()}" th:text="#{${'dashboard.options.status.' + status.key()}}">Ungelesen</option>
+                </select>
+            </div>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="dashboard-options-modal"
+                    th:text="#{dashboard.cancel}">Abbrechen</button>
+            <button type="submit" class="btn" data-testid="dashboard-options-save" th:text="#{dashboard.save}">Speichern</button>
+        </div>
+    </form>
+</th:block>
+
+<th:block th:fragment="reset-body">
+    <div class="krt-modal-body">
+        <p class="m-0" th:text="#{dashboard.reset.text}">Alle Widgets werden durch die Standardansicht ersetzt.</p>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="dashboard-reset-modal"
+                th:text="#{dashboard.cancel}">Abbrechen</button>
+        <button type="button" class="btn btn-danger" data-trigger="dashboard-reset-confirm" data-testid="dashboard-reset-confirm"
+                th:text="#{dashboard.reset.confirm}">Wiederherstellen</button>
+    </div>
+</th:block>
+
+</body>
+</html>
