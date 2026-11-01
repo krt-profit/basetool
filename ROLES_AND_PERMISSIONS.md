@@ -130,19 +130,16 @@ Mission responses are cleaned up server-side in [`MissionController`](backend/sr
 through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
-  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for a caller **below
-  Logistician**: owner and managers are emptied (unless the same response tells the caller it may
-  manage the mission, see below), and every nested user — participant, assigned ship's owner — is
-  reduced to the public callsign tuple (username, display/effective name, rank): e-mail, description,
-  roles, permissions, memberships, join date and the Discord-link flag are dropped. The
+  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for **every non-admin**: the owner, the managers and every nested user — participant, assigned ship's owner — are
+  reduced to the peer shape (display/effective name, rank, description, squadrons; the username only
+  without a display name): e-mail, roles, permissions, flags, join date and the Discord-link flag are dropped. The
   roster itself stays, as do the description, the organisation, the units, the frequencies, the
   Ablauf steps, the Ziele and each participant's payout preference and comment — a peer is a member
   of the organisation and reads the Einsatz's own planning data.
 - The caller's **own** capability flags (`canEdit`, `canManageManagers`) survive the pass. They are
   answers about the caller, not somebody else's data, and forcing them off would hide the management
-  controls from a MISSION_MANAGER — who sits below Logistician in the hierarchy. When either flag is
-  true the owner and manager list survive too, as the callsign tuple, because the caller may rewrite
-  exactly that list.
+  controls from a MISSION_MANAGER — who sits below Logistician in the hierarchy. The owner and the manager
+  list are visible to everyone who may see the mission, in the peer shape.
 
 **There used to be a second, stricter level** (`cleanupOutsiderMissionForGuest`) for anonymous and
 role-less callers, which additionally hid the description and each participant's payout preference
@@ -222,7 +219,7 @@ just joined.
 
 ## 2. Roles & base permissions
 
-The five application roles are the Keycloak realm roles `Admin`, `Officer`, `KRT Member`,
+The four application roles are the Keycloak realm roles `Admin`, `KRT Member`,
 `Bank Employee` and `Bank Management` (reference export:
 [`docs/keycloak/realm-config.reference.json`](docs/keycloak/realm-config.reference.json)). Each login
 syncs the token's realm roles by name onto the `app_user` row; the authority is the role name
@@ -236,15 +233,14 @@ applies.
 
 ```
 ROLE_ADMIN   > ROLE_LOGISTICIAN
-ROLE_OFFICER > ROLE_LOGISTICIAN
 ROLE_ADMIN   > ROLE_MISSION_MANAGER
-ROLE_OFFICER > ROLE_MISSION_MANAGER
 ROLE_ADMIN           > ROLE_BANK_MANAGEMENT
 ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
 ```
 
-Admins and Officers therefore automatically satisfy every `LOGISTICIAN` and
-`MISSION_MANAGER` check. Admins additionally satisfy every bank check
+Admins therefore automatically satisfy every `LOGISTICIAN` and
+`MISSION_MANAGER` check. There is no `OFFICER` role: the „Officer“ columns below mean **officer
+reach** in the owning unit of the target (§7.1). Admins additionally satisfy every bank check
 (`BANK_MANAGEMENT` and transitively `BANK_EMPLOYEE`); Bank Management satisfies
 every `BANK_EMPLOYEE` check (REQ-BANK-007).
 
@@ -253,7 +249,6 @@ every `BANK_EMPLOYEE` check (REQ-BANK-007).
 | Role                | Authorities (DataInitializer)                                                                                                                                    |
 |:--------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Admin**           | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via hierarchy) |
-| **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via hierarchy)                |
 | **KRT Member**      | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                    |
 | **Bank Employee**   | *(none — the fine-grained rights are app-managed grant rows, REQ-BANK-009)*                                                                                      |
 | **Bank Management** | *(none — "see everything" visibility comes from the role itself, ADR-0011)*                                                                                      |
@@ -291,6 +286,12 @@ promotes these into two authority surfaces:
 - **Contextual** `ROLE_LOGISTICIAN@<orgUnitId>` per (membership, flag) pair — so
   that the per-OrgUnit scoping at the `@PreAuthorize` call site
   (`@ownerScopeService.canEdit…`) can be resolved without a service roundtrip.
+
+**The grants cascade** like officer reach (REQ-SEC-005): a Logistician or Mission-Manager grant —
+flag or rank — in a **Bereich** covers the Bereich and the Staffeln and Spezialkommandos below it, a
+grant in the **Organisationsleitung** covers every unit, a grant in a Staffel or Spezialkommando
+covers that unit alone. Every per-unit Logistician and Mission-Manager gate and list reads this
+cascaded set; with a unit pinned, the pin must lie in it. Admins are unrestricted.
 
 > The **old** `app_user.is_logistician` / `app_user.is_mission_manager` columns
 > were removed with **V104** — the single source of truth is exclusively
@@ -335,39 +336,22 @@ rank — nobody promotes themselves. Every appointment is logged in the audit lo
 „Rollen & Mitglieder" and is reflected in the same transaction in the
 account-bound org-chart seat (REQ-ROLE-006).
 
-### Operational OFFICER grant (leadership & bank)
+### Officer reach (leadership & bank)
 
-> **Planned:** ADR-0300 retires this grant; see
-> [§7](#7-planned-adr-0300-adr-0301-adr-0302). Until it ships, the text below stays authoritative.
+There is no `OFFICER` role: nothing in Keycloak or the database grants it, and no code reads it
+(ADR-0300, REQ-SEC-004). What the „Officer“ columns below mean is **officer reach**, derived from the
+org-unit seat and checked against the owning unit of the target (§7.1, REQ-SEC-015):
 
-The `OFFICER` Keycloak role is granted **operatively** (manually, in Keycloak — no code derives it
-from a rank) in addition to the OrgUnit membership:
-
-- **All members of the Organisationsleitung and the Bereichsleitung, every SK lead and every
-  Staffel leadership rank (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign)
-  receive `OFFICER`.**
-  This way they satisfy the frontend's `OFFICER`-gated surfaces — e.g. the
-  „Leitung" page, whose page **and** write proxies are gated to `ADMIN` /
-  `OFFICER` (`Roles.ADMIN_OR_OFFICER`); the previously accepted
-  `LOGISTICIAN` / `MISSION_MANAGER` were removed, so a capability-only Logistician
-  / Mission-Manager (who has no appointment reach and only saw an empty page) no
-  longer opens it. The backend still evaluates reach **membership-based** via the
-  `OwnerScopeService` (oversight scope, responsible holder) — `OFFICER` only opens
-  the role-gated surfaces, **not** the contextual data reach.
-- **Bank Management (`BANK_MANAGEMENT`) also holds `OFFICER`.** **Bank Employees
-  (`BANK_EMPLOYEE`)** have **at least `KRT Member`** (MEMBER), but **not
-  necessarily `OFFICER`** — the bank gates rely exclusively on `BANK_*`
-  (REQ-BANK-007), never on `OFFICER`.
-- **Consequence for the bank:** Because Officers **and** SK-Leads carry `OFFICER`,
-  the Sonderkonto auto-visibility (`SPECIAL`, REQ-BANK-037) decides **by
-  membership** (OL member or Bereichsleiter), **never** via the `OFFICER` role —
-  Officers/SK-Leads therefore do **not** see Sonderkonten automatically, only via
-  an explicit approval.
-- **The Grand Admiral (org-chart.md REQ-ORG-021) is an OL member with a title, not a
-  distinct permission.** The holder carries the `OL_MEMBER` rank, so their reach is
-  exactly an OL member's (every row above that grants to OL members applies unchanged) —
-  only the org-chart placement differs (rendered at the top of the OL). Designated /
-  vacated under „Leitung" (ADMIN); at most one org-wide.
+- **Every Organisationsleitung member, Bereich rank, SK lead and Staffel leadership rank
+  (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign) has officer reach** in the
+  units the seat reaches — and only there. A seat requires `KRT Member`.
+- **The frontend gates the officer surfaces on the capability flags** the backend reports for the
+  active context (e.g. the „Leitung“ page); the backend decides every action per unit.
+- **Bank Management (`BANK_MANAGEMENT`) gets no officer reach.** Bank Employees and Bank Management
+  rely exclusively on `BANK_*` (REQ-BANK-007).
+- **Consequence for the bank:** the Sonderkonto auto-visibility (`SPECIAL`, REQ-BANK-037) decides
+  **by membership** (OL member or Bereichsleiter), never by officer reach — Staffel officers and
+  SK leads therefore do **not** see Sonderkonten automatically, only via an explicit approval.
 
 ---
 
@@ -375,7 +359,7 @@ from a rank) in addition to the OrgUnit membership:
 
 Columns: **Member** = KRT Member ·
 **Log.** = Member + Logistician flag · **MM** = Member + Mission-Manager flag ·
-**Officer** · **Admin**.
+**Officer** = officer reach in the target's owning unit · **Admin**.
 
 Every table here starts at **Member**, because that is where the tool starts: an account below one
 is refused with `403 NO_ROLE` before a handler runs (REQ-SEC-053), and nobody without an account
@@ -395,7 +379,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream + mute preferences (`/notifications/**`, `/api/v1/notifications/preferences`, `/profile/notification-preferences`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted below Logistician, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Personal Data
 
@@ -564,7 +548,7 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 
 | Function (gate)                                                                                                              | Member | Log. | MM | Officer | Admin |
 |:-----------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
-| Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted below Logistician, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
+| Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted for every non-admin, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** mission (`isMemberOrAbove()`)                                                                                     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, read gate⁸)                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Check in/out / change payout preference / edit / leave a participant row (participant gate⁸)                                |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |
@@ -654,6 +638,10 @@ of the manage row above.
 > (`canSeeOperationLedger`), and `/payouts` reduces an escape-only caller to their own row. Before
 > 2026-08-30 that caller received every participant's callsign, percentage, expenses, share,
 > donation, transfer fee, net payout and confirming officer.
+> Logistician powers apply **per unit** as well: the Logistician controls of the Lager, the
+> job-order and the refinery pages show only where the caller holds a Logistician grant in the pinned
+> unit (or in any unit when none is pinned); the backend re-checks the owning unit of every action.
+>
 > Mission Manager powers apply **per unit**: a grant in unit A (own flag, officer rank or the cascaded
 > reach of a Bereich or Organisationsleitung seat) creates, edits and marks payouts for A's operations
 > only; creating stamps the pinned or picked unit and needs the grant there. An ownerless
@@ -686,7 +674,8 @@ is **Staffel-scoped throughout**: every Staffel runs its own system
 sees exclusively its own data. Read **and** write access are filtered in the
 service layer via the active Staffel context
 (`OwnerScopeService.currentSquadronId()` for lists/eligibility,
-`canSeeSquadron`/`canEditSquadron(topic.owningSquadron.id)` for detail and maintenance).
+`canSeeSquadron` for detail reads, officer reach `canActAsOfficerIn(topic.owningSquadron.id)` for
+maintenance and evaluations, REQ-SEC-015).
 
 - **Member/Officer** see only their home Staffel's system.
 - **Admins** see that of the actively pinned Staffel; without a pin (all-Staffeln mode)
@@ -695,8 +684,8 @@ service layer via the active Staffel context
   system of their own: the menu item is hidden, every list/eligibility read
   returns empty, and a direct page call is blocked with 403 (`PromotionAccessPolicy.hasReadAccess()`).
 - The **evaluation matrix** (the member list of the evaluation management) lists exclusively the
-  **plain members** of a Staffel: whoever holds the `ADMIN` or `OFFICER` role **never** appears
-  there as a row to be evaluated — admins are Staffel-less, and officers carry out the evaluation
+  **plain members** of a Staffel: whoever holds the `ADMIN` role or a leadership seat **never** appears
+  there as a row to be evaluated — admins are Staffel-less, and seat holders carry out the evaluation
   instead of being evaluated themselves. The promotion system considers only plain members
   of a Staffel and is not available to any other OrgUnit kind (#817).
 
@@ -705,13 +694,14 @@ service layer via the active Staffel context
 | Read topic areas/categories/level contents/rank prerequisites (`isAuthenticated()`, **own Staffel only**)       |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
 | …**maintain** (service: admin **or** officer of the owning Staffel)                                             |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | View own evaluations / eligibility (`/my`, JWT sub, **own Staffel**)                                            |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| View **others'** evaluations/eligibility, member list (`hasAnyRole('ADMIN','OFFICER')`, officer Staffel-scoped) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
+| View **others'** evaluations/eligibility, member list (officer reach, **only the units of reach**⁵) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
 | Enable/disable promotion subsystem per Staffel (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)  |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `PromotionAccessPolicy.hasReadAccess()` is false, the menu is hidden, direct call 403.
 ² Admin: the actively pinned Staffel; in all-Staffeln mode a „Staffel wählen" (select Staffel) hint instead of mixing.
 ³ Only for one's own Staffel. **SKs are permanently excluded from the promotion system via DB CHECK/trigger + ArchUnit rule.**
 ⁴ The **member list** to be evaluated (`GET /api/v1/promotion/evaluations/members`) contains only the **plain members** of the Staffel — holders of the `ADMIN` and `OFFICER` roles are filtered out (#817), since they carry out the evaluation instead of being evaluated themselves. Officer/Admin therefore **read** the matrix but do **not appear** as a row in it.
+⁵ Reads on the management pages are filtered, not just the writes refused: with a seat in Staffel A and plain membership of Staffel B, the member list, the evaluations, the topics, categories, level texts, rank requirements and the eligibility of others cover Staffel A only; the Leitung page lists Staffel A only. A pin narrows to the pinned unit (plus what a Bereich or OL seat on it reaches below) when it is within reach and to nothing otherwise (the pages are hidden); unpinned, the units of reach are the union (REQ-ROLE-007).
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 
@@ -1274,27 +1264,26 @@ backend serves every member) but no control that writes.
 
 ## 7. Planned (ADR-0300, ADR-0301, ADR-0302)
 
-> **Status: planned** (map #2800). The decisions below are accepted and not implemented. Until they
-> ship, §0–§6 and the code stay authoritative; this section changes none of their rows.
+> **Status:** §7.1 is shipped (ADR-0300). §7.2–§7.4 are planned (map #2800): the decisions are
+> accepted and not implemented, and until they ship the code stays authoritative for them.
 
-### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007)
+### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007) — shipped
 
 - **Officer reach is derived per org unit from leadership seats only:** a Staffel leadership rank
   (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign) and an SK lead reach
   their own unit; the three Bereich ranks reach the Bereich and its direct children; an OL member
   reaches every unit. Admin passes every officer check. There is no manual grant.
-- **The Keycloak role `OFFICER` is retired** in one release: no gate reads it, the role mirror
-  ignores it, and the seeded role and its permissions are removed. Every column „Officer“ above then
-  means officer reach in the target's owning unit; lists are filtered to the caller's officer units.
+- **The Keycloak role `OFFICER` is retired:** no gate reads it, the role mirror ignores it, and the
+  seeded role and its permissions are removed. Every column „Officer“ above means officer reach in
+  the target's owning unit; lists are filtered to the caller's officer units.
 - **Bank Management keeps its `BANK_*` rights only** (REQ-BANK-007) and gets no officer reach of its
   own; a bank manager who also holds a leadership seat has reach there like anyone else.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
   whose holder loses it stays in the org chart and confers no reach. Membership rights rest on
-  `KRT Member` alone. The refusal and the reach computation are live already; until the cut the
-  gates in the tables above still read the `OFFICER` role.
+  `KRT Member`.
 - An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
   at least one unit (REQ-ROLE-007). The bank's global
-  `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).
+  `OFFICER` view-grant and approval-limit buckets for special accounts are removed (REQ-BANK-037).
 
 ### 7.2 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)
 

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,16 +88,18 @@ class PromotionLevelContentServiceTest {
             "Kann fliegen",
             null,
             null);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
-    when(repository.findAllByCategoryIdScopedOrdered(categoryId, scopeId))
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(Set.of(scopeId))));
+    when(repository.findAllByCategoryIdScopedOrdered(categoryId, Set.of(scopeId)))
         .thenReturn(List.of(content));
     when(mapper.toResponse(content)).thenReturn(response);
 
-    List<PromotionLevelContentResponse> result = service.listByCategory(categoryId);
+    List<PromotionLevelContentResponse> result =
+        service.listByCategory(categoryId, PromotionReadView.MEMBER);
 
     assertEquals(1, result.size());
     assertEquals(PromotionLevel.LEVEL_A, result.get(0).level());
-    verify(repository).findAllByCategoryIdScopedOrdered(categoryId, scopeId);
+    verify(repository).findAllByCategoryIdScopedOrdered(categoryId, Set.of(scopeId));
   }
 
   @Test

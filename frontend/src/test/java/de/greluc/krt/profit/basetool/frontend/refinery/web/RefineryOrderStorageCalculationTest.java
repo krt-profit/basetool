@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
@@ -40,7 +41,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
@@ -50,7 +50,7 @@ class RefineryOrderStorageCalculationTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @Mock private RoleHierarchy roleHierarchy;
+  @Mock private LogisticianGate logisticianGate;
 
   private RefineryOrderPageController controller;
 
@@ -62,7 +62,7 @@ class RefineryOrderStorageCalculationTest {
   void setUp() {
     controller =
         new RefineryOrderPageController(
-            new RefineryBackendClient(backendApiClient), roleHierarchy, null, null);
+            new RefineryBackendClient(backendApiClient), logisticianGate, null, null);
     model = new ExtendedModelMap();
   }
 

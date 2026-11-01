@@ -159,7 +159,7 @@ class OrgUnitBankVisibilityAudienceLabelMvcTest {
    * @throws Exception when the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void visibilitySettings_orgUnitAccount_labelsAllMembersWithTheOrgUnitScope() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubSettings(accountId, "ORG_UNIT", "SQUADRON");
@@ -180,7 +180,7 @@ class OrgUnitBankVisibilityAudienceLabelMvcTest {
    * @throws Exception when the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void visibilitySettings_specialAccount_keepsTheOrgWideAllMembersLabel() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubSettings(accountId, "SPECIAL", null);

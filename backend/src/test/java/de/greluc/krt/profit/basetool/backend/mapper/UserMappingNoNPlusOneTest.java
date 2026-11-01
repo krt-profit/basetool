@@ -53,6 +53,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -88,6 +90,7 @@ class UserMappingNoNPlusOneTest {
   @AfterEach
   void unbindRequest() {
     RequestContextHolder.resetRequestAttributes();
+    SecurityContextHolder.clearContext();
   }
 
   @Test
@@ -116,6 +119,8 @@ class UserMappingNoNPlusOneTest {
     entityManager.flush();
     entityManager.clear();
     bindRequest();
+    SecurityContextHolder.getContext()
+        .setAuthentication(new TestingAuthenticationToken("admin", "n/a", "ROLE_ADMIN"));
 
     MissionDto dto = missionMapper.toDto(missionRepository.findById(missionId).orElseThrow());
 

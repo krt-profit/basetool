@@ -78,6 +78,7 @@ public final class LayoutResponses {
             false,
             false,
             false,
+            false,
             false),
         0L);
   }
@@ -102,6 +103,7 @@ public final class LayoutResponses {
         canViewOwnJobOrders,
         false,
         false,
+        false,
         canMarkStolen,
         false,
         false,
@@ -119,7 +121,50 @@ public final class LayoutResponses {
    */
   public static CapabilitiesResponse missionManager() {
     return new CapabilitiesResponse(
-        false, false, false, false, true, false, false, false, false, false, false, false);
+        false, false, false, false, false, true, false, false, false, false, false, false, false);
+  }
+
+  /**
+   * Capability flags with only the Logistician flag set, as the backend's capabilities endpoint
+   * answers a caller holding that grant in the active context.
+   *
+   * @return the capability flags
+   */
+  public static CapabilitiesResponse logistician() {
+    return logistician(false);
+  }
+
+  /**
+   * Capability flags with the Logistician flag set and the „gestohlen" marking switch as given.
+   *
+   * @param canMarkStolen whether the server allows the „gestohlen" marking
+   * @return the capability flags
+   */
+  public static CapabilitiesResponse logistician(boolean canMarkStolen) {
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        canMarkStolen,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
+  }
+
+  /**
+   * A layout answer carrying the given capability flags.
+   *
+   * @param capabilities the capability flags
+   * @return the answer, with no org unit, no pinnable units and no unread notifications
+   */
+  public static MeLayoutResponse withCapabilities(CapabilitiesResponse capabilities) {
+    return new MeLayoutResponse(null, List.of(), capabilities, 0L);
   }
 
   /**
@@ -130,23 +175,35 @@ public final class LayoutResponses {
    *     unread notifications
    */
   public static MeLayoutResponse officerReach(boolean officerHere) {
-    return new MeLayoutResponse(
-        null,
-        List.of(),
-        new CapabilitiesResponse(
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            officerHere,
-            officerHere,
-            officerHere,
-            officerHere,
-            officerHere,
-            officerHere),
-        0L);
+    return new MeLayoutResponse(null, List.of(), officerCaps(officerHere), 0L);
+  }
+
+  /**
+   * A layout answer carrying the officer flags of the active context and the effective org unit.
+   *
+   * @param activeOrgUnitId the effective org unit, or {@code null} for none
+   * @return the answer, with every non-officer capability off, no pinnable units and no unread
+   *     notifications
+   */
+  public static MeLayoutResponse officerReachIn(UUID activeOrgUnitId) {
+    return new MeLayoutResponse(activeOrgUnitId, List.of(), officerCaps(true), 0L);
+  }
+
+  private static CapabilitiesResponse officerCaps(boolean officerHere) {
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere);
   }
 
   /**

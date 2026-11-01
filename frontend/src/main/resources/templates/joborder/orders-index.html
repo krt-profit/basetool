@@ -99,7 +99,7 @@
                 </thead>
                 <tbody th:with="queue=${orders.?[priority != null]}">
                 <tr th:each="order : ${orders}" data-testid="order-row"
-                    th:with="reorderable=${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null}"
+                    th:with="reorderable=${isLogisticianOrAbove and order.priority != null}"
                     th:attr="data-id=${order.id}, data-priority=${order.priority}, data-reorder-name=${reorderable} ? #{orders.index.reorderName(${order.displayId})} : null"
                     th:classappend="${reorderable} ? 'draggable-row' : ''"
                     th:draggable="${reorderable} ? 'true' : 'false'">
@@ -206,7 +206,7 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
-    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
+    <th:block th:if="${isLogisticianOrAbove}">
         <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
     </th:block>
     </section>
@@ -220,7 +220,7 @@
     const KRT_ORDERS_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Die Liste konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
 <script type="module" th:src="@{/js/joborder/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
-<script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:if="${isLogisticianOrAbove}" th:inline="javascript" th:attr="nonce=${cspNonce}">
     const KRT_ORDERS_REORDER_I18N = {
         success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
         error: /*[[#{error.joborder.priority.failed}]]*/ 'Could not update priority.',
@@ -233,7 +233,7 @@
         }
     };
 </script>
-<script type="module" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:if="${isLogisticianOrAbove}" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -126,6 +126,18 @@ public class CapabilityFlagsAdvice {
   }
 
   /**
+   * Whether the caller holds a Logistician grant in the active context: the pinned unit, or any
+   * unit when none is pinned. Presentation only; the backend re-checks the owning unit.
+   *
+   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
+   * @return {@code true} iff the backend reports a Logistician grant in the active context
+   */
+  @ModelAttribute("isLogisticianOrAbove")
+  public boolean isLogisticianOrAbove(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.isLogisticianOrAbove();
+  }
+
+  /**
    * Whether the caller holds a Mission Manager grant in the active context: the pinned unit, or any
    * unit when none is pinned. Presentation only; the backend re-checks the owning unit.
    *
@@ -239,6 +251,8 @@ public class CapabilityFlagsAdvice {
    *     (REQ-ORDERS-023)
    * @param canViewAssignedJobOrders whether the caller holds an assignee entry on at least one
    *     order (REQ-ORDERS-040)
+   * @param isLogisticianOrAbove whether the caller holds a Logistician grant in the active context:
+   *     in the pinned unit, or in any unit when none is pinned
    * @param isMissionManagerOrAbove whether the caller holds a Mission Manager grant in the active
    *     context: in the pinned unit, or in any unit when none is pinned
    * @param canMarkStolen whether stock may be booked in as, marked or unmarked „gestohlen"
@@ -257,6 +271,7 @@ public class CapabilityFlagsAdvice {
       boolean canViewJobOrders,
       boolean canViewOwnJobOrders,
       boolean canViewAssignedJobOrders,
+      boolean isLogisticianOrAbove,
       boolean isMissionManagerOrAbove,
       boolean canMarkStolen,
       boolean hasOfficerReach,
@@ -269,7 +284,8 @@ public class CapabilityFlagsAdvice {
     /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
     public static final CapabilitiesResponse NONE =
         new CapabilitiesResponse(
-            false, false, false, false, false, false, false, false, false, false, false, false);
+            false, false, false, false, false, false, false, false, false, false, false, false,
+            false);
 
     /**
      * Every role-derived capability on, as an admin passes each gate; the server switch stays the
@@ -280,7 +296,7 @@ public class CapabilityFlagsAdvice {
      */
     public static CapabilitiesResponse admin(boolean canMarkStolen) {
       return new CapabilitiesResponse(
-          true, true, true, true, true, canMarkStolen, true, true, true, true, true, true);
+          true, true, true, true, true, true, canMarkStolen, true, true, true, true, true, true);
     }
   }
 }

@@ -13,7 +13,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.global}, count=null, actions=~{::lager-all-actions})}">
         <th:block th:ref="lager-all-actions">
-            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:href="@{/inventory/input(source='admin')}"
+            <a th:if="${isLogisticianOrAbove}" th:href="@{/inventory/input(source='admin')}"
                class="btn btn--cta" data-testid="page-head-primary" th:text="#{inventory.input.new}">Einbuchen</a>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='lager-all-more', items=~{::lager-all-more-items})}">
@@ -553,7 +553,7 @@
     <th:block th:replace="~{inventory/fragments/inventory-stolen-mark :: stolenMarkModal('inv-admin')}"></th:block>
 </th:block>
 
-<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
+<th:block th:if="${isLogisticianOrAbove}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='poolChangeModal', titleKey='inventory.poolChange.modal.title', variant='krt-modal--wide', closeTrigger='inv-admin-close-pool', body=~{::poolChangeModal-body})}">
     <th:block th:ref="poolChangeModal-body">
         <form id="poolChangeForm">

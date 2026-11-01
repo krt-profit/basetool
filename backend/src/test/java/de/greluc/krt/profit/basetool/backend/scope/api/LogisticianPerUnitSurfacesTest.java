@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -42,6 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -146,6 +148,15 @@ class LogisticianPerUnitSurfacesTest {
               Optional.of(new UsernamePasswordAuthenticationToken("caller", "n/a", authorities)));
       RequestScopeResolver resolver = mock(RequestScopeResolver.class);
       when(resolver.currentScopePredicate()).thenReturn(caller.scope());
+      UUID pin = caller.scope().activeOrgUnitId();
+      when(resolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(caller.grants());
+      when(resolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
+          .thenReturn(
+              pin == null
+                  ? caller.grants().stream()
+                      .filter(caller.scope().memberOrgUnitIds()::contains)
+                      .collect(Collectors.toUnmodifiableSet())
+                  : (caller.grants().contains(pin) ? Set.of(pin) : Set.of()));
       when(resolver.canViewJobOrders()).thenReturn(true);
       ownerScopeService =
           new OwnerScopeService(
@@ -252,6 +263,15 @@ class LogisticianPerUnitSurfacesTest {
       assertThat(listScope.activeOrgUnitId()).isNull();
       assertThat(listScope.memberOrgUnitIds()).isEqualTo(caller.reachable());
     }
+  }
+
+  @ParameterizedTest
+  @MethodSource("callers")
+  void theCapabilityFlagIsOnExactlyWhereTheCallerHandlesAUnitInTheActiveScope(Caller caller) {
+    OwnerScopeService scope = new Chain(caller).ownerScopeService;
+
+    assertThat(scope.canActAsLogisticianInActiveContext())
+        .isEqualTo(caller.admin() || !caller.reachable().isEmpty());
   }
 
   @Test

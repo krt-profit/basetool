@@ -44,6 +44,7 @@ import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,10 +109,6 @@ public class RequestScopeResolver {
   /** Request-memo key for {@link #currentOfficerOrgUnitIds()}. */
   private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_OFFICER_ORG_UNIT_IDS =
       RequestMemo.Key.of(RequestScopeResolver.class, "officerOrgUnitIds");
-
-  /** Request-memo key for {@link #currentMissionManagerOrgUnitIds()}. */
-  private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_MISSION_MANAGER_ORG_UNIT_IDS =
-      RequestMemo.Key.of(RequestScopeResolver.class, "missionManagerOrgUnitIds");
 
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -376,7 +373,7 @@ public class RequestScopeResolver {
    *
    * <ul>
    *   <li>admin: {@link #currentScopePredicate()};
-   *   <li>officer: their Staffel; SK lead: the SKs they lead;
+   *   <li>squadron rank / SK lead: their own unit;
    *   <li>Bereichsleitung / OL: their seat and everything below it, via {@link
    *       OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}.
    * </ul>
@@ -413,24 +410,14 @@ public class RequestScopeResolver {
   }
 
   /**
-   * The org units a non-admin caller oversees: the Staffeln of an officer, every unit with an SK
-   * lead or functional-rank seat, and the cascaded leadership reach.
+   * The org units a non-admin caller oversees: every unit with an SK lead or functional-rank seat,
+   * and the cascaded leadership reach.
    *
    * @return the overseen org-unit ids, never {@code null}.
    */
   @NotNull
   private Set<UUID> currentOversightOrgUnitIds() {
-    Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
-    List<OrgUnitMembership> memberships = currentCallerMemberships();
-    if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
-      for (OrgUnitMembership m : memberships) {
-        if (m.getKind() == OrgUnitKind.SQUADRON) {
-          oversightOrgUnitIds.add(m.getId().getOrgUnitId());
-        }
-      }
-    }
-    oversightOrgUnitIds.addAll(seatReach(memberships));
-    return oversightOrgUnitIds;
+    return seatReach(currentCallerMemberships());
   }
 
   /**
@@ -453,6 +440,54 @@ public class RequestScopeResolver {
   }
 
   /**
+   * The org units whose officer-surface data the caller may read (REQ-ROLE-007): an admin sees
+   * every unit, or the pinned one; any other caller sees the units of {@link
+   * #currentOfficerOrgUnitIds()}, narrowed by {@link #narrowToPin(Set)}.
+   *
+   * @return the readable org-unit ids; empty for a caller without reach; {@code null} for the
+   *     unrestricted admin scope
+   */
+  @Nullable
+  public Set<UUID> currentOfficerReadScope() {
+    Optional<UUID> pin = readActiveSquadronFromHeader();
+    if (authHelper.isAdmin()) {
+      return pin.<Set<UUID>>map(Set::of).orElse(null);
+    }
+    return narrowToPin(currentOfficerOrgUnitIds());
+  }
+
+  /**
+   * Narrows a set of reached org units to the active-context pin: unchanged when nothing is pinned,
+   * empty when the pin is not among them, otherwise the pinned unit plus the units the caller's
+   * seat on it reaches through the cascade (a Bereich or OL pin covers the units below it).
+   *
+   * @param reach the org units the caller reaches; never {@code null}
+   * @return the reached units the pin leaves; never {@code null}
+   */
+  @NotNull
+  public Set<UUID> narrowToPin(@NotNull Set<UUID> reach) {
+    Optional<UUID> pin = readActiveSquadronFromHeader();
+    if (pin.isEmpty()) {
+      return reach;
+    }
+    UUID pinned = pin.get();
+    if (!reach.contains(pinned)) {
+      return Set.of();
+    }
+    List<OrgUnitMembership> seatsOnPin =
+        currentCallerMemberships().stream()
+            .filter(m -> m.getId().getOrgUnitId().equals(pinned))
+            .toList();
+    Set<UUID> narrowed = new LinkedHashSet<>();
+    narrowed.add(pinned);
+    if (!seatsOnPin.isEmpty()) {
+      narrowed.addAll(orgUnitCascadeService.cascadedOfficerReach(seatsOnPin));
+    }
+    narrowed.retainAll(reach);
+    return narrowed;
+  }
+
+  /**
    * Whether the caller holds officer reach in the active context: in the pinned unit when one is
    * pinned, in at least one unit otherwise. Admins always pass. Drives visibility only, never a
    * write (REQ-SEC-047).
@@ -471,31 +506,59 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Returns the org units in which the caller holds a Mission Manager grant, own or seat-derived:
-   * the contextual {@code MISSION_MANAGER} authorities, never the flat role. An admin's pass is not
-   * part of the set. Memoised per request.
+   * Returns the org units in which the caller holds the contextual role {@code roleName}, own or
+   * seat-derived, including the units below a Bereich or Organisationsleitung grant (REQ-SEC-005):
+   * the contextual authorities, never the flat role. An admin's pass is not part of the set.
+   *
+   * <p>The one resolution behind every per-unit Logistician and Mission Manager gate and list
+   * scope; the pin is not applied (see {@link #currentGrantedOrgUnitIdsInActiveContext(String)}).
+   *
+   * @param roleName the contextual role, e.g. {@link Roles#LOGISTICIAN}; never {@code null}
+   * @return the org-unit ids of the caller's grants; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> currentGrantedOrgUnitIds(@NotNull String roleName) {
+    Set<UUID> direct = new LinkedHashSet<>();
+    authHelper
+        .currentAuthentication()
+        .filter(Authentication::isAuthenticated)
+        .ifPresent(a -> {
+          for (GrantedAuthority authority : a.getAuthorities()) {
+            if (authority instanceof OrgUnitContextualAuthority ctx
+                && roleName.equals(ctx.roleName())) {
+              direct.add(ctx.orgUnitId());
+            }
+          }
+        });
+    Set<UUID> granted = new LinkedHashSet<>(direct);
+    granted.addAll(orgUnitCascadeService.unitsBelow(direct));
+    return Collections.unmodifiableSet(granted);
+  }
+
+  /**
+   * {@link #currentGrantedOrgUnitIds(String)} inside the active context: the pinned unit when it
+   * lies in the granted set, nothing when it does not, the whole set when no unit is pinned.
+   *
+   * @param roleName the contextual role; never {@code null}
+   * @return the org-unit ids the caller's grants cover in the active context; never {@code null}
+   */
+  @NotNull
+  public Set<UUID> currentGrantedOrgUnitIdsInActiveContext(@NotNull String roleName) {
+    Set<UUID> grants = currentGrantedOrgUnitIds(roleName);
+    return readActiveSquadronFromHeader()
+        .<Set<UUID>>map(pin -> grants.contains(pin) ? Set.of(pin) : Set.of())
+        .orElse(grants);
+  }
+
+  /**
+   * Returns the org units in which the caller holds a Mission Manager grant, own or seat-derived,
+   * including the cascade ({@link #currentGrantedOrgUnitIds(String)}).
    *
    * @return the caller's Mission Manager org-unit ids; never {@code null}, possibly empty
    */
   @NotNull
   public Set<UUID> currentMissionManagerOrgUnitIds() {
-    return RequestMemo.get(
-        request,
-        CACHE_KEY_MISSION_MANAGER_ORG_UNIT_IDS,
-        () -> {
-          Set<UUID> grants = new LinkedHashSet<>();
-          authHelper
-              .currentAuthentication()
-              .ifPresent(a -> {
-                for (GrantedAuthority authority : a.getAuthorities()) {
-                  if (authority instanceof OrgUnitContextualAuthority ctx
-                      && Roles.MISSION_MANAGER.equals(ctx.roleName())) {
-                    grants.add(ctx.orgUnitId());
-                  }
-                }
-              });
-          return Collections.unmodifiableSet(grants);
-        });
+    return currentGrantedOrgUnitIds(Roles.MISSION_MANAGER);
   }
 
   /**
@@ -518,14 +581,8 @@ public class RequestScopeResolver {
    * @return {@code true} iff the caller is an admin or holds a grant in the active context
    */
   public boolean canActAsMissionManagerInActiveContext() {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    Set<UUID> grants = currentMissionManagerOrgUnitIds();
-    if (grants.isEmpty()) {
-      return false;
-    }
-    return readActiveSquadronFromHeader().map(grants::contains).orElse(true);
+    return authHelper.isAdmin()
+        || !currentGrantedOrgUnitIdsInActiveContext(Roles.MISSION_MANAGER).isEmpty();
   }
 
   /**

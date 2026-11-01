@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.time.Instant;
 import java.util.*;
@@ -77,6 +78,7 @@ class OfficerRefineryAccessTest {
 
   @Test
   void officer_ShouldBeAbleToSelectUserInCreateForm() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -87,7 +89,7 @@ class OfficerRefineryAccessTest {
             null,
             null,
             null,
-            Set.of("OFFICER"),
+            Set.of("LOGISTICIAN"),
             Collections.emptySet(),
             null,
             false,
@@ -154,7 +156,7 @@ class OfficerRefineryAccessTest {
         new DefaultOidcUser(
             Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
+                    "ROLE_LOGISTICIAN")),
             idToken);
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
@@ -193,7 +195,7 @@ class OfficerRefineryAccessTest {
             null,
             null,
             null,
-            Set.of("OFFICER"),
+            Set.of("LOGISTICIAN"),
             Collections.emptySet(),
             null,
             false,
@@ -242,7 +244,7 @@ class OfficerRefineryAccessTest {
         new DefaultOidcUser(
             Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
+                    "ROLE_LOGISTICIAN")),
             idToken);
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");

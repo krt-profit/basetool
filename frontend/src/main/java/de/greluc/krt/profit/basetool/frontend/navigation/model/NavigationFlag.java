@@ -34,6 +34,9 @@ public enum NavigationFlag {
   /** The caller holds an assignee entry on at least one order (REQ-ORDERS-040). */
   ASSIGNED_JOB_ORDERS,
 
+  /** The caller holds a Logistician grant in the active context. */
+  LOGISTICIAN_HERE,
+
   /** The Leitung page is offered in the active context (officer reach). */
   OPEN_LEITUNG,
 

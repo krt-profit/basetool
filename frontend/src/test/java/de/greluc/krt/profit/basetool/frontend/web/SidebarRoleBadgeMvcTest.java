@@ -76,7 +76,7 @@ class SidebarRoleBadgeMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void theOfficerRoleWithoutReachShowsNeitherBadgeNorEntry() throws Exception {
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.officerReach(false));

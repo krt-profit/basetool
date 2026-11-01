@@ -48,4 +48,14 @@ public interface SquadronVisibility {
    */
   @Nullable
   Set<UUID> currentUserListScopeSquadronIds();
+
+  /**
+   * The Staffel ids whose members the caller may evaluate and manage as an officer, narrowed to the
+   * pinned unit and never wider than the caller's officer reach.
+   *
+   * @return the id set, empty without officer reach, or {@code null} for the unrestricted admin
+   *     scope
+   */
+  @Nullable
+  Set<UUID> currentOfficerReadScope();
 }

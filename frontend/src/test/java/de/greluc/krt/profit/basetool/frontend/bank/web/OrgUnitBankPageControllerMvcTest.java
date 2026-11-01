@@ -164,7 +164,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_rendersBalanceCardRequestModalAndOwnRequests() throws Exception {
     UUID orgUnitId = UUID.randomUUID();
     stubData(orgUnitId);
@@ -187,7 +187,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_rendersAccountNameFilterOverKontenList() throws Exception {
     stubData(UUID.randomUUID());
 
@@ -205,7 +205,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_fragmentViewResolves() throws Exception {
     stubData(UUID.randomUUID());
 
@@ -216,7 +216,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_defaultLayoutRendersCardGridAndViewToggle() throws Exception {
     stubData(UUID.randomUUID());
 
@@ -232,7 +232,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_rendersTheImportMapBeforeItsModuleScripts() throws Exception {
     stubData(UUID.randomUUID());
 
@@ -255,7 +255,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_tableLayoutRendersDenseTable() throws Exception {
     stubData(UUID.randomUUID());
 
@@ -268,7 +268,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_accountsFragmentViewResolves() throws Exception {
     stubData(UUID.randomUUID());
 
@@ -292,7 +292,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_failingFetchDegradesToEmptyAndStillRenders() throws Exception {
     BankBookingRequestDto request =
         new BankBookingRequestDto(
@@ -510,7 +510,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBankAccount_rendersDetailWithSettingsAndVisibilityToggles() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId);
@@ -659,7 +659,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBankAccount_settingsFragmentViewResolves() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId);
@@ -727,7 +727,7 @@ class OrgUnitBankPageControllerMvcTest {
             .claim("displayName", "Officer X")
             .build();
     return new DefaultOidcUser(
-        List.of(new SimpleGrantedAuthority("ROLE_OFFICER")), idToken, "preferred_username");
+        List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")), idToken, "preferred_username");
   }
 
   /**
@@ -737,7 +737,7 @@ class OrgUnitBankPageControllerMvcTest {
    * @throws Exception if the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_pendingOwnRequestOffersTheEditModal() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
@@ -766,7 +766,7 @@ class OrgUnitBankPageControllerMvcTest {
    * @throws Exception if the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_approvedOwnRequestOffersNoEditAction() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
@@ -887,7 +887,7 @@ class OrgUnitBankPageControllerMvcTest {
    * signing off blind on a mandating account.
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_foreignRequestWithJustificationRendersExpandableDetailRow() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
@@ -909,7 +909,7 @@ class OrgUnitBankPageControllerMvcTest {
    * enough to make the row expandable — a confirmed request may carry only a staff note.
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_foreignRequestStaffNoteRendersInTheDetailRow() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
@@ -930,7 +930,7 @@ class OrgUnitBankPageControllerMvcTest {
    * @throws Exception if the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_ownRequestWithJustificationRendersExpandableDetailRow() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
@@ -955,7 +955,7 @@ class OrgUnitBankPageControllerMvcTest {
    * @throws Exception if the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_ownRequestNeverRendersTheStaffNote() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
@@ -976,7 +976,7 @@ class OrgUnitBankPageControllerMvcTest {
 
   /** A row carrying neither Begruendung nor Notiz stays flat: no chevron, no empty sub-row. */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_foreignRequestWithoutDetailRendersNoChevron() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))

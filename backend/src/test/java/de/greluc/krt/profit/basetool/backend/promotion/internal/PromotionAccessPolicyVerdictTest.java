@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
@@ -223,7 +224,9 @@ class PromotionAccessPolicyVerdictTest {
     OwnerScopeService ownerScopeService =
         new OwnerScopeService(
             resolver, mock(AccessGateService.class), mock(OrgUnitStampingService.class));
-    PromotionAccessPolicy policy = new PromotionAccessPolicy(ownerScopeService, authHelper);
+    PromotionAccessPolicy policy =
+        new PromotionAccessPolicy(
+            ownerScopeService, authHelper, mock(OrgUnitMembershipQueryService.class));
 
     assertThat(policy.isFeatureEnabledForCurrentScope())
         .as("feature flag")

@@ -122,8 +122,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Section patches ({@code /core}, {@code /schedule}, {@code /flags}) are versioned
  * independently, and {@code .../slim} endpoints return only the affected sub-DTO. Responses for
- * callers below Logistician pass through {@link MissionPeerRedactor#cleanupMissionForPeer}
- * (REQ-SEC-007); authorisation is delegated to {@link MissionAccessPolicy}.
+ * non-admin callers pass through {@link MissionPeerRedactor#cleanupMissionForPeer} (REQ-SEC-007);
+ * authorisation is delegated to {@link MissionAccessPolicy}.
  */
 @RestController
 @RequestMapping("/api/v1/missions")
@@ -205,7 +205,7 @@ public class MissionController {
   }
 
   /**
-   * Returns a single mission, visible per {@code canSeeMission}; callers below Logistician get the
+   * Returns a single mission, visible per {@code canSeeMission}; non-admin callers get the
    * peer-redacted DTO (REQ-SEC-007).
    *
    * @param id mission id
@@ -223,7 +223,7 @@ public class MissionController {
 
   /**
    * Returns the next upcoming {@code PLANNED} or {@code ACTIVE} mission, or 204 when none
-   * (REQ-MISSION-003); callers below Logistician get the peer-redacted DTO.
+   * (REQ-MISSION-003); non-admin callers get the peer-redacted DTO.
    *
    * @return mission DTO or 204 No Content
    */
@@ -1302,53 +1302,47 @@ public class MissionController {
   }
 
   /**
-   * Applies the peer redaction to a mission DTO for callers below Logistician (REQ-SEC-007).
+   * Applies the peer redaction to a mission DTO for non-admin callers (REQ-SEC-007).
    *
    * @param dto the freshly mapped DTO
-   * @return the same DTO for Logistician-and-above, the peer-redacted copy for everyone else
+   * @return the same DTO for admins, the peer-redacted copy for everyone else
    */
   private MissionDto redactForPeer(MissionDto dto) {
-    return authHelperService.isLogisticianOrAbove()
-        ? dto
-        : missionPeerRedactor.cleanupMissionForPeer(dto);
+    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupMissionForPeer(dto);
   }
 
   /**
    * Peer pass for a single unit DTO (the slim unit endpoints).
    *
    * @param dto the freshly mapped unit
-   * @return the same DTO for Logistician-and-above, otherwise one whose nested ship owner is
-   *     reduced to the public callsign tuple (REQ-SEC-040)
+   * @return the same DTO for admins, otherwise one whose nested ship owner is reduced to the public
+   *     callsign tuple (REQ-SEC-040)
    */
   private MissionUnitDto redactForPeer(MissionUnitDto dto) {
-    return authHelperService.isLogisticianOrAbove()
-        ? dto
-        : missionPeerRedactor.cleanupUnitForPeer(dto);
+    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupUnitForPeer(dto);
   }
 
   /**
    * Peer pass for a single participant row (the slim participant endpoints).
    *
    * @param dto the freshly mapped participant
-   * @return the same DTO for Logistician-and-above, otherwise one whose nested user is reduced to
-   *     the public callsign tuple — no e-mail, no real name (REQ-SEC-007)
+   * @return the same DTO for admins, otherwise one whose nested user is reduced to the public
+   *     callsign tuple — no e-mail, no real name (REQ-SEC-007)
    */
   private MissionParticipantDto redactForPeer(MissionParticipantDto dto) {
-    return authHelperService.isLogisticianOrAbove()
-        ? dto
-        : missionPeerRedactor.cleanupParticipantForPeer(dto);
+    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupParticipantForPeer(dto);
   }
 
   /**
    * Peer pass for a participant list.
    *
    * @param participants the freshly mapped roster rows
-   * @return the same list for Logistician-and-above, otherwise one whose nested users are reduced
-   *     to the public callsign tuple
+   * @return the same list for admins, otherwise one whose nested users are reduced to the public
+   *     callsign tuple
    */
   private List<MissionParticipantDto> redactParticipantsForPeer(
       List<MissionParticipantDto> participants) {
-    return authHelperService.isLogisticianOrAbove()
+    return authHelperService.isAdmin()
         ? participants
         : participants.stream().map(missionPeerRedactor::cleanupParticipantForPeer).toList();
   }
@@ -1357,10 +1351,10 @@ public class MissionController {
    * Peer pass for a unit list.
    *
    * @param units the freshly mapped units
-   * @return the same list for Logistician-and-above, otherwise a redacted copy
+   * @return the same list for admins, otherwise a redacted copy
    */
   private List<MissionUnitDto> redactUnitsForPeer(List<MissionUnitDto> units) {
-    return authHelperService.isLogisticianOrAbove()
+    return authHelperService.isAdmin()
         ? units
         : units.stream().map(missionPeerRedactor::cleanupUnitForPeer).toList();
   }
@@ -1370,10 +1364,10 @@ public class MissionController {
    * (REQ-SEC-040).
    *
    * @param ships the selectable ships
-   * @return the same list for Logistician-and-above, otherwise a redacted copy
+   * @return the same list for admins, otherwise a redacted copy
    */
   private List<ShipDto> redactShipsForPeer(List<ShipDto> ships) {
-    return authHelperService.isLogisticianOrAbove()
+    return authHelperService.isAdmin()
         ? ships
         : ships.stream().map(missionPeerRedactor::cleanupShipForPeer).toList();
   }

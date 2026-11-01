@@ -1,7 +1,7 @@
 # ADR-0300 — Officer reach is derived per org unit and the Keycloak OFFICER role is retired
 
-- **Status:** Accepted — implementation pending: the code change, the migrations, the pre-cut
-  report and the Keycloak role cleanup are not done yet.
+- **Status:** Accepted — implemented on the integration branch (#2847); the production
+  realm-role deletion is a separate owner-approved provisioner run (ADR-0202 amendment 8).
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Amends:** [ADR-0042](0042-unified-membership-rank-with-delegated-appointment.md) — its baseline
@@ -64,8 +64,8 @@ unit and needs to know where a member is an officer.
 - An officer acts only where they hold a seat; the cross-unit gap closes, and the role can no longer
   drift from the org chart.
 - REQ-ROLE-002, REQ-ROLE-007 (dropping its out-of-scope line), REQ-SEC-004, REQ-SEC-015,
-  REQ-SEC-047, REQ-SEC-065, REQ-ORG-029, REQ-BANK-037 and the role matrix are amended, marked
-  planned until the cut ships.
+  REQ-SEC-047, REQ-SEC-065, REQ-ORG-029, REQ-BANK-037 and the role matrix are amended, and
+  lose their planned markers with the cut.
 - The implementation also amends every other requirement that names the `OFFICER` role or
   `ADMIN_OR_OFFICER`: REQ-ROLE-004; REQ-SEC-002a, -005, -006, -007, -009, -020, -037, -040, -042,
   -053, -058, -060, -061, -072, -083, -085; REQ-ORG-005, -015, -017, -021; REQ-BANK-008, -010,

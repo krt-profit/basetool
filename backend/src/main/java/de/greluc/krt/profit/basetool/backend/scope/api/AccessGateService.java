@@ -23,16 +23,11 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import java.util.LinkedHashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,43 +75,31 @@ public class AccessGateService {
   }
 
   /**
-   * Checks whether the caller holds the contextual authority {@code (roleName, orgUnitId)} ({@link
-   * de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority}); admins always
-   * pass.
+   * Checks whether the caller holds the contextual role {@code roleName} in {@code orgUnitId}: a
+   * grant in that unit or in the Bereich or Organisationsleitung above it ({@link
+   * RequestScopeResolver#currentGrantedOrgUnitIds(String)}); admins always pass.
    *
    * @param orgUnitId the org unit the caller wants to act on; never {@code null}
    * @param roleName the role to check (e.g. {@code "LOGISTICIAN"}); never {@code null}
-   * @return {@code true} iff the caller is an admin or holds the contextual authority
+   * @return {@code true} iff the caller is an admin or holds the role in {@code orgUnitId}
    */
   public boolean hasRoleInOrgUnit(@NotNull UUID orgUnitId, @NotNull String roleName) {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    Optional<Authentication> authentication = authHelper.currentAuthentication();
-    if (authentication.isEmpty()
-        || !authentication.get().isAuthenticated()
-        || authentication.get().getAuthorities() == null) {
-      return false;
-    }
-    OrgUnitContextualAuthority target = new OrgUnitContextualAuthority(roleName, orgUnitId);
-    for (GrantedAuthority a : authentication.get().getAuthorities()) {
-      if (a instanceof OrgUnitContextualAuthority ctx && ctx.equals(target)) {
-        return true;
-      }
-    }
-    return false;
+    return authHelper.isAdmin()
+        || requestScopeResolver.currentGrantedOrgUnitIds(roleName).contains(orgUnitId);
   }
 
   /**
    * Checks whether the caller acts as Logistician in {@code orgUnitId}, the unit that owns the
-   * target: the contextual {@code LOGISTICIAN} grant of that unit, inside the active scope (a pin
-   * to another unit refuses it); admins pass within their own scope (REQ-SEC-005).
+   * target: a Logistician grant covering that unit inside the active context (a pin outside the
+   * grant refuses it); admins pass within their own scope (REQ-SEC-005).
    *
    * @param orgUnitId the target's owning org unit; never {@code null}
-   * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active scope
+   * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active context
    */
   public boolean canActAsLogisticianIn(@NotNull UUID orgUnitId) {
-    return hasRoleInOrgUnit(orgUnitId, Roles.LOGISTICIAN) && canEditSquadron(orgUnitId);
+    return authHelper.isAdmin()
+        ? canEditSquadron(orgUnitId)
+        : currentLogisticianOrgUnitIds().contains(orgUnitId);
   }
 
   /**
@@ -131,28 +114,15 @@ public class AccessGateService {
   }
 
   /**
-   * Returns the org units whose data the caller handles as Logistician: the units of the caller's
-   * contextual {@code LOGISTICIAN} grants inside the active scope. An admin holds no grants, so the
-   * set is empty for them; callers branch on {@link AuthHelperService#isAdmin()} first.
+   * Returns the org units whose data the caller handles as Logistician: the units their grants
+   * cover, cascade included, inside the active context. An admin holds no grants, so the set is
+   * empty for them; callers branch on {@link AuthHelperService#isAdmin()} first.
    *
    * @return the Logistician org-unit ids; never {@code null}, possibly empty
    */
   @NotNull
   public Set<UUID> currentLogisticianOrgUnitIds() {
-    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
-    Set<UUID> ids = new LinkedHashSet<>();
-    authHelper
-        .currentAuthentication()
-        .ifPresent(authentication -> {
-          for (GrantedAuthority a : authentication.getAuthorities()) {
-            if (a instanceof OrgUnitContextualAuthority ctx
-                && Roles.LOGISTICIAN.equals(ctx.roleName())
-                && scope.permits(ctx.orgUnitId())) {
-              ids.add(ctx.orgUnitId());
-            }
-          }
-        });
-    return ids;
+    return requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN);
   }
 
   /**
@@ -170,6 +140,20 @@ public class AccessGateService {
   }
 
   /**
+   * Whether the caller handles at least one unit as Logistician inside the active scope: the pinned
+   * unit when one is pinned, any unit otherwise. Admins always pass. Drives visibility only, never
+   * a write.
+   *
+   * @return {@code true} iff {@link #currentLogisticianScope()} reaches at least one unit
+   */
+  public boolean canActAsLogisticianInActiveContext() {
+    ScopePredicate scope = currentLogisticianScope();
+    return scope.adminAllScope()
+        || scope.activeOrgUnitId() != null
+        || !scope.memberOrgUnitIds().isEmpty();
+  }
+
+  /**
    * Checks whether the caller holds officer reach in {@code orgUnitId}, the unit that owns the
    * target (REQ-SEC-015, ADR-0300); admins always pass.
    *
@@ -182,6 +166,17 @@ public class AccessGateService {
       return true;
     }
     return requestScopeResolver.currentOfficerOrgUnitIds().contains(orgUnitId);
+  }
+
+  /**
+   * Checks whether the caller holds officer reach in at least one org unit; the coarse method gate
+   * in front of a write whose owning unit is checked afterwards with {@link
+   * #canActAsOfficerIn(UUID)}. Admins always pass.
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in any unit
+   */
+  public boolean canActAsOfficerAnywhere() {
+    return authHelper.isAdmin() || !requestScopeResolver.currentOfficerOrgUnitIds().isEmpty();
   }
 
   /**

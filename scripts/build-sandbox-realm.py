@@ -106,7 +106,7 @@ SANDBOX = Target(
         {"id": "5a4d0000-0000-4000-8000-000000000002", "username": "sandbox-member-2",
          "roles": ["KRT Member"]},
         {"id": "5a4d0000-0000-4000-8000-000000000003", "username": "sandbox-admin",
-         "roles": ["Admin", "Officer", "KRT Member"]},
+         "roles": ["Admin", "KRT Member"]},
         *({"id": f"5a4d0000-0000-4000-8000-0000000002{n:02d}", "username": f"sandbox-load-{n:02d}",
            "roles": ["KRT Member"]} for n in range(1, LOAD_MEMBERS + 1)),
     ],

@@ -116,10 +116,9 @@ class RecipientDirectoriesTest {
   }
 
   @Test
-  void theGlobalOfficerRoleIsEverySeatHolderAndNeverReadsTheRoleMirror() {
+  void everySeatHolderResolvesWithoutReadingTheRoleMirror() {
     when(orgUnitMembershipRepository.findAllLeadershipUserIds()).thenReturn(Set.of(ALICE, BOB));
 
-    assertThat(resolution.resolveByRole("OFFICER")).containsExactlyInAnyOrder(ALICE, BOB);
     assertThat(resolution.resolveSeatHolders()).containsExactlyInAnyOrder(ALICE, BOB);
     verifyNoInteractions(userRepository);
   }

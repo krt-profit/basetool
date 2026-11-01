@@ -217,21 +217,17 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Returns the org-unit ids whose membership makes the user a Logistician of that unit, by {@link
-   * OrgUnitMembership#isLogisticianOfOwnUnit()} and without the leadership cascade (REQ-XCH-043).
+   * Returns the org-unit ids in which the user is a Logistician: the units whose membership makes
+   * them one by {@link OrgUnitMembership#isLogisticianOfOwnUnit()}, plus the units below a Bereich
+   * or Organisationsleitung they are one of (REQ-SEC-005, REQ-XCH-043).
    *
-   * @param userId the user whose direct memberships to read; never {@code null}.
+   * @param userId the user whose memberships to read; never {@code null}.
    * @return the org-unit ids; never {@code null}, possibly empty.
    */
   @NotNull
   public Set<UUID> findLogisticianOrgUnitIds(@NotNull UUID userId) {
-    Set<UUID> ids = new LinkedHashSet<>();
-    for (OrgUnitMembership row : membershipRepository.findAllByIdUserId(userId)) {
-      if (row.isLogisticianOfOwnUnit()) {
-        ids.add(row.getId().getOrgUnitId());
-      }
-    }
-    return ids;
+    return orgUnitCascadeService.grantedUnits(
+        membershipRepository.findAllByIdUserId(userId), OrgUnitMembership::isLogisticianOfOwnUnit);
   }
 
   /**

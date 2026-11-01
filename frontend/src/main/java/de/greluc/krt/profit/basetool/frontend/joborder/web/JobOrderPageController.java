@@ -33,14 +33,13 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,12 +51,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -91,7 +86,9 @@ public class JobOrderPageController {
   /** Reads the backend data of each job-order page with its defaults and section fallbacks. */
   private final JobOrderPageReader pageReader;
 
-  private final RoleHierarchy roleHierarchy;
+  /** Answers the pin-aware Logistician capability of the active context. */
+  private final LogisticianGate logisticianGate;
+
   private final QualityTierCatalog qualityTierCatalog;
   private final JobOrderItemLines jobOrderItemLines;
 
@@ -381,7 +378,7 @@ public class JobOrderPageController {
     return new JobOrderPageReader.OrderCaller(
         principal != null,
         principal != null ? CurrentUser.userId(principal) : null,
-        isLogistician(principal));
+        logisticianGate.isGranted());
   }
 
   /**
@@ -440,7 +437,7 @@ public class JobOrderPageController {
    */
   @NotNull
   @GetMapping("/{id}/items/edit")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("@logisticianGate.isGranted()")
   public String viewEditItemForm(
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
     JobOrderPageReader.ItemEditPage edit = pageReader.readItemEdit(id);
@@ -823,30 +820,5 @@ public class JobOrderPageController {
     model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);
     model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
-  }
-
-  private boolean isLogistician(OidcUser principal) {
-    if (principal == null) {
-      return false;
-    }
-
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    Collection<? extends GrantedAuthority> authorities =
-        (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
-
-    Collection<? extends GrantedAuthority> reachableAuthorities =
-        roleHierarchy.getReachableGrantedAuthorities(authorities);
-    log.debug(
-        "JobOrder: Checking logistician status. Original authorities: {}."
-            + " Reachable authorities: {}",
-        authorities,
-        reachableAuthorities);
-    boolean result =
-        reachableAuthorities.stream()
-            .anyMatch(a ->
-                a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
-    log.debug("JobOrder: Is logistician: {}", result);
-    return result;
   }
 }

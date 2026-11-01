@@ -76,26 +76,12 @@ class InventoryPageControllerTest {
   private InventoryPageController controller;
   private InventoryWriteController writeController;
 
-  /** Mirrors {@code SecurityConfig#roleHierarchy}, which mirrors the backend's. */
-  private static final org.springframework.security.access.hierarchicalroles.RoleHierarchy
-      ROLE_HIERARCHY =
-          org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl.fromHierarchy(
-              """
-              ROLE_ADMIN > ROLE_LOGISTICIAN
-              ROLE_OFFICER > ROLE_LOGISTICIAN
-              ROLE_ADMIN > ROLE_MISSION_MANAGER
-              ROLE_OFFICER > ROLE_MISSION_MANAGER
-              ROLE_ADMIN > ROLE_BANK_MANAGEMENT
-              ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
-              """);
-
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
     controller =
-        new InventoryPageController(
-            inventoryClient, PARALLEL, ROLE_HIERARCHY, mock(ItemPickerLabels.class));
+        new InventoryPageController(inventoryClient, PARALLEL, mock(ItemPickerLabels.class));
     writeController = new InventoryWriteController(inventoryClient, controller);
   }
 

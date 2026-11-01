@@ -75,8 +75,6 @@ public class OrgUnitBankPageController {
       "hasAnyRole('"
           + Roles.ADMIN
           + "','"
-          + Roles.OFFICER
-          + "','"
           + Roles.LOGISTICIAN
           + "','"
           + Roles.MISSION_MANAGER

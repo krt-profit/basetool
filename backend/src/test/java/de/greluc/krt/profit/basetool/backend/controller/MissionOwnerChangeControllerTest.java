@@ -79,8 +79,11 @@ class MissionOwnerChangeControllerTest {
     when(missionAccessPolicy.canChangeOwner(eq(missionId), any())).thenReturn(true);
   }
 
-  private static SimpleGrantedAuthority officer() {
-    return new SimpleGrantedAuthority("ROLE_OFFICER");
+  private static SimpleGrantedAuthority[] officer() {
+    return new SimpleGrantedAuthority[] {
+      new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+      new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")
+    };
   }
 
   private String body(Long version) {
@@ -121,7 +124,7 @@ class MissionOwnerChangeControllerTest {
             put("/api/v1/missions/{id}/owner", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body(2L))
-                .with(jwt().authorities(officer())))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.owner.id").value(newOwnerId.toString()))
         .andExpect(jsonPath("$.ownershipVersion").value(3));

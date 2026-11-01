@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,14 +110,15 @@ class RankRequirementServiceTest {
             .minimumLevel(PromotionLevel.LEVEL_A)
             .requiredCount(3)
             .build();
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(SQUADRON_ID));
-    when(repository.findAllScoped(SQUADRON_ID, pageable))
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(Set.of(SQUADRON_ID))));
+    when(repository.findAllScoped(Set.of(SQUADRON_ID), pageable))
         .thenReturn(new PageImpl<>(List.of(req), pageable, 1));
     when(mapper.toResponse(req)).thenReturn(anyResponse());
 
-    service.list(pageable);
+    service.list(pageable, PromotionReadView.MEMBER);
 
-    verify(repository).findAllScoped(SQUADRON_ID, pageable);
+    verify(repository).findAllScoped(Set.of(SQUADRON_ID), pageable);
     verify(repository, never()).findAll(any(Pageable.class));
   }
 
@@ -129,14 +131,16 @@ class RankRequirementServiceTest {
             .minimumLevel(PromotionLevel.LEVEL_A)
             .requiredCount(3)
             .build();
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(SQUADRON_ID));
-    when(repository.findScopedByFromRankAndToRank(20, 19, SQUADRON_ID)).thenReturn(List.of(req));
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(Set.of(SQUADRON_ID))));
+    when(repository.findScopedByFromRankAndToRank(20, 19, Set.of(SQUADRON_ID)))
+        .thenReturn(List.of(req));
     when(mapper.toResponse(req)).thenReturn(anyResponse());
 
-    List<RankRequirementResponse> result = service.listByRanks(20, 19);
+    List<RankRequirementResponse> result = service.listByRanks(20, 19, PromotionReadView.MEMBER);
 
     assertEquals(1, result.size());
-    verify(repository).findScopedByFromRankAndToRank(20, 19, SQUADRON_ID);
+    verify(repository).findScopedByFromRankAndToRank(20, 19, Set.of(SQUADRON_ID));
   }
 
   @Test
@@ -263,7 +267,6 @@ class RankRequirementServiceTest {
     var request =
         new RankRequirementWriteRequest(20, 19, null, null, PromotionLevel.LEVEL_A, 3, null, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(true);
 
     assertThrows(ObjectOptimisticLockingFailureException.class, () -> service.update(id, request));
   }
@@ -292,7 +295,6 @@ class RankRequirementServiceTest {
             .build();
     entity.setOwningSquadron(squadron(SQUADRON_ID));
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(true);
 
     service.delete(id);
 
@@ -318,7 +320,9 @@ class RankRequirementServiceTest {
             .build();
     entity.setOwningSquadron(squadron(SQUADRON_ID));
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(false);
+    doThrow(new AccessDeniedException("no reach"))
+        .when(promotionAccessPolicy)
+        .assertOfficerIn(SQUADRON_ID);
 
     assertThrows(AccessDeniedException.class, () -> service.delete(id));
     verify(repository, never()).delete(any());

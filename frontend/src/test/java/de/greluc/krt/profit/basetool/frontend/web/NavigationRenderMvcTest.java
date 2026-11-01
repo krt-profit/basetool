@@ -28,7 +28,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -166,8 +168,10 @@ class NavigationRenderMvcTest {
   @Test
   void quickAccessSourcesFollowTheRoles() throws Exception {
     String member = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    CapabilityStubs.logistician(backendApiClient);
     String logistician =
         render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    CapabilityStubs.report(backendApiClient, CapabilitiesResponse.NONE);
     String admin = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
     assertThat(member)

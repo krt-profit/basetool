@@ -149,7 +149,7 @@ class RefineryOrderTenancyE2eTest {
         MEMBER_USER, MEMBER_PASSWORD, bacMissionId, seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD));
     bacOrderId =
         seeder.createRefineryOrder(
-            ADMIN_USER, ADMIN_PASSWORD, hubLocationId, materialId, IRIDIUM_ID, bacMissionId);
+            MEMBER_USER, MEMBER_PASSWORD, hubLocationId, materialId, IRIDIUM_ID, bacMissionId);
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -374,7 +374,8 @@ class RefineryOrderTenancyE2eTest {
   /**
    * The mission refinery roll-up is org-scoped (BAC-004): a viewer scoped to Staffel B sees no
    * Staffel-A refinery order on a public A-mission, even though the mission itself is cross-staffel
-   * visible. An admin without a pin (all-scope) still sees it.
+   * visible. An admin without a pin (all-scope) still sees it. The order belongs to a member, since
+   * the roll-up always lists the caller's own orders.
    */
   @Test
   void missionRefineryRollupIsOrgScoped() {

@@ -202,6 +202,30 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#narrowToPin(Set)}: narrows reached org units to the
+   * active-context pin.
+   *
+   * @param reach the org units the caller reaches
+   * @return the reached units the pin leaves, empty when the pin is out of reach
+   */
+  @NotNull
+  public Set<UUID> narrowToPin(@NotNull Set<UUID> reach) {
+    return requestScopeResolver.narrowToPin(reach);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#currentOfficerReadScope()}: the org units whose
+   * officer-surface data the caller may read, pin-aware.
+   *
+   * @return the readable org-unit ids, empty without reach, {@code null} for the admin scope
+   */
+  @Nullable
+  @Override
+  public Set<UUID> currentOfficerReadScope() {
+    return requestScopeResolver.currentOfficerReadScope();
+  }
+
+  /**
    * Delegates to {@link AccessGateService#canActAsOfficerIn(UUID)}: whether the caller holds
    * officer reach in the target's owning unit.
    *
@@ -210,6 +234,16 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean canActAsOfficerIn(@NotNull UUID orgUnitId) {
     return accessGateService.canActAsOfficerIn(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsOfficerAnywhere()}: whether the caller holds
+   * officer reach in at least one unit.
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in any unit
+   */
+  public boolean canActAsOfficerAnywhere() {
+    return accessGateService.canActAsOfficerAnywhere();
   }
 
   /**
@@ -277,6 +311,16 @@ public class OwnerScopeService implements SquadronVisibility {
   @NotNull
   public ScopePredicate currentLogisticianScope() {
     return accessGateService.currentLogisticianScope();
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianInActiveContext()}: whether the caller
+   * handles a unit as Logistician in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds a Logistician grant in the context
+   */
+  public boolean canActAsLogisticianInActiveContext() {
+    return accessGateService.canActAsLogisticianInActiveContext();
   }
 
   /**
@@ -540,6 +584,18 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean hasRoleInOrgUnit(@NotNull UUID orgUnitId, @NotNull String roleName) {
     return accessGateService.hasRoleInOrgUnit(orgUnitId, roleName);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#currentGrantedOrgUnitIds(String)}: the org units in
+   * which the caller holds the contextual role, cascade included.
+   *
+   * @param roleName the contextual role, e.g. {@code "LOGISTICIAN"}; never {@code null}.
+   * @return the org-unit ids of the caller's grants; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<UUID> currentGrantedOrgUnitIds(@NotNull String roleName) {
+    return requestScopeResolver.currentGrantedOrgUnitIds(roleName);
   }
 
   /**

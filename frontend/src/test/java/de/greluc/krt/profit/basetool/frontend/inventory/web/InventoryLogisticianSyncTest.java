@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,6 +76,7 @@ class InventoryLogisticianSyncTest {
 
   @Test
   void memberWithLogisticianFlag_ShouldSeeActions() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -157,53 +159,5 @@ class InventoryLogisticianSyncTest {
         .perform(get("/inventory/all").with(authentication(auth)))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("Einbuchen"))));
-  }
-
-  @Test
-  void officerWithoutLogisticianFlag_ShouldSeeActionsByHierarchy() throws Exception {
-    UUID userId = UUID.randomUUID();
-    UserDto userDto =
-        new UserDto(
-            userId,
-            "testuser",
-            "Test User",
-            "Test User",
-            null,
-            null,
-            null,
-            Set.of("OFFICER"),
-            Collections.emptySet(),
-            null,
-            false,
-            false,
-            true,
-            null,
-            java.util.List.of(),
-            1L,
-            null,
-            false);
-    when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-
-    Map<String, Object> claims = new HashMap<>();
-    claims.put(IdTokenClaimNames.SUB, "test-sub");
-    claims.put("preferred_username", "testuser");
-    OidcIdToken idToken =
-        new OidcIdToken("token-value", Instant.now(), Instant.now().plusSeconds(3600), claims);
-    OidcUser oidcUser =
-        new DefaultOidcUser(
-            Collections.singletonList(
-                new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
-            idToken);
-    OAuth2AuthenticationToken auth =
-        new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
-
-    mockMvc
-        .perform(get("/inventory/all").with(authentication(auth)))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("Einbuchen")));
   }
 }

@@ -132,7 +132,7 @@ public class MeController {
         holdsAssigneeEntry(),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)),
-        authHelperService.isLogisticianOrAbove(),
+        ownerScopeService.canActAsLogisticianInActiveContext(),
         ownerScopeService.canActAsMissionManagerInActiveContext(),
         authHelperService.isAdmin(),
         inventoryProperties.stolenMarkingEnabled(),
@@ -251,8 +251,9 @@ public class MeController {
    *     affected by the pinned unit
    * @param canViewBankStaff whether the caller holds {@code BANK_EMPLOYEE} or above
    * @param canManageBank whether the caller holds {@code BANK_MANAGEMENT}
-   * @param isLogisticianOrAbove whether the caller reaches {@code LOGISTICIAN} through the role
-   *     hierarchy; gates the Lager and Auftrag write paths
+   * @param isLogisticianOrAbove whether the caller holds a Logistician grant in the active context:
+   *     in the pinned unit, or in any unit when none is pinned; {@code true} for an admin; gates
+   *     the Lager, refinery and Auftrag write controls
    * @param isMissionManagerOrAbove whether the caller holds a Mission Manager grant in the active
    *     context: in the pinned unit, or in any unit when none is pinned; {@code true} for an admin;
    *     gates the mission and operation management

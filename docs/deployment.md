@@ -1646,6 +1646,27 @@ Every section prints a `count=` line, then one line per row:
 the daily Keycloak user sync (`UserSyncTask`, 05:00 Europe/Berlin). A blocking row is resolved in Keycloak (grant `KRT Member`) or in the org
 chart (vacate the seat); then run the report again. Attach only the `count=` lines to the release PR.
 
+### Deleting the Officer realm role after the OFFICER retirement
+
+The release carries migrations `V317`–`V319`; the realm role `Officer` is deleted afterwards by the
+provisioner (ADR-0202 amendment 8), as a separate step that needs @greluc's explicit approval for
+this host. Order: the release is live and the report above was clean, then the dry run, then the
+apply.
+
+```sh
+python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin>            # dry run, writes nothing
+python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --apply
+```
+
+The dry run lists exactly `- realm role 'Officer' deleted with its user mappings (retired with the
+OFFICER role, ADR-0300)` and exits `2`; the apply re-plans and fails unless the second plan is
+empty. A realm without the role receives no write.
+
+**Rollback.** Re-creating the role restores nothing: the user mappings are gone with it. If the
+release is rolled back past the cut, create the role again (`kcadm.sh create roles -r basetool -s
+name=Officer`) and grant it to the accounts the report listed under `officer_without_seat` and to
+the seat holders; the application mirror (`user_roles`) refreshes at the next login or user sync.
+
 ### Updating the operational scripts and units
 
 `deploy.sh`, the other scripts and the `basetool-*` units are **not** in the config bundle — a deployer

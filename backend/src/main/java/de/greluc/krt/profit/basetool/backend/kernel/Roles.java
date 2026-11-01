@@ -38,7 +38,6 @@ public final class Roles {
   public static final String ROLE_PREFIX = "ROLE_";
 
   public static final String ADMIN = "ADMIN";
-  public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
@@ -79,11 +78,16 @@ public final class Roles {
     return ROLE_PREFIX + code;
   }
 
-  /** Compile-time {@code @PreAuthorize} SpEL expression for the admin-or-officer gate. */
-  public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
-
   /** Compile-time {@code @PreAuthorize} SpEL expression for the {@code hasRole('ADMIN')} gate. */
   public static final String HAS_ROLE_ADMIN = "hasRole('" + ADMIN + "')";
+
+  /**
+   * Compile-time {@code @PreAuthorize} SpEL expression for the coarse officer-reach gate: an admin,
+   * or a caller with officer reach in at least one unit (REQ-SEC-015). The target's owning unit is
+   * checked afterwards with {@code OwnerScopeService#canActAsOfficerIn}.
+   */
+  public static final String ADMIN_OR_OFFICER_REACH =
+      HAS_ROLE_ADMIN + " or @ownerScopeService.canActAsOfficerAnywhere()";
 
   /**
    * Single-role {@code hasRole('BANK_MANAGEMENT')} gate; a compile-time constant like {@link

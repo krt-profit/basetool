@@ -62,15 +62,16 @@ public class PromotionLevelContentService {
    * #SORTABLE_FIELDS} by the controller.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of level contents
    */
-  public Page<PromotionLevelContentResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<PromotionLevelContentResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
@@ -78,17 +79,18 @@ public class PromotionLevelContentService {
    * de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevel}.
    *
    * @param categoryId identifier of the parent category
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return the category's level contents in display order
    */
-  public List<PromotionLevelContentResponse> listByCategory(@NotNull UUID categoryId) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllByCategoryIdScopedOrdered(categoryId, scope).stream()
-        .map(mapper::toResponse)
-        .toList();
+  public List<PromotionLevelContentResponse> listByCategory(
+      @NotNull UUID categoryId, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllByCategoryIdScopedOrdered(categoryId, scope.squadronIds()).stream()
+                .map(mapper::toResponse)
+                .toList())
+        .orElseGet(List::of);
   }
 
   /**
@@ -108,15 +110,15 @@ public class PromotionLevelContentService {
   }
 
   /**
-   * Persists a new {@link PromotionLevelContent} attached to the requested category; ADMIN or
-   * OFFICER only.
+   * Persists a new {@link PromotionLevelContent} attached to the requested category; admins and
+   * callers with officer reach in the owning squadron only.
    *
    * @param request validated payload describing the new level content
    * @return the persisted level content in response form
    * @throws NotFoundException if the referenced category does not exist
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
     PromotionCategory category =
@@ -147,7 +149,7 @@ public class PromotionLevelContentService {
    * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public PromotionLevelContentResponse update(
       @NotNull UUID id, @NotNull PromotionLevelContentWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
@@ -173,14 +175,14 @@ public class PromotionLevelContentService {
   }
 
   /**
-   * Permanently removes the level content identified by {@code id}. Restricted to ADMIN or OFFICER
-   * callers.
+   * Permanently removes the level content identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the level content to delete
    * @throws NotFoundException if no level content exists for that id
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public void delete(@NotNull UUID id) {
     promotionAccessPolicy.assertFeatureEnabled();
     PromotionLevelContent entity = load(id);
@@ -204,10 +206,7 @@ public class PromotionLevelContentService {
         || category.getTopic().getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
-      throw new AccessDeniedException(
-          "Caller's squadron context does not allow editing level contents of this scope");
-    }
+    promotionAccessPolicy.assertOfficerIn(category.getTopic().getOwningSquadron().getId());
   }
 
   private void assertCallerMaySeeLevelContent(@NotNull PromotionLevelContent levelContent) {

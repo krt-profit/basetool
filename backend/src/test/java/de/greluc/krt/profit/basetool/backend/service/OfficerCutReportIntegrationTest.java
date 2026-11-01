@@ -93,7 +93,10 @@ class OfficerCutReportIntegrationTest {
   @BeforeEach
   void seed() {
     Role krtMember = roleRepository.findByNameIgnoreCase("KRT Member").orElseThrow();
-    Role officer = roleRepository.findByNameIgnoreCase("Officer").orElseThrow();
+    Role officer = new Role();
+    officer.setCode("OFFICER");
+    officer.setName("Officer");
+    officer = roleRepository.saveAndFlush(officer);
     user(SEAT_WITHOUT_ROLE, "cut-seat-without", Set.of(officer));
     user(SEAT_WITH_ROLE, "cut-seat-with", Set.of(krtMember, officer));
     user(PLAIN_MEMBER, "cut-plain", Set.of());

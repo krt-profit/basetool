@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,7 @@ class OrderHierarchyVisibilityTest {
 
   @Test
   void orderDetail_AsOfficer_ShouldShowLogisticianButtons() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     JobOrderDto order =
@@ -131,7 +133,7 @@ class OrderHierarchyVisibilityTest {
         new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(
             java.util.Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
+                    "ROLE_LOGISTICIAN")),
             idToken);
     org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken authToken =
         new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(

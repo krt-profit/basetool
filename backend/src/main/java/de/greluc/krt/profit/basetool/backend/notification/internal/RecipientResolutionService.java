@@ -35,16 +35,10 @@ import org.springframework.stereotype.Service;
 /**
  * Resolves a notification rule selector's recipient description into concrete user {@code sub}s
  * through the recipient directories the owning modules implement (plan §5.3).
- *
- * <p>The {@code OFFICER} pseudo-role is not a stored role: it resolves to the holders of a
- * leadership seat, in one org unit or in any (REQ-NOTIF-008).
  */
 @Service
 @RequiredArgsConstructor
 public class RecipientResolutionService {
-
-  /** Role code that stands for "holds a leadership seat" instead of a stored role. */
-  static final String ROLE_OFFICER = "OFFICER";
 
   private final RoleRecipientDirectory roleRecipientDirectory;
   private final OrgUnitRecipientDirectory orgUnitRecipientDirectory;
@@ -53,17 +47,14 @@ public class RecipientResolutionService {
   private final ExchangeRecipientDirectory exchangeRecipientDirectory;
 
   /**
-   * Resolves every holder of a global role by its stable code; {@code OFFICER} resolves to every
-   * seat holder.
+   * Resolves every holder of a global role by its stable code.
    *
    * @param roleCode the role code (e.g. {@code ADMIN})
    * @return the matching user subs; never {@code null}
    */
   @NotNull
   public Set<UUID> resolveByRole(@NotNull String roleCode) {
-    return ROLE_OFFICER.equalsIgnoreCase(roleCode)
-        ? resolveSeatHolders()
-        : roleRecipientDirectory.holdersOfRole(roleCode);
+    return roleRecipientDirectory.holdersOfRole(roleCode);
   }
 
   /**
@@ -78,8 +69,8 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves a role evaluated relative to a specific org unit; {@code OFFICER} is the seat holders
-   * directly in that unit, without any cascade.
+   * Resolves a role evaluated relative to a specific org unit; {@code OFFICER} and {@code
+   * UNIT_LEADERSHIP} are the seat holders directly in that unit, without any cascade.
    *
    * @param role the org-relative role
    * @param orgUnitId the context org unit

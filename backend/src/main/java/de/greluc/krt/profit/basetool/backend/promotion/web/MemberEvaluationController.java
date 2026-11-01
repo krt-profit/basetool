@@ -58,7 +58,7 @@ import org.springframework.web.bind.annotation.RestController;
  * REST endpoints for {@code MemberEvaluation}.
  *
  * <p>{@code /my} is filtered by the caller's JWT sub; {@code /all} and upsert require ADMIN or
- * OFFICER, with officers limited to their own squadron by {@code MemberEvaluationService}.
+ * officer reach, checked per owning squadron by {@code MemberEvaluationService}.
  */
 @RestController
 @RequestMapping("/api/v1/promotion/evaluations")
@@ -130,7 +130,7 @@ public class MemberEvaluationController {
    * @return a {@link PageResponse} covering all evaluations
    */
   @GetMapping("/all")
-  @Operation(summary = "List all member evaluations (ADMIN/OFFICER, squadron-scoped for OFFICER).")
+  @Operation(summary = "List all member evaluations (ADMIN or officer reach, squadron-scoped).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "All evaluations."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
@@ -150,7 +150,8 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Pages the ordinary squadron members the caller may evaluate, excluding admins and officers.
+   * Pages the ordinary squadron members the caller may evaluate, excluding admins and
+   * leadership-seat holders.
    *
    * <p>Scoped to the officer's own squadron, or to the admin's focused squadron; an admin in "all
    * squadrons" mode sees every squadron.
@@ -162,12 +163,12 @@ public class MemberEvaluationController {
    * @return a {@link PageResponse} of evaluatable members
    */
   @GetMapping("/members")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   @Transactional(readOnly = true)
   @Operation(
       summary =
-          "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins"
-              + " and officers excluded).")
+          "List squadron members eligible for evaluation (ADMIN or officer reach, squadron-scoped,"
+              + " admins and leadership seats excluded).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Evaluatable members."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
@@ -197,7 +198,7 @@ public class MemberEvaluationController {
   @PutMapping("/user/{userId}/category/{categoryId}")
   @Operation(
       summary =
-          "Upsert evaluation for a user/category. ADMIN or OFFICER of the category's owning"
+          "Upsert evaluation for a user/category. ADMIN or officer reach in the category's owning"
               + " squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Evaluation upserted."),
@@ -214,7 +215,7 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Permanently deletes an evaluation; ADMIN or OFFICER of the category's owning squadron.
+   * Permanently deletes an evaluation; ADMIN or officer reach in the category's owning squadron.
    *
    * @param id identifier of the {@link
    *     de.greluc.krt.profit.basetool.backend.promotion.internal.MemberEvaluation} to delete
@@ -222,7 +223,8 @@ public class MemberEvaluationController {
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
-      summary = "Delete a member evaluation. ADMIN or OFFICER of the category's owning squadron.")
+      summary =
+          "Delete a member evaluation. ADMIN or officer reach in the category's owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")

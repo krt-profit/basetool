@@ -319,7 +319,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void toggleMemberLeadAjax_officer_returns403() throws Exception {
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

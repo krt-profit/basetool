@@ -125,7 +125,7 @@ class PromotionManagePageControllerMvcTest {
     PromotionEligibilityDto elig =
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),
@@ -169,7 +169,7 @@ class PromotionManagePageControllerMvcTest {
     PromotionCategoryDto cat =
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
 
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),
@@ -232,7 +232,7 @@ class PromotionManagePageControllerMvcTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all?view=MANAGEMENT"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),

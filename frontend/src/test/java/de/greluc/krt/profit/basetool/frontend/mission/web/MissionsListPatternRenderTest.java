@@ -109,7 +109,7 @@ class MissionsListPatternRenderTest {
 
   /** The list renders on the pattern: head, toolbar, row link, translated status, foot. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void rendersTheListPattern() throws Exception {
     String html =
         render(new PageResponse<>(List.of(mission("PLANNED")), 0, 20, 1L, 1, List.of()), "");
@@ -144,7 +144,7 @@ class MissionsListPatternRenderTest {
 
   /** An empty result renders the empty state and no table. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void rendersTheEmptyState() throws Exception {
     String html =
         render(new PageResponse<>(List.<MissionListDto>of(), 0, 20, 0L, 0, List.of()), "");
@@ -158,7 +158,7 @@ class MissionsListPatternRenderTest {
 
   /** The past segment is selected from the URL. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void selectsThePastSegmentFromTheUrl() throws Exception {
     String html =
         render(

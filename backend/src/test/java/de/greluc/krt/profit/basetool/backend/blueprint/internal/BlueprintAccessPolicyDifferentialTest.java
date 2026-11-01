@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -65,16 +64,15 @@ class BlueprintAccessPolicyDifferentialTest {
    * @param officer whether the caller reaches ROLE_OFFICER
    * @param seat the role of the caller's one membership, or {@code null} for none
    */
-  private record Caller(String name, boolean admin, boolean officer, MembershipRole seat) {}
+  private record Caller(String name, boolean admin, MembershipRole seat) {}
 
   @Test
   void thePolicyReturnsTheScopeHubsVerdictForEveryCaller() {
     List<Caller> callers = new ArrayList<>();
-    callers.add(new Caller("admin", true, false, null));
-    callers.add(new Caller("officer without a seat", false, true, null));
-    callers.add(new Caller("member of none", false, false, null));
+    callers.add(new Caller("admin", true, null));
+    callers.add(new Caller("member of none", false, null));
     for (MembershipRole role : MembershipRole.values()) {
-      callers.add(new Caller("member as " + role, false, false, role));
+      callers.add(new Caller("member as " + role, false, role));
     }
 
     int granted = 0;
@@ -84,8 +82,6 @@ class BlueprintAccessPolicyDifferentialTest {
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
       when(authHelper.hasReachableRole(any())).thenReturn(false);
-      when(authHelper.hasReachableRole(Roles.authority(Roles.OFFICER)))
-          .thenReturn(caller.officer());
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
 
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);

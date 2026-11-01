@@ -31,12 +31,12 @@ import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendCli
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -54,7 +54,7 @@ class JobOrderPageControllerReauthMvcTest {
             new JobOrderPageController(
                 client,
                 new JobOrderPageReader(client, mock(ParallelPageLoader.class)),
-                mock(RoleHierarchy.class),
+                mock(LogisticianGate.class),
                 mock(QualityTierCatalog.class),
                 mock(JobOrderItemLines.class)));
     ReauthPageMvc.signInMember();

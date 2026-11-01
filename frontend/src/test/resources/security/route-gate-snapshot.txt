@@ -208,19 +208,19 @@
 /api/proxy/org-units/bank/requests/{id}/cancel POST -> OrgUnitBankProxyController#cancelRequest gate=method:isAuthenticated() layout=no
 /api/proxy/org-units/bank/requests/{id}/owner-approval DELETE -> OrgUnitBankProxyController#revokeOwnerApproval gate=method:isAuthenticated() layout=no
 /api/proxy/org-units/bank/requests/{id}/owner-approval POST -> OrgUnitBankProxyController#grantOwnerApproval gate=method:isAuthenticated() layout=no
-/api/proxy/promotion/categories POST -> PromotionProxyController#createCategory gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/categories/{id} DELETE -> PromotionProxyController#deleteCategory gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/categories/{id} PUT -> PromotionProxyController#updateCategory gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/evaluations/user/{userId}/category/{categoryId} PUT -> PromotionProxyController#updateEvaluation gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/level-contents POST -> PromotionProxyController#createLevelContent gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/level-contents/{id} DELETE -> PromotionProxyController#deleteLevelContent gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/level-contents/{id} PUT -> PromotionProxyController#updateLevelContent gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/rank-requirements POST -> PromotionProxyController#createRankRequirement gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/rank-requirements/{id} DELETE -> PromotionProxyController#deleteRankRequirement gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/rank-requirements/{id} PUT -> PromotionProxyController#updateRankRequirement gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/topics POST -> PromotionProxyController#createTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/topics/{id} DELETE -> PromotionProxyController#deleteTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
-/api/proxy/promotion/topics/{id} PUT -> PromotionProxyController#updateTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/categories POST -> PromotionProxyController#createCategory gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/categories/{id} DELETE -> PromotionProxyController#deleteCategory gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/categories/{id} PUT -> PromotionProxyController#updateCategory gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/evaluations/user/{userId}/category/{categoryId} PUT -> PromotionProxyController#updateEvaluation gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/level-contents POST -> PromotionProxyController#createLevelContent gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/level-contents/{id} DELETE -> PromotionProxyController#deleteLevelContent gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/level-contents/{id} PUT -> PromotionProxyController#updateLevelContent gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/rank-requirements POST -> PromotionProxyController#createRankRequirement gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/rank-requirements/{id} DELETE -> PromotionProxyController#deleteRankRequirement gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/rank-requirements/{id} PUT -> PromotionProxyController#updateRankRequirement gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/topics POST -> PromotionProxyController#createTopic gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/topics/{id} DELETE -> PromotionProxyController#deleteTopic gate=method:@officerSurfaceGate.canManagePromotions() layout=no
+/api/proxy/promotion/topics/{id} PUT -> PromotionProxyController#updateTopic gate=method:@officerSurfaceGate.canManagePromotions() layout=no
 /api/proxy/purchasing/admin/risk-classes PUT -> PurchasingProxyController#updateRiskClasses gate=method:hasRole('ADMIN') layout=no
 /api/proxy/purchasing/admin/settings PUT -> PurchasingProxyController#updateSettings gate=method:hasRole('ADMIN') layout=no
 /api/proxy/purchasing/deals POST -> PurchasingProxyController#createDeal gate=class:isAuthenticated() layout=no
@@ -470,30 +470,30 @@
 /orders/{id}/assignees/{userId} DELETE -> JobOrderWriteController#removeAssignee gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId}/note DELETE -> JobOrderWriteController#deleteAssigneeNote gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId}/note PUT -> JobOrderWriteController#setAssigneeNote gate=class:isAuthenticated() layout=yes
-/orders/{id}/blueprint-variant-counting POST -> JobOrderWriteController#updateBlueprintVariantCounting gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/blueprint-variant-counting POST -> JobOrderWriteController#updateBlueprintVariantCounting gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/delete POST -> JobOrderWriteController#deleteOrder gate=class:isAuthenticated() layout=yes
-/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
-/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
-/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
-/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
-/orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('ADMIN') layout=yes
-/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'ADMIN') layout=yes
+/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes
-/orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/requested-update POST -> JobOrderWriteController#updateOrderAsRequester gate=class:isAuthenticated() layout=yes
 /orders/{id}/requested-update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAsRequesterAjax gate=class:isAuthenticated() layout=yes
 /orders/{id}/status POST -> JobOrderWriteController#updateStatus gate=class:isAuthenticated() layout=yes
-/orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=method:hasRole('LOGISTICIAN') layout=yes
-/orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{jobOrderId}/item-collection GET -> ItemCollectionPageController#viewItemCollection gate=method:isAuthenticated() layout=yes
 /orders/{jobOrderId}/material-collection GET -> MaterialCollectionPageController#viewMaterialCollection gate=method:isAuthenticated() layout=yes
 /org-chart GET -> OrgChartPageController#orgChart gate=method:isAuthenticated() layout=yes
@@ -501,28 +501,28 @@
 /org-chart/positions/{id}/ajax DELETE -> OrgChartPageController#deletePosition gate=method:hasRole('ADMIN') layout=yes
 /org-chart/positions/{id}/ajax PUT -> OrgChartPageController#updatePosition gate=method:hasRole('ADMIN') layout=yes
 /org-chart/positions/{id}/leader/ajax DELETE -> OrgChartPageController#vacateLeader gate=method:hasRole('ADMIN') layout=yes
-/org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
-/org-unit-bank/accounts/{id} GET -> OrgUnitBankPageController#orgUnitBankAccount gate=method:hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
-/organisation/leitung GET -> LeitungPageController#leitung gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/bereiche/{bereichId}/members/ajax POST -> LeitungPageController#addBereichLeader gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/bereiche/{bereichId}/members/{userId}/ajax DELETE -> LeitungPageController#removeBereichLeader gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax DELETE -> LeitungPageController#removeGrandAdmiral gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax PUT -> LeitungPageController#setGrandAdmiral gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/organisationsleitung/{olId}/members/ajax POST -> LeitungPageController#addOlMember gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/organisationsleitung/{olId}/members/{userId}/ajax DELETE -> LeitungPageController#removeOlMember gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/special-commands/{skId}/members/{userId}/lead/ajax PATCH -> LeitungPageController#toggleSkLead gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/squadrons/{squadronId}/kommando-groups/ajax POST -> LeitungPageController#createKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/squadrons/{squadronId}/kommando-groups/{groupId}/ajax DELETE -> LeitungPageController#deleteKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/squadrons/{squadronId}/kommando-groups/{groupId}/ajax PUT -> LeitungPageController#updateKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax DELETE -> LeitungPageController#removeSquadronRank gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax PUT -> LeitungPageController#assignSquadronRank gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id} GET -> SpecialCommandMembersPageController#detail gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id}/members POST -> SpecialCommandMembersPageController#addMember gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id}/members POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#addMemberAjax gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id}/members/{userId}/delete POST -> SpecialCommandMembersPageController#removeMember gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id}/members/{userId}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#removeMemberAjax gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id}/members/{userId}/flags POST -> SpecialCommandMembersPageController#patchMemberFlags gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/special-commands/{id}/members/{userId}/flags POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#patchMemberFlagsAjax gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
+/org-unit-bank/accounts/{id} GET -> OrgUnitBankPageController#orgUnitBankAccount gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
+/organisation/leitung GET -> LeitungPageController#leitung gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/bereiche/{bereichId}/members/ajax POST -> LeitungPageController#addBereichLeader gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/bereiche/{bereichId}/members/{userId}/ajax DELETE -> LeitungPageController#removeBereichLeader gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax DELETE -> LeitungPageController#removeGrandAdmiral gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax PUT -> LeitungPageController#setGrandAdmiral gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/organisationsleitung/{olId}/members/ajax POST -> LeitungPageController#addOlMember gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/organisationsleitung/{olId}/members/{userId}/ajax DELETE -> LeitungPageController#removeOlMember gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/special-commands/{skId}/members/{userId}/lead/ajax PATCH -> LeitungPageController#toggleSkLead gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/squadrons/{squadronId}/kommando-groups/ajax POST -> LeitungPageController#createKommandoGroup gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/squadrons/{squadronId}/kommando-groups/{groupId}/ajax DELETE -> LeitungPageController#deleteKommandoGroup gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/squadrons/{squadronId}/kommando-groups/{groupId}/ajax PUT -> LeitungPageController#updateKommandoGroup gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax DELETE -> LeitungPageController#removeSquadronRank gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax PUT -> LeitungPageController#assignSquadronRank gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes
+/organisation/special-commands/{id} GET -> SpecialCommandMembersPageController#detail gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
+/organisation/special-commands/{id}/members POST -> SpecialCommandMembersPageController#addMember gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
+/organisation/special-commands/{id}/members POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#addMemberAjax gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
+/organisation/special-commands/{id}/members/{userId}/delete POST -> SpecialCommandMembersPageController#removeMember gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
+/organisation/special-commands/{id}/members/{userId}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#removeMemberAjax gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
+/organisation/special-commands/{id}/members/{userId}/flags POST -> SpecialCommandMembersPageController#patchMemberFlags gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
+/organisation/special-commands/{id}/members/{userId}/flags POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#patchMemberFlagsAjax gate=class:@officerSurfaceGate.hasOfficerReach() layout=yes
 /pending-approval GET -> PendingApprovalPageController#pendingApproval gate=class:isAuthenticated() layout=yes
 /pending-approval/status GET -> PendingApprovalPageController#status gate=class:isAuthenticated() layout=yes
 /personal-inventory GET -> PersonalInventoryPageController#view gate=class:isAuthenticated() layout=yes
@@ -564,9 +564,9 @@
 /profile/payout-preference POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updatePayoutPreferenceAjax gate=class:isAuthenticated() layout=yes
 /profile/rsi-handle POST -> ProfileController#updateRsiHandle gate=class:isAuthenticated() layout=yes
 /profile/rsi-handle POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileRsiHandleProxyController#updateRsiHandle gate=class:isAuthenticated() layout=no
-/promotion/admin/rank-requirements GET -> PromotionPageController#adminRankRequirements gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/promotion/admin/topics GET -> PromotionPageController#adminTopics gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/promotion/manage GET -> PromotionPageController#manage gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/promotion/admin/rank-requirements GET -> PromotionPageController#adminRankRequirements gate=method:@officerSurfaceGate.canManagePromotions() layout=yes
+/promotion/admin/topics GET -> PromotionPageController#adminTopics gate=method:@officerSurfaceGate.canManagePromotions() layout=yes
+/promotion/manage GET -> PromotionPageController#manage gate=method:@officerSurfaceGate.canManagePromotions() layout=yes
 /promotion/my-evaluations GET -> PromotionPageController#myEvaluations gate=class:isAuthenticated() layout=yes
 /promotion/overview GET -> PromotionPageController#overview gate=class:isAuthenticated() layout=yes
 /purchasing/deals GET -> PurchasingPageController#deals gate=class:isAuthenticated() layout=yes

@@ -148,7 +148,7 @@ class MissionFinanceEntryControllerTest {
     assertThat(user.roles()).isNull();
     assertThat(user.permissions()).isNull();
     assertThat(user.isLogistician()).isFalse();
-    assertThat(user.username()).isEqualTo("bob.callsign");
+    assertThat(user.username()).isNull();
     assertThat(user.displayName()).isEqualTo("Bob");
     assertThat(user.effectiveName()).isEqualTo("Bob");
   }

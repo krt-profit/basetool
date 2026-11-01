@@ -277,7 +277,7 @@ class SeededNotificationRulesIntegrationTest {
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
-            SelectorKind.ROLE),
+            SelectorKind.SEAT_HOLDERS),
         rule(
             NotificationEventType.SUPPLY_DONATION_PLEDGED,
             NotificationType.SUPPLY_DONATION_PLEDGED,
