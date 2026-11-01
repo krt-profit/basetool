@@ -66,12 +66,22 @@ dieser Skill schreibt auf dem Host nichts und darf es auch nicht.
 > Ist die Variable nicht gesetzt, sagt das Skript das und bricht ab — **frag dann den
 > Nutzer**, schreib die Adresse nirgends ins Repo.
 
-> [!note] Seit 2026-09-22 über Podman
-> Die Produktion läuft als **rootless Podman** unter dem Dienstkonto `basetool` (arc42 §7). Das
-> Skript setzt deshalb `cd / && sudo -n -u basetool podman exec -i db-backend …` ab — dieselbe Form
-> wie `rt_exec` in `scripts/lib/container-runtime.sh`. Das `cd /` ist nötig, weil die
-> SSH-Sitzung in `/root` beginnt, das `basetool` nicht betreten darf. Am 2026-09-22 mit einer
-> Nur-Lese-Abfrage auf dem Host geprüft.
+> [!important] Der Nutzer führt Schritt 1 selbst aus — mit seinem sudo-Passwort
+> Die Produktion läuft als **rootless Podman** unter dem Dienstkonto `basetool` (arc42 §7).
+> Per SSH kommt nur `greluc` auf den Host, und `podman exec` als `basetool` verlangt dessen
+> sudo-Passwort. Das Skript ruft deshalb `ssh -t` mit
+> `cd / && echo <SQL base64> | base64 -d | sudo -u basetool podman exec -i db-backend …` auf:
+> Die SQL steht base64-kodiert in der Befehlszeile, weil stdin dem Terminal gehört, an dem
+> `sudo` nach dem Passwort fragt. Das `cd /` ist nötig, weil `basetool` das Startverzeichnis
+> der SSH-Sitzung nicht betreten darf.
+>
+> - **Claude fragt nie nach dem Passwort** und führt das Skript nicht selbst aus. Ohne
+>   interaktives Terminal bricht es sofort ab.
+> - Gib dem Nutzer den Befehl aus Schritt 1 (mit `--month` und `--host`) zum Ausführen in
+>   seinem eigenen PowerShell-Terminal. Er fügt die Ausgabe in den Chat ein, und du arbeitest
+>   ab der Gegenprobe damit weiter.
+> - `podman exec` ist laut `CLAUDE.md` ein Schreibvorgang mit Freigabepflicht. Der Nutzer gibt
+>   die Freigabe, indem er den Befehl selbst ausführt; die SQL bleibt dabei schreibgeschützt.
 
 > [!note] SSH geht auf diesem Rechner nur über den Windows-Client
 > Das Skript wählt `C:\Windows\System32\OpenSSH\ssh.exe` selbst, wenn es existiert.

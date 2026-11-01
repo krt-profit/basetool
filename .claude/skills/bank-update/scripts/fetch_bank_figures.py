@@ -12,7 +12,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +25,10 @@ DB_CONTAINER = "db-backend"
 DB_PORT = "15432"
 
 SERVICE_USER = "basetool"
+
+# Matches a partial line that may still grow into a "label|value" row; anything else,
+# such as the sudo password prompt, is shown at once.
+DATA_ROW_PREFIX = re.compile(r"[a-z_]*(\|.*)?\r?")
 
 WINDOWS_SSH = r"C:\Windows\System32\OpenSSH\ssh.exe"
 
@@ -169,32 +175,62 @@ UNION ALL SELECT 'req_krt_rej_sum', COALESCE(SUM(r.amount), 0)::text
 """
 
 
-def run_query(host: str, sql: str) -> dict[str, Decimal]:
-    """Execute the query on the production host and return the labelled figures."""
-    remote = (
-        f'cd / && sudo -n -u {SERVICE_USER} podman exec -i {DB_CONTAINER} sh -c '
+def remote_command(sql: str) -> str:
+    """Build the remote shell command that feeds ``sql`` to psql in the DB container.
+
+    The SQL travels base64-encoded on the command line, because stdin belongs to the
+    terminal on which ``sudo`` asks for the operator's password.
+    """
+    payload = base64.b64encode(sql.encode("utf-8")).decode("ascii")
+    return (
+        f"cd / && echo {payload} | base64 -d | "
+        f"sudo -u {SERVICE_USER} podman exec -i {DB_CONTAINER} sh -c "
         f'"psql -qAt -U \\$POSTGRES_USER -d \\$POSTGRES_DB -p {DB_PORT} -f -"'
     )
-    proc = subprocess.run(
-        [resolve_ssh(), "-o", "BatchMode=yes", host, remote],
-        input=sql,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
+
+
+def parse_row(line: str, figures: dict[str, Decimal]) -> None:
+    """Store one ``label|value`` row in ``figures``; echo any other line to stderr."""
+    if "|" not in line:
+        if line:
+            print(line, file=sys.stderr)
+        return
+    label, _, value = line.partition("|")
+    try:
+        figures[label.strip()] = Decimal(value.strip())
+    except ArithmeticError:
+        sys.exit(f"Unparsable row from psql: {line!r}")
+
+
+def run_query(host: str, sql: str) -> dict[str, Decimal]:
+    """Execute the query on the production host and return the labelled figures.
+
+    Runs over ``ssh -t``: ``podman exec`` as the service user needs the operator's sudo
+    password, typed into this terminal.
+    """
+    if not sys.stdin.isatty():
+        sys.exit("Run this in an interactive terminal: sudo on the host asks for your password.")
+    proc = subprocess.Popen(
+        [resolve_ssh(), "-o", "BatchMode=yes", "-t", host, remote_command(sql)],
+        stdout=subprocess.PIPE,
     )
-    if proc.returncode != 0:
-        sys.stderr.write(proc.stderr)
-        sys.exit(f"psql failed (exit {proc.returncode}).")
+    assert proc.stdout is not None
 
     figures: dict[str, Decimal] = {}
-    for line in proc.stdout.splitlines():
-        if "|" not in line:
-            continue
-        label, _, value = line.partition("|")
-        try:
-            figures[label.strip()] = Decimal(value.strip())
-        except Exception:  # noqa: BLE001
-            sys.exit(f"Unparsable row from psql: {line!r}")
+    pending = ""
+    while chunk := proc.stdout.read1(4096):
+        pending += chunk.decode("utf-8", errors="replace")
+        *lines, pending = pending.split("\n")
+        for line in lines:
+            parse_row(line.rstrip("\r"), figures)
+        if pending and not DATA_ROW_PREFIX.fullmatch(pending):
+            sys.stderr.write(pending)
+            sys.stderr.flush()
+            pending = ""
+    parse_row(pending.rstrip("\r"), figures)
+
+    if proc.wait() != 0:
+        sys.exit(f"psql failed (exit {proc.returncode}).")
     if not figures:
         sys.exit("psql returned no rows — is the query or the container name right?")
     return figures
