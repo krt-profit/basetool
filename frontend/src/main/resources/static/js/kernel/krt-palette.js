@@ -24,6 +24,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import {
     KRT_SEARCH_PREFIXES,
     krtSearchFind,
+    krtSearchHitHref,
     krtSearchFold,
     krtSearchParse,
     krtSearchRank,
@@ -60,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @property {string} foldLabel the folded label the search matches first
      * @property {string} foldRest the folded breadcrumb and search terms the search matches second
      * @property {string} [href] the page it opens; absent for an action
+     * @property {string} [adminHref] the page it opens in administration mode instead
      * @property {() => void} [run] what an action does
      * @property {string} [fill] the query a prefix-help row puts into the input
      * @property {boolean} [fromServer] whether it is an entity hit of the backend search, which
@@ -79,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * A palette row with its folded search text.
      *
-     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
+     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, adminHref?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
      *     what the row shows and does
      * @returns {PaletteItem} the row
      */
@@ -93,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
             foldRest: krtSearchFold(`${spec.crumb} ${spec.keywords}`),
         };
         if (spec.href) item.href = spec.href;
+        if (spec.adminHref) item.adminHref = spec.adminHref;
         if (spec.run) item.run = spec.run;
         if (spec.fill) item.fill = spec.fill;
         if (spec.fromServer) item.fromServer = true;
@@ -475,7 +478,12 @@ document.addEventListener('DOMContentLoaded', () => {
             item.run();
         } else if (item.href) {
             if (!item.fromServer) remember(item);
-            window.location.assign(item.href);
+            const adminMode = !!krtChrome.nav && krtChrome.nav.isAdminMode();
+            window.location.assign(
+                item.fromServer
+                    ? krtSearchHitHref(/** @type {any} */ (item), adminMode)
+                    : item.href,
+            );
         }
     };
 
@@ -581,6 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .join(CRUMB_SEPARATOR);
         return makeItem({
             href: e.href,
+            adminHref: typeof e.adminHref === 'string' ? e.adminHref : undefined,
             label: e.label,
             crumb,
             icon: typeof e.icon === 'string' && e.icon ? e.icon : 'list',

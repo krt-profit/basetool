@@ -106,9 +106,10 @@ class QuickAccessSearchControllerTest {
                 "Mission",
                 "clipboard-check",
                 "PLANNED",
-                start),
+                start,
+                null),
             new QuickAccessSearchItem(
-                "material", "/materials/2", "Mining laser", "Material", "swap", null, null));
+                "material", "/materials/2", "Mining laser", "Material", "swap", null, null, null));
   }
 
   /** The contributors run at the same time, not one after the other. */

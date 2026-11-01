@@ -39,6 +39,7 @@ import org.springframework.stereotype.Component;
 public class MemberQuickAccessSearchContributor implements QuickAccessSearchContributor {
 
   private static final String RANK_KEY_PREFIX = "orgChart.rank.";
+  private static final String MEMBER_EDIT_PATH = "/members/";
 
   private final OrgChartBackendClient orgChartClient;
 
@@ -57,7 +58,8 @@ public class MemberQuickAccessSearchContributor implements QuickAccessSearchCont
    *
    * @param query the search term
    * @param limit the most hits
-   * @return the people as hits on the org chart with the person highlighted, their rank as status
+   * @return the people as hits on the org chart with the person highlighted, their rank as status;
+   *     an account also opens its member edit page in administration mode
    */
   @Override
   public @NotNull List<QuickAccessHit> results(@NotNull String query, int limit) {
@@ -69,7 +71,8 @@ public class MemberQuickAccessSearchContributor implements QuickAccessSearchCont
                     : OrgChartPageController.highlightHref(p.highlightKey()),
                 p.name(),
                 RANK_KEY_PREFIX + p.positionType(),
-                null))
+                null,
+                p.accountId() == null ? null : MEMBER_EDIT_PATH + p.accountId()))
         .toList();
   }
 }

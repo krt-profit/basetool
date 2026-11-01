@@ -70,7 +70,8 @@ class MemberQuickAccessSearchContributorTest {
                 "/org-chart?highlight=" + OrgChartFixture.DORA,
                 "Dora",
                 "orgChart.rank.COMMAND_LEAD",
-                null));
+                null,
+                "/members/" + OrgChartFixture.DORA));
     assertThat(contributor.results("alice", 5))
         .extracting(QuickAccessHit::statusKey)
         .containsExactly("orgChart.rank.OL_MEMBER");
@@ -81,6 +82,9 @@ class MemberQuickAccessSearchContributorTest {
   void aHolderWithoutAnAccountIsKeyedBySeat() {
     when(orgChartClient.orgChart()).thenReturn(OrgChartFixture.chart());
 
+    assertThat(contributor.results("freitext", 5))
+        .extracting(QuickAccessHit::adminHref)
+        .containsExactly((String) null);
     assertThat(contributor.results("freitext", 5))
         .extracting(QuickAccessHit::href)
         .containsExactly("/org-chart?highlight=" + OrgChartFixture.FREE_TEXT_POSITION);

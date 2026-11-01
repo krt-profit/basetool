@@ -63,11 +63,15 @@ final class OrgChartSearchEntries {
    *
    * @param highlightKey the user id, or the position id of a holder without an account, which the
    *     chart page highlights; {@code null} when the chart gives neither
+   * @param accountId the user id of a holder with an account, otherwise {@code null}
    * @param name the name the chart shows
    * @param positionType the first rank the person holds on the chart
    */
   record PersonEntry(
-      @Nullable UUID highlightKey, @NotNull String name, @NotNull String positionType) {}
+      @Nullable UUID highlightKey,
+      @Nullable UUID accountId,
+      @NotNull String name,
+      @NotNull String positionType) {}
 
   /**
    * The units of the chart that match a term, those whose name starts with it first.
@@ -201,7 +205,7 @@ final class OrgChartSearchEntries {
       return null;
     }
     UUID key = node.userId() != null ? node.userId() : node.positionId();
-    return new PersonEntry(key, name, node.positionType());
+    return new PersonEntry(key, node.userId(), name, node.positionType());
   }
 
   private static <T> @NotNull List<T> orEmpty(@Nullable List<T> list) {

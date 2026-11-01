@@ -2399,8 +2399,7 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 > types, the limits, the prefixes with their help, the mixed ranking by match quality and the kept
 > highlight. Still planned, with the current code and the quick-access text of REQ-UI-026
 > authoritative until they ship: „Häufig", the empty state, filtering of hidden pages, the
-> additional actions and the dialog keys, and a member hit that opens the member edit page in admin
-> mode (a member hit opens the org chart for everyone).
+> additional actions and the dialog keys.
 
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
@@ -2434,6 +2433,9 @@ with `crumb` the type's name and `status` localized.
 - **Limits:** debounced (250 ms), at least 2 characters (1 digit for a job-order number), at most
   100 characters, 5 hits per type, aborted when the user types on. Each type carries its own
   minimum (`QuickAccessSearchKind.minTermLength`); a type is asked only when the term reaches it.
+- **Admin mode:** a member hit with an account carries `adminHref` (`/members/{id}`); the browser
+  opens it instead of the org chart while the drawer is in administration mode
+  (`krtSearchHitHref`). A holder without an account always opens the chart.
 - **Highlight:** the org chart marks and scrolls to the unit or person named by its `highlight`
   query parameter (an org unit id, a user id, or the seat id of a holder without an account).
   Blueprint and ship hits open the overview or unit hangar filtered by the name (`search`).
@@ -2497,7 +2499,7 @@ limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTe
 `ShipQuickAccessSearchContributorTest`, `OrgUnitQuickAccessSearchContributorTest`,
 `MemberQuickAccessSearchContributorTest` (exactly the chart's people),
 `JobOrderQuickAccessSearchContributorTest` (the read the page uses) · `QuickAccessFoldTest` · `:frontend:testSearchJs`
-(prefix parsing, ranking) · `QuickAccessSearchE2eTest` (every type found, entity names kept out of
+(prefix parsing, ranking, the admin-mode target) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
 `krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
 `monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:**
 `:frontend:testSearchJs` (decay, empty-state de-duplication) · `NavigationE2eTest` (Ctrl+Enter,

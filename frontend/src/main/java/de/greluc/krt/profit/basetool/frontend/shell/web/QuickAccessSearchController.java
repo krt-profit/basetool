@@ -91,6 +91,7 @@ public class QuickAccessSearchController {
    * @param icon the sprite symbol without its {@code krt-icon-} prefix
    * @param status the entity's status, or {@code null}
    * @param date the entity's date, or {@code null}
+   * @param adminHref the page the hit opens in administration mode, or {@code null}
    */
   public record QuickAccessSearchItem(
       @NotNull String kind,
@@ -99,7 +100,8 @@ public class QuickAccessSearchController {
       @NotNull String crumb,
       @NotNull String icon,
       @Nullable String status,
-      @Nullable Instant date) {}
+      @Nullable Instant date,
+      @Nullable String adminHref) {}
 
   /**
    * Creates the controller with the default per-type timeout.
@@ -225,7 +227,8 @@ public class QuickAccessSearchController {
                 h.statusKey() == null
                     ? null
                     : messageSource.getMessage(h.statusKey(), null, h.statusKey(), locale),
-                h.date()))
+                h.date(),
+                h.adminHref()))
         .toList();
   }
 
