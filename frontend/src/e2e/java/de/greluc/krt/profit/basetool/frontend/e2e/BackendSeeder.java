@@ -2391,6 +2391,51 @@ public final class BackendSeeder {
   }
 
   /**
+   * Homes {@code targetUserId} in a Staffel and appoints them its Staffelleiter, so officer reach
+   * (which is seat-based) applies to that Staffel only. Idempotent.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param targetUserId the app_user id to seat (must hold {@code KRT Member})
+   * @param squadronId the Staffel OrgUnit id
+   * @param isLogistician whether to set the {@code is_logistician} flag on the membership
+   */
+  public void assignStaffelleiterSeat(
+      String adminUser,
+      String adminPassword,
+      String targetUserId,
+      String squadronId,
+      boolean isLogistician) {
+    assignStaffelMembership(
+        adminUser, adminPassword, targetUserId, squadronId, isLogistician, false);
+    String detail =
+        getBody(
+            adminUser,
+            adminPassword,
+            "/api/v1/org-units/members/" + targetUserId + "/memberships/detail");
+    long version = -1;
+    for (JsonElement row :
+        JsonParser.parseString(detail).getAsJsonObject().getAsJsonArray("memberships")) {
+      JsonObject membership = row.getAsJsonObject();
+      if (squadronId.equals(membership.get("orgUnitId").getAsString())) {
+        version = membership.get("version").getAsLong();
+      }
+    }
+    if (version < 0) {
+      throw new IllegalStateException("No Staffel membership to seat for " + targetUserId);
+    }
+    int status =
+        putForStatus(
+            adminUser,
+            adminPassword,
+            "/api/v1/squadrons/" + squadronId + "/ranks/" + targetUserId,
+            "{\"role\":\"STAFFELLEITER\",\"version\":" + version + "}");
+    if (status < 200 || status >= 300) {
+      throw new IllegalStateException("Staffelleiter seat PUT failed: HTTP " + status);
+    }
+  }
+
+  /**
    * Issues an authenticated {@code PATCH} and returns the HTTP status, so callers can react to a
    * 409.
    *
