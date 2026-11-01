@@ -28,6 +28,9 @@ public enum DashboardOption {
   /** The number of days ahead. */
   DAYS,
 
+  /** The time range in days, stored in the same field as {@link #DAYS}. */
+  RANGE,
+
   /** The number of rows shown. */
   ROWS,
 

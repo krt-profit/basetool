@@ -81,10 +81,48 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
-      EnumSet.noneOf(DashboardOption.class));
+      EnumSet.noneOf(DashboardOption.class)),
+
+  /** The admin links as tiles. */
+  ADMIN_HUB(
+      DashboardMode.ADMIN,
+      DashboardColumn.WIDE,
+      NavigationGate.anyRole(Roles.ADMIN),
+      EnumSet.noneOf(DashboardOption.class)),
+
+  /** The pending deletion requests. */
+  DELETION_REQUESTS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.ADMIN),
+      EnumSet.of(DashboardOption.ROWS)),
+
+  /** The pending Discord registrations. */
+  DISCORD_REGISTRATIONS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.ADMIN),
+      EnumSet.of(DashboardOption.ROWS)),
+
+  /** The latest sync and import runs. */
+  SYNC_STATUS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.ADMIN),
+      EnumSet.of(DashboardOption.RANGE)),
+
+  /** The members without accepted terms. */
+  OPEN_TERMS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.ADMIN),
+      EnumSet.of(DashboardOption.ROWS));
 
   /** The day counts the days option offers. */
   public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);
+
+  /** The day counts the range option offers. */
+  public static final List<Integer> RANGE_CHOICES = List.of(1, 7, 30);
 
   /** The row counts the rows option offers. */
   public static final List<Integer> ROW_CHOICES = List.of(3, 5, 10);

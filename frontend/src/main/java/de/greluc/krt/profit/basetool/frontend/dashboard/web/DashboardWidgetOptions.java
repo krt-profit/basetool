@@ -33,6 +33,9 @@ final class DashboardWidgetOptions {
   /** The days ahead of a widget that offers the option and was given none. */
   static final int DEFAULT_DAYS = 7;
 
+  /** The range in days of a sync status that was given none. */
+  static final int DEFAULT_RANGE_DAYS = 7;
+
   /** The rows of a widget that offers the option and was given none. */
   static final int DEFAULT_ROWS = 5;
 
@@ -48,6 +51,18 @@ final class DashboardWidgetOptions {
     return requested != null && DashboardWidgetType.DAY_CHOICES.contains(requested)
         ? requested
         : DEFAULT_DAYS;
+  }
+
+  /**
+   * The range of the sync status in days.
+   *
+   * @param requested the requested range, or {@code null}
+   * @return the requested range when offered, else {@link #DEFAULT_RANGE_DAYS}
+   */
+  static int range(@Nullable Integer requested) {
+    return requested != null && DashboardWidgetType.RANGE_CHOICES.contains(requested)
+        ? requested
+        : DEFAULT_RANGE_DAYS;
   }
 
   /**

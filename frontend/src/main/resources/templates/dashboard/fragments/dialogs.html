@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 
 <th:block th:fragment="dialogs">
@@ -9,6 +9,22 @@
         body=~{dashboard/fragments/dialogs :: options-body})}"></th:block>
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='dashboard-reset-modal', titleKey='dashboard.reset.title',
         body=~{dashboard/fragments/dialogs :: reset-body})}"></th:block>
+    <th:block sec:authorize="hasRole('ADMIN')">
+        <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='dashboard-info-delete-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger',
+            body=~{dashboard/fragments/dialogs :: info-delete-body})}"></th:block>
+    </th:block>
+</th:block>
+
+<th:block th:fragment="info-delete-body">
+    <div class="krt-modal-body">
+        <p class="m-0" th:text="#{info.delete.confirm.message}">Möchtest du die Information wirklich löschen?</p>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="dashboard-info-delete-modal"
+                th:text="#{dashboard.cancel}">Abbrechen</button>
+        <button type="button" class="btn btn-danger" data-trigger="dashboard-info-delete-confirm" data-testid="dashboard-info-delete-confirm"
+                th:text="#{info.delete}">Löschen</button>
+    </div>
 </th:block>
 
 <th:block th:fragment="catalogue-body">
@@ -50,6 +66,13 @@
                 <select id="dashboard-option-days" name="days" class="form-control">
                     <option th:each="days : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).DAY_CHOICES}"
                             th:value="${days}" th:text="#{dashboard.options.days.value(${days})}">7 Tage</option>
+                </select>
+            </div>
+            <div class="form-group" data-option="range" data-field="days">
+                <label class="form-label" for="dashboard-option-range" th:text="#{dashboard.options.range}">Zeitraum</label>
+                <select id="dashboard-option-range" name="range" class="form-control">
+                    <option th:each="days : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).RANGE_CHOICES}"
+                            th:value="${days}" th:text="#{${'dashboard.options.range.value.' + days}}">7 Tage</option>
                 </select>
             </div>
             <div class="form-group" data-option="rows">

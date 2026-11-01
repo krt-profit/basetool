@@ -326,7 +326,8 @@ function openOptions(trigger) {
         const option = /** @type {HTMLElement} */ (group).dataset.option ?? '';
         group.classList.toggle('is-hidden', !offered.includes(option));
         const select = group.querySelector('select');
-        if (select) select.value = item.dataset[option] ?? '';
+        const field = /** @type {HTMLElement} */ (group).dataset.field ?? option;
+        if (select) select.value = item.dataset[field] ?? '';
     });
     krtModal.open(OPTIONS_MODAL);
 }
@@ -355,7 +356,7 @@ async function saveOptions(form) {
     const item = optionsItem;
     if (!item) return;
     if (!item.dataset.widgetId && !(await writeLayout())) return;
-    const days = optionValue(form, 'days');
+    const days = optionValue(form, 'days') ?? optionValue(form, 'range');
     const rows = optionValue(form, 'rows');
     const result = await krtFetch.write({
         method: 'PUT',

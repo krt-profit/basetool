@@ -53,6 +53,8 @@ class DashboardReaderTest {
 
   private static final NavigationAccess MEMBER =
       new NavigationAccess(Set.of("KRT_MEMBER"), Set.of());
+  private static final NavigationAccess ADMIN =
+      new NavigationAccess(Set.of("ADMIN", "KRT_MEMBER"), Set.of());
   private static final NavigationAccess GUEST = new NavigationAccess(Set.of(), Set.of());
 
   private final DashboardBackendClient client = mock(DashboardBackendClient.class);
@@ -99,6 +101,44 @@ class DashboardReaderTest {
     assertThat(view.narrow())
         .extracting(item -> item.widget().type())
         .containsExactly(DashboardWidgetType.FAVOURITES);
+  }
+
+  @Test
+  @DisplayName("the admin dashboard offers the five admin widgets to an administrator only")
+  void offersTheAdminCatalogueToAdministrators() {
+    when(client.dashboard(DashboardMode.ADMIN))
+        .thenReturn(new DashboardResponse(DashboardMode.ADMIN, 0, false, List.of()));
+
+    DashboardView forAdmin = reader.read(DashboardMode.ADMIN, ADMIN, null, List.of());
+    DashboardView forMember = reader.read(DashboardMode.ADMIN, MEMBER, null, List.of());
+
+    assertThat(forAdmin.catalogue())
+        .containsExactly(
+            DashboardWidgetType.ADMIN_HUB,
+            DashboardWidgetType.DELETION_REQUESTS,
+            DashboardWidgetType.DISCORD_REGISTRATIONS,
+            DashboardWidgetType.SYNC_STATUS,
+            DashboardWidgetType.OPEN_TERMS);
+    assertThat(forMember.catalogue()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("an admin widget is deleted once the member lost the admin role")
+  void deletesAdminWidgetsOnRoleLoss() {
+    DashboardResponse stored =
+        new DashboardResponse(
+            DashboardMode.ADMIN,
+            3,
+            true,
+            List.of(widget(DashboardWidgetType.OPEN_TERMS, DashboardColumn.NARROW, null)));
+    when(client.dashboard(DashboardMode.ADMIN)).thenReturn(stored);
+    when(client.pruneDashboard(DashboardMode.ADMIN, List.of(DashboardWidgetType.OPEN_TERMS)))
+        .thenReturn(new DashboardResponse(DashboardMode.ADMIN, 4, true, List.of()));
+
+    DashboardView view = reader.read(DashboardMode.ADMIN, MEMBER, null, List.of());
+
+    assertThat(view.empty()).isTrue();
+    assertThat(view.version()).isEqualTo(4);
   }
 
   @Test
@@ -170,7 +210,13 @@ class DashboardReaderTest {
     when(client.dashboard(DashboardMode.MEMBER)).thenReturn(stored(false));
 
     assertThat(read(MEMBER, null, List.of()).catalogue())
-        .containsExactlyInAnyOrder(DashboardWidgetType.values());
+        .containsExactlyInAnyOrder(
+            DashboardWidgetType.UPCOMING_DAYS,
+            DashboardWidgetType.INFORMATION,
+            DashboardWidgetType.FAVOURITES,
+            DashboardWidgetType.NOTIFICATIONS,
+            DashboardWidgetType.NEXT_MISSION,
+            DashboardWidgetType.HANGAR_READINESS);
     assertThat(read(GUEST, null, List.of()).catalogue())
         .doesNotContain(DashboardWidgetType.UPCOMING_DAYS)
         .contains(DashboardWidgetType.INFORMATION);

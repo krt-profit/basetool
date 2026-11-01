@@ -680,8 +680,7 @@ public class NavigationRegistry {
                         "admin.deletionrequests",
                         "/admin/deletion-requests",
                         "nav.admin.deletionRequests")
-                    .with(PALETTE_ONLY),
-                of("admin.announcement", "/admin/announcement", "info.title").with(PALETTE_ONLY))
+                    .with(PALETTE_ONLY))
             .gate(adminOnly)
             .startCollapsed(),
         NavigationGroup.of(

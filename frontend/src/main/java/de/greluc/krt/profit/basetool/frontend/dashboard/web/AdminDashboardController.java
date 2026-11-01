@@ -17,34 +17,44 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.navigation.web;
+package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * The admin hub ({@code /admin}): the landing page of admin mode with one tile per administration
- * link (REQ-UI-026).
- *
- * <p>It lists the {@code navigation} model attribute and reads nothing from the backend.
+ * The admin dashboard ({@code /admin}): the landing page of admin mode, a widget board of its own
+ * with the hub of admin links as one widget (REQ-UI-034).
  */
 @Controller
 @UsesLayoutModel
+@RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-public class AdminHubPageController {
+public class AdminDashboardController {
+
+  private final DashboardReader reader;
 
   /**
-   * Renders the admin hub.
+   * Renders the admin dashboard; its widgets load themselves.
    *
-   * @return the {@code navigation/admin-hub} view name
+   * @param model the Thymeleaf model, filled with {@code dashboard}
+   * @return the {@code dashboard/index} view name
    */
   @NotNull
   @GetMapping("/admin")
-  public String hub() {
-    return "navigation/admin-hub";
+  public String dashboard(@NotNull Model model) {
+    DashboardContext context = DashboardContext.of(model);
+    model.addAttribute(
+        "dashboard",
+        reader.read(
+            DashboardMode.ADMIN, context.access(), context.activeUnitId(), context.units()));
+    return "dashboard/index";
   }
 }

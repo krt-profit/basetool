@@ -82,10 +82,53 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.noneOf(DashboardOption.class),
-      DashboardOptions.NONE);
+      DashboardOptions.NONE),
+
+  /** The admin links as tiles. */
+  ADMIN_HUB(
+      DashboardMode.ADMIN,
+      DashboardColumn.WIDE,
+      true,
+      EnumSet.noneOf(DashboardOption.class),
+      DashboardOptions.NONE),
+
+  /** The pending deletion requests. */
+  DELETION_REQUESTS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      true,
+      EnumSet.of(DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null)),
+
+  /** The pending Discord registrations. */
+  DISCORD_REGISTRATIONS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      true,
+      EnumSet.of(DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null)),
+
+  /** The latest sync and import runs. */
+  SYNC_STATUS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      true,
+      EnumSet.of(DashboardOption.RANGE),
+      new DashboardOptions(null, 7, null, null)),
+
+  /** The members without accepted terms. */
+  OPEN_TERMS(
+      DashboardMode.ADMIN,
+      DashboardColumn.NARROW,
+      true,
+      EnumSet.of(DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null));
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */
   public static final Set<Integer> DAY_CHOICES = Set.of(3, 7, 14);
+
+  /** The day counts a widget with the {@link DashboardOption#RANGE} option accepts. */
+  public static final Set<Integer> RANGE_CHOICES = Set.of(1, 7, 30);
 
   /** The row counts a widget with the {@link DashboardOption#ROWS} option accepts. */
   public static final Set<Integer> ROW_CHOICES = Set.of(3, 5, 10);
@@ -133,8 +176,7 @@ public enum DashboardWidgetType {
     if (candidate.orgUnitId() != null && !options.contains(DashboardOption.UNIT)) {
       return "The widget offers no unit option.";
     }
-    if (candidate.days() != null
-        && (!options.contains(DashboardOption.DAYS) || !DAY_CHOICES.contains(candidate.days()))) {
+    if (candidate.days() != null && !daysAllowed(candidate.days())) {
       return "The days option is not allowed here.";
     }
     if (candidate.rows() != null
@@ -145,5 +187,10 @@ public enum DashboardWidgetType {
       return "The widget offers no status option.";
     }
     return null;
+  }
+
+  private boolean daysAllowed(int days) {
+    return options.contains(DashboardOption.DAYS) && DAY_CHOICES.contains(days)
+        || options.contains(DashboardOption.RANGE) && RANGE_CHOICES.contains(days);
   }
 }
