@@ -39,6 +39,9 @@ public class NavigationMentionSource implements PersonMentionSource {
 
   @Override
   public @NotNull Set<String> exemptColumns() {
-    return Set.of("navigation_favourite.entry_key", "navigation_hidden.entry_key");
+    return Set.of(
+        "navigation_favourite.entry_key",
+        "navigation_hidden.entry_key",
+        "navigation_tab_bar.entry_key");
   }
 }

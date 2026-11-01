@@ -25,11 +25,14 @@ import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesUpdat
 import de.greluc.krt.profit.basetool.backend.navigation.internal.HiddenResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationMetrics;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationMode;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPreferencesService;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationSection;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationWriteOutcome;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.PruneRequest;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.TabBarResponse;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.TabBarUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +50,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -147,6 +151,30 @@ public class NavigationPreferencesController {
   }
 
   /**
+   * Replaces the caller's phone tab bar of one mode.
+   *
+   * @param mode the path segment of the mode, {@code member} or {@code admin}
+   * @param request the three slots and the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the stored bar with the new version
+   */
+  @PutMapping("/tab-bar/{mode}")
+  @Operation(summary = "Replace the caller's phone tab bar of one mode.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Tab bar stored."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation failed, the mode is unknown or a key repeats."),
+    @ApiResponse(responseCode = "409", description = "The mode's tab-bar version is stale.")
+  })
+  public TabBarResponse replaceTabBar(
+      @PathVariable String mode,
+      @Valid @RequestBody TabBarUpdateRequest request,
+      @CurrentUserId UUID userId) {
+    return service.replaceTabBar(userId, NavigationMode.fromSegment(mode), request);
+  }
+
+  /**
    * Counts a write that bean validation refused before the service saw it as a rejected write
    * (REQ-OBS-011), then answers it like every other validation failure.
    *
@@ -165,6 +193,8 @@ public class NavigationPreferencesController {
     } else if (target instanceof FavouritesAndHiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
+    } else if (target instanceof TabBarUpdateRequest) {
+      metrics.recordWrite(NavigationSection.TAB_BAR, NavigationWriteOutcome.REJECTED);
     }
     return problems.handleValidationExceptions(ex, request);
   }

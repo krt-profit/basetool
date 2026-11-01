@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.navigation.internal;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import lombok.RequiredArgsConstructor;
+import java.util.function.LongSupplier;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
@@ -32,28 +34,36 @@ import org.springframework.stereotype.Component;
  * (REQ-OBS-011).
  */
 @Component
-@RequiredArgsConstructor
 public class NavigationBusinessGauges implements BusinessGaugeSource {
 
-  private final NavigationPreferencesRepository repository;
+  private final Map<NavigationSection, LongSupplier> counts =
+      new EnumMap<>(NavigationSection.class);
 
-  private final AtomicLong favouriteAccounts = new AtomicLong();
-  private final AtomicLong hiddenAccounts = new AtomicLong();
+  private final Map<NavigationSection, AtomicLong> accounts =
+      new EnumMap<>(NavigationSection.class);
+
+  /**
+   * Binds each section to the count of members that personalised it.
+   *
+   * @param repository the preferences store
+   */
+  public NavigationBusinessGauges(NavigationPreferencesRepository repository) {
+    counts.put(NavigationSection.FAVOURITES, repository::countWithFavourites);
+    counts.put(NavigationSection.HIDDEN, repository::countWithHidden);
+    counts.put(NavigationSection.TAB_BAR, repository::countWithTabBar);
+    counts.keySet().forEach(section -> accounts.put(section, new AtomicLong()));
+  }
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
-    Gauge.builder(
-            NavigationMetrics.PERSONALISED_ACCOUNTS, favouriteAccounts, AtomicLong::doubleValue)
-        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
-        .register(registry);
-    Gauge.builder(NavigationMetrics.PERSONALISED_ACCOUNTS, hiddenAccounts, AtomicLong::doubleValue)
-        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.HIDDEN.getTag())
-        .register(registry);
+    accounts.forEach((section, value) ->
+        Gauge.builder(NavigationMetrics.PERSONALISED_ACCOUNTS, value, AtomicLong::doubleValue)
+            .tag(NavigationMetrics.TAG_SECTION, section.getTag())
+            .register(registry));
   }
 
   @Override
   public void sample() {
-    favouriteAccounts.set(repository.countWithFavourites());
-    hiddenAccounts.set(repository.countWithHidden());
+    counts.forEach((section, count) -> accounts.get(section).set(count.getAsLong()));
   }
 }

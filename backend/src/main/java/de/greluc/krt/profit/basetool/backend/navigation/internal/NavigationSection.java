@@ -31,7 +31,10 @@ public enum NavigationSection {
   FAVOURITES("favourites"),
 
   /** The hidden pages (REQ-UI-032). */
-  HIDDEN("hidden");
+  HIDDEN("hidden"),
+
+  /** The phone tab bars of both modes (REQ-UI-032). */
+  TAB_BAR("tabbar");
 
   private final String tag;
 }

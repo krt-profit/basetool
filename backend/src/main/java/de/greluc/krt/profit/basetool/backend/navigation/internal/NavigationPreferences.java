@@ -64,6 +64,19 @@ public class NavigationPreferences {
   @Column(name = "hidden_version", nullable = false)
   private long hiddenVersion;
 
+  @Setter
+  @Column(name = "tab_bar_member_version", nullable = false)
+  private long tabBarMemberVersion;
+
+  @Setter
+  @Column(name = "tab_bar_admin_version", nullable = false)
+  private long tabBarAdminVersion;
+
+  /** The chosen slots of both modes' phone tab bars; a slot without a row is automatic. */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "navigation_tab_bar", joinColumns = @JoinColumn(name = "preferences_id"))
+  private Set<TabBarSlot> tabBar = new LinkedHashSet<>();
+
   /** The hidden page keys; a page is never both hidden and a favourite. */
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "navigation_hidden", joinColumns = @JoinColumn(name = "preferences_id"))
@@ -96,6 +109,45 @@ public class NavigationPreferences {
   public void replaceFavourites(List<String> keys) {
     favourites.clear();
     favourites.addAll(keys);
+  }
+
+  /**
+   * Replaces the chosen slots of one mode's tab bar.
+   *
+   * @param mode the mode whose bar changes
+   * @param slots {@link NavigationLimits#TAB_BAR_SLOTS} entries, {@code null} for an automatic slot
+   */
+  public void replaceTabBar(NavigationMode mode, List<String> slots) {
+    tabBar.removeIf(slot -> slot.mode() == mode);
+    for (int index = 0; index < slots.size(); index++) {
+      if (slots.get(index) != null) {
+        tabBar.add(new TabBarSlot(mode, index, slots.get(index)));
+      }
+    }
+  }
+
+  /**
+   * Reads the slots of one mode's tab bar.
+   *
+   * @param mode the mode
+   * @return {@link NavigationLimits#TAB_BAR_SLOTS} entries, {@code null} for an automatic slot
+   */
+  public List<String> tabBarSlots(NavigationMode mode) {
+    List<String> slots = new ArrayList<>(NavigationLimits.automaticSlots());
+    tabBar.stream()
+        .filter(slot -> slot.mode() == mode)
+        .forEach(slot -> slots.set(slot.slotIndex(), slot.entryKey()));
+    return slots;
+  }
+
+  /**
+   * The version of one mode's tab-bar section.
+   *
+   * @param mode the mode
+   * @return the section's current version
+   */
+  public long tabBarVersion(NavigationMode mode) {
+    return mode == NavigationMode.MEMBER ? tabBarMemberVersion : tabBarAdminVersion;
   }
 
   /**
