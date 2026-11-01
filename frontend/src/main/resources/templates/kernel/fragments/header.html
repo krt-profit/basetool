@@ -29,9 +29,9 @@
             </button>
             <div id="notification-bell" class="notification-bell">
                 <span id="notification-i18n" hidden
-                      th:attr="data-loading=#{notifications.loading},data-empty=#{notifications.empty},data-mark-read=#{notifications.markRead},data-delete=#{notifications.delete},data-deleted=#{notifications.success.deleted},data-all-read=#{notifications.success.allRead},data-cleared=#{notifications.success.cleared},data-confirm-clear-title=#{notifications.confirm.clear.title},data-confirm-clear-body=#{notifications.confirm.clear.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-error=#{notification.error.title}"></span>
+                      th:attr="data-loading=#{notifications.loading},data-empty=#{notifications.empty},data-mark-read=#{notifications.markRead},data-delete=#{notifications.delete},data-deleted=#{notifications.success.deleted},data-all-read=#{notifications.success.allRead},data-cleared=#{notifications.success.cleared},data-confirm-clear-title=#{notifications.confirm.clear.title},data-confirm-clear-body=#{notifications.confirm.clear.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-bell-open=#{notifications.bell.aria},data-bell-open-unread=#{notifications.bell.aria.unread},data-error=#{notification.error.title}"></span>
                 <button type="button" id="notification-toggle" class="notification-bell-btn"
-                        th:title="#{notifications.bell.title}" th:aria-label="#{notifications.bell.aria}"
+                        th:title="#{notifications.bell.title}" th:aria-label="${unreadNotificationCount > 0} ? #{notifications.bell.aria.unread(${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount})} : #{notifications.bell.aria}"
                         aria-haspopup="true" aria-expanded="false">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
                     <span id="notification-badge" class="notification-badge" aria-hidden="true"
