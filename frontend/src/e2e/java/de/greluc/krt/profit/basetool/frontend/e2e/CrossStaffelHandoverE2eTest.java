@@ -70,13 +70,12 @@ class CrossStaffelHandoverE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
-      seeder.assignStaffelMembership(
+      seeder.assignStaffelleiterSeat(
           ADMIN_USER,
           ADMIN_PASSWORD,
           seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
           IRIDIUM_ID,
-          true,
-          false);
+          true);
       String staffelBId = seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, STAFFEL_B_NAME, "EHOB");
       seeder.assignStaffelMembership(
           ADMIN_USER,

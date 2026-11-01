@@ -69,8 +69,8 @@ class NumberFieldLocaleE2eTest {
     }
     BackendSeeder seeder = new BackendSeeder();
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
-    seeder.assignStaffelMembership(
-        ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
+    seeder.assignStaffelleiterSeat(
+        ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false);
     accountId =
         seeder.ensureOrgUnitBankAccount(
             MGMT_USER, MGMT_PASSWORD, "E2E Org-Unit Bank", IRIDIUM_SQUADRON_ID);
