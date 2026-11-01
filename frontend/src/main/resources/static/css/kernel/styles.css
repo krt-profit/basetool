@@ -3055,7 +3055,6 @@
 
     .nav-start-page {
         flex: none;
-        color: var(--color-gray-2-text);
         font-size: var(--fs-xs);
     }
 
