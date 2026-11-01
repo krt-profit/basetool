@@ -7652,12 +7652,12 @@
             width: 100%;
             height: calc(100% + 2px);
         }
-    }
-    @media (width <= 768px) {
+
         .krt-segmented--sm .krt-segmented__item {
             min-height: calc(var(--touch-target) - 2px);
         }
-
+    }
+    @media (width <= 768px) {
         :is(.krt-segmented--block, :is(.toolbar, .page-actions) > .krt-segmented) {
             flex-wrap: wrap;
             gap: 1px;

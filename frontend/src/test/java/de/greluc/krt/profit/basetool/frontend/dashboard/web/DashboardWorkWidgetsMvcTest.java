@@ -41,6 +41,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,15 +89,17 @@ class DashboardWorkWidgetsMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  private String render(String path, String... params) throws Exception {
+  private String render(String path) throws Exception {
+    return render(path, Map.of());
+  }
+
+  private String render(String path, Map<String, String> params) throws Exception {
     var request =
         get(path)
             .header("X-Requested-With", "XMLHttpRequest")
             .with(oidcLogin())
             .locale(Locale.GERMAN);
-    for (int i = 0; i < params.length; i += 2) {
-      request.param(params[i], params[i + 1]);
-    }
+    params.forEach(request::param);
     return mockMvc
         .perform(request)
         .andExpect(status().isOk())
@@ -197,7 +200,7 @@ class DashboardWorkWidgetsMvcTest {
             eq(ORDERS_ONE_STATUS_URL), anyTypeRef(), eq(0), eq(10), eq("IN_PROGRESS")))
         .thenReturn(orders(1, order(43, "IN_PROGRESS", 2)));
 
-    String html = render(ASSIGNED, "rows", "10", "status", "IN_PROGRESS");
+    String html = render(ASSIGNED, Map.of("rows", "10", "status", "IN_PROGRESS"));
 
     verify(backendApiClient)
         .get(eq(ORDERS_ONE_STATUS_URL), anyTypeRef(), eq(0), eq(10), eq("IN_PROGRESS"));
@@ -211,7 +214,7 @@ class DashboardWorkWidgetsMvcTest {
             eq(ORDERS_TWO_STATUSES_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN"), eq("IN_PROGRESS")))
         .thenReturn(orders(0));
 
-    render(ASSIGNED, "status", "UNREAD");
+    render(ASSIGNED, Map.of("status", "UNREAD"));
 
     verify(backendApiClient)
         .get(
@@ -266,7 +269,7 @@ class DashboardWorkWidgetsMvcTest {
                 level("Agricium", 0.7, "ALF"),
                 level("Bexalite", 0.8, "ALF")));
 
-    String html = render(LOW_STOCK, "rows", "3");
+    String html = render(LOW_STOCK, Map.of("rows", "3"));
 
     assertThat(html)
         .containsPattern("data-testid=\"dashboard-low-stock-count\"[^>]*>4<")
@@ -280,7 +283,7 @@ class DashboardWorkWidgetsMvcTest {
     when(backendApiClient.get(eq(LOW_URL + "&orgUnitId={unit}"), anyTypeRef(), eq(UNIT)))
         .thenReturn(List.of(level("Quantanium", 0.0, "ALF")));
 
-    String html = render(LOW_STOCK, "unit", UNIT.toString());
+    String html = render(LOW_STOCK, Map.of("unit", UNIT.toString()));
 
     assertThat(html).contains("Quantanium").doesNotContain("dashboard-low-stock-unit");
   }
@@ -334,7 +337,7 @@ class DashboardWorkWidgetsMvcTest {
             new PageResponse<>(
                 List.of(account("KRT Hauptkonto", 900, null, -5)), 0, 10, 1L, 1, List.of()));
 
-    String html = render(BANK, "rows", "10");
+    String html = render(BANK, Map.of("rows", "10"));
 
     assertThat(html)
         .contains("kein Ziel")
