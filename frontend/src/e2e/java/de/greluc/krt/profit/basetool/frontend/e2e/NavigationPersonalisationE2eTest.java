@@ -71,14 +71,15 @@ class NavigationPersonalisationE2eTest {
       }
       """;
 
+  /** Twelve registry keys every member may see; unknown keys would be pruned on load. */
   private static final String FILL_TO_THE_CAP =
       """
       async () => {
         const state = document.querySelector('[data-favourites-state]');
         const keys = [
-          'hangar.overview', 'storage.overview', 'refinery.orders', 'operations.list',
-          'hangar.catalog', 'hangar.unit', 'storage.levels', 'storage.my', 'storage.all',
-          'personal.inventory', 'personal.blueprints', 'personal.profile',
+          'operations.list', 'hangar.overview', 'hangar.catalog', 'hangar.unit',
+          'storage.overview', 'storage.levels', 'storage.my', 'storage.all',
+          'refinery.orders', 'materials.list', 'materials.overview', 'materials.profit',
         ];
         await window.krtFetch.write({
           method: 'PUT',
