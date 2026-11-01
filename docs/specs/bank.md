@@ -1617,8 +1617,8 @@ audiences, all-members and individual grants only:
 
 - **No `GLOBAL_ROLE` audience remains.** The Sichtbarkeit editor of a Sonderkonto offers no role
   buckets, and adding one is rejected as a bad request (`OrgUnitBankSettingsService`,
-  REQ-BANK-035). The grantee kind `GLOBAL_ROLE` no longer exists in code, and `V320` removes it from the table checks.
-- **Existing grants and limits were removed by migrations** `V318` (`OFFICER`) and `V320` (every
+  REQ-BANK-035). The grantee kind `GLOBAL_ROLE` no longer exists in code, and `V321` removes it from the table checks.
+- **Existing grants and limits were removed by migrations** `V319` (`OFFICER`) and `V321` (every
   remaining `GLOBAL_ROLE` row, i.e. `LOGISTICIAN` and `MISSION_MANAGER`). Each deletes every
   `bank_account_view_grant` row and every `bank_account_approval_limit` row (REQ-BANK-041) with
   `GLOBAL_ROLE` row and writes one `bank_audit_event` per removed row with the system as
@@ -1632,8 +1632,8 @@ audiences, all-members and individual grants only:
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (no role buckets on a Sonderkonto),
 `OfficerCutMigrationTest`, `SonderkontoBucketRetirementMigrationTest` (grants and limits deleted, one
-audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`, `db/migration/V318`,
-`db/migration/V320` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
+audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`, `db/migration/V319`,
+`db/migration/V321` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 
