@@ -176,7 +176,7 @@ group, and a group at most one Kommandoleiter and one stellv. (ADR-0322).
 
 - [x] `kommando_group` exists, caps at four per squadron, and rejects a non-`SQUADRON` parent (V185).
 - [x] `chk_org_unit_membership_kommando_group_role` confines `kommando_group_id` to the in-group
-  squadron ranks and lets each of them go without one (V322).
+  squadron ranks and lets each of them go without one (V313).
 - [x] Kommandogruppe CRUD + member assignment honour ≤1 KL and ≤1 stellv. per group and ≤4 KL,
   ≤4 stellv. and ≤4 Ensigns per squadron.
 - [x] A Kommandoleiter or stellv. Kommandoleiter can be appointed without a Kommandogruppe.
@@ -185,7 +185,7 @@ group, and a group at most one Kommandoleiter and one stellv. (ADR-0322).
   constraint rather than committing a duplicate; the per-squadron caps of four stay
   service-layer-only (a count, like the org chart's own ≤4 ENSIGN cap).
 
-**Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`, `v322AllowsKommandoleiterWithoutGroup`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality, ungrouped ranks) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRankCaps`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql`, `V322__allow_kommandoleiter_without_group.sql` · **Decision:** ADR-0042, ADR-0322 · **Issues:** #800
+**Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`, `v313AllowsKommandoleiterWithoutGroup`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality, ungrouped ranks) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRankCaps`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql`, `V313__allow_kommandoleiter_without_group.sql` · **Decision:** ADR-0042, ADR-0322 · **Issues:** #800
 
 ### REQ-ROLE-004 — Delegated appointment ladder, no self-promotion
 

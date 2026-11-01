@@ -19,7 +19,7 @@ without a group. A group grants no rights, so the binding only blocked the appoi
 
 1. **The group is optional for all three in-Kommando ranks.** A Kommandoleiter, a stellv.
    Kommandoleiter and an Ensign may carry a `kommando_group_id` of their Staffel or none; a
-   Staffelleiter still carries none. V322 relaxes `chk_org_unit_membership_kommando_group_role`
+   Staffelleiter still carries none. V313 relaxes `chk_org_unit_membership_kommando_group_role`
    accordingly.
 2. **Caps per Staffel, and per group where there is one.** At most four Kommandoleiter, four stellv.
    and four Ensigns per Staffel, counted with and without a group; within a group still at most one

@@ -407,11 +407,11 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * Verifies V322 (REQ-ROLE-003): Kommandoleiter and stellv. Kommandoleiter may hold no
+   * Verifies V313 (REQ-ROLE-003): Kommandoleiter and stellv. Kommandoleiter may hold no
    * Kommandogruppe, while a plain member still may not carry one.
    */
   @Test
-  void v322AllowsKommandoleiterWithoutGroup() {
+  void v313AllowsKommandoleiterWithoutGroup() {
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     UUID userA = UUID.fromString("ffffff00-0000-0000-0000-000000000322");
     UUID userB = UUID.fromString("ffffff00-0000-0000-0000-000000000323");
@@ -426,7 +426,7 @@ class OrgHierarchyMigrationTest {
     try {
       insertUser(jdbc, userA);
       insertUser(jdbc, userB);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V322_SQ", "TV322", false, null);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V313_SQ", "TV313", false, null);
       insertKommandoGroup(jdbc, groupId, squadronId, "Alpha");
 
       insertMembership(jdbc, userA, squadronId);
