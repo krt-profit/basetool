@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -30,9 +31,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +49,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.servlet.ModelAndView;
 
 /**
  * Who may open the job-order create form ({@code GET /orders/create}) and what it loads: anonymous
@@ -87,5 +94,77 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(view().name("joborder/orders-create"));
 
     verify(backendApiClient).getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
+  }
+
+  @Test
+  @WithMockUser
+  void viewCreateForm_WithPrefillParameters_StartsTheFormWithThem() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    UUID material = UUID.randomUUID();
+    UUID unit = UUID.randomUUID();
+
+    JobOrderForm form =
+        (JobOrderForm)
+            mockMvc
+                .perform(
+                    get("/orders/create")
+                        .param("materialId", material.toString())
+                        .param("minQuality", "650")
+                        .param("amount", "4.5")
+                        .param("requestingOrgUnitId", unit.toString()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getModelAndView()
+                .getModel()
+                .get("jobOrderForm");
+
+    assertThat(form.getMaterials().getFirst().getMaterialId()).isEqualTo(material);
+    assertThat(form.getMaterials().getFirst().getMinQuality()).isEqualTo(650);
+    assertThat(form.getMaterials().getFirst().getAmount()).isEqualTo(4.5);
+    assertThat(form.getRequestingOrgUnitId()).isEqualTo(unit);
+  }
+
+  @Test
+  @WithMockUser
+  void viewCreateForm_WithAnItemPrefill_OpensTheItemOrderWithTheLine() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    UUID item = UUID.randomUUID();
+    UUID unit = UUID.randomUUID();
+
+    ModelAndView page =
+        mockMvc
+            .perform(
+                get("/orders/create")
+                    .param("gameItemId", item.toString())
+                    .param("gameItemName", "Gatling S2")
+                    .param("amount", "2.0")
+                    .param("requestingOrgUnitId", unit.toString()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getModelAndView();
+
+    assertThat(page).isNotNull();
+    assertThat(page.getModel().get("startInItemMode")).isEqualTo(true);
+    assertThat((List<?>) page.getModel().get("editItems"))
+        .singleElement()
+        .isEqualTo(
+            Map.of("gameItemId", item.toString(), "gameItemName", "Gatling S2", "amount", 2));
+    assertThat(
+            ((JobOrderItemForm) page.getModel().get("jobOrderItemForm")).getRequestingOrgUnitId())
+        .isEqualTo(unit);
+  }
+
+  @Test
+  @WithMockUser
+  void viewCreateForm_WithoutAnItem_StaysInMaterialMode() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    ModelAndView page = mockMvc.perform(get("/orders/create")).andReturn().getModelAndView();
+
+    assertThat(page).isNotNull();
+    assertThat(page.getModel()).doesNotContainKey("startInItemMode").doesNotContainKey("editItems");
   }
 }

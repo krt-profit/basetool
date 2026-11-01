@@ -19,6 +19,7 @@
 
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtSearchFold } from '/js/kernel/krt-search.js';
+import { NAV_EDIT_EVENT, NAV_RENDERED_EVENT } from '/js/kernel/nav-preferences.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const phone = window.matchMedia('(max-width: 768px)');
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userToggleEl = sidebarEl ? sidebarEl.querySelector('.nav-user-toggle') : null;
     const langBtnEl = sidebarEl ? sidebarEl.querySelector('.nav-lang-btn') : null;
     const langMenuEl = document.getElementById('nav-lang-menu');
-    const tabEls = Array.from(document.querySelectorAll('.mobile-tab[data-tab-path]'));
+    const pinnedQuery = window.matchMedia('(min-width: 1280px)');
 
     /** @type {HTMLElement | null} */
     let returnFocusEl = null;
@@ -80,40 +81,63 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /** @type {HTMLAnchorElement | null} */
-    let activeLink = null;
-    if (sidebarEl) {
-        const here = window.location.pathname;
-        let activeLen = -1;
-        sidebarEl
-            .querySelectorAll(
-                '.nav-top-link, .nav-group:not(.nav-group-filter-only) .nav-link, .nav-personal .nav-link',
-            )
-            .forEach((link) => {
-                if (!(link instanceof HTMLAnchorElement)) return;
-                const href = link.getAttribute('href');
-                if (!href || href.charAt(0) !== '/') return;
-                const linkPath = href.split('?')[0].split('#')[0];
-                const isMatch =
-                    linkPath === '/'
-                        ? here === '/'
-                        : here === linkPath || here.indexOf(`${linkPath}/`) === 0;
-                if (isMatch && linkPath.length > activeLen) {
-                    activeLink = link;
-                    activeLen = linkPath.length;
-                }
-            });
-    }
-    const currentLink = /** @type {HTMLAnchorElement | null} */ (activeLink);
-    const activeGroup = currentLink ? currentLink.closest('.nav-group') : null;
-    if (currentLink) {
-        currentLink.classList.add('is-active');
-        currentLink.setAttribute('aria-current', 'page');
-        if (activeGroup) activeGroup.classList.add('is-active');
-    }
+    let currentLink = null;
+    /** @type {Element | null} */
+    let activeGroup = null;
 
-    const groups = sidebarEl ? Array.from(sidebarEl.querySelectorAll('.nav-group')) : [];
+    /** Marks the link that opens the page being shown and the group that holds it. */
+    const markActive = function () {
+        /** @type {HTMLAnchorElement | null} */
+        let activeLink = null;
+        if (sidebarEl) {
+            const here = window.location.pathname;
+            let activeLen = -1;
+            sidebarEl
+                .querySelectorAll(
+                    '.nav-top-link, .nav-group:not(.nav-group-filter-only) .nav-link, .nav-personal .nav-link',
+                )
+                .forEach((link) => {
+                    if (!(link instanceof HTMLAnchorElement)) return;
+                    const href = link.getAttribute('href');
+                    if (!href || href.charAt(0) !== '/') return;
+                    const linkPath = href.split('?')[0].split('#')[0];
+                    const areaPaths = (link.getAttribute('data-nav-paths') || '')
+                        .split(' ')
+                        .filter((path) => path.length > 0);
+                    [linkPath, ...areaPaths].forEach((path) => {
+                        const isMatch =
+                            path === '/'
+                                ? here === '/'
+                                : here === path || here.indexOf(`${path}/`) === 0;
+                        if (isMatch && path.length > activeLen) {
+                            activeLink = link;
+                            activeLen = path.length;
+                        }
+                    });
+                });
+        }
+        currentLink = /** @type {HTMLAnchorElement | null} */ (activeLink);
+        activeGroup = currentLink ? currentLink.closest('.nav-group') : null;
+        if (currentLink) {
+            currentLink.classList.add('is-active');
+            currentLink.setAttribute('aria-current', 'page');
+            if (activeGroup) activeGroup.classList.add('is-active');
+        }
+    };
+
+    /** @type {Element[]} */
+    let groups = [];
     /** @type {Map<Element, boolean>} */
     const groupOpen = new Map();
+
+    /**
+     * Whether "Anpassen" is on, which shows every group's links.
+     *
+     * @returns {boolean} true while the sidebar is in edit mode
+     */
+    const editing = function () {
+        return !!sidebarEl && sidebarEl.classList.contains('is-editing');
+    };
 
     /**
      * Shows or hides a group's links and mirrors the state on its head.
@@ -122,61 +146,82 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {boolean} open whether the links are shown
      */
     const renderGroup = function (group, open) {
+        const shown = open || editing();
         const head = group.querySelector('.nav-group-head');
         const links = group.querySelector('.nav-group-links');
-        if (head) head.setAttribute('aria-expanded', String(open));
-        if (links instanceof HTMLElement) links.hidden = !open;
+        if (head) head.setAttribute('aria-expanded', String(shown));
+        if (links instanceof HTMLElement) links.hidden = !shown;
     };
 
     /**
      * Sets every group to its default for the current device class: on a phone only the group
      * holding the current page is open (accordion), elsewhere every group is open unless the
-     * member collapsed it before.
+     * member collapsed it before. Groups that were open before a re-render keep their state.
+     *
+     * @param {Map<string, boolean>} [previous] the open state by group key before a re-render
      */
-    const initGroups = function () {
+    const initGroups = function (previous) {
         groups.forEach((group) => {
             const key = group.getAttribute('data-group-key');
+            const collapsedByDefault = group.getAttribute('data-collapsed') === 'true';
             let open;
-            if (phone.matches) {
+            if (previous && key !== null && previous.has(key)) {
+                open = group === activeGroup || !!previous.get(key);
+            } else if (phone.matches) {
                 open = group === activeGroup;
             } else {
-                open = group === activeGroup || readState(`krt.sidebar.${key}`) !== 'closed';
+                const stored = readState(`krt.sidebar.${key}`);
+                open =
+                    group === activeGroup ||
+                    (stored === null ? !collapsedByDefault : stored !== 'closed');
             }
             groupOpen.set(group, open);
             if (!query) renderGroup(group, open);
         });
     };
 
-    groups.forEach((group) => {
-        const count = group.querySelector('.nav-group-count');
-        if (count) count.textContent = String(group.querySelectorAll('.nav-link').length);
-        const head = group.querySelector('.nav-group-head');
-        if (!head) return;
-        head.addEventListener('click', () => {
-            if (query) return;
-            const open = !groupOpen.get(group);
-            if (open && phone.matches) {
-                const mode = group.closest('.nav-mode');
-                groups.forEach((other) => {
-                    if (other !== group && other.closest('.nav-mode') === mode) {
-                        groupOpen.set(other, false);
-                        renderGroup(other, false);
-                    }
-                });
-            }
-            groupOpen.set(group, open);
-            renderGroup(group, open);
-            if (!phone.matches) {
-                writeState(
-                    `krt.sidebar.${group.getAttribute('data-group-key')}`,
-                    open ? 'open' : 'closed',
-                );
-            }
+    /**
+     * Collects the groups of the sidebar, counts their links and binds their heads.
+     *
+     * @param {Map<string, boolean>} [previous] the open state by group key before a re-render
+     */
+    const bindGroups = function (previous) {
+        groups = sidebarEl ? Array.from(sidebarEl.querySelectorAll('.nav-group')) : [];
+        groupOpen.clear();
+        groups.forEach((group) => {
+            const count = group.querySelector('.nav-group-count');
+            if (count) count.textContent = String(group.querySelectorAll('.nav-link').length);
+            const head = group.querySelector('.nav-group-head');
+            if (!head) return;
+            head.addEventListener('click', () => {
+                if (query || editing()) return;
+                const open = !groupOpen.get(group);
+                if (open && phone.matches) {
+                    const mode = group.closest('.nav-mode');
+                    groups.forEach((other) => {
+                        if (other !== group && other.closest('.nav-mode') === mode) {
+                            groupOpen.set(other, false);
+                            renderGroup(other, false);
+                        }
+                    });
+                }
+                groupOpen.set(group, open);
+                renderGroup(group, open);
+                if (!phone.matches) {
+                    writeState(
+                        `krt.sidebar.${group.getAttribute('data-group-key')}`,
+                        open ? 'open' : 'closed',
+                    );
+                }
+            });
         });
-    });
-    initGroups();
+        initGroups(previous);
+    };
+
+    markActive();
+    bindGroups();
     if (typeof phone.addEventListener === 'function') {
-        phone.addEventListener('change', initGroups);
+        phone.addEventListener('change', () => initGroups());
     }
 
     /** Applies the admin mode and the menu filter to the list. */
@@ -186,6 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebarEl.classList.toggle('is-filtering', filtering);
         sidebarEl.classList.toggle('is-admin-mode', adminMode);
         if (adminBarEl instanceof HTMLElement) adminBarEl.hidden = filtering || !adminMode;
+        document.querySelectorAll('.mobile-tab-slots[data-tabbar-mode]').forEach((slots) => {
+            if (slots instanceof HTMLElement) {
+                slots.hidden = (slots.dataset.tabbarMode === 'admin') !== adminMode;
+            }
+        });
         let anyHit = false;
         groups.forEach((group) => {
             const filterOnly = group.classList.contains('nav-group-filter-only');
@@ -230,6 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterEl) filterEl.value = '';
         setPersonalOpen(false);
         renderList();
+        document.dispatchEvent(
+            new CustomEvent('krt:nav-admin-mode', { detail: { admin: adminMode } }),
+        );
     };
 
     /**
@@ -252,22 +305,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (langBtnEl) langBtnEl.setAttribute('aria-expanded', String(open));
     };
 
-    const markActiveTab = function () {
+    /**
+     * Finds the tab that marks the area of the page being shown: the one whose own path, or one of
+     * the paths of the tabbed page it opens, is the longest prefix of the current path.
+     *
+     * @returns {Element | null} the tab, or null when no tab covers the page
+     */
+    const findActiveTab = function () {
         const here = window.location.pathname;
         /** @type {Element | null} */
         let best = null;
         let bestLen = -1;
-        tabEls.forEach((tab) => {
-            const path = tab.getAttribute('data-tab-path') || '';
-            if ((here === path || here.indexOf(`${path}/`) === 0) && path.length > bestLen) {
-                best = tab;
-                bestLen = path.length;
-            }
+        document.querySelectorAll('.mobile-tab[data-tab-path]').forEach((tab) => {
+            const paths = [
+                tab.getAttribute('data-tab-path') || '',
+                ...(tab.getAttribute('data-nav-paths') || '').split(' '),
+            ].filter((path) => path.length > 0);
+            paths.forEach((path) => {
+                if ((here === path || here.indexOf(`${path}/`) === 0) && path.length > bestLen) {
+                    best = tab;
+                    bestLen = path.length;
+                }
+            });
         });
         return best;
     };
-    const activeTab = /** @type {Element | null} */ (markActiveTab());
-
+    /** @type {Element | null} */
+    let activeTab = findActiveTab();
     /**
      * Mirrors the drawer state on its openers and on the tab bar.
      *
@@ -290,6 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const openSidebar = function (focus) {
         if (!sidebarEl) return;
+        if (isDocked()) {
+            const docked = focus || filterEl;
+            if (docked) docked.focus({ preventScroll: true });
+            return;
+        }
         const active = document.activeElement;
         returnFocusEl = active instanceof HTMLElement ? active : null;
         sidebarEl.removeAttribute('inert');
@@ -306,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {boolean} restoreFocus whether focus returns to the control that opened it
      */
     const closeSidebar = function (restoreFocus) {
-        if (!sidebarEl) return;
+        if (!sidebarEl || isDocked()) return;
         sidebarEl.classList.remove('open');
         sidebarEl.setAttribute('inert', '');
         if (overlayEl) overlayEl.classList.remove('visible');
@@ -322,6 +391,30 @@ document.addEventListener('DOMContentLoaded', () => {
         return !!sidebarEl && sidebarEl.classList.contains('open');
     };
 
+    /**
+     * Whether the labelled sidebar is fixed beside the page: the pinned mode from 1280 px.
+     *
+     * @returns {boolean} true while the sidebar is docked and always reachable
+     */
+    const isDocked = function () {
+        return document.body.dataset.navMode === 'pinned' && pinnedQuery.matches;
+    };
+
+    /**
+     * Makes the sidebar reachable while docked and inert again when it falls back to the drawer.
+     */
+    const syncDocked = function () {
+        if (!sidebarEl) return;
+        if (isDocked()) {
+            sidebarEl.classList.remove('open');
+            if (overlayEl) overlayEl.classList.remove('visible');
+            setOpeners(false);
+            sidebarEl.removeAttribute('inert');
+        } else if (!isOpen()) {
+            sidebarEl.setAttribute('inert', '');
+        }
+    };
+
     krtChrome.nav = {
         open(focus) {
             openSidebar(focus || null);
@@ -335,17 +428,47 @@ document.addEventListener('DOMContentLoaded', () => {
             if (list) list.scrollTop = 0;
             openSidebar(null);
         },
+        isAdminMode() {
+            return adminMode;
+        },
+        setAdminMode(on) {
+            setAdminMode(on);
+            const list = document.getElementById('nav-list');
+            if (list) list.scrollTop = 0;
+        },
     };
+    syncDocked();
+    if (typeof pinnedQuery.addEventListener === 'function') {
+        pinnedQuery.addEventListener('change', syncDocked);
+    }
+    document.addEventListener('krt:nav-mode-changed', syncDocked);
 
+    const shownLink = /** @type {HTMLAnchorElement | null} */ (currentLink);
     if (sidebarEl && adminModeEl) {
         adminMode =
+            window.location.pathname === '/admin' ||
             window.location.pathname.indexOf('/admin/') === 0 ||
-            (!!currentLink && adminModeEl.contains(currentLink));
+            (!!shownLink && adminModeEl.contains(shownLink));
     }
-    if (currentLink && personalEl && personalEl.contains(currentLink)) {
+    if (shownLink && personalEl && personalEl.contains(shownLink)) {
         setPersonalOpen(true);
     }
     renderList();
+
+    document.addEventListener(NAV_RENDERED_EVENT, () => {
+        /** @type {Map<string, boolean>} */
+        const previous = new Map();
+        groups.forEach((group) => {
+            const key = group.getAttribute('data-group-key');
+            if (key !== null) previous.set(key, !!groupOpen.get(group));
+        });
+        markActive();
+        bindGroups(previous);
+        renderList();
+        activeTab = findActiveTab();
+        setOpeners(isOpen());
+    });
+    document.addEventListener(NAV_EDIT_EVENT, renderList);
 
     [hamburgerEl, menuTabEl].forEach((opener) => {
         if (!opener) return;
@@ -423,6 +546,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sidebarEl) {
         sidebarEl.querySelectorAll('.nav-admin-entry, .nav-admin-back').forEach((btn) => {
             btn.addEventListener('click', () => {
+                if (!adminMode && btn.classList.contains('nav-admin-entry')) {
+                    const appearance = document.querySelector('[data-appearance-state]');
+                    if (appearance instanceof HTMLElement && appearance.dataset.startAdmin) {
+                        window.location.assign('/start?mode=admin');
+                        return;
+                    }
+                }
                 setAdminMode(!adminMode);
                 const list = document.getElementById('nav-list');
                 if (list) list.scrollTop = 0;
@@ -457,7 +587,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    if (window.location.pathname.indexOf('/admin/') === 0) {
+    if (
+        window.location.pathname === '/admin' ||
+        window.location.pathname.indexOf('/admin/') === 0
+    ) {
         document.body.classList.add('admin-mode');
     }
 

@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -59,7 +60,7 @@ class DashboardBackendClientTest {
     Instant start = Instant.parse("2026-10-05T08:30:00.123456Z");
     Instant end = Instant.parse("2026-10-12T08:30:00.123456Z");
 
-    client.upcomingMissions(start, end);
+    client.upcomingMissions(start, end, null);
 
     backend.expect(
         "GET",
@@ -68,6 +69,50 @@ class DashboardBackendClientTest {
             + "&end="
             + end
             + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50");
+  }
+
+  @Test
+  void upcomingMissionsOfAPinnedUnitAskTheBackendForThatUnit() {
+    backend.answerJson(
+        "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}");
+    Instant start = Instant.parse("2026-10-05T08:30:00Z");
+    Instant end = Instant.parse("2026-10-12T08:30:00Z");
+
+    client.upcomingMissions(start, end, ID);
+
+    backend.expect(
+        "GET",
+        "/api/v1/missions?start="
+            + start
+            + "&end="
+            + end
+            + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50&orgUnitId="
+            + ID);
+  }
+
+  @Test
+  void nextMissionsReadTheSummaryRowsWithTheLimitAndNothingWhenNoneIsUpcoming() {
+    backend.answerJson(
+        "[{\"id\":\"" + ID + "\",\"name\":\"Konvoi\",\"signedUp\":true},{\"name\":\"Zweiter\"}]");
+    backend.answerEmpty();
+
+    assertThat(client.nextMissions(3))
+        .extracting(MissionListDto::name)
+        .containsExactly("Konvoi", "Zweiter");
+    assertThat(client.nextMissions(10)).isEmpty();
+
+    backend.expect("GET", "/api/v1/missions/next/summary?limit=3");
+    backend.expect("GET", "/api/v1/missions/next/summary?limit=10");
+  }
+
+  @Test
+  void hangarReadinessReadsTheOwnersCounts() {
+    backend.answerJson("{\"total\":13,\"fitted\":9}");
+
+    assertThat(client.hangarReadiness())
+        .isEqualTo(new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto(13, 9));
+
+    backend.expect("GET", "/api/v1/hangar/my-ships/readiness");
   }
 
   @Test

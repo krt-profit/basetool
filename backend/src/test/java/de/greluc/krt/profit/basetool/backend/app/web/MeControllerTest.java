@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -62,7 +63,44 @@ class MeControllerTest {
 
   @Mock private InventoryProperties inventoryProperties;
 
+  @Mock private JobOrderAssigneeLookup jobOrderAssigneeLookup;
+
   @InjectMocks private MeController controller;
+
+  @Test
+  void getCapabilities_assignedJobOrdersFlagFollowsTheCallersEntries() {
+    UUID callerId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(true);
+    assertTrue(controller.getCapabilities().canViewAssignedJobOrders());
+
+    when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(false);
+    assertFalse(controller.getCapabilities().canViewAssignedJobOrders());
+  }
+
+  @Test
+  void getCapabilities_assignedJobOrdersFlagIsIndependentOfTheProfitGateAndThePin() {
+    UUID callerId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(true);
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(ownerScopeService.canViewOwnJobOrders()).thenReturn(false);
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.canViewAssignedJobOrders());
+    assertFalse(response.canViewJobOrders());
+    assertFalse(response.canViewOwnJobOrders());
+  }
+
+  @Test
+  void getCapabilities_assignedJobOrdersFlagIsFalseWithoutAnIdentifiedCaller() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+
+    assertFalse(controller.getCapabilities().canViewAssignedJobOrders());
+    verify(jobOrderAssigneeLookup, never()).holdsAnyEntry(any());
+  }
 
   @Test
   void getActiveOrgUnit_present_returnsUuid() {
@@ -83,30 +121,31 @@ class MeControllerTest {
   }
 
   @Test
-  void getCapabilities_logisticianFlagIsTheHierarchyAnswer_notTheMembershipOne() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+  void getCapabilities_logisticianFlagFollowsTheGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isLogisticianOrAbove());
-    verify(authHelperService).isLogisticianOrAbove();
   }
 
   @Test
-  void getCapabilities_logisticianFlagFalseWhenTheCallerReachesNeitherRole() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+  void getCapabilities_logisticianFlagIsFalseWithoutAGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().isLogisticianOrAbove());
   }
 
   @Test
-  void getCapabilities_missionManagerFlagResolvesThroughTheHierarchy() {
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)))
-        .thenReturn(false);
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(false);
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)))
-        .thenReturn(true);
+  void getCapabilities_missionManagerFlagFollowsTheGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsMissionManagerInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isMissionManagerOrAbove());
+  }
+
+  @Test
+  void getCapabilities_missionManagerFlagIsFalseWithoutAGrantInTheActiveContext() {
+    when(ownerScopeService.canActAsMissionManagerInActiveContext()).thenReturn(false);
+
+    assertFalse(controller.getCapabilities().isMissionManagerOrAbove());
   }
 
   @Test
@@ -124,6 +163,41 @@ class MeControllerTest {
 
     when(inventoryProperties.stolenMarkingEnabled()).thenReturn(false);
     assertFalse(controller.getCapabilities().canMarkStolen());
+  }
+
+  @Test
+  void getCapabilities_officerFlagsFollowTheReachInTheActiveContext() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.hasOfficerReach());
+    assertTrue(response.canOpenLeitung());
+    assertTrue(response.canManagePromotions());
+    assertTrue(response.canSeeHangarOwnerDetails());
+    assertTrue(response.canManageJobOrders());
+    assertTrue(response.canManageMissionFinance());
+  }
+
+  @Test
+  void getCapabilities_officerFlagsOffWithoutReachInTheActiveContext() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertFalse(response.hasOfficerReach());
+    assertFalse(response.canOpenLeitung());
+    assertFalse(response.canManagePromotions());
+    assertFalse(response.canSeeHangarOwnerDetails());
+    assertFalse(response.canManageJobOrders());
+    assertFalse(response.canManageMissionFinance());
+  }
+
+  @Test
+  void getLayout_carriesTheSameOfficerFlags() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+
+    assertTrue(controller.getLayout(null, UUID.randomUUID()).capabilities().hasOfficerReach());
   }
 
   @Test
@@ -229,7 +303,7 @@ class MeControllerTest {
     when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.of(active));
     when(authHelperService.isAdmin()).thenReturn(true);
     when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(true);
     when(notificationService.unreadCount(callerId)).thenReturn(7L);
 
     MeController.LayoutResponse layout = controller.getLayout(null, callerId);

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-31.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0301
 
 # Job-order assignee notes and the assignee grant
@@ -39,55 +39,68 @@ order-level write; a stale note edit surfaces as HTTP 409.
 
 **Enforced by:** `JobOrderServiceAssigneeAndListTest` (AssigneeNoteTests), `JobOrderMapperTest`
 · **Code:** `JobOrderAssigneeService.updateAssigneeNote` / `deleteAssigneeNote` (reached through
-the `JobOrderService` facade), `JobOrderController.setAssigneeNote` / `deleteAssigneeNote`
+the `JobOrderService` facade), `JobOrderAssigneeController.setAssigneeNote` / `deleteAssigneeNote`
 (`PUT` / `DELETE /api/v1/orders/{id}/assignees/{userId}/note`), frontend
 `JobOrderWriteController` + `orders-detail.js` · **Issues:** —
 
 ### REQ-ORDERS-014 — Who may change an assignee note
 
 A user may create, edit, or delete the note **only on their own assignee entry**. A
-**Logistician-or-above** (the role hierarchy promotes Officer and Admin into Logistician) may
-change the note on **any** entry of an order they can see; an Admin can see every order. This
-is the same self-or-logistician rule that already gates adding and removing assignees
-(`verifyAssigneeAccess` + `@jobOrderAccessPolicy.canSeeJobOrder`), applied unchanged — no new
-permission concept. The 403 decision lives in the controller, not the service, so business
-logic stays free of `SecurityContextHolder` reads (ArchUnit invariant).
+**Logistician of the order** — a caller holding the Logistician grant of the order's processing
+unit (own or seat-derived; an Admin always) within the order's edit scope — may change the note on
+**any** entry. A Logistician grant in another unit never qualifies, also not for a member of the
+order's unit. The order detail and the assignee writes carry the answer as `canManageAssignees`. This is the same
+self-or-logistician rule that gates adding and removing assignees
+(`verifyAssigneeAccess` on `@jobOrderAccessPolicy.canManageAssignees`, behind
+`@jobOrderAccessPolicy.canSeeJobOrder`) — no new permission concept. Reading an order only through
+an assignee entry (REQ-ORDERS-047) never qualifies for someone else's entry. The 403 decision lives
+in the controller, not the service, so business logic stays free of `SecurityContextHolder` reads
+(ArchUnit invariant).
 
 **Acceptance**
 
 - [ ] A non-logistician editing their own note succeeds without consulting the role helper.
 - [ ] A non-logistician editing another user's note is rejected (HTTP 403); the service is
   never called.
-- [ ] A logistician editing another user's note on a visible order succeeds.
+- [ ] A logistician of the order editing another user's note succeeds.
+- [x] A Logistician who reads the order only as its assignee editing another user's entry is
+  rejected (HTTP 403).
+- [x] A Logistician of unit A who is a plain member of the order's unit B assigns nobody else and
+  gets no picker (HTTP 403).
 
-**Enforced by:** `JobOrderControllerTest` (set/deleteAssigneeNote auth tests)
-· **Code:** `JobOrderController.verifyAssigneeAccess` · **Issues:** —
+**Enforced by:** `JobOrderAssigneeControllerTest` (set/deleteAssigneeNote auth tests),
+`JobOrderAccessPolicyTest` (`canManageAssignees_*`), `JobOrderAssigneeGrantIntegrationTest`
+· **Code:** `JobOrderAssigneeController.verifyAssigneeAccess`, `JobOrderAccessPolicy.canManageAssignees`
+· **Issues:** —
 
 ### REQ-ORDERS-047 — Being an assignee grants read visibility of that order
 
-> **Status: planned** (ADR-0301, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 An assignee entry (`JobOrderAssignee`) is the only meaning of „assigned to me"; there is no separate
-responsible person. Profit members still sign themselves up and off, and a Logistician-or-above of a
-visible order still adds and removes anyone (REQ-ORDERS-014). The entry additionally grants its
-holder **read visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003,
-ADR-0301).
+responsible person. Profit members still sign themselves up and off, and a Logistician of the order
+still adds and removes anyone (REQ-ORDERS-014). The entry additionally grants its holder **read
+visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, ADR-0301).
 
-- **Who may be assigned.** A Logistician with access to the order may assign **any active
-  account**, including members of units that are not profit-eligible. The assignee picker is a
-  handle search over all active accounts: members of the processing (responsible) unit first, every
-  other hit marked with its unit, no further personal data.
-- **What the grant shows.** An assignee who reaches the order only through the grant sees its detail
-  **in full** (materials, progress, assignees, notes) and finds it in the „Ich bearbeite" segment
-  (`assignedToMe=true`) and in the „Alle" list (`ALL`) of the overview (REQ-ORDERS-040). „Zu
-  bearbeiten" (`TO_PROCESS`) keeps the normal tenancy scope, and the grant widens no other list.
+- **Who may be assigned.** A Logistician of the order may assign **any active account** (approved,
+  present and enabled in Keycloak), including members of units that are not profit-eligible; an
+  inactive account answers `400`. The assignee picker
+  (`GET /api/v1/orders/{id}/assignee-candidates?query=`, gated like assigning someone else) is a
+  handle search over all active accounts, at most 20 hits: direct members of the processing
+  (responsible) unit first, every other hit marked with its primary unit, no further personal data.
+- **What the grant shows.** An assignee who reaches the order only through the grant reads its
+  detail **in full** (materials, progress, assignees, notes, linked-stock drill-downs) with the
+  owner panels redacted as for any viewer outside the unit, and finds it in the „Alle" list (`ALL`)
+  of the overview. The „Ich bearbeite" segment (`assignedToMe=true`, REQ-ORDERS-040) lists the entries
+  without profit access. „Zu bearbeiten" (`TO_PROCESS`) keeps the normal tenancy scope, and the grant
+  widens no other list — not the reference lookup of the Lager pickers, not the material board.
 - **What the grant allows.** Such an assignee may edit their own note (REQ-ORDERS-013) and remove
   themselves, nothing else. Status, priority, lines, claims, handovers and production stay with the
-  processing unit; any other write answers `403`.
+  processing unit; any other write answers `403`. The order's `canEdit` flag reads `false` for
+  them, and the detail page renders read-only apart from the own note and the self-removal, both
+  updated in place (REQ-FE-001).
 - **How long it lasts.** As long as the entry exists, whatever the order's status. Leaving the unit
   does not end it; removing the entry does. Account erasure removes the entries
-  (`JobOrderMemberUnlink`, REQ-DATA-008); no membership observer is added.
+  (`JobOrderMemberUnlink`, REQ-DATA-008); no membership observer is added. Adding or removing an
+  entry and editing a note leave the order's `version` unchanged.
 - **Audit.** Adding or removing an assignee who is not a direct member of the processing unit
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in the
   Aufträge area instead of `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is visible
@@ -98,24 +111,50 @@ ADR-0301).
 
 **Acceptance**
 
-- [ ] An assignee outside every visible unit opens the order's detail and sees it in full; a
+- [x] An assignee outside every visible unit opens the order's detail and sees it in full; a
   unit-mate of that assignee who holds no entry still cannot open it.
-- [ ] Such an order appears in the assignee's „Ich bearbeite" and „Alle" lists, never in „Zu
-  bearbeiten".
-- [ ] Such an assignee edits their own note and removes themselves; a status, line or handover
-  write answers `403`.
-- [ ] The grant survives a status change and the assignee leaving their unit, and ends with the
+- [x] Such an order appears in the assignee's „Alle" list, never in „Zu bearbeiten".
+- [x] Such an order appears in the assignee's „Ich bearbeite" list, also for an assignee without
+  profit access, who then sees „Aufträge" in the navigation with only that segment (REQ-ORDERS-040).
+- [x] Such an assignee edits their own note and removes themselves; a status write, an assignment
+  of someone else or a picker search answers `403`.
+- [x] The grant survives a status change and the assignee leaving their unit, and ends with the
   entry.
-- [ ] Adding and removing a non-member of the processing unit records the two external event types;
+- [x] A note edit and the self-removal leave the order's `version` unchanged.
+- [x] Adding and removing a non-member of the processing unit records the two external event types;
   a direct member records the existing ones.
-- [ ] The picker lists the processing unit's members first and marks every other hit with its unit.
+- [x] The picker lists the processing unit's members first, marks every other hit with its unit and
+  leaves inactive accounts out.
 
-**Enforced by (to be added):** `JobOrderAccessPolicyTest` (`assigneeGrant_*`),
-`JobOrderAssigneeGrantIntegrationTest`, `JobOrderServiceAssigneeAndListTest`
-(`externalAssignee_*`), `AuthorizationMatrixTest`, `AdminAuditLogPageControllerTest` · **Code:**
-`JobOrderAccessPolicy.canSeeJobOrder`, `JobOrderAssigneeService`, `AuditEventType` · **Related:**
+**Enforced by:** `JobOrderAccessPolicyTest` (`assigneeGrant_*`, `canManageAssignees_*`),
+`JobOrderAssigneeGrantIntegrationTest`, `JobOrderScopeQueryIntegrationTest` (`assigneeGrant_*`),
+`JobOrderServiceAssigneeAndListTest` (`externalAssignee_*`, inactive accounts),
+`JobOrderPageReaderTest`, `JobOrderPageControllerNoReloadMvcTest` (grant-only assignee, Logistician of another unit),
+`AuthorizationMatrixTest`, `AdminAuditLogPageControllerTest` · **Code:**
+`JobOrderAccessPolicy.canSeeJobOrder` / `canSeeJobOrderInScope` / `canManageAssignees`,
+`JobOrderRepository.findScopedJobOrders`, `JobOrderAssigneeService`,
+`JobOrderAssigneeCandidateService`, `JobOrderAssigneeController`, `AuditEventType`, frontend `JobOrderPageReader`,
+`JobOrderAssigneeCandidateProxyController`, `joborder/orders-detail.html` · **Related:**
 REQ-ORDERS-013, REQ-ORDERS-014, REQ-ORDERS-040, REQ-ORDERS-043, REQ-ORG-003, REQ-AUDIT-001 ·
 **Decision:** ADR-0301
+
+### REQ-ORDERS-048 — Job orders are found by number
+
+`GET /api/v1/orders/by-number?number=<digits>&limit=<n>` (`isAuthenticated()`) returns the orders
+whose `displayId` starts with the one to nine digits, by ascending number, at most `limit` (1–20,
+default 5), each as `JobOrderNumberHitDto {id, displayId, status, createdAt}`. Any other `number`
+is a 400.
+
+- The result is exactly what the caller may open from the order list: for a caller inside the order
+  workflow the scoped orders of `JobOrderScope.PREDICATE` (REQ-DATA-010), and for every caller the
+  orders they hold an assignee entry on (REQ-ORDERS-047). A caller outside the workflow therefore
+  finds only their assigned orders; an unidentified caller finds none.
+- The quick access (REQ-UI-033) is the only consumer; it shows the number only.
+
+**Enforced by:** `JobOrderScopeQueryIntegrationTest` (scope, prefix, assignee grant),
+`JobOrderQueryServiceNumberLookupTest`, `JobOrderNumberLookupControllerTest`, `authorization-matrix.txt` ·
+**Code:** `JobOrderNumberLookupController.findByNumber`, `JobOrderQueryService.findByNumberPrefix`,
+`JobOrderRepository.findVisibleByNumberPrefix` · **Related:** REQ-ORDERS-047, REQ-UI-033
 
 ## Out of scope
 

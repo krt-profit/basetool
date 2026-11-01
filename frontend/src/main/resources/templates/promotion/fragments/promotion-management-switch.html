@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="switch(active)" class="krt-segmented" th:aria-label="#{nav.promotion.manage}" data-testid="promotion-management-switch">
+    <a th:href="@{/promotion/manage}" class="krt-segmented__item"
+       th:attr="aria-current=${active == 'evaluations'} ? 'page' : null"
+       data-testid="promotion-switch-evaluations" th:text="#{nav.tab.evaluations}">Bewertungen</a>
+    <a th:href="@{/promotion/admin/topics}" class="krt-segmented__item"
+       th:attr="aria-current=${active == 'topics'} ? 'page' : null"
+       data-testid="promotion-switch-topics" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
+    <a th:href="@{/promotion/admin/rank-requirements}" class="krt-segmented__item"
+       th:attr="aria-current=${active == 'ranks'} ? 'page' : null"
+       data-testid="promotion-switch-ranks" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
+</nav>
+</body>
+</html>

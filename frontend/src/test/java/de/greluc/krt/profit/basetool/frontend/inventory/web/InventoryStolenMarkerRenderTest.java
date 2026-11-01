@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.Collections;
@@ -174,7 +175,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/my-inventory/grouped", group(stack(true), stack(false)));
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-stolen=\"true\"")))
         .andExpect(content().string(containsString("data-stolen=\"false\"")))
@@ -190,7 +191,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/my-inventory/grouped", group(stack(false)));
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString(STOLEN_CHIP))));
   }
@@ -201,7 +202,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/my-inventory/grouped", group(stack(true)));
 
     mockMvc
-        .perform(get("/inventory/my").param("stolenOnly", "true"))
+        .perform(get("/inventory?storage=my").param("stolenOnly", "true"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("value=\"only\" selected=\"selected\"")));
 
@@ -227,7 +228,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/all/grouped", group(stack(true)));
 
     mockMvc
-        .perform(get("/inventory/all").param("nonStolenOnly", "true"))
+        .perform(get("/inventory?storage=all").param("nonStolenOnly", "true"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-stolen=\"true\"")))
         .andExpect(content().string(containsString(STOLEN_CHIP)))
@@ -244,7 +245,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/my-inventory/grouped", group(stack(false)));
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"stolenMarkModal\"")))
         .andExpect(content().string(containsString("id=\"stolenMarkForm\"")))
@@ -260,7 +261,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/my-inventory/grouped", group(stack(true)));
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(STOLEN_CHIP)))
         .andExpect(content().string(containsString("id=\"stolenFilter\"")))
@@ -363,7 +364,7 @@ class InventoryStolenMarkerRenderTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void allStackEntries_offerUnmarkOnAnEditableRowWhileMarkingIsOn() throws Exception {
-    stubMarking(true);
+    CapabilityStubs.report(backendApiClient, LayoutResponses.logistician(true));
     UUID itemId = UUID.randomUUID();
     stubEntries("/inventory/all/stack/entries", entry(itemId, true, true));
 
@@ -409,7 +410,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/all/grouped", group(stack(true)));
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"stolenMarkModal\"")))
         .andExpect(content().string(containsString("id=\"stolenMarkForm\"")))
@@ -426,7 +427,7 @@ class InventoryStolenMarkerRenderTest {
     stubGrouped("/inventory/all/grouped", group(stack(true)));
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(STOLEN_CHIP)))
         .andExpect(content().string(not(containsString("id=\"stolenMarkModal\""))))

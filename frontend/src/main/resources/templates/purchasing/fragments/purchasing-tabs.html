@@ -2,9 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <nav th:fragment="tabs(active)" class="tab-nav purchasing-tabs" th:aria-label="#{purchasing.title}" data-testid="purchasing-tabs">
+    <a th:if="${supplyEnabled}" th:href="@{/supply/needs}" class="tab"
+       data-testid="purchasing-tab-needs" th:text="#{supply.tab.needs}">Bedarf</a>
+    <a th:if="${supplyEnabled}" th:href="@{/supply/donations/mine}" class="tab"
+       data-testid="purchasing-tab-mine" th:text="#{supply.tab.mine}">Meine Spenden</a>
     <a th:href="@{/purchasing/deals}" class="tab" th:classappend="${active == 'deals'} ? 'active'"
        th:attr="aria-current=${active == 'deals'} ? 'page' : null" data-testid="purchasing-tab-deals"
-       th:text="#{purchasing.tab.deals}">Gesch&auml;fte</a>
+       th:text="#{nav.purchasing.deals}">Ankauf</a>
     <a th:if="${purchasingTabs.partners()}" th:href="@{/purchasing/partners}" class="tab"
        th:classappend="${active == 'partners'} ? 'active'"
        th:attr="aria-current=${active == 'partners'} ? 'page' : null" data-testid="purchasing-tab-partners"

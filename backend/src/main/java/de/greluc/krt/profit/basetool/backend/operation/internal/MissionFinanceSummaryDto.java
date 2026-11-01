@@ -24,13 +24,25 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One mission's line of an operation's finance view: its entries and its linked refinery orders.
+ *
+ * <p>An anonymised line (a mission the caller may not see) has no name and no entries or orders;
+ * only the total remains.
+ *
+ * @param missionId the mission's id
+ * @param missionName the mission's display name; {@code null} when anonymised
+ * @param totalSum the mission's signed bottom line in aUEC
+ * @param entries the mission's finance entries; empty when anonymised
+ * @param refineryOrders the mission's refinery orders; empty when anonymised
+ * @param anonymised {@code true} when the caller may not see the mission
  */
 public record MissionFinanceSummaryDto(
     UUID missionId,
-    String missionName,
+    @Nullable String missionName,
     BigDecimal totalSum,
     List<MissionFinanceEntryDto> entries,
-    List<RefineryOrderDto> refineryOrders) {}
+    List<RefineryOrderDto> refineryOrders,
+    boolean anonymised) {}

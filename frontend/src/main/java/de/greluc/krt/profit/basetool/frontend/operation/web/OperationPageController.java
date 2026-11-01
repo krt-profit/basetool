@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
@@ -60,8 +61,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -91,6 +90,8 @@ public class OperationPageController {
 
   /** The operation domain's typed backend client. */
   private final OperationBackendClient operationClient;
+
+  private final MissionManagerGate missionManagerGate;
 
   private final MarkdownRenderer markdown;
   private final ParallelPageLoader parallelPageLoader;
@@ -179,14 +180,13 @@ public class OperationPageController {
   /**
    * Renders the operation detail page, loading the operation, its missions, the finance roll-up and
    * the payouts concurrently via {@link ParallelPageLoader}. A backend failure redirects to the
-   * list with a flash error. {@code canEdit} is derived from the {@link Authentication}.
+   * list with a flash error. {@code canEdit} is the Mission Manager grant in the active context.
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
    * @param size page size for the embedded missions table (default 10)
    * @param fragment when {@code "missions"} only the embedded missions fragment is rendered
    *     (REQ-FE-002); otherwise the full page
-   * @param authentication current user's authentication (used for {@code canEdit})
    * @param model Thymeleaf model populated with operation, missions, finance and payouts
    * @return the {@code operation-detail} view name, its {@code missions} fragment, or a redirect on
    *     backend failure of the full-page load
@@ -198,13 +198,11 @@ public class OperationPageController {
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "10") Integer size,
       @RequestParam(required = false) String fragment,
-      Authentication authentication,
       Model model) {
     if (fragment != null) {
-      return operationFragment(id, page, size, fragment, authentication, model);
+      return operationFragment(id, page, size, fragment, model);
     }
-    if (!SectionFallback.run(
-        log, "operation-detail", () -> loadFullModel(id, page, size, authentication, model))) {
+    if (!SectionFallback.run(log, "operation-detail", () -> loadFullModel(id, page, size, model))) {
       model.addAttribute("error", "error.operation.load");
       return "redirect:/operations";
     }
@@ -221,20 +219,13 @@ public class OperationPageController {
    * @param size page size for the embedded missions table
    * @param fragment the requested fragment name ({@code overview}/{@code payout}/{@code
    *     finance}/{@code missions})
-   * @param authentication current user's authentication (used for {@code canEdit} / {@code
-   *     canUnsetPaidOut})
    * @param model Thymeleaf model populated with the fragment's data
    * @return the {@code operation-detail :: <fragment>} view, or {@code :: fragmentError} on an
    *     unknown fragment or a backend failure
    */
   @NotNull
   private String operationFragment(
-      UUID id,
-      Integer page,
-      Integer size,
-      String fragment,
-      Authentication authentication,
-      Model model) {
+      UUID id, Integer page, Integer size, String fragment, Model model) {
     if ("missions".equals(fragment)) {
       return missionsFragment(id, page, size, model);
     }
@@ -244,11 +235,11 @@ public class OperationPageController {
         () ->
             switch (fragment.toLowerCase(Locale.ROOT)) {
               case "overview" -> {
-                loadFullModel(id, page, size, authentication, model);
+                loadFullModel(id, page, size, model);
                 yield "operation/operation-detail :: overviewSection";
               }
               case "payout" -> {
-                loadPayoutModel(id, authentication, model);
+                loadPayoutModel(id, model);
                 yield "operation/operation-detail :: payoutSection";
               }
               case "finance" -> {
@@ -263,18 +254,16 @@ public class OperationPageController {
   /**
    * Loads the full operation-detail model (the overview fragment needs all of it): the four
    * independent reads fanned out on virtual threads via {@link ParallelPageLoader} plus the derived
-   * {@code operationMaxMissionResult}, {@code payoutProgress}, {@code canEdit} and {@code
-   * canUnsetPaidOut}. Propagates a backend failure to the caller (the full page redirects, the
-   * overview fragment shows its inline error).
+   * {@code operationMaxMissionResult}, {@code payoutProgress} and {@code canEdit}. Propagates a
+   * backend failure to the caller (the full page redirects, the overview fragment shows its inline
+   * error).
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
    * @param size page size for the embedded missions table
-   * @param authentication current user's authentication
    * @param model Thymeleaf model to populate
    */
-  private void loadFullModel(
-      UUID id, Integer page, Integer size, Authentication authentication, Model model) {
+  private void loadFullModel(UUID id, Integer page, Integer size, Model model) {
     CompletableFuture<OperationDto> operationF =
         parallelPageLoader.loadAsync(() -> operationClient.operation(id));
     CompletableFuture<PageResponse<MissionListDto>> missionsF =
@@ -309,8 +298,7 @@ public class OperationPageController {
                 .orElse(BigDecimal.ZERO);
     model.addAttribute("operationMaxMissionResult", maxMissionResult);
 
-    model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-    model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
+    model.addAttribute("canEdit", missionManagerGate.isGranted());
   }
 
   /**
@@ -320,17 +308,15 @@ public class OperationPageController {
    * flags. Deliberately issues neither the finance-summary nor the missions read.
    *
    * @param id operation id
-   * @param authentication current user's authentication
    * @param model Thymeleaf model to populate
    */
-  private void loadPayoutModel(UUID id, Authentication authentication, @NotNull Model model) {
+  private void loadPayoutModel(UUID id, @NotNull Model model) {
     model.addAttribute("operation", operationClient.operation(id));
     OperationPayoutSummaryDto payoutSummary = operationClient.payouts(id);
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
     model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
-    model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-    model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
+    model.addAttribute("canEdit", missionManagerGate.isGranted());
   }
 
   /**
@@ -414,29 +400,6 @@ public class OperationPageController {
     return "operation/operation-detail :: financeDetail";
   }
 
-  private static boolean hasMissionManagerRole(Authentication authentication) {
-    if (authentication == null) {
-      return false;
-    }
-    return authentication.getAuthorities().stream()
-        .map(GrantedAuthority::getAuthority)
-        .anyMatch(role ->
-            Roles.authority(Roles.ADMIN).equals(role)
-                || Roles.authority(Roles.OFFICER).equals(role)
-                || Roles.authority(Roles.MISSION_MANAGER).equals(role));
-  }
-
-  private static boolean hasOfficerOrAdminRole(Authentication authentication) {
-    if (authentication == null) {
-      return false;
-    }
-    return authentication.getAuthorities().stream()
-        .map(GrantedAuthority::getAuthority)
-        .anyMatch(role ->
-            Roles.authority(Roles.ADMIN).equals(role)
-                || Roles.authority(Roles.OFFICER).equals(role));
-  }
-
   /**
    * Creates a new operation. {@code MISSION_MANAGER} role is required (admin/officer satisfy it via
    * the role hierarchy).
@@ -447,7 +410,7 @@ public class OperationPageController {
    */
   @NotNull
   @PostMapping("/create")
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public String createOperation(
       @ModelAttribute OperationForm form, RedirectAttributes redirectAttributes) {
     try {
@@ -471,7 +434,7 @@ public class OperationPageController {
    */
   @NotNull
   @PostMapping("/{id}/update")
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   public String updateOperation(
       @PathVariable @NotNull UUID id,
       @ModelAttribute OperationForm form,
@@ -497,7 +460,7 @@ public class OperationPageController {
   /**
    * AJAX endpoint behind the per-row "Bezahlt" checkbox, proxying to {@code PUT
    * /api/v1/operations/{id}/payouts/paid-out}. Any mission manager may set {@code paidOut=true};
-   * only ADMIN or OFFICER may clear it.
+   * the backend lets only an admin or a caller with officer reach in the operation's unit clear it.
    *
    * @param id operation id (from the URL)
    * @param request participant key + new {@code paidOut} value
@@ -505,14 +468,7 @@ public class OperationPageController {
    *     status
    */
   @PostMapping("/{id}/payouts/paid-out")
-  @PreAuthorize(
-      "hasRole('"
-          + Roles.MISSION_MANAGER
-          + "') and (#request.paidOut() or hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "'))")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   @ResponseBody
   public ResponseEntity<OperationPayoutStatusDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
@@ -581,7 +537,7 @@ public class OperationPageController {
    * @return {@code 200} with no body on success, or the backend error as {@code problem+json}
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> createOperationAjax(@RequestBody OperationForm form) {
     return relay(
@@ -603,7 +559,7 @@ public class OperationPageController {
    * @return {@code 200} with the fresh version/name/status, or the propagated backend error
    */
   @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize("@missionManagerGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateOperationAjax(
       @PathVariable @NotNull UUID id, @RequestBody OperationForm form) {

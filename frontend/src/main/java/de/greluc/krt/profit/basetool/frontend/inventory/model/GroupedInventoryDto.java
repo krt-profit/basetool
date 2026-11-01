@@ -30,6 +30,14 @@ import java.util.Objects;
  * Frontend mirror of the per-catalog-entry Lager roll-up, broken down into {@link
  * InventoryStackDto} stacks. A material group carries {@code material} and quality aggregates; a
  * game-item group carries {@code gameItem} with {@code null} quality aggregates (REQ-INV-029).
+ *
+ * @param material the grouping material, or {@code null} for a game-item group
+ * @param gameItem the grouping game item, or {@code null} for a material group
+ * @param totalAmount the summed quantity across all stacks
+ * @param averageQuality amount-weighted mean quality, or {@code null}
+ * @param maxQuality highest quality across the stacks, or {@code null}
+ * @param stacks the per-stock-identity stacks of this group
+ * @param lowStock whether a minimum stock level of this material or game item is low (REQ-INV-068)
  */
 @DtoMirror
 public record GroupedInventoryDto(
@@ -38,7 +46,28 @@ public record GroupedInventoryDto(
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    List<InventoryStackDto> stacks) {
+    List<InventoryStackDto> stacks,
+    boolean lowStock) {
+
+  /**
+   * Creates a group that no low level marks.
+   *
+   * @param material the grouping material, or {@code null} for a game-item group
+   * @param gameItem the grouping game item, or {@code null} for a material group
+   * @param totalAmount the summed quantity across all stacks
+   * @param averageQuality amount-weighted mean quality, or {@code null}
+   * @param maxQuality highest quality across the stacks, or {@code null}
+   * @param stacks the per-stock-identity stacks of this group
+   */
+  public GroupedInventoryDto(
+      MaterialReferenceDto material,
+      InventoryGameItemReferenceDto gameItem,
+      Double totalAmount,
+      Double averageQuality,
+      Integer maxQuality,
+      List<InventoryStackDto> stacks) {
+    this(material, gameItem, totalAmount, averageQuality, maxQuality, stacks, false);
+  }
 
   /**
    * Counts the distinct owning users across this group's stacks, for the grouped Lager row's

@@ -27,11 +27,11 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDt
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -67,12 +67,8 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -136,7 +132,9 @@ public class RefineryOrderPageController {
   /** The refinery domain's typed backend client. */
   private final RefineryBackendClient refineryClient;
 
-  private final RoleHierarchy roleHierarchy;
+  /** Answers the pin-aware Logistician capability of the active context. */
+  private final LogisticianGate logisticianGate;
+
   private final IngestHandoffService ingestHandoffService;
   private final ParallelPageLoader parallelPageLoader;
 
@@ -219,7 +217,7 @@ public class RefineryOrderPageController {
     }
     final Instant now = Instant.now();
     final UUID viewerId = getCurrentUserId(principal);
-    final boolean manager = isLogistician(principal);
+    final boolean manager = logisticianGate.isGranted();
     List<RefineryListRow> rows =
         contentOf(shown).stream()
             .map(o -> RefineryListRow.of(o, now, viewerId, manager, locale))
@@ -504,7 +502,7 @@ public class RefineryOrderPageController {
         form.setOwnerId(currentUserId);
       }
     }
-    model.addAttribute("isLogistician", isLogistician(principal));
+    model.addAttribute("isLogistician", logisticianGate.isGranted());
     model.addAttribute("refineryOrderForm", form);
     final RefineryOrderForm boundForm = form;
     UUID preselectedLocationId = boundForm.getLocationId();
@@ -670,7 +668,7 @@ public class RefineryOrderPageController {
     if (section != null && !FRAGMENT_ORDER.equals(section) && !FRAGMENT_STORE.equals(section)) {
       return "refinery/refinery-orders-details :: fragmentError";
     }
-    boolean isLogistician = isLogistician(principal);
+    boolean isLogistician = logisticianGate.isGranted();
     model.addAttribute("isLogistician", isLogistician);
 
     if ((!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm"))
@@ -1145,36 +1143,5 @@ public class RefineryOrderPageController {
       return null;
     }
     return CurrentUser.userId(principal);
-  }
-
-  private boolean isLogistician(OidcUser principal) {
-    if (principal == null) {
-      return false;
-    }
-
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    Collection<? extends GrantedAuthority> authorities =
-        (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
-
-    log.debug("Checking logistician status, authorities: {}", authorities);
-    Collection<? extends GrantedAuthority> reachableAuthorities =
-        roleHierarchy.getReachableGrantedAuthorities(authorities);
-    log.debug("Reachable authorities: {}", reachableAuthorities);
-    boolean result =
-        reachableAuthorities.stream()
-            .anyMatch(a ->
-                a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
-                    || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
-                    || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
-    if (!result) {
-      UserDto me =
-          SectionFallback.load(log, "refinery-logistician-flag", refineryClient::currentUser, null);
-      if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
-        log.info("Granting logistician by backend flag");
-        result = true;
-      }
-    }
-    log.debug("Is logistician (final): {}", result);
-    return result;
   }
 }

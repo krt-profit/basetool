@@ -60,6 +60,10 @@ public class LayoutContextLoader {
   /** Request attribute holding the memoised {@link LayoutContext} of the current request. */
   static final String REQUEST_ATTRIBUTE = LayoutContextLoader.class.getName() + ".context";
 
+  /** Request attribute holding the capabilities read for a handler that renders no layout model. */
+  static final String CAPABILITIES_ATTRIBUTE =
+      LayoutContextLoader.class.getName() + ".capabilities";
+
   /** The backend endpoint answering the four layout questions in one read-only transaction. */
   static final String LAYOUT_PATH = "/api/v1/me/layout";
 
@@ -94,6 +98,30 @@ public class LayoutContextLoader {
   }
 
   /**
+   * Returns the caller's capability flags for a security gate, which also guards handlers that
+   * render no layout model and so never trigger {@link #load(HttpServletRequest)}.
+   *
+   * <p>Shares the memoised layout read when the handler renders a model; otherwise reads the layout
+   * once per request into its own memo. Fails closed to {@link CapabilitiesResponse#NONE}.
+   *
+   * @param request the current request
+   * @return the caller's capability flags; never {@code null}
+   */
+  @NotNull
+  public CapabilitiesResponse capabilities(@NotNull HttpServletRequest request) {
+    if (needsLayoutModel(request)) {
+      return load(request).capabilities();
+    }
+    if (request.getAttribute(CAPABILITIES_ATTRIBUTE) instanceof CapabilitiesResponse memo) {
+      return memo;
+    }
+    CapabilitiesResponse read =
+        authHelper.isAuthenticated() ? read().capabilities() : CapabilitiesResponse.NONE;
+    request.setAttribute(CAPABILITIES_ATTRIBUTE, read);
+    return read;
+  }
+
+  /**
    * Performs the one backend read behind {@link #load(HttpServletRequest)}, or decides it is not
    * needed.
    *
@@ -105,6 +133,16 @@ public class LayoutContextLoader {
     if (!authHelper.isAuthenticated() || !needsLayoutModel(request)) {
       return LayoutContext.NONE;
     }
+    return read();
+  }
+
+  /**
+   * Reads {@code GET /api/v1/me/layout} and maps the answer.
+   *
+   * @return the caller's layout context, or {@link LayoutContext#NONE} on a failed or empty answer
+   */
+  @NotNull
+  private LayoutContext read() {
     try {
       MeLayoutResponse response = backendApiClient.get(LAYOUT_PATH, MeLayoutResponse.class);
       if (response == null) {

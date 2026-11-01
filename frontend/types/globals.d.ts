@@ -623,14 +623,16 @@ interface KrtHerkunftApi {
 }
 
 /**
- * The per-page settings of the two Lager pages sharing `inventory-common.js`: the global Lager
- * (`/inventory/all`) and the personal one (`/inventory/my`).
+ * The per-page settings of the two Lager lists sharing `inventory-common.js`: the global Lager
+ * (`/inventory?storage=all`) and the personal one (`/inventory?storage=my`).
  */
 interface KrtInventoryLagerConfig {
     /** The page's data-trigger prefix: `inv-admin` or `inv-my`. */
     triggerPrefix: string;
     /** The route root the stack-entries endpoints hang off: `/inventory/all` or `/inventory/my`. */
     basePath: string;
+    /** The option of the Lager tab the page shows: `all` or `my`. */
+    storage: 'all' | 'my';
     /** The global Lager's stacks are per owner: its stack-entries URL carries `userId`. */
     stackPerOwner: boolean;
     /** The personal Lager's stack key carries the personal flag. */
@@ -662,6 +664,8 @@ interface KrtLagerSelection {
 
 /** One page's instance of the shared Lager behaviour, from `krtInventory.createLager`. */
 interface KrtInventoryLager {
+    /** The address of the Lager tab with the page's storage option selected. */
+    lagerPageUrl(): URL;
     /** Whether the Items (game-item) view is active rather than the Material view. */
     lagerIsItemsView(): boolean;
     /** Re-applies the persisted group and stack expansion after a grouped-table re-swap. */
@@ -783,6 +787,8 @@ interface KrtComboboxI18n extends Partial<Record<string, unknown>> {
  * `detail` shape.
  */
 interface DocumentEventMap {
+    /** Fired for every notification the notification stream delivers. */
+    'krt:notification': CustomEvent<null>;
     /**
      * Fired after `krtFetch.swap` replaced a container's content, so progressive enhancement can
      * re-run on the new markup.
@@ -796,8 +802,8 @@ interface DocumentEventMap {
     'krt:inventory-changed': CustomEvent<null>;
 }
 
-/** Fetches combobox options on demand for a query. */
-type KrtComboboxRemoteSource = (query: string) => Promise<any[]>;
+/** Fetches combobox options on demand for a query, given the select it serves. */
+type KrtComboboxRemoteSource = (query: string, select?: HTMLElement) => Promise<any[]>;
 
 /** Overrides for one combobox instance; each text key has a `data-combobox-*` fallback. */
 interface KrtComboboxConfig {
@@ -882,6 +888,15 @@ interface KrtNavApi {
 
     /** Opens the drawer on the administration groups; only effective for an administrator. */
     openAdmin(): void;
+
+    /** Whether the drawer shows the administration groups. */
+    isAdminMode(): boolean;
+
+    /**
+     * Switches between the member groups and the administration groups without opening the
+     * drawer; only effective for an administrator. Announces the change as `krt:nav-admin-mode`.
+     */
+    setAdminMode(on: boolean): void;
 }
 
 /** The quick-access command palette (`krt-palette.js`, REQ-UI-026). */
@@ -892,6 +907,12 @@ interface KrtPaletteApi {
      * @param query text to pre-fill the search with
      */
     open(query?: string): void;
+}
+
+/** The „Tastenkürzel“ dialog (`nav-shortcuts.js`, REQ-UI-035). */
+interface KrtShortcutsApi {
+    /** Opens the dialog. */
+    open(): void;
 }
 
 interface Window {

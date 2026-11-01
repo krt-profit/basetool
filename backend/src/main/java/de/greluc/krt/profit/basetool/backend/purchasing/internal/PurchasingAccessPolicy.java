@@ -22,17 +22,14 @@ package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -140,18 +137,7 @@ public class PurchasingAccessPolicy {
    */
   @NotNull
   public Set<UUID> managedUnitIds() {
-    Set<UUID> ids = new HashSet<>();
-    authHelperService
-        .currentAuthentication()
-        .ifPresent(authentication -> {
-          for (GrantedAuthority authority : authentication.getAuthorities()) {
-            if (authority instanceof OrgUnitContextualAuthority contextual
-                && UNIT_MANAGER_ROLE.equals(contextual.roleName())) {
-              ids.add(contextual.orgUnitId());
-            }
-          }
-        });
-    return ids;
+    return ownerScopeService.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE);
   }
 
   /**
@@ -287,13 +273,14 @@ public class PurchasingAccessPolicy {
   }
 
   /**
-   * Whether the caller is the lead of the unit: the Staffelleiter or the SK lead.
+   * Whether the caller leads the unit: holds officer reach in it through a leadership seat, or is
+   * its SK lead.
    *
    * @param orgUnitId the unit
    * @return {@code true} for the unit's lead
    */
   public boolean leadsUnit(@NotNull UUID orgUnitId) {
-    return ownerScopeService.hasRoleInOrgUnit(orgUnitId, "OFFICER")
+    return ownerScopeService.canActAsOfficerIn(orgUnitId)
         || ownerScopeService.hasRoleInOrgUnit(orgUnitId, "LEAD");
   }
 }

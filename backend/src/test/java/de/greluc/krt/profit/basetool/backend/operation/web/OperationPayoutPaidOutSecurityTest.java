@@ -46,7 +46,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Security tests for {@link OperationController#setPayoutStatus}: any mission manager may set
- * {@code paidOut=true}, only ADMIN or OFFICER may clear it.
+ * {@code paidOut=true}, only a caller with officer reach in the operation's unit (or an admin) may
+ * clear it (REQ-SEC-065).
  */
 @SpringBootTest
 class OperationPayoutPaidOutSecurityTest {
@@ -68,7 +69,7 @@ class OperationPayoutPaidOutSecurityTest {
   }
 
   private static SimpleGrantedAuthority officer() {
-    return new SimpleGrantedAuthority("ROLE_OFFICER");
+    return new SimpleGrantedAuthority("ROLE_MISSION_MANAGER");
   }
 
   private static SimpleGrantedAuthority missionManager() {
@@ -103,6 +104,23 @@ class OperationPayoutPaidOutSecurityTest {
   }
 
   @Test
+  void flatMissionManagerWithoutAGrantInTheOwningUnit_isForbidden() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(false);
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, true))
+                .with(jwt().authorities(missionManager())))
+        .andExpect(status().isForbidden());
+
+    verify(operationPayoutService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
+  }
+
+  @Test
   void missionManager_isForbiddenFromSetting_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
@@ -120,10 +138,11 @@ class OperationPayoutPaidOutSecurityTest {
   }
 
   @Test
-  void officer_canSet_paidOutFalse() throws Exception {
+  void seatInOwningUnit_canSet_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
     when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationAccessPolicy.canClearPayout(opId)).thenReturn(true);
     when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(false)))
         .thenReturn(refreshedRow(key));
 
@@ -139,10 +158,29 @@ class OperationPayoutPaidOutSecurityTest {
   }
 
   @Test
+  void officerWithoutReachInOwningUnit_isForbiddenFromSetting_paidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationAccessPolicy.canClearPayout(opId)).thenReturn(false);
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, false))
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isForbidden());
+
+    verify(operationPayoutService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
+  }
+
+  @Test
   void admin_canSet_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
     when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationAccessPolicy.canClearPayout(opId)).thenReturn(true);
     when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(false)))
         .thenReturn(refreshedRow(key));
 

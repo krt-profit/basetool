@@ -69,6 +69,8 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibi
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
@@ -535,7 +537,9 @@ class ArchitectureTest {
           OrgUnitBankRequestService.class,
           OrgUnitBankResponsibilityService.class,
           OrgUnitBankSettingsService.class,
-          OrgUnitBankVisibilityService.class);
+          OrgUnitBankVisibilityService.class,
+          OrgUnitBankVisibleAccountDto.class,
+          OrgUnitBankVisibleAccountsQuery.class);
 
   /**
    * The bank domain: the {@code bank} module package tree without the {@link #ORG_UNIT_BANK_SIDE},

@@ -59,6 +59,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -156,11 +157,11 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   }
 
   /**
-   * Lists a target user's refinery orders within the caller's org-unit scope, for the cross-user
-   * oversight endpoint.
+   * Lists a target user's refinery orders for the cross-user oversight endpoint, limited to the
+   * units in which the caller is Logistician.
    *
    * <p>The {@code @PreAuthorize} gate only checks a shared org unit; the per-row scope filter here
-   * hides orders stamped to units the caller does not share.
+   * hides orders stamped to units in which the caller is no Logistician.
    *
    * @param targetUserId the user whose orders to list; never {@code null}
    * @param pageable page request
@@ -168,7 +169,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    */
   public Page<RefineryOrder> getUserRefineryOrdersScoped(
       @NotNull UUID targetUserId, @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentLogisticianScope();
     return refineryOrderRepository.findByOwnerIdScoped(
         targetUserId,
         scope.adminAllScope(),
@@ -235,27 +236,29 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   }
 
   /**
-   * Lists the refinery orders linked to a mission within the caller's org-unit scope.
+   * Lists the refinery orders linked to a mission that the caller may see on the mission: their
+   * own, plus every order of the units in which they are Logistician (REQ-SEC-005).
    *
    * @param missionId mission id
-   * @return the in-scope orders linked to the mission
+   * @param userId the caller's user id
+   * @return the caller's own orders and the orders of their Logistician units, each once
    */
-  public List<RefineryOrder> getMissionRefineryOrdersScoped(@NotNull UUID missionId) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return refineryOrderRepository.findByMissionIdScoped(
-        missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
-  }
-
-  /**
-   * Lists the orders of the given mission that are owned by the given user.
-   *
-   * @param missionId mission id
-   * @param userId owner id
-   * @return matching orders
-   */
-  public List<RefineryOrder> getMissionRefineryOrders(
+  public List<RefineryOrder> getMissionRefineryOrdersForCaller(
       @NotNull UUID missionId, @NotNull UUID userId) {
-    return refineryOrderRepository.findByMissionIdAndOwnerId(missionId, userId);
+    Map<UUID, RefineryOrder> byId = new LinkedHashMap<>();
+    ScopePredicate scope = ownerScopeService.currentLogisticianScope();
+    if (scope.adminAllScope()
+        || scope.activeOrgUnitId() != null
+        || !scope.memberOrgUnitIds().isEmpty()) {
+      refineryOrderRepository
+          .findByMissionIdScoped(
+              missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
+          .forEach(o -> byId.put(o.getId(), o));
+    }
+    refineryOrderRepository
+        .findByMissionIdAndOwnerId(missionId, userId)
+        .forEach(o -> byId.putIfAbsent(o.getId(), o));
+    return List.copyOf(byId.values());
   }
 
   /**
@@ -328,6 +331,26 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   @Transactional
   public RefineryOrder createRefineryOrder(
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
+    return create(userId, order, owningOrgUnitId, false);
+  }
+
+  /**
+   * Like {@link #createRefineryOrder}, for another member's order: the caller must be Logistician
+   * of the stamped unit, an order without a unit is admin-only (REQ-SEC-005).
+   *
+   * @param userId the member who will own the order
+   * @param order transient entity with shallow id-only references
+   * @param owningOrgUnitId the org unit to stamp, as for {@link #createRefineryOrder}
+   * @return the persisted order
+   */
+  @Transactional
+  public RefineryOrder createRefineryOrderOnBehalf(
+      @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
+    return create(userId, order, owningOrgUnitId, true);
+  }
+
+  private RefineryOrder create(
+      @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId, boolean onBehalf) {
     order.setId(null);
     order.setVersion(null);
     order.setStatus(RefineryOrderStatus.OPEN);
@@ -338,7 +361,9 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     order.setOwner(user);
     order.setOwningOrgUnit(
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId));
-
+    if (onBehalf) {
+      ownerScopeService.requireLogisticianInOwner(order.getOwningOrgUnit());
+    }
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
           Entities.require(

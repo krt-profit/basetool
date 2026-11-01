@@ -39,6 +39,7 @@
       "catalogue/admin-material-aliases.js",
       "catalogue/admin-materials.js",
       "catalogue/admin-quality-tiers.js",
+      "catalogue/admin-squadrons.js",
       "catalogue/catalogue-list.js",
       "catalogue/locations.js",
       "catalogue/material-detail.js",
@@ -52,7 +53,8 @@
       "catalogue/uex.js"
     ],
     "dashboard": [
-      "dashboard/announcement.js",
+      "dashboard/dashboard-edit.js",
+      "dashboard/dashboard-widgets.js",
       "dashboard/index.js"
     ],
     "exchange": [
@@ -90,7 +92,8 @@
       "inventory/inventory-materialboerse.js",
       "inventory/inventory-my.js",
       "inventory/inventory-note-modal.js",
-      "inventory/inventory-pool-change.js"
+      "inventory/inventory-pool-change.js",
+      "inventory/stock-levels.js"
     ],
     "joborder": [
       "joborder/item-collection.js",
@@ -122,8 +125,10 @@
       "kernel/krt-filter-chips.js",
       "kernel/krt-filter-panel.js",
       "kernel/krt-focus.js",
+      "kernel/krt-frequent.js",
       "kernel/krt-hooks.js",
       "kernel/krt-html.js",
+      "kernel/krt-instant-toggle.js",
       "kernel/krt-i18n.js",
       "kernel/krt-list-count.js",
       "kernel/krt-live-sync.js",
@@ -132,13 +137,25 @@
       "kernel/krt-number-input.js",
       "kernel/krt-overflow-menu.js",
       "kernel/krt-page-sections.js",
+      "kernel/krt-palette-personalise.js",
       "kernel/krt-palette.js",
       "kernel/krt-reorder.js",
       "kernel/krt-search.js",
+      "kernel/krt-shortcuts.js",
       "kernel/krt-searchable-select.js",
       "kernel/krt-tab-scroll-cue.js",
       "kernel/krt-table-sort.js",
       "kernel/krt-user-search.js",
+      "kernel/nav-appearance.js",
+      "kernel/nav-edit.js",
+      "kernel/nav-favourites.js",
+      "kernel/nav-order.js",
+      "kernel/nav-preferences.js",
+      "kernel/nav-rail.js",
+      "kernel/nav-reset.js",
+      "kernel/nav-shortcuts.js",
+      "kernel/nav-start-page.js",
+      "kernel/nav-tabbar.js",
       "kernel/safe-url.js",
       "kernel/scu-decimal-input.js",
       "kernel/sidebar.js",
@@ -164,6 +181,7 @@
       "mission/missions.js"
     ],
     "notification": [
+      "notification/notification-bell-label.js",
       "notification/notification-rules.js",
       "notification/notifications-page.js",
       "notification/notifications.js"

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
@@ -102,5 +103,15 @@ public final class InventoryAuditLabels {
         .findFirst()
         .map(names)
         .orElse("-");
+  }
+
+  /**
+   * Renders an org unit for an audit details payload as {@code kind:id}.
+   *
+   * @param orgUnit the unit, or {@code null}
+   * @return {@code kind:id}, or {@code none} without a unit
+   */
+  public static @NotNull String orgUnitRef(@Nullable OrgUnit orgUnit) {
+    return orgUnit == null ? "none" : orgUnit.getKind() + ":" + orgUnit.getId();
   }
 }

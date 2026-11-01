@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation',
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orgunitbank.overview', eyebrowKey='nav.section.organisation',
         titleText=#{bank.orgUnit.title}, actions=~{::ou-head-actions})}">
         <th:block th:ref="ou-head-actions">
             <button type="button" class="btn btn--cta" th:if="${canRequestAny}"

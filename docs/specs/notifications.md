@@ -119,6 +119,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_WITHDRAWN` | none (no rule) | — | supersedes the pledge notices | REQ-SUP-016 |
+| `INVENTORY_STOCK_LEVEL_LOW` | `INVENTORY_STOCK_LEVEL_LOW` | V316 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the level's unit, no cascade); raised once per low, re-armed at the target, by the `stock_level_low` timed producer | REQ-NOTIF-030 |
 | `SUPPLY_NEED_ORDER_COVERED` | `SUPPLY_NEED_ORDER_COVERED` | V312 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); raised once per link by the `supply_order_covered` timed producer | REQ-SUP-024 |
 | `SUPPLY_NEED_CLOSED` | none (no rule) | — | supersedes the need's covered-order notices when it is fulfilled or withdrawn | REQ-SUP-024 |
 | `PURCHASING_NEED_RELEASED` | `PURCHASING_NEED_RELEASED` | V289 | `EVENT_RECIPIENTS` (the active Handelsbeauftragten); the only purchasing notice a member can mute | REQ-PUR-024 |
@@ -262,6 +263,7 @@ from the event.
 Four group kinds were added for the wider notifications of issue #2414 and read no selector
 column either: `MISSION_PARTICIPANTS`, `MISSION_LEADERSHIP`, `EXCHANGE_CLIENT_HOLDERS` and
 `EVENT_RECIPIENTS` (REQ-NOTIF-024), and `ORG_RELATIVE_ROLE` gained the role `UNIT_LEADERSHIP`.
+`SEAT_HOLDERS` (every leadership seat holder, REQ-NOTIF-024) reads no column and no event field.
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
@@ -307,13 +309,11 @@ frontend `notification/web/AdminNotificationRulePageController`,
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
 
 When a job order is created, the seeded default rule resolves recipients from the **responsible
-org unit**: officers (global `OFFICER` role ∩ membership of that unit), leads
+org unit**: officers (the seat holders directly in that unit, `OrgRelativeRole.OFFICER`), leads
 (`org_unit_membership.role = SK_LEAD`), logisticians (`org_unit_membership.is_logistician`), plus the
 global admins (`ROLE` `ADMIN`). The creating actor is excluded. The seeded rule is
-admin-editable and -deletable. Officer-ness is a Keycloak role mirrored into `user_roles`, so a
-freshly-promoted-but-not-yet-logged-in officer becomes a recipient only after the next
-Keycloak reconciliation (`UserSyncTask`, daily at 05:00 Europe/Berlin by default, or an admin's
-manual sync) — an accepted eventual-consistency window. A login re-syncs the roles at once.
+admin-editable and -deletable. Officer-ness is the membership rank, read live from
+`org_unit_membership`; a newly appointed seat holder is a recipient at once.
 
 The notice leaves the inbox when the order closes: completing it (status change or the last
 handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which supersedes the order's
@@ -962,10 +962,18 @@ the rule editor like the others:
 | `MISSION_LEADERSHIP` | the mission's owner and its co-managers | `contextMissionId()` |
 | `EXCHANGE_CLIENT_HOLDERS` | every member with a non-revoked installation of the client; of any client when the event is exchange-wide | `contextExchangeClientId()` or `contextAllExchangeClients()` |
 | `EVENT_RECIPIENTS` | the set of affected users the event lists (bulk actions) | `contextRecipientUserIds()` |
+| `SEAT_HOLDERS` | every member who holds a leadership seat in any org unit | nothing |
 
 `OrgRelativeRole.UNIT_LEADERSHIP` resolves to the members whose rank confers oversight of the context
-org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …), whether or not
-they hold the global `OFFICER` role.
+org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …). The seats
+are read **directly in that unit**: the seat holders of a Bereich or the Organisationsleitung are not
+included for a Staffel, and a Bereich's rule does not reach its Staffeln. No `KRT Member` filter
+applies; a seat holder without that role is a recipient like any other.
+
+`OFFICER` is no stored role any more. `OrgRelativeRole.OFFICER` is an alias of `UNIT_LEADERSHIP`,
+and a `ROLE` selector with the code `OFFICER` resolves like `SEAT_HOLDERS`, so rules that name it
+keep addressing the seat holders (ADR-0300). `SEAT_HOLDERS` is the persistable, editable target
+such rules are migrated to.
 
 An event that carries nothing a kind needs resolves to nobody for that kind. The plain
 `excludeActor` rule and the de-duplication apply to the new kinds exactly as to the old ones, and
@@ -977,6 +985,10 @@ data only through its SPIs `MissionRecipientDirectory` and `ExchangeRecipientDir
 - [x] Each new kind resolves through the event's context and drops the actor when the rule says so.
 - [x] A mission or exchange event without its context resolves to nobody.
 - [x] `UNIT_LEADERSHIP` reaches every seat holder of the unit and no plain member.
+- [x] `OrgRelativeRole.OFFICER` resolves to the seat holders directly in the context unit; the
+  seat holders of a higher unit (Bereich, Organisationsleitung) are not reached.
+- [x] A `ROLE` selector `OFFICER` and a `SEAT_HOLDERS` selector resolve to every seat holder
+  without reading the role mirror; `SEAT_HOLDERS` is stored with every selector column `null`.
 - [x] The rule editor offers every new kind and the new role, under a localized label, and stores a
   group kind with every selector column `null`.
 
@@ -1159,9 +1171,6 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 
 ### REQ-NOTIF-030 — A minimum stock level that falls low tells the unit's Logisticians
 
-> **Status: planned** (ADR-0302, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 A minimum stock level (REQ-INV-067) whose allocated free stock drops below its minimum raises the
 notification type `INVENTORY_STOCK_LEVEL_LOW`.
 
@@ -1179,34 +1188,42 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
   through the rule engine (REQ-NOTIF-007). The notice links to the unit's „Mindestbestände" tab.
 - **Switchable.** The type is mutable (REQ-NOTIF-027) and appears in the profile's
   „Benachrichtigungen" card under the Lager area.
-- **Silent lifecycle.** Deleting a level, its catalogue entry or its unit, and deactivating its
-  tier, send no notice (REQ-INV-068).
-- **Payload.** The unit, the material or item and the tier as ids and coded parameters, the minimum
-  and the allocated amount; no member name.
+- **Silent lifecycle.** Deleting a level or its material, and deactivating its tier, send no
+  notice; a level of an inactive unit or catalogue entry raises none while it is hidden
+  (REQ-INV-068).
+- **Payload.** The unit and the material or item name (with the tier code), the minimum and the
+  allocated amount; the level is the loose entity, and no member name is carried. Game-item levels
+  notify the same way.
 - **Observable.** `basetool_notification_created_total{notification_type}` and
   `basetool_notification_timed_produced_total{kind}` count it (REQ-OBS-011). A low level is a
   notice, never an alert.
 
 **Acceptance**
 
-- [ ] A level falling below its minimum notifies its unit's direct Logisticians and seat holders
-  once; a Bereich lead above the unit is not notified.
-- [ ] Stock rising above the minimum but below the target and falling again sends nothing; reaching
-  the target and falling low again sends a second notice.
-- [ ] A member who muted the type gets nothing.
-- [ ] Deleting the level or its catalogue entry, dissolving the unit and deactivating the tier send
-  nothing.
-- [ ] A Logistician's edit of a level does not 409 against the producer's marker.
+- [x] A level falling below its minimum notifies its unit's direct Logisticians and seat holders
+  once; a Bereich lead above the unit is not notified. *`StockLevelNoticeIntegrationTest`,
+  `SeededNotificationRulesIntegrationTest`.*
+- [x] Stock rising above the minimum but below the target and falling again sends nothing; reaching
+  the target and falling low again sends a second notice. *`StockLevelNoticeProducerTest`,
+  `StockLevelNoticeIntegrationTest`.*
+- [x] A member who muted the type gets nothing. *`StockLevelNoticeIntegrationTest`.*
+- [x] Deleting the level or its material, deactivating the unit or the catalogue entry, and
+  deactivating the tier send nothing; a level of an inactive unit or entry notifies once it returns.
+  *`StockLevelNoticeIntegrationTest`.*
+- [x] A Logistician's edit of a level does not 409 against the producer's marker.
+  *`StockLevelNoticeIntegrationTest`.*
 
-**Enforced by (to be added):** `StockLevelNoticeProducerTest`, `StockLevelNoticeIntegrationTest`,
-`NotificationPreferenceGroupsTest`, `NotificationTypeMessageCoverageTest` · **Code:** to be added
-(`NotificationType#INVENTORY_STOCK_LEVEL_LOW`, the inventory module's producer) · **Related:**
+**Enforced by:** `StockLevelNoticeProducerTest`, `StockLevelNoticeIntegrationTest`,
+`SeededNotificationRulesIntegrationTest`, `NotificationPreferenceGroupsTest`,
+`NotificationTypeMessageCoverageTest`, `NotificationTargetsTest` · **Code:**
+`NotificationType#INVENTORY_STOCK_LEVEL_LOW`, `inventory/internal/StockLevelNoticeProducer`,
+`StockLevelStates`, `InventoryNotices#stockLevelLow`, migration V316 · **Related:**
 REQ-INV-067, REQ-INV-068, REQ-NOTIF-024, REQ-NOTIF-026, REQ-NOTIF-027 · **Decision:** ADR-0302
 
 ### REQ-NOTIF-031 — Amounts in a notification carry thousands separators
 
 The backend stores an amount parameter locale-free (`3000000`, `12.50`). The web inbox and bell
-render the parameters `amount`, `fee`, `balance`, `total`, `open` and `donation` with the
+render the parameters `amount`, `fee`, `balance`, `total`, `open`, `donation` and `minimum` with the
 thousands and decimal separators of the member's language: `3.000.000` and `12,50` in German,
 `3,000,000` and `12.50` in English. Every other parameter — an account number, a deal number, a count, a name — renders as
 stored, and so does a value that is not a plain decimal. Lists the producer pre-renders (`lots`,
@@ -1277,7 +1294,8 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
 | `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
-| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory/my` (the notice names a source row, not the recipient's) |
+| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory?storage=my` (the notice names a source row, not the recipient's) |
+| `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
 | `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |
 | `BLUEPRINT_CHANGED_BY_ADMIN`, `BLUEPRINT_PURGED_BY_ADMIN` | `/personal-inventory/blueprints` |
 | `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile#profile-deletion-host` |

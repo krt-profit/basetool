@@ -54,8 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The organisation notices end to end against Postgres (REQ-ORG-029, -030): the seat queries, the
- * mismatch reaching the admins until the roles fit, and the departure reaching the leadership of
- * the member's unit and not the member. Runs in a rolled-back transaction.
+ * missing {@code KRT Member} of a seat holder reaching the admins until it is resolved, and the
+ * departure reaching the leadership of the member's unit and not the member. Runs in a rolled-back
+ * transaction.
  */
 @SpringBootTest
 @Transactional
@@ -77,9 +78,9 @@ class OrgNoticeIntegrationTest {
   @BeforeEach
   void seed() {
     Role admin = roleRepository.findByNameIgnoreCase("Admin").orElseThrow();
-    Role officer = roleRepository.findByNameIgnoreCase("Officer").orElseThrow();
+    Role krtMember = roleRepository.findByNameIgnoreCase("KRT Member").orElseThrow();
     user(ADMIN, "org-admin", Set.of(admin));
-    user(LEADER, "org-leader", Set.of(officer));
+    user(LEADER, "org-leader", Set.of(krtMember));
     user(MEMBER, "org-member", Set.of());
     squadron = new Squadron();
     squadron.setName("Org Notice " + UUID.randomUUID());
@@ -123,17 +124,26 @@ class OrgNoticeIntegrationTest {
   }
 
   @Test
+  void theSeatHolderQueriesSeparateSeatsFromPlainMembersPerUnitAndGlobally() {
+    assertThat(membershipRepository.findLeadershipUserIdsByOrgUnit(squadron.getId()))
+        .containsExactly(LEADER);
+    assertThat(membershipRepository.findAllLeadershipUserIds())
+        .contains(LEADER)
+        .doesNotContain(MEMBER);
+  }
+
+  @Test
   void theRoleQueryFindsHeldRolesOnly() {
-    assertThat(userRepository.hasAnyRoleCode(LEADER, List.of("OFFICER"))).isTrue();
-    assertThat(userRepository.hasAnyRoleCode(MEMBER, List.of("OFFICER", "ADMIN"))).isFalse();
+    assertThat(userRepository.hasAnyRoleCode(LEADER, List.of("KRT_MEMBER"))).isTrue();
+    assertThat(userRepository.hasAnyRoleCode(MEMBER, List.of("KRT_MEMBER", "ADMIN"))).isFalse();
     assertThat(userRepository.hasAnyRoleCode(ADMIN, List.of("ADMIN"))).isTrue();
   }
 
   @Test
-  void aMismatchReachesTheAdminsAndGoesWhenTheRolesFit() {
+  void aSeatHolderWithoutKrtMemberReachesTheAdminsAndGoesWhenResolved() {
     creationService.createFromEvent(
         OrgNotices.leadershipRoleMismatch(
-            MEMBER, "org-member", "ALP", "APPOINTED", "ENSIGN", "MISSING_OFFICER", LEADER));
+            MEMBER, "org-member", "ALP", "APPOINTED", "ENSIGN", "MISSING_KRT_MEMBER", LEADER));
     assertThat(inbox(ADMIN)).containsExactly(NotificationType.ORG_LEADERSHIP_ROLE_MISMATCH);
 
     creationService.createFromEvent(OrgNotices.leadershipRolesAgree(MEMBER));
@@ -145,10 +155,10 @@ class OrgNoticeIntegrationTest {
   void aSecondMismatchOfTheSameMemberReplacesTheFirst() {
     creationService.createFromEvent(
         OrgNotices.leadershipRoleMismatch(
-            MEMBER, "org-member", "ALP", "APPOINTED", "ENSIGN", "MISSING_OFFICER", null));
+            MEMBER, "org-member", "ALP", "APPOINTED", "ENSIGN", "MISSING_KRT_MEMBER", null));
     creationService.createFromEvent(
         OrgNotices.leadershipRoleMismatch(
-            MEMBER, "org-member", "ALP", "REMOVED", "ENSIGN", "SURPLUS_OFFICER", null));
+            MEMBER, "org-member", "ALP", "ROLES_RECONCILED", "ENSIGN", "MISSING_KRT_MEMBER", null));
 
     assertThat(inbox(ADMIN)).containsExactly(NotificationType.ORG_LEADERSHIP_ROLE_MISMATCH);
   }

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -53,6 +54,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -238,10 +240,21 @@ public class HangarService {
   }
 
   /**
+   * Returns how many ships the user owns and how many of them are fitted (REQ-HANGAR-016).
+   *
+   * @param userId owner id
+   * @return the user's hangar readiness
+   */
+  public ShipReadinessDto getMyReadiness(@NotNull UUID userId) {
+    return shipRepository.readinessOf(userId);
+  }
+
+  /**
    * Returns the per-ship-type unit overview in the caller's unit-overview scope (REQ-HANGAR-003),
    * optionally with the per-ship owner, location and fitted breakdown. Counts and breakdown use the
    * same {@link ScopePredicate}, so no ship outside the caller's scope is surfaced; whether the
-   * caller may see owner details is decided by the controller.
+   * caller may see owner details is decided by the controller, and the breakdown covers only the
+   * ships of units in which the caller holds officer reach.
    *
    * @param pageable page request (sortable by {@code shipType.name})
    * @param includeOwnerDetails whether to load the per-ship owner/location/fitted breakdown
@@ -267,8 +280,12 @@ public class HangarService {
 
     List<Ship> ships =
         includeOwnerDetails && !types.isEmpty()
-            ? shipRepository.findByShipTypeInScoped(
-                types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
+            ? shipRepository
+                .findByShipTypeInScoped(
+                    types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
+                .stream()
+                .filter(s -> ownerScopeService.canActAsOfficerInOwner(owningUnitId(s)))
+                .toList()
             : Collections.emptyList();
 
     Map<UUID, List<Ship>> shipsByType =
@@ -670,12 +687,12 @@ public class HangarService {
   }
 
   /**
-   * Clears the {@code fitted} flag on every ship in the caller's squadron scope; in the admin
-   * all-squadrons mode on every ship.
+   * Clears the {@code fitted} flag on every ship of the units in the caller's scope in which the
+   * caller holds officer reach; in the admin all-squadrons mode on every ship.
    */
   @Transactional
   public void resetAllFittedStatus() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = officerResetScope(ownerScopeService.currentScopePredicate());
     List<ShipRepository.OwnerShipCount> perOwner =
         shipRepository.countFittedByOwnerScoped(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
@@ -699,6 +716,30 @@ public class HangarService {
       }
       unitLiveSync.unitsChanged(units);
     }
+  }
+
+  /**
+   * Narrows {@code scope} to the units in which the caller holds officer reach; the admin all-scope
+   * stays as it is.
+   */
+  private @NotNull ScopePredicate officerResetScope(@NotNull ScopePredicate scope) {
+    if (scope.adminAllScope()) {
+      return scope;
+    }
+    Set<UUID> candidates =
+        scope.activeOrgUnitId() == null
+            ? scope.memberOrgUnitIds()
+            : Set.of(scope.activeOrgUnitId());
+    return new ScopePredicate(
+        false,
+        null,
+        candidates.stream()
+            .filter(ownerScopeService::canActAsOfficerIn)
+            .collect(Collectors.toSet()));
+  }
+
+  private static @Nullable UUID owningUnitId(@NotNull Ship ship) {
+    return ship.getOwningOrgUnit() == null ? null : ship.getOwningOrgUnit().getId();
   }
 
   /**

@@ -126,7 +126,7 @@ class MissionServiceTest {
   @Test
   void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
     when(ownerScopeService.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.empty());
@@ -135,6 +135,27 @@ class MissionServiceTest {
 
     assertEquals(Optional.empty(), result);
     verify(missionRepository, never()).findById(any());
+  }
+
+  @Test
+  void getNextMission_memberWithoutUnit_readsPublicMissionsOnly() {
+    UUID id = UUID.randomUUID();
+    Mission head = new Mission();
+    head.setId(id);
+    Mission detail = new Mission();
+    detail.setId(id);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(missionRepository.findNextPublicMission(any(), eq(List.of("PLANNED", "ACTIVE"))))
+        .thenReturn(Optional.of(head));
+    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+
+    Optional<Mission> result = missionService.getNextMission();
+
+    assertSame(detail, result.orElseThrow());
+    verify(missionRepository, never())
+        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(any(), any());
+    verify(missionRepository, never()).findNextScopedMission(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -202,6 +223,90 @@ class MissionServiceTest {
   }
 
   @Test
+  void getUpcomingOwnAndSignedUp_scopedMember_passesScopeCallerAndLimit() {
+    UUID orgA = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Mission upcoming = new Mission();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            eq(List.of("PLANNED", "ACTIVE")),
+            eq(false),
+            eq(false),
+            eq(false),
+            isNull(),
+            eq(Set.of(orgA)),
+            eq(userId),
+            eq(true),
+            eq(PageRequest.of(0, 4))))
+        .thenReturn(List.of(upcoming));
+
+    List<Mission> result = missionService.getUpcomingOwnAndSignedUp(4);
+
+    assertEquals(List.of(upcoming), result);
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_pinned_passesTheActiveOrgUnit() {
+    UUID pin = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, pin, Set.of()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            any(),
+            eq(false),
+            eq(false),
+            eq(false),
+            eq(pin),
+            eq(Set.of()),
+            isNull(),
+            eq(true),
+            eq(PageRequest.of(0, 5))))
+        .thenReturn(List.of());
+
+    assertEquals(List.of(), missionService.getUpcomingOwnAndSignedUp(5));
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_adminAllScope_spansTheOrganisation() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), eq(false), eq(true), any(), any(), any(), eq(true), any()))
+        .thenReturn(List.of());
+
+    missionService.getUpcomingOwnAndSignedUp(5);
+
+    verify(missionRepository)
+        .findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), eq(false), eq(true), any(), any(), any(), eq(true), any());
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_unitlessMember_isLimitedToPublicMissions() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(), any(), eq(false), eq(true), eq(false), any(), any(), any(), eq(true), any()))
+        .thenReturn(List.of());
+
+    missionService.getUpcomingOwnAndSignedUp(5);
+
+    verify(missionRepository)
+        .findUpcomingOwnOrSignedUp(
+            any(), any(), eq(false), eq(true), eq(false), any(), any(), any(), eq(true), any());
+  }
+
+  @Test
   void searchMissions_ShouldCallRepository() {
     String query = "Test";
     Instant start = Instant.now();
@@ -212,14 +317,33 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, null, null, false, null, Set.of(), false, pageable))
+            query, start, end, status, null, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
-    missionService.searchMissions(query, start, end, null, null, null, pageable);
+    missionService.searchMissions(query, start, end, null, null, null, null, pageable);
 
     verify(missionRepository)
         .searchMissions(
-            query, start, end, status, null, null, false, null, Set.of(), false, pageable);
+            query, start, end, status, null, null, null, false, null, Set.of(), false, pageable);
+  }
+
+  /** The owning-unit filter reaches the repository next to the caller's scope. */
+  @Test
+  void searchMissions_passesTheOrgUnitFilterToTheRepository() {
+    UUID unit = UUID.randomUUID();
+    List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
+    Pageable pageable = PageRequest.of(0, 20);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(missionRepository.searchMissions(
+            null, null, null, allFour, null, null, unit, false, null, Set.of(), false, pageable))
+        .thenReturn(Page.empty());
+
+    missionService.searchMissions(null, null, null, null, null, null, unit, pageable);
+
+    verify(missionRepository)
+        .searchMissions(
+            null, null, null, allFour, null, null, unit, false, null, Set.of(), false, pageable);
   }
 
   /**
@@ -233,16 +357,16 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            null, null, null, allFour, null, null, false, null, Set.of(), false, pageable))
+            null, null, null, allFour, null, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
-    missionService.searchMissions(null, null, null, null, null, null, pageable);
-    missionService.searchMissions(null, null, null, List.of(), null, null, pageable);
-    missionService.searchMissions(null, null, null, allFour, null, null, pageable);
+    missionService.searchMissions(null, null, null, null, null, null, null, pageable);
+    missionService.searchMissions(null, null, null, List.of(), null, null, null, pageable);
+    missionService.searchMissions(null, null, null, allFour, null, null, null, pageable);
 
     verify(missionRepository, times(3))
         .searchMissions(
-            null, null, null, allFour, null, null, false, null, Set.of(), false, pageable);
+            null, null, null, allFour, null, null, null, false, null, Set.of(), false, pageable);
   }
 
   @Test
@@ -338,6 +462,23 @@ class MissionServiceTest {
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership owner → ownerless mission");
     assertEquals(caller, saved.getOwner());
+  }
+
+  @Test
+  void createMission_internalWithoutOwningOrgUnit_isRejectedAndNotPersisted() {
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        () ->
+            missionService.createMission(
+                new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
+                    "Intern", null, null, "PLANNED", null, null, null, true, null, null, null, null,
+                    null)));
+    verify(missionRepository, never()).save(any(Mission.class));
   }
 
   @Test

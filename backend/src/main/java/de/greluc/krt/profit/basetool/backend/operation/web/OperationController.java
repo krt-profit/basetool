@@ -357,31 +357,24 @@ public class OperationController {
    */
   @PutMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
-      "hasRole('"
-          + Roles.MISSION_MANAGER
-          + "') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or"
-          + " hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "'))")
+      "@operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or"
+          + " @operationAccessPolicy.canClearPayout(#id))")
   @Operation(
       summary = "Toggle the per-participant paid-out flag for an operation",
       description =
-          "Records that a mission manager has marked the participant as paid out (or unset "
-              + "it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and "
-              + "officers satisfy it via the role hierarchy). Setting `paidOut=false` is "
-              + "reserved for ADMIN and OFFICER — a plain mission manager cannot undo a "
-              + "paid-out confirmation. Last-writer-wins: no client-supplied version is "
-              + "required because the field is a boolean. The audit fields (`paidOutAt`, "
-              + "`paidOutByUser`) are always refreshed when `paidOut=true`; setting "
-              + "`paidOut=false` keeps the last audit fields as a historical record. The "
-              + "participantKey matches the opaque key returned by `/payouts` (real user UUID "
-              + "stringified, `guest_<name>` for an external participant, or "
-              + "`deleted_<participantId>` for a participant whose account was deleted). Returns "
-              + "only the participant's paid-out status "
-              + "block (flag + audit trace) — a toggle never changes any amount, so the payout "
-              + "computation is not re-run.")
+          "Records that a mission manager has marked the participant as paid out (or unset it)."
+              + " Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers"
+              + " satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN"
+              + " and callers with officer reach in the operation's owning unit — a plain mission"
+              + " manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied"
+              + " version is required because the field is a boolean. The audit fields"
+              + " (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting"
+              + " `paidOut=false` keeps the last audit fields as a historical record. The"
+              + " participantKey matches the opaque key returned by `/payouts` (real user UUID"
+              + " stringified, `guest_<name>` for an external participant, or"
+              + " `deleted_<participantId>` for a participant whose account was deleted). Returns"
+              + " only the participant's paid-out status block (flag + audit trace) — a toggle"
+              + " never changes any amount, so the payout computation is not re-run.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paid-out flag updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -390,7 +383,7 @@ public class OperationController {
         responseCode = "403",
         description =
             "Caller lacks the MISSION_MANAGER role, or attempted to clear paidOut without"
-                + " ADMIN/OFFICER."),
+                + " officer reach in the operation's unit."),
     @ApiResponse(
         responseCode = "404",
         description = "Operation not found, or participantKey is not part of the operation.")
@@ -407,8 +400,12 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize(Roles.HAS_ROLE_MISSION_MANAGER)
-  @Operation(summary = "Create a new operation")
+  @PreAuthorize("@ownerScopeService.canActAsMissionManagerInActiveContext()")
+  @Operation(
+      summary = "Create a new operation",
+      description =
+          "Requires the MISSION_MANAGER grant in the unit that will own the operation; without a"
+              + " unit, in an Organisationsleitung or Bereich unit.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -431,8 +428,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize(
-      "hasRole('" + Roles.MISSION_MANAGER + "') and @operationAccessPolicy.canEditOperation(#id)")
+  @PreAuthorize("@operationAccessPolicy.canEditOperation(#id)")
   @Operation(
       summary = "Update an existing operation",
       description =

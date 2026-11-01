@@ -207,6 +207,34 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
+   * Unscoped list of the orders in the given statuses that the given units requested, with both
+   * kinds' requirement branches and the requested items, for the requested amount of the minimum
+   * stock levels (REQ-INV-067).
+   *
+   * <p>Unpaged because the result is aggregated into sums; callers pass only non-terminal statuses.
+   *
+   * @param statuses the statuses to keep; never empty.
+   * @param requestingOrgUnitIds the requesting units; never empty.
+   * @return the orders with their requirement branches loaded.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "items",
+        "items.gameItem",
+        "items.materials",
+        "items.materials.material",
+        "requestingOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE o.status IN :statuses"
+          + " AND o.requestingOrgUnit.id IN :requestingOrgUnitIds")
+  List<JobOrder> findRequestedBy(
+      @Param("statuses") Collection<JobOrderStatus> statuses,
+      @Param("requestingOrgUnitIds") Collection<UUID> requestingOrgUnitIds);
+
+  /**
    * Scoped, paged job-order list behind {@code GET /api/v1/orders}, combining visibility scope,
    * status filter and optional squadron display filter.
    *
@@ -215,8 +243,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}). The squadron filter matches
    * the responsible or requesting side and only narrows the scoped result. The processing filter
    * keeps only orders whose profit-eligible responsible unit is in {@code processingOrgUnitIds}
-   * (REQ-ORDERS-040) and likewise only narrows. Only the two org units are fetched; collections
-   * batch-load (REQ-DATA-003).
+   * (REQ-ORDERS-040) and likewise only narrows. Without the processing filter the scope is widened
+   * by the assignee grant: an order on which {@code callerId} holds an assignee entry is visible
+   * too (REQ-ORDERS-047). Only the two org units are fetched; collections batch-load
+   * (REQ-DATA-003).
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
@@ -232,13 +262,16 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the OrgUnits the caller belongs to (non-admin path); empty for admins
    *     and anonymous callers.
+   * @param callerId the caller's user id for the assignee grant; a placeholder when unknown.
    * @param pageable page request.
    * @return paged job orders visible to the caller, matching the status and squadron filters.
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
-      "SELECT o FROM JobOrder o WHERE "
+      "SELECT o FROM JobOrder o WHERE ("
           + JobOrderScope.PREDICATE
+          + " OR (:processingFilter = FALSE AND EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE"
+          + " a.jobOrder = o AND a.user.id = :callerId)))"
           + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
           + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds) AND (:processingFilter ="
           + " FALSE OR (o.responsibleOrgUnit.id IN :processingOrgUnitIds AND"
@@ -252,7 +285,67 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("callerId") UUID callerId,
       Pageable pageable);
+
+  /**
+   * Paged list of the orders on which {@code callerId} holds an assignee entry, behind {@code GET
+   * /api/v1/orders?assignedToMe=true} (REQ-ORDERS-040). The entry is the visibility grant itself
+   * (REQ-ORDERS-047), so no tenancy predicate applies.
+   *
+   * @param statuses status values to keep; pass the full enum set to disable status filtering
+   *     (never empty).
+   * @param callerId the caller's user id.
+   * @param pageable page request (carries the sort).
+   * @return paged job orders the caller is an assignee of.
+   */
+  @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
+  @Query(
+      """
+      SELECT o FROM JobOrder o WHERE o.status IN :statuses AND EXISTS
+      (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id = :callerId)
+      """)
+  Page<JobOrder> findAssignedJobOrders(
+      @Param("statuses") List<JobOrderStatus> statuses,
+      @Param("callerId") UUID callerId,
+      Pageable pageable);
+
+  /**
+   * The orders whose number starts with {@code numberPrefix} that the caller may open from the
+   * order list: the scoped orders when {@code scoped} is set, and always the orders the caller is
+   * an assignee of (REQ-ORDERS-047), by ascending number.
+   *
+   * @param numberPrefix the digits the number starts with.
+   * @param scoped whether the caller may use the scoped order list.
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active pin.
+   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
+   * @param memberOrgUnitIds the OrgUnits the caller belongs to (non-admin path).
+   * @param callerId the caller's user id for the assignee grant; a placeholder when unknown.
+   * @param pageable page request carrying the limit.
+   * @return the matching orders, at most one page.
+   */
+  @Query(
+      "SELECT o FROM JobOrder o WHERE CAST(o.displayId AS string) LIKE CONCAT(:numberPrefix, '%')"
+          + " AND ((:scoped = TRUE AND "
+          + JobOrderScope.PREDICATE
+          + ") OR EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id ="
+          + " :callerId)) ORDER BY o.displayId ASC")
+  List<JobOrder> findVisibleByNumberPrefix(
+      @Param("numberPrefix") String numberPrefix,
+      @Param("scoped") boolean scoped,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("callerId") UUID callerId,
+      Pageable pageable);
+
+  /**
+   * Whether {@code userId} holds an assignee entry on any job order.
+   *
+   * @param userId the user to check.
+   * @return {@code true} iff at least one entry exists.
+   */
+  boolean existsByAssigneesUserId(UUID userId);
 
   /**
    * Requester-side paged job-order list (REQ-ORDERS-023): orders whose {@code requestingOrgUnit} is

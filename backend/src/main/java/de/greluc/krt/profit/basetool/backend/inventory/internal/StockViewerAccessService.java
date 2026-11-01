@@ -45,7 +45,7 @@ public class StockViewerAccessService implements StockViewerAccess {
   public boolean mayEditInventoryItem(UUID inventoryItemId, @Nullable UUID ownerId) {
     return inventoryItemId != null
         && inventoryAccessPolicy.canEditInventoryItem(inventoryItemId)
-        && (isCaller(ownerId) || authHelperService.isLogisticianOrAbove());
+        && (isCaller(ownerId) || inventoryAccessPolicy.isLogisticianOfItem(inventoryItemId));
   }
 
   /** {@inheritDoc} */

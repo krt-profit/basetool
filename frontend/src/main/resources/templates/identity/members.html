@@ -6,7 +6,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{members.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.members.list', eyebrowKey='nav.admin.group.members', titleText=#{members.title},
         count=${usersPage != null ? usersPage.totalElements() : null}, countId='members-count', countFor='members-results', actions=~{::members-actions})}">
         <th:block th:ref="members-actions">
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">

@@ -38,11 +38,14 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -190,7 +193,8 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void myLagerRendersTheListPatternWithTheSelectionBar() throws Exception {
-    String html = render("/inventory/my", "/inventory/my-inventory/grouped", materialGroups());
+    String html =
+        render("/inventory?storage=my", "/inventory/my-inventory/grouped", materialGroups());
     String main = main(html);
 
     assertThat(main)
@@ -229,7 +233,7 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void emptyMyLagerRendersTheEmptyState() throws Exception {
-    String main = main(render("/inventory/my", "/never", List.of()));
+    String main = main(render("/inventory?storage=my", "/never", List.of()));
 
     assertThat(main)
         .contains("id=\"inventoryTable\"")
@@ -244,7 +248,7 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void myLagerItemsViewRendersItsOwnFilterForm() throws Exception {
-    String main = main(render("/inventory/my?view=items", "/never", List.of()));
+    String main = main(render("/inventory?storage=my&view=items", "/never", List.of()));
 
     assertThat(main)
         .containsPattern("class=\"page-eyebrow\" href=\"/inventory\\?view=items\"")
@@ -264,7 +268,11 @@ class InventoryLagerPatternRenderTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void myLagerItemsViewShowsComponentChipsOnlyForComponents() throws Exception {
     String main =
-        main(render("/inventory/my?view=items", "/inventory/my-inventory/grouped", itemGroups()));
+        main(
+            render(
+                "/inventory?storage=my&view=items",
+                "/inventory/my-inventory/grouped",
+                itemGroups()));
 
     assertThat(main)
         .contains("class=\"tree-cell tree-name lager-item-name\"")
@@ -298,11 +306,11 @@ class InventoryLagerPatternRenderTest {
     String my =
         main(
             render(
-                "/inventory/my?view=items&sizes=1&itemClasses=MILITARY",
+                "/inventory?storage=my&view=items&sizes=1&itemClasses=MILITARY",
                 "/inventory/my-inventory/grouped",
                 itemGroups()));
     String global =
-        main(render("/inventory/all?view=items", "/inventory/all/grouped", itemGroups()));
+        main(render("/inventory?storage=all&view=items", "/inventory/all/grouped", itemGroups()));
 
     for (String[] page : new String[][] {{my, "inv-my"}, {global, "inv-admin"}}) {
       assertThat(page[0])
@@ -349,7 +357,8 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void globalLagerItemsViewShowsComponentChips() throws Exception {
-    String main = main(render("/inventory/all?view=items", "/inventory/all/grouped", itemGroups()));
+    String main =
+        main(render("/inventory?storage=all&view=items", "/inventory/all/grouped", itemGroups()));
 
     assertThat(main)
         .contains("class=\"tree-cell tree-name lager-item-name\"")
@@ -423,7 +432,9 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void globalLagerRendersTheListPatternForALogistician() throws Exception {
-    String main = main(render("/inventory/all", "/inventory/all/grouped", materialGroups()));
+    CapabilityStubs.logistician(backendApiClient);
+    String main =
+        main(render("/inventory?storage=all", "/inventory/all/grouped", materialGroups()));
 
     assertThat(main)
         .contains("<h1>Globales Lager</h1>")
@@ -441,11 +452,48 @@ class InventoryLagerPatternRenderTest {
     assertThat(main.split("btn--cta", -1)).hasSize(2);
   }
 
+  /**
+   * The Lager tab marks the storage option it shows in its switch and keeps the Lager tab bar, so
+   * the two lists are options of the tab and no pages of their own (REQ-UI-026).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theStorageOptionIsSelectedInTheSwitchOfTheLagerTab() throws Exception {
+    String my = main(render("/inventory?storage=my", "/never", List.of()));
+    String all = main(render("/inventory?storage=all&view=items", "/never", List.of()));
+
+    assertThat(switchLink(my, "inventory-my-link")).contains("aria-current=\"page\"");
+    assertThat(switchLink(my, "inventory-global-link")).doesNotContain("aria-current");
+    assertThat(switchLink(all, "inventory-global-link"))
+        .contains("aria-current=\"page\"")
+        .contains("href=\"/inventory?storage=all&amp;view=items\"");
+    assertThat(switchLink(all, "inventory-my-link")).doesNotContain("aria-current");
+    assertThat(my).contains("href=\"/inventory/stock-levels\"");
+  }
+
+  /** The aggregated overview selects neither storage option. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theOverviewSelectsNoStorageOption() throws Exception {
+    String main = main(render("/inventory", "/never", List.of()));
+
+    assertThat(switchLink(main, "inventory-my-link"))
+        .contains("href=\"/inventory?storage=my\"")
+        .doesNotContain("aria-current");
+    assertThat(switchLink(main, "inventory-global-link")).doesNotContain("aria-current");
+  }
+
+  private static @NotNull String switchLink(@NotNull String html, @NotNull String testId) {
+    Matcher matcher = Pattern.compile("<a[^>]*data-testid=\"" + testId + "\"[^>]*>").matcher(html);
+    assertThat(matcher.find()).as("switch link %s", testId).isTrue();
+    return matcher.group();
+  }
+
   /** A member sees the org-wide Lager without any page action. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void globalLagerHasNoPrimaryActionForAMember() throws Exception {
-    String main = main(render("/inventory/all", "/never", List.of()));
+    String main = main(render("/inventory?storage=all", "/never", List.of()));
 
     assertThat(main)
         .doesNotContain("btn--cta")
@@ -458,7 +506,7 @@ class InventoryLagerPatternRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void globalLagerMovesEmptyingIntoTheOverflowMenuForAnAdmin() throws Exception {
-    String html = render("/inventory/all", "/never", List.of());
+    String html = render("/inventory?storage=all", "/never", List.of());
 
     assertThat(main(html))
         .containsPattern(

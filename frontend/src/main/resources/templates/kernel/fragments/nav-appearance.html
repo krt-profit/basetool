@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<div th:fragment="state" hidden data-appearance-state
+     th:data-loaded="${navigationAppearance.loaded()}" th:data-version="${navigationAppearance.version()}"
+     th:data-mode="${navigationAppearance.modeAttribute()}" th:data-shortcuts="${navigationAppearance.shortcutsEnabled()}"
+     th:data-start-member="${navigationStartPages.selected('member')}"
+     th:data-start-admin="${navigationStartPages.selected('admin')}"
+     th:data-start-error="#{nav.startPage.error}"
+     th:data-shortcut-unavailable="#{nav.shortcuts.unavailable('{n}')}" th:data-shortcut-empty="#{nav.shortcuts.empty('{n}')}"
+     th:data-error="#{nav.mode.error}" th:data-conflict="#{nav.mode.conflict}"></div>
+
+<th:block th:fragment="switch(name)">
+    <th:block th:replace="~{kernel/fragments/components :: segmented(name=${name}, labelKey='nav.mode.label', variant='krt-segmented--sm',
+        selected=${navigationAppearance.modeAttribute()}, options=${navigationAppearance.options()})}"></th:block>
+</th:block>
+</body>
+</html>

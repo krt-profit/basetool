@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,6 +78,33 @@ public class InventoryAccessPolicy implements BookInPolicy {
         .findById(itemId)
         .map(i -> ownerScopeService.permitsOwnedRow(i.getUser(), i.getOwningOrgUnit(), true))
         .orElse(false);
+  }
+
+  /**
+   * Checks whether the caller handles Lager row {@code itemId} as Logistician: a Logistician grant
+   * in the row's owning unit inside the active scope, or an admin. A personal row without a unit is
+   * reserved to admins (REQ-SEC-005).
+   *
+   * @param itemId the row to inspect; never {@code null}
+   * @return {@code true} iff the caller may act on the row as Logistician; {@code false} for an
+   *     unknown row
+   */
+  public boolean isLogisticianOfItem(@NotNull UUID itemId) {
+    return inventoryItemRepository
+        .findById(itemId)
+        .map(i -> ownerScopeService.canActAsLogisticianInOwner(owningUnitId(i)))
+        .orElse(false);
+  }
+
+  /**
+   * Returns the id of the unit that owns {@code item}, or {@code null} for an ownerless row.
+   *
+   * @param item the row
+   * @return the owning unit id, or {@code null}
+   */
+  @Nullable
+  private static UUID owningUnitId(@NotNull InventoryItem item) {
+    return item.getOwningOrgUnit() == null ? null : item.getOwningOrgUnit().getId();
   }
 
   /**

@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -49,10 +48,11 @@ class InventoryPageControllerReauthMvcTest {
 
   @BeforeEach
   void setUp() {
+    InventoryCatalogs catalogs = new InventoryCatalogs(client);
     mockMvc =
         ReauthPageMvc.standalone(
-            new InventoryPageController(
-                client, PARALLEL, mock(RoleHierarchy.class), mock(ItemPickerLabels.class)));
+            new InventoryPageController(client, catalogs, mock(ItemPickerLabels.class)),
+            new InventoryInputPageController(client, PARALLEL, catalogs));
     ReauthPageMvc.signInMember();
   }
 

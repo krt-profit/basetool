@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -57,7 +58,7 @@ class MissionCreatePageTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void testCreateMissionPage_ShouldHideActualTimeFields() throws Exception {
     mockMvc
         .perform(get("/missions/new"))
@@ -67,12 +68,26 @@ class MissionCreatePageTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void testCreateMissionPage_ShouldRenderDetailsCardFullWidth() throws Exception {
     mockMvc
         .perform(get("/missions/new"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("pane-grid-2 pane-grid--single")))
         .andExpect(content().string(not(containsString("class=\"pane-col\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void testCreateMissionPage_WithoutPickableUnit_DisablesTheInternalSwitch() throws Exception {
+    mockMvc
+        .perform(get("/missions/new"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(matchesPattern("(?s).*<input[^>]*id=\"isInternal\"[^>]*disabled.*")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("Interne Missionen brauchen eine verantwortliche Einheit.")));
   }
 }

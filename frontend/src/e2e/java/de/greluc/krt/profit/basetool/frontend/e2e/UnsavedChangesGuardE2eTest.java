@@ -114,15 +114,15 @@ class UnsavedChangesGuardE2eTest {
         });
   }
 
-  /** Edits the announcement text without saving and asserts the guard still stops the link. */
+  /** Edits the profile description without saving and asserts the guard still stops the link. */
   @Test
   void editingADataFormStillArmsTheGuard() {
     withPage(
         "unsaved-guard-data-form",
         page -> {
-          E2eSupport.navigate(page, STACK.baseUrl() + "/admin/announcement");
+          E2eSupport.navigate(page, STACK.baseUrl() + "/profile");
 
-          page.locator("#info-edit-content").fill("unsaved guard probe");
+          page.locator("#profile-description-form textarea").fill("unsaved guard probe");
           page.locator(BRAND_LINK).click();
 
           assertThat(page.locator(GUARD_MODAL)).isVisible();

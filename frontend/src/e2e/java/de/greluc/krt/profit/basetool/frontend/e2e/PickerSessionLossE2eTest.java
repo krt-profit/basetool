@@ -40,8 +40,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * Asserts that a remote picker whose session is gone sends the member to the login instead of
  * silently showing no matches (REQ-FE-031, REQ-SEC-012).
  *
- * <p>Runs on the {@code /admin/personal-inventory} member picker as {@code test-admin}; the session
- * is lost by clearing every cookie of the browser context, the Keycloak ones included.
+ * <p>Runs on the {@code /inventory/input?source=admin} owner picker as {@code test-admin}; the
+ * session is lost by clearing every cookie of the browser context, the Keycloak ones included.
  */
 @Tag("e2e")
 class PickerSessionLossE2eTest {
@@ -94,10 +94,9 @@ class PickerSessionLossE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/admin/personal-inventory");
+        E2eSupport.navigate(page, baseUrl + "/inventory/input?source=admin");
         page.waitForLoadState();
-        Locator textbox =
-            page.locator(".krt-combobox:has(#krt-pi-user-select) .krt-combobox__input");
+        Locator textbox = page.locator(".krt-combobox:has(#userId) .krt-combobox__input");
         textbox.waitFor();
 
         context.clearCookies();

@@ -1,0 +1,71 @@
+rule_files:
+  - ../alerts/apps.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the entity search answers in 1 to 2 seconds
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="0.5"}'
+        values: "0x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="1.0"}'
+        values: "0x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="2.0"}'
+        values: "0+10x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="+Inf"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: QuickAccessSearchSlow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: QuickAccessSearchSlow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Quick-access search p95 >1s"
+              description: "The quick access's entity search (/quick-access/search) answered slower than 1 second at the 95th percentile for 10 minutes (REQ-UI-033). Every entity type is asked in parallel and capped at 2 seconds, so one slow backend list read drags the whole answer. Runbook: sum by (kind, outcome) (rate(basetool_quick_access_search_total[10m])) names the type that times out or fails; check that type's backend list endpoint latency on dashboard 03 and the backend's slow-query log."
+
+  - name: silent - the entity search answers within half a second
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="0.5"}'
+        values: "0+10x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="1.0"}'
+        values: "0+10x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="2.0"}'
+        values: "0+10x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="+Inf"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: QuickAccessSearchSlow
+        exp_alerts: []
+
+  - name: silent - another slow endpoint is not the entity search
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/missions", le="0.5"}'
+        values: "0x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/missions", le="1.0"}'
+        values: "0x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/missions", le="2.0"}'
+        values: "0+10x40"
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/missions", le="+Inf"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: QuickAccessSearchSlow
+        exp_alerts: []
+
+  - name: silent - no search traffic at all
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search", le="+Inf"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: QuickAccessSearchSlow
+        exp_alerts: []

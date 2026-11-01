@@ -45,8 +45,6 @@ import org.jetbrains.annotations.Nullable;
  * @param allMembersSupported whether the all-members toggle applies
  * @param areaMembersSupported whether the Bereich-members toggle applies; only for {@code AREA}
  *     accounts (REQ-BANK-048)
- * @param roleBucketsGlobal {@code true} when {@link #availableRoleCodes()} are global role codes,
- *     {@code false} for {@code MembershipRole} names
  * @param availableRoleCodes the role buckets the caller may toggle, in display order
  * @param grantedRoleCodes the role buckets currently granted
  * @param allMembersGranted whether the all-members grant is set
@@ -69,7 +67,6 @@ public record OrgUnitBankAccountSettingsDto(
     boolean visibilityConfigurable,
     boolean allMembersSupported,
     boolean areaMembersSupported,
-    boolean roleBucketsGlobal,
     List<String> availableRoleCodes,
     List<String> grantedRoleCodes,
     boolean allMembersGranted,

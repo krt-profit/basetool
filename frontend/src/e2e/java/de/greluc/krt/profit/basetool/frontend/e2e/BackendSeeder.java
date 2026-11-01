@@ -1751,6 +1751,39 @@ public final class BackendSeeder {
   }
 
   /**
+   * Reads the name the application shows for a user: the display name, else the username.
+   *
+   * @param username the Keycloak username
+   * @param password the Keycloak password
+   * @return the user's effective name
+   */
+  public String getEffectiveName(String username, String password) {
+    try {
+      String token = passwordGrant(username, password);
+      return getJson("/api/v1/users/me", token).get("effectiveName").getAsString();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getEffectiveName(" + username + ") failed", e);
+    }
+  }
+
+  /**
+   * Reads the human-readable number of a job order.
+   *
+   * @param username the Keycloak username of a user who may read the order
+   * @param password the Keycloak password
+   * @param jobOrderId the order's id
+   * @return the order's {@code displayId}
+   */
+  public int getJobOrderNumber(String username, String password, String jobOrderId) {
+    try {
+      String token = passwordGrant(username, password);
+      return getJson("/api/v1/orders/" + jobOrderId, token).get("displayId").getAsInt();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getJobOrderNumber failed", e);
+    }
+  }
+
+  /**
    * Posts a {@code RefineryExtract} JSON to {@code POST /api/v1/refinery-orders/import-extract} and
    * returns the backend's draft answer verbatim.
    *
@@ -2387,6 +2420,103 @@ public final class BackendSeeder {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.assignStaffelMembership failed", e);
+    }
+  }
+
+  /**
+   * Homes {@code targetUserId} in a Staffel and appoints them its Staffelleiter, so officer reach
+   * (which is seat-based) applies to that Staffel only. Idempotent.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param targetUserId the app_user id to seat (must hold {@code KRT Member})
+   * @param squadronId the Staffel OrgUnit id
+   * @param isLogistician whether to set the {@code is_logistician} flag on the membership
+   */
+  public void assignStaffelleiterSeat(
+      String adminUser,
+      String adminPassword,
+      String targetUserId,
+      String squadronId,
+      boolean isLogistician) {
+    assignStaffelMembership(
+        adminUser, adminPassword, targetUserId, squadronId, isLogistician, false);
+    appointStaffelleiter(adminUser, adminPassword, targetUserId, squadronId);
+  }
+
+  /**
+   * Adds a second Staffel membership to {@code targetUserId} next to its existing home Staffel and
+   * appoints them that Staffel's Staffelleiter, so the user shows up on the org chart as a seat
+   * holder without losing the home Staffel.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param targetUserId the app_user id to seat (must hold {@code KRT Member})
+   * @param homeSquadronId the Staffel the user already belongs to and keeps
+   * @param squadronId the Staffel OrgUnit id to seat the user in
+   */
+  public void assignSecondStaffelleiterSeat(
+      String adminUser,
+      String adminPassword,
+      String targetUserId,
+      String homeSquadronId,
+      String squadronId) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      String body =
+          "{\"staffeln\":[{\"squadronId\":\""
+              + homeSquadronId
+              + "\",\"isLogistician\":false,\"isMissionManager\":false},"
+              + "{\"squadronId\":\""
+              + squadronId
+              + "\",\"isLogistician\":false,\"isMissionManager\":false}]}";
+      int status = patch(token, "/api/v1/org-units/members/" + targetUserId + "/memberships", body);
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException("Second Staffel membership PATCH failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.assignSecondStaffelleiterSeat failed", e);
+    }
+    appointStaffelleiter(adminUser, adminPassword, targetUserId, squadronId);
+  }
+
+  /**
+   * Appoints an existing Staffel member its Staffelleiter via {@code PUT
+   * /api/v1/squadrons/{id}/ranks/{userId}}.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param targetUserId the member to appoint
+   * @param squadronId the Staffel OrgUnit id
+   */
+  private void appointStaffelleiter(
+      String adminUser, String adminPassword, String targetUserId, String squadronId) {
+    String detail =
+        getBody(
+            adminUser,
+            adminPassword,
+            "/api/v1/org-units/members/" + targetUserId + "/memberships/detail");
+    long version = -1;
+    for (JsonElement row :
+        JsonParser.parseString(detail).getAsJsonObject().getAsJsonArray("memberships")) {
+      JsonObject membership = row.getAsJsonObject();
+      if (squadronId.equals(membership.get("orgUnitId").getAsString())) {
+        version = membership.get("version").getAsLong();
+      }
+    }
+    if (version < 0) {
+      throw new IllegalStateException("No Staffel membership to seat for " + targetUserId);
+    }
+    int status =
+        putForStatus(
+            adminUser,
+            adminPassword,
+            "/api/v1/squadrons/" + squadronId + "/ranks/" + targetUserId,
+            "{\"role\":\"STAFFELLEITER\",\"version\":" + version + "}");
+    if (status < 200 || status >= 300) {
+      throw new IllegalStateException("Staffelleiter seat PUT failed: HTTP " + status);
     }
   }
 

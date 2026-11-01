@@ -21,10 +21,16 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 
 /**
+ * A user search hit; a candidate hit also carries the unit that marks a non-member.
+ *
+ * @typedef {{ id: string, effectiveName?: string, displayName?: string, username?: string,
+ *     unitShorthand?: string | null, unitName?: string | null }} UserSearchHit
+ */
+
+/**
  * Maps a user search hit to a combobox option.
  *
- * @param {{ id: string, effectiveName?: string, displayName?: string, username?: string }} row
- *     the search hit
+ * @param {UserSearchHit} row the search hit
  * @returns {{ value: string, label: string }} the option
  */
 function toOption(row) {
@@ -35,17 +41,30 @@ function toOption(row) {
 }
 
 /**
+ * Maps a candidate hit to a combobox option whose label names the unit of a non-member.
+ *
+ * @param {UserSearchHit} row the candidate hit
+ * @returns {{ value: string, label: string }} the option
+ */
+function toCandidateOption(row) {
+    const option = toOption(row);
+    const unit = row.unitShorthand || row.unitName;
+    return unit ? { value: option.value, label: `${option.label} (${unit})` } : option;
+}
+
+/**
  * Searches users through the given endpoint.
  *
  * @param {string} path the search endpoint
  * @param {string} [query] the search text
+ * @param {(row: UserSearchHit) => { value: string, label: string }} [map] the hit-to-option mapping
  * @returns {Promise<{ value: string, label: string }[]>} the matching options; empty on failure
  */
-function fetchUsers(path, query) {
+function fetchUsers(path, query, map = toOption) {
     return krtFetch
         .getJson(`${path}?query=${encodeURIComponent(query || '')}`)
         .then((list) => {
-            return (list || []).map(toOption);
+            return (list || []).map(map);
         })
         .catch(() => {
             return [];
@@ -57,4 +76,8 @@ krtComboboxRemoteSources['remote-users'] = function (query) {
 };
 krtComboboxRemoteSources['remote-bank-users'] = function (query) {
     return fetchUsers('/users/search-bank', query);
+};
+krtComboboxRemoteSources['remote-user-candidates'] = function (query, select) {
+    const path = select?.dataset.comboboxSourceUrl;
+    return path ? fetchUsers(path, query, toCandidateOption) : Promise.resolve([]);
 };

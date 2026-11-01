@@ -1,21 +1,19 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <body>
-<nav th:fragment="tabbar" class="mobile-tabbar" th:aria-label="#{mobile.tab.aria}">
-    <a th:href="@{/missions}" class="mobile-tab" data-tab-path="/missions" data-testid="mobile-tab-missions">
-        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"></use></svg>
-        <span th:text="#{mobile.tab.missions}">Einsätze</span>
-    </a>
-    <a th:href="@{/inventory}" class="mobile-tab" data-tab-path="/inventory" data-testid="mobile-tab-inventory">
-        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"></use></svg>
-        <span th:text="#{mobile.tab.inventory}">Lager</span>
-    </a>
-    <a th:href="${canViewJobOrders or canViewOwnJobOrders} ? @{/orders} : @{/orders/create}"
-       class="mobile-tab" data-tab-path="/orders" data-testid="mobile-tab-orders">
-        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"></use></svg>
-        <span th:text="#{mobile.tab.orders}">Aufträge</span>
-    </a>
-    <a th:href="@{/notifications}" class="mobile-tab" data-tab-path="/notifications" data-testid="mobile-tab-notifications">
+<nav th:fragment="tabbar" class="mobile-tabbar" th:aria-label="#{mobile.tab.aria}"
+     th:with="adminPage=${!navigation.admin().isEmpty() and currentRequestUri != null and (currentRequestUri == '/admin' or currentRequestUri.startsWith('/admin/') or currentRequestUri.startsWith('/admin?'))}">
+    <div class="mobile-tab-slots" data-tabbar-mode="member" th:hidden="${adminPage}"
+         data-nav-swap="tabbar-slots-member">
+        <th:block th:replace="~{kernel/fragments/mobile-nav :: slots('member')}" />
+    </div>
+    <div class="mobile-tab-slots" data-tabbar-mode="admin" th:hidden="${!adminPage}"
+         data-nav-swap="tabbar-slots-admin" th:unless="${navigation.admin().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/mobile-nav :: slots('admin')}" />
+    </div>
+    <a th:each="entry : ${navigation.top().links()}" th:if="${entry.key() == 'notifications.list'}"
+       th:href="@{${entry.href()}}" class="mobile-tab" th:data-tab-path="${entry.href()}"
+       data-testid="mobile-tab-notifications" th:data-entry-key="${entry.key()}">
         <span class="mobile-tab-icon">
             <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
             <span class="mobile-tab-badge" data-notif-badge
@@ -30,5 +28,19 @@
         <span th:text="#{mobile.tab.menu}">Menü</span>
     </button>
 </nav>
+
+<th:block th:fragment="slots(mode)" th:with="bar=${navigationTabBars.get(mode)}">
+    <a th:each="slot : ${bar.slots()}" th:href="@{${slot.entry().href()}}" class="mobile-tab"
+       th:classappend="${slot.standIn()} ? 'is-standin'"
+       th:data-tab-path="${slot.path()}"
+       th:data-nav-paths="${navigation.areaPaths(slot.entry())}"
+       th:data-testid="|mobile-tab-${slot.entry().key()}|"
+       th:data-entry-key="${slot.entry().key()}" th:data-slot-index="${slot.index()}"
+       th:data-stand-in="${slot.standIn()} ? 'true' : null"
+       th:title="${bar.loaded()} ? (${slot.standIn()} ? #{nav.tabbar.standIn} : #{nav.tabbar.longPress}) : null">
+        <svg class="krt-icon" aria-hidden="true"><use th:href="|#krt-icon-${slot.icon()}|"></use></svg>
+        <span th:text="#{${slot.entry().labelKey()}}">Einsätze</span>
+    </a>
+</th:block>
 </body>
 </html>

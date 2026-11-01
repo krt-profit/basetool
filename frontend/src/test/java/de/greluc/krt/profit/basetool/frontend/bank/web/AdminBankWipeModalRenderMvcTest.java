@@ -63,7 +63,7 @@ class AdminBankWipeModalRenderMvcTest {
   void wipeModal_appliesDangerVariant_andProjectsFormExactlyOnce() throws Exception {
     String html =
         mockMvc
-            .perform(get("/admin/bank"))
+            .perform(get("/admin/settings/danger-zone"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -90,7 +90,9 @@ class AdminBankWipeModalRenderMvcTest {
   void pageUsesThePageHeadAndReportsAFailureAsAnAlert() throws Exception {
     String html =
         mockMvc
-            .perform(get("/admin/bank").flashAttr("error", "admin.bank.wipe.error.failed"))
+            .perform(
+                get("/admin/settings/danger-zone")
+                    .flashAttr("error", "admin.bank.wipe.error.failed"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()

@@ -139,9 +139,9 @@ class BlueprintOverviewPageControllerMvcTest {
   }
 
   /**
-   * The list follows the list pattern: a page head with the „Flotte &amp; Logistik" eyebrow and the
-   * total, one always-visible search, the owners column filled per row, no HUD box and no „Details"
-   * button column.
+   * The list follows the list pattern: a page head with the „Logistik" eyebrow and the total, one
+   * always-visible search, the owners column filled per row, no HUD box and no „Details" button
+   * column.
    */
   @Test
   @WithMockUser
@@ -154,7 +154,7 @@ class BlueprintOverviewPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-testid=\"page-head\"")))
         .andExpect(content().string(containsString("data-testid=\"page-eyebrow\"")))
-        .andExpect(content().string(containsString("Flotte &amp; Logistik")))
+        .andExpect(content().string(containsString("Logistik")))
         .andExpect(content().string(containsString("data-testid=\"page-head-count\"")))
         .andExpect(content().string(containsString("data-testid=\"toolbar-search\"")))
         .andExpect(content().string(containsString("data-testid=\"bp-overview-row\"")))

@@ -163,7 +163,19 @@ class PagePatternTestIdsRenderTest {
                 1,
                 List.of()));
 
-    String html = render("/operations", "OFFICER", "MISSION_MANAGER");
+    when(backendApiClient.get(
+            de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.PATH,
+            de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader
+                .MeLayoutResponse.class))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader
+                .MeLayoutResponse(
+                null,
+                List.of(),
+                de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager(),
+                0L));
+
+    String html = render("/operations", "LOGISTICIAN", "MISSION_MANAGER");
 
     String primary = tagWith(pageActions(html), "data-testid=\"page-head-primary\"");
     assertThat(primary).contains("btn--cta");

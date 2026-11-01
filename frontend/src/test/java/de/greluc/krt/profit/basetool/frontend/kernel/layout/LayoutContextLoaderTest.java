@@ -73,7 +73,7 @@ class LayoutContextLoaderTest {
             new MeLayoutResponse(
                 home,
                 List.of(new OrgUnitMembershipOptionDto(home, "ALPHA", "ALP", "SQUADRON", true)),
-                new CapabilitiesResponse(true, true, false, false),
+                LayoutResponses.caps(true, true, false, false),
                 3L));
     LayoutContextLoader loader = loader();
     MockHttpServletRequest request = new MockHttpServletRequest();
@@ -147,6 +147,42 @@ class LayoutContextLoaderTest {
     LayoutContext context = loader().load(requestFor("json"));
 
     assertThat(context).isSameAs(LayoutContext.NONE);
+    verifyNoInteractions(backendApiClient);
+  }
+
+  @Test
+  void capabilitiesForAModelHandlerShareTheMemoisedLayoutRead() throws Exception {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+    LayoutContextLoader loader = loader();
+    MockHttpServletRequest request = requestFor("view");
+
+    assertThat(loader.capabilities(request).hasOfficerReach()).isTrue();
+    assertThat(loader.load(request).capabilities().canManagePromotions()).isTrue();
+
+    verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
+  }
+
+  @Test
+  void capabilitiesForABodyWritingHandlerAreReadOncePerRequestIntoTheirOwnMemo() throws Exception {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+    LayoutContextLoader loader = loader();
+    MockHttpServletRequest request = requestFor("json");
+
+    assertThat(loader.capabilities(request).canOpenLeitung()).isTrue();
+    assertThat(loader.capabilities(request).canManagePromotions()).isTrue();
+
+    verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
+  }
+
+  @Test
+  void capabilitiesForAnAnonymousCallerOfABodyWritingHandlerAreNoneWithoutACall() throws Exception {
+    when(authHelper.isAuthenticated()).thenReturn(false);
+
+    assertThat(loader().capabilities(requestFor("json"))).isEqualTo(CapabilitiesResponse.NONE);
     verifyNoInteractions(backendApiClient);
   }
 

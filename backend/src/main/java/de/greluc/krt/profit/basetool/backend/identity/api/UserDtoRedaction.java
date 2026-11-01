@@ -24,20 +24,19 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The peer projection of a {@link UserDto}, shared by every surface that embeds another member's
- * user record. Lives in the dependency-leaf {@code support} package.
+ * The peer projection of a {@link UserDto}: the one shape a non-admin gets of another member, on
+ * every surface that returns or embeds a user. Lives in the dependency-leaf {@code support}
+ * package.
  */
 public final class UserDtoRedaction {
 
   private UserDtoRedaction() {}
 
   /**
-   * Returns the slim peer view, keeping only {@code id}, {@code username}, {@code displayName},
-   * {@code effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code squadrons}
-   * and {@code version}.
-   *
-   * <p>Unlike {@code MissionPeerRedactor.cleanupUserForPeer}, it keeps {@code squadron} and {@code
-   * squadrons}.
+   * Returns the peer view every non-admin gets of another member (REQ-SEC-007): {@code id}, {@code
+   * displayName}, {@code effectiveName}, {@code rank}, {@code description}, {@code inKeycloak},
+   * {@code squadron}, {@code squadrons} and {@code version}. The {@code username} stays only when
+   * the member has no display name, since it is then the name shown.
    *
    * @param dto the persisted user DTO, or {@code null}.
    * @return the peer-shaped DTO, or {@code null} when {@code dto} was {@code null}.
@@ -49,12 +48,12 @@ public final class UserDtoRedaction {
     }
     return new UserDto(
         dto.id(),
-        dto.username(),
+        hasDisplayName(dto) ? null : dto.username(),
         dto.displayName(),
         dto.effectiveName(),
         null,
         dto.rank(),
-        null,
+        dto.description(),
         null,
         null,
         null,
@@ -66,6 +65,34 @@ public final class UserDtoRedaction {
         dto.version(),
         null,
         null);
+  }
+
+  private static boolean hasDisplayName(UserDto dto) {
+    return hasDisplayName(dto.displayName());
+  }
+
+  private static boolean hasDisplayName(@Nullable String displayName) {
+    return displayName != null && !displayName.isBlank();
+  }
+
+  /**
+   * Returns the peer view of a user reference: the {@code username} is dropped when a display name
+   * is set, since the display name is then the name shown.
+   *
+   * @param reference the reference, or {@code null}
+   * @return the peer-shaped reference, or {@code null} when {@code reference} was {@code null}
+   */
+  @Contract("null -> null; !null -> !null")
+  public static @Nullable UserReferenceDto toPeerReference(@Nullable UserReferenceDto reference) {
+    if (reference == null) {
+      return null;
+    }
+    return new UserReferenceDto(
+        reference.id(),
+        hasDisplayName(reference.displayName()) ? null : reference.username(),
+        reference.displayName(),
+        reference.effectiveName(),
+        reference.rank());
   }
 
   /**

@@ -134,6 +134,9 @@ public class CatalogueBackendClient {
   private static final ParameterizedTypeReference<PageResponse<TerminalDto>> TERMINAL_PAGE =
       new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<P4kImportJobDto>> P4K_JOB_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private static final ParameterizedTypeReference<PageResponse<SyncReportDto>> SYNC_REPORT_PAGE =
       new ParameterizedTypeReference<>() {};
 
@@ -689,11 +692,7 @@ public class CatalogueBackendClient {
    */
   @Nullable
   public List<P4kImportJobDto> p4kImportJobs() {
-    return backendApiClient.execute(
-        HttpMethod.GET,
-        JOBS_URI,
-        webClient -> webClient.get().uri(JOBS_URI),
-        spec -> spec.bodyToFlux(P4kImportJobDto.class).collectList());
+    return backendApiClient.get(JOBS_URI, P4K_JOB_LIST);
   }
 
   /**

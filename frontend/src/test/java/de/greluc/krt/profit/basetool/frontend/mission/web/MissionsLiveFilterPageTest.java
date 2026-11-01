@@ -69,7 +69,7 @@ class MissionsLiveFilterPageTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionsPage_ShouldRenderWithoutFilterSubmitButton() throws Exception {
     mockMvc
         .perform(get("/missions"))
@@ -82,7 +82,7 @@ class MissionsLiveFilterPageTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionsPage_WithFragmentResults_ShouldReturnOnlyResultsFragment() throws Exception {
     mockMvc
         .perform(get("/missions").param("fragment", "results"))

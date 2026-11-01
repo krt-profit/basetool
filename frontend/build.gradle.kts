@@ -860,17 +860,34 @@ val testReorderJs =
     outputs.upToDateWhen { false }
   }
 
+val testShortcutsJs =
+  tasks.register<NodeTask>("testShortcutsJs") {
+    group = "verification"
+    description =
+      "Regression tests for the navigation shortcuts Alt+1 to Alt+9 and Alt+0: digit-row key matching and the per-slot decision."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-shortcuts.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-shortcuts.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-shortcuts.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testSearchJs =
   tasks.register<NodeTask>("testSearchJs") {
     group = "verification"
     description =
-      "Regression tests for the tolerant menu search: case, umlauts, spelled-out umlauts and hit ranges."
+      "Regression tests for the tolerant menu search, the quick-access ranking and the frequent-use decay and the empty-state de-duplication."
     dependsOn(tasks.named("npmSetup"))
     script.set(layout.projectDirectory.file("scripts/krt-search.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/krt-search.test.mjs"))
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-search.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-frequent.js"))
     outputs.upToDateWhen { false }
   }
 
@@ -886,6 +903,24 @@ val testNumberFormatJs =
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-number-format.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
+val testNotificationBellLabelJs =
+  tasks.register<NodeTask>("testNotificationBellLabelJs") {
+    group = "verification"
+    description =
+      "Regression tests for the notification bell's accessible name: the unread count, the 99+ cap and the plain label."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/notification-bell-label.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/notification-bell-label.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/notification/notification-bell-label.js",
+      ),
     )
     outputs.upToDateWhen { false }
   }
@@ -1033,8 +1068,10 @@ tasks.named("check").configure {
     testSafeUrl,
     testTableSort,
     testReorderJs,
+    testShortcutsJs,
     testSearchJs,
     testNumberFormatJs,
+    testNotificationBellLabelJs,
     testBlueprintStatsJs,
     testEslintBans,
     testTypecheckRatchet,

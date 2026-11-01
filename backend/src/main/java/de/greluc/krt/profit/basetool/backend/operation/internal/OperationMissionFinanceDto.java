@@ -21,13 +21,17 @@ package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One mission's line in the operation finance summary: its id, name and signed bottom line, without
  * per-entry lists (those load via {@code GET /api/v1/operations/{id}/finances/{missionId}}).
  *
  * @param missionId the mission's id
- * @param missionName the mission's display name
+ * @param missionName the mission's display name; {@code null} when the line is anonymised
  * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
+ * @param anonymised {@code true} when the caller may not see the mission (an internal mission of
+ *     another unit); the line keeps its amount and drops the name (REQ-MISSION-008)
  */
-public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}
+public record OperationMissionFinanceDto(
+    UUID missionId, @Nullable String missionName, BigDecimal totalSum, boolean anonymised) {}

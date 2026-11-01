@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCre
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPoolChangeDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelCreateRequest;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
@@ -64,6 +65,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionReque
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptionsRequest;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
@@ -212,8 +214,22 @@ class MassAssignmentGuardTest {
   private static final Map<Class<?>, Map<String, String>> REVIEWED_CLIENT_INPUTS =
       Map.ofEntries(
           Map.entry(
+              DashboardOptionsRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the unit a widget is pinned to, a display choice: every read of the widget is"
+                      + " scoped by the caller's reach",
+                  "status",
+                  "the status filter option of a widget, not a lifecycle state")),
+          Map.entry(
               ReassignResponsibleOrgUnitRequest.class,
               Map.of("responsibleOrgUnitId", JOB_ORDER_UNITS)),
+          Map.entry(
+              StockLevelCreateRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the unit whose pool the level watches, authorised by the controller gate"
+                      + " StockLevelAccessPolicy.canMaintainStockLevelsOf")),
           Map.entry(
               CreateNeedRequest.class,
               Map.of(

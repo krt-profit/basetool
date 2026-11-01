@@ -69,6 +69,7 @@ public class InventoryAggregationService {
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
   private final InventoryItemViewRepository inventoryItemViewRepository;
+  private final StockLevelService stockLevelService;
 
   /**
    * Sums the caller's own stock into one SCU total per material and quality for the blueprint
@@ -90,16 +91,20 @@ public class InventoryAggregationService {
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    LowStockSubjects low = stockLevelService.lowSubjects();
     return inventoryItemRepository
         .getAggregatedInventory(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
-        .map(obj ->
-            new AggregatedInventoryDto(
-                materialMapper.toDto((Material) obj[0]),
-                null,
-                obj[1] != null ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0 : 0.0,
-                obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
-                obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0));
+        .map(obj -> {
+          Material material = (Material) obj[0];
+          return new AggregatedInventoryDto(
+              materialMapper.toDto(material),
+              null,
+              obj[1] != null ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0 : 0.0,
+              obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
+              obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0,
+              low.lowMaterial(material.getId()));
+        });
   }
 
   /**
@@ -111,6 +116,7 @@ public class InventoryAggregationService {
    */
   public Page<AggregatedInventoryDto> getAggregatedItemInventory(Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    LowStockSubjects low = stockLevelService.lowSubjects();
     return inventoryItemRepository
         .getAggregatedItemInventory(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
@@ -120,7 +126,8 @@ public class InventoryAggregationService {
                 inventoryItemMapper.gameItemToReferenceDto((GameItem) obj[0]),
                 null,
                 null,
-                obj[1] != null ? ((Number) obj[1]).doubleValue() : 0.0));
+                obj[1] != null ? ((Number) obj[1]).doubleValue() : 0.0,
+                low.lowGameItem(((GameItem) obj[0]).getId())));
   }
 
   /**
@@ -329,7 +336,12 @@ public class InventoryAggregationService {
             filter.stolenOnly(),
             filter.nonStolenOnly());
 
-    return buildGroupedFromStacks(stacks);
+    LowStockSubjects low = stockLevelService.lowSubjects();
+    return buildGroupedFromStacks(stacks).stream()
+        .map(group ->
+            group.withLowStock(
+                low.lowMaterial(group.material() == null ? null : group.material().id())))
+        .toList();
   }
 
   /**
@@ -483,7 +495,12 @@ public class InventoryAggregationService {
             attributes.gradesOrNull(),
             attributes.hasItemClasses(),
             attributes.itemClassesOrNull());
-    return buildGroupedFromItemStacks(stacks);
+    LowStockSubjects low = stockLevelService.lowSubjects();
+    return buildGroupedFromItemStacks(stacks).stream()
+        .map(group ->
+            group.withLowStock(
+                low.lowGameItem(group.gameItem() == null ? null : group.gameItem().id())))
+        .toList();
   }
 
   /**

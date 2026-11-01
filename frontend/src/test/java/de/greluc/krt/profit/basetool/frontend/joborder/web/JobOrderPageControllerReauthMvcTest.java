@@ -22,21 +22,21 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -54,7 +54,7 @@ class JobOrderPageControllerReauthMvcTest {
             new JobOrderPageController(
                 client,
                 new JobOrderPageReader(client, mock(ParallelPageLoader.class)),
-                mock(RoleHierarchy.class),
+                mock(LogisticianGate.class),
                 mock(QualityTierCatalog.class),
                 mock(JobOrderItemLines.class)));
     ReauthPageMvc.signInMember();
@@ -67,12 +67,15 @@ class JobOrderPageControllerReauthMvcTest {
 
   @Test
   void anExpiredSessionOnTheOrderListRedirectsToLogin() throws Exception {
-    when(client.orders(anyBoolean(), anyBoolean(), anyInt(), anyInt(), any(), any()))
+    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
         .thenThrow(expiredSession());
 
     mockMvc
         .perform(
-            get("/orders").param("canViewJobOrders", "true").param("canViewOwnJobOrders", "false"))
+            get("/orders")
+                .param("canViewJobOrders", "true")
+                .param("canViewOwnJobOrders", "false")
+                .param("canViewAssignedJobOrders", "false"))
         .andExpect(redirectsToLogin());
   }
 

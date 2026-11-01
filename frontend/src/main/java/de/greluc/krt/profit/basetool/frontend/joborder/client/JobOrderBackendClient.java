@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportPreviewRequestDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeCandidateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
@@ -38,10 +39,12 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderNumberHitDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -115,16 +118,19 @@ public class JobOrderBackendClient {
   private static final ParameterizedTypeReference<List<LinkedStockAttributionDto>>
       LIST_OF_STOCK_ATTRIBUTION = new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<JobOrderAssigneeCandidateDto>>
+      LIST_OF_ASSIGNEE_CANDIDATE = new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<JobOrderNumberHitDto>> LIST_OF_NUMBER_HIT =
+      new ParameterizedTypeReference<>() {};
+
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
 
   /**
    * Reads one page of the order list, sorted by priority.
    *
-   * @param ownScope {@code true} to read the caller's own requested orders, which ignore the
-   *     squadron filter
-   * @param toProcess {@code true} to read the queue of the caller's own units, which ignores the
-   *     squadron filter
+   * @param scope the segment to read; only {@link OrderListScope#ALL} carries the squadron filter
    * @param page the zero-based page index
    * @param size the page size
    * @param statuses the status filter, never empty
@@ -133,14 +139,14 @@ public class JobOrderBackendClient {
    */
   @Nullable
   public PageResponse<JobOrderDto> orders(
-      boolean ownScope,
-      boolean toProcess,
+      @NotNull OrderListScope scope,
       int page,
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds) {
     StringBuilder uri =
-        new StringBuilder(ownScope ? "/api/v1/orders/requested" : "/api/v1/orders")
+        new StringBuilder(
+                scope == OrderListScope.MINE ? "/api/v1/orders/requested" : "/api/v1/orders")
             .append("?page={page}&size={size}&sort=priority,asc&status=");
     List<Object> uriVariables = new ArrayList<>();
     uriVariables.add(page);
@@ -152,9 +158,13 @@ public class JobOrderBackendClient {
       uri.append("{status}");
       uriVariables.add(statuses.get(i));
     }
-    if (toProcess) {
-      uri.append("&toProcess=true");
-    } else if (!ownScope) {
+    uri.append(
+        switch (scope) {
+          case TO_PROCESS -> "&toProcess=true";
+          case ASSIGNED -> "&assignedToMe=true";
+          case ALL, MINE -> "";
+        });
+    if (scope == OrderListScope.ALL) {
       for (UUID sid : squadronIds) {
         uri.append("&squadronId={squadronId}");
         uriVariables.add(sid);
@@ -217,6 +227,22 @@ public class JobOrderBackendClient {
   public List<InventoryItemDto> orphanedInventory(@NotNull UUID id) {
     return backendApiClient.get(
         "/api/v1/orders/{id}/allocations/orphaned", LIST_OF_INVENTORY_ITEM, id);
+  }
+
+  /**
+   * Finds the orders whose number starts with the given digits among those the caller may open.
+   *
+   * @param digits the digits the number starts with
+   * @param limit the most hits
+   * @return the hits by ascending number, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<JobOrderNumberHitDto> ordersByNumber(@NotNull String digits, int limit) {
+    return backendApiClient.get(
+        "/api/v1/orders/by-number?number={number}&limit={limit}",
+        LIST_OF_NUMBER_HIT,
+        digits,
+        limit);
   }
 
   /**
@@ -298,6 +324,23 @@ public class JobOrderBackendClient {
   public List<LinkedStockAttributionDto> stockAttribution(@NotNull UUID id, @NotNull UUID matId) {
     return backendApiClient.get(
         "/api/v1/orders/{id}/materials/{matId}/attribution", LIST_OF_STOCK_ATTRIBUTION, id, matId);
+  }
+
+  /**
+   * Searches the accounts a Logistician of the order may assign (REQ-ORDERS-047).
+   *
+   * @param id the order
+   * @param query the handle fragment, possibly empty
+   * @return the candidates, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<JobOrderAssigneeCandidateDto> assigneeCandidates(
+      @NotNull UUID id, @NotNull String query) {
+    return backendApiClient.get(
+        "/api/v1/orders/{id}/assignee-candidates?query={query}",
+        LIST_OF_ASSIGNEE_CANDIDATE,
+        id,
+        query);
   }
 
   /**

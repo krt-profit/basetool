@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttribution
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
@@ -54,6 +55,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,6 +84,7 @@ public class JobOrderQueryService {
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderMaterialRequirementResolver materialRequirementResolver;
+  private final AuthHelperService authHelper;
 
   /**
    * Paged list with an optional status filter, always constrained to the caller's visibility scope.
@@ -123,7 +126,8 @@ public class JobOrderQueryService {
    * <p>With {@code toProcess} only orders whose profit-eligible responsible unit is one of the
    * caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned org
    * unit when one is active, otherwise the caller's direct memberships. The filter only narrows the
-   * scoped result; a caller with no processing unit gets an empty page.
+   * scoped result; a caller with no processing unit gets an empty page. Without it the scope also
+   * holds the orders the caller is an assignee of (REQ-ORDERS-047).
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -140,8 +144,7 @@ public class JobOrderQueryService {
     if (!ownerScopeService.canViewJobOrders()) {
       return Page.empty(pageable);
     }
-    List<JobOrderStatus> effectiveStatuses =
-        (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
+    List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
     if (toProcess) {
@@ -165,9 +168,30 @@ public class JobOrderQueryService {
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
+            authHelper.currentUserId().orElse(NIL_ID),
             pageable);
 
     return jobOrderStockProjectionService.mapPageWithStock(page);
+  }
+
+  /**
+   * Paged list of the orders the caller holds an assignee entry on, the "Ich bearbeite" list
+   * (REQ-ORDERS-040). The entry is the visibility grant (REQ-ORDERS-047), so the list is open to a
+   * caller outside the profit gate; an unidentified caller gets an empty page.
+   *
+   * @param statuses optional status filter; null/empty means "all"
+   * @param pageable page request
+   * @return paged job orders the caller is an assignee of, as DTOs
+   */
+  public Page<JobOrderDto> getAssignedJobOrders(
+      @Nullable List<JobOrderStatus> statuses, Pageable pageable) {
+    UUID callerId = authHelper.currentUserId().orElse(null);
+    if (callerId == null) {
+      return Page.empty(pageable);
+    }
+    List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
+    return jobOrderStockProjectionService.mapPageWithStock(
+        jobOrderRepository.findAssignedJobOrders(effectiveStatuses, callerId, pageable));
   }
 
   /**
@@ -183,11 +207,46 @@ public class JobOrderQueryService {
     if (requesterOrgUnitIds.isEmpty()) {
       return Page.empty(pageable);
     }
-    List<JobOrderStatus> effectiveStatuses =
-        (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
+    List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     Page<JobOrder> page =
         jobOrderRepository.findRequestedOrders(effectiveStatuses, requesterOrgUnitIds, pageable);
     return jobOrderStockProjectionService.mapPageWithStock(page);
+  }
+
+  /**
+   * Finds the orders whose number starts with the given digits among those the caller may open: the
+   * scoped orders for a caller inside the order workflow and, for every caller, the orders they are
+   * an assignee of (REQ-ORDERS-048).
+   *
+   * @param numberPrefix the digits the number starts with
+   * @param limit the most hits to return
+   * @return the matching orders by ascending number, empty for an unidentified caller
+   */
+  public @NotNull List<JobOrderNumberHitDto> findByNumberPrefix(
+      @NotNull String numberPrefix, int limit) {
+    UUID callerId = authHelper.currentUserId().orElse(null);
+    if (callerId == null) {
+      return List.of();
+    }
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return jobOrderRepository
+        .findVisibleByNumberPrefix(
+            numberPrefix,
+            ownerScopeService.canViewJobOrders(),
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            callerId,
+            PageRequest.of(0, limit))
+        .stream()
+        .map(o ->
+            new JobOrderNumberHitDto(o.getId(), o.getDisplayId(), o.getStatus(), o.getCreatedAt()))
+        .toList();
+  }
+
+  private static @NotNull List<JobOrderStatus> statusesOrAll(
+      @Nullable List<JobOrderStatus> statuses) {
+    return statuses == null || statuses.isEmpty() ? List.of(JobOrderStatus.values()) : statuses;
   }
 
   /**
@@ -203,7 +262,7 @@ public class JobOrderQueryService {
     }
     List<JobOrder> visible =
         jobOrderRepository.findAllActiveWithMaterials().stream()
-            .filter(jobOrderAccessPolicy::canSeeJobOrder)
+            .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
             .toList();
     List<UUID> needIds = withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of();
     OrderLinkedStockIndex stockIndex =

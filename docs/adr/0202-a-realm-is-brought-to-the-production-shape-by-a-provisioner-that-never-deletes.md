@@ -5,7 +5,8 @@
   (2026-10-17): the production shape loses `basetool-android`, the `krt-mobile-dpop` profile, its
   policy and the `dpop-refresh-only` marker role (ADR-0131). The provisioner deletes them wherever
   they remain, the one exception to decision 4 (*Amendment 7*, #2674); converging the remaining
-  shape is unchanged.
+  shape is unchanged. Amended again by [ADR-0300](0300-officer-reach-is-derived-per-org-unit-and-the-keycloak-officer-role-is-retired.md)
+  (2026-10-31): the provisioner also deletes the retired `Officer` realm role (*Amendment 8*).
 - **Date:** 2026-09-22
 - **Deciders:** @greluc (requested 2026-09-22: "the testing host must mirror production")
 - **Related:** [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) (the DPoP policy and its
@@ -273,3 +274,18 @@ receives no write. It is not a general permission to delete: the three objects a
 and everything else only the target realm has is still reported and left alone. Requirements:
 `REQ-OPS-033`, `REQ-SEC-030` and `REQ-SEC-035` (both superseded); pinned by case 4 of
 `scripts/provision-keycloak-realm.test.sh`.
+
+## Amendment 8 — 2026-10-31: the retired Officer realm role is deleted by the provisioner
+
+- **Deciders:** @greluc (ADR-0300)
+
+With the `OFFICER` role retired (ADR-0300), the realm role `Officer` leaves the production shape.
+The provisioner no longer creates it and deletes it wherever it remains, as a second named
+retirement beside the Android client (*Amendment 7*): `plan_retired_realm_roles` plans
+`- realm role 'Officer' deleted with its user mappings (retired with the OFFICER role, ADR-0300)`,
+the dry run lists it and exits `2`, and a realm without the role receives no write. Keycloak drops
+the role's user mappings with it. It is not a general permission to delete: the role is a named
+constant, and every other role only the target realm has is still left alone. Requirements:
+`REQ-SEC-004`; pinned by case 4b of `scripts/provision-keycloak-realm.test.sh`. Production gets the
+deletion with a separate owner-approved dry run and apply, after the release that carries the
+migration.

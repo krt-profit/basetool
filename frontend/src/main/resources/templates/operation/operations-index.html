@@ -9,10 +9,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{operations.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='operations.list', eyebrowKey='nav.group.operations', titleText=#{operations.title},
         count=${operationsPage != null ? operationsPage.totalElements() : null}, countId='operations-count', countFor='operations-results', actions=~{::operations-actions})}">
         <th:block th:ref="operations-actions">
-            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)"
+            <button th:if="${isMissionManagerOrAbove}"
                     type="button" class="btn btn--cta" data-testid="page-head-primary" th:text="#{operation.create}"
                     data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
         </th:block>

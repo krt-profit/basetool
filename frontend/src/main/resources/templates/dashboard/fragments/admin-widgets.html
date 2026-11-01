@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="adminHub" data-widget-content class="admin-hub" data-testid="admin-hub">
+    <section class="admin-hub__group" th:each="item : ${navigation.admin()}" th:data-testid="|admin-hub-${item.group().key()}|">
+        <h3 class="admin-hub__title" th:text="#{${item.group().labelKey()}}">Gruppe</h3>
+        <ul class="admin-hub-links">
+            <li th:each="entry : ${item.links()}">
+                <a th:href="@{${entry.href()}}" th:data-entry-key="${entry.key()}" th:text="#{${entry.labelKey()}}">Link</a>
+            </li>
+        </ul>
+    </section>
+</div>
+
+<div th:fragment="deletionRequests" data-widget-content data-testid="admin-widget-deletion-requests">
+    <ul th:if="${not #lists.isEmpty(adminRows)}" class="dash-links">
+        <li th:each="request : ${adminRows}" class="admin-row">
+            <span class="cell-title" th:text="${@handles.display(request.handle)}">Callsign</span>
+            <span class="cell-sub" th:text="${#temporals.format(@relativeDays.local(request.requestedAt), 'dd.MM.yyyy')}">01.01.2026</span>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(adminRows)}" class="home-notifs__empty" data-testid="admin-widget-empty"
+       th:text="#{dashboard.widget.deletion-requests.empty}">Keine offenen Löschanträge.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="admin-widget-count" th:text="${adminTotal}">2</span>
+        <a class="home-card-link" th:href="@{/admin/deletion-requests}" th:text="#{dashboard.widget.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="discordRegistrations" data-widget-content data-testid="admin-widget-discord-registrations">
+    <ul th:if="${not #lists.isEmpty(adminRows)}" class="dash-links">
+        <li th:each="registration : ${adminRows}" class="admin-row">
+            <span class="cell-title" th:text="${registration.username}">Callsign</span>
+            <span class="cell-sub" th:text="${#temporals.format(@relativeDays.local(registration.registeredAt), 'dd.MM.yyyy')}">01.01.2026</span>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(adminRows)}" class="home-notifs__empty" data-testid="admin-widget-empty"
+       th:text="#{dashboard.widget.discord-registrations.empty}">Keine offenen Registrierungen.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="admin-widget-count" th:text="${adminTotal}">3</span>
+        <a class="home-card-link" th:href="@{/admin/discord-registrations}" th:text="#{dashboard.widget.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="openTerms" data-widget-content data-testid="admin-widget-open-terms">
+    <ul th:if="${not #lists.isEmpty(adminRows)}" class="dash-links">
+        <li th:each="member : ${adminRows}" class="admin-row">
+            <span class="cell-title" th:text="${member.displayName != null and !#strings.isEmpty(member.displayName)} ? ${member.displayName} : ${member.username}">Callsign</span>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(adminRows)}" class="home-notifs__empty" data-testid="admin-widget-empty"
+       th:text="#{dashboard.widget.open-terms.empty}">Alle Mitglieder haben zugestimmt.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="admin-widget-count" th:text="${adminTotal}">5</span>
+        <a class="home-card-link" th:href="@{/admin/terms}" th:text="#{dashboard.widget.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="syncStatus" data-widget-content data-testid="admin-widget-sync-status">
+    <ul class="dash-links">
+        <li th:each="row : ${syncRows}" class="admin-row" th:classappend="${!row.inRange()} ? 'is-stale'"
+            th:data-testid="|admin-sync-${#strings.toLowerCase(row.source().name())}|">
+            <span class="cell-title" th:text="#{${row.source().labelKey()}}">UEX</span>
+            <span class="cell-sub" th:if="${row.lastRunAt() == null}" th:text="#{dashboard.widget.sync-status.never}">Noch kein Lauf</span>
+            <span class="cell-sub" th:if="${row.lastRunAt() != null}">
+                <span th:text="${#temporals.format(@relativeDays.local(row.lastRunAt()), 'dd.MM.yyyy HH:mm')}">01.01.2026 12:00</span>
+                <span th:if="${!row.inRange()}" th:text="#{dashboard.widget.sync-status.outside(${syncRange})}">· außerhalb des Zeitraums</span>
+            </span>
+            <span th:if="${row.status() != null}" class="status-pill"
+                  th:classappend="${row.status() == 'FAILED'} ? 'status-failed'"
+                  th:text="#{${'dashboard.widget.sync-status.status.' + #strings.toLowerCase(row.status())}}">Erfolgreich</span>
+        </li>
+    </ul>
+    <div class="home-card-foot dash-widget__foot">
+        <a class="home-card-link" th:href="@{/admin/sync-reports}" th:text="#{dashboard.widget.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+</body>
+</html>

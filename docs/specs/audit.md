@@ -28,7 +28,7 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-> **Status: planned** (ADR-0298, ADR-0300, ADR-0301, ADR-0302, map #2800) for the coverage additions
+> **Status: planned** (ADR-0298, ADR-0300, ADR-0302, map #2800) for the coverage additions
 > in the planned amendment at the end of this requirement. Until they ship, the current text below /
 > the current code stays authoritative.
 
@@ -98,6 +98,10 @@ web, naming its client (REQ-AUDIT-005):
   the undo of a client's org-stock writes (`INVENTORY_ITEM_RESTORED` per shared row it removed,
   recreated or set back, with the amount afterwards and whether it was removed; an entry already as
   restored records nothing, REQ-XCH-046) /
+  a unit's minimum stock levels (REQ-INV-068: `MIN_STOCK_LEVEL_SET` on create,
+  `MIN_STOCK_LEVEL_CHANGED` only when minimum, target or tier changed, with from / to of all three,
+  `MIN_STOCK_LEVEL_REMOVED` on delete; the subject is the level, labelled by the material or item name,
+  the details carry the unit as `kind:id`, the material or game-item id, tier codes and amounts) /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover — material handover **and** item delivery consuming the order's earmarked item
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
@@ -117,6 +121,10 @@ web, naming its client (REQ-AUDIT-005):
   quality-tier catalogue create, update, deactivate and delete (`QUALITY_TIER_*`, REQ-ORDERS-036). A requesting-owner edit (REQ-ORDERS-023) reuses the
   existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
   bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
+  Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
+  records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of
+  `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public; the assignee is the
+  target user, and the details carry only `assignee=<id>` — no handle, unit name or free text.
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
@@ -416,29 +424,29 @@ by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json
 
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
 `RoleServiceTest`, `AdminAuditLogPageControllerTest`,
-per-domain emission assertions in the service tests · **Code:** `audit/api/AuditRecorder`,
+per-domain emission assertions in the service tests (for the external assignee
+`JobOrderServiceAssigneeAndListTest` `externalAssignee_*` and `JobOrderAssigneeGrantIntegrationTest`)
+· **Code:** `audit/api/AuditRecorder`,
 `audit/api/AuditService`, `audit/api/AuditEvent`, `audit/api/AuditDomain`, `audit/api/AuditEventType`,
 `audit/web/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)
 
-#### Planned amendment (ADR-0298, ADR-0300, ADR-0301, ADR-0302)
+#### Planned amendment (ADR-0298, ADR-0300, ADR-0302)
 
 The coverage list gains:
 
-- **Lager** — minimum stock levels (REQ-INV-068): `MIN_STOCK_LEVEL_SET`, `MIN_STOCK_LEVEL_CHANGED`
-  (only when a field changed), `MIN_STOCK_LEVEL_REMOVED` and `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE`
-  (one per level a catalogue deletion or unit dissolution removed). The subject is the level,
-  labelled by the material or item name; the details carry ids, the unit as `kind:id`, tier codes
-  and amounts.
-- **Aufträge** — an assignee who is not a direct member of the processing unit
-  (REQ-ORDERS-047): `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in
-  place of `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public. The assignee
-  is the target user; the details carry no handle and no unit name.
-- **Bank trail** (`bank_audit_event`) — the removal of the `GLOBAL_ROLE OFFICER` view-grant bucket
-  on special accounts (REQ-BANK-037, ADR-0300) writes one `GRANT_REVOKED` per removed grant, with
-  the system as actor.
+- **Lager** — minimum stock levels (REQ-INV-068): `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE` (one per
+  level the deletion of its material removed), and the write events above for game-item levels. The subject
+  is the level, labelled by the material or item name; the details carry ids, the unit as
+  `kind:id`, tier codes and amounts.
+- **Bank trail** (`bank_audit_event`) — the one-time removal of the `GLOBAL_ROLE` view-grant and
+  approval-limit buckets on special accounts (`OFFICER`, then `LOGISTICIAN` and `MISSION_MANAGER`;
+  REQ-BANK-037, ADR-0300) wrote one
+  `BALANCE_VISIBILITY_REVOKED` per grant and one `APPROVAL_LIMIT_CLEARED` per limit, with the
+  system as actor. Those rows come from the SQL migration and are not counted by
+  `basetool_bank_audit_events_total`.
 
-The six new types join the viewer's per-area event-type lists and the DE/EN labels, and are counted
+The new types join the viewer's per-area event-type lists and the DE/EN labels, and are counted
 by `basetool_audit_events_total{domain}` / `basetool_bank_audit_events_total{event_type}`
 (REQ-OBS-011).
 
@@ -448,8 +456,8 @@ They are an account's own presentation choices, owner-only and read by nobody el
 trail of them would record personal habits without serving any oversight. They are counted, not
 audited (`basetool_navigation_preference_writes_total`, REQ-OBS-011).
 
-**Enforced by (to be added):** `StockLevelServiceTest`, `JobOrderServiceAssigneeAndListTest`
-(`externalAssignee_*`), the bank grant migration test, `AdminAuditLogPageControllerTest`
+**Enforced by (to be added):** `StockLevelServiceTest`, the bank grant migration test,
+`AdminAuditLogPageControllerTest`
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 

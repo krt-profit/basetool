@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -88,6 +89,14 @@ class InventoryAggregationServiceTest {
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private InventoryItemViewRepository inventoryItemViewRepository;
+  @Mock private StockLevelService stockLevelService;
+
+  @BeforeEach
+  void noLowLevels() {
+    lenient()
+        .when(stockLevelService.lowSubjects())
+        .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
+  }
 
   @InjectMocks private InventoryAggregationService service;
 

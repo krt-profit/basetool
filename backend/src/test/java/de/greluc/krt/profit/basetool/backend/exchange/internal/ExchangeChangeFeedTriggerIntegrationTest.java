@@ -564,6 +564,85 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   }
 
   @Test
+  void aBereichLogisticianFlagAnnouncesThePoolsBelowTheBereichOnly() {
+    UUID bereich = orgUnit("feed-area", "BEREICH", null);
+    UUID child = orgUnit("feed-area-child", "SQUADRON", bereich);
+    UUID outside =
+        orgUnit("feed-area-outside", "SQUADRON", orgUnit("feed-area-other", "BEREICH", null));
+    UUID material = material("feed-cascade-gold");
+    UUID location = location("feed-cascade-hurston");
+    stock(bob, material, location, 1, false, false, child);
+    stock(bob, material, location, 1, false, false, outside);
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
+        alice,
+        bereich);
+    int before = orgChanges(child).size();
+    int beforeOutside = orgChanges(outside).size();
+
+    jdbc.update(
+        "UPDATE org_unit_membership SET is_logistician = TRUE WHERE user_id = ? AND org_unit_id ="
+            + " ?",
+        alice,
+        bereich);
+
+    assertThat(orgChanges(child).subList(before, orgChanges(child).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(child, material, location, 1, false));
+    assertThat(orgChanges(outside)).hasSize(beforeOutside);
+  }
+
+  @Test
+  void anOrganisationsleitungLogisticianFlagAnnouncesEveryPool() {
+    UUID leadership = orgUnit("feed-ol", "ORGANISATIONSLEITUNG", null);
+    UUID pool = orgUnit("feed-ol-pool", "SQUADRON", orgUnit("feed-ol-area", "BEREICH", null));
+    UUID material = material("feed-cascade-iron");
+    UUID location = location("feed-cascade-arccorp");
+    stock(bob, material, location, 1, false, false, pool);
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
+        alice,
+        leadership);
+    int before = orgChanges(pool).size();
+
+    jdbc.update(
+        "UPDATE org_unit_membership SET is_logistician = TRUE WHERE user_id = ? AND org_unit_id ="
+            + " ?",
+        alice,
+        leadership);
+
+    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(pool, material, location, 1, false));
+  }
+
+  @Test
+  void aStaffelLogisticianFlagAnnouncesItsOwnPoolOnly() {
+    UUID bereich = orgUnit("feed-flat-area", "BEREICH", null);
+    UUID staffel = orgUnit("feed-flat-staffel", "SQUADRON", bereich);
+    UUID sibling = orgUnit("feed-flat-sibling", "SQUADRON", bereich);
+    UUID material = material("feed-cascade-tin");
+    UUID location = location("feed-cascade-microtech");
+    stock(bob, material, location, 1, false, false, staffel);
+    stock(bob, material, location, 1, false, false, sibling);
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
+        alice,
+        staffel);
+    int before = orgChanges(staffel).size();
+    int beforeSibling = orgChanges(sibling).size();
+
+    jdbc.update(
+        "UPDATE org_unit_membership SET is_logistician = TRUE WHERE user_id = ? AND org_unit_id ="
+            + " ?",
+        alice,
+        staffel);
+
+    assertThat(orgChanges(staffel).size()).isGreaterThan(before);
+    assertThat(orgChanges(sibling)).hasSize(beforeSibling);
+  }
+
+  @Test
   void renamingAUnitAnnouncesEveryLotOfItsPool() {
     UUID pool = orgUnit("feed-rename-pool");
     UUID material = material("feed-bexalite");
@@ -718,13 +797,27 @@ class ExchangeChangeFeedTriggerIntegrationTest {
    * @return its id
    */
   private @NotNull UUID orgUnit(@NotNull String name) {
+    return orgUnit(name, "SQUADRON", null);
+  }
+
+  /**
+   * Inserts an org unit of a kind below an optional parent.
+   *
+   * @param name the name
+   * @param kind the org-unit kind
+   * @param parent the parent unit, or {@code null}
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String name, @NotNull String kind, UUID parent) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, FALSE, ?)",
         id,
+        kind,
         name,
-        "F" + id.toString().substring(0, 8));
+        "F" + id.toString().substring(0, 8),
+        parent);
     return id;
   }
 

@@ -16,7 +16,8 @@
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
-> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned) ·
+> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned; REQ-UI-033
+> shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -579,7 +580,7 @@ page head never runs wider than the content below it:
 
 **Breakpoints are only the class boundaries** (DS-11, ADR-0242, amended 2026-10-03): a media query
 uses `(width <= 768px)`, `(width <= 1024px)` or `(width >= 1440px)` — or a range between two of them —
-and nothing else. Stylelint's `media-feature-name-value-allowed-list` enforces it in both
+and, for the pinned sidebar of REQ-UI-026 only, `(width >= 1280px)`; nothing else (owner decision 24). Stylelint's `media-feature-name-value-allowed-list` enforces it in both
 configurations, for `width`, `min-width` and `max-width`. A component that has to react to its own
 width uses a container query. The tokens `--bp-phone-max`, `--bp-tablet-max` and `--bp-wide-min`
 document the values (a custom property cannot be used inside `@media`). The fifteen earlier values
@@ -1354,7 +1355,8 @@ Binding details:
 - **The icon is emitted at its content-hashed URL**, resolved through `ResourceUrlProvider`.
   `/logos/**` is served `immutable` for a year, so a manifest naming the bare path would pin every
   installed home screen to a URL no browser revalidates — a redesigned icon would never arrive.
-- **`scope` and `start_url` are the application root, and sign-in is inside them.** A `scope` is one
+- **`scope` and `id` are the application root, `start_url` is its entry point `/start`
+  (REQ-UI-034), and sign-in is inside them.** A `scope` is one
   URL prefix and cannot span two origins, so while Keycloak answered on a host of its own the
   authentication hop was outside it. On iOS a navigation out of scope opens in a Safari View
   Controller, which has its own storage; Apple keeps OAuth in the app **by heuristic** rather than by
@@ -1382,7 +1384,8 @@ Binding details:
   request, with no redirect, **for every `Accept` header**.
 - [ ] Its `name`, `short_name` and `description` come from the bundles and follow `?locale=`; an
   unsupported or malformed value renders German with `"lang": "de"`, never a mismatched pair.
-- [ ] `display` is `standalone`; `start_url`, `scope` and `id` are the application root.
+- [ ] `display` is `standalone`; `scope` and `id` are the application root and `start_url` is
+  `/start`, which leads to the start page of the member (REQ-UI-034).
 - [ ] `icons` holds **exactly two** entries: the opaque 192 px and 512 px tiles at their
   **content-hashed** URLs, `purpose` `any`, never `maskable`.
 - [ ] `Cache-Control: max-age=3600, public` and **no** `Vary`, because the body depends only on the
@@ -1591,9 +1594,8 @@ The org's members use a set of community websites alongside the Basetool — tra
 ship databases, crafting, the org's own sites and the game's official ones. The Basetool lists
 them in one place so nobody has to collect the addresses from Discord.
 
-- **Where.** `/sc-links`, titled „Star-Citizen-Links" / "Star Citizen links". Reached from the
-  drawer group „Ressourcen" / "Resources", the last group of the main menu (REQ-UI-026), and from
-  the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
+- **Where.** `/sc-links`, titled „Star-Citizen-Links" / "Star Citizen links". Reached from a link
+  in the footer (REQ-UI-026) and from the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
 - **What.** Forty links in six sections, in this order:
@@ -1633,14 +1635,18 @@ them in one place so nobody has to collect the addresses from Discord.
 
 **Enforced by:** `ScLinkCatalogTest` (unique HTTPS addresses, every logo shipped and none unused,
 SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageControllerMvcTest`
-(renders every card with its logo and address in DE and EN, the sidebar entry under „Ressourcen") ·
+(renders every card with its logo and address in DE and EN, the footer link) ·
 `AnonymousSurfaceSweepMvcTest` (anonymous navigation is sent to the login) ·
 **Related:** REQ-UI-018, REQ-SEC-052
 
 ### REQ-UI-026 — Navigation: a structured drawer, a quick access and a phone tab bar
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current text below stays
-> authoritative; the planned amendment at the end of this requirement replaces the parts it names.
+> **Status: partly shipped** (ADR-0297, map #2800). Admin mode and the member default of the
+> amendment are implemented and replace the *List* zone, the group list and the quick access's page
+> list of the text below, and so are the three desktop modes (drawer, rail, pinned sidebar) with the
+> „Darstellung" switch; „Mehr" and „Anpassen" in the rail wait for the hiding and editing of
+> REQ-UI-032. The personalisation and the phone tab bar of the amendment stay planned, and the
+> current text stays authoritative for them.
 
 The navigation has grown to about 65 links for a member with many roles, several viewport heights
 of one flat drawer. It is one model on every device
@@ -1705,8 +1711,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
   longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
-  safe area) holds Einsätze · Lager · Aufträge · Meldungen (with the unread count) · Menü; the current
-  area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
+  safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
+  default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
   accordion with the current page's group open, the legal links, the handbook and the version at the
   end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
   shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
@@ -1722,10 +1728,25 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   removes both.
 - **No data, nothing mutates.** Every action navigates or opens the drawer; the org-unit switch
   and logout keep their existing forms, so no live-update wiring, audit event or metric changes.
+- **One entry registry.** The drawer (top links, groups, personal panel, admin groups, legal
+  links), the phone tab bar and the quick access's own pages and actions are rendered from one
+  frontend registry, never from links written into the fragments. Each entry carries a stable
+  **entry key**, its path, label, search terms and its gate (roles, of which one is needed, read
+  through the role hierarchy, plus the capability and feature flags it requires or excludes);
+  every rendered link names its key in `data-entry-key`. A tab-bar slot names candidate entries
+  and opens the first one the member may see. **Key format:** two or more dot-separated segments,
+  each a lower-case letter followed by lower-case letters or digits, at most 64 characters
+  (e.g. `missions.list`, `storage.my`, `admin.syncreports.uex`); a key never encodes the path.
 
 **Enforced by:** `NavigationRenderMvcTest` (header, drawer zones and groups, admin mode only for
 administrators, the quick-access metadata, search terms on menu links, the quick access's own pages
 and actions per role, no „Rechtliches" group, nothing of it for a signed-out visitor) ·
+`NavigationEntryKeyRenderMvcTest` (every rendered link names a registered entry key) ·
+`NavigationMemberRenderMvcTest` (the four task groups, the footer link, officer-only tabs by flag) ·
+`NavigationLegacyRedirectMvcTest` (the former Lager list URLs redirect to the Lager tab with the option and
+their filter query; in-place requests and sub-paths are not redirected) ·
+`NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
+`NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
 `PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
 `:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
@@ -1735,13 +1756,14 @@ mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access foll
 chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
 `kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
 `static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
-`kernel/layout/QuickAccessContributor.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
+`kernel/layout/QuickAccessContributor.java`, `kernel/fragments/nav-entries.html`,
+`navigation/web/NavigationRegistry.java`, `navigation/web/NavigationAdvice.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
 ADR-0282
 
 #### Planned amendment (ADR-0297)
 
 **What it replaces.** The *List* zone and the admin groups of „The drawer" and „Information
-architecture", the 769 px drawer threshold, the tab-bar line of „Phones" and the „No data,
+architecture", the 769 px drawer threshold and the „No data,
 nothing mutates" bullet (preferences are written, REQ-UI-032). The header, the context and foot
 zones, the menu filter, tolerant matching, „Rights stay on the server" and accessibility stay; the
 quick access is extended by REQ-UI-033.
@@ -1760,6 +1782,14 @@ its former sibling pages become tabs of it.
 | Staffel | users | Organisation (Organigramm · Staffel-Bank · *Leitung*), Beförderung (Übersicht · Meine Bewertungen · *Verwaltung*) |
 | Kartellbank (bank staff only) | bank | Kartellbank (Dashboard · Verwaltung · Berechtigungen · Anträge) |
 
+- *Shipped:* the groups, links and tabs are the entries of the registry (`NavigationRegistry`),
+  every tab bar is `NavigationPageTabs` rendered by `pageHead(tabsKey=…)`, and a page left with fewer
+  than two permitted tabs shows no bar. A tab can cover pages that are not tabs themselves (Beförderung's
+  Themenbereiche and Rangvoraussetzungen); they show the bar with the
+  covering tab current. Beschaffung keeps its supply and purchasing tab fragments, which add
+  „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. Every former URL still opens
+  its page or tab (the Lager lists by redirect); an entry gated on a flag or role the caller lacks is neither a link nor a tab, and
+  officer-only tabs follow `canOpenLeitung` and `canManagePromotions`.
 - *Italic* tabs are officer-only (officer reach per org unit, ADR-0300); Beförderung's
   „Verwaltung" holds Bewertungen, Themenbereiche and Rangvoraussetzungen. Officers therefore also
   see 10 links, bank staff 11.
@@ -1771,6 +1801,10 @@ its former sibling pages become tabs of it.
   quick-access entries open the „Lager" tab with that option selected and keep their own stable
   entry keys (REQ-UI-032), so they can still be favourites, tab-bar slots and start pages; the old
   URLs `/inventory/my` and `/inventory/all` redirect to the tab with the option.
+  *Shipped:* the options are `/inventory?storage=my` and `/inventory?storage=all`, rendered by the
+  Lager tab with the „Lager" tab bar and the switch (`aria-current` on the selected option); the
+  old page URLs redirect with their filter query kept, while their in-place requests and sub-paths
+  (stack entries, entry ids) keep their endpoints.
 - The ship catalogue, readable by every signed-in user, is a Hangar tab; editing it stays in
   admin mode.
 - A user without profit access who is an assignee of at least one job order sees „Aufträge" with
@@ -1783,6 +1817,11 @@ its former sibling pages become tabs of it.
 
 **Admin mode: the admin dashboard plus 13 links in 3 groups, collapsed by default.** The admin
 dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four current admin groups.
+*Shipped:* `/admin` is the admin dashboard (REQ-UI-034), the groups start collapsed (the
+member's own choice and the group holding the current page win), and every merged page shows a tab
+bar of its sibling pages (`NavigationPageTabs` in the registry). The old four admin groups are gone;
+the former admin pages that became tabs keep their URLs, and the URLs that merged redirect
+(`NavigationLegacyRedirectMvcTest`).
 
 | Group | Icon | Links (tabs) |
 |---|---|---|
@@ -1792,15 +1831,21 @@ dashboard (REQ-UI-034) carries the hub of tiles; the groups replace the four cur
 
 Page merges this needs:
 
-- All four org-unit kinds are managed on Organisationsstruktur. Staffel CRUD leaves Missionsdaten;
-  the per-unit switches „Beförderung aktiv" and „Auftragsbearbeitung" leave Systemeinstellungen
-  for the unit's row.
-- The person detail (`/members/{id}`) gets the tabs Stammdaten · Hangar · Inventar · Blueprints ·
-  Export; the admin personal-inventory and personal-blueprints pages and their member picker go.
-- „Gefahrenzone" holds the destructive one-off actions: the bank wipe-reset and deleting every
-  user's blueprints.
+- All four org-unit kinds are managed on Organisationsstruktur: the tabs Struktur · Staffeln ·
+  Spezialkommandos. Staffel CRUD left Missionsdaten (`/admin/mission-data?kind=squadrons` redirects
+  to `/admin/org-structure/squadrons`), and the per-unit switches „Beförderung aktiv" and
+  „Auftragsbearbeitung" left Systemeinstellungen for the unit's row — on the Staffeln tab for
+  squadrons and on the Spezialkommandos tab for the „Auftragsbearbeitung" of a special command. The
+  switches save in place and need no audit event of their own beyond the existing ones.
+- The person detail (`/members/{id}/edit`) has the tabs Stammdaten · Hangar · Inventar ·
+  Blueprints · Export. Inventar and Blueprints are the former admin personal-inventory and
+  personal-blueprints pages, now keyed by the member (`/admin/personal-inventory?userSub=…`,
+  `/admin/personal-blueprints?userSub=…`); the member picker is gone and the pages without a member
+  lead to the member list.
+- „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the bank
+  wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
 - „Informationen" (the home-page announcement) is edited inline in its dashboard widget; it has no
-  admin link.
+  admin link, and `/admin/announcement` redirects to the dashboard (page `GET` only).
 
 **One default for every role; visibility follows the active context.**
 
@@ -1849,21 +1894,43 @@ stored mode is kept.
 - „Anpassen" in rail mode opens the labelled sidebar as an overlay; „Fertig" returns to the rail.
 - **Icons** are 24 × 24 with stroke 2 in the sprite's style; missing ones go into the design
   system's sprite.
+- *Shipped:* the mode is the `data-nav-mode` of `body`, rendered from the stored „Darstellung"
+  section, so the first paint is right and a failed read renders the drawer with the switch off.
+  The style sheet applies the width rules; the rail (`nav-rail.html`, one `.nav-rail-item` per
+  group with its flyout) is a sibling of the sidebar, which stays the labelled overlay in the rail
+  mode and is docked in the pinned mode. The switch is a `.krt-segmented` radio group in the
+  sidebar head and in the profile card „Darstellung", and writes in place through `krtFetch`
+  (`nav-appearance.js`). The rail is `nav-rail.js`; `krtChrome.nav.open()` opens the sidebar as an
+  overlay in the rail mode, which is what „Anpassen" will call.
 
-**Phone tab bar: five slots.** Slots 1–3 are configurable (REQ-UI-032), slot 4 is the fixed
-„Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
-navigation. One bar per mode.
+**Phone tab bar: five slots** (shipped). Slots 1–3 are configurable (REQ-UI-032), slot 4 is the
+fixed „Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
+navigation. One bar per mode: the member bar shows in member mode, the admin bar in admin mode.
+Every slot is at least 44 px wide and tall and shows the icon of its entry.
 
 | Mode | Default slots 1–3 |
 |---|---|
 | Member | Missionen · Lager · Aufträge |
 | Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
 
+**Enforced by (admin mode and phone tab bar shipped):** `AdminNavigationRenderMvcTest` (hub, three
+collapsed groups, 13 links, tab bar) · `NavigationTabBarMvcTest`, `NavigationTabBarResolverTest`
+(the default slots per mode, the fill from the favourites, the stand-in) ·
+`NavigationTabBarE2eTest` (the phone bar at 375 px) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
+tab, in-place requests are not redirected) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
+bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, the tab bar).
+
+**Enforced by (desktop modes shipped):** `NavigationDesktopModesMvcTest` (the mode on the body, the
+switch, the rail's groups, flyouts, favourites, foot and avatar flyout, the appearance relay) ·
+`NavigationE2eTest` (the three modes and their width fallbacks at 1024, 1100, 1280 and 1440 px,
+`scroll-padding-inline-start`, flyouts by hover, click and keyboard with Escape returning focus,
+the admin toggle) · `NavigationAppearanceServiceTest`, `NavigationPreferencesControllerTest`
+(the section store).
+
 **Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
 „Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
-tab) · `NavigationE2eTest` (the three desktop modes and their width fallbacks, rail flyouts by
-hover, click and keyboard, the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
+tab) · **Related:** REQ-UI-032, REQ-UI-033,
 REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
@@ -2231,14 +2298,20 @@ page use it; positions there count the reorderable rows of the rendered page.
 
 ### REQ-UI-032 — Navigation personalisation: favourites, „Mehr", order and the tab bar
 
-> **Status: planned** (ADR-0297, ADR-0298, map #2800). Until it ships, the current code stays
-> authoritative.
+> **Status: shipped** (ADR-0297, ADR-0298, ADR-0323, map #2800). Shipped: the store, the
+> Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
+> on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
+> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the order of groups and
+> links with the up/down controls and „Standardreihenfolge", „Darstellung" with the desktop mode
+> and `shortcutsEnabled` (own version, the profile card and the sidebar switch), the phone tab
+> bar with its „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the
+> privacy flows and the metrics, the start pages of „Darstellung" and the full reset.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
 **Entry keys.** Every page and every tab of a tabbed page — the personal pages included — has a
-stable entry key (e.g. `missions.list`, `orders.demand`) from a frontend-side entry registry,
-never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
+stable entry key (e.g. `missions.list`, `orders.demand`) from the frontend entry registry and in
+its key format (REQ-UI-026, „One entry registry"), never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
 the „Lager" tab with that switch selected (REQ-UI-026), keyed and handled like a tab. The backend
 checks the key's format only. A renamed page keeps its key or gets an explicit key remap; an
 unknown key from a new release (entry or group) is placed after its default predecessor, with no
@@ -2303,7 +2376,11 @@ Outside edit mode every page and tab header carries a star and „Als Startseite
 | „Tab-Leiste zurücksetzen" | the tab bar of the current mode (back to automatic) |
 | Full reset in the profile, after a confirmation dialog (REQ-UI-013) | all five sections in both modes, both dashboards and both start pages (REQ-UI-034); the desktop mode returns to the drawer |
 
-„Darstellung" has no reset of its own.
+„Darstellung" has no reset of its own. The full reset takes no version: it clears every section
+and moves every section's version on (a dashboard's layout version included), so a window that
+still holds an older version gets the 409 hint on its next write instead of bringing the cleared
+state back. It runs in one transaction, asks the confirmation dialog first, and updates the open
+page in place: the lists, the tab bar, the start-page controls and the desktop mode.
 
 **Store.** Server-side in the `navigation` module (ADR-0298), five sections, each with its own
 optimistic-lock version, so an edit in one never 409s another:
@@ -2316,7 +2393,9 @@ optimistic-lock version, so an edit in one never 409s another:
 | Tab-Leiste | slots 1–3 (none = automatic) | per mode, own version each |
 | Darstellung | desktop mode, `shortcutsEnabled` (REQ-UI-035), start page per mode | once per user |
 
-- Relational tables, Flyway-owned, each `REFERENCES app_user (id) ON DELETE CASCADE`, so account
+- Relational tables, Flyway-owned: one root table `navigation_preferences` per user, which
+  `REFERENCES app_user (id) ON DELETE CASCADE` and carries the version counter of every section,
+  and every further preference table references that root with `ON DELETE CASCADE`, so account
   erasure removes them (REQ-DATA-021).
 - **Data export and account merge:** the preferences are part of the Art. 15 / Art. 20 export in
   their own section `navigationPreferences` (REQ-SEC-058) and of the admin account merge
@@ -2330,10 +2409,10 @@ optimistic-lock version, so an edit in one never 409s another:
   are the privacy flows, not a preference view.
 - **Not audited:** personal UI preferences lie outside every audited area of REQ-AUDIT-001; the
   absence of audit events is deliberate.
-- **Deletion on next load:** an entry the user may no longer see user-wide is detected by the
-  frontend while it builds the navigation and deleted from every section through the backend,
-  which holds no key-to-permission knowledge. Unavailability in the active context deletes
-  nothing. Regaining a role restores nothing.
+- **Deletion on next load:** an entry the user may no longer see user-wide, and a stored key the
+  entry registry no longer knows, is detected by the frontend while it builds the navigation and
+  deleted from every section through the backend, which holds no key-to-permission knowledge.
+  Unavailability in the active context deletes nothing. Regaining a role restores nothing.
 
 **Browser-side state stays in the browser** (REQ-UI-017, ADR-0120): group collapse
 (`krt.sidebar.*`), the recent pages (`krt.recent`) and the „Häufig" ranking (REQ-UI-033).
@@ -2350,27 +2429,51 @@ optimistic-lock version, so an edit in one never 409s another:
 
 **Monitoring:** `basetool_navigation_preference_writes_total{section,outcome}` and
 `basetool_navigation_personalised_accounts{section}` (REQ-OBS-011); the endpoints count in
-`http_server_requests` by route template, and their 5xx rate alerts above 5 %.
+`http_server_requests` by route template, and their 5xx rate alerts above 5 %
+(`NavigationEndpointsErroring`).
 
-**Enforced by (to be added):** `NavigationPreferenceServiceTest` (cap of 12, mutual exclusion in
-one write, per-section and per-mode versions, owner-only, deletion of unknown-permission keys) ·
-`NavigationPreferenceControllerTest` (owner gate, 409 per section) · `NavigationRenderMvcTest`
-(Favoriten, greyed favourites, „Mehr", stored order with unknown keys, tab-bar filling and
-stand-ins) · `NavigationPersonalisationE2eTest` (edit mode, resets, the full reset's confirmation,
-44 px controls up to 1024 px, the 409 hint) · the export and merge tests of REQ-SEC-058 and
-REQ-SEC-046 · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+**Enforced by:** `NavigationPreferencesServiceTest` (order, the version per section,
+duplicate keys, owner isolation, deletion of entries), `NavigationPreferencesControllerTest` (the
+cap of 12, the key format, the owner from the token, 409), `NavigationFavouritesMvcTest` (Favoriten,
+the greyed favourite, the star, the deletion on load, failing closed, the relay),
+`NavigationFavouritesReaderTest`, `NavigationCurrentEntryTest`, `NavigationBackendClientTest`,
+`NavigationHiddenMvcTest` (Mehr only while a page is hidden, the hidden page and its tabs out of
+the quick access, no hide control on personal pages, the relays), `NavigationRegistryTest` (which
+entries are pages, which tabs leave with a page), `NavigationMenuTest`,
+`NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint, hiding with focus and
+announcement, favourite and hidden excluding each other, the resets, 44 px controls up to 1024 px
+and 32 px above), `NavigationOrderTest` (the scopes, the version per mode, independence from the
+other sections, the reset, the deletion of entries, the metric), `NavigationOrderingTest` and
+`NavigationMenuOrderTest` (the stored order and the placement of keys the store does not know),
+`NavigationOrderMvcTest` (the rendered order, the move controls, the relays),
+`NavigationOrderE2eTest` (moving by button and by Alt+Arrow without a drag, focus kept, the live
+announcement, reload, „Standardreihenfolge", the 409 hint, 44 px controls up to 1024 px and 32 px
+above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the frozen bar,
+the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest` (the bar
+per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a taken
+entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin bar),
+`NavigationResetServiceTest` (every section, both dashboards and both start pages back to the
+default, every version moved on, owner isolation, the metrics), `StartPageControlsMvcTest` (the
+reset dialog and its relay), `NavigationStartPageE2eTest` (the full reset of every section in
+place, after the confirmation), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 ·
+**Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
-
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code and the quick-access
-> text of REQ-UI-026 stay authoritative.
 
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
 (`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
-each type is scoped by its domain's rules and fails closed on its own.
+each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
+backend read that backs the page its hits open (missions and operations over every period,
+materials from the visible catalogue, blueprints from the availability overview, ship types from
+the unit hangar overview, job orders from the scoped number lookup of REQ-ORDERS-048, org units and
+members from the org chart), so a hit is exactly an entity that page would show the caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
+caller to the login. An optional repeatable `kind` parameter (the type keys `mission`,
+`operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`) narrows the
+search; an unknown key asks no type. Each hit is `{kind, href, label, crumb, icon, status, date}`,
+with `crumb` the type's name and `status` localized.
 
 | Type | Matched on | Opens |
 |---|---|---|
@@ -2384,13 +2487,24 @@ each type is scoped by its domain's rules and fails closed on its own.
 | Member | name | org chart with the person highlighted; in admin mode the member edit page |
 
 - A hit carries a slim projection (id, name, status, date). A member finds exactly the people the
-  org chart shows them, with the same fields; no search reveals more than the page it opens.
-- **Limits:** debounced, at least 2 characters (1 digit for a job-order number), 5 hits per type,
-  aborted when the user types on.
+  org chart shows them, by the name it shows (display name, the username only when none is set),
+  with the rank they hold there as status; no search reveals more than the page it opens. A job
+  order hit shows the number only (`#12`) with its status and creation date.
+- **Limits:** debounced (250 ms), at least 2 characters (1 digit for a job-order number), at most
+  100 characters, 5 hits per type, aborted when the user types on. Each type carries its own
+  minimum (`QuickAccessSearchKind.minTermLength`); a type is asked only when the term reaches it.
+- **Admin mode:** a member hit with an account carries `adminHref` (`/members/{id}`); the browser
+  opens it instead of the org chart while the drawer is in administration mode
+  (`krtSearchHitHref`). A holder without an account always opens the chart.
+- **Highlight:** the org chart marks and scrolls to the unit or person named by its `highlight`
+  query parameter (an org unit id, a user id, or the seat id of a holder without an account).
+  Blueprint and ship hits open the overview or unit hangar filtered by the name (`search`).
 - **The term stays a query parameter;** it never reaches a path, an MDC field or a metric label.
 
 **Prefixes.** Symbol and word are equivalent; both languages' words are accepted in either UI
-language; `?` shows the prefix help.
+language, in any case and with or without a space after the colon; `?` alone shows the prefix
+help, one row per prefix, which puts that prefix into the input. A page or action prefix asks the
+backend nothing; an entity prefix asks only that type.
 
 | Kind | Symbol | Words (DE / EN) |
 |---|---|---|
@@ -2405,17 +2519,26 @@ language; `?` shows the prefix help.
 | Ships | — | `schiff:` / `ship:` |
 | Org units | — | `einheit:` / `unit:` |
 
-**Ranking.** One mixed list, scored by match quality plus the „Häufig" weight (pages and tabs
-only). Entity hits arrive later and the list re-sorts, but the highlighted hit stays highlighted
-and Enter opens exactly it.
+**Ranking.** One mixed list („Treffer"), scored by match quality plus the „Häufig" weight (pages
+and tabs only): a label that starts with the term, then one that contains it, then a breadcrumb
+or search-term hit, then an entity hit the backend matched otherwise; on a tie pages come first.
+The actions follow in their own group. Entity hits arrive later and the list re-sorts, but the
+highlighted hit stays highlighted and Enter opens exactly it. Each entity row shows the type, the
+status and the date as its breadcrumb.
 
-**„Häufig".** A per-device ranking in `localStorage`: every page or tab visit counts, however it
-was reached; entry keys only; each visit decays over about 30 days. It ranks typed results and
-fills the empty state; the navigation never reorders itself by use.
+**„Häufig".** A per-device ranking in `localStorage` (`krt.frequent`): every page or tab visit
+counts, however it was reached; entry keys only; each visit decays over about 30 days. It ranks
+typed results and fills the empty state; the navigation never reorders itself by use. A visit
+weighs 1 and falls linearly to 0 over 30 days; an entry is „häufig" from a summed weight of 2.
+In the ranking the weighted sum lifts a page by up to 1.5 match steps (full lift from a sum of 10), so a
+frequently used weaker match can pass a slightly better unused one and a match two steps better
+still wins. The store keeps at most 30 visits per entry and 200 entries, and every storage access
+is wrapped in a try/catch.
 
-**Empty state.** Favoriten, then Häufig, then Zuletzt (`krt.recent`), without duplicates: an
-entry shown in a higher section is left out of the lower ones. Entity hits never enter Zuletzt or
-Häufig, so no entity or member name reaches `localStorage`.
+**Empty state.** Favoriten, then Häufig (at most 5), then Zuletzt (`krt.recent`, at most 4),
+without duplicates: an entry shown in a higher section is left out of the lower ones. Entries are
+identified by their stable entry key, a page without an entry by its path. Entity hits never
+enter Zuletzt or Häufig, so no entity or member name reaches `localStorage`.
 
 **Filtering.** A hidden page and its tabs, and every entry unavailable in the active context
 (REQ-UI-026), are left out; entity hits and actions of a hidden page stay.
@@ -2423,28 +2546,53 @@ Häufig, so no entity or member name reaches `localStorage`.
 **Actions** (in addition to those of REQ-UI-026):
 
 - Navigation: favourite / unfavourite this page, hide this page, open „Anpassen" (REQ-UI-032).
+  Each is offered only where the drawer's own control exists (the star of the page, its hide
+  control, the „Anpassen" toggle), and the favourite action is left out at the cap of twelve.
+  A favourite toggle is the favourites write of REQ-UI-032: in place, with its 409 handling.
 - Create actions for the tabbed pages, each gated like the form it opens.
 - **Page context actions:** a page may contribute actions that only navigate or open the dialog or
   form it already has; they never mutate, so confirmation, permission, audit and live update stay
-  on the existing path.
+  on the existing path. A page marks the element with `data-palette-action="<name>"` (and an
+  optional `data-palette-icon`); choosing the action clicks it.
 
-**Keys in the dialog.** Ctrl+Enter opens the highlighted hit in a new browser tab; Tab accepts a
-suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or tab (intercepted
-only while the dialog is open).
+**Keys in the dialog.** Ctrl+Enter (Cmd+Enter on macOS) opens the highlighted hit in a new browser
+tab; Tab accepts a suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or
+tab (intercepted only while the dialog is open). Ctrl+D leaves the dialog open, marks the row with
+a star and says the result in a polite status line.
 
 **Monitoring:** `basetool_quick_access_search_total{kind,outcome}` (REQ-OBS-011); the p95 of
-`/quick-access/search` alerts above 1 s for 10 minutes.
+`/quick-access/search` alerts above 1 s for 10 minutes (`QuickAccessSearchSlow`).
 
-**Enforced by (to be added):** `QuickAccessSearchControllerTest` (parallel contributors, fail
-closed per type, limits, term not in the path or MDC) · one `…QuickAccessSearchContributorTest` per
-type (scope, member visibility equal to the org chart) · `:frontend:testSearchJs` (prefix parsing,
-ranking, decay, empty-state de-duplication) · `NavigationE2eTest` (late hits keep the highlight,
-Ctrl+Enter, Tab, Ctrl+D, `?` help, hidden pages filtered) · **Related:** REQ-UI-026, REQ-UI-032,
-REQ-SEC-007, REQ-OBS-011, ADR-0282, ADR-0297
+**Enforced by:** `QuickAccessSearchControllerTest` (parallel contributors, fail closed per type,
+limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTest` ·
+`MissionQuickAccessSearchContributorTest`, `OperationQuickAccessSearchContributorTest`,
+`MaterialQuickAccessSearchContributorTest`, `BlueprintQuickAccessSearchContributorTest`,
+`ShipQuickAccessSearchContributorTest`, `OrgUnitQuickAccessSearchContributorTest`,
+`MemberQuickAccessSearchContributorTest` (exactly the chart's people),
+`JobOrderQuickAccessSearchContributorTest` (the read the page uses) · `QuickAccessFoldTest` · `:frontend:testSearchJs`
+(prefix parsing, ranking, the admin-mode target, the decay and the empty-state de-duplication) ·
+`NavigationCurrentEntryTest`, `NavigationRenderMvcTest` (which links can be favourites) ·
+`NavigationE2eTest` (Ctrl+Enter, Tab, Ctrl+D, the empty state without duplicates, hidden pages
+filtered while their hits and actions stay, a page-contributed action) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
+`krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
+`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **Code:** `shell/web/QuickAccessSearchController.java`,
+`shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
+`kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
+`static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
+`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
+ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 
-> **Status: planned** (ADR-0299, map #2800). Until it ships, the current code stays authoritative.
+> **Status: partially shipped** (ADR-0299, map #2800). Shipped: the member dashboard with its
+> default, the framework (two columns, up/down, column switch, remove, catalogue and options
+> dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
+> version per instance, the deletion on role loss, live update or the ten-minute poll, the
+> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
+> bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
+> Favoriten and Benachrichtigungen, with the options of the matrix below, the admin
+> dashboard with its five widgets and the start page per mode. Planned: the other catalogue
+> widgets and their options; until they ship, the current code stays authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2475,7 +2623,7 @@ unit.
 | Mode | Widget | Shows | Options |
 |---|---|---|---|
 | Member | Nächste Tage | the missions of the coming days | unit; 3 / **7** / 14 days; rows |
-| Member | Nächster Einsatz | the user's next mission | — |
+| Member | Nächster Einsatz | the next missions of the user's units and the ones the user is signed up for, merged, soonest first (REQ-MISSION-031) | rows |
 | Member | Hangar-Bereitschaft | readiness of the user's hangar | — |
 | Member | Aufträge zu bearbeiten | orders the user's unit processes | unit; status **Offen + In Bearbeitung** / Offen / In Bearbeitung; rows |
 | Member | Meine Aufträge | orders the user requested | status **Laufend** / Abgeschlossen / Alle; rows |
@@ -2534,6 +2682,20 @@ default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI
   start page, on switching into admin mode. A deep link that triggered the login wins.
 - A start page no longer permitted or unavailable in the active context falls back to the
   dashboard.
+- **One entry point, `GET /start[?mode=admin]`.** It redirects to the registry path of the mode's
+  start page, or to the dashboard of the mode (`/`, `/admin`). A plain login, one without a saved
+  request or whose saved request is only an asset or the bare root, ends there; so does the
+  `start_url` of the web app manifest. A saved deep link keeps winning. Switching into admin mode
+  from the sidebar goes there only when an admin start page is set, and otherwise only swaps the
+  list as before. The path comes from the entry registry, never from the request, and a key of the
+  other mode is no start page of this one.
+- **The dashboard never redirects:** the logo, `/` and Alt+0 always open the dashboard.
+- **Header button.** „Als Startseite festlegen" sits next to the star on every page and tab that
+  can be a favourite; it turns into „Startseite entfernen" on the chosen page. A write is
+  `PUT /api/v1/navigation/preferences/appearance/start-page/{mode}` with the appearance version,
+  which it bumps, so it conflicts with „Darstellung" writes and with nothing else.
+- A start page whose key the member may no longer see user-wide is deleted on the next load
+  (REQ-UI-032).
 
 **Hint.** A one-time, dismissible hint on the dashboard points to „Anpassen" (navigation and
 dashboard). Its dismissal is kept in the browser; it also goes once the user sets a favourite or
@@ -2543,17 +2705,39 @@ changes the dashboard.
 and alert on a 5xx rate above 5 %; layout and option writes count in
 `basetool_navigation_preference_writes_total` (REQ-OBS-011).
 
-**Enforced by (to be added):** `DashboardLayoutServiceTest` (12-instance cap per mode, layout and
-option versions, owner-only, deletion on role loss) · `DashboardRenderMvcTest` (defaults per mode,
-widgets gated by their data, greyed pinned instances) · `StartPageRedirectMvcTest` (start page per
-mode, deep-link precedence, fallback) · `DashboardE2eTest` (edit mode, catalogue and options,
-phone single column, 10-minute poll on visibility, the hint) · **Related:** REQ-UI-018,
-REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-SEC-046,
-REQ-SEC-058, ADR-0299
+**Enforced by:** `DashboardServiceTest` (the default, the cap of 12 per mode, layout and option
+versions, owner isolation, deletion by widget type, the write counters),
+`NavigationDashboardControllerTest` (authentication, the admin mode's gate, 409, 404),
+`DashboardReaderTest` and `DashboardRenderMvcTest` (the board per stored layout, greyed pinned
+instances, the empty and error states, deletion on role loss, the hint, the catalogue),
+`DashboardUpcomingDaysWidgetMvcTest`, `DashboardSummaryWidgetsMvcTest` (Nächster Einsatz and
+Hangar-Bereitschaft: the rows and their rows option, the counts, the empty states, the member's hangar room),
+`DashboardWorkWidgetsMvcTest` (Ich bearbeite, Bestand niedrig and Bank: the read per option, the
+page total as count, the rows, the unit label, the target bar and trend, the empty states),
+`DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
+widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
+`NavigationLegacyRedirectMvcTest` (`/admin/announcement`), `StartPageRedirectMvcTest` (the start
+page per mode, the fallbacks, no open redirect, the mode of the page), `StartPageControlsMvcTest`
+(the header button, the selects, the state, the relays), `AssetAwareAuthenticationSuccessHandlerTest`
+(a plain login ends at `/start`, a deep link wins), `NavigationStartPageServiceTest` (the page per
+mode, the shared version, the key check, the deletion), `NavigationStartPageE2eTest` (the button
+in place, `/start`, the select, the 409 hint),
+`DashboardLayoutControllerTest`, `DashboardLayoutBackendClientTest`, `DashboardBackendClientTest`
+(the two summary reads), `OrgUnitBankAccountsBackendClientTest` and `StockLevelBackendClientTest`
+(the two work reads), `AdminDashboardE2eTest` (the admin default, edit mode and range on the
+admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, catalogue and
+options, restore, the summary and work
+widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
+the hint, deletion on role loss), the export
+and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the tests of the widgets that
+follow ·
+**Related:** REQ-UI-018,
+REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-HANGAR-016,
+REQ-MISSION-031, REQ-SEC-046, REQ-SEC-058, ADR-0299
 
 ### REQ-UI-035 — Favourites and the dashboard have keyboard shortcuts
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code stays authoritative.
+> **Status: shipped** (ADR-0297, map #2800).
 
 | Keys | Opens |
 |---|---|
@@ -2568,6 +2752,8 @@ REQ-SEC-058, ADR-0299
   fields.
 - **Member mode only:** in admin mode Alt+0 … Alt+9 do nothing. No phone counterpart.
 - **Switch:** `shortcutsEnabled` in „Darstellung" (REQ-UI-032), one value per user, default on.
+  It is a switch in the profile card „Darstellung", written in place with the section's version
+  (`nav-appearance.js`), and stays off while the stored section could not be read.
 - **Discoverability:** tooltip and `aria-keyshortcuts` on the favourite links and the dashboard
   link only where the key currently works. A „Tastenkürzel" dialog (REQ-UI-013), opened from the
   quick access and the profile menu, always lists `Strg K` and the dialog keys of REQ-UI-033; for
@@ -2576,9 +2762,18 @@ REQ-SEC-058, ADR-0299
 - Not shortcuts: the desktop mode, „Anpassen" (both stay buttons and quick-access actions), and
   „back" (the browser's Alt+Left). No single-character shortcut, so WCAG 2.1.4 does not apply.
 
-**Enforced by (to be added):** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate,
-switch, admin mode) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard,
-toast on a greyed or empty slot, the „Tastenkürzel" dialog) · **Related:** REQ-UI-026,
+*Shipped:* `krt-shortcuts.js` holds the key matching and the decision per slot, `nav-shortcuts.js`
+reads the favourites of the member group from the navigation, sets the tooltip and
+`aria-keyshortcuts` of the first nine favourites and of the home link where the keys work, and
+opens the dialog `nav-shortcuts` (`kernel/fragments/nav-shortcuts.html`) from the profile menu,
+the rail's avatar flyout and the quick-access action „Tastenkürzel anzeigen".
+
+**Enforced by:** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate, switch, admin
+mode) · `NavigationDesktopModesMvcTest` (the switch on the state, the dialog, its openers, the
+relay) · `NavigationAppearanceServiceTest`, `NavigationPreferencesControllerTest` (the stored
+switch) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard, toast on a
+greyed or empty slot, rest while a dialog is open and in admin mode, the profile switch, the
+„Tastenkürzel" dialog) · `DialogA11yE2eTest` (the dialog contract) · **Related:** REQ-UI-026,
 REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
 
 ### REQ-UI-037 — Number fields use the separators of the page language while typing

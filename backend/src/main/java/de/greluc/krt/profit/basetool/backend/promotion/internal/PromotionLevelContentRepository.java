@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,21 +52,21 @@ public interface PromotionLevelContentRepository
   List<PromotionLevelContent> findAllByCategoryIdOrderByLevel(UUID categoryId);
 
   /**
-   * Squadron-scoped paged read across all categories. When {@code owningSquadronId} is {@code null}
+   * Squadron-scoped paged read across all categories. When {@code scopeSquadronIds} is {@code null}
    * the result spans every squadron (admin "all squadrons" mode); a non-null id restricts the
    * result to level contents whose category's topic is owned by that squadron.
    *
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of level contents visible to the caller
    */
   @Query(
       """
-      SELECT lc FROM PromotionLevelContent lc WHERE :owningSquadronId IS NULL OR
-      lc.category.topic.owningSquadron.id = :owningSquadronId
+      SELECT lc FROM PromotionLevelContent lc WHERE :scopeSquadronIds IS NULL OR
+      lc.category.topic.owningSquadron.id IN :scopeSquadronIds
       """)
   Page<PromotionLevelContent> findAllScoped(
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
    * Squadron-scoped unpaginated read of one category's level contents ordered by {@link
@@ -73,18 +74,18 @@ public interface PromotionLevelContentRepository
    * categoryId} cannot leak a foreign squadron's level contents.
    *
    * @param categoryId identifier of the parent category
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @return the category's level contents in level order, scoped to the caller
    */
   @Query(
       """
       SELECT lc FROM PromotionLevelContent lc WHERE lc.category.id = :categoryId AND
-      (:owningSquadronId IS NULL OR lc.category.topic.owningSquadron.id =
-      :owningSquadronId) ORDER BY lc.level ASC
+      (:scopeSquadronIds IS NULL OR lc.category.topic.owningSquadron.id =
+      :scopeSquadronIds) ORDER BY lc.level ASC
       """)
   List<PromotionLevelContent> findAllByCategoryIdScopedOrdered(
       @Param("categoryId") UUID categoryId,
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 
   /**
    * Looks up the single {@link PromotionLevelContent} entry that describes the expectations of the

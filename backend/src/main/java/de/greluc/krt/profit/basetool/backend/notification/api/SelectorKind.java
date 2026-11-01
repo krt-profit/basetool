@@ -92,16 +92,22 @@ public enum SelectorKind {
    * NotificationEvent#contextRecipientUserIds()}), for bulk actions that touch many members. Reads
    * no selector columns (REQ-NOTIF-024).
    */
-  EVENT_RECIPIENTS;
+  EVENT_RECIPIENTS,
 
   /**
-   * Whether this kind reads nothing from the selector row and takes its recipients from the event
-   * alone.
+   * Resolves to every member who holds a leadership seat in any org unit. Reads no selector columns
+   * and nothing from the event.
+   */
+  SEAT_HOLDERS;
+
+  /**
+   * Whether this kind reads no selector column, so the row is stored with every column {@code
+   * null}.
    *
    * @return {@code true} for every kind except {@link #SPECIFIC_USER}, {@link #ROLE} and {@link
    *     #ORG_RELATIVE_ROLE}
    */
-  public boolean readsOnlyTheEvent() {
+  public boolean readsNoSelectorColumns() {
     return switch (this) {
       case SPECIFIC_USER, ROLE, ORG_RELATIVE_ROLE -> false;
       case ACCOUNT_GRANT,
@@ -110,7 +116,8 @@ public enum SelectorKind {
           MISSION_PARTICIPANTS,
           MISSION_LEADERSHIP,
           EXCHANGE_CLIENT_HOLDERS,
-          EVENT_RECIPIENTS ->
+          EVENT_RECIPIENTS,
+          SEAT_HOLDERS ->
           true;
     };
   }

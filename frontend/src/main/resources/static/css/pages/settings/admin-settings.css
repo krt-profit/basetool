@@ -12,9 +12,6 @@
         justify-content: flex-end;
         margin: 0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6));
     }
-    .settings-units {
-        margin-top: var(--space-6);
-    }
     @media (width <= 768px) {
         .form-layout.card > .form-actions--sticky {
             margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4));

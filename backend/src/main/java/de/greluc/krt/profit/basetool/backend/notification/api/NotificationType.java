@@ -268,6 +268,12 @@ public enum NotificationType {
   INVENTORY_POOL_CHANGED_BY_OTHER,
 
   /**
+   * A minimum stock level of the member's unit turned low (REQ-NOTIF-030), rendered with {@code
+   * unit}, {@code entry}, {@code tier}, {@code minimum} and {@code allocated}.
+   */
+  INVENTORY_STOCK_LEVEL_LOW,
+
+  /**
    * A booking request is approved and ready to confirm (REQ-BANK-057), rendered with {@code type},
    * {@code amount}, {@code accountNo} and {@code approver}.
    */
@@ -310,7 +316,7 @@ public enum NotificationType {
   BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
 
   /**
-   * A member's OFFICER role does not fit their leadership seats (REQ-ORG-029), rendered with {@code
+   * A leadership seat holder lacks the {@code KRT Member} role (REQ-ORG-029), rendered with {@code
    * member}, {@code unit}, the {@code seat} and {@code rank} words and the {@code mismatch} word.
    */
   ORG_LEADERSHIP_ROLE_MISMATCH,
@@ -515,6 +521,7 @@ public enum NotificationType {
           MATERIAL_REQUEST_UNAVAILABLE,
           INVENTORY_BOOKED_OUT_BY_OTHER,
           INVENTORY_POOL_CHANGED_BY_OTHER,
+          INVENTORY_STOCK_LEVEL_LOW,
           BANK_BOOKING_REQUEST_APPROVED,
           BANK_GRANT_CHANGED,
           BANK_GRANT_REVOKED,

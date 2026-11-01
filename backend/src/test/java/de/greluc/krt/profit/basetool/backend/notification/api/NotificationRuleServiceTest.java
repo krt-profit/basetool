@@ -202,7 +202,8 @@ class NotificationRuleServiceTest {
         "MISSION_PARTICIPANTS",
         "MISSION_LEADERSHIP",
         "EXCHANGE_CLIENT_HOLDERS",
-        "EVENT_RECIPIENTS"
+        "EVENT_RECIPIENTS",
+        "SEAT_HOLDERS"
       })
   void createAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
@@ -232,7 +233,8 @@ class NotificationRuleServiceTest {
         "MISSION_PARTICIPANTS",
         "MISSION_LEADERSHIP",
         "EXCHANGE_CLIENT_HOLDERS",
-        "EVENT_RECIPIENTS"
+        "EVENT_RECIPIENTS",
+        "SEAT_HOLDERS"
       })
   void updateAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     UUID id = UUID.randomUUID();

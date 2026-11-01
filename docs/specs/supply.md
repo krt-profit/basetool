@@ -43,14 +43,13 @@ and carry the setting's own version.
 
 ### REQ-SUP-003 — Raising a need
 
-> **Status: planned** (ADR-0300, ADR-0302, map #2800). Until it ships, the current text below / the
-> current code stays authoritative.
-
-The lead or a Logistician of a unit with `may_raise_needs`, and an admin, raise a need: a material xor
-a game item, an amount above zero (whole units for pieces and game items), a quality tier for a
-material (the base tier when omitted), a priority and an optional job order of that unit. Any other
-caller receives 403. The catalogue entry and the tier of a need are fixed; a different one is a new
-need.
+A Logistician of a unit with `may_raise_needs`, the lead included, and an admin raise a need: a
+material xor a game item, an amount above zero (whole units for pieces and game items), a quality
+tier for a material (the base tier when omitted), a priority and an optional job order of that unit.
+Any other caller receives 403. The catalogue entry and the tier of a need are fixed; a different one
+is a new need. A unit's leadership seat always confers the contextual Logistician authority of that
+unit (`hasRoleInOrgUnit(unit, LOGISTICIAN)`), so the lead is no separate case and no gate evaluates
+the two differently.
 
 The need form offers the job order as a picker: the open and in-progress orders of the units the
 caller manages (every raising unit for an admin), filtered to the selected unit
@@ -58,20 +57,13 @@ caller manages (every raising unit for an admin), filtered to the selected unit
 `OPEN` or `IN_PROGRESS`; a link to an order that has closed since survives an edit unchanged, and an
 edit sends the link back instead of clearing it (ADR-0320).
 
-**Enforced by:** `SupplyNeedServiceTest`, `SupplyNeedOrderRenderTest` · **Code:**
-`supply/internal/SupplyNeedService`, `supply/needs.html`, `static/js/supply/supply-needs.js`
+The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses the same gate and
+opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` for a game item),
+`needTier` and `needAmount` query parameters of `/supply/needs`.
 
-#### Planned amendment (ADR-0300, ADR-0302)
-
-The first sentence reads: „**A Logistician of a unit with `may_raise_needs`, the lead included,**
-and an admin raise a need". A unit's leadership seat always confers the contextual Logistician
-authority of that unit (`hasRoleInOrgUnit(unit, LOGISTICIAN)`, derived from officer reach), so the
-lead is no separate case and no gate evaluates the two differently. The rest of the requirement is
-unchanged. The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses the same
-gate.
-
-**Enforced by (to be added):** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`) ·
-**Related:** REQ-INV-068, REQ-ROLE-002
+**Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`), `SupplyNeedOrderRenderTest`
+· **Code:** `supply/internal/SupplyNeedService`, `supply/needs.html`,
+`static/js/supply/supply-needs.js` · **Related:** REQ-INV-068, REQ-ROLE-002
 
 ### REQ-SUP-004 — Purchasable flag
 

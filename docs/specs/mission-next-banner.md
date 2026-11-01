@@ -33,8 +33,9 @@ something the squadron is heading towards, and returning it as "next mission" is
 The `/next` lookup must also be **org-unit relevant**. A member should get the next mission of their
 _own_ org unit (or, for a Bereich/Organisationsleitung leader, their subordinate units), not the
 organisation-wide next mission that may belong to a squadron they have nothing to do with. A viewer
-who belongs to no org unit (a brand-new account, an admin in "all squadrons" mode) keeps the
-organisation-wide next mission as before. (The home-page grid above deliberately does **not**
+who belongs to no org unit (a brand-new account) gets only the next **public** mission — an internal
+mission is visible only to the members of its unit. An admin in "all squadrons" mode keeps the
+organisation-wide next mission. (The home-page grid above deliberately does **not**
 apply this narrowing — it uses the broad mission-list scope per REQ-MISSION-012.)
 
 ## Requirements
@@ -83,9 +84,26 @@ the viewer has any:
   (REQ-MISSION-003's status filter still applies). Foreign missions are **excluded — including other
   units' public ones**; the cross-staffel public escape that widens the mission _lists_ deliberately
   does **not** apply to the banner, because the banner answers "what is _my_ unit heading towards".
-- A viewer with **no** effective org-unit scope keeps the unchanged organisation-wide behaviour of
-  REQ-MISSION-003: an admin in "all squadrons" mode (no active pin) and a member who belongs to no
-  org unit both see the soonest eligible mission across the whole organisation.
+- **Internal missions are visible only to the members of the mission's unit**, to the leadership
+  cascade above (REQ-ORG-015), to the Mission Manager cascade and to admins. No other viewer sees a
+  foreign internal mission through this lookup, any fallback of it, the lists, the search, the
+  calendar, the dashboard widgets or the operation finance views.
+- **A mission without an owning org unit cannot be internal.** Create, the flags patch and the
+  owning-unit reassignment answer `400 Bad Request` when the result would be an internal mission
+  without a unit, and the check constraint `ck_mission_internal_has_owning_org_unit` enforces it in
+  the database. An ownerless mission is therefore always public (REQ-ORG-009). The mission form
+  disables the „Intern" switch while no owning unit is selectable.
+- **The operation finance views anonymise a child mission the viewer may not see** (the visibility
+  rule of the mission detail page, `MissionAccessPolicy#canSeeMission`): `GET
+  /api/v1/operations/{id}/finances`, `/finance-summary` and `/finances/{missionId}` keep the row and
+  its amount, so the operation total stays traceable, and return `anonymised = true` with no name,
+  no entries and no refinery orders. The frontend shows „Interne Mission einer anderen Einheit" (EN
+  „Internal mission of another unit") without link or detail. In the summary the anonymised rows
+  sort behind the named ones.
+- A viewer with **no** effective org-unit scope sees only **public** missions: a member who belongs
+  to no org unit gets the soonest eligible public mission across the organisation, never an internal
+  one. An admin in "all squadrons" mode (no active pin) keeps the organisation-wide lookup over
+  public and internal missions.
 - When no eligible mission exists in scope, the endpoint returns `204 No Content` and the page
   renders its empty state — unchanged.
 
@@ -94,19 +112,33 @@ the viewer has any:
 - [ ] A member of Staffel A whose own next mission is later than Staffel B's public next mission sees Staffel A's mission, not Staffel B's.
 - [ ] A Bereichsleitung sees the soonest mission across their Bereich's Staffeln/SKs; an OL member sees the soonest across every org unit.
 - [ ] A member sees their own org unit's **internal** next mission (it is not hidden by the public-escape removal).
-- [ ] A member with no org-unit membership still sees the organisation-wide next mission.
+- [ ] A member with no org-unit membership sees the soonest public mission and never a foreign internal one, even when that one starts earlier.
+- [ ] An admin in "all squadrons" mode still sees the soonest mission across the organisation, internal ones included.
+- [ ] Creating an internal mission that resolves to no owning unit, flagging an ownerless mission internal, or reassigning an internal mission to no unit answers 400; the database refuses such a row.
+- [ ] A viewer who may not see an operation's child mission gets its line anonymised (no name, entries or orders, amount kept) in the full, summary and per-mission finance reads.
 - [ ] A scoped viewer with no upcoming own-unit mission gets `204`, even if other units have upcoming missions.
 
 **Enforced by:** `MissionServiceTest`
 (`getNextMission_scopedMember_usesScopedQueryThenRefetches`,
 `getNextMission_scopedPinned_passesActiveOrgUnitId`,
 `getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch`,
-`getNextMission_refetchesByIdThroughGraph` (unscoped fallback)),
+`getNextMission_refetchesByIdThroughGraph` (admin all-squadrons),
+`getNextMission_memberWithoutUnit_readsPublicMissionsOnly`),
 `MissionRepositoryLookupOrderingTest`
 (`findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal`,
-`findNextScopedMission_includesOwnInternalMission`).
-**Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead`,
-`MissionRepository#findNextScopedMission`,
+`findNextScopedMission_includesOwnInternalMission`,
+`findNextPublicMission_skipsInternalAndTerminalMissions`),
+`MissionServiceSectionPatchTest` (`updateFlagsSection_shouldRejectInternal_whenMissionHasNoOwningOrgUnit`,
+`updateOwningOrgUnit_shouldRejectOwnerlessTarget_whenMissionIsInternal`), `MissionServiceTest`
+(`createMission_internalWithoutOwningOrgUnit_isRejectedAndNotPersisted`),
+`MissionInternalConstraintDataTest` (PostgreSQL), `OperationFinanceServiceTest`
+(`*_anonymises*`, `getMissionFinanceDetail_hiddenMission_returnsTheAnonymisedSummary`),
+`OperationPageControllerMvcTest` (anonymised label), `MissionCreatePageTest`
+(`testCreateMissionPage_WithoutPickableUnit_DisablesTheInternalSwitch`).
+**Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead` +
+`#requireOwningOrgUnitForInternal`, `OperationFinanceService`, `MissionVisibility`,
+migration `V329__constrain_internal_mission_to_owning_org_unit.sql`,
+`MissionRepository#findNextScopedMission` + `#findNextPublicMission`,
 `OwnerScopeService#currentScopePredicate` (scope vector + leadership cascade).
 
 ### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)
@@ -123,7 +155,10 @@ next-mission banner; the first row is the soonest upcoming mission.
   every unit's public missions via the cross-staffel public escape ([`org-unit-tenancy.md`](org-unit-tenancy.md)) —
   deliberately **wider** than the own-unit-only scope of the `/next` lookup (REQ-MISSION-008). This
   is an explicit, owner-approved product decision: the home overview answers "what is the
-  organisation heading towards in the coming week", not only "my unit".
+  organisation heading towards in the coming week", not only "my unit". A widget pinned to a unit
+  (REQ-UI-034) adds `orgUnitId` to the request: the optional filter of `GET /api/v1/missions` keeps
+  the missions that unit owns, applied by the backend inside the caller's visibility (the same scope
+  predicate, so it never shows a mission the list would not), before paging.
 - **Own-unit highlight.** Because the scope is broad, a tile whose owning org unit is one the
   **authenticated** viewer is **directly assigned to** is flagged with a "Meine Einheit" chip
   (`home.upcoming.my_unit`, the square `.chip--primary`). "Directly assigned" spans **every org-unit
@@ -200,6 +235,48 @@ row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip),
 `OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
 `MissionController` `/api/v1/missions` endpoint; the only new backend surfaces are the
 kind-agnostic own-membership id lookup and the per-caller `signedUp` field on its rows.
+
+### REQ-MISSION-031 — The upcoming missions of the own units and the sign-ups are served as list rows
+
+`GET /api/v1/missions/next/summary?limit=<n>` returns, as `MissionListDto` rows (the shape of
+`GET /api/v1/missions`), the upcoming missions of the caller's own org units **merged** with the
+upcoming missions the caller is signed up for, each mission once, soonest planned start first. It is
+the read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
+
+- **Own units.** The same selection as the `/next` lookup: only `PLANNED` or `ACTIVE` missions
+  (REQ-MISSION-003) within the caller's org-unit scope and the pin of the active context
+  (REQ-MISSION-008); a caller without a unit scope gets the public missions only, an admin in
+  all-squadrons mode every mission.
+- **Sign-ups.** A mission the caller holds a participant row on (`PLANNED` / `ACTIVE`, planned start
+  in the future) is included even when another unit owns it, but only inside the caller's mission
+  visibility (the scope predicate of the mission list, REQ-MISSION-012): a signed-up internal
+  mission of a unit the caller cannot see stays out. A mission in both sets appears once.
+- **Order and bound.** Sorted by `plannedStartTime` ascending, ties by id. `limit` is the most rows
+  returned, 1 to 10, **5** when absent; a value outside 1 to 10 is `400 Bad Request`. The union,
+  the order and the limit are one query, so a page of ten holds the ten soonest of both sets.
+- **No upcoming mission.** The answer is `200` with an empty list, never `204`.
+- **Row content.** Each row carries the per-caller `signedUp` flag and the registered count from the
+  same batched reads as the list (REQ-MISSION-012, REQ-DATA-003) and its owning org unit from the
+  same query; there is no per-row read. It holds no participant or unit data, so it needs no peer
+  redaction.
+- **Gate.** Authenticated member or above, like `/next`.
+
+**Acceptance**
+
+- [x] The result holds the upcoming own-unit missions and the upcoming signed-up missions of another visible unit, each once, soonest first.
+- [x] A mission of a foreign unit the caller is not signed up for is not in the result.
+- [x] A signed-up internal mission of a unit the caller cannot see is not in the result.
+- [x] A caller without a unit gets the public upcoming missions and no foreign internal one.
+- [x] The pin narrows the own-unit part to the pinned unit and leaves the sign-ups.
+- [x] `limit` bounds the result and keeps the soonest entries; 1 and 10 are accepted, 0 and 11 answer 400, an absent `limit` means 5.
+- [x] With no upcoming mission the endpoint answers an empty list.
+
+**Enforced by:** `MissionNextSummaryControllerTest`, `MissionServiceTest`
+(`getUpcomingOwnAndSignedUp_*`), `MissionUpcomingOwnOrSignedUpQueryDataTest` (PostgreSQL),
+`DashboardBackendClientTest` (`nextMissionsReadTheSummaryRowsWithTheLimitAndNothingWhenNoneIsUpcoming`),
+`DashboardSummaryWidgetsMvcTest` · **Code:** `MissionNextSummaryController#getNextMissionsSummary`,
+`MissionService#getUpcomingOwnAndSignedUp`, `MissionRepository#findUpcomingOwnOrSignedUp` ·
+**Related:** REQ-MISSION-003, REQ-MISSION-008, REQ-MISSION-012, REQ-UI-034
 
 ## Out of scope
 

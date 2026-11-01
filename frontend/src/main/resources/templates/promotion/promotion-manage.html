@@ -9,9 +9,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:with="pmShowMatrix=${!isAllSquadronsMode and members != null and !members.isEmpty()}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.manage.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='promotion.manage', eyebrowKey='nav.promotion', titleText=#{promotion.manage.title},
         count=${pmShowMatrix ? members.size() : null}, countId='pm-count', actions=~{::pm-actions})}">
         <th:block th:ref="pm-actions">
+            <th:block th:replace="~{promotion/fragments/promotion-management-switch :: switch(active='evaluations')}"></th:block>
             <th:block th:if="${pmShowMatrix}">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='pm-more', items=~{::pm-more-items})}">
                     <th:block th:ref="pm-more-items">
@@ -155,8 +156,8 @@
                             th:with="lastEval=${lastEvaluatedByUser[member.id.toString()]},
                                      hasEval=${hasEvaluationsByUser[member.id.toString()] != null and hasEvaluationsByUser[member.id.toString()]},
                                      eligList=${eligibilityByUser[member.id.toString()]}"
-                            th:attr="data-pm-member-name=${#strings.toLowerCase(member.username)},
-                                     data-pm-username=${member.username},
+                            th:attr="data-pm-member-name=${#strings.toLowerCase(member.effectiveName)},
+                                     data-pm-username=${member.effectiveName},
                                      data-pm-user-id=${member.id},
                                      data-pm-rank=${member.rank != null ? member.rank : ''},
                                      data-pm-original-order=${memberIter.index},
@@ -167,10 +168,10 @@
                                 <input type="checkbox"
                                        class="pm-row-checkbox"
                                        data-trigger="pm-row-check"
-                                       th:attr="data-pm-user-id=${member.id},aria-label=${member.username}" />
+                                       th:attr="data-pm-user-id=${member.id},aria-label=${member.effectiveName}" />
                             </td>
                             <td class="pm-member-cell pm-member-col">
-                                <span class="pm-member-name" th:text="${member.username}">Mitglied</span>
+                                <span class="pm-member-name" th:text="${member.effectiveName}">Mitglied</span>
                                 <span th:if="${member.rank != null}"
                                       class="pm-member-rank"
                                       th:text="|#{promotion.manage.member.rank}: ${member.rank}|">Rang: 20</span>
@@ -200,7 +201,7 @@
                                 <th:block th:with="eval=${evaluationMap[member.id.toString() + '_' + cat.id.toString()]}">
                                     <select class="level-select"
                                             data-trigger="pm-save-evaluation"
-                                            th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''},data-level=${eval != null ? eval.assignedLevel : ''},aria-label=${member.username + ' - ' + cat.name}">
+                                            th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''},data-level=${eval != null ? eval.assignedLevel : ''},aria-label=${member.effectiveName + ' - ' + cat.name}">
                                         <option value="" th:text="#{promotion.manage.level.none}"
                                                 th:selected="${eval == null or eval.assignedLevel == null}">Keine</option>
                                         <option value="LEVEL_A" th:text="#{promotion.manage.level.a}"

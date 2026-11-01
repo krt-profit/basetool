@@ -115,6 +115,7 @@ public class AdminNotificationRulePageController {
           "MATERIAL_REQUEST_UNAVAILABLE",
           "INVENTORY_BOOKED_OUT_BY_OTHER",
           "INVENTORY_POOL_CHANGED_BY_OTHER",
+          "INVENTORY_STOCK_LEVEL_LOW",
           "BANK_BOOKING_REQUEST_APPROVED",
           "BANK_BOOKING_REQUEST_APPROVAL_REVOKED",
           "BANK_GRANT_CHANGED",
@@ -202,6 +203,7 @@ public class AdminNotificationRulePageController {
           "MATERIAL_REQUEST_UNAVAILABLE",
           "INVENTORY_BOOKED_OUT_BY_OTHER",
           "INVENTORY_POOL_CHANGED_BY_OTHER",
+          "INVENTORY_STOCK_LEVEL_LOW",
           "BANK_BOOKING_REQUEST_APPROVED",
           "BANK_GRANT_CHANGED",
           "BANK_GRANT_REVOKED",
@@ -251,7 +253,8 @@ public class AdminNotificationRulePageController {
           "MISSION_PARTICIPANTS",
           "MISSION_LEADERSHIP",
           "EXCHANGE_CLIENT_HOLDERS",
-          "EVENT_RECIPIENTS");
+          "EVENT_RECIPIENTS",
+          "SEAT_HOLDERS");
 
   /**
    * {@code OrgRelativeRole} codes, labelled via {@code
@@ -273,8 +276,7 @@ public class AdminNotificationRulePageController {
    * save rather than stored as a rule that addresses nobody.
    */
   static final List<String> ROLE_CODES =
-      List.of(
-          Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
+      List.of(Roles.ADMIN, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
 
   private final NotificationBackendClient notificationClient;
 

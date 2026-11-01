@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="card">
+    <div class="bank-danger-card" data-testid="bp-purge-card">
+        <div class="bank-danger-head">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+            <h2 th:text="#{admin.personalInventory.blueprints.purge.title}">Alle Blueprints aller Nutzer l&ouml;schen</h2>
+        </div>
+        <p th:text="#{admin.personalInventory.blueprints.purge.modal.text}">Diese Aktion l&ouml;scht die Blueprints ALLER Nutzer unwiderruflich.</p>
+        <button type="button" class="btn btn-quiet-danger" data-trigger="open-modal-display"
+                data-modal-id="bp-purge-modal" data-testid="bp-purge-open"
+                th:text="#{admin.personalInventory.blueprints.purge.button}">Alle l&ouml;schen</button>
+    </div>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bp-purge-modal', titleKey='admin.personalInventory.blueprints.purge.modal.title', variant='krt-modal--danger', body=~{::bp-purge-modal-body})}">
+        <th:block th:ref="bp-purge-modal-body">
+            <form method="post" th:action="@{/admin/personal-blueprints/delete-all-users}" class="no-track" data-bp-purge
+                  th:data-purge-success="#{admin.personalInventory.blueprints.purge.toast.count}"
+                  th:data-purge-error="#{admin.personalInventory.blueprints.purge.error}">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <div class="krt-modal-body stack gap-3">
+                    <p th:text="#{admin.personalInventory.blueprints.purge.modal.text}">Diese Aktion l&ouml;scht die Blueprints ALLER Nutzer unwiderruflich. Tippe LOESCHEN, um zu best&auml;tigen.</p>
+                    <div class="form-group">
+                        <label for="bp-purge-confirm" th:text="#{admin.personalInventory.blueprints.purge.modal.label}">Best&auml;tigung</label>
+                        <input type="text" id="bp-purge-confirm" name="confirm" autocomplete="off"
+                               data-confirm-token="LOESCHEN" data-confirm-submit="bp-purge-submit"
+                               data-testid="bp-purge-confirm" placeholder="LOESCHEN">
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bp-purge-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" id="bp-purge-submit"
+                            data-testid="bp-purge-submit" disabled>
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                        <span th:text="#{admin.personalInventory.blueprints.purge.button}">Alle l&ouml;schen</span>
+                    </button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+</th:block>
+</body>
+</html>

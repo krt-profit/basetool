@@ -46,7 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface for the frequency-type reference table, including drag-and-drop reorder via {@code
- * /reorder}; mutations are OFFICER/ADMIN.
+ * /reorder}; mutations are ADMIN-only.
  *
  * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint (REQ-SEC-052).
  */

@@ -4338,6 +4338,202 @@
         }
       ],
       "description": "Notifications raised by the one-minute time-based producer (REQ-NOTIF-026), by producer kind."
+    },
+    {
+      "id": 91,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 312
+      },
+      "type": "timeseries",
+      "title": "Minimum stock levels below their minimum",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "basetool_inventory_minimum_levels_below",
+          "refId": "A",
+          "legendFormat": "low levels",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Minimum stock levels whose allocated free stock is below the minimum right now (REQ-INV-067, REQ-OBS-011). A trend for the Logisticians, not an alert."
+    },
+    {
+      "id": 92,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 312
+      },
+      "type": "timeseries",
+      "title": "Navigation preference writes/hour by section and outcome",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (section, outcome) (increase(basetool_navigation_preference_writes_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{section}} {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Writes of the navigation preference sections; a conflict is a stale section version (REQ-UI-032, REQ-OBS-011)."
+    },
+    {
+      "id": 93,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 320
+      },
+      "type": "timeseries",
+      "title": "Personalised navigation accounts by section",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "basetool_navigation_personalised_accounts",
+          "refId": "A",
+          "legendFormat": "{{section}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Accounts holding at least one entry in a navigation preference section (REQ-UI-032, REQ-OBS-011)."
+    },
+    {
+      "id": 94,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 320
+      },
+      "type": "timeseries",
+      "title": "Navigation endpoints 5xx rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/.*|/dashboard/.*\", status=~\"5..\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "5xx/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Server errors of the navigation preference endpoints; NavigationEndpointsErroring alerts above 5 % (REQ-UI-032)."
     }
   ]
 }

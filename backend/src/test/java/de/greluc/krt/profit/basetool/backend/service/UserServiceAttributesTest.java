@@ -35,7 +35,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.identity.api.CallerUserProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.OfficerReachDirectory;
 import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
@@ -88,7 +90,9 @@ class UserServiceAttributesTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
+  @Mock private OfficerReachDirectory officerReachDirectory;
   @Mock private AuditRecorder auditRecorder;
+  @Mock private CallerUserProjection callerUserProjection;
 
   @InjectMocks private UserService userService;
 
@@ -196,7 +200,7 @@ class UserServiceAttributesTest {
     }
 
     @Test
-    void rankForNeitherOfficerNorSquadronUser_isSetWithoutValidation() {
+    void rankForAccountWithoutRoleOrSeat_isSetWithoutValidation() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(role(Roles.BANK_EMPLOYEE, "Bank Employee"))));
@@ -308,7 +312,7 @@ class UserServiceAttributesTest {
     }
 
     @Test
-    void officerRankBoundaries_areInclusive() {
+    void reachRankBoundaries_areInclusive() {
       assertOfficerRankPasses(1);
       assertOfficerRankPasses(12);
     }
@@ -320,10 +324,11 @@ class UserServiceAttributesTest {
     }
 
     @Test
-    void officerRank_zero_isRejected() {
+    void reachRank_zero_isRejected() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(role(Roles.OFFICER, "Officer"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
+      when(officerReachDirectory.holdsOfficerReach(USER_ID)).thenReturn(true);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
@@ -346,7 +351,8 @@ class UserServiceAttributesTest {
     private void assertOfficerRankPasses(int rank) {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(role(Roles.OFFICER, "Officer"))));
+      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
+      when(officerReachDirectory.holdsOfficerReach(USER_ID)).thenReturn(true);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -461,6 +467,7 @@ class UserServiceAttributesTest {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
       when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
+      when(callerUserProjection.forCaller(dto)).thenReturn(dto);
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
@@ -482,6 +489,7 @@ class UserServiceAttributesTest {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
       when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(scopeSet);
       when(userRepository.findAllReferenceScoped(scopeSet)).thenReturn(List.of(dto));
+      when(callerUserProjection.forCaller(dto)).thenReturn(dto);
 
       assertEquals(List.of(dto), userService.findAllReference());
     }

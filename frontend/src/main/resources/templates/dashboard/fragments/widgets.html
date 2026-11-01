@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+
+<a th:fragment="missionRow(mission)" class="home-mission" data-testid="home-mission" th:href="@{/missions/{id}(id=${mission.id})}"
+   th:with="start=${@relativeDays.local(mission.plannedStartTime)}, meet=${@relativeDays.local(mission.meetingTime)}">
+    <span class="home-date" aria-hidden="true" th:if="${start != null}">
+        <span class="home-date__dow" th:text="${#temporals.format(start, 'EE')}">Sa</span>
+        <span class="home-date__day" th:text="${#temporals.format(start, 'dd')}">03</span>
+        <span class="home-date__mon" th:text="${#temporals.format(start, 'MMM')}">Okt</span>
+    </span>
+    <span class="home-mission__main">
+        <span class="cell-title" th:text="${mission.name}">Einsatz</span>
+        <span class="cell-sub">
+            <th:block th:if="${meet != null}"><span th:text="#{home.mission.ts(${#temporals.format(meet, 'HH:mm')})}">TS 13:30</span> · </th:block><th:block th:if="${start != null}"><span th:text="#{home.mission.join(${#temporals.format(start, 'HH:mm')})}">Join 14:00</span></th:block><th:block th:if="${mission.meetingPoint != null and !#strings.isEmpty(mission.meetingPoint)}"> · <span th:text="${mission.meetingPoint}">GrimHEX</span></th:block>
+            · <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
+        </span>
+    </span>
+    <span class="home-mission__status">
+        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
+              th:text="#{${'mission.status.' + #strings.toLowerCase(mission.status)}}">GEPLANT</span>
+        <span th:if="${mission.signedUp}" class="chip chip--success" data-testid="home-mission-signed-up"
+              th:text="#{home.upcoming.signed_up}">Angemeldet</span>
+        <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}"
+              class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
+    </span>
+    <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+</a>
+
+<div th:fragment="upcomingDays" data-widget-content>
+    <ul th:if="${not #lists.isEmpty(upcomingMissions)}" class="home-missions">
+        <li th:each="mission : ${upcomingMissions}">
+            <th:block th:replace="~{dashboard/fragments/widgets :: missionRow(${mission})}"></th:block>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(upcomingMissions)}" class="home-notifs__empty" data-testid="home-upcoming-empty"
+       th:text="#{dashboard.upcoming.empty(${upcomingDays})}">Keine Einsätze in den nächsten 7 Tagen.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="home-upcoming-count" th:text="${upcomingTotal}">4</span>
+        <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>
+    </div>
+</div>
+
+<div th:fragment="nextMission" data-widget-content data-testid="dashboard-next-mission">
+    <ul th:if="${not #lists.isEmpty(nextMissions)}" class="home-missions">
+        <li th:each="mission : ${nextMissions}">
+            <th:block th:replace="~{dashboard/fragments/widgets :: missionRow(${mission})}"></th:block>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(nextMissions)}" class="home-notifs__empty" data-testid="dashboard-next-mission-empty"
+       th:text="#{dashboard.nextMission.empty}">Kein Einsatz geplant.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>
+    </div>
+</div>
+
+<div th:fragment="hangarReadiness" data-widget-content data-testid="dashboard-hangar-readiness"
+     th:attr="data-live-sync-topic=${hangarLiveSyncTopic}">
+    <th:block th:if="${hangarTotal > 0}">
+        <p class="dash-figure m-0" data-testid="dashboard-hangar-fitted" th:text="${hangarFitted}">9</p>
+        <p class="cell-sub m-0" data-testid="dashboard-hangar-summary"
+           th:text="#{dashboard.hangar.summary(${hangarTotal})}">von 13 Schiffen einsatzbereit</p>
+    </th:block>
+    <p th:if="${hangarTotal == 0}" class="home-notifs__empty" data-testid="dashboard-hangar-empty"
+       th:text="#{dashboard.hangar.empty}">Dein Hangar ist leer.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <a class="home-card-link" th:href="@{/hangar}" th:text="#{dashboard.hangar.all}">Zum Hangar →</a>
+    </div>
+</div>
+
+<div th:fragment="information" data-widget-content class="home-info dash-info"
+     th:classappend="${unreadAnnouncement} ? 'is-unread'" data-testid="home-info">
+    <th:block th:if="${announcement}">
+        <div class="markdown-content home-info__body is-clamped" data-info-body
+             th:with="announcementHtml=${@markdown.render(announcement.content)}"
+             th:utext="${announcementHtml}"></div>
+        <div class="split home-info__foot">
+            <button type="button" class="home-card-link home-info__more" data-trigger="dashboard-info-toggle"
+                    aria-expanded="false"
+                    th:text="#{home.info.more}" th:attr="data-less=#{home.info.less},data-more=#{home.info.more}">Weiterlesen</button>
+            <form th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" class="m-0"
+                  data-trigger="dashboard-info-read">
+                <input type="hidden" name="id" th:value="${announcement.id}" />
+                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{home.info.read}">Gelesen</button>
+            </form>
+        </div>
+    </th:block>
+    <p th:unless="${announcement}" class="home-notifs__empty" th:text="#{dashboard.info.empty}">Es gibt zurzeit keine Information.</p>
+    <th:block sec:authorize="hasRole('ADMIN')">
+        <div class="home-card-foot dash-info__admin">
+            <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-info-edit"
+                    data-testid="dashboard-info-edit" th:text="#{dashboard.info.edit}">Bearbeiten</button>
+            <button type="button" class="btn btn-ghost btn-xs" data-trigger="dashboard-info-delete"
+                    data-testid="dashboard-info-delete" th:if="${announcement}" th:text="#{dashboard.info.delete}">Entfernen</button>
+        </div>
+        <form class="dash-info__editor is-hidden" data-trigger="dashboard-info-save" data-info-editor
+              th:attr="data-version=${adminAnnouncement != null ? adminAnnouncement.version : null},data-error=#{dashboard.info.error}">
+            <label class="form-label" th:text="#{dashboard.info.label}">Text</label>
+            <textarea class="announcement-text" name="content" rows="8" data-testid="dashboard-info-text"
+                      th:text="${adminAnnouncement != null ? adminAnnouncement.content : ''}"></textarea>
+            <div class="split">
+                <button type="submit" class="btn btn-xs" data-testid="dashboard-info-save" th:text="#{dashboard.save}">Speichern</button>
+                <button type="button" class="btn btn-ghost btn-xs" data-trigger="dashboard-info-cancel" th:text="#{dashboard.cancel}">Abbrechen</button>
+            </div>
+        </form>
+    </th:block>
+</div>
+
+<div th:fragment="favourites" data-widget-content data-testid="dashboard-favourites">
+    <ul th:if="${not #lists.isEmpty(navigationFavourites.member())}" class="dash-links">
+        <li th:each="item : ${navigationFavourites.member()}">
+            <a th:if="${item.available()}" class="dash-link" th:href="@{${item.entry().href()}}"
+               th:data-entry-key="${item.entry().key()}" th:text="#{${item.entry().labelKey()}}">Seite</a>
+            <span th:unless="${item.available()}" class="dash-link is-unavailable" aria-disabled="true"
+                  th:data-entry-key="${item.entry().key()}">
+                <span th:text="#{${item.entry().labelKey()}}">Seite</span>
+                <span class="nav-unavailable-hint"
+                      th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">In Einheit nicht verfügbar</span>
+            </span>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(navigationFavourites.member())}" class="home-notifs__empty"
+       data-testid="dashboard-favourites-empty" th:text="#{dashboard.favourites.empty}">Du hast noch keine Favoriten.</p>
+</div>
+
+<div th:fragment="notifications" data-widget-content data-testid="home-notifications"
+     th:attr="data-notification-rows=${notificationRows},data-notification-status=${notificationStatus.name()},data-empty=#{home.notifications.empty}">
+    <ul class="home-notifs__list" data-home-notif-list aria-live="polite"></ul>
+    <p class="home-notifs__empty" data-home-notif-empty hidden th:text="#{home.notifications.empty}">Keine Benachrichtigungen.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="filter-count" data-home-notif-count hidden>0</span>
+        <a class="home-card-link" th:href="@{/notifications}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+</body>
+</html>

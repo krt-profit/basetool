@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.overview.title})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='promotion.overview', eyebrowKey='nav.promotion', titleText=#{promotion.overview.title})}"></th:block>
 
     <div th:if="${isAllSquadronsMode}" class="alert alert-info"
          th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</div>

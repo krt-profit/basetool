@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.manage.title}, actions=~{::bank-manage-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='bank.manage', eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.manage.title}, actions=~{::bank-manage-actions})}">
         <th:block th:ref="bank-manage-actions">
             <button type="button" class="btn btn-ghost" th:if="${activeTab == 'halter' and management}"
                     data-trigger="open-modal-display" data-modal-id="bank-register-holder-modal"

@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.grants.title}, actions=~{::bank-grants-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='bank.grants', eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.grants.title}, actions=~{::bank-grants-actions})}">
         <th:block th:ref="bank-grants-actions">
             <button type="button" class="btn btn--cta"
                     data-trigger="open-modal-display" data-modal-id="bank-grant-create-modal"

@@ -30,6 +30,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -190,6 +191,171 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentOfficerOrgUnitIds()}: the org units in which
+   * the caller holds officer reach through a leadership seat.
+   *
+   * @return the caller's officer org-unit ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> currentOfficerOrgUnitIds() {
+    return requestScopeResolver.currentOfficerOrgUnitIds();
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#narrowToPin(Set)}: narrows reached org units to the
+   * active-context pin.
+   *
+   * @param reach the org units the caller reaches
+   * @return the reached units the pin leaves, empty when the pin is out of reach
+   */
+  @NotNull
+  public Set<UUID> narrowToPin(@NotNull Set<UUID> reach) {
+    return requestScopeResolver.narrowToPin(reach);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#currentOfficerReadScope()}: the org units whose
+   * officer-surface data the caller may read, pin-aware.
+   *
+   * @return the readable org-unit ids, empty without reach, {@code null} for the admin scope
+   */
+  @Nullable
+  @Override
+  public Set<UUID> currentOfficerReadScope() {
+    return requestScopeResolver.currentOfficerReadScope();
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsOfficerIn(UUID)}: whether the caller holds
+   * officer reach in the target's owning unit.
+   *
+   * @param orgUnitId the target's owning org unit; never {@code null}
+   * @return {@code true} iff the caller is an admin or holds officer reach in {@code orgUnitId}
+   */
+  public boolean canActAsOfficerIn(@NotNull UUID orgUnitId) {
+    return accessGateService.canActAsOfficerIn(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsOfficerAnywhere()}: whether the caller holds
+   * officer reach in at least one unit.
+   *
+   * @return {@code true} iff the caller is an admin or holds officer reach in any unit
+   */
+  public boolean canActAsOfficerAnywhere() {
+    return accessGateService.canActAsOfficerAnywhere();
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsOfficerInOwner(UUID)}: officer reach in the
+   * target's owning unit, where a target without a unit is reserved to admins.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds officer reach in {@code orgUnitId}
+   */
+  public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
+    return accessGateService.canActAsOfficerInOwner(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianIn(UUID)}: whether the caller is
+   * Logistician of the target's owning unit inside the active scope.
+   *
+   * @param orgUnitId the target's owning org unit; never {@code null}
+   * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active scope
+   */
+  public boolean canActAsLogisticianIn(@NotNull UUID orgUnitId) {
+    return accessGateService.canActAsLogisticianIn(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianInOwner(UUID)}: Logistician reach in
+   * the target's owning unit, where a target without a unit is reserved to admins.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or Logistician of {@code orgUnitId}
+   */
+  public boolean canActAsLogisticianInOwner(@Nullable UUID orgUnitId) {
+    return accessGateService.canActAsLogisticianInOwner(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#currentLogisticianOrgUnitIds()}: the org units in which
+   * the caller holds a Logistician grant inside the active scope.
+   *
+   * @return the caller's Logistician org-unit ids; never {@code null}, empty for an admin
+   */
+  @NotNull
+  public Set<UUID> currentLogisticianOrgUnitIds() {
+    return accessGateService.currentLogisticianOrgUnitIds();
+  }
+
+  /**
+   * Refuses the caller unless they act as Logistician in the unit that owns the target.
+   *
+   * @param orgUnit the target's owning org unit, or {@code null} when it has none (admin only)
+   * @throws AccessDeniedException when the caller is no Logistician of {@code orgUnit}
+   */
+  public void requireLogisticianInOwner(@Nullable OrgUnit orgUnit) {
+    if (!canActAsLogisticianInOwner(orgUnit == null ? null : orgUnit.getId())) {
+      throw new AccessDeniedException("Access denied: not a Logistician of the target's org unit");
+    }
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#currentLogisticianScope()}: the scope vector of the data
+   * the caller handles as Logistician, for list queries.
+   *
+   * @return a never-null scope vector limited to the caller's Logistician units
+   */
+  @NotNull
+  public ScopePredicate currentLogisticianScope() {
+    return accessGateService.currentLogisticianScope();
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canActAsLogisticianInActiveContext()}: whether the caller
+   * handles a unit as Logistician in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds a Logistician grant in the context
+   */
+  public boolean canActAsLogisticianInActiveContext() {
+    return accessGateService.canActAsLogisticianInActiveContext();
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#canActAsOfficerInActiveContext()}: whether the caller
+   * holds officer reach in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds reach in the active context
+   */
+  public boolean canActAsOfficerInActiveContext() {
+    return requestScopeResolver.canActAsOfficerInActiveContext();
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canManageMissionsOf(UUID)}: a Mission Manager grant in
+   * the target's owning unit, where a target without a unit needs a grant in an
+   * Organisationsleitung or Bereich unit.
+   *
+   * @param orgUnitId the target's owning org unit, or {@code null} when it has none
+   * @return {@code true} iff the caller is an admin or holds the matching grant
+   */
+  public boolean canManageMissionsOf(@Nullable UUID orgUnitId) {
+    return accessGateService.canManageMissionsOf(orgUnitId);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#canActAsMissionManagerInActiveContext()}: whether the
+   * caller holds a Mission Manager grant in the pinned unit, or in any unit when nothing is pinned.
+   *
+   * @return {@code true} iff the caller is an admin or holds a grant in the active context
+   */
+  public boolean canActAsMissionManagerInActiveContext() {
+    return requestScopeResolver.canActAsMissionManagerInActiveContext();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentOversightScope()}: the cascading (view)
    * oversight scope backing the blueprint overview and the F1 bank balance view.
    *
@@ -198,6 +364,17 @@ public class OwnerScopeService implements SquadronVisibility {
   @NotNull
   public ScopePredicate currentOversightScope() {
     return requestScopeResolver.currentOversightScope();
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#currentOversightScopeIgnoringPin()}: the cascading
+   * oversight scope over the caller's whole reach, ignoring the active-org-unit pin.
+   *
+   * @return a never-null, pin-free cascading oversight scope.
+   */
+  @NotNull
+  public ScopePredicate currentOversightScopeIgnoringPin() {
+    return requestScopeResolver.currentOversightScopeIgnoringPin();
   }
 
   /**
@@ -407,6 +584,18 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean hasRoleInOrgUnit(@NotNull UUID orgUnitId, @NotNull String roleName) {
     return accessGateService.hasRoleInOrgUnit(orgUnitId, roleName);
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#currentGrantedOrgUnitIds(String)}: the org units in
+   * which the caller holds the contextual role, cascade included.
+   *
+   * @param roleName the contextual role, e.g. {@code "LOGISTICIAN"}; never {@code null}.
+   * @return the org-unit ids of the caller's grants; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<UUID> currentGrantedOrgUnitIds(@NotNull String roleName) {
+    return requestScopeResolver.currentGrantedOrgUnitIds(roleName);
   }
 
   /**

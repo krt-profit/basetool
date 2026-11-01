@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.shell.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessContributor;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessEntry;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessHiddenEntries;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
@@ -42,6 +44,7 @@ public class QuickAccessController {
 
   private final List<QuickAccessContributor> contributors;
   private final MessageSource messageSource;
+  private final QuickAccessHiddenEntries hiddenEntries;
 
   /**
    * One page of the answer, already in the caller's language.
@@ -60,7 +63,8 @@ public class QuickAccessController {
       @NotNull String keywords) {}
 
   /**
-   * Lists the pages every contributor offers the caller, in contributor order.
+   * Lists the pages every contributor offers the caller, in contributor order, without the tabs of
+   * the pages the caller hid.
    *
    * @return the pages, possibly empty
    */
@@ -68,8 +72,10 @@ public class QuickAccessController {
   @GetMapping(value = PATH, headers = "X-Requested-With=XMLHttpRequest")
   public List<QuickAccessItem> entries() {
     Locale locale = LocaleContextHolder.getLocale();
+    Set<String> hidden = hiddenEntries.keys();
     return contributors.stream()
         .flatMap(c -> c.entries().stream())
+        .filter(e -> e.pageKey() == null || !hidden.contains(e.pageKey()))
         .map(e -> toItem(e, locale))
         .toList();
   }

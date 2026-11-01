@@ -21,6 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.client;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardLayoutRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardOptionsRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardPruneRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -44,10 +52,16 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class DashboardBackendClient {
 
+  /** The backend's dashboard endpoint of a mode. */
+  private static final String DASHBOARD = "/api/v1/navigation/dashboards/{mode}";
+
   /** The backend's announcement endpoint. */
   private static final String ANNOUNCEMENT = "/api/v1/announcements/current";
 
   private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<MissionListDto>> MISSION_LIST =
       new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<List<UUID>> UUID_LIST =
@@ -57,27 +71,133 @@ public class DashboardBackendClient {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Reads the first 50 planned or active missions starting in a period, soonest first.
+   * Reads the first 50 planned or active missions starting in a period, soonest first, optionally
+   * only those of one owning org unit.
    *
    * @param start the period start
    * @param end the period end
+   * @param orgUnitId the owning org unit, or {@code null} for every unit the caller may see
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
   public PageResponse<MissionListDto> upcomingMissions(
-      @NotNull Instant start, @NotNull Instant end) {
-    String uri =
+      @NotNull Instant start, @NotNull Instant end, @Nullable UUID orgUnitId) {
+    UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/missions")
             .queryParam("start", start)
             .queryParam("end", end)
             .queryParam("sort", "plannedStartTime,asc")
             .queryParam("status", "PLANNED")
             .queryParam("status", "ACTIVE")
-            .queryParam("size", 50)
-            .encode()
+            .queryParam("size", 50);
+    if (orgUnitId != null) {
+      uri.queryParam("orgUnitId", orgUnitId);
+    }
+    return backendApiClient.get(uri.encode().build().toUriString(), MISSION_PAGE);
+  }
+
+  /**
+   * Reads the caller's upcoming missions as list rows: those of the caller's org units and those
+   * the caller is signed up for, soonest first.
+   *
+   * @param limit the most rows to read, 1 to 10
+   * @return the rows, empty when no mission is upcoming
+   */
+  @NotNull
+  public List<MissionListDto> nextMissions(int limit) {
+    String uri =
+        UriComponentsBuilder.fromPath("/api/v1/missions/next/summary")
+            .queryParam("limit", limit)
             .build()
             .toUriString();
-    return backendApiClient.get(uri, MISSION_PAGE);
+    List<MissionListDto> rows = backendApiClient.get(uri, MISSION_LIST);
+    return rows == null ? List.of() : rows;
+  }
+
+  /**
+   * Reads how many ships the caller owns and how many are fitted.
+   *
+   * @return the counts, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipReadinessDto hangarReadiness() {
+    return backendApiClient.get("/api/v1/hangar/my-ships/readiness", ShipReadinessDto.class);
+  }
+
+  /**
+   * Reads the caller's dashboard of a mode; the default while the caller never changed it.
+   *
+   * @param mode the mode
+   * @return the dashboard, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse dashboard(@NotNull DashboardMode mode) {
+    return backendApiClient.get(DASHBOARD, DashboardResponse.class, mode.slug());
+  }
+
+  /**
+   * Replaces the caller's layout of a mode.
+   *
+   * @param mode the mode
+   * @param request the instances in display order and the layout version the caller last saw
+   * @return the stored dashboard, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse replaceLayout(
+      @NotNull DashboardMode mode, @NotNull DashboardLayoutRequest request) {
+    return backendApiClient.put(
+        DASHBOARD + "/layout", request, DashboardResponse.class, mode.slug());
+  }
+
+  /**
+   * Replaces the options of one instance.
+   *
+   * @param mode the mode
+   * @param widgetId the instance
+   * @param request the new options and the option version the caller last saw
+   * @return the stored instance, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardWidgetResponse replaceOptions(
+      @NotNull DashboardMode mode,
+      @NotNull UUID widgetId,
+      @NotNull DashboardOptionsRequest request) {
+    return backendApiClient.put(
+        DASHBOARD + "/widgets/{widgetId}/options",
+        request,
+        DashboardWidgetResponse.class,
+        mode.slug(),
+        widgetId);
+  }
+
+  /**
+   * Restores the default dashboard of a mode.
+   *
+   * @param mode the mode
+   * @param version the layout version the caller last saw
+   * @return the default dashboard, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse resetDashboard(@NotNull DashboardMode mode, long version) {
+    return backendApiClient.delete(
+        DASHBOARD + "?version={version}", DashboardResponse.class, mode.slug(), version);
+  }
+
+  /**
+   * Deletes the instances of widget types the caller may no longer use.
+   *
+   * @param mode the mode
+   * @param types the widget types
+   * @return the dashboard after the deletion, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardResponse pruneDashboard(
+      @NotNull DashboardMode mode, @NotNull List<DashboardWidgetType> types) {
+    return backendApiClient.post(
+        DASHBOARD + "/prune",
+        new DashboardPruneRequest(types),
+        DashboardResponse.class,
+        mode.slug());
   }
 
   /**

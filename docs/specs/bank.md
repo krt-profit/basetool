@@ -1203,8 +1203,8 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 > **Amendment (REQ-BANK-037, owner-approved tightening):** the Sonderkonto auto-view is narrowed from
 > "any Bereich/OL oversight seat" to **OL members and `BEREICHSLEITER` only** (plus bank staff/admin) —
 > Bereichskoordinatoren and Bereichsoperatoren no longer auto-see Sonderkonten. On top of that, OL
-> members or bank management may **grant** further Sonderkonto visibility (global roles / all members /
-> individual users, REQ-BANK-035), and a Sonderkonto now supports the read-only drill-in + statement
+> members or bank management may **grant** further Sonderkonto visibility (all members /
+> individual users, REQ-BANK-035; the global-role buckets are retired, REQ-BANK-037), and a Sonderkonto now supports the read-only drill-in + statement
 > (REQ-BANK-038), not just a balance card. The seam helper is `currentUserIsOlMember()` /
 > `currentUserIsBereichsleiter()` (the broader `currentUserHasAreaOrOlOversight()` is gone since
 > 2026-10-10).
@@ -1543,7 +1543,7 @@ users who would not otherwise see it, via additive `bank_account_view_grant` row
 - **SK-Konto:** all SK members, or named individual users (no sub-ranks).
 - **Bereichskonto:** `BEREICHSKOORDINATOR` / `BEREICHSOPERATOR` (each separately), all Bereich members,
   or named individuals.
-- **Sonderkonto (`SPECIAL`):** global roles (e.g. all officers), all KRT members, or named individuals;
+- **Sonderkonto (`SPECIAL`):** all KRT members or named individuals (no role buckets, REQ-BANK-037);
   configured by **OL members or bank management** (REQ-BANK-037).
 - **OL/KRT-Konto (`CARTEL`)** and **`CARTEL_BANK`** carry no configurable visibility (their audiences are
   fixed by REQ-BANK-037).
@@ -1575,7 +1575,7 @@ configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible hol
 (always all-members) and `CARTEL_BANK` (internal) audiences stay fixed (REQ-BANK-037) — there is nothing
 to configure there, not even for an admin.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `bank/internal/BankAccountViewGrant`, `bank/internal/BankAccountViewGrantRepository`, `bank/internal/OrgUnitBankAccessService` (authorization), `bank/internal/OrgUnitBankVisibilityService` (grant/revoke + audit), `bank/web/OrgUnitBankController`, `db/migration/V189`, frontend `templates/bank/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / all-members for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `bank/internal/BankAccountViewGrant`, `bank/internal/BankAccountViewGrantRepository`, `bank/internal/OrgUnitBankAccessService` (authorization), `bank/internal/OrgUnitBankVisibilityService` (grant/revoke + audit), `bank/web/OrgUnitBankController`, `db/migration/V189`, frontend `templates/bank/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-036 — Balance target ("Kontostandsziel")
 
@@ -1595,9 +1595,6 @@ it was a `PATCH` before wave 4 of the API cut). Both echo the version and write 
 
 ### REQ-BANK-037 — Fixed cartel/special visibility (KRT account & Sonderkonten)
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 Two account groups have **fixed** (non-holder-configurable) visibility on the org-unit bank page:
 
 - **OL/KRT-Konto (`CARTEL`):** its balance and read-only detail are **always visible to every KRT
@@ -1611,25 +1608,32 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
-#### Planned amendment (ADR-0300)
+#### The Sonderkonto role audiences are retired (ADR-0300)
 
-The Keycloak `OFFICER` role is retired (REQ-SEC-004), so a Sonderkonto can no longer be opened to
-"all officers":
+The Keycloak `OFFICER` role is retired (REQ-SEC-004), and the `LOGISTICIAN` and `MISSION_MANAGER`
+buckets go with it: a Sonderkonto has no owning unit, so a flat role bucket would open it to the
+holders of a role granted in any unit. A Sonderkonto is opened by bank roles, the fixed seat
+audiences, all-members and individual grants only:
 
-- **The `GLOBAL_ROLE` `OFFICER` audience goes.** The Sichtbarkeit editor of a Sonderkonto no longer
-  offers it; the remaining global-role audiences are `LOGISTICIAN` and `MISSION_MANAGER`
-  (`OrgUnitBankSettingsService`, REQ-BANK-035).
-- **Existing grants are removed by migration.** It deletes every `bank_account_view_grant` row with
-  `GLOBAL_ROLE` `OFFICER` and writes one `BALANCE_VISIBILITY_REVOKED` `bank_audit_event` per removed
-  grant, with the system as actor (REQ-BANK-012).
+- **No `GLOBAL_ROLE` audience remains.** The Sichtbarkeit editor of a Sonderkonto offers no role
+  buckets, and adding one is rejected as a bad request (`OrgUnitBankSettingsService`,
+  REQ-BANK-035). The grantee kind `GLOBAL_ROLE` no longer exists in code, and `V321` removes it from the table checks.
+- **Existing grants and limits were removed by migrations** `V319` (`OFFICER`) and `V321` (every
+  remaining `GLOBAL_ROLE` row, i.e. `LOGISTICIAN` and `MISSION_MANAGER`). Each deletes every
+  `bank_account_view_grant` row and every `bank_account_approval_limit` row (REQ-BANK-041) with
+  `GLOBAL_ROLE` row and writes one `bank_audit_event` per removed row with the system as
+  actor and `GLOBAL_ROLE:<role>` as details: `BALANCE_VISIBILITY_REVOKED` for a grant,
+  `APPROVAL_LIMIT_CLEARED` for a limit (REQ-BANK-012). The one-time cut writes the rows in SQL, so
+  `basetool_bank_audit_events_total` counts runtime events only and does not see them.
 - **Bank management gains no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007). A
   bank manager who also holds a leadership seat has officer reach there like anyone else.
 - The fixed audiences above — `CARTEL` for every KRT member, `CARTEL_BANK` for its holder and bank
   staff, `SPECIAL` auto-visible to bank staff, admins, OL members and Bereichsleiter — stay.
 
-**Enforced by (to be added):** `OrgUnitBankAccessServiceTest` (no officer bucket on a Sonderkonto),
-`OrgUnitBankSettingsServiceTest` (the offered buckets), a migration test (grants deleted, one audit
-row per grant) · **Related:** REQ-BANK-035, REQ-SEC-004, ADR-0300
+**Enforced by:** `OrgUnitBankAccessServiceTest` (no role buckets on a Sonderkonto),
+`OfficerCutMigrationTest`, `SonderkontoBucketRetirementMigrationTest` (grants and limits deleted, one
+audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`, `db/migration/V319`,
+`db/migration/V321` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 
@@ -1828,9 +1832,7 @@ third key, so the labels now agree wherever the audiences do). An outsider
 holding only a per-user view grant is request-eligible (REQ-BANK-039) but matches no membership
 tier, so they fall through to *approval required* unless they hold their own `USER` limit.
 (Resolution mirrors the visibility model's
-four-kind grantee set; the `GLOBAL_ROLE` tier is reserved for parity and never produced for limits,
-since it is the Sonderkonto role bucket and Sonderkonten are non-request-capable — see
-`BankApprovalLimitService`.) The result is **snapshotted** onto the request
+grantee set.) The result is **snapshotted** onto the request
 (`requires_owner_approval`, `applicable_limit`) so the org-unit-blind confirm path only reads the
 boolean.
 
@@ -2977,8 +2979,6 @@ observer treats the call as idempotent.
 
 ### REQ-BANK-064 — Collective read of the viewable org-unit bank accounts
 
-> **Status: planned** (ADR-0299, map #2800). Until it ships, the current code stays authoritative.
-
 `GET /api/v1/bank/org-units/accounts/visible` returns, as one paged read, the accounts the caller
 may view on the **org-unit bank page** (`/org-unit-bank`), with what the home dashboard's „Bank"
 widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal accounts
@@ -2988,13 +2988,16 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
   over the active accounts (REQ-BANK-021, -035, -037). The bank-staff view (`/bank`) does not count.
   Every member sees at least the KRT (`CARTEL`) account, so the result is never empty for a member.
 - **Context-free set.** The set is computed for the caller's whole reach and does not follow the
-  active org-unit pin; only the order below uses the active context.
-- **Paged and sorted in the backend.** The read takes the standard `Pageable` and answers a
-  `PageResponse` (REQ-API-005). The order is fixed by the backend and takes no client sort field:
-  the KRT (`CARTEL`) account first, then the accounts owned by the active org-unit context (the
-  pinned unit, or every unit of the union when none is pinned, REQ-UI-026), then all others, each
-  part by account number, `id` as the tiebreaker. The widget requests page 0 with its row count as
-  `size`.
+  active org-unit pin (`OwnerScopeService#currentOversightScopeIgnoringPin`; an admin sees every
+  active account); only the order below uses the active context.
+- **Paged and sorted in the backend.** The read takes the standard `page` / `size` and answers a
+  `PageResponse` (REQ-API-005) with the true `totalElements`; visibility is decided in Java, so the
+  page is cut in memory and only its accounts' figures are loaded. The order is fixed by the backend
+  and takes no client sort field (a `sort` parameter is ignored): the KRT (`CARTEL`) account first,
+  then the accounts owned by the active org-unit context (the pinned unit, or every unit the caller
+  is a direct member of when none is pinned — the units of the union, REQ-UI-026), then all others,
+  each part by account number, `id` as the tiebreaker. The widget requests page 0 with its row count
+  as `size`.
 - **Per account:** id, account number, name, type, owning org unit, current balance, balance target
   (when set, REQ-BANK-036) and the 30-day series of daily end-of-day balances with its net delta, as
   on the org-unit bank cards (`BankTrendCalculator`, no per-account query).
@@ -3005,21 +3008,24 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
   widget refetches this read on such a frame. No new room.
 - **Not audited** (a read) and not a new metric: `http_server_requests` covers the route.
 
-**Acceptance (planned)**
+**Acceptance**
 
-- [ ] The read returns exactly the accounts the org-unit bank page lists for the same caller,
+- [x] The read returns exactly the accounts the org-unit bank page lists for the same caller,
   unpinned, with balance, target and the 30-day series.
-- [ ] A plain member gets the KRT account; a pin does not change the set.
-- [ ] The KRT account comes first, the active context's accounts next, the rest by account number;
+- [x] A plain member gets the KRT account; a pin does not change the set.
+- [x] The KRT account comes first, the active context's accounts next, the rest by account number;
   page 0 with `size` 3 returns the first three of that order and the true `totalElements`.
-- [ ] The response carries no holder or custody data.
+- [x] The response carries no holder or custody data.
 
-**Enforced by (to be added):** `OrgUnitBankAccessServiceTest` (visible set equals the page's set,
-pin ignored for the set, no holders), `OrgUnitBankVisibleAccountsQueryTest` (backend order, paging),
-`OrgUnitBankControllerTest` (route, member gate, `Pageable` binding),
-`OrgUnitBankVisibleAccountsDtoTest` (no holder field) · **Code (planned):**
-`bank/internal/OrgUnitBankAccessService`, `bank/web/OrgUnitBankController` · **Related:** REQ-BANK-021, REQ-BANK-035, REQ-BANK-037,
-REQ-API-005, REQ-UI-034, ADR-0299
+**Enforced by:** `OrgUnitBankAccessServiceTest` (visible set equals the page's set unpinned, pin
+ignored for the set, KRT for a plain member, active context), `OrgUnitBankVisibleAccountsQueryTest`
+(backend order, paging, figures), `OrgUnitBankControllerTest` (route, member gate, `page` / `size`
+binding, no sort), `OrgUnitBankVisibleAccountDtoTest` (no holder field), `OwnerScopeServiceTest`
+(pin-free oversight scope), `AuthorizationMatrixTest`, `NoStoreApiScopesTest` · **Code:**
+`bank/internal/OrgUnitBankAccessService#listViewableActiveAccounts`,
+`bank/internal/OrgUnitBankVisibleAccountsQuery`, `bank/internal/OrgUnitBankVisibleAccountDto`,
+`bank/web/OrgUnitBankController#listVisibleAccounts` · **Related:** REQ-BANK-021, REQ-BANK-035,
+REQ-BANK-037, REQ-API-005, REQ-UI-034, ADR-0299
 
 ### REQ-BANK-065 — A deposit shows what the depositor transfers with the in-game fee
 

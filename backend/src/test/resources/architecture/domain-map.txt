@@ -5,6 +5,7 @@ module platform 0
 module audit 1
 module notification 1
 module livesync 1
+module navigation 1
 module catalogue 2
 module identity 3
 module orgunit 4
@@ -156,6 +157,7 @@ package exchange exchange the exchange module's package tree (plan 5.2)
 package identity identity the identity module's package tree (plan 5.2)
 package joborder joborder the job-order module's package tree (plan 5.2)
 package livesync livesync the live-sync module's package tree (plan 5.2)
+package navigation navigation the navigation module's package tree, a leaf without an api package (REQ-MOD-006)
 package materialexchange materialexchange the Materialboerse module's package tree (plan 5.2)
 package notification notification the notification module's package tree (plan 5.2)
 package privacy privacy the GDPR module's package tree, transitional (plan 5.1 rank 13, 7.6)

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessEntry;
 import de.greluc.krt.profit.basetool.frontend.shell.web.QuickAccessController.QuickAccessItem;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -56,7 +57,8 @@ class QuickAccessControllerTest {
                 () ->
                     List.of(
                         new QuickAccessEntry("/b", "b.label", "a.crumb", "gear", "b.keywords"))),
-            messages);
+            messages,
+            Set::of);
 
     assertThat(controller.entries())
         .containsExactly(
@@ -64,11 +66,29 @@ class QuickAccessControllerTest {
             new QuickAccessItem("/b", "Beta", "Group", "gear", ""));
   }
 
+  /** An entry of a hidden page is left out; entries of other pages and of no page stay. */
+  @Test
+  void leavesOutTheEntriesOfAHiddenPage() {
+    StaticMessageSource messages = new StaticMessageSource();
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    QuickAccessController controller =
+        new QuickAccessController(
+            List.of(() ->
+                List.of(
+                    new QuickAccessEntry("/s", "s.label", "c", "list", "k", "supply.needs"),
+                    new QuickAccessEntry("/p", "p.label", "c", "list", "k", "bank.dashboard"),
+                    new QuickAccessEntry("/n", "n.label", "c", "list", "k"))),
+            messages,
+            () -> Set.of("supply.needs"));
+
+    assertThat(controller.entries()).extracting(QuickAccessItem::href).containsExactly("/p", "/n");
+  }
+
   /** Without contributors, or when none offers anything, the answer is empty. */
   @Test
   void answersEmptyWithoutEntries() {
     QuickAccessController controller =
-        new QuickAccessController(List.of(List::of), new StaticMessageSource());
+        new QuickAccessController(List.of(List::of), new StaticMessageSource(), Set::of);
 
     assertThat(controller.entries()).isEmpty();
   }

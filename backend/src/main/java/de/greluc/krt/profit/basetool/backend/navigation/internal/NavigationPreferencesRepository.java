@@ -1,0 +1,292 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.navigation.internal;
+
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.NativeQuery;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+/** Persistence of the {@link NavigationPreferences} roots and their sections. */
+public interface NavigationPreferencesRepository
+    extends JpaRepository<NavigationPreferences, UUID> {
+
+  /**
+   * Creates the member's root row when it does not exist yet; a concurrent creator is not an error.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @NativeQuery(
+      "INSERT INTO navigation_preferences (user_id) VALUES (:userId) ON CONFLICT (user_id) DO"
+          + " NOTHING")
+  void insertIfAbsent(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the favourites version when it still equals the expected one, locking the root row until
+   * the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.favouritesVersion = p.favouritesVersion + 1"
+          + " WHERE p.userId = :userId AND p.favouritesVersion = :expected")
+  int bumpFavouritesVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the appearance version when it still equals the expected one, locking the root row until
+   * the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.appearanceVersion = p.appearanceVersion + 1"
+          + " WHERE p.userId = :userId AND p.appearanceVersion = :expected")
+  int bumpAppearanceVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the appearance version without a check, for a change the member did not echo a version
+   * for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.appearanceVersion = p.appearanceVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpAppearanceVersion(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the favourites version without a check, for a change the member did not echo a version
+   * for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.favouritesVersion = p.favouritesVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpFavouritesVersion(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the hidden version when it still equals the expected one, locking the root row until the
+   * transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.hiddenVersion = p.hiddenVersion + 1"
+          + " WHERE p.userId = :userId AND p.hiddenVersion = :expected")
+  int bumpHiddenVersionIfMatches(@Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the hidden version without a check, for a change the member did not echo a version for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.hiddenVersion = p.hiddenVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpHiddenVersion(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the favourites and the hidden version in one statement when both still equal the expected
+   * ones, so a stale version of either leaves both untouched.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expectedFavourites the favourites version the caller last saw
+   * @param expectedHidden the hidden version the caller last saw
+   * @return {@code 1} when both versions matched, {@code 0} when either is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.favouritesVersion = p.favouritesVersion + 1,"
+          + " p.hiddenVersion = p.hiddenVersion + 1 WHERE p.userId = :userId"
+          + " AND p.favouritesVersion = :expectedFavourites AND p.hiddenVersion = :expectedHidden")
+  int bumpBothVersionsIfMatch(
+      @Param("userId") UUID userId,
+      @Param("expectedFavourites") long expectedFavourites,
+      @Param("expectedHidden") long expectedHidden);
+
+  /**
+   * Bumps the order version of a mode when it still equals the expected one, locking the root row
+   * until the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the navigation mode
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  default int bumpOrderVersionIfMatches(UUID userId, NavigationMode mode, long expected) {
+    return mode == NavigationMode.MEMBER
+        ? bumpMemberOrderVersionIfMatches(userId, expected)
+        : bumpAdminOrderVersionIfMatches(userId, expected);
+  }
+
+  /**
+   * Bumps the order version of a mode without a check, for a change the member did not echo a
+   * version for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the navigation mode
+   */
+  default void bumpOrderVersion(UUID userId, NavigationMode mode) {
+    if (mode == NavigationMode.MEMBER) {
+      bumpMemberOrderVersion(userId);
+    } else {
+      bumpAdminOrderVersion(userId);
+    }
+  }
+
+  /**
+   * Bumps the member mode's order version when it still equals the expected one.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderMemberVersion = p.orderMemberVersion + 1"
+          + " WHERE p.userId = :userId AND p.orderMemberVersion = :expected")
+  int bumpMemberOrderVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the administration mode's order version when it still equals the expected one.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderAdminVersion = p.orderAdminVersion + 1"
+          + " WHERE p.userId = :userId AND p.orderAdminVersion = :expected")
+  int bumpAdminOrderVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the member mode's order version without a check.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderMemberVersion = p.orderMemberVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpMemberOrderVersion(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the administration mode's order version without a check.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderAdminVersion = p.orderAdminVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpAdminOrderVersion(@Param("userId") UUID userId);
+
+  /**
+   * Counts the members with a stored order in either mode.
+   *
+   * @return the number of members that moved a group or a link
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.orderRows) > 0")
+  long countWithOrder();
+
+  /**
+   * Bumps one mode's tab-bar version when it still equals the expected one, locking the root row
+   * until the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param member {@code true} for the member bar, {@code false} for the administration bar
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET"
+          + " p.tabBarMemberVersion = CASE WHEN :member = true THEN p.tabBarMemberVersion + 1"
+          + " ELSE p.tabBarMemberVersion END,"
+          + " p.tabBarAdminVersion = CASE WHEN :member = true THEN p.tabBarAdminVersion"
+          + " ELSE p.tabBarAdminVersion + 1 END"
+          + " WHERE p.userId = :userId AND ((:member = true AND p.tabBarMemberVersion = :expected)"
+          + " OR (:member = false AND p.tabBarAdminVersion = :expected))")
+  int bumpTabBarVersionIfMatches(
+      @Param("userId") UUID userId,
+      @Param("member") boolean member,
+      @Param("expected") long expected);
+
+  /**
+   * Bumps one mode's tab-bar version without a check, for a change the member did not echo a
+   * version for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param member {@code true} for the member bar, {@code false} for the administration bar
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET"
+          + " p.tabBarMemberVersion = CASE WHEN :member = true THEN p.tabBarMemberVersion + 1"
+          + " ELSE p.tabBarMemberVersion END,"
+          + " p.tabBarAdminVersion = CASE WHEN :member = true THEN p.tabBarAdminVersion"
+          + " ELSE p.tabBarAdminVersion + 1 END WHERE p.userId = :userId")
+  void bumpTabBarVersion(@Param("userId") UUID userId, @Param("member") boolean member);
+
+  /**
+   * Counts the members with at least one chosen slot in a phone tab bar.
+   *
+   * @return the number of members that edited a bar
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.tabBar) > 0")
+  long countWithTabBar();
+
+  /**
+   * Counts the members with at least one hidden page.
+   *
+   * @return the number of members that hid a page
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.hidden) > 0")
+  long countWithHidden();
+
+  /**
+   * Counts the members with at least one favourite.
+   *
+   * @return the number of members that personalised the favourites
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.favourites) > 0")
+  long countWithFavourites();
+}

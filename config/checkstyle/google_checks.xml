@@ -86,19 +86,6 @@
     <property name="files" value="^(?!.*basetool.backend.catalogue.internal.P4kImportService\.java$)"/>
   </module>
   <module name="FileLength">
-    <property name="id" value="fileLengthInventoryPageController"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1519"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.frontend.inventory.web.InventoryPageController\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthInventoryPageController"/>
-    <property name="files" value="^(?!.*basetool.frontend.inventory.web.InventoryPageController\.java$)"/>
-  </module>
-  <module name="FileLength">
     <property name="id" value="fileLengthInventoryItemRepository"/>
     <property name="fileExtensions" value="java"/>
     <property name="max" value="1367"/>
@@ -257,7 +244,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthOrgUnitMembershipService"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1074"/>
+    <property name="max" value="1063"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
@@ -279,19 +266,6 @@
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLengthMissionBackendClient"/>
     <property name="files" value="^(?!.*basetool.frontend.mission.client.MissionBackendClient\.java$)"/>
-  </module>
-  <module name="FileLength">
-    <property name="id" value="fileLengthJobOrderController"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="1097"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.backend.joborder.web.JobOrderController\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthJobOrderController"/>
-    <property name="files" value="^(?!.*basetool.backend.joborder.web.JobOrderController\.java$)"/>
   </module>
   <module name="FileLength">
     <property name="id" value="fileLengthBankBackendClient"/>

@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -48,8 +47,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the blueprint access policy (plan §5.4, ADR-0236): for every
  * caller of the matrix, {@link BlueprintAccessPolicy#canAccessBlueprintOverview()} returns the
- * scope hub's verdict and the verdict of a restatement of the rule on its inputs (admin, officer,
- * or an oversight seat).
+ * scope hub's verdict and the verdict of a restatement of the rule on its inputs (admin or an
+ * oversight seat).
  *
  * <p>The hub keeps the predicate for the member's own capability view, so both stay live and the
  * test keeps comparing them. The matrix covers an admin, an officer without a seat, a member of no
@@ -65,16 +64,15 @@ class BlueprintAccessPolicyDifferentialTest {
    * @param officer whether the caller reaches ROLE_OFFICER
    * @param seat the role of the caller's one membership, or {@code null} for none
    */
-  private record Caller(String name, boolean admin, boolean officer, MembershipRole seat) {}
+  private record Caller(String name, boolean admin, MembershipRole seat) {}
 
   @Test
   void thePolicyReturnsTheScopeHubsVerdictForEveryCaller() {
     List<Caller> callers = new ArrayList<>();
-    callers.add(new Caller("admin", true, false, null));
-    callers.add(new Caller("officer without a seat", false, true, null));
-    callers.add(new Caller("member of none", false, false, null));
+    callers.add(new Caller("admin", true, null));
+    callers.add(new Caller("member of none", false, null));
     for (MembershipRole role : MembershipRole.values()) {
-      callers.add(new Caller("member as " + role, false, false, role));
+      callers.add(new Caller("member as " + role, false, role));
     }
 
     int granted = 0;
@@ -84,8 +82,6 @@ class BlueprintAccessPolicyDifferentialTest {
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
       when(authHelper.hasReachableRole(any())).thenReturn(false);
-      when(authHelper.hasReachableRole(Roles.authority(Roles.OFFICER)))
-          .thenReturn(caller.officer());
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
 
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
@@ -117,9 +113,7 @@ class BlueprintAccessPolicyDifferentialTest {
       BlueprintAccessPolicy policy = new BlueprintAccessPolicy(hub);
 
       boolean restated =
-          caller.admin()
-              || caller.officer()
-              || (caller.seat() != null && caller.seat().confersOwnLevelOversight());
+          caller.admin() || (caller.seat() != null && caller.seat().confersOwnLevelOversight());
       boolean now = policy.canAccessBlueprintOverview();
       assertThat(hub.canAccessBlueprintOverview()).as("hub for %s", caller.name()).isEqualTo(now);
       assertThat(now).as("policy for %s", caller.name()).isEqualTo(restated);

@@ -103,8 +103,9 @@ public class OperationAccessPolicy {
   }
 
   /**
-   * Checks whether the caller may edit operation {@code operationId}: strict owning-org-unit check;
-   * an ownerless operation passes and is restricted by the controller's role gate (REQ-ORG-009).
+   * Checks whether the caller may edit operation {@code operationId}: a Mission Manager grant in
+   * the owning org unit, or for an ownerless operation in an Organisationsleitung or Bereich unit;
+   * admins pass (REQ-SEC-065).
    *
    * @param operationId operation to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the operation
@@ -113,8 +114,25 @@ public class OperationAccessPolicy {
     return operationRepository
         .findById(operationId)
         .map(o ->
-            o.getOwningOrgUnit() == null
-                || ownerScopeService.canEditSquadron(o.getOwningOrgUnit().getId()))
+            ownerScopeService.canManageMissionsOf(
+                o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
+        .orElse(false);
+  }
+
+  /**
+   * Checks whether the caller may clear a participant's paid-out flag on operation {@code
+   * operationId}: officer reach in the operation's owning unit; an ownerless operation is reserved
+   * to admins (REQ-SEC-065).
+   *
+   * @param operationId operation to inspect; never {@code null}
+   * @return {@code true} iff the caller is an admin or holds officer reach in the owning unit
+   */
+  public boolean canClearPayout(@NotNull UUID operationId) {
+    return operationRepository
+        .findById(operationId)
+        .map(o ->
+            ownerScopeService.canActAsOfficerInOwner(
+                o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 

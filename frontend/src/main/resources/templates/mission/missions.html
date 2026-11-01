@@ -6,7 +6,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{missions.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='missions.list', eyebrowKey='nav.group.operations', titleText=#{missions.title},
         count=${missionsPage != null ? missionsPage.totalElements() : null}, countId='missions-count', countFor='missions-results', actions=~{::missions-actions})}">
         <th:block th:ref="missions-actions">
             <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn btn--cta"

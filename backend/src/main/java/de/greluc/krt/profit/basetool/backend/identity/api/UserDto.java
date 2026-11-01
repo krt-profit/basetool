@@ -32,11 +32,12 @@ import org.jetbrains.annotations.Nullable;
  * <p>{@code squadron} is the user's primary Staffel (first by name) and {@code squadrons} the
  * complete membership set (REQ-ORG-017); both are {@code null} / empty without a membership. {@code
  * discordLinked} tells whether a Discord account is federated, never the Discord id itself, and is
- * {@code null} in peer and guest redactions (REQ-SEC-019).
+ * {@code null} in peer and guest redactions (REQ-SEC-019). {@code username} is {@code null} in the
+ * peer view of a member who has a display name.
  */
 public record UserDto(
     UUID id,
-    String username,
+    @Nullable String username,
     String displayName,
     String effectiveName,
     @Nullable String email,

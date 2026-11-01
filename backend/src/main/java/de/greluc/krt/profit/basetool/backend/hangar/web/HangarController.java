@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.web;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
@@ -38,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -102,7 +102,6 @@ public class HangarController {
   private final UserService userService;
   private final ShipMapper shipMapper;
   private final UserMapper userMapper;
-  private final AuthHelperService authHelperService;
   private final HangarAccessPolicy hangarAccessPolicy;
 
   /**
@@ -132,6 +131,19 @@ public class HangarController {
   }
 
   /**
+   * Returns how many ships the calling user owns and how many are fitted, the summary the home
+   * dashboard's hangar-readiness widget shows (REQ-HANGAR-016).
+   *
+   * @param jwt caller's JWT — its {@code sub} claim derives the owner; never read from the URL
+   * @return the caller's ship and fitted-ship counts
+   */
+  @GetMapping("/my-ships/readiness")
+  @Transactional(readOnly = true)
+  public ShipReadinessDto getMyReadiness(@AuthenticationPrincipal Jwt jwt) {
+    return hangarService.getMyReadiness(userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
    * Lists ships across all users. Requires the {@code HANGAR_READ} authority.
    *
    * @return paged ship DTOs
@@ -152,8 +164,9 @@ public class HangarController {
   }
 
   /**
-   * Returns per-ship-type counts across the squadron; admins and officers additionally see the
-   * per-ship owner, location and fitted breakdown (REQ-HANGAR-001).
+   * Returns per-ship-type counts across the squadron; admins and callers with officer reach
+   * additionally see the per-ship owner, location and fitted breakdown of the ships of units they
+   * reach (REQ-HANGAR-001).
    *
    * @param page zero-based page index
    * @param size page size
@@ -169,7 +182,7 @@ public class HangarController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String search) {
-    boolean includeOwnerDetails = authHelperService.isAdminOrOfficer();
+    boolean includeOwnerDetails = hangarAccessPolicy.canSeeOwnerDetails();
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("shipType.name"), "shipType.name");
@@ -458,9 +471,12 @@ public class HangarController {
     return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
   }
 
-  /** Bulk reset of the {@code fitted} flag on every ship in the squadron. ADMIN/OFFICER-only. */
+  /**
+   * Bulk reset of the {@code fitted} flag on the ships of the units the caller reaches as officer;
+   * an admin resets every ship in scope.
+   */
   @PostMapping("/ships/reset-fitted")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize("@hangarAccessPolicy.canResetFitted()")
   public void resetAllFittedStatus() {
     hangarService.resetAllFittedStatus();
   }

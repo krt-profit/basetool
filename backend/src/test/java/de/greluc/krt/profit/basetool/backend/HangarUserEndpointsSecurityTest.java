@@ -110,6 +110,18 @@ class HangarUserEndpointsSecurityTest {
   }
 
   @Test
+  void testMyReadiness_NoHangarAuthorityAllowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/hangar/my-ships/readiness")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(user.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void testAddShip_WriteAllowed() throws Exception {
     String body =
         "{"

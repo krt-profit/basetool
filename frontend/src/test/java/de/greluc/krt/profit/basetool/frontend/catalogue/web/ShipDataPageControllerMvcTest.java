@@ -160,7 +160,7 @@ class ShipDataPageControllerMvcTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Einsatz &amp; Flotte<")
         .contains("data-testid=\"overflow-menu-toggle\"")
         .contains("data-testid=\"ship-data-reset-fitted\"")
         .contains("id=\"shipTypesTable\" class=\"data-table data-table--stack\"")

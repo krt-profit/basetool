@@ -94,12 +94,11 @@ class JobOrderTenancyE2eTest {
       String squadronBId =
           seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy B", "ETNB");
       seeder.setSquadronProfitEligible(ADMIN_USER, ADMIN_PASSWORD, squadronBId, true);
-      seeder.assignStaffelMembership(
+      seeder.assignStaffelleiterSeat(
           ADMIN_USER,
           ADMIN_PASSWORD,
           seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
           squadronBId,
-          false,
           false);
 
       String squadronCId =

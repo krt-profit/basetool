@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -35,9 +35,12 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,34 +103,32 @@ class MissionAccessPolicyGateTest {
   }
 
   @Test
-  void canManageMission_ManagerList_GlobalMissionManager_ShouldReturnTrue() {
+  void canManageMission_MissionManagerGrantInOwningUnit_ShouldReturnTrue() {
+    UUID unitId = UUID.randomUUID();
+    OrgUnit unit = new Squadron();
+    unit.setId(unitId);
+    mission.setOwningOrgUnit(unit);
     when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(
-            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
+    when(authentication.getAuthorities()).thenReturn(Collections.emptyList());
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
+    when(ownerScopeService.canManageMissionsOf(unitId)).thenReturn(true);
 
     assertTrue(missionAccessPolicy.canManageMission(missionId, authentication));
   }
 
   @Test
-  void canManageMission_ManagerList_OfficerRole_ShouldReturnTrue() {
+  void canManageMission_FlatRolesWithoutAGrant_ShouldReturnFalse() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
-        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
+        .thenAnswer(i ->
+            List.of(
+                new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                new SimpleGrantedAuthority("ROLE_OFFICER"),
+                new SimpleGrantedAuthority("MISSION_MANAGE")));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
-    assertTrue(missionAccessPolicy.canManageMission(missionId, authentication));
-  }
-
-  @Test
-  void canManageMission_ManagerList_MissionManagePermission_ShouldReturnTrue() {
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("MISSION_MANAGE")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
-
-    assertTrue(missionAccessPolicy.canManageMission(missionId, authentication));
+    assertFalse(missionAccessPolicy.canManageMission(missionId, authentication));
   }
 
   @Test
@@ -164,11 +165,13 @@ class MissionAccessPolicyGateTest {
 
   @Test
   void canManageMission_ManagerList_MissionManagerForeignOrgUnit_ShouldReturnFalse() {
+    UUID foreignUnitId = UUID.randomUUID();
+    OrgUnit foreignUnit = new Squadron();
+    foreignUnit.setId(foreignUnitId);
+    mission.setOwningOrgUnit(foreignUnit);
     when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(
-            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    doReturn(false).when(missionAccessPolicy).canEditMission(missionId);
+    when(authentication.getAuthorities()).thenReturn(Collections.emptyList());
+    when(ownerScopeService.canManageMissionsOf(foreignUnitId)).thenReturn(false);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
@@ -251,7 +254,7 @@ class MissionAccessPolicyGateTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
+    when(ownerScopeService.canManageMissionsOf(null)).thenReturn(true);
 
     assertTrue(
         missionAccessPolicy.canAccessLoadedParticipant(mission, participantId, authentication));
@@ -273,7 +276,7 @@ class MissionAccessPolicyGateTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    doReturn(false).when(missionAccessPolicy).canEditMission(missionId);
+    when(ownerScopeService.canManageMissionsOf(null)).thenReturn(false);
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(
@@ -412,14 +415,42 @@ class MissionAccessPolicyGateTest {
   }
 
   @Test
-  void canChangeOwner_OfficerRole_ShouldReturnTrue() {
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
-    when(authentication.getAuthorities())
-        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
+  void canChangeOwner_SeatInOwningUnit_ShouldReturnTrue() {
+    UUID unitId = givenOwnedMission();
+    givenAuthenticatedCaller("ROLE_KRT_MEMBER");
+    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(true);
 
     assertTrue(missionAccessPolicy.canChangeOwner(missionId, authentication));
+  }
+
+  @Test
+  void canChangeOwner_SeatInOtherUnit_ShouldReturnFalse() {
+    UUID unitId = givenOwnedMission();
+    givenAuthenticatedCaller("ROLE_KRT_MEMBER");
+    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(false);
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+    assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
+  }
+
+  @Test
+  void canChangeOwner_FlatOfficerRoleWithoutReach_ShouldReturnFalse() {
+    UUID unitId = givenOwnedMission();
+    givenAuthenticatedCaller("ROLE_OFFICER");
+    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(false);
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+    assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
+  }
+
+  @Test
+  void canChangeOwner_OwnerlessMissionWithoutReach_ShouldReturnFalse() {
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
+    givenAuthenticatedCaller("ROLE_KRT_MEMBER");
+    when(ownerScopeService.canActAsOfficerInOwner(null)).thenReturn(false);
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+    assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
 
   @Test
@@ -469,6 +500,8 @@ class MissionAccessPolicyGateTest {
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
+    mission.setOwner(user);
     when(userService.getCurrentUser()).thenReturn(Optional.empty());
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
@@ -481,7 +514,6 @@ class MissionAccessPolicyGateTest {
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(
         missionAccessPolicy.canChangeOwner(missionId, authentication),
@@ -507,10 +539,9 @@ class MissionAccessPolicyGateTest {
   @Test
   void canCreateFinanceEntry_MissionManagerInScope_ShouldReturnTrue() {
     when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(
-            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
+    when(authentication.getAuthorities()).thenReturn(Collections.emptyList());
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
+    when(ownerScopeService.canManageMissionsOf(null)).thenReturn(true);
 
     assertTrue(
         missionAccessPolicy.canCreateFinanceEntry(missionId, UUID.randomUUID(), authentication));
@@ -588,22 +619,41 @@ class MissionAccessPolicyGateTest {
   }
 
   @Test
-  void canEditFinanceEntry_OfficerInScope_ShouldReturnTrue() {
+  void canEditFinanceEntry_SeatInOwningUnit_ShouldReturnTrue() {
     UUID entryId = UUID.randomUUID();
+    UUID unitId = givenOwnedMission();
     MissionFinanceEntry entry = new MissionFinanceEntry();
     entry.setMission(mission);
     when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    doReturn(true).when(missionAccessPolicy).canEditMission(missionId);
+    givenAuthenticatedCaller("ROLE_KRT_MEMBER");
+    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(true);
 
     assertTrue(missionAccessPolicy.canEditFinanceEntry(entryId, authentication));
   }
 
   @Test
-  void canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse() {
+  void canEditFinanceEntry_PlainMemberOfOwningUnit_ShouldReturnFalse() {
     UUID entryId = UUID.randomUUID();
+    UUID unitId = givenOwnedMission();
+    User otherUser = new User();
+    otherUser.setId(UUID.randomUUID());
+    MissionParticipant participant = new MissionParticipant();
+    participant.setUser(otherUser);
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    entry.setMission(mission);
+    entry.setParticipant(participant);
+    when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    givenAuthenticatedCaller("ROLE_KRT_MEMBER");
+    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(false);
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+    assertFalse(missionAccessPolicy.canEditFinanceEntry(entryId, authentication));
+  }
+
+  @Test
+  void canEditFinanceEntry_SeatInOtherUnit_ShouldReturnFalse() {
+    UUID entryId = UUID.randomUUID();
+    UUID unitId = givenOwnedMission();
     User otherUser = new User();
     otherUser.setId(UUID.randomUUID());
     MissionParticipant participant = new MissionParticipant();
@@ -613,10 +663,8 @@ class MissionAccessPolicyGateTest {
     entry.setParticipant(participant);
 
     when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(authentication.getAuthorities())
-        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    doReturn(false).when(missionAccessPolicy).canEditMission(missionId);
+    givenAuthenticatedCaller("ROLE_OFFICER");
+    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(false);
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(missionAccessPolicy.canEditFinanceEntry(entryId, authentication));
@@ -660,5 +708,23 @@ class MissionAccessPolicyGateTest {
         .thenReturn(Optional.empty());
 
     assertFalse(missionAccessPolicy.canEditFinanceEntry(entryId, authentication));
+  }
+
+  private UUID givenOwnedMission() {
+    UUID unitId = UUID.randomUUID();
+    OrgUnit unit = new Squadron();
+    unit.setId(unitId);
+    mission.setOwningOrgUnit(unit);
+    lenient()
+        .when(missionRepository.findByIdForAuthorization(missionId))
+        .thenReturn(Optional.of(mission));
+    return unitId;
+  }
+
+  private void givenAuthenticatedCaller(String authority) {
+    when(authentication.isAuthenticated()).thenReturn(true);
+    lenient().when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority(authority)));
   }
 }

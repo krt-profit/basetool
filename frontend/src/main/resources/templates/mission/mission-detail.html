@@ -242,7 +242,7 @@
                     </th:block>
                 </div>
             </div>
-            <details class="more" open sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)"
+            <details class="more" open sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)"
                      th:if="${!#strings.isEmpty(mission.description)}">
                 <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
                 <div class="more-body">
@@ -342,7 +342,7 @@
             <div id="finance-results"><th:block th:fragment="financeSection">
             <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
-            <div class="kpi-grid fin-kpis" data-testid="mission-finance-kpis" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
+            <div class="kpi-grid fin-kpis" data-testid="mission-finance-kpis" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                 <div class="kpi-total">
                     <div class="kpi-label" th:text="#{mission.finance.kpi.total}">Gesamtergebnis</div>
                     <div class="kpi-value"><span th:classappend="${financeSum >= 0 ? 'is-pos' : 'is-neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'DEFAULT')}">0</span> <span class="kpi-unit">aUEC</span></div>
@@ -366,7 +366,7 @@
             </div>
 
             <div class="pane-grid-fin">
-                <section class="card card--flush fin-card" data-testid="mission-finance-list" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
+                <section class="card card--flush fin-card" data-testid="mission-finance-list" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                     <div class="card-head fin-card-head">
                         <h2 class="card-title" th:text="#{mission.finances}">Finanzen</h2>
                         <button type="button" class="btn btn--cta" data-trigger="open-modal-display" data-modal-id="finance-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</span></button>
@@ -450,7 +450,7 @@
                                                 th:data-participant-id="${p?.id}"
                                                 th:data-original-value="${p?.payoutPreference?.name()}"
                                                 data-trigger="mission-update-payout"
-                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
+                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
                                             <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
                                             <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
                                         </select>
@@ -603,7 +603,7 @@
                                     <div class="field-error" data-error-for="meetingPoint" th:text="${#fields.hasErrors('meetingPoint') ? #fields.errors('meetingPoint')[0] : ''}"></div>
                                 </div>
 
-                                <div class="form-group span-all" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
+                                <div class="form-group span-all" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                                     <label for="mission-description" th:text="#{mission.description}">Description</label>
                                     <textarea id="mission-description" name="description" rows="5" maxlength="20000" th:text="*{description}"></textarea>
                                     <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>
@@ -690,11 +690,13 @@
 
                         <fieldset class="form-section" th:if="${isNew or mission.canEdit}">
                             <legend class="form-section__head" th:text="|3 · #{mission.form.section.visibility}|">3 · Sichtbarkeit</legend>
-                            <div class="form-group">
+                            <div class="form-group" th:with="internalNeedsUnit=${isNew ? (ownerOptions == null or ownerOptions.isEmpty()) : mission.owningSquadron == null}">
                                 <label class="krt-switch" for="isInternal">
-                                    <input type="checkbox" role="switch" id="isInternal" th:field="*{isInternal}">
+                                    <input type="checkbox" role="switch" id="isInternal" th:field="*{isInternal}"
+                                           th:disabled="${internalNeedsUnit}">
                                     <span th:text="#{mission.is_internal}">Intern</span>
                                 </label>
+                                <p class="form-hint m-0" th:if="${internalNeedsUnit}" th:text="#{mission.is_internal.requires_unit}">Interne Missionen brauchen eine verantwortliche Einheit.</p>
                             </div>
                             <th:block th:if="${isNew}">
                                 <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
@@ -1256,7 +1258,7 @@
                     <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
                     <select name="responsibleUserId" id="add-unit-responsible" data-krt-combobox>
                         <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
-                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.username}" th:text="${p.user.effectiveName}">User</option>
+                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.effectiveName}" th:text="${p.user.effectiveName}">User</option>
                     </select>
                 </div>
                 </div>
@@ -1365,7 +1367,7 @@
                     <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
                     <select name="responsibleUserId" id="edit-unit-responsible" data-krt-combobox>
                         <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
-                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.username}" th:text="${p.user.effectiveName}">User</option>
+                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.effectiveName}" th:text="${p.user.effectiveName}">User</option>
                     </select>
                 </div>
                 </div>
@@ -1436,7 +1438,7 @@
                         <option value="" disabled selected th:text="#{general.select_placeholder}">- Bitte w&auml;hlen -</option>
                         <option th:each="p : ${participants}"
                                 th:value="${p.id}"
-                                th:attr="data-search=${p.user != null ? p.user.username : ''}"
+                                th:attr="data-search=${p.user != null ? p.user.effectiveName : ''}"
                                 th:text="${p.user != null ? p.user.effectiveName : (p.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}"
                                 th:selected="${financeForm.participantId != null and financeForm.participantId.toString() == p.id.toString()}"></option>
                     </select>

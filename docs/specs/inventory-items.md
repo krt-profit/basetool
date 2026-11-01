@@ -48,7 +48,7 @@ semantics are identical to material rows.
 
 ### REQ-INV-030 — Separate Material / Items views on the Lager surfaces
 
-`/inventory`, `/inventory/my` and `/inventory/all` offer a Material ↔ Items view switch
+`/inventory`, `/inventory?storage=my` and `/inventory?storage=all` offer a Material ↔ Items view switch
 (`view=items` riding the page's query state); the item view mirrors the material tree
 (GameItem → stack → lazy entries, REQ-INV-002/005 semantics) without quality or mission
 columns and with view-scoped expansion persistence. Drilldowns are per-catalog pages

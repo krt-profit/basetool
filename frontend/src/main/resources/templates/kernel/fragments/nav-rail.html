@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<body>
+<div th:fragment="item(key, label, icon, links)" class="nav-rail-item" th:data-rail-key="${key}">
+    <button type="button" class="nav-rail-btn" th:data-testid="|nav-rail-group-${key}|"
+            th:data-group-key="${key}" aria-expanded="false" th:aria-controls="|nav-rail-flyout-${key}|"
+            th:aria-label="${label}">
+        <svg class="krt-icon" aria-hidden="true"><use th:href="|#krt-icon-${icon}|"></use></svg>
+    </button>
+    <div class="nav-rail-flyout" th:id="|nav-rail-flyout-${key}|" hidden>
+        <div class="nav-rail-flyout-head" th:text="${label}">Group</div>
+        <div class="nav-rail-flyout-links">
+            <th:block th:each="entry : ${links}">
+                <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, true)}" />
+            </th:block>
+        </div>
+    </div>
+</div>
+
+<th:block th:fragment="favourites(mode)"
+          th:with="items=${mode == 'admin'} ? ${navigationFavourites.admin()} : ${navigationFavourites.member()}">
+    <div th:unless="${#lists.isEmpty(items)}" class="nav-rail-item" data-rail-key="favourites">
+        <button type="button" class="nav-rail-btn" data-testid="nav-rail-group-favourites"
+                data-group-key="favourites" aria-expanded="false" aria-controls="nav-rail-flyout-favourites"
+                th:aria-label="#{nav.favourites.title}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-star"></use></svg>
+        </button>
+        <div class="nav-rail-flyout" id="nav-rail-flyout-favourites" hidden>
+            <div class="nav-rail-flyout-head" th:text="#{nav.favourites.title}">Favoriten</div>
+            <div class="nav-rail-flyout-links">
+                <th:block th:each="fav : ${items}">
+                    <th:block th:if="${fav.available()}"
+                              th:replace="~{kernel/fragments/nav-entries :: link(${fav.entry()}, 'nav-link', null, null, true)}" />
+                    <span th:unless="${fav.available()}" class="nav-link is-unavailable" aria-disabled="true"
+                          th:data-entry-key="${fav.entry().key()}">
+                        <span class="nav-link-label" th:text="#{${fav.entry().labelKey()}}">Seite</span>
+                        <span class="nav-unavailable-hint"
+                              th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">nicht verfügbar</span>
+                    </span>
+                </th:block>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<th:block th:fragment="more(mode)"
+          th:with="items=${mode == 'admin'} ? ${navigationHidden.admin()} : ${navigationHidden.member()},
+                   groupKey=${mode == 'admin'} ? 'admin-more' : 'more'">
+    <div th:unless="${#lists.isEmpty(items)}" class="nav-rail-item" th:data-rail-key="${groupKey}">
+        <button type="button" class="nav-rail-btn" th:data-testid="|nav-rail-group-${groupKey}|"
+                th:data-group-key="${groupKey}" aria-expanded="false" th:aria-controls="|nav-rail-flyout-${groupKey}|"
+                th:aria-label="#{nav.more.title}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-more"></use></svg>
+        </button>
+        <div class="nav-rail-flyout" th:id="|nav-rail-flyout-${groupKey}|" hidden>
+            <div class="nav-rail-flyout-head" th:text="#{nav.more.title}">Mehr</div>
+            <div class="nav-rail-flyout-links">
+                <th:block th:each="hid : ${items}">
+                    <th:block th:if="${hid.available()}"
+                              th:replace="~{kernel/fragments/nav-entries :: link(${hid.entry()}, 'nav-link', null, null, true)}" />
+                    <span th:unless="${hid.available()}" class="nav-link is-unavailable" aria-disabled="true"
+                          th:data-entry-key="${hid.entry().key()}">
+                        <span class="nav-link-label" th:text="#{${hid.entry().labelKey()}}">Seite</span>
+                        <span class="nav-unavailable-hint"
+                              th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">nicht verfügbar</span>
+                    </span>
+                </th:block>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<nav th:fragment="rail" id="nav-rail" class="nav-rail" th:aria-label="#{nav.rail.aria}" sec:authorize="isAuthenticated()">
+    <div class="nav-rail-mode" data-nav-rail-mode="main">
+        <th:block th:replace="~{kernel/fragments/nav-rail :: favourites('member')}" />
+        <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty()}">
+            <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
+        </th:block>
+        <th:block th:replace="~{kernel/fragments/nav-rail :: more('member')}" />
+    </div>
+    <div class="nav-rail-mode" data-nav-rail-mode="admin" hidden th:unless="${navigation.admin().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/nav-rail :: favourites('admin')}" />
+        <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
+            <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
+        </th:block>
+        <th:block th:replace="~{kernel/fragments/nav-rail :: more('admin')}" />
+    </div>
+    <span class="nav-rail-grow"></span>
+    <button type="button" class="nav-rail-btn" data-testid="nav-rail-admin" aria-pressed="false"
+            th:data-label-enter="#{nav.rail.admin.enter}" th:data-label-leave="#{nav.rail.admin.leave}"
+            th:aria-label="#{nav.rail.admin.enter}"
+            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-shield"></use></svg>
+    </button>
+    <div class="nav-rail-item nav-rail-item--avatar" data-rail-key="avatar">
+        <button type="button" class="nav-rail-btn" data-testid="nav-rail-avatar" data-group-key="avatar"
+                aria-expanded="false" aria-controls="nav-rail-flyout-avatar"
+                th:aria-label="#{nav.rail.avatar.aria(${#authentication.name})}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"></use></svg>
+        </button>
+        <div class="nav-rail-flyout" id="nav-rail-flyout-avatar" hidden>
+            <div class="nav-rail-flyout-head nav-rail-user">
+                <span class="nav-user-name" sec:authentication="name">greluc</span>
+                <span class="nav-user-meta">
+                    <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">ALPHA</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${hasOfficerReach}" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:unless="${hasOfficerReach}" th:text="#{nav.user.role.member}">Mitglied</span>
+                </span>
+            </div>
+            <form th:if="${availableOrgUnits != null and availableOrgUnits.size() > 1}"
+                  th:action="@{/me/active-org-unit}" method="post" class="squadron-switcher no-track nav-rail-switcher">
+                <input type="hidden" name="_referer" th:value="${currentRequestUri}" />
+                <label for="nav-rail-switcher-select" class="squadron-switcher-label"
+                       th:text="#{orgUnit.switcher.label}">Active OrgUnit</label>
+                <select id="nav-rail-switcher-select" name="orgUnitId" class="squadron-switcher-select" data-rail-switcher>
+                    <option value=""
+                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
+                            th:selected="${activeSquadronId == null}"
+                            th:text="#{orgUnit.switcher.all}">All org units</option>
+                    <option value=""
+                            sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
+                            th:selected="${activeSquadronId == null}"
+                            th:text="#{orgUnit.switcher.allMine}">All my org units</option>
+                    <option th:each="ou : ${availableOrgUnits}"
+                            th:value="${ou.orgUnitId()}"
+                            th:selected="${activeSquadronId != null and activeSquadronId == ou.orgUnitId()}"
+                            th:text="${ou.orgUnitShorthand() != null ? ou.orgUnitShorthand() + ' — ' + ou.orgUnitName() : ou.orgUnitName()}">ALP — ALPHA</option>
+                </select>
+            </form>
+            <div class="nav-rail-flyout-links">
+                <th:block th:each="entry : ${navigation.personal().links()}">
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, true)}" />
+                </th:block>
+            </div>
+            <div class="nav-rail-edit">
+                <button type="button" class="btn btn-ghost" data-trigger="open-shortcuts" data-testid="nav-rail-shortcuts"
+                        aria-controls="nav-shortcuts">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"></use></svg>
+                    <span th:text="#{shortcuts.open}">Tastenkürzel</span>
+                </button>
+            </div>
+            <div class="nav-rail-edit" th:if="${navigationFavourites.loaded()}">
+                <button type="button" class="btn btn-ghost" data-trigger="nav-rail-edit" data-testid="nav-rail-edit">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                    <span th:text="#{nav.edit.start}">Anpassen</span>
+                </button>
+            </div>
+            <div class="nav-rail-mode-switch">
+                <th:block th:replace="~{kernel/fragments/nav-appearance :: switch('desktop-mode-rail')}" />
+            </div>
+            <div class="nav-rail-user-foot">
+                <div class="nav-rail-lang-menu">
+                    <a th:href="@{''(lang='de')}" lang="de" class="nav-rail-lang" th:text="#{lang.de}">DE</a>
+                    <a th:href="@{''(lang='en')}" lang="en" class="nav-rail-lang" th:text="#{lang.en}">EN</a>
+                </div>
+                <form th:action="@{/logout}" method="post" class="nav-rail-logout-form">
+                    <button type="submit" class="nav-logout-btn" data-testid="nav-rail-logout"
+                            th:aria-label="#{nav.logout}" th:title="#{nav.logout}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-logout"></use></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</nav>
+</body>
+</html>

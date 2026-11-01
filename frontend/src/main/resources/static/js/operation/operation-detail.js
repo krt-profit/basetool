@@ -477,7 +477,7 @@ function payoutPaidUrl() {
 /**
  * Whether the viewer may take a paid-out mark back.
  *
- * @returns {boolean} true for officers and admins
+ * @returns {boolean} true when the viewer has officer reach in the active context
  */
 function canUnsetPaidOut() {
     const pane = document.getElementById('pane-op-payout');

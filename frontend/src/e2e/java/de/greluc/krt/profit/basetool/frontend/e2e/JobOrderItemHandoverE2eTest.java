@@ -229,9 +229,9 @@ class JobOrderItemHandoverE2eTest {
 
   /**
    * Sums the squadron-wide item-stock total of one game item through the same grouped {@code
-   * catalog=ITEM} endpoint the {@code /inventory/all} item view renders from (REQ-INV-030/032), so
-   * a before/after delta proves the delivery consumed the earmarked stock (REQ-ORDERS-030) without
-   * racing the post-write render.
+   * catalog=ITEM} endpoint the {@code /inventory?storage=all} item view renders from
+   * (REQ-INV-030/032), so a before/after delta proves the delivery consumed the earmarked stock
+   * (REQ-ORDERS-030) without racing the post-write render.
    *
    * @param seeder the backend seeder used for the authenticated read-back
    * @param gameItemId the game item whose stacks to sum

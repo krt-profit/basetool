@@ -365,43 +365,55 @@ plan guard G-25
 
 ### REQ-SEC-004 — Roles & hierarchy
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
+Roles: `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles, which the
+matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159) and **`OFFICER` is not one of
+them since `V318`** (ADR-0300): there is no role below member, and a token that maps to none of
+these is refused with `403 NO_ROLE` (REQ-SEC-053).
+Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, and on
+the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never**
+`MISSION_MANAGER > LOGISTICIAN`, which is why a mission manager is inside the peer-redaction tier
+(REQ-SEC-007). The full matrix is authoritative in
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 
-Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles,
-which the matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159): there is no role
-below member, and a token that maps to none of these is refused with `403 NO_ROLE` (REQ-SEC-053).
-Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`,
-`OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`, and on the bank side
-`ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never** `MISSION_MANAGER > LOGISTICIAN`, which is
-why a mission manager is inside the peer-redaction tier (REQ-SEC-007). The full matrix is
-authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
+#### Officer reach replaces the OFFICER role (ADR-0300)
 
-#### Planned amendment (ADR-0300)
+`OFFICER` was retired by a hard cut in one release:
 
-`OFFICER` is no longer a role. It is retired by a hard cut in one release:
-
-- **Roles:** `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` and the bank roles. A migration
-  removes the seeded `OFFICER` role and its permissions; `Roles.OFFICER`,
-  `Roles.ADMIN_OR_OFFICER` and their frontend mirrors go with it.
-- **Hierarchy:** `OFFICER > LOGISTICIAN` and `OFFICER > MISSION_MANAGER` are dropped. The rest is
-  unchanged, and `MISSION_MANAGER > LOGISTICIAN` stays absent.
+- **Roles:** migration `V318` removed the seeded `OFFICER` role, its `user_roles` rows and its
+  permissions; `Roles.OFFICER`, `Roles.ADMIN_OR_OFFICER` and their frontend mirrors are gone.
+- **Hierarchy:** the `OFFICER > LOGISTICIAN` and `OFFICER > MISSION_MANAGER` edges are gone, in both
+  `SecurityConfig`s. `MISSION_MANAGER > LOGISTICIAN` stays absent.
 - **Officer reach replaces the role.** It is derived per org unit from the caller's leadership
   seats (REQ-ROLE-002) and evaluated against the **owning unit of the target** (mission, job order,
   promotion topic, ship, …); lists are filtered to the caller's officer units. An admin passes every
   officer check. No token, realm role or per-membership flag grants it.
-- **Membership rights rest on `KRT_MEMBER` alone.** `MEMBER_OR_ABOVE` no longer lists `OFFICER`.
-- **The realm role is ignored, then deleted.** `UserReconciliationService` mirrors no `OFFICER`
-  realm role and `CustomJwtGrantedAuthoritiesConverter` mints no `ROLE_OFFICER` from any source.
-  The provisioning script deletes the realm role after the release; the test realms, the e2e realm
-  export and the sandbox realm drop it.
+- **Membership rights rest on `KRT_MEMBER`.** The member-list URL rules and `MEMBER_OR_ABOVE` no
+  longer list `OFFICER`; the oversight scope no longer adds every squadron membership of a role
+  holder.
+- **The realm role is ignored, then deleted.** The role catalogue holds no `Officer` role, so
+  `UserReconciliationService` maps no `OFFICER` realm role onto a local one and
+  `CustomJwtGrantedAuthoritiesConverter` mints no `ROLE_OFFICER` from any source. The provisioning
+  script deletes the realm role (ADR-0202 amendment 6); the test realms, the e2e realm export and
+  the sandbox realm dropped it.
+- **Notification rules** that addressed the `ROLE OFFICER` selector were moved to the `SEAT_HOLDERS`
+  selector by `V320` and stay editable (REQ-NOTIF-008).
 - **Precondition of the cut:** a report of every leadership seat holder who lacks `KRT Member`. The
-  cut ships only when that list is empty (REQ-ORG-029).
+  cut ships only when that list is empty (REQ-ORG-029). The report ships as
+  `scripts/officer-cut-report.sql`: a read-only session, SELECTs only, ids and coded words but no
+  names. Beside the blocking section `seat_without_krt_member` it lists what the cut removes or
+  changes, so the release can be checked against it: `officer_without_seat` (hand-granted officers
+  who lose officer power), `bank_view_grant_officer` and `bank_approval_limit_officer` (the
+  `GLOBAL_ROLE OFFICER` buckets the cut deletes, each with a bank audit event) and
+  `notification_rule_role_officer` (the `ROLE OFFICER` selectors the cut moves to the seat-holder
+  target). Every section prints a `count=` line, so an empty one reads `count=0`. Enforced by
+  `OfficerCutReportIntegrationTest`; how to run it on production: `docs/deployment.md`, *Pre-cut
+  report for the OFFICER retirement*.
 
-**Enforced by (to be added):** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a
-realm role or a seat), `UserReconciliationServiceTest` (an `OFFICER` realm role is not mirrored),
-`SecurityConfigRoleHierarchyTest` (no `OFFICER` edge), a migration test for the removed seeded role
-· **Related:** REQ-ROLE-002, REQ-SEC-015, REQ-SEC-047, ADR-0300
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a realm role or
+a seat), `UserReconciliationServiceTest` (an `Officer` realm role is not mirrored),
+`SecurityConfigTest` (no `OFFICER` edge), `OfficerCutMigrationTest` (the
+removed role with its rows, the moved notification selectors) · **Related:** REQ-ROLE-002,
+REQ-SEC-015, REQ-SEC-047, ADR-0300
 
 ### REQ-SEC-005 — Contextual LOGISTICIAN / MISSION_MANAGER grants
 
@@ -417,11 +429,57 @@ dropped in the destructive cleanup release.
 The flat authority is the OR-union over *all* of a caller's memberships and therefore carries
 **no** OrgUnit context on its own — it MUST never authorise a write against another OrgUnit's
 aggregate by itself. Every elevated-mission-role write path (mission edit, manager/owner change,
-**and participant management** — check-in/out, attribute edit, payout-preference, removal) gates the
-flat role behind `OwnerScopeService.canEditMission(...)`; `MissionAccessPolicy.canAccessLoadedParticipant`
-does so by delegating its management branch to `canManageMission` rather than short-circuiting on the
-bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
-REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
+**and participant management** — check-in/out, attribute edit, payout-preference, removal) reads the
+contextual `MISSION_MANAGER@<owningOrgUnitId>` grant through `OwnerScopeService.canManageMissionsOf(...)`,
+never the flat role; `MissionAccessPolicy.canAccessLoadedParticipant` does so by delegating its
+management branch to `canManageMission` rather than short-circuiting on the bare `ROLE_MISSION_MANAGER`
+authority. (Unlinked **guest** participants stay openly editable per REQ-SEC-009; this scope gate
+applies only to *user-linked* participants.)
+
+**Logistician and Mission Manager grants cascade down the org tree**, like officer reach: a grant
+(own flag, rank or seat-derived) in a Bereich covers the Bereich and the Staffeln and
+Spezialkommandos below it, a grant in the Organisationsleitung covers every unit, a grant in a Staffel
+or Spezialkommando covers that unit alone. The cascade is resolved once, for direct flags and seats
+alike, by `OrgUnitCascadeService#unitsBelow` behind
+`RequestScopeResolver#currentGrantedOrgUnitIds(role)`; every per-unit gate and list scope reads that
+set (`hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`,
+`canManageMissionsOf`, the supply and purchasing managed units, the exchange's
+`findLogisticianOrgUnitIds`), never the raw contextual authorities. A pin must lie in the covered
+set; a pin outside it covers nothing. Admins are unrestricted. **Enforced by:** `GrantCascadeTest`,
+`OrgUnitCascadeServiceTest`, `LogisticianPerUnitSurfacesTest`.
+
+Mission Manager powers apply **per unit**: a grant in unit A (own flag, an officer rank, or the
+cascaded reach of a Bereich or Organisationsleitung grant) manages A's missions and operations and
+those of the units below A, and nothing else. A mission or operation **without an owning unit** is managed only by a caller with a
+Mission Manager grant in an Organisationsleitung or Bereich unit (or an admin); a squadron Mission
+Manager does not manage it. Creating an operation requires the grant in the unit the operation is
+stamped to. Finance edits and the owner change of an ownerless mission stay admin-only (REQ-SEC-065).
+`isMissionManagerOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
+pinned (`OwnerScopeService#canActAsMissionManagerInActiveContext()`); the frontend gates read it
+through `MissionManagerGate`. **Enforced by:** `OwnerScopeServiceTest.MissionManagerGateTests`,
+`MissionAccessPolicyGateTest`, `OperationServiceTest`, `MeControllerTest`, `MissionManagerGateTest`.
+
+**A Logistician grant is per unit.** A contextual `LOGISTICIAN@unit` authority (own membership flag,
+lead or seat-derived reach) gives reads, lists and actions of **that unit** only; a plain membership
+of another unit never adds Logistician powers there, and grants in A and C give exactly A and C
+(unpinned: their union; pinned: the pinned unit only if it lies in them, cascade included). The flat
+`ROLE_LOGISTICIAN` stays a coarse gate and decides nothing on a target by itself. The per-target
+decision is `AccessGateService.canActAsLogisticianIn(unit)` (the Logistician grant set of the active
+context contains the unit; a target without a unit is reserved to admins), the list decision is
+`currentLogisticianScope()`. It governs the Lager rows of other members (allocation, note,
+delivered, stolen, book-out, personal rebook, the stock viewer's `canEdit`), the job-order writes
+and handover reports (the responsible unit, SK-queue orders included), the earmarks, the squadron a
+material claim is made for, and the refinery order read, edit, delete, store, creation for another member (the stamped unit),
+the user order list and the mission order list (own orders plus those of the Logistician units).
+`isLogisticianOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
+pinned (`OwnerScopeService#canActAsLogisticianInActiveContext()`, true when `currentLogisticianScope()`
+reaches a unit, so the cascade of a Bereich or Organisationsleitung grant applies); the frontend
+gates for the inventory, job-order and refinery pages and their write proxies read it through
+`LogisticianGate`, and per-object controls follow the backend's per-unit answer. **Enforced by:**
+`LogisticianPerUnitSurfacesTest`, `MeControllerTest`, `LogisticianGateTest`,
+`LogisticianPinAwareSurfacesMvcTest`.
+
+A contextual grant never lifts a redaction: the personal data of other members is admin-only (REQ-SEC-007).
 
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
 per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
@@ -505,7 +563,7 @@ Every read/write filters by JWT `sub` unless the caller has an elevated role (`A
 > authenticated non-member ADR-0129 introduced. That gateway calls only the two import endpoints, so
 > the gate closes a hole rather than a path.
 
-For a **member below Logistician**, return only the minimum required data. Sensitive fields
+For **every non-admin** — a plain member, a Logistician, a Mission Manager or a seat holder alike, in any unit, pinned or not — another member's record is the peer shape on every surface that returns or embeds a user (user list, search and `get`, mission participants, unit ship owners, hangar, inventory, job-order and refinery owners): `roles`, `permissions`, the Logistician / Mission Manager flags, `joinDate`, `discordLinked` and `lastReadAnnouncementId` are visible to admins only, and no grant lifts that. `description`, display name, rank and squadrons are visible to every member; `username` only when the member has no display name. The projection is done once, in `UserMapper.toDto` (admin and the caller's own record stay full), so a new embedding surface is redacted by default. Sensitive fields
 (e-mail, real name, internal orders/items) MUST be explicitly cleared in the controller via a
 `cleanup…ForPeer`-style helper to prevent information disclosure. (E-mail is shown only in a user's
 own profile — never elsewhere.) The naming convention is enforced structurally by the ArchUnit rule
@@ -517,15 +575,9 @@ own profile — never elsewhere.) The naming convention is enforced structurally
 > role-less `GUEST` callers. Both audiences are gone (REQ-SEC-052, REQ-SEC-053), so the tier went
 > with them and `MissionGuestRedactor` became `MissionPeerRedactor`.
 
-**The mission's owner and managers are withheld from a peer who is only reading, and kept for one
-who may manage the mission** (`canEdit` or `canManageManagers`). The exemption exists because the
-pass now runs for callers who hold those rights: a bare `MISSION_MANAGER` is below Logistician — the
-hierarchy puts ADMIN/OFFICER above both roles but never MISSION_MANAGER above LOGISTICIAN — so the
-response asserted `canManageManagers: true` and handed over an empty manager list in the same
-breath, and the Verwaltung panel offered add/remove controls over a list nobody could see. It
-discloses nothing: `UserReferenceDto` is id, username, display name, effective name and rank, the
-same public callsign tuple every participant on that mission already carries, and it travels only to
-a caller who may rewrite the list it names.
+**The mission's owner and managers are visible to everyone who may see the mission**, in the peer shape of
+this requirement (names and rank, no admin fields; the username only when no display name is set). They are
+no longer limited to a caller who may manage the mission.
 
 > The rule that selects the endpoints was rewritten rather than renamed, and that is the part worth
 > reading. It used to select gates carrying **no** `isAuthenticated()` clause — the shape that made
@@ -1150,9 +1202,6 @@ number of users that reconciled successfully; and each failure increments
 
 ### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 The org hierarchy (REQ-ORG-014) introduces Bereich and OL leadership whose access **cascades** down to
 subordinate units (REQ-ORG-015). This is a security-load-bearing carve-out, so the invariant is pinned
 here:
@@ -1186,9 +1235,9 @@ whitelist (incl. the new `OrgUnitBankAccessService`); `TenancyGuardTest`'s write
 matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
 
-#### Planned amendment (ADR-0300)
+#### Officer reach per leadership seat (ADR-0300)
 
-Officer-equivalent reach becomes **the** officer reach: there is no separate officer role to be
+Officer-equivalent reach is **the** officer reach: there is no separate officer role to be
 equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one reach computation
 (`confersOwnUnitOfficerReach` and `OrgUnitCascadeService.cascadedOfficerReach`):
 
@@ -1206,15 +1255,22 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   every Staffel membership of a role holder: a member gets officer power only in the units their
   seats reach.
 - **A seat confers reach only while its holder holds `KRT Member`.** An appointment of a member
-  without it is refused; a seat whose holder loses it later stays in the org chart and confers
-  nothing (REQ-ORG-029).
+  without it is refused with `409 LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER` — every seat-writing path of
+  `OrgUnitMembershipService`: Bereich rank, OL seat, Grand Admiral, SK lead, squadron rank. A seat
+  whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029).
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Enforced by (to be added):** `OwnerScopeServiceTest` (officer reach per seat kind, no reach from a
-membership without a seat, no reach without `KRT Member`), `OrgUnitMembershipServiceTest`
-(appointment without `KRT Member` refused), `OrgHierarchyVisibilityMatrixE2eTest` (a Staffel officer
-denied a foreign Staffel they are a plain member of) · **Related:** REQ-ROLE-002, REQ-ORG-015,
-ADR-0300
+**Where it is read.** The scope kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
+
+**Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
+membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
+`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`), `DomainProblemContractTest`,
+`PurchasingAccessPolicyTest` (a seat in one unit leads no other unit), `GameItemControllerTest` ·
+**Code:** `MembershipRole#confersOwnUnitOfficerReach`, `RequestScopeResolver#currentOfficerOrgUnitIds`,
+`AccessGateService#canActAsOfficerIn`, `OrgUnitMembershipService`,
+`LeadershipSeatRequiresKrtMemberException` · **Enforced by:**
+`OrgHierarchyVisibilityMatrixE2eTest` (a Staffel officer denied a foreign Staffel they are a plain
+member of) · **Related:** REQ-ROLE-002, REQ-ORG-015, ADR-0300
 
 ### REQ-SEC-018 — Anonymous guest sign-up edits require a per-row capability token *(superseded)*
 
@@ -1300,40 +1356,34 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 
 ### REQ-SEC-065 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 `MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
-`MissionAccessPolicy.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
-authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
-`canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
-the entry's mission is within their owning-OrgUnit scope (`OwnerScopeService.canEditMission`). Only
-`ROLE_ADMIN` bypasses the scope check (system-wide oversight). The entry owner's self-edit path (linked
-participant who is still a registered participant) is unchanged.
+`MissionAccessPolicy.canEditFinanceEntry`. `canEditFinanceEntry` passes for an admin, for a caller
+with **officer reach in the mission's owning unit** (REQ-SEC-015, ADR-0300), and on the self-edit path
+of the entry owner (a linked participant who is still a registered participant). A seat in another
+unit, or a plain membership of the owning unit, does not pass. A mission without an owning unit has no
+unit to reach in, so its officer-only writes are reserved to admins.
+
+The mission owner change (`canChangeOwner`: the current owner, an admin, or officer reach in the
+mission's owning unit) and the reset of an operation's payout status to unpaid
+(`OperationAccessPolicy#canClearPayout`: an admin or officer reach in the operation's owning unit)
+follow the same rule on the target's owning unit; every other mission manager keeps setting the mark.
+The frontend offers the unpaid reset from the pin-aware `hasOfficerReach` flag and leaves the
+per-operation decision to the backend.
 
 **Acceptance**
 
-- [x] An officer scoped to OrgUnit A is denied (403) editing/deleting a finance entry of an OrgUnit-B
-  mission (even a B-internal mission they cannot read).
-- [x] An officer in scope, an admin, and the entry owner-participant are allowed.
+- [x] A caller with a seat in unit A is denied (403) editing/deleting a finance entry, changing the
+  owner of a mission, or clearing a payout mark of unit B.
+- [x] A caller with a seat in the owning unit, an admin, and the entry owner-participant are allowed.
+- [x] A plain member of the owning unit is denied; an ownerless target is admin-only.
 
 **Enforced by:** `MissionAccessPolicyGateTest`
-(`canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse`, `…_OfficerInScope_*`, `…_Admin_*`,
-`…_OwnerStillParticipant_*`). **Security audit:** finding H1.
-
-#### Planned amendment (ADR-0300)
-
-There is no `ROLE_OFFICER` any more (REQ-SEC-004). `canEditFinanceEntry` passes for an admin, for a
-caller with **officer reach in the mission's owning unit** (REQ-SEC-015), and on the unchanged
-self-edit path of the entry owner. A seat in another unit, or a plain membership of the owning
-unit, does not pass. The mission owner change (`canChangeOwner`) and the reset of an operation's
-payout status to unpaid follow the same rule on the target's owning unit.
-
-**Enforced by (to be added):** `MissionAccessPolicyGateTest`
-(`canEditFinanceEntry_SeatInOwningUnit_*`, `…_SeatInOtherUnit_*`, `…_PlainMemberOfOwningUnit_*`),
-`OperationPayoutServiceTest` (unpaid reset by officer reach) · **Related:** REQ-SEC-015, ADR-0300
+(`canEditFinanceEntry_SeatInOwningUnit_*`, `…_SeatInOtherUnit_*`, `…_PlainMemberOfOwningUnit_*`,
+`…_Admin_*`, `…_OwnerStillParticipant_*`, `canChangeOwner_Seat*`),
+`OperationAccessPolicyClearPayoutTest`, `OperationPayoutPaidOutSecurityTest`,
+`OperationPageControllerMvcTest` · **Related:** REQ-SEC-015, ADR-0300. **Security audit:** finding H1.
 
 ### REQ-SEC-020 — Member-evaluation writes are scoped to the evaluated member's squadron
 
@@ -2228,6 +2278,7 @@ family decides, so a sub-family can differ from its parent.
 | --- | --- |
 | `/api/v1/bank/**` (the org-unit slice `/api/v1/bank/org-units/**` included) | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
+| `/api/v1/navigation/**` | **new** — one member's own navigation preferences (REQ-UI-032) |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
 | `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
@@ -3230,7 +3281,11 @@ the token, and there is no id an anonymous caller could substitute. They answer 
 here is that every admitted path has its status recorded when it is added — not that the obvious
 ones may be assumed, because "obvious" is exactly what the one wrong entry always looked like
 beforehand. The officers' matrix (`/promotion/manage`, `/evaluations/all`, `/evaluations/members`)
-is **not** on the list at all: the admin area is web-only permanently.
+is **not** on the list at all: the admin area is web-only permanently. Those reads, like every
+list behind an officer surface, are limited to the caller's officer reach, pin-aware, rather than to
+the member-list scope (REQ-ROLE-007, REQ-SEC-015): `SquadronVisibility#currentOfficerReadScope`
+yields the reach units, narrowed to the pin or empty when the pin is out of reach, and `null` only
+for an unpinned admin.
 
 **The live-sync bridge adds a second stream and the vhost's first client-driven publish**
 (ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and
@@ -3462,8 +3517,8 @@ invisible from the anonymous surface.
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
 `POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionAccessPolicy#canCreateFinanceEntry`:
-a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope
-covers it; the owner or a co-manager) may book for any of its participants, and every other member
+a caller who may manage the mission (ADMIN; a MISSION_MANAGER grant in the mission's owning unit,
+REQ-SEC-005; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.
 
 It MUST NOT be gated on `MissionAccessPolicy#canSeeMission`, which deliberately grants the
@@ -3639,10 +3694,13 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 `DiscordRegistrationAdminController#merge` ·
 **Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
 
-#### Planned amendment (ADR-0298)
+#### Amendment (ADR-0298)
 
-> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
-> current code stays authoritative.
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row, the
+> favourites, the hidden entries, the order, the appearance and the tab bars
+> (`NavigationUserReassignment`, position 210, `navigation_preferences.user_id`; the order, the
+> appearance row and the tab bars follow the root's cascade, so the target's win). The
+> sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
 merge. The `navigation` module declares their columns as following the member in a
@@ -3661,15 +3719,17 @@ The source's rows that the result does not take over are removed with the merge;
 stays on the emptied account. The rows moved and removed count in the `USER_MERGED` details like
 any participant's. The merge never refuses on account of the preferences.
 
-**Enforced by (to be added):** `UserAccountMergeEndStateTest` (the favourite union with its order
-and cut, hidden entries minus favourites, the target's order, tab bar, „Darstellung" and
-dashboards), `UserReassignmentOrderTest`, `UserAccountMergeCoverageTest` · **Related:** REQ-UI-032,
-REQ-UI-034, REQ-DATA-021, ADR-0298, ADR-0299
+**Enforced by:** `NavigationUserReassignmentTest` and `FavouritesMergeTest` (the favourite union
+with its order and cut, the emptied account's rows removed), `UserReassignmentOrderTest`,
+`UserAccountMergeCoverageTest`, the hidden entries minus favourites, the target's order and the
+target's tab bar in `NavigationUserReassignmentTest`;
+**to be added:** the target's „Darstellung" start pages and dashboards · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021,
+ADR-0298, ADR-0299
 
 ### REQ-SEC-047 — A client is told its authorisation, never left to derive it
 
-> **Status: planned** (ADR-0300, ADR-0301, map #2800). Until it ships, the current text below /
-> the current code stays authoritative.
+> **Status: partly planned** (ADR-0301, map #2800). The officer flags (ADR-0300) are live; the
+> `canViewAssignedJobOrders` flag of the amendment below follows ADR-0301.
 
 The API answers "may this caller do this" itself. Two shapes carry it:
 
@@ -3732,30 +3792,54 @@ layer directly.
 `InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047
 
-#### Planned amendment (ADR-0300)
+#### The assignee capability (ADR-0301)
+
+`GET /api/v1/me/capabilities` and the `capabilities` object of `GET /api/v1/me/layout` carry
+`canViewAssignedJobOrders`: `true` iff the caller holds at least one job-order assignee entry
+(REQ-ORDERS-047, REQ-ORDERS-040, the exception in [`org-unit-tenancy.md`](org-unit-tenancy.md)
+REQ-ORG-003). It keys on the caller's person, never on the pinned unit or the profit gate, and it
+steers the UI only: the backend decides per order. The frontend mirrors it as the model attribute of
+the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
+
+**Enforced by:** `MeControllerTest` (`getCapabilities_assignedJobOrdersFlag*`),
+`JobOrderAssigneeGrantIntegrationTest`, `CapabilityFlagsAdviceTest`
+
+#### Officer reach in the capabilities (ADR-0300)
 
 - **The capabilities are pin-aware.** `GET /api/v1/me/capabilities` and the `capabilities` object of
   `GET /api/v1/me/layout` carry the caller's officer flags (officer reach and the officer-gated
   surfaces: Leitung, promotion management, hangar owner details, job-order writes, mission finance)
   for the **active context**: for the pinned unit when one is pinned (REQ-SEC-048), for the union of
-  the caller's officer units when none is. An admin reads `true`. The object also carries
-  `canViewAssignedJobOrders`: a member who holds an assignee entry reads that order even outside
-  the order's unit (ADR-0301, REQ-ORDERS-047, REQ-ORDERS-040, the exception in
-  [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003).
+  the caller's officer units when none is. An admin reads `true`.
 - **The frontend keeps no reach logic.** Every frontend `ROLE_OFFICER` gate — `sec:authorize`,
   controller checks, `data-*` attributes, `Roles.ADMIN_OR_OFFICER` — is replaced by these flags.
   REQ-SEC-013 still governs the role checks that remain.
 - **The flags are presentation.** The backend re-checks officer reach on the target's owning unit
   on every request (REQ-SEC-015); a flag that reads `true` for the union never authorises a write
   in a unit without reach.
-- `isLogisticianOrAbove` and `isMissionManagerOrAbove` still resolve through the hierarchy; a seat
-  holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
+- `isLogisticianOrAbove` and `isMissionManagerOrAbove` are pin-aware grant flags (REQ-SEC-005); a
+  seat holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
   officer role.
 
-**Enforced by (to be added):** `MeControllerTest` (officer flags for a pinned unit with a seat, a
-pinned unit without one, the unpinned union, an admin), a frontend ArchUnit or source scan that no
-template or controller names `ROLE_OFFICER` or `ADMIN_OR_OFFICER` · **Related:** REQ-SEC-013,
-REQ-SEC-048, REQ-ROLE-002, ADR-0300
+**The officer flags:** `hasOfficerReach`, `canOpenLeitung`,
+`canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
+`canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`
+(and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
+the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
+pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
+(fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on
+`canOpenLeitung` and the promotion management entries on `canManagePromotions`, and the sidebar's
+role badge reads `hasOfficerReach`; the bank member search, the profit calculation and the
+blueprint availability overview no longer admit the `OFFICER` role. The promotion and Leitung
+pages and proxies and the Spezialkommando members page gate on `canManagePromotions`,
+`canOpenLeitung` and `hasOfficerReach` through the frontend `OfficerSurfaceGate`.
+
+**Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
+carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
+without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest`, `NavigationMenuTest`,
+`SidebarRoleBadgeMvcTest`, `OfficerRoleRetiredSourceScanTest` (no main source or template names
+`ROLE_OFFICER` or `ADMIN_OR_OFFICER`) · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
+ADR-0300
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 
@@ -5068,10 +5152,13 @@ links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
-#### Planned amendment (ADR-0298)
+#### Amendment (ADR-0298)
 
-> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
-> current code stays authoritative.
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
+> favourites, the hidden entries, the order, the desktop mode, the tab bars and the dashboard instances (`preference_section`, `position`, `entry_key`,
+> `dashboard_mode`, `widget_type`, `column_side`, `org_unit_id`, `range_days`, `row_count`,
+> `status_filter` per row; an order row's section reads `order.<mode>.<scope>`, the tab bar of a
+> mode is `tabbar-member` / `tabbar-admin`). The sections that follow are planned and join the same statement.
 
 - **The navigation preferences and the home dashboards are part of the export, in their own
   section** `navigationPreferences`, declared by the `navigation` module as a
@@ -5085,10 +5172,11 @@ links, beside the separate deletion card) · **Decision:**
 - The section has its `pdf.export.section.*` label in all three backend bundles, and its columns
   count for REQ-DATA-021 like every other section's.
 
-**Enforced by (to be added):** `PersonalDataExportCatalogueTest` and `DataExportEndStateTest` (the
-`navigationPreferences` section with a seeded favourite, hidden entry and dashboard instance),
-`PersonalDataExportOwnershipTest`, `DataExportPdfSectionLabelCoverageTest`,
-`GdprParticipantCoverageTest` · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
+**Enforced by:** `PersonalDataExportCatalogueTest` and `DataExportEndStateTest` (the
+`navigationPreferences` section with a seeded favourite, hidden entry, order key and dashboard instance),
+`PersonalDataExportOwnershipTest`,
+`DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`; **to be added:** the
+further sections with a seeded dashboard instance · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021, ADR-0298,
 ADR-0299
 
 ### REQ-SEC-059 — A half-finished account deletion is observable

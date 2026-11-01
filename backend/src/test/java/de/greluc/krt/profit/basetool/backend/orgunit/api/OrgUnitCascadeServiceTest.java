@@ -297,4 +297,60 @@ class OrgUnitCascadeServiceTest {
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
   }
+
+  @Test
+  void unitsBelow_olGrant_reachesEveryUnit() {
+    when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(OL_ID)))
+        .thenReturn(List.of(OL_ID));
+    when(orgUnitRepository.findAllOrgUnitIds())
+        .thenReturn(List.of(OL_ID, BEREICH_A_ID, BEREICH_B_ID, STAFFEL_A1_ID, SK_A1_ID));
+
+    assertEquals(
+        Set.of(OL_ID, BEREICH_A_ID, BEREICH_B_ID, STAFFEL_A1_ID, SK_A1_ID),
+        service.unitsBelow(Set.of(OL_ID)));
+  }
+
+  @Test
+  void unitsBelow_bereichGrant_reachesItsStaffelnAndSpezialkommandosOnly() {
+    when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(BEREICH_A_ID)))
+        .thenReturn(List.of());
+    when(orgUnitRepository.findChildOrgUnitIdsIn(Set.of(BEREICH_A_ID)))
+        .thenReturn(List.of(STAFFEL_A1_ID, STAFFEL_A2_ID, SK_A1_ID));
+
+    assertEquals(
+        Set.of(STAFFEL_A1_ID, STAFFEL_A2_ID, SK_A1_ID), service.unitsBelow(Set.of(BEREICH_A_ID)));
+  }
+
+  @Test
+  void unitsBelow_staffelGrant_reachesNothingFurther() {
+    when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(STAFFEL_A1_ID)))
+        .thenReturn(List.of());
+    when(orgUnitRepository.findChildOrgUnitIdsIn(Set.of(STAFFEL_A1_ID))).thenReturn(List.of());
+
+    assertTrue(service.unitsBelow(Set.of(STAFFEL_A1_ID)).isEmpty());
+  }
+
+  @Test
+  void unitsBelow_noGrant_readsNoHierarchy() {
+    assertTrue(service.unitsBelow(Set.of()).isEmpty());
+    verify(orgUnitRepository, never()).findChildOrgUnitIdsIn(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never())
+        .findOrganisationsleitungIdsAmong(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void grantedUnits_flagOnlyBereichMember_coversTheBereichAndItsChildren() {
+    OrgUnitMembership flagged = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
+    flagged.setLogistician(true);
+    OrgUnitMembership plainStaffel = membership(STAFFEL_B1_ID, OrgUnitKind.SQUADRON);
+    when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(BEREICH_A_ID)))
+        .thenReturn(List.of());
+    when(orgUnitRepository.findChildOrgUnitIdsIn(Set.of(BEREICH_A_ID)))
+        .thenReturn(List.of(STAFFEL_A1_ID, SK_A1_ID));
+
+    Set<UUID> granted =
+        service.grantedUnits(List.of(flagged, plainStaffel), OrgUnitMembership::isLogistician);
+
+    assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID, SK_A1_ID), granted);
+  }
 }

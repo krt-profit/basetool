@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -176,6 +177,7 @@ class OrdersCreateFormPatternRenderTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void itemEditFormHidesTheKindAndSavesChanges() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID id = UUID.randomUUID();
     JobOrderDto order =
         new JobOrderDto(
@@ -197,6 +199,7 @@ class OrdersCreateFormPatternRenderTest {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     doReturn(order)
