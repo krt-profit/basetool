@@ -58,6 +58,7 @@ class NavigationPreferencesControllerTest {
   private static final String APPEARANCE = PREFERENCES + "/appearance";
   private static final String HIDDEN = PREFERENCES + "/hidden";
   private static final String BOTH = PREFERENCES + "/favourites-and-hidden";
+  private static final String TAB_BAR = PREFERENCES + "/tab-bar/";
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -358,5 +359,57 @@ class NavigationPreferencesControllerTest {
         "{\"favourites\":{\"keys\":[\"orders.list\"],\"version\":1},"
             + "\"hidden\":{\"keys\":[\"bank.dashboard\"],\"version\":0}}",
         200);
+  }
+
+  @Test
+  void storesATabBarPerModeAndReadsItBack() throws Exception {
+    putJson(
+        TAB_BAR + "member",
+        "{\"slots\":[\"orders.list\",null,\"missions.list\"],\"version\":0}",
+        200);
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.tabBars.member.slots[0]").value("orders.list"))
+        .andExpect(jsonPath("$.tabBars.member.slots[1]").isEmpty())
+        .andExpect(jsonPath("$.tabBars.member.version").value(1))
+        .andExpect(jsonPath("$.tabBars.admin.version").value(0))
+        .andExpect(jsonPath("$.favourites.version").value(0));
+  }
+
+  @Test
+  void theTabBarVersionIsPerMode() throws Exception {
+    putJson(TAB_BAR + "member", "{\"slots\":[\"a.one\",null,null],\"version\":0}", 200);
+
+    putJson(TAB_BAR + "admin", "{\"slots\":[\"a.one\",null,null],\"version\":0}", 200);
+    putJson(TAB_BAR + "member", "{\"slots\":[\"b.two\",null,null],\"version\":0}", 409);
+  }
+
+  @Test
+  void refusesAnUnknownModeAWrongSlotCountAndARepeatedKey() throws Exception {
+    putJson(TAB_BAR + "tablet", "{\"slots\":[null,null,null],\"version\":0}", 400);
+    putJson(TAB_BAR + "member", "{\"slots\":[\"a.one\",null],\"version\":0}", 400);
+    putJson(TAB_BAR + "member", "{\"slots\":[\"a.one\",\"a.one\",null],\"version\":0}", 400);
+    putJson(TAB_BAR + "member", "{\"slots\":[\"/orders\",null,null],\"version\":0}", 400);
+  }
+
+  @Test
+  void countsARefusedTabBarWriteAsRejectedInItsOwnSection() throws Exception {
+    double before = rejected("tabbar");
+
+    putJson(TAB_BAR + "admin", "{\"slots\":[\"a.one\"],\"version\":0}", 400);
+
+    org.assertj.core.api.Assertions.assertThat(rejected("tabbar")).isEqualTo(before + 1);
+  }
+
+  private double rejected(String section) {
+    return meterRegistry
+        .counter(
+            NavigationMetrics.PREFERENCE_WRITES,
+            NavigationMetrics.TAG_SECTION,
+            section,
+            MetricNames.TAG_OUTCOME,
+            "rejected")
+        .count();
   }
 }

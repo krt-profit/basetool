@@ -3697,9 +3697,9 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row, the
-> favourites, the hidden entries and the appearance (`NavigationUserReassignment`, position 210,
-> `navigation_preferences.user_id`; the appearance row follows the root's cascade, so the target's
-> wins). The
+> favourites, the hidden entries, the appearance and the tab bars (`NavigationUserReassignment`,
+> position 210, `navigation_preferences.user_id`; the appearance row and the tab bars follow the
+> root's cascade, so the target's win). The
 > sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
@@ -3721,8 +3721,8 @@ any participant's. The merge never refuses on account of the preferences.
 
 **Enforced by:** `NavigationUserReassignmentTest` and `FavouritesMergeTest` (the favourite union
 with its order and cut, the emptied account's rows removed), `UserReassignmentOrderTest`,
-`UserAccountMergeCoverageTest`, the hidden entries minus favourites in `NavigationUserReassignmentTest`;
-**to be added:** the target's order, tab bar, „Darstellung" and dashboards · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021,
+`UserAccountMergeCoverageTest`, the hidden entries minus favourites and the target's tab bar in `NavigationUserReassignmentTest`;
+**to be added:** the target's order, „Darstellung" and dashboards · **Related:** REQ-UI-032, REQ-UI-034, REQ-DATA-021,
 ADR-0298, ADR-0299
 
 ### REQ-SEC-047 — A client is told its authorisation, never left to derive it
@@ -5154,7 +5154,7 @@ links, beside the separate deletion card) · **Decision:**
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
-> favourites, the hidden entries and the desktop mode (`preference_section`, `position`, `value` per row). The
+> favourites, the hidden entries, the desktop mode and the tab bars (`preference_section`, `position`, `value` per row; the tab bar of a mode is `tabbar-member` / `tabbar-admin`). The
 > sections that follow and
 > the dashboards are planned and join the same statement.
 

@@ -71,6 +71,7 @@ class NavigationMetricsTest {
     NavigationPreferencesRepository repository = mock(NavigationPreferencesRepository.class);
     when(repository.countWithFavourites()).thenReturn(7L);
     when(repository.countWithHidden()).thenReturn(3L);
+    when(repository.countWithTabBar()).thenReturn(2L);
     NavigationAppearanceRepository appearances = mock(NavigationAppearanceRepository.class);
     when(appearances.countPersonalised()).thenReturn(4L);
     NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository, appearances);
@@ -82,6 +83,7 @@ class NavigationMetricsTest {
 
     assertThat(gauge(NavigationSection.FAVOURITES)).isEqualTo(7);
     assertThat(gauge(NavigationSection.HIDDEN)).isEqualTo(3);
+    assertThat(gauge(NavigationSection.TAB_BAR)).isEqualTo(2);
     assertThat(gauge(NavigationSection.APPEARANCE)).isEqualTo(4);
   }
 

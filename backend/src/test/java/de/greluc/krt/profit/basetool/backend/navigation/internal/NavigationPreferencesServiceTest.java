@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -296,5 +297,133 @@ class NavigationPreferencesServiceTest {
   @DisplayName("pruning for a member without a row is a no-op")
   void pruneWithoutARowIsANoOp() {
     assertThat(service.prune(member(), List.of("orders.demand")).favourites().keys()).isEmpty();
+  }
+
+  private static TabBarUpdateRequest tabBar(long version, String... slots) {
+    return new TabBarUpdateRequest(Arrays.asList(slots), version);
+  }
+
+  private double tabBarWrites(NavigationWriteOutcome outcome) {
+    return meterRegistry
+        .counter(
+            NavigationMetrics.PREFERENCE_WRITES,
+            NavigationMetrics.TAG_SECTION,
+            NavigationSection.TAB_BAR.getTag(),
+            MetricNames.TAG_OUTCOME,
+            outcome.getTag())
+        .count();
+  }
+
+  @Test
+  @DisplayName("a member without a row reads both tab bars automatic at version 0")
+  void readsBothTabBarsAutomatic() {
+    TabBarsResponse bars = service.read(member()).tabBars();
+
+    assertThat(bars.member().slots()).containsExactly(null, null, null);
+    assertThat(bars.member().version()).isZero();
+    assertThat(bars.admin()).isEqualTo(bars.member());
+  }
+
+  @Test
+  @DisplayName("a tab-bar write stores the slots by position and bumps only its own mode")
+  void storesTheSlotsAndBumpsOnlyItsOwnMode() {
+    UUID owner = member();
+
+    TabBarResponse stored =
+        service.replaceTabBar(
+            owner,
+            NavigationMode.MEMBER,
+            tabBar(0, "orders.list", "missions.list", "storage.overview"));
+
+    assertThat(stored.slots()).containsExactly("orders.list", "missions.list", "storage.overview");
+    assertThat(stored.version()).isEqualTo(1);
+    TabBarsResponse bars = service.read(owner).tabBars();
+    assertThat(bars.member()).isEqualTo(stored);
+    assertThat(bars.admin()).isEqualTo(TabBarResponse.AUTOMATIC);
+  }
+
+  @Test
+  @DisplayName("a slot may stay automatic and all-automatic returns the bar to automatic")
+  void keepsAutomaticSlotsAndResets() {
+    UUID owner = member();
+
+    TabBarResponse partial =
+        service.replaceTabBar(
+            owner, NavigationMode.ADMIN, tabBar(0, "admin.dashboard", null, null));
+    TabBarResponse reset =
+        service.replaceTabBar(owner, NavigationMode.ADMIN, tabBar(1, null, null, null));
+
+    assertThat(partial.slots()).containsExactly("admin.dashboard", null, null);
+    assertThat(reset.slots()).containsExactly(null, null, null);
+    assertThat(reset.version()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName(
+      "a stale tab-bar version is rejected, counted and changes nothing; the other mode is free")
+  void rejectsAStaleVersionPerMode() {
+    UUID owner = member();
+    service.replaceTabBar(owner, NavigationMode.MEMBER, tabBar(0, "a.one", "b.two", "c.three"));
+    double conflicts = tabBarWrites(NavigationWriteOutcome.CONFLICT);
+
+    assertThatThrownBy(() ->
+            service.replaceTabBar(owner, NavigationMode.MEMBER, tabBar(0, "c.three", null, null)))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    TabBarResponse admin =
+        service.replaceTabBar(
+            owner, NavigationMode.ADMIN, tabBar(0, "admin.dashboard", null, null));
+
+    assertThat(tabBarWrites(NavigationWriteOutcome.CONFLICT)).isEqualTo(conflicts + 1);
+    assertThat(service.read(owner).tabBars().member().slots())
+        .containsExactly("a.one", "b.two", "c.three");
+    assertThat(admin.version()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("a tab-bar write leaves the favourites and hidden versions alone")
+  void leavesTheOtherSectionsAlone() {
+    UUID owner = member();
+    service.replaceFavourites(owner, favourites(0, "a.one"));
+
+    service.replaceTabBar(owner, NavigationMode.MEMBER, tabBar(0, "a.one", null, null));
+
+    assertThat(service.read(owner).favourites().version()).isEqualTo(1);
+    assertThat(service.read(owner).hidden().version()).isZero();
+  }
+
+  @Test
+  @DisplayName("a key repeated in the bar is rejected and counted as rejected")
+  void rejectsARepeatedTabBarKey() {
+    UUID owner = member();
+    double rejected = tabBarWrites(NavigationWriteOutcome.REJECTED);
+
+    assertThatThrownBy(() ->
+            service.replaceTabBar(owner, NavigationMode.MEMBER, tabBar(0, "a.one", "a.one", null)))
+        .isInstanceOf(BadRequestException.class);
+
+    assertThat(tabBarWrites(NavigationWriteOutcome.REJECTED)).isEqualTo(rejected + 1);
+  }
+
+  @Test
+  @DisplayName("the deletion on load turns a slot of a deleted key back to automatic")
+  void pruneClearsTheSlotOfADeletedKey() {
+    UUID owner = member();
+    service.replaceTabBar(owner, NavigationMode.MEMBER, tabBar(0, "a.one", "b.two", "c.three"));
+
+    TabBarResponse bar = service.prune(owner, List.of("b.two")).tabBars().member();
+
+    assertThat(bar.slots()).containsExactly("a.one", null, "c.three");
+    assertThat(bar.version()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("one member's tab bar never reaches another member")
+  void tabBarsAreOwnerIsolated() {
+    UUID first = member();
+    UUID second = member();
+
+    service.replaceTabBar(first, NavigationMode.MEMBER, tabBar(0, "a.one", null, null));
+
+    assertThat(service.read(second).tabBars()).isEqualTo(TabBarsResponse.AUTOMATIC);
   }
 }

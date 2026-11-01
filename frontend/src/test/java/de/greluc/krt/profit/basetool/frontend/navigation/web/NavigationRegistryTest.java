@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.List;
 import java.util.Set;
@@ -71,21 +72,44 @@ class NavigationRegistryTest {
     assertThat(keys).doesNotHaveDuplicates().contains("operations", "personal", "admin-operations");
   }
 
-  /** The phone tab bar holds today's four tabs, each naming registered entries. */
+  /** Each mode's default tab-bar slots name registered entries of that mode's tabbable set. */
   @Test
-  void theTabBarNamesRegisteredEntries() {
-    assertThat(registry.tabs())
-        .extracting(NavigationTab::testId)
-        .containsExactly(
-            "mobile-tab-missions",
-            "mobile-tab-inventory",
-            "mobile-tab-orders",
-            "mobile-tab-notifications");
-    assertThat(registry.tabs())
-        .flatExtracting(NavigationTab::entryKeys)
-        .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
-    assertThat(registry.tabs().get(2).entryKeys())
+  void theDefaultSlotsNameTabbableEntriesOfTheirMode() {
+    for (NavigationMode mode : NavigationMode.values()) {
+      assertThat(registry.defaultTabs(mode)).hasSize(3);
+      assertThat(registry.defaultTabs(mode))
+          .flatExtracting(NavigationTab::entryKeys)
+          .allSatisfy(key ->
+              assertThat(registry.tabbable(mode))
+                  .extracting(NavigationEntry::key)
+                  .as(key)
+                  .contains(key));
+    }
+    assertThat(registry.defaultTabs(NavigationMode.MEMBER).get(2).entryKeys())
         .containsExactly("orders.list", "orders.own", "orders.assigned", "orders.create");
+    assertThat(registry.defaultTabs(NavigationMode.ADMIN))
+        .extracting(tab -> tab.entryKeys().getFirst())
+        .containsExactly("admin.dashboard", "admin.members", "admin.auditlog");
+  }
+
+  /** The tabbable entries are the pages of the mode, the personal pages and the admin hub. */
+  @Test
+  void theTabbableEntriesSplitByMode() {
+    assertThat(registry.tabbable(NavigationMode.MEMBER))
+        .extracting(NavigationEntry::key)
+        .contains("missions.list", "storage.levels", "personal.profile")
+        .doesNotContain("admin.dashboard", "notifications.list", "public.home");
+    assertThat(registry.tabbable(NavigationMode.ADMIN))
+        .extracting(NavigationEntry::key)
+        .contains("admin.dashboard", "admin.auditlog")
+        .doesNotContain("missions.list");
+  }
+
+  /** An entry shows its own icon, else its group's. */
+  @Test
+  void anEntryTakesItsGroupIconWhenItHasNone() {
+    assertThat(registry.iconOf(registry.entry("admin.dashboard").orElseThrow())).isEqualTo("gear");
+    assertThat(registry.iconOf(registry.entry("admin.members").orElseThrow())).isEqualTo("users");
   }
 
   /** Admin mode has the hub and exactly 13 menu links in three groups that start collapsed. */

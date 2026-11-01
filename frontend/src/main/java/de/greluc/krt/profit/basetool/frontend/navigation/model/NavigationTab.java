@@ -23,27 +23,17 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * One slot of the phone tab bar: the first permitted of its candidate entries opens from it, and
- * the area it marks as current is the first candidate's path.
+ * One default slot of the phone tab bar: the first permitted of its candidate entries opens from
+ * it, and the area it marks as current is the first candidate's path.
  *
  * @param entryKeys the candidate entry keys, the primary entry first
- * @param labelKey the message key of the short tab label
- * @param icon the sprite icon name
- * @param testId the {@code data-testid} of the tab
  */
-public record NavigationTab(
-    @NotNull List<String> entryKeys,
-    @NotNull String labelKey,
-    @NotNull String icon,
-    @NotNull String testId) {
+public record NavigationTab(@NotNull List<String> entryKeys) {
 
   /**
    * Refuses a slot without candidates and copies the keys.
    *
    * @param entryKeys the candidate entry keys
-   * @param labelKey the message key of the label
-   * @param icon the sprite icon name
-   * @param testId the test id
    * @throws IllegalArgumentException if no candidate is given
    */
   public NavigationTab {

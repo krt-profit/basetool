@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
+import java.util.Collections;
+import java.util.List;
+
 /** The bounds the navigation preferences are validated against (REQ-UI-032). */
 public final class NavigationLimits {
 
@@ -37,5 +40,17 @@ public final class NavigationLimits {
   /** The most keys one prune request names. */
   public static final int MAX_PRUNE_KEYS = 200;
 
+  /** The slots of a phone tab bar the member can choose; the bar's other two are fixed. */
+  public static final int TAB_BAR_SLOTS = 3;
+
   private NavigationLimits() {}
+
+  /**
+   * The slots of a bar that is filled automatically: all empty.
+   *
+   * @return {@link #TAB_BAR_SLOTS} {@code null} entries
+   */
+  public static List<String> automaticSlots() {
+    return Collections.nCopies(TAB_BAR_SLOTS, null);
+  }
 }

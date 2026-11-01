@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAvailab
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.Collection;
@@ -146,8 +147,11 @@ public class NavigationRegistry {
   /** The quick access's handbook and language actions. */
   private final NavigationGroup paletteTail = buildPaletteTail();
 
-  /** The phone tab bar's slots before the fixed menu button. */
+  /** The member mode's default phone tab-bar slots (REQ-UI-026). */
   private final List<NavigationTab> tabs = buildTabs();
+
+  /** The administration mode's default phone tab-bar slots (REQ-UI-026). */
+  private final List<NavigationTab> adminTabs = buildAdminTabs();
 
   @Getter(AccessLevel.NONE)
   private final Map<String, NavigationEntry> byKey =
@@ -180,6 +184,9 @@ public class NavigationRegistry {
 
   @Getter(AccessLevel.NONE)
   private final Map<String, Set<String>> families = buildFamilies();
+
+  @Getter(AccessLevel.NONE)
+  private final Map<NavigationMode, List<NavigationEntry>> tabbable = buildTabbable();
 
   @NotNull
   private static Set<String> keysOf(@NotNull List<NavigationGroup> groups) {
@@ -279,6 +286,44 @@ public class NavigationRegistry {
   }
 
   /**
+   * The entries a slot of the phone tab bar of one mode can hold, in registry order: every page and
+   * tab of the mode, the personal pages and the administration hub included.
+   *
+   * @param mode the mode whose bar is meant
+   * @return the entries a slot can hold
+   */
+  @NotNull
+  public List<NavigationEntry> tabbable(@NotNull NavigationMode mode) {
+    return tabbable.get(mode);
+  }
+
+  /**
+   * The default slots of one mode's phone tab bar.
+   *
+   * @param mode the mode whose bar is meant
+   * @return the default slots in order
+   */
+  @NotNull
+  public List<NavigationTab> defaultTabs(@NotNull NavigationMode mode) {
+    return mode == NavigationMode.MEMBER ? tabs : adminTabs;
+  }
+
+  /**
+   * The sprite icon an entry shows as a tab: its own, else its group's.
+   *
+   * @param entry a registered entry
+   * @return the icon name
+   */
+  @NotNull
+  public String iconOf(@NotNull NavigationEntry entry) {
+    if (entry.icon() != null) {
+      return entry.icon();
+    }
+    NavigationGroup group = groupByKey.get(entry.key());
+    return group != null && group.icon() != null ? group.icon() : ICON_LIST;
+  }
+
+  /**
    * Whether a starrable entry belongs to the administration mode.
    *
    * @param key the entry key
@@ -317,6 +362,19 @@ public class NavigationRegistry {
    * zone that open one of its tabs; a view that has no tab of its own is listed in {@link
    * #PAGE_VIEWS}.
    */
+  @NotNull
+  private Map<NavigationMode, List<NavigationEntry>> buildTabbable() {
+    return Map.of(
+        NavigationMode.MEMBER,
+        Stream.concat(main.stream(), Stream.of(personal))
+            .flatMap(group -> group.entries().stream())
+            .toList(),
+        NavigationMode.ADMIN,
+        Stream.concat(Stream.of(adminTop), admin.stream())
+            .flatMap(group -> group.entries().stream())
+            .toList());
+  }
+
   @NotNull
   private Map<String, Set<String>> buildFamilies() {
     Map<String, Set<String>> byPage = new HashMap<>();
@@ -819,25 +877,17 @@ public class NavigationRegistry {
   @NotNull
   private static List<NavigationTab> buildTabs() {
     return List.of(
+        new NavigationTab(List.of("missions.list")),
+        new NavigationTab(List.of("storage.overview")),
         new NavigationTab(
-            List.of("missions.list"),
-            "mobile.tab.missions",
-            "clipboard-check",
-            "mobile-tab-missions"),
-        new NavigationTab(
-            List.of("storage.overview"),
-            "mobile.tab.inventory",
-            ICON_BOOKOUT,
-            "mobile-tab-inventory"),
-        new NavigationTab(
-            List.of("orders.list", "orders.own", "orders.assigned", "orders.create"),
-            "mobile.tab.orders",
-            ICON_LIST,
-            "mobile-tab-orders"),
-        new NavigationTab(
-            List.of("notifications.list"),
-            "mobile.tab.notifications",
-            "bell",
-            "mobile-tab-notifications"));
+            List.of("orders.list", "orders.own", "orders.assigned", "orders.create")));
+  }
+
+  @NotNull
+  private static List<NavigationTab> buildAdminTabs() {
+    return List.of(
+        new NavigationTab(List.of("admin.dashboard")),
+        new NavigationTab(List.of("admin.members")),
+        new NavigationTab(List.of("admin.auditlog")));
   }
 }

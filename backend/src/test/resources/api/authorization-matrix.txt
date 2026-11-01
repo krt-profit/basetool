@@ -323,6 +323,7 @@ PUT /api/v1/navigation/preferences/favourites | NavigationPreferencesController#
 PUT /api/v1/navigation/preferences/favourites-and-hidden | NavigationPreferencesController#replaceFavouritesAndHidden | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/navigation/preferences/hidden | NavigationPreferencesController#replaceHidden | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/navigation/preferences/prune | NavigationPreferencesController#prune | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/navigation/preferences/tab-bar/{mode} | NavigationPreferencesController#replaceTabBar | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/notifications | NotificationController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/notifications/admin/rules | NotificationRuleController#list | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/notifications/admin/rules | NotificationRuleController#create | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)

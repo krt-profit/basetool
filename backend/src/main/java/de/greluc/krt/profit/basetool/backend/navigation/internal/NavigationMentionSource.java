@@ -42,6 +42,7 @@ public class NavigationMentionSource implements PersonMentionSource {
     return Set.of(
         "navigation_appearance.desktop_mode",
         "navigation_favourite.entry_key",
-        "navigation_hidden.entry_key");
+        "navigation_hidden.entry_key",
+        "navigation_tab_bar.entry_key");
   }
 }

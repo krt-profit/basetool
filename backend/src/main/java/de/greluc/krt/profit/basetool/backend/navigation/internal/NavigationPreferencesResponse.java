@@ -27,8 +27,10 @@ import org.jetbrains.annotations.NotNull;
  * @param favourites the favourites section
  * @param hidden the hidden-pages section
  * @param appearance the „Darstellung" section
+ * @param tabBars the phone tab-bar sections of both modes
  */
 public record NavigationPreferencesResponse(
     @NotNull FavouritesResponse favourites,
     @NotNull HiddenResponse hidden,
-    @NotNull AppearanceResponse appearance) {}
+    @NotNull AppearanceResponse appearance,
+    @NotNull TabBarsResponse tabBars) {}

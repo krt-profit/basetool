@@ -142,3 +142,4 @@ navigation_preferences navigation
 navigation_favourite navigation
 navigation_appearance navigation
 navigation_hidden navigation
+navigation_tab_bar navigation

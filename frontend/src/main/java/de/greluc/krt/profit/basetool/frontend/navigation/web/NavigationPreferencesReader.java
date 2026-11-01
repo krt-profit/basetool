@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAvailab
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import java.util.ArrayList;
@@ -41,10 +42,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Reads the caller's stored favourites and hidden pages and resolves them against the registry
- * (REQ-UI-032): an entry the caller may no longer see in any context, and a key that is no longer a
- * favouritable or hideable entry, is deleted from the store; an entry only the active context does
- * not offer stays and renders greyed.
+ * Reads the caller's stored favourites, hidden pages and tab bars and resolves them against the
+ * registry (REQ-UI-032): an entry the caller may no longer see in any context, and a key that is no
+ * longer a favouritable or hideable entry, is deleted from the store; an entry only the active
+ * context does not offer stays and renders greyed.
  *
  * <p>Fails closed: a failed read yields {@link NavigationPersonalisation#NOT_LOADED}, which renders
  * no favourite, hides no page and disables the controls.
@@ -59,6 +60,8 @@ public class NavigationPreferencesReader {
   private final NavigationBackendClient client;
 
   private final NavigationRegistry registry;
+
+  private final NavigationTabBarResolver tabBarResolver;
 
   /**
    * Reads and resolves the caller's preferences, deleting the entries the caller may no longer see.
@@ -104,8 +107,12 @@ public class NavigationPreferencesReader {
     List<String> gone = new ArrayList<>();
     NavigationFavourites favourites = resolveFavourites(stored.favourites(), access, gone);
     NavigationHidden hidden = resolveHidden(stored.hidden(), access, gone);
+    for (NavigationMode mode : NavigationMode.values()) {
+      gone.addAll(tabBarResolver.gone(mode, stored.tabBars().of(mode), access));
+    }
     return new Resolution(
-        new NavigationPersonalisation(favourites, hidden), gone.stream().distinct().toList());
+        new NavigationPersonalisation(favourites, hidden, stored.tabBars()),
+        gone.stream().distinct().toList());
   }
 
   private NavigationFavourites resolveFavourites(

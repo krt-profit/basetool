@@ -255,7 +255,8 @@ class NavigationRenderMvcTest {
         .containsPattern("href=\"/orders\"[^>]*data-testid=\"nav-orders-assigned\"")
         .doesNotContain("data-testid=\"nav-orders\"")
         .doesNotContain("data-testid=\"nav-orders-own\"");
-    assertThat(assignee).containsPattern("href=\"/orders\"[^>]*data-testid=\"mobile-tab-orders\"");
+    assertThat(assignee)
+        .containsPattern("href=\"/orders\"[^>]*data-testid=\"mobile-tab-orders.assigned\"");
     assertThat(section(SIDEBAR, plainMember))
         .doesNotContain("data-testid=\"nav-orders-assigned\"")
         .contains("data-testid=\"nav-orders-create\"");

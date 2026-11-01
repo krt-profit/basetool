@@ -66,7 +66,10 @@
                    th:data-announce-hidden="#{nav.hidden.announce.hidden('{name}')}"
                    th:data-announce-shown="#{nav.hidden.announce.shown('{name}')}"
                    th:data-announce-all-shown="#{nav.hidden.announce.allShown}"
-                   th:data-announce-favourites-cleared="#{nav.favourites.announce.cleared}"></p>
+                   th:data-announce-favourites-cleared="#{nav.favourites.announce.cleared}"
+                   th:data-announce-tabbar-set="#{nav.tabbar.announce.set('{slot}', '{name}')}"
+                   th:data-announce-tabbar-swapped="#{nav.tabbar.announce.swapped('{slot}', '{name}')}"
+                   th:data-announce-tabbar-reset="#{nav.tabbar.announce.reset}"></p>
                 <div class="nav-admin-bar" hidden
                      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <button type="button" class="nav-admin-back" data-testid="nav-admin-back">
@@ -170,12 +173,14 @@
     </th:block>
     <th:block sec:authorize="isAuthenticated()">
         <th:block th:replace="~{kernel/fragments/mobile-nav :: tabbar}" />
+        <th:block th:replace="~{kernel/fragments/nav-tabbar :: pickers}" />
         <th:block th:replace="~{kernel/fragments/palette :: palette}" />
     </th:block>
     <script type="module" th:src="@{/js/kernel/sidebar.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/krt-palette.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-favourites.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-edit.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-tabbar.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-appearance.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-rail.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />
