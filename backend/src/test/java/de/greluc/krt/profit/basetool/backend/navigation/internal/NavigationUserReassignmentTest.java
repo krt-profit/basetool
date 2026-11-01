@@ -103,6 +103,24 @@ class NavigationUserReassignmentTest {
   }
 
   @Test
+  @DisplayName("the target's order wins and the source's order is dropped with its row")
+  void theTargetsOrderWins() {
+    UUID source = member();
+    UUID target = member();
+    service.replaceOrderScope(
+        source, "member", "groups", new OrderScopeUpdateRequest(List.of("bank", "trade"), 0L));
+    service.replaceOrderScope(
+        target, "member", "groups", new OrderScopeUpdateRequest(List.of("trade", "bank"), 0L));
+
+    participant.reassign(source, target);
+
+    assertThat(repository.findById(source)).isEmpty();
+    OrderModeResponse order = service.read(target).order().member();
+    assertThat(order.scopes().get("groups")).containsExactly("trade", "bank");
+    assertThat(order.version()).isEqualTo(1);
+  }
+
+  @Test
   @DisplayName("a source without a row moves nothing")
   void sourceWithoutARowMovesNothing() {
     UUID target = member();

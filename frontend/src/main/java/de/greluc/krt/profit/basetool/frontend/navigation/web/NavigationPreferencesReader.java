@@ -28,13 +28,21 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAvailability;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationOrder;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -98,8 +106,56 @@ public class NavigationPreferencesReader {
     List<String> gone = new ArrayList<>();
     NavigationFavourites favourites = resolveFavourites(stored.favourites(), access, gone);
     NavigationHidden hidden = resolveHidden(stored.hidden(), access, gone);
+    NavigationOrder order = resolveOrder(stored.order(), access, gone);
     return new Resolution(
-        new NavigationPersonalisation(favourites, hidden), gone.stream().distinct().toList());
+        new NavigationPersonalisation(favourites, hidden, order),
+        gone.stream().distinct().toList());
+  }
+
+  private NavigationOrder resolveOrder(
+      OrderResponse stored, NavigationAccess access, List<String> gone) {
+    return new NavigationOrder(
+        resolveOrder(stored.member(), registry.main(), access, gone),
+        resolveOrder(stored.admin(), registry.admin(), access, gone));
+  }
+
+  private NavigationOrder.Mode resolveOrder(
+      OrderModeResponse stored,
+      List<NavigationGroup> groups,
+      NavigationAccess access,
+      List<String> gone) {
+    Set<String> liveGroups =
+        groups.stream()
+            .filter(group ->
+                group.entries().stream()
+                    .anyMatch(entry ->
+                        registry.availability(entry, access) != NavigationAvailability.GONE))
+            .map(NavigationGroup::key)
+            .collect(Collectors.toSet());
+    Map<String, List<String>> kept = new LinkedHashMap<>();
+    stored
+        .scopes()
+        .forEach((scope, keys) -> {
+          boolean groupScope = NavigationOrder.GROUPS_SCOPE.equals(scope);
+          List<String> live =
+              keys.stream()
+                  .filter(key -> {
+                    boolean known =
+                        groupScope
+                            ? liveGroups.contains(key)
+                            : availability(registry.entry(key), access)
+                                != NavigationAvailability.GONE;
+                    if (!known) {
+                      gone.add(key);
+                    }
+                    return known;
+                  })
+                  .toList();
+          if (!live.isEmpty()) {
+            kept.put(scope, live);
+          }
+        });
+    return new NavigationOrder.Mode(kept, stored.version());
   }
 
   private NavigationFavourites resolveFavourites(

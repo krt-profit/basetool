@@ -2281,9 +2281,10 @@ page use it; positions there count the reorderable rows of the rendered page.
 > **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store, the
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
-> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the privacy flows and the
-> metrics. Planned: the order and the up/down controls of „Anpassen", the tab bar, „Darstellung"
-> and the full reset; until they ship, the current code stays authoritative for them.
+> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the order of groups and
+> links with the up/down controls and „Standardreihenfolge", the privacy flows and the metrics.
+> Planned: the tab bar, „Darstellung" and the full reset; until they ship, the current code stays
+> authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
@@ -2416,8 +2417,14 @@ the quick access, no hide control on personal pages, the relays), `NavigationReg
 entries are pages, which tabs leave with a page), `NavigationMenuTest`,
 `NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint, hiding with focus and
 announcement, favourite and hidden excluding each other, the resets, 44 px controls up to 1024 px
-and 32 px above), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
-full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+and 32 px above), `NavigationOrderTest` (the scopes, the version per mode, independence from the
+other sections, the reset, the deletion of entries, the metric), `NavigationOrderingTest` and
+`NavigationMenuOrderTest` (the stored order and the placement of keys the store does not know),
+`NavigationOrderMvcTest` (the rendered order, the move controls, the relays),
+`NavigationOrderE2eTest` (moving by button and by Alt+Arrow without a drag, focus kept, the live
+announcement, reload, „Standardreihenfolge", the 409 hint, 44 px controls up to 1024 px and 32 px
+above), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the full
+reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use

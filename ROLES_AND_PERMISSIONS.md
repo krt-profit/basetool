@@ -1307,7 +1307,8 @@ export for somebody who cannot sign in included (REQ-SEC-058) — and of the adm
 where the surviving account's choices win (REQ-SEC-046).
 
 The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
-`PUT .../hidden`, `PUT .../favourites-and-hidden` and `POST /api/v1/navigation/preferences/prune`
-need only a signed-in user; the owner is always the
-token's subject, no endpoint takes a member id, and a favourite or hidden page is a key of a page the user already
-sees — the entry's own gate stays authoritative.
+`PUT .../hidden`, `PUT .../favourites-and-hidden`, `PUT .../order/{mode}/{scope}`,
+`POST .../order/{mode}/reset` and `POST /api/v1/navigation/preferences/prune` need only a signed-in
+user; the owner is always the token's subject, no endpoint takes a member id, and a favourite,
+hidden page or ordered key is a key of a page the user already sees — the entry's own gate stays
+authoritative.

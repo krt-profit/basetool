@@ -32,8 +32,7 @@ import jakarta.persistence.Embeddable;
  */
 @Embeddable
 public record OrderRow(
-    @Column(name = "mode", nullable = false, length = NavigationLimits.MAX_MODE_LENGTH)
-        String mode,
+    @Column(name = "mode", nullable = false, length = NavigationLimits.MAX_MODE_LENGTH) String mode,
     @Column(name = "scope", nullable = false, length = NavigationLimits.MAX_ENTRY_KEY_LENGTH)
         String scope,
     @Column(name = "entry_key", nullable = false, length = NavigationLimits.MAX_ENTRY_KEY_LENGTH)

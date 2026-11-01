@@ -57,6 +57,7 @@ class NavigationPreferencesControllerTest {
   private static final String FAVOURITES = PREFERENCES + "/favourites";
   private static final String HIDDEN = PREFERENCES + "/hidden";
   private static final String BOTH = PREFERENCES + "/favourites-and-hidden";
+  private static final String ORDER = PREFERENCES + "/order/";
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -256,6 +257,60 @@ class NavigationPreferencesControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().is(status));
+  }
+
+  @Test
+  void storesAnOrderScopeAndReadsItBackPerMode() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"bank\"],\"version\":0}", 200);
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.order.member.scopes.groups[0]").value("trade"))
+        .andExpect(jsonPath("$.order.member.scopes.groups[1]").value("bank"))
+        .andExpect(jsonPath("$.order.member.version").value(1))
+        .andExpect(jsonPath("$.order.admin.version").value(0));
+  }
+
+  @Test
+  void answers409ForAStaleOrderVersionAndLeavesTheOtherModeAlone() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\"],\"version\":0}", 200);
+
+    putJson(ORDER + "member/groups", "{\"keys\":[\"bank\"],\"version\":0}", 409);
+    putJson(ORDER + "admin/groups", "{\"keys\":[\"admin-members\"],\"version\":0}", 200);
+  }
+
+  @Test
+  void refusesAMalformedOrderWrite() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"Trade\"],\"version\":0}", 400);
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"trade\"],\"version\":0}", 400);
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\"]}", 400);
+    putJson(ORDER + "guest/groups", "{\"keys\":[\"trade\"],\"version\":0}", 400);
+  }
+
+  @Test
+  void resetsTheOrderOfAMode() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"bank\"],\"version\":0}", 200);
+
+    mockMvc
+        .perform(
+            post(ORDER + "member/reset")
+                .with(as(owner))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":1}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.scopes").isEmpty())
+        .andExpect(jsonPath("$.version").value(2));
+  }
+
+  @Test
+  void aMembersOrderIsInvisibleToAnotherMember() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"bank\"],\"version\":0}", 200);
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(member())))
+        .andExpect(jsonPath("$.order.member.scopes").isEmpty());
   }
 
   @Test

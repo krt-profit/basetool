@@ -62,7 +62,9 @@
                    th:data-announce-hidden="#{nav.hidden.announce.hidden('{name}')}"
                    th:data-announce-shown="#{nav.hidden.announce.shown('{name}')}"
                    th:data-announce-all-shown="#{nav.hidden.announce.allShown}"
-                   th:data-announce-favourites-cleared="#{nav.favourites.announce.cleared}"></p>
+                   th:data-announce-favourites-cleared="#{nav.favourites.announce.cleared}"
+                   th:data-announce-order-reset="#{nav.order.announce.reset}"
+                   th:data-reorder-announce="#{reorder.announce('{name}', '{from}', '{to}', '{total}')}"></p>
                 <div class="nav-admin-bar" hidden
                      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <button type="button" class="nav-admin-back" data-testid="nav-admin-back">
@@ -114,7 +116,7 @@
                  th:data-nav-group="#{${navigation.personal().group().labelKey()}}" th:data-nav-icon="${navigation.personal().group().icon()}">
                 <span class="nav-personal-title" th:text="#{${navigation.personal().group().labelKey()}}">Persönlich</span>
                 <th:block th:each="entry : ${navigation.personal().links()}">
-                    <th:block th:replace="~{kernel/fragments/nav-entries :: row(${entry}, false)}" />
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: row(${entry}, false, null, null)}" />
                 </th:block>
             </div>
             <div class="nav-user-row">
@@ -169,6 +171,7 @@
     <script type="module" th:src="@{/js/kernel/krt-palette.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-favourites.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-edit.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-order.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />
     <th:block th:replace="~{kernel/fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{kernel/fragments/footer :: footer}" />

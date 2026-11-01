@@ -28,6 +28,10 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateR
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,6 +109,45 @@ class NavigationBackendClientTest {
         "PUT",
         "/api/v1/navigation/preferences/favourites-and-hidden",
         "{\"favourites\":{\"keys\":[],\"version\":3},\"hidden\":{\"keys\":[],\"version\":4}}");
+  }
+
+  @Test
+  void putsTheOrderOfOneScopeWithTheModesVersion() {
+    backend.answerJson("{\"scopes\":{\"groups\":[\"trade\",\"bank\"]},\"version\":2}");
+
+    OrderModeResponse stored =
+        client.replaceOrderScope(
+            "member", "groups", new OrderScopeUpdateRequest(List.of("trade", "bank"), 1L));
+
+    assertThat(stored.version()).isEqualTo(2);
+    assertThat(stored.scopes().get("groups")).containsExactly("trade", "bank");
+    backend.expect(
+        "PUT",
+        "/api/v1/navigation/preferences/order/member/groups",
+        "{\"keys\":[\"trade\",\"bank\"],\"version\":1}");
+  }
+
+  @Test
+  void postsTheOrderReset() {
+    backend.answerJson("{\"scopes\":{},\"version\":3}");
+
+    client.resetOrder("admin", new OrderResetRequest(2L));
+
+    backend.expect("POST", "/api/v1/navigation/preferences/order/admin/reset", "{\"version\":2}");
+  }
+
+  @Test
+  void readsTheOrderSectionOfBothModes() {
+    backend.answerJson(
+        "{\"favourites\":{\"keys\":[],\"version\":0},\"hidden\":{\"keys\":[],\"version\":0},"
+            + "\"order\":{\"member\":{\"scopes\":{\"groups\":[\"trade\"]},\"version\":4},"
+            + "\"admin\":{\"scopes\":{},\"version\":1}}}");
+
+    OrderResponse order = client.preferences().order();
+
+    assertThat(order.member().version()).isEqualTo(4);
+    assertThat(order.member().scopes().get("groups")).containsExactly("trade");
+    assertThat(order.admin().version()).isEqualTo(1);
   }
 
   @Test

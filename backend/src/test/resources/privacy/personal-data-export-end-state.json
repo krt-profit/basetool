@@ -582,6 +582,10 @@
       "preference_section" : "hidden",
       "position" : 0,
       "entry_key" : "bank.dashboard"
+    }, {
+      "preference_section" : "order.member.groups",
+      "position" : 0,
+      "entry_key" : "logistics"
     } ],
     "truncated" : false
   } ]

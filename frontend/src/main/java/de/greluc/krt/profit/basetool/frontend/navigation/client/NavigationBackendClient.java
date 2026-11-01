@@ -26,6 +26,9 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateR
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.PruneRequest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -99,6 +102,34 @@ public class NavigationBackendClient {
       @NotNull FavouritesAndHiddenUpdateRequest request) {
     return backendApiClient.put(
         FAVOURITES_AND_HIDDEN, request, NavigationPreferencesResponse.class);
+  }
+
+  /**
+   * Replaces the stored order of one scope of a mode.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param scope {@code groups} or the key of the group whose links are ordered
+   * @param request the scope's keys in their new order and the version the caller last saw
+   * @return the mode's order with the new version, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public OrderModeResponse replaceOrderScope(
+      @NotNull String mode, @NotNull String scope, @NotNull OrderScopeUpdateRequest request) {
+    return backendApiClient.put(
+        PREFERENCES + "/order/" + mode + "/" + scope, request, OrderModeResponse.class);
+  }
+
+  /**
+   * Clears the stored order of a mode, back to the default order.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param request the version the caller last saw
+   * @return the empty order with the new version, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public OrderModeResponse resetOrder(@NotNull String mode, @NotNull OrderResetRequest request) {
+    return backendApiClient.post(
+        PREFERENCES + "/order/" + mode + "/reset", request, OrderModeResponse.class);
   }
 
   /**

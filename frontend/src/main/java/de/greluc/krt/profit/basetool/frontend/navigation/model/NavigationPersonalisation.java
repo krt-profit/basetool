@@ -26,11 +26,15 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param favourites the favourites section
  * @param hidden the hidden-pages section
+ * @param order the order section
  */
 public record NavigationPersonalisation(
-    @NotNull NavigationFavourites favourites, @NotNull NavigationHidden hidden) {
+    @NotNull NavigationFavourites favourites,
+    @NotNull NavigationHidden hidden,
+    @NotNull NavigationOrder order) {
 
   /** The preferences of a caller whose preferences were not read: nothing stored. */
   public static final NavigationPersonalisation NOT_LOADED =
-      new NavigationPersonalisation(NavigationFavourites.NOT_LOADED, NavigationHidden.NOT_LOADED);
+      new NavigationPersonalisation(
+          NavigationFavourites.NOT_LOADED, NavigationHidden.NOT_LOADED, NavigationOrder.NOT_LOADED);
 }

@@ -22,11 +22,14 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationOrder;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationOrdering;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -95,13 +98,33 @@ public record NavigationMenu(
       @NotNull NavigationRegistry registry,
       @NotNull NavigationAccess access,
       @NotNull Set<String> hiddenPages) {
+    return resolve(registry, access, hiddenPages, NavigationOrder.NOT_LOADED);
+  }
+
+  /**
+   * Resolves the registry for one caller who hid pages and moved groups and links: each mode's
+   * permitted groups and each group's menu links follow the stored order, with a key the store does
+   * not know placed after its default predecessor.
+   *
+   * @param registry the entry registry
+   * @param access the caller's reachable roles and flags
+   * @param hiddenPages the keys of the pages the caller hid; keys that are no page are ignored
+   * @param order the caller's stored order
+   * @return the caller's navigation
+   */
+  @NotNull
+  public static NavigationMenu resolve(
+      @NotNull NavigationRegistry registry,
+      @NotNull NavigationAccess access,
+      @NotNull Set<String> hiddenPages,
+      @NotNull NavigationOrder order) {
     Set<String> hiddenEntries = registry.familyOf(hiddenPages);
     return new NavigationMenu(
         Group.of(registry.top(), access),
-        groups(registry.main(), access, hiddenPages, hiddenEntries),
+        groups(registry.main(), access, hiddenPages, hiddenEntries, order.member()),
         Group.of(registry.personal(), access),
         Group.of(registry.adminTop(), access),
-        groups(registry.admin(), access, hiddenPages, hiddenEntries),
+        groups(registry.admin(), access, hiddenPages, hiddenEntries, order.admin()),
         Group.of(registry.anonymous(), access),
         Group.of(registry.legal(), access),
         Group.of(registry.fanKit(), access),
@@ -251,13 +274,18 @@ public record NavigationMenu(
       @NotNull List<NavigationGroup> groups,
       @NotNull NavigationAccess access,
       @NotNull Set<String> hiddenPages,
-      @NotNull Set<String> hiddenEntries) {
-    return groups.stream()
+      @NotNull Set<String> hiddenEntries,
+      @NotNull NavigationOrder.Mode order) {
+    Map<String, Group> byKey = new LinkedHashMap<>();
+    groups.stream()
         .map(group -> Group.of(group, access, hiddenPages, hiddenEntries))
         .filter(group ->
             !group.links().isEmpty()
                 || !group.hiddenLinks().isEmpty()
                 || !group.palettePages().isEmpty())
+        .forEach(group -> byKey.put(group.group().key(), group));
+    return NavigationOrdering.merge(List.copyOf(byKey.keySet()), order.groups()).stream()
+        .map(key -> byKey.get(key).inOrder(order.links(key)))
         .toList();
   }
 
@@ -276,6 +304,23 @@ public record NavigationMenu(
       @NotNull List<NavigationEntry> links,
       @NotNull List<NavigationEntry> hiddenLinks,
       @NotNull List<NavigationEntry> palettePages) {
+
+    /**
+     * This group with its menu links in the stored order.
+     *
+     * @param storedKeys the link keys the member stored for this group
+     * @return the group; a link the store does not know follows its default predecessor
+     */
+    @NotNull
+    Group inOrder(@NotNull List<String> storedKeys) {
+      Map<String, NavigationEntry> byKey = new LinkedHashMap<>();
+      links.forEach(link -> byKey.put(link.key(), link));
+      List<NavigationEntry> ordered =
+          NavigationOrdering.merge(List.copyOf(byKey.keySet()), storedKeys).stream()
+              .map(byKey::get)
+              .toList();
+      return new Group(group, ordered, hiddenLinks, palettePages);
+    }
 
     @NotNull
     private static Group of(@NotNull NavigationGroup group, @NotNull NavigationAccess access) {

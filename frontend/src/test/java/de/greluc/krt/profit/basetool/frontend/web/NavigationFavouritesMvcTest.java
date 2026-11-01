@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,9 @@ class NavigationFavouritesMvcTest {
     when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
         .thenReturn(
             new NavigationPreferencesResponse(
-                new FavouritesResponse(List.of(keys), version), HiddenResponse.EMPTY));
+                new FavouritesResponse(List.of(keys), version),
+                HiddenResponse.EMPTY,
+                OrderResponse.EMPTY));
   }
 
   private static RequestPostProcessor member() {
@@ -149,7 +152,9 @@ class NavigationFavouritesMvcTest {
             eq(PREFERENCES + "/prune"), any(), eq(NavigationPreferencesResponse.class)))
         .thenReturn(
             new NavigationPreferencesResponse(
-                new FavouritesResponse(List.of("refinery.orders"), 4), HiddenResponse.EMPTY));
+                new FavouritesResponse(List.of("refinery.orders"), 4),
+                HiddenResponse.EMPTY,
+                OrderResponse.EMPTY));
 
     String html = page(member());
 

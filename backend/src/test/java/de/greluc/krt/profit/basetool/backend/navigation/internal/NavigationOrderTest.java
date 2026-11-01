@@ -155,7 +155,8 @@ class NavigationOrderTest {
     service.replaceOrderScope(owner, MEMBER, GROUPS, scope(0, "bank", "trade"));
 
     OrderModeResponse admin =
-        service.replaceOrderScope(owner, ADMIN, GROUPS, scope(0, "admin-masterdata", "admin-members"));
+        service.replaceOrderScope(
+            owner, ADMIN, GROUPS, scope(0, "admin-masterdata", "admin-members"));
 
     assertThat(admin.version()).isEqualTo(1);
     assertThat(service.read(owner).order().member().version()).isEqualTo(1);
@@ -202,10 +203,9 @@ class NavigationOrderTest {
     IntStream.range(0, NavigationLimits.MAX_ORDER_SCOPES)
         .forEach(i -> service.replaceOrderScope(owner, MEMBER, "g" + i, scope(i, "k" + i)));
 
-    assertThatThrownBy(
-            () ->
-                service.replaceOrderScope(
-                    owner, MEMBER, "overflow", scope(NavigationLimits.MAX_ORDER_SCOPES, "x")))
+    assertThatThrownBy(() ->
+            service.replaceOrderScope(
+                owner, MEMBER, "overflow", scope(NavigationLimits.MAX_ORDER_SCOPES, "x")))
         .isInstanceOf(BadRequestException.class);
   }
 

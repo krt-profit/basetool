@@ -144,6 +144,7 @@
       "kernel/krt-user-search.js",
       "kernel/nav-edit.js",
       "kernel/nav-favourites.js",
+      "kernel/nav-order.js",
       "kernel/nav-preferences.js",
       "kernel/safe-url.js",
       "kernel/scu-decimal-input.js",

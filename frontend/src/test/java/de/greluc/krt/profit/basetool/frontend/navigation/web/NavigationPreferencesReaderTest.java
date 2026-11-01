@@ -35,9 +35,13 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavouri
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites.Item;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationOrder;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,16 +64,89 @@ class NavigationPreferencesReaderTest {
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
     return new NavigationPreferencesResponse(
-        new FavouritesResponse(List.of(keys), version), HiddenResponse.EMPTY);
+        new FavouritesResponse(List.of(keys), version), HiddenResponse.EMPTY, OrderResponse.EMPTY);
   }
 
   private static NavigationPreferencesResponse storedHidden(long version, String... keys) {
     return new NavigationPreferencesResponse(
-        new FavouritesResponse(List.of(), 0), new HiddenResponse(List.of(keys), version));
+        new FavouritesResponse(List.of(), 0),
+        new HiddenResponse(List.of(keys), version),
+        OrderResponse.EMPTY);
   }
 
   private static List<String> keys(List<Item> items) {
     return items.stream().map(item -> item.entry().key()).toList();
+  }
+
+  private static NavigationPreferencesResponse storedOrder(OrderModeResponse member) {
+    return new NavigationPreferencesResponse(
+        new FavouritesResponse(List.of(), 0),
+        HiddenResponse.EMPTY,
+        new OrderResponse(member, OrderModeResponse.EMPTY));
+  }
+
+  @Test
+  @DisplayName("a stored order of known groups and permitted links is rendered as stored")
+  void rendersTheStoredOrder() {
+    when(client.preferences())
+        .thenReturn(
+            storedOrder(
+                new OrderModeResponse(
+                    Map.of(
+                        "groups", List.of("logistics", "operations"),
+                        "operations", List.of("hangar.overview", "missions.list")),
+                    6)));
+
+    NavigationOrder.Mode order = reader.read(MEMBER).order().member();
+
+    assertThat(order.version()).isEqualTo(6);
+    assertThat(order.groups()).containsExactly("logistics", "operations");
+    assertThat(order.links("operations")).containsExactly("hangar.overview", "missions.list");
+    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+  }
+
+  @Test
+  @DisplayName("an order key the registry does not know or the caller lost the role for is deleted")
+  void deletesOrderKeysThatAreGone() {
+    when(client.preferences())
+        .thenReturn(
+            storedOrder(
+                new OrderModeResponse(
+                    Map.of(
+                        "groups", List.of("operations", "retired-group"),
+                        "operations", List.of("missions.list", "retired.page"),
+                        "unit", List.of("admin.terms")),
+                    3)));
+    when(client.prune(org.mockito.ArgumentMatchers.anyList()))
+        .thenReturn(
+            storedOrder(
+                new OrderModeResponse(
+                    Map.of(
+                        "groups", List.of("operations"),
+                        "operations", List.of("missions.list")),
+                    4)));
+
+    NavigationOrder.Mode order = reader.read(MEMBER).order().member();
+
+    verify(client)
+        .prune(
+            org.mockito.ArgumentMatchers.argThat(gone ->
+                gone.containsAll(List.of("retired-group", "retired.page", "admin.terms"))
+                    && gone.size() == 3));
+    assertThat(order.version()).isEqualTo(4);
+    assertThat(order.groups()).containsExactly("operations");
+  }
+
+  @Test
+  @DisplayName("an entry only the active context refuses keeps its place in the stored order")
+  void keepsAContextOnlyOrderKey() {
+    when(client.preferences())
+        .thenReturn(
+            storedOrder(new OrderModeResponse(Map.of("logistics", List.of("orders.list")), 1)));
+
+    assertThat(reader.read(MEMBER).order().member().links("logistics"))
+        .containsExactly("orders.list");
+    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
   }
 
   @Test

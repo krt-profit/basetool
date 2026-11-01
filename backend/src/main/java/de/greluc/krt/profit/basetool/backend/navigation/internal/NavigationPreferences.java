@@ -141,7 +141,8 @@ public class NavigationPreferences {
     Map<String, List<String>> scopes = new LinkedHashMap<>();
     orderRows.stream()
         .filter(row -> row.mode().equals(mode.getTag()))
-        .forEach(row -> scopes.computeIfAbsent(row.scope(), _ -> new ArrayList<>()).add(row.entryKey()));
+        .forEach(
+            row -> scopes.computeIfAbsent(row.scope(), _ -> new ArrayList<>()).add(row.entryKey()));
     return scopes;
   }
 
@@ -185,7 +186,8 @@ public class NavigationPreferences {
   public Set<NavigationMode> removeFromOrder(Collection<String> keys) {
     Set<NavigationMode> changed = EnumSet.noneOf(NavigationMode.class);
     for (NavigationMode mode : NavigationMode.values()) {
-      if (orderRows.removeIf(row -> row.mode().equals(mode.getTag()) && keys.contains(row.entryKey()))) {
+      if (orderRows.removeIf(
+          row -> row.mode().equals(mode.getTag()) && keys.contains(row.entryKey()))) {
         changed.add(mode);
       }
     }
