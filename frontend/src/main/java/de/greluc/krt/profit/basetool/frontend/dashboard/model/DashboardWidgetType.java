@@ -69,12 +69,12 @@ public enum DashboardWidgetType {
       NavigationGate.ALWAYS,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS)),
 
-  /** The member's next mission; the mission list is for members and above. */
+  /** The member's next missions; the mission list is for members and above. */
   NEXT_MISSION(
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.noneOf(DashboardOption.class)),
+      EnumSet.of(DashboardOption.ROWS)),
 
   /** The readiness of the member's hangar; the hangar is open to every signed-in member. */
   HANGAR_READINESS(

@@ -202,6 +202,76 @@ class MissionServiceTest {
   }
 
   @Test
+  void getUpcomingOwnAndSignedUp_scopedMember_passesScopeCallerAndLimit() {
+    UUID orgA = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Mission upcoming = new Mission();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            eq(List.of("PLANNED", "ACTIVE")),
+            eq(false),
+            eq(false),
+            isNull(),
+            eq(Set.of(orgA)),
+            eq(userId),
+            eq(true),
+            eq(PageRequest.of(0, 4))))
+        .thenReturn(List.of(upcoming));
+
+    List<Mission> result = missionService.getUpcomingOwnAndSignedUp(4);
+
+    assertEquals(List.of(upcoming), result);
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_pinned_passesTheActiveOrgUnit() {
+    UUID pin = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, pin, Set.of()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            any(),
+            eq(false),
+            eq(false),
+            eq(pin),
+            eq(Set.of()),
+            isNull(),
+            eq(true),
+            eq(PageRequest.of(0, 5))))
+        .thenReturn(List.of());
+
+    assertEquals(List.of(), missionService.getUpcomingOwnAndSignedUp(5));
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_adminAllScopeAndUnitlessCaller_spanTheOrganisation() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, Set.of()))
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), eq(true), any(), any(), any(), eq(true), any()))
+        .thenReturn(List.of());
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), eq(false), any(), any(), any(), eq(true), any()))
+        .thenReturn(List.of());
+
+    missionService.getUpcomingOwnAndSignedUp(5);
+    missionService.getUpcomingOwnAndSignedUp(5);
+
+    verify(missionRepository, times(2))
+        .findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), any(Boolean.class), any(), any(), any(), eq(true), any());
+  }
+
+  @Test
   void searchMissions_ShouldCallRepository() {
     String query = "Test";
     Instant start = Instant.now();

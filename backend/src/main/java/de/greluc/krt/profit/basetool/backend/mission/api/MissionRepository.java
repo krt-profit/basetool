@@ -180,6 +180,50 @@ public interface MissionRepository
       Pageable pageable);
 
   /**
+   * Returns the upcoming missions of the caller's own org units merged with those the caller is
+   * signed up for, each mission once, soonest first (REQ-MISSION-031).
+   *
+   * <p>The own-unit part follows {@link #findNextScopedMission}: the pin when set, else the member
+   * units, or every mission when {@code ownOrgWide}. A signed-up mission counts only inside the
+   * caller's mission visibility. Fetches only {@code owningOrgUnit}, so the limit stays in SQL.
+   *
+   * @param now exclusive lower bound on {@code plannedStartTime}
+   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
+   * @param ownOrgWide {@code true} when the caller has no unit scope and the own-unit part spans
+   *     the whole organisation
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
+   * @param activeOrgUnitId the single pinned OrgUnit id, or {@code null}
+   * @param memberOrgUnitIds the caller's effective org-unit reach; consulted only without a pin
+   * @param userId the caller whose sign-ups count, or {@code null} for none
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member or above
+   * @param pageable the limit ({@code PageRequest.of(0, limit)})
+   * @return the matching missions, soonest first, at most {@code pageable} size
+   */
+  @EntityGraph(attributePaths = {"owningOrgUnit"})
+  @Query(
+      """
+      SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND (
+        :ownOrgWide = true
+        OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
+        OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
+        OR (EXISTS (SELECT 1 FROM MissionParticipant p WHERE p.mission = m AND p.user.id = :userId)
+      AND """
+          + MissionScope.PREDICATE
+          + """
+      )) ORDER BY m.plannedStartTime ASC, m.id ASC
+      """)
+  List<Mission> findUpcomingOwnOrSignedUp(
+      @Param("now") Instant now,
+      @Param("statuses") Collection<String> statuses,
+      @Param("ownOrgWide") boolean ownOrgWide,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("userId") @Nullable UUID userId,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
+      Pageable pageable);
+
+  /**
    * Paged mission search by text, date range, status and org-unit scope.
    *
    * <p>Filters are optional ({@code null} removes a clause) except {@code status}, which is always

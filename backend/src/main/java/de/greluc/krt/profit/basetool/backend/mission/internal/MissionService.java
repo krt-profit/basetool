@@ -243,13 +243,46 @@ public class MissionService implements MissionCommands {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant now = Instant.now();
     Optional<Mission> next;
-    if (scope.adminAllScope()
-        || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty())) {
+    if (isOrganisationWide(scope)) {
       next = findNextMissionHead(now);
     } else {
       next = findNextScopedMissionHead(now, scope);
     }
     return next.map(Mission::getId).flatMap(missionRepository::findById);
+  }
+
+  /**
+   * Returns the upcoming {@code PLANNED} or {@code ACTIVE} missions of the caller's org units
+   * (REQ-MISSION-008 scope and pin) merged with those the caller is signed up for, each mission
+   * once, soonest planned start first (REQ-MISSION-031).
+   *
+   * @param limit the most missions to return
+   * @return the missions with their owning org unit loaded, empty when none is upcoming
+   */
+  public List<Mission> getUpcomingOwnAndSignedUp(int limit) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return missionRepository.findUpcomingOwnOrSignedUp(
+        Instant.now(),
+        NEXT_MISSION_STATUSES,
+        isOrganisationWide(scope),
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        authHelperService.currentUserId().orElse(null),
+        authHelperService.isMemberOrAbove(),
+        PageRequest.of(0, limit));
+  }
+
+  /**
+   * Tells whether the caller has no org-unit scope, so the next-mission lookups span the whole
+   * organisation (REQ-MISSION-008).
+   *
+   * @param scope the caller's scope predicate
+   * @return {@code true} for an admin in all-squadrons mode or a caller without any unit
+   */
+  private static boolean isOrganisationWide(@NotNull ScopePredicate scope) {
+    return scope.adminAllScope()
+        || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty());
   }
 
   /**

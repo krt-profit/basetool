@@ -2609,7 +2609,7 @@ unit.
 | Mode | Widget | Shows | Options |
 |---|---|---|---|
 | Member | Nächste Tage | the missions of the coming days | unit; 3 / **7** / 14 days; rows |
-| Member | Nächster Einsatz | the user's next mission | — |
+| Member | Nächster Einsatz | the next missions of the user's units and the ones the user is signed up for, merged, soonest first (REQ-MISSION-031) | rows |
 | Member | Hangar-Bereitschaft | readiness of the user's hangar | — |
 | Member | Aufträge zu bearbeiten | orders the user's unit processes | unit; status **Offen + In Bearbeitung** / Offen / In Bearbeitung; rows |
 | Member | Meine Aufträge | orders the user requested | status **Laufend** / Abgeschlossen / Alle; rows |
@@ -2683,7 +2683,7 @@ versions, owner isolation, deletion by widget type, the write counters),
 `DashboardReaderTest` and `DashboardRenderMvcTest` (the board per stored layout, greyed pinned
 instances, the empty and error states, deletion on role loss, the hint, the catalogue),
 `DashboardUpcomingDaysWidgetMvcTest`, `DashboardSummaryWidgetsMvcTest` (Nächster Einsatz and
-Hangar-Bereitschaft: the row, the counts, the empty states, the member's hangar room),
+Hangar-Bereitschaft: the rows and their rows option, the counts, the empty states, the member's hangar room),
 `DashboardLayoutControllerTest`, `DashboardLayoutBackendClientTest`, `DashboardBackendClientTest`
 (the two summary reads), `DashboardE2eTest` (edit mode, catalogue and options, restore, the summary
 widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,

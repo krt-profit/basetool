@@ -68,13 +68,13 @@ public enum DashboardWidgetType {
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
       new DashboardOptions(null, null, 5, DashboardStatus.UNREAD)),
 
-  /** The member's next mission. */
+  /** The member's next missions: those of the own units and those the member is signed up for. */
   NEXT_MISSION(
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       false,
-      EnumSet.noneOf(DashboardOption.class),
-      DashboardOptions.NONE),
+      EnumSet.of(DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null)),
 
   /** The readiness of the member's hangar. */
   HANGAR_READINESS(

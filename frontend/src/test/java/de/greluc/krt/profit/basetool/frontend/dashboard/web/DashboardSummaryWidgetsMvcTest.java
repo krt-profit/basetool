@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -56,7 +57,7 @@ class DashboardSummaryWidgetsMvcTest {
 
   private static final String NEXT_MISSION = "/dashboard/widgets/next-mission";
   private static final String HANGAR = "/dashboard/widgets/hangar-readiness";
-  private static final String NEXT_PATH = "/api/v1/missions/next/summary";
+  private static final String NEXT_PATH = "/api/v1/missions/next/summary?limit=";
   private static final String READINESS_PATH = "/api/v1/hangar/my-ships/readiness";
   private static final UUID MEMBER = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
 
@@ -89,10 +90,15 @@ class DashboardSummaryWidgetsMvcTest {
   }
 
   private static MissionListDto mission(boolean signedUp, SquadronReferenceDto unit) {
+    return mission("00000000-0000-0000-0000-0000000000a1", "Erzkonvoi", signedUp, unit);
+  }
+
+  private static MissionListDto mission(
+      String id, String name, boolean signedUp, SquadronReferenceDto unit) {
     Instant start = Instant.now().plus(2, ChronoUnit.DAYS);
     return new MissionListDto(
-        UUID.fromString("00000000-0000-0000-0000-0000000000a1"),
-        "Erzkonvoi",
+        UUID.fromString(id),
+        name,
         null,
         null,
         "PLANNED",
@@ -110,11 +116,14 @@ class DashboardSummaryWidgetsMvcTest {
         0L);
   }
 
-  /** The next mission is one row linking to the mission, with the signed-up chip. */
+  /** The next missions are rows linking to the missions, with the signed-up chip, in read order. */
   @Test
-  void nextMission_rendersTheRowOfTheSummaryRead() throws Exception {
-    when(backendApiClient.get(eq(NEXT_PATH), eq(MissionListDto.class)))
-        .thenReturn(mission(true, null));
+  void nextMission_rendersTheRowsOfTheSummaryRead() throws Exception {
+    when(backendApiClient.get(eq(NEXT_PATH + 5), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                mission(true, null),
+                mission("00000000-0000-0000-0000-0000000000a2", "Bergungsflug", false, null)));
 
     String html = render(NEXT_MISSION);
 
@@ -126,13 +135,28 @@ class DashboardSummaryWidgetsMvcTest {
         .contains(">GEPLANT<")
         .contains("data-testid=\"home-mission-signed-up\"")
         .contains("Alle Einsätze →");
-    assertThat(html.split("data-testid=\"home-mission\"", -1)).hasSize(2);
+    assertThat(html.split("data-testid=\"home-mission\"", -1)).hasSize(3);
+    assertThat(html.indexOf("Erzkonvoi")).isLessThan(html.indexOf("Bergungsflug"));
+    assertThat(html.split("data-testid=\"home-mission-signed-up\"", -1)).hasSize(2);
+  }
+
+  /** The rows option becomes the limit of the summary read; an unoffered value falls back to 5. */
+  @Test
+  void nextMission_asksTheBackendForTheRowsOption() throws Exception {
+    when(backendApiClient.get(eq(NEXT_PATH + 3), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq(NEXT_PATH + 5), anyTypeRef())).thenReturn(List.of());
+
+    render(NEXT_MISSION + "?rows=3");
+    render(NEXT_MISSION + "?rows=4");
+
+    verify(backendApiClient).get(eq(NEXT_PATH + 3), anyTypeRef());
+    verify(backendApiClient).get(eq(NEXT_PATH + 5), anyTypeRef());
   }
 
   /** Without an upcoming mission the widget says so instead of showing a row. */
   @Test
   void nextMission_withoutAMissionShowsTheEmptyState() throws Exception {
-    when(backendApiClient.get(eq(NEXT_PATH), eq(MissionListDto.class))).thenReturn(null);
+    when(backendApiClient.get(eq(NEXT_PATH + 5), anyTypeRef())).thenReturn(List.of());
 
     String html = render(NEXT_MISSION);
 
@@ -146,8 +170,8 @@ class DashboardSummaryWidgetsMvcTest {
   @Test
   void nextMission_flagsTheMissionOfTheCallersOwnUnit() throws Exception {
     UUID unit = UUID.randomUUID();
-    when(backendApiClient.get(eq(NEXT_PATH), eq(MissionListDto.class)))
-        .thenReturn(mission(false, new SquadronReferenceDto(unit, "Alpha", "ALF")));
+    when(backendApiClient.get(eq(NEXT_PATH + 5), anyTypeRef()))
+        .thenReturn(List.of(mission(false, new SquadronReferenceDto(unit, "Alpha", "ALF"))));
     when(backendApiClient.get(eq("/api/v1/org-units/me/ids"), anyTypeRef()))
         .thenReturn(List.of(unit));
 

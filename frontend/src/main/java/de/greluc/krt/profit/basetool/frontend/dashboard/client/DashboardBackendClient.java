@@ -61,6 +61,9 @@ public class DashboardBackendClient {
   private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE =
       new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<MissionListDto>> MISSION_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private static final ParameterizedTypeReference<List<UUID>> UUID_LIST =
       new ParameterizedTypeReference<>() {};
 
@@ -94,13 +97,21 @@ public class DashboardBackendClient {
   }
 
   /**
-   * Reads the caller's next upcoming mission as a list row.
+   * Reads the caller's upcoming missions as list rows: those of the caller's org units and those
+   * the caller is signed up for, soonest first.
    *
-   * @return the row, or {@code null} when no mission is upcoming
+   * @param limit the most rows to read, 1 to 10
+   * @return the rows, empty when no mission is upcoming
    */
-  @Nullable
-  public MissionListDto nextMission() {
-    return backendApiClient.get("/api/v1/missions/next/summary", MissionListDto.class);
+  @NotNull
+  public List<MissionListDto> nextMissions(int limit) {
+    String uri =
+        UriComponentsBuilder.fromPath("/api/v1/missions/next/summary")
+            .queryParam("limit", limit)
+            .build()
+            .toUriString();
+    List<MissionListDto> rows = backendApiClient.get(uri, MISSION_LIST);
+    return rows == null ? List.of() : rows;
   }
 
   /**

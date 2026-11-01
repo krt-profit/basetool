@@ -42,10 +42,12 @@
 </div>
 
 <div th:fragment="nextMission" data-widget-content data-testid="dashboard-next-mission">
-    <ul th:if="${nextMission != null}" class="home-missions">
-        <li><th:block th:replace="~{dashboard/fragments/widgets :: missionRow(${nextMission})}"></th:block></li>
+    <ul th:if="${not #lists.isEmpty(nextMissions)}" class="home-missions">
+        <li th:each="mission : ${nextMissions}">
+            <th:block th:replace="~{dashboard/fragments/widgets :: missionRow(${mission})}"></th:block>
+        </li>
     </ul>
-    <p th:if="${nextMission == null}" class="home-notifs__empty" data-testid="dashboard-next-mission-empty"
+    <p th:if="${#lists.isEmpty(nextMissions)}" class="home-notifs__empty" data-testid="dashboard-next-mission-empty"
        th:text="#{dashboard.nextMission.empty}">Kein Einsatz geplant.</p>
     <div class="home-card-foot dash-widget__foot">
         <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>

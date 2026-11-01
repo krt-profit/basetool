@@ -146,15 +146,18 @@ public class DashboardWidgetController {
   }
 
   /**
-   * Renders the member's next mission as one row.
+   * Renders the member's next missions: those of the member's units and those the member is signed
+   * up for.
    *
    * @param model the Thymeleaf model
+   * @param rows the rows shown
    * @return the {@code nextMission} fragment
    */
   @NotNull
   @GetMapping(value = "/next-mission", headers = "X-Requested-With=XMLHttpRequest")
-  public String nextMission(@NotNull Model model) {
-    model.addAttribute("nextMission", client.nextMission());
+  public String nextMission(
+      @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
+    model.addAttribute("nextMissions", client.nextMissions(DashboardWidgetOptions.rows(rows)));
     model.addAttribute(
         "myOrgUnitIds", SectionFallback.load(log, "own-org-units", this::ownUnits, Set.of()));
     return WIDGETS + "nextMission";

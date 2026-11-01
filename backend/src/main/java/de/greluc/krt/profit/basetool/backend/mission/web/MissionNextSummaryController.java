@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
@@ -26,18 +27,21 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Serves the caller's next upcoming mission as one list row, the read of the home dashboard's
- * next-mission widget (REQ-MISSION-031).
+ * Serves the caller's upcoming missions as list rows, the read of the home dashboard's next-mission
+ * widget (REQ-MISSION-031).
  */
 @RestController
 @RequestMapping("/api/v1/missions/next")
@@ -45,31 +49,45 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Missions", description = "Mission management endpoints")
 public class MissionNextSummaryController {
 
+  /** The number of rows returned when the caller names no limit. */
+  static final int DEFAULT_LIMIT = 5;
+
+  /** The most rows a caller may ask for. */
+  static final int MAX_LIMIT = 10;
+
   private final MissionService missionService;
   private final MissionMapper missionMapper;
 
   /**
-   * Returns the mission of {@code GET /api/v1/missions/next} as a list row that says whether the
-   * caller is signed up.
+   * Returns the upcoming missions of the caller's org units merged with those the caller is signed
+   * up for, as list rows that say whether the caller is signed up.
    *
-   * @return the mission's list row, or 204 No Content when no mission is upcoming
+   * @param limit the most rows to return, 1 to {@value #MAX_LIMIT}; {@value #DEFAULT_LIMIT} when
+   *     absent
+   * @return the rows, soonest planned start first; empty when no mission is upcoming
+   * @throws BadRequestException when {@code limit} is outside its bounds
    */
   @GetMapping("/summary")
-  @Operation(summary = "Get the next upcoming mission as a list row")
+  @Operation(summary = "Get the next upcoming missions as list rows")
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Transactional(readOnly = true)
-  public ResponseEntity<MissionListDto> getNextMissionSummary() {
-    return missionService
-        .getNextMission()
-        .map(this::toRow)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.noContent().build());
-  }
-
-  private MissionListDto toRow(Mission mission) {
-    List<UUID> ids = List.of(mission.getId());
-    long registered = missionService.registeredCounts(ids).getOrDefault(mission.getId(), 0L);
-    boolean signedUp = missionService.signedUpMissionIds(ids).contains(mission.getId());
-    return missionMapper.toListDto(mission, registered, signedUp);
+  public List<MissionListDto> getNextMissionsSummary(
+      @RequestParam(required = false) @Nullable Integer limit) {
+    int size = limit == null ? DEFAULT_LIMIT : limit;
+    if (size < 1 || size > MAX_LIMIT) {
+      throw new BadRequestException("limit must be between 1 and " + MAX_LIMIT);
+    }
+    List<Mission> missions = missionService.getUpcomingOwnAndSignedUp(size);
+    if (missions.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> ids = missions.stream().map(Mission::getId).toList();
+    Map<UUID, Long> counts = missionService.registeredCounts(ids);
+    Set<UUID> signedUp = missionService.signedUpMissionIds(ids);
+    return missions.stream()
+        .map(mission ->
+            missionMapper.toListDto(
+                mission, counts.getOrDefault(mission.getId(), 0L), signedUp.contains(mission.getId())))
+        .toList();
   }
 }
