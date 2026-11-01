@@ -84,8 +84,6 @@ public class NavigationAppearanceWriter {
     row.setShortcutsEnabled(shortcutsEnabled);
     appearances.saveAndFlush(row);
     return new AppearanceResponse(
-        mode,
-        shortcutsEnabled,
-        preferences.findById(userId).orElseThrow().getAppearanceVersion());
+        mode, shortcutsEnabled, preferences.findById(userId).orElseThrow().getAppearanceVersion());
   }
 }
