@@ -127,7 +127,8 @@ function dropHint() {
 
 /**
  * Takes the stored layout the backend answered: the new version and the ids of the instances,
- * which come back in the order they were sent.
+ * which come back in the order they were sent; an instance appended by a catalogue pick has no
+ * element yet and is ignored.
  *
  * @param {{ version: number, widgets: Array<{ id: string, optionsVersion: number }> }} stored
  *     the backend's answer
@@ -205,9 +206,7 @@ async function writeLayout(extra = []) {
             conflict();
             return true;
         },
-        onSuccess: (stored) => {
-            if (extra.length === 0) applyStored(stored);
-        },
+        onSuccess: applyStored,
     });
     if (!result.ok && result.status !== 409) {
         await reloadBoard();
