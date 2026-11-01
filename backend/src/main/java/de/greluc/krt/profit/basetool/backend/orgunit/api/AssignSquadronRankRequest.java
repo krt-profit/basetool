@@ -26,9 +26,9 @@ import java.util.UUID;
  * Request body to assign or change a squadron leadership rank of an existing Staffel member
  * (REQ-ROLE-003); squadron and user come from the path. A non-squadron rank is rejected with 400.
  *
- * <p>{@code kommandoGroupId} is required for {@link MembershipRole#KOMMANDOLEITER} / {@link
- * MembershipRole#STELLV_KOMMANDOLEITER}, optional for {@link MembershipRole#ENSIGN} and must be
- * {@code null} for {@link MembershipRole#STAFFELLEITER}.
+ * <p>{@code kommandoGroupId} is optional for {@link MembershipRole#KOMMANDOLEITER}, {@link
+ * MembershipRole#STELLV_KOMMANDOLEITER} and {@link MembershipRole#ENSIGN} and must be {@code null}
+ * for {@link MembershipRole#STAFFELLEITER}.
  *
  * @param role the squadron rank to set; required
  * @param kommandoGroupId the Kommandogruppe of the same squadron to bind, or {@code null}

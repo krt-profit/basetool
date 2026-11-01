@@ -24,14 +24,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One Staffel column in the org chart: its Staffelleiter, up to four Kommandos and the Ensigns
- * reporting directly to the Staffelleiter; rendered even when empty.
+ * One Staffel column in the org chart: its Staffelleiter, its Kommandos and the stellv.
+ * Kommandoleiter and Ensigns reporting directly to the Staffelleiter; rendered even when empty.
  *
  * @param orgUnitId id of the owning Staffel.
  * @param name the Staffel's display name.
  * @param shorthand the Staffel's short tag (e.g. {@code ALP}).
  * @param lead the Staffelleiter node, or {@code null} when the seat is vacant.
- * @param commands the Kommandos, ordered for display; never {@code null}, at most four.
+ * @param commands the Kommandos, grouped and ungrouped, ordered for display; never {@code null}.
+ * @param directDeputies stellv. Kommandoleiter without a Kommandogruppe, reporting straight to the
+ *     Staffelleiter, ordered for display; never {@code null}.
  * @param directEnsigns Ensigns reporting straight to the Staffelleiter, ordered for display; never
  *     {@code null}.
  * @param canAddCommand whether another Kommandoleiter may still be added (fewer than four exist).
@@ -43,6 +45,7 @@ public record SquadronChartDto(
     String shorthand,
     @Nullable OrgChartNodeDto lead,
     List<CommandChartDto> commands,
+    List<OrgChartNodeDto> directDeputies,
     List<OrgChartNodeDto> directEnsigns,
     boolean canAddCommand,
     boolean canAddEnsign) {}

@@ -133,7 +133,7 @@
                     th:text="#{orgChart.add.squadronLead}">Staffelleiter zuweisen</button>
 
             <ul class="oc-fan" role="group"
-                th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directEnsigns())}">
+                th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directDeputies()) or !#lists.isEmpty(sq.directEnsigns())}">
 
                 <li th:each="cmd : ${sq.commands()}">
                     <div class="oc-col">
@@ -147,7 +147,7 @@
                                   th:if="${cmd.name() == null}"
                                   th:text="#{orgChart.command.unnamed}">Ohne Namen</span>
                             <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
-                                 th:if="${cmd.kommandoGroupId() == null}">
+                                 th:if="${cmd.kommandoGroupId() == null and cmd.leaderUserId() == null}">
                                 <button type="button" class="oc-icon-btn" data-trigger="oc-rename"
                                         th:data-position-id="${cmd.positionId()}"
                                         th:data-version="${cmd.version()}"
@@ -246,6 +246,12 @@
                                 th:data-parent-id="${cmd.positionId()}"
                                 th:data-rank-label="#{orgChart.rank.ENSIGN}"
                                 th:text="#{orgChart.add.ensign}">Ensign hinzufügen</button>
+                    </div>
+                </li>
+
+                <li th:each="d : ${sq.directDeputies()}">
+                    <div class="oc-col">
+                        <th:block th:replace="~{orgchart/fragments/org-chart-node :: ocNode(${d}, 4)}"></th:block>
                     </div>
                 </li>
 

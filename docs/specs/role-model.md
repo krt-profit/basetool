@@ -7,9 +7,9 @@
 ## Context & goal
 
 The single flat Keycloak `OFFICER` role is no longer enough to model squadron leadership. Each
-Staffel has exactly one **Staffelleiter**, up to four **Kommandoleiter** (each leading a
-Kommandogruppe, optionally with a **stellvertretender Kommandoleiter**), and up to four **Ensigns**
-(assigned to a Kommandogruppe or generally to the Staffelleitung). Each Bereich has one
+Staffel has exactly one **Staffelleiter**, up to four **Kommandoleiter** and four **stellvertretende
+Kommandoleiter**, and up to four **Ensigns**, each assigned to a Kommandogruppe or generally to the
+Staffelleitung (a group has at most one Kommandoleiter and one stellv.). Each Bereich has one
 **Bereichsleiter**, plus zero-or-more **Bereichskoordinatoren** and **Bereichsoperatoren**. Members
 can belong to the **Organisationsleitung (OL)**; every Bereichsleiter is automatically part of the OL
 body.
@@ -166,23 +166,26 @@ the officer standing they stood next to is no longer a Keycloak role.
 
 A Kommandogruppe is a first-class named sub-structure of a Staffel (`kommando_group`: squadron
 `org_unit_id` FK, name, sort index, `@Version`); at most four per squadron. A membership with role
-`KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` / `ENSIGN` carries a nullable `kommando_group_id`:
-`KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` MUST reference a group; `ENSIGN` MAY (null = "allgemein
-der Staffelleitung"); every other rank must have a null group. A group's parent must be a `SQUADRON`.
+`KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` / `ENSIGN` carries a nullable `kommando_group_id`: each
+of the three MAY reference a group of its own squadron (null = "allgemein der Staffelleitung");
+every other rank must have a null group. A group's parent must be a `SQUADRON`. A squadron holds at
+most four Kommandoleiter, four stellv. Kommandoleiter and four Ensigns, counted with and without a
+group, and a group at most one Kommandoleiter and one stellv. (ADR-0322).
 
 **Acceptance**
 
 - [x] `kommando_group` exists, caps at four per squadron, and rejects a non-`SQUADRON` parent (V185).
 - [x] `chk_org_unit_membership_kommando_group_role` confines `kommando_group_id` to the in-group
-  squadron ranks (V185).
-- [x] Kommandogruppe CRUD + member assignment honour ≤1 KL and ≤1 stellv. per group and ≤4 Ensigns
-  per squadron (Phase 3).
+  squadron ranks and lets each of them go without one (V313).
+- [x] Kommandogruppe CRUD + member assignment honour ≤1 KL and ≤1 stellv. per group and ≤4 KL,
+  ≤4 stellv. and ≤4 Ensigns per squadron.
+- [x] A Kommandoleiter or stellv. Kommandoleiter can be appointed without a Kommandogruppe.
 - [x] The three singleton caps (≤1 Staffelleiter/squadron, ≤1 KL + ≤1 stellv./group) are
   DB-backstopped by partial unique indexes (V188), so a concurrent double-assign fails on the
-  constraint rather than committing a duplicate; the ≤4 Ensign cap stays service-layer-only (a count,
-  like the org chart's own ≤4 ENSIGN cap).
+  constraint rather than committing a duplicate; the per-squadron caps of four stay
+  service-layer-only (a count, like the org chart's own ≤4 ENSIGN cap).
 
-**Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`, `v313AllowsKommandoleiterWithoutGroup`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality, ungrouped ranks) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRankCaps`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql`, `V313__allow_kommandoleiter_without_group.sql` · **Decision:** ADR-0042, ADR-0322 · **Issues:** #800
 
 ### REQ-ROLE-004 — Delegated appointment ladder, no self-promotion
 
@@ -297,9 +300,13 @@ appointment flow (never by giving the chart scope awareness): the flat seats
 chart position keyed by org unit (singletons are reassigned, not duplicated, so the partial unique
 indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
 node tied to its Kommandogruppe via the V186 `kommando_group_id` link carries the Kommandoleiter, and
-the stellv. Kommandoleiter / Ensigns hang off it. A Kommandogruppe create / rename / delete mirrors
-the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-025) or
-removes the other seats. Legacy admin-authored Kommandos (no `kommando_group_id`) stay chart-only.
+the stellv. Kommandoleiter / Ensigns hang off it. A Kommandoleiter without a group holds an own
+unnamed `COMMAND_LEAD` node without a group link; a stellv. or Ensign without a group reports
+straight to the Staffelleiter (`SquadronChartDto.directDeputies` / `directEnsigns`). A Kommandogruppe
+create / rename / delete mirrors the leaderless node, and revoking a rank vacates a led Kommando
+(keeping the node, REQ-ORG-025) or removes the other seats; an unnamed ungrouped Kommando that
+nothing reports into is removed with its leader's rank (ADR-0322). Legacy admin-authored Kommandos
+(no `kommando_group_id`) stay chart-only.
 
 The mirror is the **single writer** of account-linked chart seats: the chart editor itself is
 account-free — its write API rejects setting an account holder, and editing / vacating / deleting a

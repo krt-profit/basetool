@@ -31,7 +31,9 @@ import java.util.UUID;
  * @param name the Staffel's display name.
  * @param shorthand the Staffel's short tag.
  * @param lead the Staffelleiter node, or {@code null} when vacant.
- * @param commands the Kommandos; never {@code null}, at most four.
+ * @param commands the Kommandos, grouped and ungrouped; never {@code null}.
+ * @param directDeputies stellv. Kommandoleiter without a Kommandogruppe, reporting straight to the
+ *     Staffelleiter; never {@code null}.
  * @param directEnsigns Ensigns reporting straight to the Staffelleiter; never {@code null}.
  * @param canAddCommand whether another Kommandoleiter may still be added.
  * @param canAddEnsign whether another Ensign may still be added.
@@ -43,6 +45,7 @@ public record SquadronChartDto(
     String shorthand,
     OrgChartNodeDto lead,
     List<CommandChartDto> commands,
+    List<OrgChartNodeDto> directDeputies,
     List<OrgChartNodeDto> directEnsigns,
     boolean canAddCommand,
     boolean canAddEnsign) {}

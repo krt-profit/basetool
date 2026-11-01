@@ -91445,6 +91445,12 @@
               "$ref" : "#/components/schemas/CommandChartDto"
             }
           },
+          "directDeputies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          },
           "directEnsigns" : {
             "type" : "array",
             "items" : {
