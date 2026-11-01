@@ -55,6 +55,7 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
       DashboardLayoutRepository dashboardLayouts) {
     counts.put(NavigationSection.FAVOURITES, repository::countWithFavourites);
     counts.put(NavigationSection.HIDDEN, repository::countWithHidden);
+    counts.put(NavigationSection.ORDER, repository::countWithOrder);
     counts.put(NavigationSection.TAB_BAR, repository::countWithTabBar);
     counts.put(NavigationSection.APPEARANCE, appearances::countPersonalised);
     counts.put(NavigationSection.DASHBOARD, dashboardLayouts::countCustomised);

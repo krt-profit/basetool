@@ -201,6 +201,9 @@ exempt-column|navigation_dashboard_widget.status_filter
 exempt-column|navigation_dashboard_widget.widget_type
 exempt-column|navigation_favourite.entry_key
 exempt-column|navigation_hidden.entry_key
+exempt-column|navigation_order.entry_key
+exempt-column|navigation_order.mode
+exempt-column|navigation_order.scope
 exempt-column|navigation_tab_bar.entry_key
 exempt-column|navigation_tab_bar.mode
 exempt-column|notification.entity_type

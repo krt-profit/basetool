@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
@@ -255,6 +256,7 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("missions.list"), 1),
                 new HiddenResponse(List.of(), 0),
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
 
@@ -329,6 +331,7 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(), 0),
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
     assertThat(widget("favourites"))
@@ -340,6 +343,7 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("missions.list"), 1),
                 new HiddenResponse(List.of(), 0),
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
     assertThat(widget("favourites"))

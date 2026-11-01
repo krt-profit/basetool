@@ -340,6 +340,11 @@ class DataExportEndStateTest {
           owner.getId(),
           "bank.dashboard");
       jdbc.update(
+          "INSERT INTO navigation_order (preferences_id, order_index, mode, scope, entry_key)"
+              + " VALUES (?, 0, 'member', 'groups', ?)",
+          owner.getId(),
+          "logistics");
+      jdbc.update(
           "INSERT INTO navigation_tab_bar (preferences_id, mode, slot_index, entry_key)"
               + " VALUES (?, 'MEMBER', 1, ?)",
           owner.getId(),

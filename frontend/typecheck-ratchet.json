@@ -150,6 +150,7 @@
       "kernel/nav-appearance.js",
       "kernel/nav-edit.js",
       "kernel/nav-favourites.js",
+      "kernel/nav-order.js",
       "kernel/nav-preferences.js",
       "kernel/nav-rail.js",
       "kernel/nav-shortcuts.js",

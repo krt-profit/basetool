@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -92,6 +93,7 @@ class NavigationDesktopModesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(favourites), 0),
                 HiddenResponse.EMPTY,
+                OrderResponse.EMPTY,
                 new AppearanceResponse(mode, true, version),
                 TabBarsResponse.AUTOMATIC));
   }
@@ -269,6 +271,7 @@ class NavigationDesktopModesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of("refinery.orders"), 2),
+                OrderResponse.EMPTY,
                 new AppearanceResponse(DesktopMode.RAIL, true, 1),
                 TabBarsResponse.AUTOMATIC));
     String rail = rail(page(member()));
@@ -341,6 +344,7 @@ class NavigationDesktopModesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 HiddenResponse.EMPTY,
+                OrderResponse.EMPTY,
                 new AppearanceResponse(DesktopMode.DRAWER, false, 2),
                 TabBarsResponse.AUTOMATIC));
     assertThat(page(member())).contains("data-shortcuts=\"false\"");

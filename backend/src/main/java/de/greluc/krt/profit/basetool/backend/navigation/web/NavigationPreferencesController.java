@@ -32,6 +32,9 @@ import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPrefe
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPreferencesService;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationSection;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationWriteOutcome;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderModeResponse;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderResetRequest;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.PruneRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.TabBarResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.TabBarUpdateRequest;
@@ -172,6 +175,54 @@ public class NavigationPreferencesController {
   }
 
   /**
+   * Replaces the stored order of one scope of a mode.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param scope {@code groups} or the key of the group whose links are ordered
+   * @param request the scope's keys in their new order and the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the mode's order with the new version
+   */
+  @PutMapping("/order/{mode}/{scope}")
+  @Operation(summary = "Replace the stored order of one group list or link list of a mode.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Order stored."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation failed, a key repeats or the mode or scope is malformed."),
+    @ApiResponse(responseCode = "409", description = "The order version of the mode is stale.")
+  })
+  public OrderModeResponse replaceOrderScope(
+      @PathVariable String mode,
+      @PathVariable String scope,
+      @Valid @RequestBody OrderScopeUpdateRequest request,
+      @CurrentUserId UUID userId) {
+    return service.replaceOrderScope(userId, mode, scope, request);
+  }
+
+  /**
+   * Clears the stored order of a mode, back to the default order.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param request the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the empty order with the new version
+   */
+  @PostMapping("/order/{mode}/reset")
+  @Operation(summary = "Reset the order of a mode to the default order.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Order cleared."),
+    @ApiResponse(responseCode = "400", description = "Validation failed or the mode is unknown."),
+    @ApiResponse(responseCode = "409", description = "The order version of the mode is stale.")
+  })
+  public OrderModeResponse resetOrder(
+      @PathVariable String mode,
+      @Valid @RequestBody OrderResetRequest request,
+      @CurrentUserId UUID userId) {
+    return service.resetOrder(userId, mode, request);
+  }
+
+  /**
    * Replaces the caller's phone tab bar of one mode.
    *
    * @param mode the path segment of the mode, {@code member} or {@code admin}
@@ -213,6 +264,8 @@ public class NavigationPreferencesController {
       metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof HiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
+    } else if (target instanceof OrderScopeUpdateRequest || target instanceof OrderResetRequest) {
+      metrics.recordWrite(NavigationSection.ORDER, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof FavouritesAndHiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);

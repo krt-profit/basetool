@@ -619,6 +619,17 @@
       "row_count" : null,
       "status_filter" : null
     }, {
+      "preference_section" : "order.member.groups",
+      "position" : 0,
+      "entry_key" : "logistics",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
       "preference_section" : "shortcutsEnabled",
       "position" : 0,
       "entry_key" : "true",
