@@ -68,7 +68,7 @@ public interface MembershipChangeObserver {
    * @param squadronId the Staffel
    * @param userId the member's account
    * @param rank the assigned squadron rank
-   * @param group the bound Kommandogruppe, {@code null} for a Staffelleiter or an unbound Ensign
+   * @param group the bound Kommandogruppe, {@code null} for a Staffelleiter or an unbound rank
    */
   void onSquadronRankAssigned(
       @NotNull UUID squadronId,

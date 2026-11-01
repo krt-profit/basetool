@@ -196,6 +196,27 @@ class OrgChartServiceTest {
   }
 
   @Test
+  void getOrgChart_parentlessDeputy_isProjectedAsDirectDeputy() {
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+
+    OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null);
+    OrgChartPosition groupedDeputy =
+        pos(OrgChartPositionType.DEPUTY_COMMAND_LEAD, squadron, command);
+    OrgChartPosition directDeputy = pos(OrgChartPositionType.DEPUTY_COMMAND_LEAD, squadron, null);
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of(command, groupedDeputy, directDeputy));
+
+    SquadronChartDto dto = readService().getOrgChart().squadrons().getFirst();
+
+    assertEquals(groupedDeputy.getId(), dto.commands().getFirst().deputy().positionId());
+    assertEquals(1, dto.directDeputies().size());
+    assertEquals(directDeputy.getId(), dto.directDeputies().getFirst().positionId());
+  }
+
+  @Test
   void getOrgChart_noActiveUnits_skipsUnitPositionQuery() {
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -1650,6 +1671,7 @@ class OrgChartServiceTest {
     Squadron s = squadron(squadronId, "ALPHA", "ALP");
     OrgChartPosition priorCommand =
         pos(OrgChartPositionType.COMMAND_LEAD, s, null, user(userId, "kl"));
+    priorCommand.setName("Alpha");
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
         .thenReturn(List.of(priorCommand));
     when(positionRepository.findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
@@ -1666,6 +1688,92 @@ class OrgChartServiceTest {
 
     assertNull(priorCommand.getUser(), "the former Kommando node is vacated, not removed");
     verify(positionRepository, never()).delete(priorCommand);
+  }
+
+  @Test
+  void mirrorSquadronRank_kommandoleiterWithoutGroup_createsOwnUngroupedKommando() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
+    User u = user(userId, "kl");
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            squadronId, OrgChartPositionType.COMMAND_LEAD))
+        .thenReturn(2L);
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(u);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.KOMMANDOLEITER, null);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.COMMAND_LEAD, saved.getPositionType());
+    assertSame(u, saved.getUser());
+    assertNull(saved.getKommandoGroup());
+    assertNull(saved.getName());
+    assertNull(saved.getParent());
+    assertEquals(2, saved.getSortIndex());
+  }
+
+  @Test
+  void mirrorSquadronRank_stellvWithoutGroup_createsParentlessDeputy() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "ALPHA", "ALP");
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            squadronId, OrgChartPositionType.DEPUTY_COMMAND_LEAD))
+        .thenReturn(1L);
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "stellv"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service()
+        .onSquadronRankAssigned(squadronId, userId, MembershipRole.STELLV_KOMMANDOLEITER, null);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.DEPUTY_COMMAND_LEAD, saved.getPositionType());
+    assertNull(saved.getParent(), "a group-less deputy reports straight to the Staffelleiter");
+    verify(positionRepository, never()).findByParentIdAndPositionType(any(), any());
+  }
+
+  @Test
+  void mirrorRemoveSquadronRank_deletesBareUngroupedKommando() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgChartPosition command =
+        pos(
+            OrgChartPositionType.COMMAND_LEAD,
+            squadron(squadronId, "ALPHA", "ALP"),
+            null,
+            user(userId, "kl"));
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
+        .thenReturn(List.of(command));
+    when(positionRepository.existsByParentId(command.getId())).thenReturn(false);
+
+    service().onSquadronRankCleared(squadronId, userId);
+
+    verify(positionRepository).delete(command);
+  }
+
+  @Test
+  void mirrorRemoveSquadronRank_ungroupedKommandoWithChildren_isVacated() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgChartPosition command =
+        pos(
+            OrgChartPositionType.COMMAND_LEAD,
+            squadron(squadronId, "ALPHA", "ALP"),
+            null,
+            user(userId, "kl"));
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
+        .thenReturn(List.of(command));
+    when(positionRepository.existsByParentId(command.getId())).thenReturn(true);
+
+    service().onSquadronRankCleared(squadronId, userId);
+
+    assertNull(command.getUser());
+    verify(positionRepository, never()).delete(command);
   }
 
   @Test

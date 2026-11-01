@@ -91,6 +91,15 @@ public interface OrgChartPositionRepository extends JpaRepository<OrgChartPositi
   boolean existsByParentIdAndPositionType(UUID parentId, OrgChartPositionType positionType);
 
   /**
+   * Whether any position hangs off the given parent; the squadron-rank mirror deletes a vacated
+   * ungrouped Kommando only when nothing reports into it (REQ-ROLE-006).
+   *
+   * @param parentId the parent position id; never {@code null}.
+   * @return {@code true} iff at least one child position exists under that parent.
+   */
+  boolean existsByParentId(UUID parentId);
+
+  /**
    * Whether the user already holds any position in the given OrgUnit. Backs the "a user appears at
    * most once per Staffel/SK" guard, surfacing a friendly error before the {@code
    * uq_org_chart_user_per_unit} index would reject the insert.

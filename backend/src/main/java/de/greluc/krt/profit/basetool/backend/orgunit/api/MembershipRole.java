@@ -45,16 +45,18 @@ public enum MembershipRole {
   STAFFELLEITER,
 
   /**
-   * Kommandoleiter — leads one {@link KommandoGroup} within a Staffel. Valid only on a {@code
-   * SQUADRON} membership and must reference a {@link OrgUnitMembership#getKommandoGroup() command
-   * group}; up to four per squadron. Confers officer-equivalent reach over its own squadron.
+   * Kommandoleiter — leads a Kommando within a Staffel. Valid only on a {@code SQUADRON}
+   * membership; may reference a {@link OrgUnitMembership#getKommandoGroup() command group} (at most
+   * one per group) or be {@code null}; up to four per squadron. Confers officer-equivalent reach
+   * over its own squadron.
    */
   KOMMANDOLEITER,
 
   /**
-   * Stellvertretender Kommandoleiter — deputy of a {@link KommandoGroup}'s {@link #KOMMANDOLEITER}.
-   * Valid only on a {@code SQUADRON} membership and must reference a command group; at most one per
-   * group. Confers officer-equivalent reach over its own squadron.
+   * Stellvertretender Kommandoleiter — deputy Kommandoleiter. Valid only on a {@code SQUADRON}
+   * membership; may reference a {@link KommandoGroup} (at most one per group) or be {@code null}
+   * ("allgemein der Staffelleitung"); up to four per squadron. Confers officer-equivalent reach
+   * over its own squadron.
    */
   STELLV_KOMMANDOLEITER,
 

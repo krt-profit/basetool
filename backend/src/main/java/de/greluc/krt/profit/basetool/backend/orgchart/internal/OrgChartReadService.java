@@ -243,12 +243,6 @@ public class OrgChartReadService {
             .toList();
     List<CommandChartDto> commandDtos =
         commands.stream().map(cmd -> buildCommand(cmd, positions)).toList();
-    List<OrgChartNodeDto> directEnsigns =
-        positions.stream()
-            .filter(p -> p.getPositionType() == OrgChartPositionType.ENSIGN)
-            .filter(p -> p.getParent() == null)
-            .map(mapper::toNode)
-            .toList();
     long ensignCount =
         positions.stream().filter(p -> p.getPositionType() == OrgChartPositionType.ENSIGN).count();
     return new SquadronChartDto(
@@ -257,7 +251,8 @@ public class OrgChartReadService {
         unit.getShorthand(),
         lead,
         commandDtos,
-        directEnsigns,
+        directNodesOfType(positions, OrgChartPositionType.DEPUTY_COMMAND_LEAD),
+        directNodesOfType(positions, OrgChartPositionType.ENSIGN),
         commands.size() < OrgChartService.MAX_COMMAND_LEADS,
         ensignCount < OrgChartService.MAX_ENSIGNS);
   }
@@ -310,6 +305,23 @@ public class OrgChartReadService {
         unit.getShorthand(),
         commanders,
         commanders.size() < OrgChartService.MAX_SK_COMMANDERS);
+  }
+
+  /**
+   * Projects the positions of one type that report straight to the Staffelleiter (no parent
+   * Kommando).
+   *
+   * @param positions every position of the Staffel; never {@code null}.
+   * @param type the rank to project.
+   * @return the parentless nodes of that rank, in the input order; never {@code null}.
+   */
+  private List<OrgChartNodeDto> directNodesOfType(
+      @NotNull List<OrgChartPosition> positions, OrgChartPositionType type) {
+    return positions.stream()
+        .filter(p -> p.getPositionType() == type)
+        .filter(p -> p.getParent() == null)
+        .map(mapper::toNode)
+        .toList();
   }
 
   private List<OrgChartNodeDto> nodesOfType(
