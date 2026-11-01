@@ -331,7 +331,8 @@ Appointment runs through a **delegated ladder without self-promotion**
 OL members; OL → Bereichsleiter; Bereichsleiter → Staffelleiter / SK-Leiter /
 Bereichskoordinatoren / -operatoren (own Bereich); Staffelleiter →
 Kommandoleiter / Stellvertreter / Ensigns + Kommandogruppen (own Staffel, at most
-four Kommandogruppen). To appoint a rank, you must hold a **strictly higher**
+four Kommandogruppen and four of each of the three ranks; a Kommandogruppe is
+optional for all three, ADR-0322). To appoint a rank, you must hold a **strictly higher**
 rank — nobody promotes themselves. Every appointment is logged in the audit log
 „Rollen & Mitglieder" and is reflected in the same transaction in the
 account-bound org-chart seat (REQ-ROLE-006).

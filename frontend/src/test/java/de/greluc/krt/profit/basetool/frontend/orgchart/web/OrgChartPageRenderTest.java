@@ -110,7 +110,15 @@ class OrgChartPageRenderTest {
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
-                        UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true)),
+                        UUID.randomUUID(),
+                        "ALPHA",
+                        "ALP",
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        true,
+                        true)),
                 List.of()));
     when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
         .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
@@ -207,6 +215,7 @@ class OrgChartPageRenderTest {
                         null,
                         List.of(command),
                         List.of(),
+                        List.of(),
                         true,
                         true)),
                 List.of()));
@@ -261,6 +270,7 @@ class OrgChartPageRenderTest {
                         null,
                         List.of(command),
                         List.of(),
+                        List.of(),
                         false,
                         false)),
                 List.of()));
@@ -297,6 +307,56 @@ class OrgChartPageRenderTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void ungroupedAccountLedCommandAndDirectDeputy_admin_renderWithoutEditAffordances()
+      throws Exception {
+    CommandChartDto command =
+        new CommandChartDto(
+            UUID.randomUUID(), null, 0L, 0, null, UUID.randomUUID(), "Cmd", null, null, List.of());
+    OrgChartNodeDto directDeputy =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "DEPUTY_COMMAND_LEAD", UUID.randomUUID(), "Deputy", null, 0, 0L);
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(
+                    new SquadronChartDto(
+                        UUID.randomUUID(),
+                        "ALPHA",
+                        "ALP",
+                        null,
+                        List.of(command),
+                        List.of(directDeputy),
+                        List.of(),
+                        false,
+                        false)),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("the ungrouped Kommando renders").contains("oc-command-head");
+    assertThat(html).as("the appointed Kommandoleiter renders").contains("Cmd");
+    assertThat(html).as("the group-less Stv. renders").contains("Deputy");
+    assertThat(html)
+        .as("no rename control on an account-led Kommando head")
+        .doesNotContain("data-trigger=\"oc-rename\"");
+    assertThat(html)
+        .as("no remove control on an account-held seat")
+        .doesNotContain("data-trigger=\"oc-remove\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void chartBodyFragment_rendersTreeWithoutPageChrome() throws Exception {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
@@ -306,7 +366,15 @@ class OrgChartPageRenderTest {
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
-                        UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true)),
+                        UUID.randomUUID(),
+                        "ALPHA",
+                        "ALP",
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        true,
+                        true)),
                 List.of()));
 
     String html =
@@ -493,6 +561,7 @@ class OrgChartPageRenderTest {
                         null,
                         List.of(command),
                         List.of(),
+                        List.of(),
                         true,
                         true)),
                 List.of()));
@@ -527,7 +596,7 @@ class OrgChartPageRenderTest {
             UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", null, 0, 0L);
     SquadronChartDto sq =
         new SquadronChartDto(
-            UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), true, true);
+            UUID.randomUUID(), "ALPHA", "ALP", null, List.of(), List.of(), List.of(), true, true);
     BereichChartDto bereich =
         new BereichChartDto(
             UUID.randomUUID(),

@@ -327,19 +327,21 @@ public class OrgChartService implements MembershipChangeObserver {
    *
    * <ul>
    *   <li>{@code STAFFELLEITER} → the squadron's single {@code SQUADRON_LEAD} seat;
-   *   <li>{@code KOMMANDOLEITER} → the holder of the group's {@code COMMAND_LEAD} node;
-   *   <li>{@code STELLV_KOMMANDOLEITER} → the {@code DEPUTY_COMMAND_LEAD} under that node;
+   *   <li>{@code KOMMANDOLEITER} → the holder of the group's {@code COMMAND_LEAD} node, or of an
+   *       own ungrouped, unnamed {@code COMMAND_LEAD} node without a group;
+   *   <li>{@code STELLV_KOMMANDOLEITER} → the {@code DEPUTY_COMMAND_LEAD} under that node, or a
+   *       Staffelleiter-direct deputy without a group;
    *   <li>{@code ENSIGN} → an {@code ENSIGN} under that node, or a Staffelleiter-direct Ensign
    *       without a group.
    * </ul>
    *
    * <p>Any prior squadron seat is cleared first; a led Kommando is vacated rather than removed
-   * (REQ-ORG-025).
+   * (REQ-ORG-025), except an ungrouped one nothing reports into.
    *
    * @param squadronId the Staffel the rank is on; never {@code null}.
    * @param userId the appointed member's account; never {@code null}.
    * @param rank the squadron rank assigned; must be a squadron rank.
-   * @param group the bound Kommandogruppe, or {@code null} for a Staffelleiter / general Ensign.
+   * @param group the bound Kommandogruppe, or {@code null} for a Staffelleiter or an unbound rank.
    */
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -353,16 +355,27 @@ public class OrgChartService implements MembershipChangeObserver {
       case STAFFELLEITER ->
           upsertSingletonSeat(squadronId, OrgChartPositionType.SQUADRON_LEAD, userId);
       case KOMMANDOLEITER -> {
-        OrgChartPosition command = commandLeadForGroup(squadronId, Objects.requireNonNull(group));
-        command.setUser(userReference(userId));
-        command.setDisplayName(null);
+        if (group == null) {
+          reuseOrCreateSeat(squadronId, OrgChartPositionType.COMMAND_LEAD, null, userId);
+        } else {
+          OrgChartPosition command = commandLeadForGroup(squadronId, group);
+          command.setUser(userReference(userId));
+          command.setDisplayName(null);
+        }
       }
-      case STELLV_KOMMANDOLEITER ->
-          upsertDeputySeat(
-              squadronId, commandLeadForGroup(squadronId, Objects.requireNonNull(group)), userId);
+      case STELLV_KOMMANDOLEITER -> {
+        if (group == null) {
+          reuseOrCreateSeat(squadronId, OrgChartPositionType.DEPUTY_COMMAND_LEAD, null, userId);
+        } else {
+          upsertDeputySeat(squadronId, commandLeadForGroup(squadronId, group), userId);
+        }
+      }
       case ENSIGN ->
-          createEnsignSeat(
-              squadronId, group == null ? null : commandLeadForGroup(squadronId, group), userId);
+          reuseOrCreateSeat(
+              squadronId,
+              OrgChartPositionType.ENSIGN,
+              group == null ? null : commandLeadForGroup(squadronId, group),
+              userId);
       default -> throw new IllegalArgumentException("Not a squadron rank: " + rank);
     }
   }
@@ -458,20 +471,35 @@ public class OrgChartService implements MembershipChangeObserver {
   /**
    * Clears the appointee's single squadron chart seat: a led Kommando ({@code COMMAND_LEAD}) is
    * vacated so the Kommando survives (REQ-ORG-025), while a {@code SQUADRON_LEAD} / {@code
-   * DEPUTY_COMMAND_LEAD} / {@code ENSIGN} seat is deleted outright.
+   * DEPUTY_COMMAND_LEAD} / {@code ENSIGN} seat and an ungrouped, unnamed Kommando nothing reports
+   * into are deleted outright.
    *
    * @param squadronId the Staffel; never {@code null}.
    * @param userId the member; never {@code null}.
    */
   private void clearSquadronSeatForUser(@NotNull UUID squadronId, @NotNull UUID userId) {
     for (OrgChartPosition seat : positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)) {
-      if (seat.getPositionType() == OrgChartPositionType.COMMAND_LEAD) {
+      if (seat.getPositionType() == OrgChartPositionType.COMMAND_LEAD
+          && !isBareUngroupedCommand(seat)) {
         seat.setUser(null);
         seat.setDisplayName(null);
       } else {
         positionRepository.delete(seat);
       }
     }
+  }
+
+  /**
+   * Returns whether a Kommando node is bound to no Kommandogruppe, carries no name and has no
+   * stellv. or Ensign under it, so vacating it would leave an empty box.
+   *
+   * @param command the {@code COMMAND_LEAD} node; never {@code null}.
+   * @return {@code true} iff the node can be removed without losing chart content.
+   */
+  private boolean isBareUngroupedCommand(@NotNull OrgChartPosition command) {
+    return command.getKommandoGroup() == null
+        && command.getName() == null
+        && !positionRepository.existsByParentId(command.getId());
   }
 
   /**
@@ -521,24 +549,23 @@ public class OrgChartService implements MembershipChangeObserver {
   }
 
   /**
-   * Creates an {@code ENSIGN} seat for the appointee, appended after the squadron's existing
-   * Ensigns, optionally reporting into a Kommando node (a {@code null} parent is a
-   * Staffelleiter-direct Ensign).
+   * Gives the appointee a seat of the given type in the Staffel: a matching free-text placeholder
+   * is converted, otherwise a fresh seat is appended after the existing ones of that type.
    *
    * @param squadronId the Staffel; never {@code null}.
-   * @param parent the Kommando node to report into, or {@code null} for a direct Ensign.
+   * @param type the rank to seat; never {@code null}.
+   * @param parent the Kommando node to report into, or {@code null} for a Staffelleiter-direct seat
+   *     or an ungrouped Kommando.
    * @param userId the appointee; never {@code null}.
    */
-  private void createEnsignSeat(
-      @NotNull UUID squadronId, @Nullable OrgChartPosition parent, @NotNull UUID userId) {
-    if (reuseFreeTextSeat(squadronId, OrgChartPositionType.ENSIGN, parent, userId)) {
-      return;
+  private void reuseOrCreateSeat(
+      @NotNull UUID squadronId,
+      @NotNull OrgChartPositionType type,
+      @Nullable OrgChartPosition parent,
+      @NotNull UUID userId) {
+    if (!reuseFreeTextSeat(squadronId, type, parent, userId)) {
+      createUserSeat(squadronId, type, userId, parent);
     }
-    int sortIndex =
-        (int)
-            positionRepository.countByOrgUnitIdAndPositionType(
-                squadronId, OrgChartPositionType.ENSIGN);
-    createSeat(squadronId, OrgChartPositionType.ENSIGN, userId, parent, sortIndex);
   }
 
   /**

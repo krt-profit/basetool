@@ -160,8 +160,8 @@ class LeitungPagePatternRenderTest {
                         null,
                         List.of(
                             new SquadronChartDto(
-                                SQUADRON, "ALPHA", "ALP", null, List.of(), List.of(), false,
-                                false)),
+                                SQUADRON, "ALPHA", "ALP", null, List.of(), List.of(), List.of(),
+                                false, false)),
                         List.of(
                             new SpecialCommandChartDto(SK, "Bergung", "BRG", List.of(), false)))),
                 null,
