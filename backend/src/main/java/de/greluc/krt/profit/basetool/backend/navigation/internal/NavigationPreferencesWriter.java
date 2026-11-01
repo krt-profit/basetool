@@ -56,6 +56,7 @@ public class NavigationPreferencesWriter {
   private static final String TOO_MANY_SCOPES = "The order holds too many scopes.";
 
   private final NavigationPreferencesRepository repository;
+  private final NavigationAppearanceWriter appearance;
 
   /**
    * Reads every section of the member; a member without a row holds the empty defaults.
@@ -67,13 +68,14 @@ public class NavigationPreferencesWriter {
   public @NotNull NavigationPreferencesResponse read(@NotNull UUID userId) {
     return repository
         .findById(userId)
-        .map(NavigationPreferencesWriter::toResponse)
+        .map(this::toResponse)
         .orElseGet(() ->
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(), 0),
                 new OrderResponse(
-                    new OrderModeResponse(Map.of(), 0), new OrderModeResponse(Map.of(), 0))));
+                    new OrderModeResponse(Map.of(), 0), new OrderModeResponse(Map.of(), 0)),
+                new AppearanceResponse(DesktopMode.DRAWER, 0)));
   }
 
   /**
@@ -154,7 +156,7 @@ public class NavigationPreferencesWriter {
     NavigationPreferences preferences = repository.findById(userId).orElseThrow();
     preferences.replaceFavourites(keys);
     repository.saveAndFlush(preferences);
-    return toResponse(preferences).favourites();
+    return favouritesOf(preferences);
   }
 
   /**
@@ -317,14 +319,19 @@ public class NavigationPreferencesWriter {
     return new OrderModeResponse(preferences.orderOf(mode), preferences.orderVersionOf(mode));
   }
 
-  private static NavigationPreferencesResponse toResponse(NavigationPreferences preferences) {
+  private NavigationPreferencesResponse toResponse(NavigationPreferences preferences) {
     return new NavigationPreferencesResponse(
-        new FavouritesResponse(
-            List.copyOf(preferences.getFavourites()), preferences.getFavouritesVersion()),
+        favouritesOf(preferences),
         new HiddenResponse(
             preferences.getHidden().stream().sorted().toList(), preferences.getHiddenVersion()),
         new OrderResponse(
             toOrder(preferences, NavigationMode.MEMBER),
-            toOrder(preferences, NavigationMode.ADMIN)));
+            toOrder(preferences, NavigationMode.ADMIN)),
+        appearance.read(preferences.getUserId(), preferences.getAppearanceVersion()));
+  }
+
+  private static FavouritesResponse favouritesOf(NavigationPreferences preferences) {
+    return new FavouritesResponse(
+        List.copyOf(preferences.getFavourites()), preferences.getFavouritesVersion());
   }
 }

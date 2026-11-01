@@ -62,6 +62,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class NavigationPreferencesReader {
 
+  private final NavigationPreferencesLoader preferences;
+
   private final NavigationBackendClient client;
 
   private final NavigationRegistry registry;
@@ -75,7 +77,7 @@ public class NavigationPreferencesReader {
   @NotNull
   public NavigationPersonalisation read(@NotNull NavigationAccess access) {
     try {
-      NavigationPreferencesResponse stored = client.preferences();
+      NavigationPreferencesResponse stored = preferences.load().orElse(null);
       if (stored == null) {
         return NavigationPersonalisation.NOT_LOADED;
       }
@@ -84,7 +86,11 @@ public class NavigationPreferencesReader {
         return resolution.view();
       }
       NavigationPreferencesResponse pruned = client.prune(resolution.gone());
-      return pruned == null ? resolution.view() : resolve(pruned, access).view();
+      if (pruned == null) {
+        return resolution.view();
+      }
+      preferences.replace(pruned);
+      return resolve(pruned, access).view();
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (BackendServiceException e) {

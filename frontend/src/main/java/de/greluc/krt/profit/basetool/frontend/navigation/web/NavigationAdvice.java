@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAppearance;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
@@ -63,6 +64,8 @@ public class NavigationAdvice {
   private final RoleHierarchy roleHierarchy;
 
   private final NavigationPreferencesReader preferencesReader;
+
+  private final NavigationPreferencesLoader preferences;
 
   private final FrontendAuthHelperService authHelper;
 
@@ -198,6 +201,25 @@ public class NavigationAdvice {
       @ModelAttribute(name = "navigationPersonalisation", binding = false) @NotNull
           NavigationPersonalisation personalisation) {
     return personalisation.hidden();
+  }
+
+  /**
+   * Reads the caller's appearance for the navigation, from the same stored preferences as the
+   * favourites; a signed-out visitor and a handler that renders no model get the drawer.
+   *
+   * @param request the current request
+   * @return the appearance to render; never {@code null}
+   */
+  @ModelAttribute("navigationAppearance")
+  @NotNull
+  public NavigationAppearance appearance(@NotNull HttpServletRequest request) {
+    if (!authHelper.isAuthenticated() || !LayoutContextLoader.needsLayoutModel(request)) {
+      return NavigationAppearance.NOT_LOADED;
+    }
+    return preferences
+        .load()
+        .map(stored -> NavigationAppearance.of(stored.appearance()))
+        .orElse(NavigationAppearance.NOT_LOADED);
   }
 
   @NotNull

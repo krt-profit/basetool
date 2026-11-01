@@ -40,6 +40,7 @@ public class NavigationMentionSource implements PersonMentionSource {
   @Override
   public @NotNull Set<String> exemptColumns() {
     return Set.of(
+        "navigation_appearance.desktop_mode",
         "navigation_favourite.entry_key",
         "navigation_hidden.entry_key",
         "navigation_order.entry_key",

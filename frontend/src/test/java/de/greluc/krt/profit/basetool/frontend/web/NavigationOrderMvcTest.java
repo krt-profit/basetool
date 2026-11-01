@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
@@ -86,7 +87,8 @@ class NavigationOrderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 HiddenResponse.EMPTY,
-                new OrderResponse(member, admin)));
+                new OrderResponse(member, admin),
+                AppearanceResponse.DRAWER));
   }
 
   private static OrderModeResponse order(long version, Map<String, List<String>> scopes) {

@@ -344,6 +344,9 @@ class DataExportEndStateTest {
               + " VALUES (?, 0, 'member', 'groups', ?)",
           owner.getId(),
           "logistics");
+      jdbc.update(
+          "INSERT INTO navigation_appearance (preferences_id, desktop_mode) VALUES (?, 'RAIL')",
+          owner.getId());
     }
     UUID partner = UUID.randomUUID();
     jdbc.update(

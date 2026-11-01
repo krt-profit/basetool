@@ -59,6 +59,7 @@ requires it and duplicating it into further files spreads personal data for no g
   `job_order*`, `refinery_order`, `personal_inventory_item`, `personal_blueprint`,
   `navigation_preferences`, `navigation_favourite`, `navigation_hidden`, `navigation_order` (the
   member's own favourites, hidden pages and group and link order as entry keys, no free text),
+  `navigation_appearance` (the chosen desktop mode, an enumerated value),
   `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,
   `announcement`.
 - **Transient only:** while a member has a mission open, the frontend shares their handle and the

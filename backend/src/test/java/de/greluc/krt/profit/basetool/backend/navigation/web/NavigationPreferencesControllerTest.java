@@ -55,6 +55,7 @@ class NavigationPreferencesControllerTest {
 
   private static final String PREFERENCES = "/api/v1/navigation/preferences";
   private static final String FAVOURITES = PREFERENCES + "/favourites";
+  private static final String APPEARANCE = PREFERENCES + "/appearance";
   private static final String HIDDEN = PREFERENCES + "/hidden";
   private static final String BOTH = PREFERENCES + "/favourites-and-hidden";
   private static final String ORDER = PREFERENCES + "/order/";
@@ -246,6 +247,59 @@ class NavigationPreferencesControllerTest {
         .andExpect(jsonPath("$.favourites.keys[0]").value("missions.list"))
         .andExpect(jsonPath("$.favourites.keys.length()").value(1))
         .andExpect(jsonPath("$.favourites.version").value(2));
+  }
+
+  private org.springframework.test.web.servlet.ResultActions putAppearance(String body)
+      throws Exception {
+    return mockMvc.perform(
+        put(APPEARANCE)
+            .with(as(owner))
+            .with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
+  }
+
+  @Test
+  void readsTheDrawerAsTheDefaultAppearance() throws Exception {
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.appearance.desktopMode").value("DRAWER"))
+        .andExpect(jsonPath("$.appearance.version").value(0));
+  }
+
+  @Test
+  void storesTheDesktopModeAndReturnsTheNextVersion() throws Exception {
+    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.desktopMode").value("RAIL"))
+        .andExpect(jsonPath("$.version").value(1));
+  }
+
+  @Test
+  void refusesAnUnknownDesktopMode() throws Exception {
+    putAppearance("{\"desktopMode\":\"TOP\",\"version\":0}").andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void refusesAMissingAppearanceVersion() throws Exception {
+    putAppearance("{\"desktopMode\":\"RAIL\"}").andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void answers409ForAStaleAppearanceVersion() throws Exception {
+    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}").andExpect(status().isOk());
+
+    putAppearance("{\"desktopMode\":\"PINNED\",\"version\":0}").andExpect(status().isConflict());
+  }
+
+  @Test
+  void anAppearanceWriteLeavesTheFavouritesVersionAlone() throws Exception {
+    putAppearance("{\"desktopMode\":\"PINNED\",\"version\":0}").andExpect(status().isOk());
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.favourites.version").value(0))
+        .andExpect(jsonPath("$.appearance.desktopMode").value("PINNED"));
   }
 
   private void putJson(String path, String body, int status) throws Exception {

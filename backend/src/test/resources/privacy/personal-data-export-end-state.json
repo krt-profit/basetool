@@ -575,17 +575,21 @@
     "key" : "navigationPreferences",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
+      "preference_section" : "desktopMode",
+      "position" : 0,
+      "value" : "RAIL"
+    }, {
       "preference_section" : "favourites",
       "position" : 0,
-      "entry_key" : "missions.list"
+      "value" : "missions.list"
     }, {
       "preference_section" : "hidden",
       "position" : 0,
-      "entry_key" : "bank.dashboard"
+      "value" : "bank.dashboard"
     }, {
       "preference_section" : "order.member.groups",
       "position" : 0,
-      "entry_key" : "logistics"
+      "value" : "logistics"
     } ],
     "truncated" : false
   } ]

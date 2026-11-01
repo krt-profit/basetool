@@ -34,7 +34,10 @@ public enum NavigationSection {
   HIDDEN("hidden"),
 
   /** The group and link order of both modes (REQ-UI-032). */
-  ORDER("order");
+  ORDER("order"),
+
+  /** The „Darstellung" section (REQ-UI-032). */
+  APPEARANCE("display");
 
   private final String tag;
 }

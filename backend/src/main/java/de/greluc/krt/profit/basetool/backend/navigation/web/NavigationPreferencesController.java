@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.web;
 
+import de.greluc.krt.profit.basetool.backend.navigation.internal.AppearanceResponse;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.AppearanceUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesUpdateRequest;
@@ -106,6 +108,25 @@ public class NavigationPreferencesController {
   public FavouritesResponse replaceFavourites(
       @Valid @RequestBody FavouritesUpdateRequest request, @CurrentUserId UUID userId) {
     return service.replaceFavourites(userId, request);
+  }
+
+  /**
+   * Replaces the caller's "Darstellung" section.
+   *
+   * @param request the new desktop mode and the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the stored appearance with the new version
+   */
+  @PutMapping("/appearance")
+  @Operation(summary = "Replace the caller's appearance section (desktop mode).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Appearance stored."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "409", description = "The appearance version is stale.")
+  })
+  public AppearanceResponse replaceAppearance(
+      @Valid @RequestBody AppearanceUpdateRequest request, @CurrentUserId UUID userId) {
+    return service.replaceAppearance(userId, request);
   }
 
   /**
@@ -212,6 +233,8 @@ public class NavigationPreferencesController {
     Object target = ex.getBindingResult().getTarget();
     if (target instanceof FavouritesUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
+    } else if (target instanceof AppearanceUpdateRequest) {
+      metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof HiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof OrderScopeUpdateRequest || target instanceof OrderResetRequest) {

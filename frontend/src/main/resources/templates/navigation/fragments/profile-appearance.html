@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="card">
+    <div class="card" id="profile-appearance-card" data-testid="profile-appearance-card">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{profile.appearance.title}">Darstellung</h2>
+        </div>
+        <p class="acct-note">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+            <span th:text="#{profile.appearance.hint}">Wähle, wie die Navigation auf großen Bildschirmen erscheint.</span>
+        </p>
+        <th:block th:replace="~{kernel/fragments/nav-appearance :: switch('desktop-mode-profile')}"></th:block>
+        <p class="form-hint" th:text="#{profile.appearance.note}">Ab 1025 px Breite.</p>
+    </div>
+</div>
+</body>
+</html>

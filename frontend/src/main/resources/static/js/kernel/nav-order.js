@@ -43,7 +43,7 @@ const TOGGLE_SELECTOR = '[data-trigger="nav-edit-toggle"]';
 /** @type {WeakSet<Element>} lists that already carry their reorder handlers */
 const attached = new WeakSet();
 
-/** @type {Map<Element, import('/js/kernel/krt-reorder.js').KrtReorderHandle>} */
+/** @type {Map<Element, ReturnType<typeof krtReorder.attach>>} */
 const groupLists = new Map();
 
 /**
