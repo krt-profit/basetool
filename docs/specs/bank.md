@@ -1617,7 +1617,7 @@ audiences, all-members and individual grants only:
 
 - **No `GLOBAL_ROLE` audience remains.** The Sichtbarkeit editor of a Sonderkonto offers no role
   buckets, and adding one is rejected as a bad request (`OrgUnitBankSettingsService`,
-  REQ-BANK-035). The grantee kind `GLOBAL_ROLE` no longer exists in code.
+  REQ-BANK-035). The grantee kind `GLOBAL_ROLE` no longer exists in code, and `V320` removes it from the table checks.
 - **Existing grants and limits were removed by migrations** `V318` (`OFFICER`) and `V320` (every
   remaining `GLOBAL_ROLE` row, i.e. `LOGISTICIAN` and `MISSION_MANAGER`). Each deletes every
   `bank_account_view_grant` row and every `bank_account_approval_limit` row (REQ-BANK-041) with

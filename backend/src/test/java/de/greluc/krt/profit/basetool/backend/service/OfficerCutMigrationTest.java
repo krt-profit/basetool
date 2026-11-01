@@ -74,6 +74,7 @@ class OfficerCutMigrationTest {
 
   @BeforeEach
   void seed() {
+    LegacyGlobalRoleRows.allowGlobalRole(jdbcTemplate);
     Role officer = new Role();
     officer.setCode("OFFICER");
     officer.setName("Officer");

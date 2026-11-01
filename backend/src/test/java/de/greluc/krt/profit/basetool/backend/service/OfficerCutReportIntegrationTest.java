@@ -92,6 +92,7 @@ class OfficerCutReportIntegrationTest {
 
   @BeforeEach
   void seed() {
+    LegacyGlobalRoleRows.allowGlobalRole(jdbcTemplate);
     Role krtMember = roleRepository.findByNameIgnoreCase("KRT Member").orElseThrow();
     Role officer = new Role();
     officer.setCode("OFFICER");

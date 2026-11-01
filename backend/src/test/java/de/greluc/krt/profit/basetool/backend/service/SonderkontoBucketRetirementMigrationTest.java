@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +60,7 @@ class SonderkontoBucketRetirementMigrationTest {
 
   @BeforeEach
   void seed() {
+    LegacyGlobalRoleRows.allowGlobalRole(jdbcTemplate);
     jdbcTemplate.update(
         "INSERT INTO bank_account (id, account_no, name, type) VALUES (?, ?, ?, 'SPECIAL')",
         ACCOUNT,
@@ -114,6 +117,28 @@ class SonderkontoBucketRetirementMigrationTest {
     assertThat(
             count("SELECT count(*) FROM bank_account_approval_limit WHERE account_id = ?", ACCOUNT))
         .isZero();
+  }
+
+  @Test
+  void theSchemaRejectsAGlobalRoleViewGrantAfterwards() throws IOException {
+    migrate();
+
+    assertThatThrownBy(() -> roleGrant(UUID.randomUUID(), "LOGISTICIAN"))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void theSchemaRejectsAGlobalRoleApprovalLimitAfterwards() throws IOException {
+    migrate();
+
+    assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "INSERT INTO bank_account_approval_limit"
+                    + " (id, account_id, grantee_kind, role_code, limit_amount)"
+                    + " VALUES (?, ?, 'GLOBAL_ROLE', 'LOGISTICIAN', 1)",
+                UUID.randomUUID(),
+                ACCOUNT))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
