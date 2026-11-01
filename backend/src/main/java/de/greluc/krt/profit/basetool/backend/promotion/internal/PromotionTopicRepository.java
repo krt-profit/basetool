@@ -48,13 +48,13 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
   /**
    * Squadron-scoped unpaginated read for the promotion-system overview. When {@code
    * scopeSquadronIds} is {@code null} the result spans every squadron (admin "all squadrons" mode);
-   * a non-null id restricts the result to a single squadron's topics. The {@code sortOrder ASC}
+   * a non-null set restricts the result to the topics of those squadrons. The {@code sortOrder ASC}
    * default matches {@link #findAllByOrderBySortOrderAsc()}.
    */
   @Query(
       """
-      SELECT t FROM PromotionTopic t WHERE :scopeSquadronIds IS NULL OR t.owningSquadron.id =
-      :scopeSquadronIds ORDER BY t.sortOrder ASC
+      SELECT t FROM PromotionTopic t WHERE (:scopeSquadronIds IS NULL OR t.owningSquadron.id IN :scopeSquadronIds)
+      ORDER BY t.sortOrder ASC
       """)
   List<PromotionTopic> findAllScoped(
       @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
@@ -66,8 +66,7 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
    */
   @Query(
       """
-      SELECT t FROM PromotionTopic t WHERE :scopeSquadronIds IS NULL OR t.owningSquadron.id =
-      :scopeSquadronIds
+      SELECT t FROM PromotionTopic t WHERE (:scopeSquadronIds IS NULL OR t.owningSquadron.id IN :scopeSquadronIds)
       """)
   Page<PromotionTopic> findAllScoped(
       @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);

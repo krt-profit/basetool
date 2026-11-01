@@ -53,6 +53,9 @@ class QuickAccessSearchE2eTest {
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
+  /** Canonical IRIDIUM Squadron id, the administrator's home Staffel. */
+  private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";
+
   /** A name fragment no other entity of the stack carries. */
   private static final String TOKEN = "Quickfind " + UUID.randomUUID().toString().substring(0, 6);
 
@@ -90,7 +93,8 @@ class QuickAccessSearchE2eTest {
       squadronId = seeder.createSquadron(USERNAME, PASSWORD, squadronName, "QF" + tag);
       adminUserId = seeder.getUserId(USERNAME, PASSWORD);
       adminName = seeder.getEffectiveName(USERNAME, PASSWORD);
-      seeder.assignSquadronLead(USERNAME, PASSWORD, squadronId, adminUserId);
+      seeder.assignSecondStaffelleiterSeat(
+          USERNAME, PASSWORD, adminUserId, IRIDIUM_SQUADRON_ID, squadronId);
       seeder.setSquadronProfitEligible(USERNAME, PASSWORD, squadronId, true);
       jobOrderId =
           seeder.createJobOrder(
