@@ -55,7 +55,7 @@ public class NavigationBackendClient {
 
   private static final String FAVOURITES_AND_HIDDEN = PREFERENCES + "/favourites-and-hidden";
 
-  private static final String TAB_BAR = PREFERENCES + "/tab-bar/";
+  private static final String TAB_BAR = PREFERENCES + "/tab-bar/{mode}";
 
   private static final String PRUNE = PREFERENCES + "/prune";
 
@@ -131,7 +131,7 @@ public class NavigationBackendClient {
   @Nullable
   public TabBarResponse replaceTabBar(
       @NotNull NavigationMode mode, @NotNull TabBarUpdateRequest request) {
-    return backendApiClient.put(TAB_BAR + mode.getSegment(), request, TabBarResponse.class);
+    return backendApiClient.put(TAB_BAR, request, TabBarResponse.class, mode.getSegment());
   }
 
   /**

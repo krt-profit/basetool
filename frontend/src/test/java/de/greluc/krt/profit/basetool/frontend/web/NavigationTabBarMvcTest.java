@@ -282,7 +282,10 @@ class NavigationTabBarMvcTest {
     TabBarUpdateRequest expected =
         new TabBarUpdateRequest(Arrays.asList("a.one", null, "c.three"), 4L);
     when(backendApiClient.put(
-            eq(PREFERENCES + "/tab-bar/member"), eq(expected), eq(TabBarResponse.class)))
+            eq(PREFERENCES + "/tab-bar/{mode}"),
+            eq(expected),
+            eq(TabBarResponse.class),
+            eq("member")))
         .thenReturn(bar(5, "a.one", null, "c.three"));
 
     mockMvc
