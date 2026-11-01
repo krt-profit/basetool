@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -129,6 +130,18 @@ class HangarServiceTest {
     hangarService.getMyShipsFiltered(userId, "   ", null, pageable);
 
     verify(shipRepository).findByOwnerIdFiltered(userId, null, null, pageable);
+  }
+
+  @Test
+  void getMyReadiness_readsTheOwnersCountsFromOneAggregate() {
+    UUID userId = UUID.randomUUID();
+    when(shipRepository.readinessOf(userId)).thenReturn(new ShipReadinessDto(13, 9));
+
+    ShipReadinessDto result = hangarService.getMyReadiness(userId);
+
+    assertEquals(13, result.total());
+    assertEquals(9, result.fitted());
+    verify(shipRepository).readinessOf(userId);
   }
 
   @Test

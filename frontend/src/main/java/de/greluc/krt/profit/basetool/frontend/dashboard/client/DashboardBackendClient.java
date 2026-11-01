@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardPruneRequ
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -90,6 +91,26 @@ public class DashboardBackendClient {
       uri.queryParam("orgUnitId", orgUnitId);
     }
     return backendApiClient.get(uri.encode().build().toUriString(), MISSION_PAGE);
+  }
+
+  /**
+   * Reads the caller's next upcoming mission as a list row.
+   *
+   * @return the row, or {@code null} when no mission is upcoming
+   */
+  @Nullable
+  public MissionListDto nextMission() {
+    return backendApiClient.get("/api/v1/missions/next/summary", MissionListDto.class);
+  }
+
+  /**
+   * Reads how many ships the caller owns and how many are fitted.
+   *
+   * @return the counts, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipReadinessDto hangarReadiness() {
+    return backendApiClient.get("/api/v1/hangar/my-ships/readiness", ShipReadinessDto.class);
   }
 
   /**

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.web;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
@@ -127,6 +128,19 @@ public class HangarController {
         hangarService.getMyShipsFiltered(
             userService.getUserIdFromJwt(jwt), search, fitted, pageable);
     return PageResponse.of(p.map(shipMapper::toOwnerDto));
+  }
+
+  /**
+   * Returns how many ships the calling user owns and how many are fitted, the summary the home
+   * dashboard's hangar-readiness widget shows (REQ-HANGAR-016).
+   *
+   * @param jwt caller's JWT — its {@code sub} claim derives the owner; never read from the URL
+   * @return the caller's ship and fitted-ship counts
+   */
+  @GetMapping("/my-ships/readiness")
+  @Transactional(readOnly = true)
+  public ShipReadinessDto getMyReadiness(@AuthenticationPrincipal Jwt jwt) {
+    return hangarService.getMyReadiness(userService.getUserIdFromJwt(jwt));
   }
 
   /**

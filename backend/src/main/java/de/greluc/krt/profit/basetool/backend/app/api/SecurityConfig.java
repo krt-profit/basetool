@@ -397,6 +397,8 @@ public class SecurityConfig {
                 .hasRole(Roles.ADMIN)
                 .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
                 .authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships/readiness")
+                .authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/hangar/ships")
                 .authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/v1/hangar/ships/*")

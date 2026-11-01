@@ -67,7 +67,21 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS));
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS)),
+
+  /** The member's next mission; the mission list is for members and above. */
+  NEXT_MISSION(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.noneOf(DashboardOption.class)),
+
+  /** The readiness of the member's hangar; the hangar is open to every signed-in member. */
+  HANGAR_READINESS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.ALWAYS,
+      EnumSet.noneOf(DashboardOption.class));
 
   /** The day counts the days option offers. */
   public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);
