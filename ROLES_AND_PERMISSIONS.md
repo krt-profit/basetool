@@ -926,7 +926,7 @@ decides per account what is visible.
   Sonderkonto: none. Derived from the role, not assigned.
 - **Configure visibility (REQ-BANK-035):** the responsible holder additionally grants
   sub-roles (each individually), all members or individual users. Sonderkonten:
-  global roles / all members / individual users — configured by **OL members
+  all members / individual users (no role buckets) — configured by **OL members
   or Bank Management**.
 - **Fixed visibility (REQ-BANK-037):** `CARTEL`/KRT account always for **all KRT Members**;
   `CARTEL_BANK` only the responsible holder + bank staff; Sonderkonten automatically for

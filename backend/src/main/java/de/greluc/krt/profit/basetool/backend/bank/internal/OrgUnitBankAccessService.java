@@ -361,7 +361,6 @@ public class OrgUnitBankAccessService {
             case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
             case AREA_MEMBERS -> callerIsMemberOfAreaCascade(owningOrgUnitId);
             case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
-            case GLOBAL_ROLE -> false;
           };
       if (match) {
         return true;
@@ -371,8 +370,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Whether a view grant of a {@code SPECIAL} account admits the caller: a reachable global role,
-   * all-members, or an individual grant.
+   * Whether a view grant of a {@code SPECIAL} account admits the caller: all-members or an
+   * individual grant.
    *
    * @param grants the account's view grants
    * @return {@code true} iff a grant admits the caller
@@ -382,9 +381,6 @@ public class OrgUnitBankAccessService {
     for (BankAccountViewGrant grant : grants) {
       boolean match =
           switch (grant.getGranteeKind()) {
-            case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(
-                    Roles.authority(Objects.requireNonNull(grant.getRoleCode())));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
             case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
@@ -604,9 +600,6 @@ public class OrgUnitBankAccessService {
                   && role != null
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, role);
             }
-            case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(
-                    Roles.authority(Objects.requireNonNull(limit.getRoleCode())));
             case AREA_MEMBERS -> owner != null && callerIsMemberOfAreaCascade(owner);
             case ALL_MEMBERS ->
                 owner != null && ownerScopeService.currentUserIsMemberOfOrgUnit(owner);

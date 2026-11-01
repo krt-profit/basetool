@@ -459,9 +459,8 @@ class OrgUnitBankPageControllerMvcTest {
             true,
             true,
             false,
-            false,
-            List.of("LOGISTICIAN", "MISSION_MANAGER"),
-            List.of("LOGISTICIAN"),
+            List.of("ENSIGN", "KOMMANDOLEITER"),
+            List.of("ENSIGN"),
             false,
             false,
             List.of(new OrgUnitBankViewUserDto(UUID.randomUUID(), "greluc")),
@@ -528,7 +527,7 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("data-tabpanel=\"history\"")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-settings")))
         .andExpect(content().string(Matchers.containsString("vis-row")))
-        .andExpect(content().string(Matchers.containsString("org-unit-vis-role-LOGISTICIAN")))
+        .andExpect(content().string(Matchers.containsString("org-unit-vis-role-ENSIGN")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
         .andExpect(content().string(Matchers.not(Matchers.containsString("status-pill"))));
   }

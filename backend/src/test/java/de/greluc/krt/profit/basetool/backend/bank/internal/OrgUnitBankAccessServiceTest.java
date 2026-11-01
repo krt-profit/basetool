@@ -707,6 +707,45 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
+  void addRoleVisibility_globalRoleOnSonderkonto_throwsBadRequest() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount special = specialAccount(accountId, "KB-0007", BankAccountStatus.ACTIVE);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        () -> settingsService.addRoleVisibility(accountId, "LOGISTICIAN"));
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        () -> settingsService.addRoleVisibility(accountId, "MISSION_MANAGER"));
+    verify(viewGrantRepository, never()).save(any());
+  }
+
+  @Test
+  void getAccountSettings_sonderkonto_offersNoRoleBuckets() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount special = specialAccount(accountId, "KB-0008", BankAccountStatus.ACTIVE);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertThat(settingsService.getAccountSettings(accountId).availableRoleCodes()).isEmpty();
+  }
+
+  @Test
+  void canView_sonderkontoWithAllMembersGrant_admitsAMember() {
+    BankAccount special = specialAccount(UUID.randomUUID(), "KB-0010", BankAccountStatus.ACTIVE);
+    BankAccountViewGrant grant = new BankAccountViewGrant();
+    grant.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
+    when(viewGrantRepository.findByAccountId(special.getId())).thenReturn(List.of(grant));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+
+    assertThat(service.canView(special)).isTrue();
+  }
+
+  @Test
   void createBookingRequest_viewableAccount_resolvesAndDelegates() {
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();

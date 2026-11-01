@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.math.BigDecimal;
@@ -68,14 +67,6 @@ public class OrgUnitBankSettingsService {
    */
   private static final List<String> BEREICH_ROLE_BUCKETS =
       List.of(MembershipRole.BEREICHSKOORDINATOR.name(), MembershipRole.BEREICHSOPERATOR.name());
-
-  /**
-   * Global-role buckets the OL may toggle for a Sonderkonto (no owning unit ⇒ no membership ranks).
-   * Stored without the {@code ROLE_} prefix; evaluated via {@code
-   * hasReachableRole(Roles.authority(code))}.
-   */
-  private static final List<String> SPECIAL_GLOBAL_ROLE_BUCKETS =
-      List.of(Roles.LOGISTICIAN, Roles.MISSION_MANAGER);
 
   private final OrgUnitBankAccessService accessService;
   private final BankAccountRepository bankAccountRepository;
@@ -140,8 +131,7 @@ public class OrgUnitBankSettingsService {
   /**
    * Adds a role-bucket view grant to an account (REQ-BANK-035); idempotent.
    *
-   * <p>The bucket is a {@code MembershipRole} for org-unit accounts and a global role for a
-   * Sonderkonto.
+   * <p>The bucket is a {@code MembershipRole} of the owning unit; a Sonderkonto has none.
    *
    * @param accountId the account
    * @param roleCode the role bucket to grant
@@ -156,8 +146,9 @@ public class OrgUnitBankSettingsService {
       @NotNull UUID accountId, @NotNull String roleCode) {
     BankAccount account = accessService.requireAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
-    BankAccountViewGranteeKind kind = requireValidRoleBucket(account, roleCode);
-    orgUnitBankVisibilityService.grantRole(account, kind, roleCode);
+    requireValidRoleBucket(account, roleCode);
+    orgUnitBankVisibilityService.grantRole(
+        account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
     return toSettingsDto(account);
   }
 
@@ -177,8 +168,9 @@ public class OrgUnitBankSettingsService {
       @NotNull UUID accountId, @NotNull String roleCode) {
     BankAccount account = accessService.requireAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
-    BankAccountViewGranteeKind kind = requireValidRoleBucket(account, roleCode);
-    orgUnitBankVisibilityService.revokeRole(account, kind, roleCode);
+    requireValidRoleBucket(account, roleCode);
+    orgUnitBankVisibilityService.revokeRole(
+        account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
     return toSettingsDto(account);
   }
 
@@ -455,9 +447,7 @@ public class OrgUnitBankSettingsService {
     List<BankAccountViewGrant> grants = viewGrantRepository.findByAccountId(account.getId());
     List<String> grantedRoleCodes =
         grants.stream()
-            .filter(grant ->
-                grant.getGranteeKind() == BankAccountViewGranteeKind.MEMBERSHIP_ROLE
-                    || grant.getGranteeKind() == BankAccountViewGranteeKind.GLOBAL_ROLE)
+            .filter(grant -> grant.getGranteeKind() == BankAccountViewGranteeKind.MEMBERSHIP_ROLE)
             .map(BankAccountViewGrant::getRoleCode)
             .toList();
     boolean allMembersGranted =
@@ -497,7 +487,6 @@ public class OrgUnitBankSettingsService {
         OrgUnitBankAccessService.visibilityConfigurable(account.getType()),
         allMembersSupported(account.getType()),
         areaMembersSupported(account.getType()),
-        roleBucketsGlobal(account.getType()),
         availableRoleCodes(account),
         grantedRoleCodes,
         allMembersGranted,
@@ -509,16 +498,13 @@ public class OrgUnitBankSettingsService {
 
   /**
    * The role-bucket codes the caller may toggle for an account, in display order: the squadron /
-   * Bereich sub-ranks for org-unit accounts, the global roles for a Sonderkonto, none otherwise.
+   * Bereich sub-ranks for org-unit accounts, none otherwise.
    *
    * @param account the account
    * @return the available role codes (possibly empty)
    */
   @NotNull
   private static List<String> availableRoleCodes(@NotNull BankAccount account) {
-    if (account.getType() == BankAccountType.SPECIAL) {
-      return SPECIAL_GLOBAL_ROLE_BUCKETS;
-    }
     OrgUnit orgUnit = account.getOrgUnit();
     if (orgUnit == null) {
       return List.of();
@@ -531,23 +517,18 @@ public class OrgUnitBankSettingsService {
   }
 
   /**
-   * Validates a role-bucket code against the account and returns its grant kind: {@code
-   * GLOBAL_ROLE} for a Sonderkonto, else {@code MEMBERSHIP_ROLE}.
+   * Validates a role-bucket code against the account.
    *
    * @param account the account
    * @param roleCode the role code to validate
-   * @return the grant kind to use
    * @throws BadRequestException when the role code is not a valid bucket for this account
    */
   @NotNull
-  private static BankAccountViewGranteeKind requireValidRoleBucket(
+  private static void requireValidRoleBucket(
       @NotNull BankAccount account, @NotNull String roleCode) {
     if (!availableRoleCodes(account).contains(roleCode)) {
       throw new BadRequestException("Unknown visibility role bucket for this account: " + roleCode);
     }
-    return roleBucketsGlobal(account.getType())
-        ? BankAccountViewGranteeKind.GLOBAL_ROLE
-        : BankAccountViewGranteeKind.MEMBERSHIP_ROLE;
   }
 
   /**
@@ -570,16 +551,5 @@ public class OrgUnitBankSettingsService {
    */
   private static boolean areaMembersSupported(@NotNull BankAccountType type) {
     return type == BankAccountType.AREA;
-  }
-
-  /**
-   * {@code true} iff the account type's role buckets are global role codes (only {@code SPECIAL});
-   * org-unit accounts use {@code MembershipRole} buckets.
-   *
-   * @param type the account type
-   * @return whether the role buckets are global roles
-   */
-  private static boolean roleBucketsGlobal(@NotNull BankAccountType type) {
-    return type == BankAccountType.SPECIAL;
   }
 }
