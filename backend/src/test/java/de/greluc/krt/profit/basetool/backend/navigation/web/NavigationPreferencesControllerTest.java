@@ -263,12 +263,29 @@ class NavigationPreferencesControllerTest {
     mockMvc
         .perform(get(PREFERENCES).with(as(owner)))
         .andExpect(jsonPath("$.appearance.desktopMode").value("DRAWER"))
+        .andExpect(jsonPath("$.appearance.shortcutsEnabled").value(true))
         .andExpect(jsonPath("$.appearance.version").value(0));
   }
 
   @Test
+  void refusesAMissingShortcutSwitch() throws Exception {
+    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}").andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void storesTheShortcutSwitch() throws Exception {
+    putAppearance("{\"desktopMode\":\"DRAWER\",\"shortcutsEnabled\":false,\"version\":0}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.shortcutsEnabled").value(false))
+        .andExpect(jsonPath("$.version").value(1));
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.appearance.shortcutsEnabled").value(false));
+  }
+
+  @Test
   void storesTheDesktopModeAndReturnsTheNextVersion() throws Exception {
-    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}")
+    putAppearance("{\"desktopMode\":\"RAIL\",\"shortcutsEnabled\":true,\"version\":0}")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.desktopMode").value("RAIL"))
         .andExpect(jsonPath("$.version").value(1));
@@ -276,24 +293,29 @@ class NavigationPreferencesControllerTest {
 
   @Test
   void refusesAnUnknownDesktopMode() throws Exception {
-    putAppearance("{\"desktopMode\":\"TOP\",\"version\":0}").andExpect(status().isBadRequest());
+    putAppearance("{\"desktopMode\":\"TOP\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isBadRequest());
   }
 
   @Test
   void refusesAMissingAppearanceVersion() throws Exception {
-    putAppearance("{\"desktopMode\":\"RAIL\"}").andExpect(status().isBadRequest());
+    putAppearance("{\"desktopMode\":\"RAIL\",\"shortcutsEnabled\":true}")
+        .andExpect(status().isBadRequest());
   }
 
   @Test
   void answers409ForAStaleAppearanceVersion() throws Exception {
-    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}").andExpect(status().isOk());
+    putAppearance("{\"desktopMode\":\"RAIL\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isOk());
 
-    putAppearance("{\"desktopMode\":\"PINNED\",\"version\":0}").andExpect(status().isConflict());
+    putAppearance("{\"desktopMode\":\"PINNED\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isConflict());
   }
 
   @Test
   void anAppearanceWriteLeavesTheFavouritesVersionAlone() throws Exception {
-    putAppearance("{\"desktopMode\":\"PINNED\",\"version\":0}").andExpect(status().isOk());
+    putAppearance("{\"desktopMode\":\"PINNED\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isOk());
 
     mockMvc
         .perform(get(PREFERENCES).with(as(owner)))

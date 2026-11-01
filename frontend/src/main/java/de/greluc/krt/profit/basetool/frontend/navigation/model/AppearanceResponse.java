@@ -26,11 +26,14 @@ import org.jetbrains.annotations.NotNull;
  * The caller's appearance section as the backend stores it (REQ-UI-032).
  *
  * @param desktopMode the chosen desktop mode
+ * @param shortcutsEnabled whether the navigation shortcuts Alt+0 to Alt+9 are on (REQ-UI-035)
  * @param version the section's optimistic-lock version, echoed on the next write
  */
 @DtoMirror
-public record AppearanceResponse(@NotNull DesktopMode desktopMode, long version) {
+public record AppearanceResponse(
+    @NotNull DesktopMode desktopMode, boolean shortcutsEnabled, long version) {
 
-  /** The appearance of a member who never chose: the drawer, at version 0. */
-  public static final AppearanceResponse DRAWER = new AppearanceResponse(DesktopMode.DRAWER, 0);
+  /** The appearance of a member who never chose: the drawer, the shortcuts on, version 0. */
+  public static final AppearanceResponse DRAWER =
+      new AppearanceResponse(DesktopMode.DRAWER, true, 0);
 }

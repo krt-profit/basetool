@@ -41,6 +41,7 @@ public class NavigationMentionSource implements PersonMentionSource {
   public @NotNull Set<String> exemptColumns() {
     return Set.of(
         "navigation_appearance.desktop_mode",
+        "navigation_appearance.shortcuts_enabled",
         "navigation_favourite.entry_key",
         "navigation_hidden.entry_key");
   }

@@ -57,6 +57,11 @@ public class NavigationExportSections implements PersonalDataExportSection {
             FROM navigation_appearance a
             JOIN navigation_preferences np ON np.user_id = a.preferences_id
             WHERE np.user_id = :userId
+            UNION ALL
+            SELECT 'shortcutsEnabled', 0, CAST(a.shortcuts_enabled AS VARCHAR)
+            FROM navigation_appearance a
+            JOIN navigation_preferences np ON np.user_id = a.preferences_id
+            WHERE np.user_id = :userId
             ORDER BY 1, 2, 3
             """));
   }

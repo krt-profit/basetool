@@ -80459,6 +80459,9 @@
             "type" : "string",
             "enum" : [ "DRAWER", "RAIL", "PINNED" ]
           },
+          "shortcutsEnabled" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -80472,13 +80475,16 @@
             "type" : "string",
             "enum" : [ "DRAWER", "RAIL", "PINNED" ]
           },
+          "shortcutsEnabled" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64",
             "minimum" : 0
           }
         },
-        "required" : [ "desktopMode", "version" ]
+        "required" : [ "desktopMode", "shortcutsEnabled", "version" ]
       },
       "AppointDelegateRequest" : {
         "type" : "object",

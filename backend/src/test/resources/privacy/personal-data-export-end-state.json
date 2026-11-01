@@ -586,6 +586,10 @@
       "preference_section" : "hidden",
       "position" : 0,
       "value" : "bank.dashboard"
+    }, {
+      "preference_section" : "shortcutsEnabled",
+      "position" : 0,
+      "value" : "true"
     } ],
     "truncated" : false
   } ]

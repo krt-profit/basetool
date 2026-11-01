@@ -27,7 +27,10 @@ import jakarta.validation.constraints.NotNull;
  * caller last saw; a stale one is rejected with HTTP 409.
  *
  * @param desktopMode the chosen desktop mode
+ * @param shortcutsEnabled whether the navigation shortcuts Alt+0 to Alt+9 are on
  * @param version the appearance version the caller last saw
  */
 public record AppearanceUpdateRequest(
-    @NotNull DesktopMode desktopMode, @NotNull @Min(0) Long version) {}
+    @NotNull DesktopMode desktopMode,
+    @NotNull Boolean shortcutsEnabled,
+    @NotNull @Min(0) Long version) {}

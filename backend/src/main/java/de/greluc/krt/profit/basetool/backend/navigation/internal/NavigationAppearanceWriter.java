@@ -50,34 +50,39 @@ public class NavigationAppearanceWriter {
    */
   @NotNull
   AppearanceResponse read(@NotNull UUID userId, long version) {
-    DesktopMode mode =
-        appearances
-            .findById(userId)
-            .map(NavigationAppearance::getDesktopMode)
-            .orElse(DesktopMode.DRAWER);
-    return new AppearanceResponse(mode, version);
+    return appearances
+        .findById(userId)
+        .map(row -> new AppearanceResponse(row.getDesktopMode(), row.isShortcutsEnabled(), version))
+        .orElseGet(() -> new AppearanceResponse(DesktopMode.DRAWER, true, version));
   }
 
   /**
-   * Replaces the desktop mode when the echoed version is current.
+   * Replaces the section when the echoed version is current.
    *
    * @param userId the owner's {@code app_user.id}
    * @param mode the chosen desktop mode
+   * @param shortcutsEnabled whether the navigation shortcuts are on
    * @param expectedVersion the appearance version the caller last saw
    * @return the stored appearance with the bumped version
    * @throws ObjectOptimisticLockingFailureException when the version is stale
    */
   @Transactional
   public @NotNull AppearanceResponse replace(
-      @NotNull UUID userId, @NotNull DesktopMode mode, long expectedVersion) {
+      @NotNull UUID userId,
+      @NotNull DesktopMode mode,
+      boolean shortcutsEnabled,
+      long expectedVersion) {
     preferences.insertIfAbsent(userId);
     if (preferences.bumpAppearanceVersionIfMatches(userId, expectedVersion) == 0) {
       throw new ObjectOptimisticLockingFailureException(NavigationPreferences.class, userId);
     }
     NavigationAppearance row =
-        appearances.findById(userId).orElseGet(() -> new NavigationAppearance(userId, mode));
+        appearances
+            .findById(userId)
+            .orElseGet(() -> new NavigationAppearance(userId, mode, shortcutsEnabled));
     row.setDesktopMode(mode);
+    row.setShortcutsEnabled(shortcutsEnabled);
     appearances.saveAndFlush(row);
-    return new AppearanceResponse(mode, expectedVersion + 1);
+    return new AppearanceResponse(mode, shortcutsEnabled, expectedVersion + 1);
   }
 }
