@@ -21,7 +21,21 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { NAV_RENDERED_EVENT } from '/js/kernel/nav-preferences.js';
+import { favouriteKeys, NAV_RENDERED_EVENT, stateElement } from '/js/kernel/nav-preferences.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import {
+    krtEmptyState,
+    krtFrequentParse,
+    krtFrequentRecord,
+    krtFrequentScores,
+    krtFrequentTop,
+} from '/js/kernel/krt-frequent.js';
+import {
+    contextActions,
+    isFavourite,
+    pageActions,
+    toggleFavourite,
+} from '/js/kernel/krt-palette-personalise.js';
 import {
     KRT_SEARCH_PREFIXES,
     krtSearchFind,
@@ -34,6 +48,9 @@ import {
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
     const RECENT_MAX = 4;
+    const RECENT_STORED_MAX = 8;
+    const FREQUENT_KEY = 'krt.frequent';
+    const FREQUENT_MAX = 5;
     const PAGE_MAX = 8;
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const SEARCH_DEBOUNCE_MS = 250;
@@ -48,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = /** @type {HTMLInputElement | null} */ (document.getElementById('palette-input'));
     const results = document.getElementById('palette-results');
     const emptyEl = dialog ? dialog.querySelector('.palette-empty') : null;
+    const liveEl = dialog ? dialog.querySelector('[data-palette-live]') : null;
     if (!dialog || !(root instanceof HTMLElement) || !input || !results) return;
     const paletteRoot = root;
     const paletteInput = input;
@@ -61,12 +79,17 @@ document.addEventListener('DOMContentLoaded', () => {
      * @property {string} icon the sprite symbol without its `krt-icon-` prefix
      * @property {string} foldLabel the folded label the search matches first
      * @property {string} foldRest the folded breadcrumb and search terms the search matches second
+     * @property {string} [key] the page's entry key, or its path for a page without an entry; absent
+     *     for an action and an entity hit
+     * @property {boolean} [starrable] whether the page can be a favourite
+     * @property {number} [frequency] how often the member opens the page, for the ranking
      * @property {string} [href] the page it opens; absent for an action
+     * @property {string} [tabHref] the page a link action opens in a new browser tab
      * @property {string} [adminHref] the page it opens in administration mode instead
      * @property {() => void} [run] what an action does
      * @property {string} [fill] the query a prefix-help row puts into the input
      * @property {boolean} [fromServer] whether it is an entity hit of the backend search, which
-     *     never enters the recently visited pages
+     *     never enters the recently visited pages or the often used ones
      */
 
     /**
@@ -82,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * A palette row with its folded search text.
      *
-     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, adminHref?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
+     * @param {{ label: string, crumb: string, icon: string, keywords: string, key?: string, starrable?: boolean, href?: string, tabHref?: string, adminHref?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
      *     what the row shows and does
      * @returns {PaletteItem} the row
      */
@@ -95,6 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
             foldLabel: krtSearchFold(spec.label),
             foldRest: krtSearchFold(`${spec.crumb} ${spec.keywords}`),
         };
+        if (spec.key) item.key = spec.key;
+        if (spec.starrable) item.starrable = true;
+        if (spec.tabHref) item.tabHref = spec.tabHref;
         if (spec.href) item.href = spec.href;
         if (spec.adminHref) item.adminHref = spec.adminHref;
         if (spec.run) item.run = spec.run;
@@ -106,23 +132,55 @@ document.addEventListener('DOMContentLoaded', () => {
     /** @type {PaletteItem[]} */
     const index = [];
     const seen = new Set();
+    /** @type {Map<string, number>} */
+    let frequencies = new Map();
+
+    /**
+     * Reads the often used ranking, tolerating blocked storage.
+     *
+     * @returns {Record<string, number[]>} the visit times by entry key
+     */
+    const readFrequent = function () {
+        try {
+            return krtFrequentParse(localStorage.getItem(FREQUENT_KEY));
+        } catch (_e) {
+            return {};
+        }
+    };
+
+    /** Loads the often used scores onto the pages, for the ranking of typed results. */
+    const refreshFrequencies = function () {
+        frequencies = krtFrequentScores(readFrequent(), Date.now());
+        index.forEach((item) => {
+            item.frequency = frequencies.get(item.key || '') || 0;
+        });
+    };
 
     /**
      * Adds a page unless its target is already offered.
      *
-     * @param {string} href the page's path
-     * @param {string} label its name
-     * @param {string} crumb its group
-     * @param {string} icon its sprite symbol
-     * @param {string} keywords its additional search terms
+     * @param {{ href: string, label: string, crumb: string, icon: string, keywords: string, entryKey?: string, starrable?: boolean }} page
+     *     the page's path, name, group, sprite symbol, additional search terms, entry key and
+     *     whether it can be a favourite
      * @returns {boolean} whether the page was added
      */
-    const addPage = function (href, label, crumb, icon, keywords) {
+    const addPage = function (page) {
+        const { href, label } = page;
         if (!label || href.charAt(0) !== '/' || href.indexOf('/oauth2/') === 0 || seen.has(href)) {
             return false;
         }
         seen.add(href);
-        index.push(makeItem({ href, label, crumb, icon, keywords }));
+        const item = makeItem({
+            href,
+            label,
+            crumb: page.crumb,
+            icon: page.icon,
+            keywords: page.keywords,
+            key: page.entryKey || href,
+            starrable: page.starrable,
+        });
+        item.frequency = frequencies.get(item.key || '') || 0;
+        index.push(item);
         return true;
     };
 
@@ -144,13 +202,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (a.hasAttribute('data-nav-skip') || a.closest('.nav-lang-menu')) return;
             const groupHolder = a.closest('[data-nav-group]');
             const iconHolder = a.closest('[data-nav-icon]');
-            addPage(
-                a.getAttribute('href') || '',
-                textOf(a.querySelector('.nav-top-label') || a),
-                groupHolder ? groupHolder.getAttribute('data-nav-group') || '' : '',
-                iconHolder ? iconHolder.getAttribute('data-nav-icon') || 'list' : 'list',
-                a.getAttribute('data-nav-keywords') || '',
-            );
+            addPage({
+                href: a.getAttribute('href') || '',
+                label: textOf(a.querySelector('.nav-top-label') || a),
+                crumb: groupHolder ? groupHolder.getAttribute('data-nav-group') || '' : '',
+                icon: iconHolder ? iconHolder.getAttribute('data-nav-icon') || 'list' : 'list',
+                keywords: a.getAttribute('data-nav-keywords') || '',
+                entryKey: a.getAttribute('data-entry-key') || undefined,
+                starrable: a.hasAttribute('data-starrable'),
+            });
         });
     };
 
@@ -170,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 crumb,
                 icon: a.getAttribute('data-nav-icon') || 'list',
                 keywords: a.getAttribute('data-nav-keywords') || '',
+                tabHref: a instanceof HTMLAnchorElement ? a.href : undefined,
                 run() {
                     if (a instanceof HTMLElement) a.click();
                 },
@@ -233,46 +294,117 @@ document.addEventListener('DOMContentLoaded', () => {
         return out;
     };
 
-    const actions = buildActions();
+    const baseActions = buildActions();
+
+    /**
+     * Says that a page became or stopped being a favourite: in the dialog's status line while it
+     * is open, otherwise as a toast.
+     *
+     * @param {string} name the page's name
+     * @param {boolean} favourite the page's new state
+     */
+    const announceFavourite = function (name, favourite) {
+        const pattern = favourite
+            ? krtI18nText(data.liveFavouriteAdded, 'data-live-favourite-added')
+            : krtI18nText(data.liveFavouriteRemoved, 'data-live-favourite-removed');
+        const message = pattern.replace('{name}', name);
+        if (krtModal.isOpen(dialog) && liveEl) {
+            liveEl.textContent = '';
+            liveEl.textContent = message;
+        } else {
+            showFrontendSuccessToast(message);
+        }
+    };
+
+    /**
+     * The actions for the page shown now: the ones its own controls allow and the ones it
+     * contributes, then the ones every page has.
+     *
+     * @returns {PaletteItem[]} the actions in display order
+     */
+    const currentActions = function () {
+        const crumb = data.actionCrumb || '';
+        return pageActions(
+            krtI18nText(data.actionCustomise, 'data-action-customise'),
+            announceFavourite,
+        )
+            .concat(contextActions())
+            .map((action) => {
+                return makeItem({
+                    label: action.label,
+                    crumb,
+                    icon: action.icon,
+                    keywords: '',
+                    run: action.run,
+                });
+            })
+            .concat(baseActions);
+    };
 
     /**
      * Reads the recently visited pages, tolerating blocked storage and foreign content.
      *
-     * @returns {{ href: string, label: string, group: string }[]} newest first
+     * @returns {{ key: string, href: string, label: string, group: string }[]} newest first; the
+     *     key is the page's path for a record written without one
      */
     const readRecent = function () {
         try {
             const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
-            return Array.isArray(raw)
-                ? raw.filter((e) => {
-                      return e && typeof e.href === 'string' && e.href.charAt(0) === '/';
-                  })
-                : [];
+            if (!Array.isArray(raw)) return [];
+            return raw
+                .filter((e) => {
+                    return e && typeof e.href === 'string' && e.href.charAt(0) === '/';
+                })
+                .map((e) => {
+                    return {
+                        key: typeof e.key === 'string' && e.key ? e.key : e.href,
+                        href: e.href,
+                        label: String(e.label || ''),
+                        group: String(e.group || ''),
+                    };
+                });
         } catch (_e) {
             return [];
         }
     };
 
     /**
-     * Puts a page at the top of the recently visited pages.
+     * Puts a page at the top of the recently visited pages; a page is one record however its
+     * address changed.
      *
      * @param {PaletteItem} entry the page
      */
     const remember = function (entry) {
         const href = entry.href;
         if (!href) return;
+        const key = entry.key || href;
         const list = readRecent().filter((e) => {
-            return e.href !== href;
+            return e.key !== key;
         });
-        list.unshift({ href, label: entry.label, group: entry.crumb });
+        list.unshift({ key, href, label: entry.label, group: entry.crumb });
         try {
-            localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+            localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_STORED_MAX)));
+        } catch (_e) {}
+    };
+
+    /**
+     * Counts a visit of a page in the often used ranking.
+     *
+     * @param {PaletteItem} entry the visited page
+     */
+    const countVisit = function (entry) {
+        try {
+            localStorage.setItem(
+                FREQUENT_KEY,
+                JSON.stringify(krtFrequentRecord(readFrequent(), entry.key || '', Date.now())),
+            );
         } catch (_e) {}
     };
 
     /**
      * Records the current page: the offered page with exactly this address (path and query, then
-     * path), otherwise the menu link the drawer marks as current.
+     * path), otherwise the menu link the drawer marks as current. Only pages are recorded, so no
+     * entity name reaches the storage.
      */
     const recordVisit = function () {
         const here = window.location.pathname;
@@ -294,9 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
                   })
                 : undefined;
         }
-        if (entry) remember(entry);
+        if (entry) {
+            remember(entry);
+            countVisit(entry);
+        }
     };
     recordVisit();
+    refreshFrequencies();
 
     const uiGerman = (document.documentElement.lang || '').toLowerCase().startsWith('de');
 
@@ -342,9 +478,51 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * The groups shown for a query: recent pages and actions when it is empty, the prefix help
-     * for `?`, otherwise the matching pages and entity hits in one ranked list, then the matching
-     * actions, each narrowed by the query's prefix.
+     * The pages of the empty state: the favourites, then the often used pages, then the recent
+     * ones, each page only in the highest section it belongs to. Pages the member cannot open
+     * here are left out.
+     *
+     * @returns {{ favourites: PaletteItem[], frequent: PaletteItem[], recent: PaletteItem[] }} the
+     *     pages of each section
+     */
+    const emptyStatePages = function () {
+        /** @type {Map<string, PaletteItem>} */
+        const byKey = new Map();
+        index.forEach((item) => {
+            if (item.key && !byKey.has(item.key)) byKey.set(item.key, item);
+        });
+        const known = (/** @type {string} */ key) => byKey.has(key);
+        const state = stateElement();
+        const keys = krtEmptyState(
+            {
+                favourites: (state ? favouriteKeys(state) : []).filter(known),
+                frequent: krtFrequentTop(readFrequent(), Date.now()).filter(known),
+                recent: readRecent()
+                    .map((e) => {
+                        const item = byKey.get(e.key) || index.find((i) => i.href === e.href);
+                        return item && item.key ? item.key : '';
+                    })
+                    .filter(known),
+            },
+            { frequent: FREQUENT_MAX, recent: RECENT_MAX },
+        );
+        const pages = (/** @type {string[]} */ list) => {
+            return list.flatMap((key) => {
+                const item = byKey.get(key);
+                return item ? [item] : [];
+            });
+        };
+        return {
+            favourites: pages(keys.favourites),
+            frequent: pages(keys.frequent),
+            recent: pages(keys.recent),
+        };
+    };
+
+    /**
+     * The groups shown for a query: favourite, often used and recent pages and the actions when it
+     * is empty, the prefix help for `?`, otherwise the matching pages and entity hits in one
+     * ranked list, then the matching actions, each narrowed by the query's prefix.
      *
      * @param {{ kind: string | null, term: string, help: boolean }} parsed the parsed query
      * @returns {{ label: string, items: PaletteItem[] }[]} the non-empty groups in display order
@@ -357,32 +535,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return groups;
         }
         const q = krtSearchFold(parsed.term);
+        const actions = currentActions();
         if (!q && parsed.kind === 'action') {
             groups.push({ label: krtI18nText(data.actions, 'data-actions'), items: actions });
             return groups;
         }
         if (!q && parsed.kind) return groups;
         if (!q) {
-            /** @type {PaletteItem[]} */
-            const recent = [];
-            readRecent().forEach((e) => {
-                const known = index.find((i) => {
-                    return i.href === e.href;
-                });
-                if (known && recent.length < RECENT_MAX) recent.push(known);
+            const pages = emptyStatePages();
+            [
+                { label: krtI18nText(data.favourites, 'data-favourites'), items: pages.favourites },
+                { label: krtI18nText(data.frequent, 'data-frequent'), items: pages.frequent },
+                { label: krtI18nText(data.recent, 'data-recent'), items: pages.recent },
+                { label: krtI18nText(data.actions, 'data-actions'), items: actions },
+            ].forEach((group) => {
+                if (group.items.length) groups.push(group);
             });
-            if (recent.length) {
-                groups.push({
-                    label: krtI18nText(data.recent, 'data-recent'),
-                    items: recent,
-                });
-            }
-            if (actions.length) {
-                groups.push({
-                    label: krtI18nText(data.actions, 'data-actions'),
-                    items: actions,
-                });
-            }
             return groups;
         }
         const pages =
@@ -468,6 +636,34 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
+     * The path a row opens in a new browser tab.
+     *
+     * @param {PaletteItem} item the row's item
+     * @returns {string | null} the path, or null for a row that opens nothing
+     */
+    const newTabTarget = function (item) {
+        if (item.fill) return null;
+        if (item.fromServer) {
+            const adminMode = !!krtChrome.nav && krtChrome.nav.isAdminMode();
+            return krtSearchHitHref(/** @type {any} */ (item), adminMode);
+        }
+        return item.href || item.tabHref || null;
+    };
+
+    /**
+     * Opens a row in a new browser tab, closing the palette.
+     *
+     * @param {PaletteItem} item the highlighted row's item
+     */
+    const chooseInNewTab = function (item) {
+        const target = newTabTarget(item);
+        if (!target) return;
+        krtModal.close(dialog);
+        if (item.href && !item.fromServer) remember(item);
+        window.open(target, '_blank', 'noopener');
+    };
+
+    /**
      * Opens a page or runs an action, closing the palette first.
      *
      * @param {PaletteItem} item the chosen row
@@ -497,10 +693,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * The identity of a row across renders.
      *
      * @param {PaletteItem} item the row's item
-     * @returns {string} its target, or its label for an action
+     * @returns {string} its entry key or target, or its label for an action
      */
     const rowKey = function (item) {
-        return item.href || `${item.crumb}|${item.label}`;
+        return item.key || item.href || `${item.crumb}|${item.label}`;
     };
 
     /**
@@ -532,6 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.setAttribute('role', 'option');
                 row.setAttribute('aria-selected', 'false');
                 if (item.href) row.setAttribute('data-href', item.href);
+                if (item.key) row.setAttribute('data-key', item.key);
                 row.appendChild(icon(item.icon, 'palette-row-icon'));
                 const text = document.createElement('span');
                 text.className = 'palette-row-text';
@@ -541,6 +738,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 crumb.textContent = item.crumb;
                 text.appendChild(crumb);
                 row.appendChild(text);
+                if (item.starrable && item.key && isFavourite(item.key)) {
+                    row.setAttribute('data-favourite', 'true');
+                    row.appendChild(icon('star-filled', 'palette-row-fav'));
+                }
                 const enter = document.createElement('span');
                 enter.className = 'palette-row-enter';
                 enter.setAttribute('aria-hidden', 'true');
@@ -681,6 +882,10 @@ document.addEventListener('DOMContentLoaded', () => {
         seen.clear();
         buildIndex();
         extraRequested = false;
+        if (krtModal.isOpen(dialog)) {
+            render(true);
+            loadExtraPages();
+        }
     });
 
     /**
@@ -701,7 +906,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const iconName = typeof e.icon === 'string' && e.icon ? e.icon : 'list';
                     const crumb = typeof e.crumb === 'string' ? e.crumb : '';
                     const keywords = typeof e.keywords === 'string' ? e.keywords : '';
-                    if (addPage(e.href, e.label, crumb, iconName, keywords)) added = true;
+                    if (
+                        addPage({ href: e.href, label: e.label, crumb, icon: iconName, keywords })
+                    ) {
+                        added = true;
+                    }
                 });
                 if (added && krtModal.isOpen(dialog)) render(true);
             })
@@ -715,6 +924,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const open = function (prefill) {
         paletteInput.value = prefill || '';
+        refreshFrequencies();
         update();
         krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
@@ -734,10 +944,34 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             select(selected - 1);
-        } else if (e.key === 'Enter') {
+        } else if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             const current = rows[selected];
             if (current) choose(current.item);
+        } else if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const current = rows[selected];
+            if (current && current.item.fill) {
+                e.preventDefault();
+                choose(current.item);
+            }
+        }
+    });
+
+    dialog.addEventListener('keydown', (e) => {
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+        const current = rows[selected];
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (current) chooseInNewTab(current.item);
+        } else if ((e.key === 'd' || e.key === 'D') && !e.shiftKey) {
+            e.preventDefault();
+            const key = current && current.item.starrable ? current.item.key : undefined;
+            if (key) {
+                const name = current.item.label;
+                toggleFavourite(key, (favourite) => {
+                    announceFavourite(name, favourite);
+                });
+            }
         }
     });
 

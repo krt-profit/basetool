@@ -1,7 +1,7 @@
 # ADR-0297 — The navigation is one task-grouped default with desktop modes, a configurable tab bar and a scoped entity search
 
 - **Status:** Accepted — implementation in progress: decision 7 ships for missions, operations
-  and materials with the prefixes (REQ-UI-033 partially shipped); the three desktop modes ship
+  and materials with the prefixes, and REQ-UI-033 is shipped in full; the three desktop modes ship
   (REQ-UI-026); the rest is pending, its requirements marked planned.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc

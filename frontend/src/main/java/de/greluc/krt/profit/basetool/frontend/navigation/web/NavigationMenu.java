@@ -166,6 +166,17 @@ public record NavigationMenu(
         .max(Comparator.comparingInt(entry -> entry.href().split("\\?", 2).length));
   }
 
+  /**
+   * Whether the caller can favourite the page or tab an entry opens.
+   *
+   * @param entry a menu or quick-access entry
+   * @return {@code true} for a page or tab of a member or administration group and for a personal
+   *     page, {@code false} for the links above the groups, legal links and actions
+   */
+  public boolean starrable(@NotNull NavigationEntry entry) {
+    return starrableEntries().anyMatch(candidate -> candidate.key().equals(entry.key()));
+  }
+
   @NotNull
   private Stream<NavigationEntry> starrableEntries() {
     return Stream.concat(

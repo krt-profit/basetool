@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -37,8 +38,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Drives the navigation of REQ-UI-026 in a browser: the drawer's menu filter and its hand-over to
- * the quick access, the {@code Ctrl+K} palette, the administration mode on admin pages and the
- * phone tab bar with its menu sheet.
+ * the quick access, the {@code Ctrl+K} palette with its dialog keys, empty state and page actions
+ * (REQ-UI-033), the administration mode on admin pages and the phone tab bar with its menu sheet.
  */
 @Tag("e2e")
 class NavigationE2eTest {
@@ -358,6 +359,226 @@ class NavigationE2eTest {
 
           page.getByTestId("mobile-tab-menu").click();
           assertThat(page.locator("#sidebar")).not().hasClass(Pattern.compile("\\bopen\\b"));
+        });
+  }
+
+  private static final String CLEAR_FAVOURITES =
+      """
+      async () => {
+        const state = document.querySelector('[data-favourites-state]');
+        await window.krtFetch.write({
+          method: 'PUT',
+          url: '/navigation/favourites',
+          payload: { keys: [], version: Number(state.dataset.version) },
+          toast: false,
+        });
+      }
+      """;
+
+  private static final String SEED_FREQUENT =
+      """
+      () => {
+        const now = Date.now();
+        localStorage.setItem('krt.frequent', JSON.stringify({
+          'missions.list': [now, now, now],
+          'storage.overview': [now, now, now],
+        }));
+      }
+      """;
+
+  /** A group of the open quick access, found by its label. */
+  private static Locator paletteGroup(Page page, String label) {
+    return page.locator("#nav-palette [role='group'][aria-label='" + label + "']");
+  }
+
+  /** Ctrl+Enter opens the highlighted hit in a new browser tab and leaves this one untouched. */
+  @Test
+  void controlEnterOpensTheHighlightedHitInANewTab() {
+    run(
+        1440,
+        900,
+        "nav-palette-new-tab",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          String hangar = page.getByTestId("nav-hangar").textContent().trim();
+          page.keyboard().press("Control+k");
+          Locator input = page.getByTestId("palette-input");
+          input.fill(hangar);
+          assertThat(page.locator("#nav-palette .palette-row.is-selected"))
+              .hasAttribute("data-href", "/hangar");
+
+          Page opened = page.context().waitForPage(() -> input.press("Control+Enter"));
+          opened.waitForLoadState();
+          assertThat(opened).hasURL(Pattern.compile(".*/hangar$"));
+          assertThat(page).hasURL(Pattern.compile(".*/inventory$"));
+          assertThat(page.locator("#nav-palette")).isHidden();
+        });
+  }
+
+  /** Tab accepts the highlighted prefix row of the help and keeps the focus in the input. */
+  @Test
+  void tabAcceptsASuggestedPrefix() {
+    run(
+        1440,
+        900,
+        "nav-palette-tab",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          page.keyboard().press("Control+k");
+          Locator input = page.getByTestId("palette-input");
+          input.fill("?");
+          input.press("ArrowDown");
+          input.press("Tab");
+          assertThat(input).hasValue("/ ");
+          assertThat(input).isFocused();
+          assertThat(page.locator("#nav-palette")).isVisible();
+        });
+  }
+
+  /**
+   * Ctrl+D favourites and unfavourites the highlighted page in place: the row shows the star, the
+   * empty state lists the page under Favoriten, and no page change or reload happens.
+   */
+  @Test
+  void controlDTogglesTheFavouriteOfTheHighlightedPage() {
+    run(
+        1440,
+        900,
+        "nav-palette-favourite",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          page.evaluate("() => { window.__paletteMarker = 'still-here'; }");
+          String hangar = page.getByTestId("nav-hangar").textContent().trim();
+          String row = "#nav-palette .palette-row[data-key='hangar.overview']";
+          page.keyboard().press("Control+k");
+          Locator input = page.getByTestId("palette-input");
+          input.fill(hangar);
+          page.locator(row).hover();
+
+          try {
+            input.press("Control+d");
+            assertThat(page.locator(row)).hasAttribute("data-favourite", "true");
+            assertThat(page.locator("[data-favourites-state]"))
+                .hasAttribute("data-keys", Pattern.compile(".*hangar\\.overview.*"));
+            assertThat(page.getByTestId("palette-live")).containsText(hangar);
+
+            input.fill("");
+            String favourites = page.locator(".palette").getAttribute("data-favourites");
+            assertThat(paletteGroup(page, favourites).locator("[data-key='hangar.overview']"))
+                .hasCount(1);
+            assertThat(page.locator(row)).hasCount(1);
+
+            input.press("Control+d");
+            assertThat(page.locator("[data-favourites-state]"))
+                .not()
+                .hasAttribute("data-keys", Pattern.compile(".*hangar\\.overview.*"));
+            assertEquals("still-here", page.evaluate("() => window.__paletteMarker"));
+          } finally {
+            page.evaluate(CLEAR_FAVOURITES);
+          }
+        });
+  }
+
+  /**
+   * The empty state lists the often used pages under Häufig and a page only in the highest section
+   * it belongs to, so the current page is not repeated under Zuletzt.
+   */
+  @Test
+  void emptyStateListsFrequentPagesWithoutDuplicates() {
+    run(
+        1440,
+        900,
+        "nav-palette-frequent",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          page.evaluate(SEED_FREQUENT);
+          page.keyboard().press("Control+k");
+          String frequent = page.locator(".palette").getAttribute("data-frequent");
+          String recent = page.locator(".palette").getAttribute("data-recent");
+
+          assertThat(paletteGroup(page, frequent).locator("[data-key='missions.list']"))
+              .hasCount(1);
+          assertThat(paletteGroup(page, frequent).locator("[data-key='storage.overview']"))
+              .hasCount(1);
+          assertThat(page.locator("#nav-palette [data-key='storage.overview']")).hasCount(1);
+          assertThat(paletteGroup(page, recent).locator("[data-key='storage.overview']"))
+              .hasCount(0);
+        });
+  }
+
+  /**
+   * A hidden page and its tabs leave the quick access and the often used pages, while an entity hit
+   * that opens that page and the page's actions stay.
+   */
+  @Test
+  void hiddenPagesLeaveTheQuickAccessButTheirHitsStay() {
+    run(
+        1440,
+        900,
+        "nav-palette-hidden",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
+          String hide = "#sidebar [data-trigger='nav-hide'][data-entry-key='orgchart.view']";
+          String hideLabel = page.locator(hide).getAttribute("aria-label");
+          page.evaluate(
+              "() => { const now = Date.now(); localStorage.setItem('krt.frequent',"
+                  + " JSON.stringify({ 'orgchart.view': [now, now, now] })); }");
+          try {
+            page.keyboard().press("Control+k");
+            Locator input = page.getByTestId("palette-input");
+            input.fill("> " + hideLabel);
+            page.locator("#nav-palette .palette-row-label")
+                .filter(new Locator.FilterOptions().setHasText(hideLabel))
+                .first()
+                .click();
+            assertThat(page.getByTestId("nav-more-orgchart.view")).hasCount(1);
+
+            page.keyboard().press("Control+k");
+            assertThat(page.locator("#nav-palette [data-key^='orgchart.']")).hasCount(0);
+            input.fill("unit: iridium");
+            assertThat(
+                    page.locator("#nav-palette .palette-row[data-href^='/org-chart?highlight=']")
+                        .first())
+                .isVisible();
+            input.fill("> ");
+            String create =
+                page.locator(
+                        ".palette-source-actions [data-testid='palette-action-create-mission']")
+                    .textContent()
+                    .trim();
+            assertThat(
+                    page.locator("#nav-palette .palette-row-label")
+                        .filter(new Locator.FilterOptions().setHasText(create))
+                        .first())
+                .isVisible();
+          } finally {
+            page.keyboard().press("Escape");
+            page.locator("#hamburger").click();
+            page.locator("#sidebar [data-nav-action='unhide'][data-entry-key='orgchart.view']")
+                .click();
+            assertThat(page.getByTestId("nav-more-orgchart.view")).hasCount(0);
+          }
+        });
+  }
+
+  /** An element a page marks with {@code data-palette-action} becomes an action of the page. */
+  @Test
+  void aPageContributesAnActionThatOnlyNavigates() {
+    run(
+        1440,
+        900,
+        "nav-palette-context",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          page.evaluate(
+              "() => { const a = document.createElement('a'); a.href = '/hangar';"
+                  + " a.setAttribute('data-palette-action', 'Context probe'); a.hidden = true;"
+                  + " document.querySelector('main, body').appendChild(a); }");
+          page.keyboard().press("Control+k");
+          Locator input = page.getByTestId("palette-input");
+          input.fill("> context probe");
+          input.press("Enter");
+          page.waitForURL(Pattern.compile(".*/hangar$"));
         });
   }
 

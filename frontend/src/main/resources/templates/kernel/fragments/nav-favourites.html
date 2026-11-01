@@ -93,7 +93,7 @@
         data-favourite-toggle data-trigger="nav-favourite-toggle"
         th:data-testid="${edit} ? 'nav-edit-star' : 'nav-star'"
         th:with="label=#{__${entry.labelKey()}__}, pressed=${navigationFavourites.isFavourite(entry.key())}"
-        th:data-entry-key="${entry.key()}" th:aria-pressed="${pressed}"
+        th:data-entry-key="${entry.key()}" th:data-label="${label}" th:aria-pressed="${pressed}"
         th:disabled="${!navigationFavourites.loaded() or (!pressed and navigationFavourites.full())}"
         th:data-label-add="#{nav.favourites.add(${label})}" th:data-label-remove="#{nav.favourites.remove(${label})}"
         th:aria-label="${pressed} ? #{nav.favourites.remove(${label})} : #{nav.favourites.add(${label})}"
