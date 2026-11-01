@@ -212,14 +212,33 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, null, null, false, null, Set.of(), false, pageable))
+            query, start, end, status, null, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
-    missionService.searchMissions(query, start, end, null, null, null, pageable);
+    missionService.searchMissions(query, start, end, null, null, null, null, pageable);
 
     verify(missionRepository)
         .searchMissions(
-            query, start, end, status, null, null, false, null, Set.of(), false, pageable);
+            query, start, end, status, null, null, null, false, null, Set.of(), false, pageable);
+  }
+
+  /** The owning-unit filter reaches the repository next to the caller's scope. */
+  @Test
+  void searchMissions_passesTheOrgUnitFilterToTheRepository() {
+    UUID unit = UUID.randomUUID();
+    List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
+    Pageable pageable = PageRequest.of(0, 20);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(missionRepository.searchMissions(
+            null, null, null, allFour, null, null, unit, false, null, Set.of(), false, pageable))
+        .thenReturn(Page.empty());
+
+    missionService.searchMissions(null, null, null, null, null, null, unit, pageable);
+
+    verify(missionRepository)
+        .searchMissions(
+            null, null, null, allFour, null, null, unit, false, null, Set.of(), false, pageable);
   }
 
   /**
@@ -233,16 +252,16 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            null, null, null, allFour, null, null, false, null, Set.of(), false, pageable))
+            null, null, null, allFour, null, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
-    missionService.searchMissions(null, null, null, null, null, null, pageable);
-    missionService.searchMissions(null, null, null, List.of(), null, null, pageable);
-    missionService.searchMissions(null, null, null, allFour, null, null, pageable);
+    missionService.searchMissions(null, null, null, null, null, null, null, pageable);
+    missionService.searchMissions(null, null, null, List.of(), null, null, null, pageable);
+    missionService.searchMissions(null, null, null, allFour, null, null, null, pageable);
 
     verify(missionRepository, times(3))
         .searchMissions(
-            null, null, null, allFour, null, null, false, null, Set.of(), false, pageable);
+            null, null, null, allFour, null, null, null, false, null, Set.of(), false, pageable);
   }
 
   @Test

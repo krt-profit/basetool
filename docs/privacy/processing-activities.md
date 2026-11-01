@@ -61,6 +61,9 @@ requires it and duplicating it into further files spreads personal data for no g
   `navigation_tab_bar` (the member's own favourites, hidden pages, group and link order and
   tab-bar slots as entry keys, no free text),
   `navigation_appearance` (the chosen desktop mode, an enumerated value),
+  `navigation_dashboard_layout`,
+  `navigation_dashboard_widget` (the member's own dashboard: widget types, columns and option
+  choices, no free text),
   `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,
   `announcement`.
 - **Transient only:** while a member has a mission open, the frontend shares their handle and the

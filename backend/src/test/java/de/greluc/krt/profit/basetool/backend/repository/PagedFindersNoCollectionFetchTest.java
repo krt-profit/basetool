@@ -141,6 +141,7 @@ class PagedFindersNoCollectionFetchTest {
                   List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
                   null,
                   null,
+                  null,
                   true,
                   null,
                   Set.of(),

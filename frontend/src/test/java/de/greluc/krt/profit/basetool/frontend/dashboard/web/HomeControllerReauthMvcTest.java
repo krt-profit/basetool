@@ -27,6 +27,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,12 +40,13 @@ import org.springframework.test.web.servlet.MockMvc;
 class HomeControllerReauthMvcTest {
 
   private final DashboardBackendClient client = mock(DashboardBackendClient.class);
+  private final DashboardReader reader = mock(DashboardReader.class);
 
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
-    mockMvc = ReauthPageMvc.standalone(new HomeController(client));
+    mockMvc = ReauthPageMvc.standalone(new HomeController(client, reader));
     ReauthPageMvc.signInMember();
   }
 
@@ -53,14 +56,16 @@ class HomeControllerReauthMvcTest {
   }
 
   @Test
-  void anExpiredSessionOnTheUpcomingMissionsRedirectsToLogin() throws Exception {
-    when(client.upcomingMissions(any(), any())).thenThrow(expiredSession());
+  void anExpiredSessionOnTheDashboardReadRedirectsToLogin() throws Exception {
+    when(reader.read(any(), any(), any(), any())).thenThrow(expiredSession());
 
     mockMvc.perform(get("/")).andExpect(redirectsToLogin());
   }
 
   @Test
   void anExpiredSessionOnTheMemberContextRedirectsToLogin() throws Exception {
+    when(reader.read(any(), any(), any(), any()))
+        .thenReturn(DashboardView.notLoaded(DashboardMode.MEMBER));
     when(client.currentUser()).thenThrow(expiredSession());
 
     mockMvc.perform(get("/")).andExpect(redirectsToLogin());

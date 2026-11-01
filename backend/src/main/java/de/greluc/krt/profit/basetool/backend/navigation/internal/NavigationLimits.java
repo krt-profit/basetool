@@ -28,6 +28,9 @@ public final class NavigationLimits {
   /** The most favourites a member keeps, shared by both navigation modes. */
   public static final int MAX_FAVOURITES = 12;
 
+  /** The most widget instances one dashboard holds, per mode (REQ-UI-034). */
+  public static final int MAX_DASHBOARD_WIDGETS = 12;
+
   /** The most hidden pages one request stores; bounds the input, the registry holds fewer. */
   public static final int MAX_HIDDEN = 100;
 

@@ -189,7 +189,7 @@ class MissionOperationReadNoNPlusOneTest {
     readOnly.setReadOnly(true);
     return readOnly.execute(_ ->
         missionService
-            .searchMissions(tag, null, null, null, null, null, PageRequest.of(0, 100))
+            .searchMissions(tag, null, null, null, null, null, null, PageRequest.of(0, 100))
             .map(mission -> missionMapper.toListDto(mission, 0L, false))
             .getContent());
   }

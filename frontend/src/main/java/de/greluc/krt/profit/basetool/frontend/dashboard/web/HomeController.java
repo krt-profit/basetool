@@ -20,20 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
-import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
-import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,8 +42,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Controller for {@code /}: the landing page for anonymous visitors and the dashboard (upcoming
- * missions, announcement, once-per-session welcome toast) for members.
+ * Controller for {@code /}: the landing page for anonymous visitors and the widget dashboard
+ * (REQ-UI-034, once-per-session welcome toast) for members, plus the announcement read marker.
  */
 @Controller
 @UsesLayoutModel
@@ -66,11 +57,15 @@ public class HomeController {
   /** Reads the dashboard's backend data. */
   private final DashboardBackendClient dashboardClient;
 
+  /** Reads the member's dashboard layout. */
+  private final DashboardReader dashboardReader;
+
   /**
    * Renders {@code /}. For an anonymous visitor it returns the landing page without any backend
-   * call, model attribute or session (REQ-SEC-052); for a member it renders the dashboard.
+   * call, model attribute or session (REQ-SEC-052); for a member it renders the dashboard board,
+   * whose widgets load themselves (REQ-UI-034).
    *
-   * @param model Thymeleaf model populated with mission, announcement, username and toast flags
+   * @param model Thymeleaf model populated with the dashboard, username and toast flags
    * @param principal authenticated OIDC user, or {@code null} for an anonymous visitor
    * @param request the current request; the session is taken from it only for a member
    * @return {@code landing} for an anonymous visitor, {@code index} for a member
@@ -82,17 +77,12 @@ public class HomeController {
     if (principal == null) {
       return "dashboard/landing";
     }
-    if (!SectionFallback.run(
-        log,
-        "upcoming-missions",
-        () -> model.addAttribute("upcomingMissions", loadUpcomingMissions()))) {
-      model.addAttribute("upcomingMissions", List.of());
-      model.addAttribute("error", "error.mission.fetch");
-    }
-
-    model.addAttribute("myOrgUnitIds", Set.of());
-
     model.addAttribute("username", principal.getPreferredUsername());
+    DashboardContext context = DashboardContext.of(model);
+    model.addAttribute(
+        "dashboard",
+        dashboardReader.read(
+            DashboardMode.MEMBER, context.access(), context.activeUnitId(), context.units()));
 
     HttpSession session = request.getSession(true);
     if (session.getAttribute("welcomeMessageShown") == null) {
@@ -101,67 +91,11 @@ public class HomeController {
       session.setAttribute("welcomeMessageShown", true);
     }
 
-    SectionFallback.run(log, "home-context", () -> addMemberContext(model));
+    SectionFallback.run(
+        log,
+        "home-context",
+        () -> model.addAttribute("currentUser", dashboardClient.currentUser()));
     return "dashboard/index";
-  }
-
-  /**
-   * Loads the missions starting within the next seven days.
-   *
-   * @return the upcoming missions, empty when the backend sent no page
-   */
-  @NotNull
-  private List<MissionListDto> loadUpcomingMissions() {
-    Instant now = Instant.now();
-    Instant horizon = now.plus(7, ChronoUnit.DAYS);
-    PageResponse<MissionListDto> upcomingPage = dashboardClient.upcomingMissions(now, horizon);
-    return (upcomingPage != null && upcomingPage.content() != null)
-        ? upcomingPage.content()
-        : List.of();
-  }
-
-  /**
-   * Adds the current user, the org units to highlight and the announcement with its unread flag.
-   *
-   * @param model the dashboard model
-   */
-  private void addMemberContext(@NotNull Model model) {
-    UserDto currentUser = dashboardClient.currentUser();
-    model.addAttribute("currentUser", currentUser);
-
-    Set<UUID> myOrgUnitIds = new HashSet<>();
-    if (currentUser.squadrons() != null) {
-      for (SquadronReferenceDto su : currentUser.squadrons()) {
-        if (su != null && su.id() != null) {
-          myOrgUnitIds.add(su.id());
-        }
-      }
-    }
-    if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
-      myOrgUnitIds.add(currentUser.squadron().id());
-    }
-    List<UUID> directOrgUnitIds =
-        SectionFallback.load(log, "own-org-units", dashboardClient::myOrgUnitIds, List.of());
-    if (directOrgUnitIds != null) {
-      for (UUID id : directOrgUnitIds) {
-        if (id != null) {
-          myOrgUnitIds.add(id);
-        }
-      }
-    }
-    model.addAttribute("myOrgUnitIds", myOrgUnitIds);
-
-    AnnouncementDto announcement = dashboardClient.announcement();
-    model.addAttribute("announcement", announcement);
-
-    boolean unread = false;
-    if (announcement != null && announcement.id() != null) {
-      if (currentUser.lastReadAnnouncementId() == null
-          || !currentUser.lastReadAnnouncementId().equals(announcement.id())) {
-        unread = true;
-      }
-    }
-    model.addAttribute("unreadAnnouncement", unread);
   }
 
   /**
