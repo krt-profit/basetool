@@ -70,13 +70,16 @@ class NavigationMetricsTest {
   void gaugeReportsTheSampledCount() {
     NavigationPreferencesRepository repository = mock(NavigationPreferencesRepository.class);
     when(repository.countWithFavourites()).thenReturn(7L);
-    NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository);
+    DashboardLayoutRepository layouts = mock(DashboardLayoutRepository.class);
+    when(layouts.countCustomised()).thenReturn(3L);
+    NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository, layouts);
 
     gauges.register(registry);
-    assertThat(gauge()).isZero();
+    assertThat(gauge(NavigationSection.FAVOURITES)).isZero();
     gauges.sample();
 
-    assertThat(gauge()).isEqualTo(7);
+    assertThat(gauge(NavigationSection.FAVOURITES)).isEqualTo(7);
+    assertThat(gauge(NavigationSection.DASHBOARD)).isEqualTo(3);
   }
 
   private double count(NavigationWriteOutcome outcome) {
@@ -88,10 +91,10 @@ class NavigationMetricsTest {
         .count();
   }
 
-  private double gauge() {
+  private double gauge(NavigationSection section) {
     return registry
         .get(NavigationMetrics.PERSONALISED_ACCOUNTS)
-        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
+        .tag(NavigationMetrics.TAG_SECTION, section.getTag())
         .gauge()
         .value();
   }

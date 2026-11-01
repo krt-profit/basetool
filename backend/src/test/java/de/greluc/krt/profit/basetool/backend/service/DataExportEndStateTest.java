@@ -335,6 +335,17 @@ class DataExportEndStateTest {
               + " VALUES (?, 0, ?)",
           owner.getId(),
           "missions.list");
+      UUID layoutId = UUID.randomUUID();
+      jdbc.update(
+          "INSERT INTO navigation_dashboard_layout (id, preferences_id, mode, layout_version,"
+              + " customised) VALUES (?, ?, 'MEMBER', 1, TRUE)",
+          layoutId,
+          owner.getId());
+      jdbc.update(
+          "INSERT INTO navigation_dashboard_widget (id, layout_id, widget_type, column_side,"
+              + " position, range_days, row_count) VALUES (?, ?, 'UPCOMING_DAYS', 'WIDE', 0, 7, 5)",
+          UUID.randomUUID(),
+          layoutId);
     }
     UUID partner = UUID.randomUUID();
     jdbc.update(

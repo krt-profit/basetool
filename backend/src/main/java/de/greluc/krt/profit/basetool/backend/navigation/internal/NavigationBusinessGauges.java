@@ -28,16 +28,18 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The navigation module's business gauge: how many members personalised each preference section
- * (REQ-OBS-011).
+ * The navigation module's business gauge: how many members personalised each preference section,
+ * the dashboard counted by its customised layouts (REQ-OBS-011).
  */
 @Component
 @RequiredArgsConstructor
 public class NavigationBusinessGauges implements BusinessGaugeSource {
 
   private final NavigationPreferencesRepository repository;
+  private final DashboardLayoutRepository dashboardLayouts;
 
   private final AtomicLong favouriteAccounts = new AtomicLong();
+  private final AtomicLong dashboardAccounts = new AtomicLong();
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
@@ -45,10 +47,15 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
             NavigationMetrics.PERSONALISED_ACCOUNTS, favouriteAccounts, AtomicLong::doubleValue)
         .tag(NavigationMetrics.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
         .register(registry);
+    Gauge.builder(
+            NavigationMetrics.PERSONALISED_ACCOUNTS, dashboardAccounts, AtomicLong::doubleValue)
+        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.DASHBOARD.getTag())
+        .register(registry);
   }
 
   @Override
   public void sample() {
     favouriteAccounts.set(repository.countWithFavourites());
+    dashboardAccounts.set(dashboardLayouts.countCustomised());
   }
 }

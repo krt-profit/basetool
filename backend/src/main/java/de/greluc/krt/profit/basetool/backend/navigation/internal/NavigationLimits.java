@@ -25,6 +25,9 @@ public final class NavigationLimits {
   /** The most favourites a member keeps, shared by both navigation modes. */
   public static final int MAX_FAVOURITES = 12;
 
+  /** The most widget instances one dashboard holds, per mode (REQ-UI-034). */
+  public static final int MAX_DASHBOARD_WIDGETS = 12;
+
   /** The longest entry key the store accepts. */
   public static final int MAX_ENTRY_KEY_LENGTH = 64;
 

@@ -575,9 +575,27 @@
     "key" : "navigationPreferences",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
+      "preference_section" : "dashboard",
+      "position" : 0,
+      "entry_key" : null,
+      "dashboard_mode" : "MEMBER",
+      "widget_type" : "UPCOMING_DAYS",
+      "column_side" : "WIDE",
+      "org_unit_id" : null,
+      "range_days" : 7,
+      "row_count" : 5,
+      "status_filter" : null
+    }, {
       "preference_section" : "favourites",
       "position" : 0,
-      "entry_key" : "missions.list"
+      "entry_key" : "missions.list",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
     } ],
     "truncated" : false
   } ]

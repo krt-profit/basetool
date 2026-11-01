@@ -40,14 +40,23 @@ public class NavigationExportSections implements PersonalDataExportSection {
             500,
             "navigationPreferences",
             ART_15_20,
-            "Chosen by the member: entry keys of pages, never free text.",
+            "Chosen by the member: entry keys of pages and widget choices, never free text.",
             """
             SELECT 'favourites' AS preference_section, f.order_index AS position,
-                   f.entry_key AS entry_key
+                   f.entry_key AS entry_key, CAST(NULL AS VARCHAR) AS dashboard_mode,
+                   CAST(NULL AS VARCHAR) AS widget_type, CAST(NULL AS VARCHAR) AS column_side,
+                   CAST(NULL AS UUID) AS org_unit_id, CAST(NULL AS INTEGER) AS range_days,
+                   CAST(NULL AS INTEGER) AS row_count, CAST(NULL AS VARCHAR) AS status_filter
             FROM navigation_favourite f
             JOIN navigation_preferences np ON np.user_id = f.preferences_id
             WHERE np.user_id = :userId
-            ORDER BY f.order_index
+            UNION ALL
+            SELECT 'dashboard', w.position, CAST(NULL AS VARCHAR), l.mode, w.widget_type,
+                   w.column_side, w.org_unit_id, w.range_days, w.row_count, w.status_filter
+            FROM navigation_dashboard_widget w
+            JOIN navigation_dashboard_layout l ON l.id = w.layout_id
+            WHERE l.preferences_id = :userId
+            ORDER BY preference_section, dashboard_mode, position
             """));
   }
 }
