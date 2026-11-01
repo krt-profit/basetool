@@ -26,18 +26,20 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * The caller's appearance as the navigation renders it (REQ-UI-026, REQ-UI-032): the stored desktop
- * mode and the version the next write echoes.
+ * mode, the shortcut switch and the version the next write echoes.
  *
  * @param loaded whether the stored appearance could be read; a failed read renders the drawer and
  *     disables the switch
  * @param mode the stored desktop mode
+ * @param shortcutsEnabled whether Alt+0 to Alt+9 are on (REQ-UI-035)
  * @param version the appearance section version the next write echoes
  */
-public record NavigationAppearance(boolean loaded, @NotNull DesktopMode mode, long version) {
+public record NavigationAppearance(
+    boolean loaded, @NotNull DesktopMode mode, boolean shortcutsEnabled, long version) {
 
   /** The appearance of a caller whose preferences were not read: the drawer, and the switch off. */
   public static final NavigationAppearance NOT_LOADED =
-      new NavigationAppearance(false, DesktopMode.DRAWER, 0);
+      new NavigationAppearance(false, DesktopMode.DRAWER, false, 0);
 
   /**
    * Wraps a stored section.
@@ -47,7 +49,8 @@ public record NavigationAppearance(boolean loaded, @NotNull DesktopMode mode, lo
    */
   @NotNull
   public static NavigationAppearance of(@NotNull AppearanceResponse stored) {
-    return new NavigationAppearance(true, stored.desktopMode(), stored.version());
+    return new NavigationAppearance(
+        true, stored.desktopMode(), stored.shortcutsEnabled(), stored.version());
   }
 
   /**

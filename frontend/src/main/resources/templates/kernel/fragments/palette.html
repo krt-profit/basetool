@@ -8,7 +8,7 @@
 </th:block>
 <th:block th:fragment="palette-body">
     <div class="palette"
-         th:attr="data-recent=#{palette.recent},data-favourites=#{palette.favourites},data-frequent=#{palette.frequent},data-action-customise=#{palette.action.customise},data-live-favourite-added=#{palette.live.favouriteAdded('{name}')},data-live-favourite-removed=#{palette.live.favouriteRemoved('{name}')},data-results=#{palette.results},data-help=#{palette.help},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries},data-entity-search-url=@{/quick-access/search}">
+         th:attr="data-recent=#{palette.recent},data-favourites=#{palette.favourites},data-frequent=#{palette.frequent},data-action-customise=#{palette.action.customise},data-action-shortcuts=#{palette.action.shortcuts},data-live-favourite-added=#{palette.live.favouriteAdded('{name}')},data-live-favourite-removed=#{palette.live.favouriteRemoved('{name}')},data-results=#{palette.results},data-help=#{palette.help},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-ou-switch=#{palette.action.ouSwitch},data-action-admin=#{palette.action.admin},data-action-logout=#{nav.logout},data-entries-url=@{/quick-access/entries},data-entity-search-url=@{/quick-access/search}">
         <div class="palette-input-row">
             <svg class="krt-icon palette-input-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
             <input type="text" id="palette-input" class="palette-input" data-testid="palette-input" autofocus

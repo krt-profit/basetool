@@ -70,7 +70,7 @@ public class NavigationPreferencesWriter {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(), 0),
-                new AppearanceResponse(DesktopMode.DRAWER, 0),
+                AppearanceResponse.DEFAULT,
                 TabBarsResponse.AUTOMATIC));
   }
 
