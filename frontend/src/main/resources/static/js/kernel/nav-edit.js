@@ -19,6 +19,8 @@
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import {
+    announce,
+    focusFirst,
     hideChange,
     NAV_EDIT_EVENT,
     stateElement,
@@ -35,36 +37,6 @@ const TOGGLE_SELECTOR = '[data-trigger="nav-edit-toggle"]';
  */
 function sidebar() {
     return document.getElementById('sidebar');
-}
-
-/**
- * Says something to assistive technology without moving focus.
- *
- * @param {string} dataKey the dataset key of the message pattern on the live region
- * @param {string} [name] the page name that replaces `{name}` in the pattern
- */
-function announce(dataKey, name = '') {
-    const region = document.querySelector('[data-nav-live]');
-    const pattern = region instanceof HTMLElement ? region.dataset[dataKey] : undefined;
-    if (region && pattern) {
-        region.textContent = pattern.replace('{name}', name);
-    }
-}
-
-/**
- * Moves focus to the first of the selectors that matches a visible element, so that the keyboard
- * position survives a control that was swapped out.
- *
- * @param {string[]} selectors candidates in order of preference
- */
-function focusFirst(selectors) {
-    for (const selector of selectors) {
-        const element = document.querySelector(selector);
-        if (element instanceof HTMLElement && element.getClientRects().length > 0) {
-            element.focus({ preventScroll: false });
-            return;
-        }
-    }
 }
 
 /**

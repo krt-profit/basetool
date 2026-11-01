@@ -48,6 +48,9 @@ public class NavigationMentionSource implements PersonMentionSource {
         "navigation_dashboard_widget.widget_type",
         "navigation_favourite.entry_key",
         "navigation_hidden.entry_key",
+        "navigation_order.entry_key",
+        "navigation_order.mode",
+        "navigation_order.scope",
         "navigation_tab_bar.entry_key",
         "navigation_tab_bar.mode");
   }

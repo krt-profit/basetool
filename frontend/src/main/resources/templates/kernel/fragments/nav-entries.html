@@ -6,17 +6,20 @@
               th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
               th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span></th:block><th:block th:if="${entry.labelWithIcon()}"><span th:text="#{${entry.labelKey()}}">Login</span>
         <svg class="krt-icon" aria-hidden="true" focusable="false"><use th:href="|#krt-icon-${entry.icon()}|"/></svg></th:block><th:block th:unless="${entry.unreadBadge() or entry.labelWithIcon()}" th:text="#{${entry.labelKey()}}">Label</th:block></a>
-<div th:fragment="row(entry, hideable)" class="nav-row" th:data-entry-key="${entry.key()}">
+<div th:fragment="row(entry, hideable, first, last)" class="nav-row" th:data-entry-key="${entry.key()}"
+     th:data-reorder-name="#{__${entry.labelKey()}__}">
     <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, false)}" />
     <div class="nav-edit-controls" data-nav-edit-controls th:if="${navigationFavourites.loaded()}">
         <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${entry}, true)}" />
         <th:block th:if="${hideable}"><th:block th:replace="~{kernel/fragments/nav-favourites :: hide(${entry})}" /></th:block>
+        <th:block th:if="${first != null}"><th:block th:replace="~{kernel/fragments/components :: reorderControls(#{__${entry.labelKey()}__}, ${first}, ${last})}" /></th:block>
     </div>
 </div>
-<section th:fragment="group(item, crumb, filterOnly)" class="nav-group"
+<section th:fragment="group(item, crumb, filterOnly, first, last)" class="nav-group"
          th:classappend="${filterOnly} ? 'nav-group-filter-only' : (${item.links().isEmpty()} ? 'nav-group-emptied' : '')"
          th:attr="data-collapsed=${item.group().collapsed()} ? 'true' : null"
          th:data-group-key="${item.group().key()}" th:data-nav-icon="${item.group().icon()}"
+         th:data-reorder-name="#{${item.group().labelKey()}}"
          th:data-nav-group="${crumb}" th:hidden="${filterOnly}">
     <button type="button" class="nav-group-head" aria-expanded="true"
             th:aria-controls="|nav-group-${item.group().key()}|" th:tabindex="${filterOnly} ? '-1' : null">
@@ -25,23 +28,34 @@
         <span class="nav-group-count"></span>
         <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
     </button>
+    <div class="nav-edit-controls nav-group-controls" data-nav-edit-controls
+         th:if="${!filterOnly and navigationFavourites.loaded()}">
+        <th:block th:replace="~{kernel/fragments/components :: reorderControls(#{${item.group().labelKey()}}, ${first}, ${last})}" />
+    </div>
     <div class="nav-group-links" th:id="|nav-group-${item.group().key()}|">
-        <th:block th:each="entry : ${item.links()}">
+        <th:block th:each="entry, position : ${item.links()}">
             <th:block th:if="${filterOnly}"><th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, true)}" /></th:block>
-            <th:block th:unless="${filterOnly}"><th:block th:replace="~{kernel/fragments/nav-entries :: row(${entry}, true)}" /></th:block>
+            <th:block th:unless="${filterOnly}"><th:block th:replace="~{kernel/fragments/nav-entries :: row(${entry}, true, ${position.first}, ${position.last})}" /></th:block>
         </th:block>
         <p th:if="${item.links().isEmpty()}" class="nav-group-emptied-note" th:text="#{nav.hidden.groupEmpty}">Alle Einträge ausgeblendet – unter „Mehr“.</p>
     </div>
 </section>
 <th:block th:fragment="mainList">
     <th:block th:replace="~{kernel/fragments/nav-favourites :: block('member')}" />
-    <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty() and item.hiddenLinks().isEmpty()}">
-        <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, #{${item.group().labelKey()}}, false)}" />
+    <th:block th:each="item, position : ${navigation.main()}" th:unless="${item.links().isEmpty() and item.hiddenLinks().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, #{${item.group().labelKey()}}, false, ${position.first}, ${position.last})}" />
     </th:block>
     <th:block th:replace="~{kernel/fragments/nav-favourites :: more('member')}" />
+    <th:block th:replace="~{kernel/fragments/nav-entries :: resetOrder('member', ${navigationOrder.member().scopes().isEmpty()})}" />
     <th:block th:replace="~{kernel/fragments/nav-tabbar :: editor('member')}" />
-    <th:block th:replace="~{kernel/fragments/nav-entries :: group(${navigation.personal()}, #{${navigation.personal().group().labelKey()}}, true)}" />
+    <th:block th:replace="~{kernel/fragments/nav-entries :: group(${navigation.personal()}, #{${navigation.personal().group().labelKey()}}, true, false, false)}" />
 </th:block>
+<div th:fragment="resetOrder(mode, isDefault)" class="nav-edit-controls nav-edit-reset" data-nav-edit-controls
+     th:if="${navigationFavourites.loaded()}">
+    <button type="button" class="btn btn-ghost nav-edit-reset-btn" data-trigger="nav-order-reset"
+            data-testid="nav-order-reset" th:data-mode="${mode}" th:disabled="${isDefault}"
+            th:text="#{nav.order.reset}">Standardreihenfolge</button>
+</div>
 <th:block th:fragment="adminList">
     <div class="nav-top" th:data-nav-group="#{nav.admin.crumb}">
         <th:block th:each="entry : ${navigation.adminTop().links()}">
@@ -49,10 +63,11 @@
         </th:block>
     </div>
     <th:block th:replace="~{kernel/fragments/nav-favourites :: block('admin')}" />
-    <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty() and item.hiddenLinks().isEmpty()}">
-        <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false)}" />
+    <th:block th:each="item, position : ${navigation.admin()}" th:unless="${item.links().isEmpty() and item.hiddenLinks().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false, ${position.first}, ${position.last})}" />
     </th:block>
     <th:block th:replace="~{kernel/fragments/nav-favourites :: more('admin')}" />
+    <th:block th:replace="~{kernel/fragments/nav-entries :: resetOrder('admin', ${navigationOrder.admin().scopes().isEmpty()})}" />
     <th:block th:replace="~{kernel/fragments/nav-tabbar :: editor('admin')}" />
 </th:block>
 <th:block th:fragment="swap">

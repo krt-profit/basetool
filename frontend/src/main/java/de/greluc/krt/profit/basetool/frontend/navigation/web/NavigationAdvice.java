@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavouri
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationOrder;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTabBar;
 import jakarta.servlet.http.HttpServletRequest;
@@ -125,9 +126,23 @@ public class NavigationAdvice {
   @NotNull
   public NavigationMenu navigation(
       @ModelAttribute(name = "navigationAccess", binding = false) @NotNull NavigationAccess access,
-      @ModelAttribute(name = "navigationHidden", binding = false) @NotNull
-          NavigationHidden hidden) {
-    return NavigationMenu.resolve(registry, access, Set.copyOf(hidden.keys()));
+      @ModelAttribute(name = "navigationHidden", binding = false) @NotNull NavigationHidden hidden,
+      @ModelAttribute(name = "navigationOrder", binding = false) @NotNull NavigationOrder order) {
+    return NavigationMenu.resolve(registry, access, Set.copyOf(hidden.keys()), order);
+  }
+
+  /**
+   * The caller's stored group and link order, for the menu and the order state.
+   *
+   * @param personalisation the stored preferences
+   * @return the order to render
+   */
+  @ModelAttribute("navigationOrder")
+  @NotNull
+  public NavigationOrder order(
+      @ModelAttribute(name = "navigationPersonalisation", binding = false) @NotNull
+          NavigationPersonalisation personalisation) {
+    return personalisation.order();
   }
 
   /**

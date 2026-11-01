@@ -3112,6 +3112,7 @@
     }
 
     .nav-edit-control,
+    .nav-edit-controls .krt-reorder__btn,
     .nav-unhide {
         flex: none;
         min-width: var(--touch-target-dense);
@@ -3120,8 +3121,18 @@
     }
 
     .nav-edit-control:hover:not(:disabled),
+    .nav-edit-controls .krt-reorder__btn:hover:not([aria-disabled='true']),
     .nav-unhide:hover:not(:disabled) {
         color: var(--color-primary);
+    }
+
+    .nav-edit-controls .krt-reorder {
+        gap: var(--space-1);
+    }
+
+    .nav-group-controls {
+        justify-content: flex-end;
+        padding-left: 1.25rem;
     }
 
     .nav-unhide {
@@ -3145,6 +3156,7 @@
     @media (width <= 1024px) {
         .nav-edit-toggle,
         .nav-edit-control,
+        .nav-edit-controls .krt-reorder__btn,
         .nav-unhide,
         .nav-edit-reset-btn {
             min-width: var(--touch-target);
