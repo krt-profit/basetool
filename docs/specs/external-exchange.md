@@ -2618,7 +2618,7 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   never refused. Like every capability it admits the routes any capability serves. A membership that
   starts or stops making its member a Logistician of the unit (the flag or the rank changes)
   announces the unit's pool in the feed (`V297`) and, for a Bereich or the Organisationsleitung, the
-  pools below it (`V316`), so the entries appear or vanish without a new snapshot. The capability itself is the client's: a client whose token gains it reads a new
+  pools below it (`V317`), so the entries appear or vanish without a new snapshot. The capability itself is the client's: a client whose token gains it reads a new
   snapshot, and one whose token loses it drops the entries it kept.
 
 **Acceptance**

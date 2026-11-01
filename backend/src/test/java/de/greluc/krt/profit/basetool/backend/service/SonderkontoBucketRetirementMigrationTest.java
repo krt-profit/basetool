@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The data cut of the Sonderkonto bucket retirement (REQ-BANK-037): the SQL of migration {@code
- * V320} is run against global-role view grants and approval limits, in a rolled-back transaction.
+ * V321} is run against global-role view grants and approval limits, in a rolled-back transaction.
  */
 @SpringBootTest
 @Transactional
@@ -94,7 +94,7 @@ class SonderkontoBucketRetirementMigrationTest {
     try (var files = Files.list(MIGRATIONS)) {
       Path script =
           files
-              .filter(file -> file.getFileName().toString().startsWith("V320__"))
+              .filter(file -> file.getFileName().toString().startsWith("V321__"))
               .findFirst()
               .orElseThrow();
       jdbcTemplate.execute(Files.readString(script, StandardCharsets.UTF_8));

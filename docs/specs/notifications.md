@@ -119,7 +119,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_WITHDRAWN` | none (no rule) | — | supersedes the pledge notices | REQ-SUP-016 |
-| `INVENTORY_STOCK_LEVEL_LOW` | `INVENTORY_STOCK_LEVEL_LOW` | V315 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the level's unit, no cascade); raised once per low, re-armed at the target, by the `stock_level_low` timed producer | REQ-NOTIF-030 |
+| `INVENTORY_STOCK_LEVEL_LOW` | `INVENTORY_STOCK_LEVEL_LOW` | V316 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the level's unit, no cascade); raised once per low, re-armed at the target, by the `stock_level_low` timed producer | REQ-NOTIF-030 |
 | `SUPPLY_NEED_ORDER_COVERED` | `SUPPLY_NEED_ORDER_COVERED` | V312 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); raised once per link by the `supply_order_covered` timed producer | REQ-SUP-024 |
 | `SUPPLY_NEED_CLOSED` | none (no rule) | — | supersedes the need's covered-order notices when it is fulfilled or withdrawn | REQ-SUP-024 |
 | `PURCHASING_NEED_RELEASED` | `PURCHASING_NEED_RELEASED` | V289 | `EVENT_RECIPIENTS` (the active Handelsbeauftragten); the only purchasing notice a member can mute | REQ-PUR-024 |
@@ -1217,7 +1217,7 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
 `SeededNotificationRulesIntegrationTest`, `NotificationPreferenceGroupsTest`,
 `NotificationTypeMessageCoverageTest`, `NotificationTargetsTest` · **Code:**
 `NotificationType#INVENTORY_STOCK_LEVEL_LOW`, `inventory/internal/StockLevelNoticeProducer`,
-`StockLevelStates`, `InventoryNotices#stockLevelLow`, migration V315 · **Related:**
+`StockLevelStates`, `InventoryNotices#stockLevelLow`, migration V316 · **Related:**
 REQ-INV-067, REQ-INV-068, REQ-NOTIF-024, REQ-NOTIF-026, REQ-NOTIF-027 · **Decision:** ADR-0302
 
 ### REQ-NOTIF-031 — Amounts in a notification carry thousands separators
