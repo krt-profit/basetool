@@ -59,8 +59,8 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
   @Autowired private UserRepository userRepository;
 
   /**
-   * An own-unit mission and a signed-up mission of another unit are both returned, merged and sorted
-   * by planned start; a foreign mission the caller is not signed up for stays out.
+   * An own-unit mission and a signed-up mission of another unit are both returned, merged and
+   * sorted by planned start; a foreign mission the caller is not signed up for stays out.
    */
   @Test
   void unionsOwnUnitAndSignedUpMissionsSoonestFirst() {

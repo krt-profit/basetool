@@ -265,6 +265,7 @@ class DashboardE2eTest {
           page.getByTestId("dashboard-customise").click();
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-next-mission").click();
+          assertThat(page.getByTestId("dashboard-widget-next-mission")).hasCount(1);
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-hangar-readiness").click();
 

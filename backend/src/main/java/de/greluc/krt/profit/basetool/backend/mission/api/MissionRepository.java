@@ -201,17 +201,14 @@ public interface MissionRepository
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
-      """
-      SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND (
-        :ownOrgWide = true
-        OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
-        OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
-        OR (EXISTS (SELECT 1 FROM MissionParticipant p WHERE p.mission = m AND p.user.id = :userId)
-      AND """
+      "SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND ("
+          + ":ownOrgWide = true"
+          + " OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
+          + " OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " OR (EXISTS (SELECT 1 FROM MissionParticipant p"
+          + " WHERE p.mission = m AND p.user.id = :userId) AND "
           + MissionScope.PREDICATE
-          + """
-      )) ORDER BY m.plannedStartTime ASC, m.id ASC
-      """)
+          + ")) ORDER BY m.plannedStartTime ASC, m.id ASC")
   List<Mission> findUpcomingOwnOrSignedUp(
       @Param("now") Instant now,
       @Param("statuses") Collection<String> statuses,

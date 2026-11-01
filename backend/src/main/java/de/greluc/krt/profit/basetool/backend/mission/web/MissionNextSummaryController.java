@@ -87,7 +87,9 @@ public class MissionNextSummaryController {
     return missions.stream()
         .map(mission ->
             missionMapper.toListDto(
-                mission, counts.getOrDefault(mission.getId(), 0L), signedUp.contains(mission.getId())))
+                mission,
+                counts.getOrDefault(mission.getId(), 0L),
+                signedUp.contains(mission.getId())))
         .toList();
   }
 }
