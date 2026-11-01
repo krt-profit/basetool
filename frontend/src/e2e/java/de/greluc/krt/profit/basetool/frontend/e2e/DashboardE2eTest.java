@@ -348,19 +348,22 @@ class DashboardE2eTest {
                   page.getByTestId("dashboard-widget-assigned-orders")
                       .locator(
                           "[data-testid='dashboard-assigned-order'],"
-                              + " [data-testid='dashboard-assigned-orders-empty']"))
+                              + " [data-testid='dashboard-assigned-orders-empty']")
+                      .first())
               .isVisible();
           assertThat(
                   page.getByTestId("dashboard-widget-low-stock")
                       .locator(
                           "[data-testid='dashboard-low-stock-row'],"
-                              + " [data-testid='dashboard-low-stock-empty']"))
+                              + " [data-testid='dashboard-low-stock-empty']")
+                      .first())
               .isVisible();
           assertThat(
                   page.getByTestId("dashboard-widget-bank")
                       .locator(
                           "[data-testid='dashboard-bank-row'],"
-                              + " [data-testid='dashboard-bank-empty']"))
+                              + " [data-testid='dashboard-bank-empty']")
+                      .first())
               .isVisible();
           assertThat(page.getByTestId("dashboard-widget-bank")).hasAttribute("data-rows", "3");
 
