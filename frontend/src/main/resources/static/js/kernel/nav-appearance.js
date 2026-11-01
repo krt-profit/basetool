@@ -18,7 +18,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { NAV_SHORTCUTS_EVENT } from '/js/kernel/nav-preferences.js';
+import { NAV_SHORTCUTS_EVENT, NAV_START_PAGE_EVENT } from '/js/kernel/nav-preferences.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 const APPEARANCE_URL = '/navigation/appearance';
@@ -37,19 +37,22 @@ function stateElement() {
 }
 
 /**
- * Puts the page in line with a stored appearance: the mode on the body, the version in the state
- * and the selected option of every switch, then tells the navigation to re-evaluate its layout.
+ * Puts the page in line with a stored appearance: the mode on the body, the start pages and the
+ * version in the state and the selected option of every switch, then tells the navigation to
+ * re-evaluate its layout.
  *
- * @param {{ desktopMode: string, shortcutsEnabled: boolean, version: number }} stored the
- *     appearance section as stored
+ * @param {{ desktopMode: string, shortcutsEnabled: boolean, startPageMember?: string | null,
+ *     startPageAdmin?: string | null, version: number }} stored the appearance section as stored
  */
-function apply(stored) {
+export function applyAppearance(stored) {
     const state = stateElement();
     const mode = String(stored.desktopMode).toLowerCase();
     if (state) {
         state.dataset.version = String(stored.version);
         state.dataset.mode = mode;
         state.dataset.shortcuts = String(stored.shortcutsEnabled);
+        state.dataset.startMember = stored.startPageMember || '';
+        state.dataset.startAdmin = stored.startPageAdmin || '';
     }
     document.body.dataset.navMode = mode;
     document.querySelectorAll(`${SWITCH_SELECTOR} input[type="radio"]`).forEach((input) => {
@@ -64,6 +67,7 @@ function apply(stored) {
     });
     document.dispatchEvent(new CustomEvent('krt:nav-mode-changed', { detail: { mode } }));
     document.dispatchEvent(new CustomEvent(NAV_SHORTCUTS_EVENT));
+    document.dispatchEvent(new CustomEvent(NAV_START_PAGE_EVENT));
 }
 
 /**
@@ -72,7 +76,7 @@ function apply(stored) {
 async function reload() {
     const stored = await krtFetch.getJson(APPEARANCE_URL);
     if (stored) {
-        apply(stored);
+        applyAppearance(stored);
     }
 }
 
@@ -101,7 +105,7 @@ function write(input, change) {
         submitter: input,
         toast: false,
         errorMessage: state.dataset.error,
-        onSuccess: (stored) => apply(stored),
+        onSuccess: (stored) => applyAppearance(stored),
         onError: (status) => {
             if (status !== 409) {
                 reload();

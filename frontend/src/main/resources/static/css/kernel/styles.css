@@ -3053,6 +3053,23 @@
         opacity: 0.4;
     }
 
+    .nav-start-page {
+        flex: none;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+
+    .nav-start-page:hover:not(:disabled),
+    .nav-start-page[aria-pressed='true'] {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+
+    .nav-start-page:disabled {
+        cursor: not-allowed;
+        opacity: 0.4;
+    }
+
     .nav-star .nav-star-on,
     .nav-star[aria-pressed='true'] .nav-star-off {
         display: none;

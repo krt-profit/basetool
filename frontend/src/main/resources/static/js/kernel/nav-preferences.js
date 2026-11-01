@@ -35,6 +35,9 @@ export const NAV_RENDERED_EVENT = 'krt:nav-rendered';
 /** Fired on the document when the shortcut switch of „Darstellung“ changed. */
 export const NAV_SHORTCUTS_EVENT = 'krt:nav-shortcuts-changed';
 
+/** Fired on the document when a start page of „Darstellung“ changed. */
+export const NAV_START_PAGE_EVENT = 'krt:nav-start-page-changed';
+
 /** Fired on the document when „Anpassen“ turns on or off. */
 export const NAV_EDIT_EVENT = 'krt:nav-edit-changed';
 

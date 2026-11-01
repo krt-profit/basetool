@@ -120,6 +120,9 @@ public class WebAppManifestController {
    */
   private static final Locale DEFAULT_LOCALE = Locale.GERMAN;
 
+  /** The entry point the installed app opens, which leads on to the member's start page. */
+  private static final String START_PAGE_PATH = "start";
+
   /** Resolves the three user-visible strings for the requested locale. */
   private final MessageSource messageSource;
 
@@ -156,7 +159,7 @@ public class WebAppManifestController {
             messageSource.getMessage("pwa.description", null, DEFAULT_DESCRIPTION, resolved),
             resolved.toLanguageTag(),
             "ltr",
-            root,
+            root + START_PAGE_PATH,
             root,
             "standalone",
             BACKGROUND_COLOR,
@@ -209,7 +212,7 @@ public class WebAppManifestController {
    * @param description one sentence, shown by richer install dialogs.
    * @param lang BCP 47 tag of the strings, always a locale the bundles cover
    * @param dir writing direction; both shipped locales are left-to-right.
-   * @param startUrl what the icon opens: the application root
+   * @param startUrl what the icon opens: the start page entry point (REQ-UI-034)
    * @param scope the application root, which includes the same-origin sign-in flow
    * @param display {@code standalone}, without a browser address bar.
    * @param backgroundColor see {@link #BACKGROUND_COLOR}.

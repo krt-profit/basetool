@@ -94,7 +94,7 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(favourites), 0),
                 HiddenResponse.EMPTY,
                 OrderResponse.EMPTY,
-                new AppearanceResponse(mode, true, version),
+                new AppearanceResponse(mode, true, null, null, version),
                 TabBarsResponse.AUTOMATIC));
   }
 
@@ -272,7 +272,7 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of("refinery.orders"), 2),
                 OrderResponse.EMPTY,
-                new AppearanceResponse(DesktopMode.RAIL, true, 1),
+                new AppearanceResponse(DesktopMode.RAIL, true, null, null, 1),
                 TabBarsResponse.AUTOMATIC));
     String rail = rail(page(member()));
 
@@ -306,7 +306,7 @@ class NavigationDesktopModesMvcTest {
   void relaysTheAppearanceWrite() throws Exception {
     when(backendApiClient.put(
             eq(APPEARANCE), any(AppearanceUpdateRequest.class), eq(AppearanceResponse.class)))
-        .thenReturn(new AppearanceResponse(DesktopMode.PINNED, true, 4));
+        .thenReturn(new AppearanceResponse(DesktopMode.PINNED, true, null, null, 4));
 
     mockMvc
         .perform(
@@ -345,7 +345,7 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(), 0),
                 HiddenResponse.EMPTY,
                 OrderResponse.EMPTY,
-                new AppearanceResponse(DesktopMode.DRAWER, false, 2),
+                new AppearanceResponse(DesktopMode.DRAWER, false, null, null, 2),
                 TabBarsResponse.AUTOMATIC));
     assertThat(page(member())).contains("data-shortcuts=\"false\"");
 

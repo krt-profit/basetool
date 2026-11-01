@@ -256,6 +256,22 @@ public class NavigationAdvice {
         .orElse(NavigationAppearance.NOT_LOADED);
   }
 
+  /**
+   * The start-page choices and the chosen start pages, for the header button and „Darstellung“.
+   *
+   * @param access the caller's roles and flags
+   * @param appearance the caller's stored appearance
+   * @return the choices to render; never {@code null}
+   */
+  @ModelAttribute("navigationStartPages")
+  @NotNull
+  public NavigationStartPages startPages(
+      @ModelAttribute(name = "navigationAccess", binding = false) @NotNull NavigationAccess access,
+      @ModelAttribute(name = "navigationAppearance", binding = false) @NotNull
+          NavigationAppearance appearance) {
+    return NavigationStartPages.of(registry, access, appearance);
+  }
+
   @NotNull
   private Set<String> roles(@Nullable Authentication authentication) {
     if (authentication == null) {

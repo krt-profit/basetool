@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<button th:fragment="button(entry)" type="button" class="btn btn-ghost nav-start-page"
+        data-trigger="nav-start-page-toggle" data-start-page-toggle data-testid="nav-start-page"
+        th:with="pressed=${navigationStartPages.isStartPage(entry)}"
+        th:data-entry-key="${entry.key()}" th:data-mode="${navigationStartPages.modeOf(entry)}"
+        th:aria-pressed="${pressed}" th:disabled="${!navigationAppearance.loaded()}"
+        th:data-label-add="#{nav.startPage.add}" th:data-label-remove="#{nav.startPage.remove}"
+        th:text="${pressed} ? #{nav.startPage.remove} : #{nav.startPage.add}">Als Startseite festlegen</button>
+
+<th:block th:fragment="selects">
+    <div class="form-group" th:each="mode : ${ {'member', 'admin'} }"
+         th:unless="${navigationStartPages.options(mode).isEmpty()}">
+        <label class="form-label" th:for="|start-page-${mode}|" th:text="#{|profile.startPage.${mode}|}">Startseite</label>
+        <select class="form-select" th:id="|start-page-${mode}|" data-start-page-select
+                th:data-mode="${mode}" th:data-testid="|start-page-select-${mode}|"
+                th:disabled="${!navigationAppearance.loaded()}">
+            <option value="" th:selected="${navigationStartPages.selected(mode).isEmpty()}"
+                    th:text="#{profile.startPage.dashboard}">Dashboard (Standard)</option>
+            <option th:each="option : ${navigationStartPages.options(mode)}" th:value="${option.key()}"
+                    th:selected="${option.key() == navigationStartPages.selected(mode)}"
+                    th:text="#{__${option.labelKey()}__}">Seite</option>
+        </select>
+    </div>
+</th:block>
+</body>
+</html>

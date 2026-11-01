@@ -546,6 +546,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sidebarEl) {
         sidebarEl.querySelectorAll('.nav-admin-entry, .nav-admin-back').forEach((btn) => {
             btn.addEventListener('click', () => {
+                if (!adminMode && btn.classList.contains('nav-admin-entry')) {
+                    const appearance = document.querySelector('[data-appearance-state]');
+                    if (appearance instanceof HTMLElement && appearance.dataset.startAdmin) {
+                        window.location.assign('/start?mode=admin');
+                        return;
+                    }
+                }
                 setAdminMode(!adminMode);
                 const list = document.getElementById('nav-list');
                 if (list) list.scrollTop = 0;

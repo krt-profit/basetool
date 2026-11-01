@@ -19,9 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,8 +56,8 @@ public class NavigationAppearanceWriter {
   AppearanceResponse read(@NotNull UUID userId, long version) {
     return appearances
         .findById(userId)
-        .map(row -> new AppearanceResponse(row.getDesktopMode(), row.isShortcutsEnabled(), version))
-        .orElseGet(() -> new AppearanceResponse(DesktopMode.DRAWER, true, version));
+        .map(row -> response(row, version))
+        .orElseGet(() -> new AppearanceResponse(DesktopMode.DRAWER, true, null, null, version));
   }
 
   /**
@@ -76,14 +80,85 @@ public class NavigationAppearanceWriter {
     if (preferences.bumpAppearanceVersionIfMatches(userId, expectedVersion) == 0) {
       throw new ObjectOptimisticLockingFailureException(NavigationPreferences.class, userId);
     }
-    NavigationAppearance row =
-        appearances
-            .findById(userId)
-            .orElseGet(() -> new NavigationAppearance(userId, mode, shortcutsEnabled));
+    NavigationAppearance row = rowOf(userId);
     row.setDesktopMode(mode);
     row.setShortcutsEnabled(shortcutsEnabled);
     appearances.saveAndFlush(row);
+    return response(row, currentVersion(userId));
+  }
+
+  /**
+   * Replaces the start page of one mode when the echoed version is current; the other mode, the
+   * desktop mode and the shortcut switch stay.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the mode whose start page changes
+   * @param entryKey the entry key of the new start page, {@code null} for the dashboard
+   * @param expectedVersion the appearance version the caller last saw
+   * @return the stored appearance with the bumped version
+   * @throws BadRequestException when the key is malformed
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   */
+  @Transactional
+  public @NotNull AppearanceResponse replaceStartPage(
+      @NotNull UUID userId,
+      @NotNull NavigationMode mode,
+      @Nullable String entryKey,
+      long expectedVersion) {
+    requireEntryKey(entryKey);
+    preferences.insertIfAbsent(userId);
+    if (preferences.bumpAppearanceVersionIfMatches(userId, expectedVersion) == 0) {
+      throw new ObjectOptimisticLockingFailureException(NavigationPreferences.class, userId);
+    }
+    NavigationAppearance row = rowOf(userId);
+    row.setStartPage(mode, entryKey);
+    appearances.saveAndFlush(row);
+    return response(row, currentVersion(userId));
+  }
+
+  /**
+   * Clears every start page that names one of the given keys, bumping the appearance version when
+   * one went.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param keys the entry keys the member may no longer see
+   * @return {@code true} when a start page was cleared
+   */
+  @Transactional
+  public boolean prune(@NotNull UUID userId, @NotNull Collection<String> keys) {
+    Optional<NavigationAppearance> stored = appearances.findById(userId);
+    if (stored.isEmpty() || !stored.get().clearStartPages(keys)) {
+      return false;
+    }
+    appearances.saveAndFlush(stored.get());
+    preferences.bumpAppearanceVersion(userId);
+    return true;
+  }
+
+  private NavigationAppearance rowOf(UUID userId) {
+    return appearances
+        .findById(userId)
+        .orElseGet(() -> new NavigationAppearance(userId, DesktopMode.DRAWER, true));
+  }
+
+  private long currentVersion(UUID userId) {
+    return preferences.findById(userId).orElseThrow().getAppearanceVersion();
+  }
+
+  private static AppearanceResponse response(NavigationAppearance row, long version) {
     return new AppearanceResponse(
-        mode, shortcutsEnabled, preferences.findById(userId).orElseThrow().getAppearanceVersion());
+        row.getDesktopMode(),
+        row.isShortcutsEnabled(),
+        row.startPageOf(NavigationMode.MEMBER),
+        row.startPageOf(NavigationMode.ADMIN),
+        version);
+  }
+
+  private static void requireEntryKey(String entryKey) {
+    if (entryKey != null
+        && (entryKey.length() > NavigationLimits.MAX_ENTRY_KEY_LENGTH
+            || !entryKey.matches(NavigationLimits.ENTRY_KEY_PATTERN))) {
+      throw new BadRequestException("The start page is not an entry key.");
+    }
   }
 }

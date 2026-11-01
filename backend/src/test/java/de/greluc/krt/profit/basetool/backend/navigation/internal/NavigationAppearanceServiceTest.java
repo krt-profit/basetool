@@ -88,8 +88,8 @@ class NavigationAppearanceServiceTest {
     AppearanceResponse rail =
         service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, false, 1L));
 
-    assertThat(off).isEqualTo(new AppearanceResponse(DesktopMode.DRAWER, false, 1));
-    assertThat(rail).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, false, 2));
+    assertThat(off).isEqualTo(new AppearanceResponse(DesktopMode.DRAWER, false, null, null, 1));
+    assertThat(rail).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, false, null, null, 2));
     assertThat(service.read(owner).appearance()).isEqualTo(rail);
   }
 
@@ -103,8 +103,8 @@ class NavigationAppearanceServiceTest {
     AppearanceResponse second =
         service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.PINNED, true, 1L));
 
-    assertThat(first).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, true, 1));
-    assertThat(second).isEqualTo(new AppearanceResponse(DesktopMode.PINNED, true, 2));
+    assertThat(first).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, true, null, null, 1));
+    assertThat(second).isEqualTo(new AppearanceResponse(DesktopMode.PINNED, true, null, null, 2));
     assertThat(service.read(owner).appearance()).isEqualTo(second);
     assertThat(service.read(owner).favourites().version()).isZero();
   }

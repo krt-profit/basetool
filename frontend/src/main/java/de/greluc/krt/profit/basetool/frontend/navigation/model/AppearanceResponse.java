@@ -21,19 +21,31 @@ package de.greluc.krt.profit.basetool.frontend.navigation.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The caller's appearance section as the backend stores it (REQ-UI-032).
  *
  * @param desktopMode the chosen desktop mode
  * @param shortcutsEnabled whether the navigation shortcuts Alt+0 to Alt+9 are on (REQ-UI-035)
+ * @param startPageMember the entry key of the member mode's start page, {@code null} for the
+ *     dashboard (REQ-UI-034)
+ * @param startPageAdmin the entry key of the administration mode's start page, {@code null} for the
+ *     dashboard
  * @param version the section's optimistic-lock version, echoed on the next write
  */
 @DtoMirror
 public record AppearanceResponse(
-    @NotNull DesktopMode desktopMode, boolean shortcutsEnabled, long version) {
+    @NotNull DesktopMode desktopMode,
+    boolean shortcutsEnabled,
+    @Nullable String startPageMember,
+    @Nullable String startPageAdmin,
+    long version) {
 
-  /** The appearance of a member who never chose: the drawer, the shortcuts on, version 0. */
+  /**
+   * The appearance of a member who never chose: the drawer, the shortcuts on, no start page,
+   * version 0.
+   */
   public static final AppearanceResponse DRAWER =
-      new AppearanceResponse(DesktopMode.DRAWER, true, 0);
+      new AppearanceResponse(DesktopMode.DRAWER, true, null, null, 0);
 }

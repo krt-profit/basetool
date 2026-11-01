@@ -4,6 +4,9 @@
 <div th:fragment="state" hidden data-appearance-state
      th:data-loaded="${navigationAppearance.loaded()}" th:data-version="${navigationAppearance.version()}"
      th:data-mode="${navigationAppearance.modeAttribute()}" th:data-shortcuts="${navigationAppearance.shortcutsEnabled()}"
+     th:data-start-member="${navigationStartPages.selected('member')}"
+     th:data-start-admin="${navigationStartPages.selected('admin')}"
+     th:data-start-error="#{nav.startPage.error}"
      th:data-shortcut-unavailable="#{nav.shortcuts.unavailable('{n}')}" th:data-shortcut-empty="#{nav.shortcuts.empty('{n}')}"
      th:data-error="#{nav.mode.error}" th:data-conflict="#{nav.mode.conflict}"></div>
 

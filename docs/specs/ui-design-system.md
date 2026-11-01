@@ -1355,7 +1355,8 @@ Binding details:
 - **The icon is emitted at its content-hashed URL**, resolved through `ResourceUrlProvider`.
   `/logos/**` is served `immutable` for a year, so a manifest naming the bare path would pin every
   installed home screen to a URL no browser revalidates — a redesigned icon would never arrive.
-- **`scope` and `start_url` are the application root, and sign-in is inside them.** A `scope` is one
+- **`scope` and `id` are the application root, `start_url` is its entry point `/start`
+  (REQ-UI-034), and sign-in is inside them.** A `scope` is one
   URL prefix and cannot span two origins, so while Keycloak answered on a host of its own the
   authentication hop was outside it. On iOS a navigation out of scope opens in a Safari View
   Controller, which has its own storage; Apple keeps OAuth in the app **by heuristic** rather than by
@@ -1383,7 +1384,8 @@ Binding details:
   request, with no redirect, **for every `Accept` header**.
 - [ ] Its `name`, `short_name` and `description` come from the bundles and follow `?locale=`; an
   unsupported or malformed value renders German with `"lang": "de"`, never a mismatched pair.
-- [ ] `display` is `standalone`; `start_url`, `scope` and `id` are the application root.
+- [ ] `display` is `standalone`; `scope` and `id` are the application root and `start_url` is
+  `/start`, which leads to the start page of the member (REQ-UI-034).
 - [ ] `icons` holds **exactly two** entries: the opaque 192 px and 512 px tiles at their
   **content-hashed** URLs, `purpose` `any`, never `maskable`.
 - [ ] `Cache-Control: max-age=3600, public` and **no** `Vary`, because the body depends only on the
@@ -2296,16 +2298,14 @@ page use it; positions there count the reorderable rows of the rendered page.
 
 ### REQ-UI-032 — Navigation personalisation: favourites, „Mehr", order and the tab bar
 
-> **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store, the
+> **Status: shipped** (ADR-0297, ADR-0298, ADR-0323, map #2800). Shipped: the store, the
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
 > and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the order of groups and
 > links with the up/down controls and „Standardreihenfolge", „Darstellung" with the desktop mode
 > and `shortcutsEnabled` (own version, the profile card and the sidebar switch), the phone tab
 > bar with its „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the
-> privacy flows and the metrics. Planned: the start pages of „Darstellung" and the full reset;
-> until they ship, the current code stays
-> authoritative for them.
+> privacy flows and the metrics, the start pages of „Darstellung" and the full reset.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
@@ -2376,7 +2376,11 @@ Outside edit mode every page and tab header carries a star and „Als Startseite
 | „Tab-Leiste zurücksetzen" | the tab bar of the current mode (back to automatic) |
 | Full reset in the profile, after a confirmation dialog (REQ-UI-013) | all five sections in both modes, both dashboards and both start pages (REQ-UI-034); the desktop mode returns to the drawer |
 
-„Darstellung" has no reset of its own.
+„Darstellung" has no reset of its own. The full reset takes no version: it clears every section
+and moves every section's version on (a dashboard's layout version included), so a window that
+still holds an older version gets the 409 hint on its next write instead of bringing the cleared
+state back. It runs in one transaction, asks the confirmation dialog first, and updates the open
+page in place: the lists, the tab bar, the start-page controls and the desktop mode.
 
 **Store.** Server-side in the `navigation` module (ADR-0298), five sections, each with its own
 optimistic-lock version, so an edit in one never 409s another:
@@ -2448,8 +2452,11 @@ above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, 
 the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest` (the bar
 per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a taken
 entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin bar),
-the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
-full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+`NavigationResetServiceTest` (every section, both dashboards and both start pages back to the
+default, every version moved on, owner isolation, the metrics), `StartPageControlsMvcTest` (the
+reset dialog and its relay), `NavigationStartPageE2eTest` (the full reset of every section in
+place, after the confirmation), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 ·
+**Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
@@ -2583,9 +2590,9 @@ ADR-0282, ADR-0297
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
 > one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
 > bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
-> Favoriten and Benachrichtigungen, with the options of the matrix below, and the admin
-> dashboard with its five widgets. Planned: the other catalogue widgets and their options and
-> the start page; until they ship, the current code stays authoritative for them.
+> Favoriten and Benachrichtigungen, with the options of the matrix below, the admin
+> dashboard with its five widgets and the start page per mode. Planned: the other catalogue
+> widgets and their options; until they ship, the current code stays authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2675,6 +2682,20 @@ default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI
   start page, on switching into admin mode. A deep link that triggered the login wins.
 - A start page no longer permitted or unavailable in the active context falls back to the
   dashboard.
+- **One entry point, `GET /start[?mode=admin]`.** It redirects to the registry path of the mode's
+  start page, or to the dashboard of the mode (`/`, `/admin`). A plain login, one without a saved
+  request or whose saved request is only an asset or the bare root, ends there; so does the
+  `start_url` of the web app manifest. A saved deep link keeps winning. Switching into admin mode
+  from the sidebar goes there only when an admin start page is set, and otherwise only swaps the
+  list as before. The path comes from the entry registry, never from the request, and a key of the
+  other mode is no start page of this one.
+- **The dashboard never redirects:** the logo, `/` and Alt+0 always open the dashboard.
+- **Header button.** „Als Startseite festlegen" sits next to the star on every page and tab that
+  can be a favourite; it turns into „Startseite entfernen" on the chosen page. A write is
+  `PUT /api/v1/navigation/preferences/appearance/start-page/{mode}` with the appearance version,
+  which it bumps, so it conflicts with „Darstellung" writes and with nothing else.
+- A start page whose key the member may no longer see user-wide is deleted on the next load
+  (REQ-UI-032).
 
 **Hint.** A one-time, dismissible hint on the dashboard points to „Anpassen" (navigation and
 dashboard). Its dismissal is kept in the browser; it also goes once the user sets a favourite or
@@ -2695,7 +2716,12 @@ Hangar-Bereitschaft: the rows and their rows option, the counts, the empty state
 page total as count, the rows, the unit label, the target bar and trend, the empty states),
 `DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
 widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
-`NavigationLegacyRedirectMvcTest` (`/admin/announcement`),
+`NavigationLegacyRedirectMvcTest` (`/admin/announcement`), `StartPageRedirectMvcTest` (the start
+page per mode, the fallbacks, no open redirect, the mode of the page), `StartPageControlsMvcTest`
+(the header button, the selects, the state, the relays), `AssetAwareAuthenticationSuccessHandlerTest`
+(a plain login ends at `/start`, a deep link wins), `NavigationStartPageServiceTest` (the page per
+mode, the shared version, the key check, the deletion), `NavigationStartPageE2eTest` (the button
+in place, `/start`, the select, the 409 hint),
 `DashboardLayoutControllerTest`, `DashboardLayoutBackendClientTest`, `DashboardBackendClientTest`
 (the two summary reads), `OrgUnitBankAccountsBackendClientTest` and `StockLevelBackendClientTest`
 (the two work reads), `AdminDashboardE2eTest` (the admin default, edit mode and range on the
@@ -2703,8 +2729,8 @@ admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, ca
 options, restore, the summary and work
 widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
 the hint, deletion on role loss), the export
-and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** `StartPageRedirectMvcTest` (start
-page per mode, deep-link precedence, fallback) and the tests of the widgets that follow ·
+and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the tests of the widgets that
+follow ·
 **Related:** REQ-UI-018,
 REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-HANGAR-016,
 REQ-MISSION-031, REQ-SEC-046, REQ-SEC-058, ADR-0299

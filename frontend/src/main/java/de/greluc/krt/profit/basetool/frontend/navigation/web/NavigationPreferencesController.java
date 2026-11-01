@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateReque
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.StartPageUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -192,6 +193,41 @@ public class NavigationPreferencesController {
     }
     return relayed(
         "replace the navigation tab bar (ajax)", () -> client.replaceTabBar(target, request));
+  }
+
+  /**
+   * Sets the caller's start page of one mode.
+   *
+   * @param mode the path segment of the mode, {@code member} or {@code admin}
+   * @param request the entry key, or {@code null} for the dashboard, and the appearance version the
+   *     caller last saw
+   * @return {@code 200} with the stored appearance and its version, {@code 404} for an unknown
+   *     mode, {@code 422} with code {@code VALIDATION} for an incomplete payload, or the relayed
+   *     backend {@code problem+json}, a {@code 409} for a stale version included
+   */
+  @PutMapping(value = "/appearance/start-page/{mode}", headers = AJAX)
+  public ResponseEntity<Object> replaceStartPage(
+      @PathVariable String mode, @RequestBody @Nullable StartPageUpdateRequest request) {
+    NavigationMode target = NavigationMode.fromSegment(mode).orElse(null);
+    if (target == null) {
+      return ResponseEntity.notFound().build();
+    }
+    if (request == null || request.version() == null) {
+      return validationError();
+    }
+    return relayed(
+        "replace the navigation start page (ajax)", () -> client.replaceStartPage(target, request));
+  }
+
+  /**
+   * Resets every preference section, both dashboards and both start pages of the caller.
+   *
+   * @return {@code 200} with the sections after the reset, or the relayed backend {@code
+   *     problem+json}
+   */
+  @PostMapping(value = "/reset", headers = AJAX)
+  public ResponseEntity<Object> resetAll() {
+    return relayed("reset the navigation preferences (ajax)", client::resetAll);
   }
 
   private static boolean complete(@Nullable FavouritesUpdateRequest request) {
