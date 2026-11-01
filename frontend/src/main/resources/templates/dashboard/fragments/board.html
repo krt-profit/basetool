@@ -34,7 +34,7 @@
          th:with="widget=${item.widget()}, type=${item.widget().type()}, title=${item.widget().type().name() == 'UPCOMING_DAYS'} ? #{dashboard.widget.upcoming-days.title(${item.widget().days()})} : #{${item.widget().type().labelKey()}}"
          th:classappend="${!item.available()} ? 'is-unavailable'"
          th:data-testid="|dashboard-widget-${type.slug()}|"
-         th:attr="data-id=${item.key()},data-widget-id=${item.storedId()},data-widget-type=${type.name()},data-widget-slug=${type.slug()},data-column=${widget.column().name()},data-options-version=${widget.optionsVersion()},data-options=${type.optionsAttribute()},data-unit=${widget.orgUnitId()},data-days=${widget.days()},data-rows=${widget.rows()},data-status=${widget.status()},data-reorder-name=${title},data-available=${item.available()}">
+         th:attr="data-id=${item.key()},data-widget-id=${item.storedId()},data-widget-type=${type.name()},data-widget-slug=${type.slug()},data-column=${widget.column().name()},data-options-version=${widget.optionsVersion()},data-options=${type.optionsAttribute()},data-status-choices=${type.statusesAttribute()},data-unit=${widget.orgUnitId()},data-days=${widget.days()},data-rows=${widget.rows()},data-status=${widget.status()},data-reorder-name=${title},data-available=${item.available()}">
     <header class="home-card-head dash-widget__head">
         <h2 class="home-card-title" th:text="${title}">Nächste 7 Tage</h2>
         <span class="chip" data-testid="dashboard-widget-unit" th:if="${item.unitName() != null}"

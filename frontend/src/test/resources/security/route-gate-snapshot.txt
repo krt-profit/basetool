@@ -283,11 +283,14 @@
 /connected-apps/{clientId}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#undo gate=class:isAuthenticated() layout=no
 /csrf GET -> CsrfTokenController#csrf gate=class:isAuthenticated() layout=no
 /dashboard/widgets/admin-hub GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#adminHub gate=class:hasRole('ADMIN') layout=yes
+/dashboard/widgets/assigned-orders GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWorkWidgetController#assignedOrders gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/bank GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWorkWidgetController#bank gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/deletion-requests GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#deletionRequests gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/discord-registrations GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#discordRegistrations gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/favourites GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#favourites gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/hangar-readiness GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#hangarReadiness gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/information GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#information gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/low-stock GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWorkWidgetController#lowStock gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/next-mission GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#nextMission gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/notifications GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#notifications gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/open-terms GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#openTerms gate=class:hasRole('ADMIN') layout=yes

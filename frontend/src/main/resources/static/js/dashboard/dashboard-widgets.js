@@ -33,7 +33,27 @@ const POLL_STAGGER_MS = 1500;
 const POLL_STAGGER_SLOTS = 8;
 
 /** The widget types a live channel updates; every other type polls. */
-const LIVE_TYPES = new Set(['UPCOMING_DAYS', 'NEXT_MISSION', 'NOTIFICATIONS', 'HANGAR_READINESS']);
+const LIVE_TYPES = new Set([
+    'UPCOMING_DAYS',
+    'NEXT_MISSION',
+    'NOTIFICATIONS',
+    'HANGAR_READINESS',
+    'ASSIGNED_ORDERS',
+    'LOW_STOCK',
+    'BANK',
+]);
+
+/**
+ * The global live-sync rooms that reload the instances of a widget type, each with the section of
+ * the room that carries the change (REQ-FE-015).
+ *
+ * @type {Record<string, { topic: string, section: string }>}
+ */
+const LIVE_ROOMS = {
+    ASSIGNED_ORDERS: { topic: 'orders', section: 'queue' },
+    LOW_STOCK: { topic: 'inventory', section: 'stock-levels' },
+    BANK: { topic: 'orgunit-bank', section: 'orgUnitBank' },
+};
 
 /** The options a widget request carries, as the item's data attributes name them. */
 const OPTION_PARAMS = ['unit', 'days', 'rows', 'status'];
@@ -186,6 +206,29 @@ function followHangarRoom(topic) {
     });
 }
 
+/** @type {Set<string>} the widget types whose room already has a receiver */
+const followedRooms = new Set();
+
+/**
+ * Listens to the global room of a widget type once, from the first instance of the type on, and
+ * reloads the type's instances when the room announces a change.
+ *
+ * @param {string} type the widget type name
+ */
+function followRoom(type) {
+    const room = LIVE_ROOMS[type];
+    if (!room || followedRooms.has(type)) return;
+    followedRooms.add(type);
+    krtLiveSync.createReceiver({
+        topic: room.topic,
+        sections: { [room.section]: { container: `[data-widget-type="${type}"]` } },
+        coalesceMs: 1500,
+        refresh() {
+            reloadType(type);
+        },
+    });
+}
+
 /**
  * Loads one instance's body from its own endpoint; a failure shows that instance's error state and
  * leaves the others alone. An instance the active context does not offer loads nothing.
@@ -208,6 +251,8 @@ export async function loadWidget(item) {
             return;
         }
         krtFetch.setTrustedHtml(body, await response.text());
+        document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: body } }));
+        followRoom(item.dataset.widgetType ?? '');
         const content = body.querySelector('[data-widget-content]');
         if (item.dataset.widgetType === 'NOTIFICATIONS' && content instanceof HTMLElement) {
             await fillNotifications(content);

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="assignedOrders" data-widget-content data-testid="dashboard-assigned-orders">
+    <ul th:if="${not #lists.isEmpty(assignedOrders)}" class="dash-links">
+        <li th:each="order : ${assignedOrders}">
+            <a class="dash-link" data-testid="dashboard-assigned-order" th:href="@{/orders/{id}(id=${order.id})}">
+                <span class="cell-title">
+                    <span th:text="'#' + ${order.displayId}">#42</span>
+                    <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(order.status)}"
+                          th:text="#{__${'status.' + order.status}__}">Offen</span>
+                </span>
+                <span class="cell-sub">
+                    <span th:text="#{dashboard.assignedOrders.priority(${order.priority != null ? order.priority : '-'})}">Prio 1</span>
+                    <th:block th:if="${order.responsibleOrgUnit != null}"> · <span th:title="${order.responsibleOrgUnit.name()}" th:text="${order.responsibleOrgUnit.shorthand()}">ALF</span></th:block>
+                </span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(assignedOrders)}" class="home-notifs__empty" data-testid="dashboard-assigned-orders-empty"
+       th:text="#{dashboard.assignedOrders.empty}">Du bearbeitest zurzeit keinen Auftrag.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="dashboard-assigned-orders-count" th:text="${assignedTotal}">7</span>
+        <a class="home-card-link" th:href="@{/orders(scope='ASSIGNED')}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="lowStock" data-widget-content data-testid="dashboard-low-stock">
+    <ul th:if="${not #lists.isEmpty(lowLevels)}" class="dash-links">
+        <li th:each="level : ${lowLevels}">
+            <a class="dash-link" data-testid="dashboard-low-stock-row" th:href="@{/inventory/stock-levels}">
+                <span class="cell-title">
+                    <span th:text="${level.entryName()}">Quantanium</span>
+                    <span th:if="${lowShowsUnit and level.orgUnit() != null}" class="chip" data-testid="dashboard-low-stock-unit"
+                          th:title="${level.orgUnit().name()}" th:text="${level.orgUnit().shorthand()}">ALF</span>
+                </span>
+                <span class="dash-meter">
+                    <span class="meter" aria-hidden="true">
+                        <i class="meter__fill--danger" th:attr="data-krtm-width=${level.fillPercent() > 100 ? 100 : level.fillPercent()}"></i>
+                    </span>
+                    <span class="cell-sub" th:text="#{inventory.stockLevels.fillPercent(${level.fillPercent()})}">40 %</span>
+                </span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(lowLevels)}" class="home-notifs__empty" data-testid="dashboard-low-stock-empty"
+       th:text="#{dashboard.lowStock.empty}">Kein Bestand unter dem Mindestbestand.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="dashboard-low-stock-count" th:text="${lowTotal}">3</span>
+        <a class="home-card-link" th:href="@{/inventory/stock-levels}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="bank" data-widget-content data-testid="dashboard-bank">
+    <ul th:if="${not #lists.isEmpty(bankAccounts)}" class="dash-links">
+        <li th:each="account : ${bankAccounts}"
+            th:with="spark=${bankSparks.get(account.accountId())},
+                     hasTarget=${account.balanceTarget() != null and account.balanceTarget().signum() > 0}">
+            <a class="dash-link" data-testid="dashboard-bank-row" th:href="@{/org-unit-bank/accounts/{id}(id=${account.accountId()})}">
+                <span class="dash-bank__top">
+                    <span class="cell-title" th:text="${account.accountName()}">ALF Betriebskonto</span>
+                    <span class="dash-bank__balance">
+                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(account.balance()), 1, 'DEFAULT')}">3.148.200</span>
+                        <span class="unit">aUEC</span>
+                    </span>
+                </span>
+                <span class="cell-sub">
+                    <span th:text="${account.accountNo()}">KB-0001</span>
+                    <th:block th:if="${account.orgUnitId() != null}"> · <span th:text="${account.orgUnitShorthand() != null ? account.orgUnitShorthand() : account.orgUnitName()}">ALF</span></th:block>
+                </span>
+                <span class="dash-bank__trend">
+                    <span class="kpi-delta"
+                          th:classappend="${account.delta30d().signum() > 0} ? 'kpi-delta--pos' : (${account.delta30d().signum() < 0} ? 'kpi-delta--neg' : 'kpi-delta--flat')"
+                          th:text="${account.delta30d().signum() > 0 ? '+ ' : (account.delta30d().signum() < 0 ? '&#8722; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(account.delta30d().abs()), 1, 'DEFAULT')}">+ 412.600</span>
+                    <svg th:if="${spark != null and spark.points() != null}" class="dash-bank__spark" width="92" height="26"
+                         viewBox="0 0 96 26" aria-hidden="true">
+                        <polyline th:attr="points=${spark.points()}" th:classappend="${spark.flat()} ? 'is-flat'"
+                                  fill="none" stroke-width="1.5"/>
+                    </svg>
+                </span>
+                <span class="dash-bank__target" th:if="${hasTarget}"
+                      th:with="pct=${account.balance().doubleValue() / account.balanceTarget().doubleValue() * 100.0}">
+                    <span class="meter" aria-hidden="true">
+                        <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
+                    </span>
+                    <span class="cell-sub"
+                          th:text="#{bank.orgUnit.card.targetOf(${#numbers.formatInteger(pct, 1, 'DEFAULT')}, ${#numbers.formatInteger(@moneyFormat.round(account.balanceTarget()), 1, 'DEFAULT')})}">63 % von 5.000.000</span>
+                </span>
+                <span class="cell-sub" th:unless="${hasTarget}" th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(bankAccounts)}" class="home-notifs__empty" data-testid="dashboard-bank-empty"
+       th:text="#{dashboard.bank.empty}">Keine Konten sichtbar.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="dashboard-bank-count" th:text="${bankTotal}">5</span>
+        <a class="home-card-link" th:href="@{/org-unit-bank}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+</body>
+</html>

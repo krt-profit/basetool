@@ -61,6 +61,19 @@ public class StockLevelBackendClient {
   }
 
   /**
+   * Reads the low levels in the caller's Lager scope, emptiest first.
+   *
+   * @param orgUnitId only this unit, or {@code null} for every unit in scope
+   * @return the low levels, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<StockLevelDto> lowLevels(@Nullable UUID orgUnitId) {
+    return orgUnitId == null
+        ? backendApiClient.get(PATH + "?lowOnly=true", LEVEL_LIST)
+        : backendApiClient.get(PATH + "?lowOnly=true&orgUnitId={unit}", LEVEL_LIST, orgUnitId);
+  }
+
+  /**
    * Reads the units whose levels the caller may maintain.
    *
    * @return the units, or {@code null} when the backend sent no body

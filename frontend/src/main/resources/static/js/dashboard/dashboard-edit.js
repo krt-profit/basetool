@@ -322,12 +322,20 @@ function openOptions(trigger) {
     if (!(item instanceof HTMLElement) || !dialog) return;
     optionsItem = item;
     const offered = (item.dataset.options ?? '').split(' ');
+    const statuses = (item.dataset.statusChoices ?? '').split(' ');
     dialog.querySelectorAll('[data-option]').forEach((group) => {
         const option = /** @type {HTMLElement} */ (group).dataset.option ?? '';
         group.classList.toggle('is-hidden', !offered.includes(option));
         const select = group.querySelector('select');
+        if (!select) return;
+        if (option === 'status') {
+            Array.from(select.options).forEach((choice) => {
+                choice.hidden = !statuses.includes(choice.value);
+                choice.disabled = choice.hidden;
+            });
+        }
         const field = /** @type {HTMLElement} */ (group).dataset.field ?? option;
-        if (select) select.value = item.dataset[field] ?? '';
+        select.value = item.dataset[field] ?? '';
     });
     krtModal.open(OPTIONS_MODAL);
 }

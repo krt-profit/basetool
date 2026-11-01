@@ -66,7 +66,8 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.UNREAD)),
+      new DashboardOptions(null, null, 5, DashboardStatus.UNREAD),
+      EnumSet.of(DashboardStatus.UNREAD, DashboardStatus.ALL)),
 
   /** The member's next missions: those of the own units and those the member is signed up for. */
   NEXT_MISSION(
@@ -122,7 +123,32 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null));
+      new DashboardOptions(null, null, 5, null)),
+
+  /** The orders the member is an assignee of, by priority. */
+  ASSIGNED_ORDERS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      new DashboardOptions(null, null, 5, DashboardStatus.OPEN_ACTIVE),
+      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+
+  /** The minimum stock levels that are low, emptiest first. */
+  LOW_STOCK(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null)),
+
+  /** The balances of the org-unit bank accounts the member may view. */
+  BANK(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.ROWS),
+      new DashboardOptions(null, null, 3, null));
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */
   public static final Set<Integer> DAY_CHOICES = Set.of(3, 7, 14);
@@ -138,6 +164,7 @@ public enum DashboardWidgetType {
   private final boolean inDefault;
   private final Set<DashboardOption> options;
   private final DashboardOptions defaults;
+  private final Set<DashboardStatus> statuses;
 
   DashboardWidgetType(
       DashboardMode mode,
@@ -145,11 +172,22 @@ public enum DashboardWidgetType {
       boolean inDefault,
       Set<DashboardOption> options,
       DashboardOptions defaults) {
+    this(mode, defaultColumn, inDefault, options, defaults, EnumSet.noneOf(DashboardStatus.class));
+  }
+
+  DashboardWidgetType(
+      DashboardMode mode,
+      DashboardColumn defaultColumn,
+      boolean inDefault,
+      Set<DashboardOption> options,
+      DashboardOptions defaults,
+      Set<DashboardStatus> statuses) {
     this.mode = mode;
     this.defaultColumn = defaultColumn;
     this.inDefault = inDefault;
     this.options = options;
     this.defaults = defaults;
+    this.statuses = statuses;
   }
 
   /**
@@ -183,8 +221,8 @@ public enum DashboardWidgetType {
         && (!options.contains(DashboardOption.ROWS) || !ROW_CHOICES.contains(candidate.rows()))) {
       return "The rows option is not allowed here.";
     }
-    if (candidate.status() != null && !options.contains(DashboardOption.STATUS)) {
-      return "The widget offers no status option.";
+    if (candidate.status() != null && !statuses.contains(candidate.status())) {
+      return "The status option is not allowed here.";
     }
     return null;
   }
