@@ -76,6 +76,17 @@ public interface DashboardLayoutRepository extends JpaRepository<NavigationDashb
       @Param("customised") boolean customised);
 
   /**
+   * Returns a layout to the mode's default and bumps its version, without a version check.
+   *
+   * @param id the layout
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @NativeQuery(
+      "UPDATE navigation_dashboard_layout SET layout_version = layout_version + 1, customised ="
+          + " FALSE WHERE id = :id")
+  void resetToDefault(@Param("id") UUID id);
+
+  /**
    * Bumps the layout version without a check, for a change the member did not echo a version for.
    *
    * @param id the layout

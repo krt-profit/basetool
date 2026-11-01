@@ -453,12 +453,14 @@
 /missions/{id}/units/{unitId}/update POST -> MissionWriteController#updateUnit gate=class:isAuthenticated() layout=yes
 /navigation/appearance GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationAppearanceController#read gate=class:isAuthenticated() layout=no
 /navigation/appearance PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationAppearanceController#replace gate=class:isAuthenticated() layout=no
+/navigation/appearance/start-page/{mode} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceStartPage gate=class:isAuthenticated() layout=no
 /navigation/favourites PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceFavourites gate=class:isAuthenticated() layout=no
 /navigation/favourites-and-hidden PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceFavouritesAndHidden gate=class:isAuthenticated() layout=no
 /navigation/hidden PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceHidden gate=class:isAuthenticated() layout=no
 /navigation/menu GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationMenuFragmentController#fragment gate=class:isAuthenticated() layout=yes
 /navigation/order/{mode}/reset POST headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#resetOrder gate=class:isAuthenticated() layout=no
 /navigation/order/{mode}/{scope} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceOrderScope gate=class:isAuthenticated() layout=no
+/navigation/reset POST headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#resetAll gate=class:isAuthenticated() layout=no
 /navigation/tab-bar/{mode} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceTabBar gate=class:isAuthenticated() layout=no
 /notifications GET -> NotificationPageController#page gate=class:isAuthenticated() layout=yes
 /notifications/page-items GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#pageItems gate=class:isAuthenticated() layout=yes
@@ -627,6 +629,7 @@
 /ship-data/reset-fitted POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#resetAllFittedAjax gate=method:hasRole('ADMIN') layout=yes
 /ship-data/ship-types/{id}/visibility POST -> ShipDataPageController#toggleShipTypeVisibility gate=method:hasRole('ADMIN') layout=yes
 /ship-data/ship-types/{id}/visibility POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#toggleShipTypeVisibilityAjax gate=method:hasRole('ADMIN') layout=yes
+/start GET -> StartPageRedirectController#start gate=class:isAuthenticated() layout=yes
 /supply/donations/incoming GET -> SupplyPageController#incomingDonations gate=class:isAuthenticated() layout=yes
 /supply/donations/mine GET -> SupplyPageController#myDonations gate=class:isAuthenticated() layout=yes
 /supply/needs GET -> SupplyPageController#needs gate=class:isAuthenticated() layout=yes

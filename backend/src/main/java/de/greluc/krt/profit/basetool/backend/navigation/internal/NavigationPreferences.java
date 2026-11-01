@@ -127,6 +127,14 @@ public class NavigationPreferences {
     this.userId = userId;
   }
 
+  /** Removes the favourites, the hidden pages, the order and the tab bars of both modes. */
+  public void clearAll() {
+    favourites.clear();
+    hidden.clear();
+    orderRows.clear();
+    tabBar.clear();
+  }
+
   /**
    * Replaces the favourites by the given keys, in order.
    *

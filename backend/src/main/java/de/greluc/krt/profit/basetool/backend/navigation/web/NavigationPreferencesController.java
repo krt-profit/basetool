@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderModeRespon
 import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderResetRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.PruneRequest;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.StartPageUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.TabBarResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.TabBarUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
@@ -130,6 +131,31 @@ public class NavigationPreferencesController {
   public AppearanceResponse replaceAppearance(
       @Valid @RequestBody AppearanceUpdateRequest request, @CurrentUserId UUID userId) {
     return service.replaceAppearance(userId, request);
+  }
+
+  /**
+   * Sets the caller's start page of one mode.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param request the entry key of the new start page, or {@code null} for the dashboard, and the
+   *     version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the stored appearance with the new version
+   */
+  @PutMapping("/appearance/start-page/{mode}")
+  @Operation(summary = "Set the caller's start page of one mode.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Start page stored."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation failed, the key is malformed or the mode is unknown."),
+    @ApiResponse(responseCode = "409", description = "The appearance version is stale.")
+  })
+  public AppearanceResponse replaceStartPage(
+      @PathVariable String mode,
+      @Valid @RequestBody StartPageUpdateRequest request,
+      @CurrentUserId UUID userId) {
+    return service.replaceStartPage(userId, NavigationMode.fromSegment(mode), request);
   }
 
   /**
@@ -260,7 +286,8 @@ public class NavigationPreferencesController {
     Object target = ex.getBindingResult().getTarget();
     if (target instanceof FavouritesUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
-    } else if (target instanceof AppearanceUpdateRequest) {
+    } else if (target instanceof AppearanceUpdateRequest
+        || target instanceof StartPageUpdateRequest) {
       metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof HiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
@@ -273,6 +300,22 @@ public class NavigationPreferencesController {
       metrics.recordWrite(NavigationSection.TAB_BAR, NavigationWriteOutcome.REJECTED);
     }
     return problems.handleValidationExceptions(ex, request);
+  }
+
+  /**
+   * Resets every preference section of both modes, both dashboards and both start pages.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @return the sections after the reset
+   */
+  @PostMapping("/reset")
+  @Operation(summary = "Reset the caller's navigation preferences, dashboards and start pages.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Everything reset."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public NavigationPreferencesResponse reset(@CurrentUserId UUID userId) {
+    return service.resetAll(userId);
   }
 
   /**

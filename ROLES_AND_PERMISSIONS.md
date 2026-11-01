@@ -1311,8 +1311,10 @@ next load, and the admin mode's dashboard is for `ADMIN` only (REQ-UI-034).
 
 The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
 `PUT .../hidden`, `PUT .../favourites-and-hidden`, `PUT .../order/{mode}/{scope}`,
-`POST .../order/{mode}/reset`, `PUT .../tab-bar/{mode}` and
-`POST /api/v1/navigation/preferences/prune` need only a signed-in user; the owner is always the
+`POST .../order/{mode}/reset`, `PUT .../tab-bar/{mode}`, `PUT .../appearance/start-page/{mode}`,
+`POST .../reset` (the full reset) and `POST /api/v1/navigation/preferences/prune` need only a
+signed-in user, and so does the frontend's `GET /start` entry point of the start page, which
+redirects only to a page the entry registry opens to the caller; the owner is always the
 token's subject, no endpoint takes a member id, and a favourite, hidden page, ordered key or
 tab-bar slot is a key of a page the user already sees — the entry's own gate stays
 authoritative.

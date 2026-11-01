@@ -27,12 +27,13 @@ import org.springframework.data.jpa.repository.Query;
 public interface NavigationAppearanceRepository extends JpaRepository<NavigationAppearance, UUID> {
 
   /**
-   * Counts the members whose desktop mode or shortcut switch is not the default.
+   * Counts the members whose desktop mode, shortcut switch or start page is not the default.
    *
    * @return the number of members that personalised the appearance
    */
   @Query(
       "SELECT COUNT(a) FROM NavigationAppearance a WHERE a.desktopMode <> 'DRAWER' OR"
-          + " a.shortcutsEnabled = false")
+          + " a.shortcutsEnabled = false OR a.startPageMember IS NOT NULL OR a.startPageAdmin IS"
+          + " NOT NULL")
   long countPersonalised();
 }

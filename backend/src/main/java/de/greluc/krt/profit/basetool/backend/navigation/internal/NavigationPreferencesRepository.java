@@ -72,6 +72,18 @@ public interface NavigationPreferencesRepository
       @Param("userId") UUID userId, @Param("expected") long expected);
 
   /**
+   * Bumps the appearance version without a check, for a change the member did not echo a version
+   * for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.appearanceVersion = p.appearanceVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpAppearanceVersion(@Param("userId") UUID userId);
+
+  /**
    * Bumps the favourites version without a check, for a change the member did not echo a version
    * for.
    *

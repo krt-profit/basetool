@@ -25,6 +25,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.Collection;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -54,6 +55,12 @@ public class NavigationAppearance {
   @Column(name = "shortcuts_enabled", nullable = false)
   private boolean shortcutsEnabled = true;
 
+  @Column(name = "start_page_member", length = NavigationLimits.MAX_ENTRY_KEY_LENGTH)
+  private String startPageMember;
+
+  @Column(name = "start_page_admin", length = NavigationLimits.MAX_ENTRY_KEY_LENGTH)
+  private String startPageAdmin;
+
   /**
    * Creates the appearance of a member.
    *
@@ -66,5 +73,47 @@ public class NavigationAppearance {
     this.preferencesId = preferencesId;
     this.desktopMode = desktopMode;
     this.shortcutsEnabled = shortcutsEnabled;
+  }
+
+  /**
+   * The start page of a mode.
+   *
+   * @param mode the navigation mode
+   * @return the entry key, or {@code null} for the dashboard
+   */
+  public String startPageOf(NavigationMode mode) {
+    return mode == NavigationMode.MEMBER ? startPageMember : startPageAdmin;
+  }
+
+  /**
+   * Sets the start page of a mode.
+   *
+   * @param mode the navigation mode
+   * @param entryKey the entry key, or {@code null} for the dashboard
+   */
+  public void setStartPage(NavigationMode mode, String entryKey) {
+    if (mode == NavigationMode.MEMBER) {
+      startPageMember = entryKey;
+    } else {
+      startPageAdmin = entryKey;
+    }
+  }
+
+  /**
+   * Clears every start page that names one of the given keys.
+   *
+   * @param keys the entry keys the member may no longer see
+   * @return {@code true} when a start page was cleared
+   */
+  public boolean clearStartPages(Collection<String> keys) {
+    boolean cleared = false;
+    for (NavigationMode mode : NavigationMode.values()) {
+      String page = startPageOf(mode);
+      if (page != null && keys.contains(page)) {
+        setStartPage(mode, null);
+        cleared = true;
+      }
+    }
+    return cleared;
   }
 }

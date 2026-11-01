@@ -153,6 +153,83 @@ class NavigationPreferencesControllerTest {
     org.assertj.core.api.Assertions.assertThat(rejected()).isEqualTo(before + 1);
   }
 
+  private org.springframework.test.web.servlet.ResultActions putStartPage(String mode, String body)
+      throws Exception {
+    return mockMvc.perform(
+        put(APPEARANCE + "/start-page/" + mode)
+            .with(as(owner))
+            .with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
+  }
+
+  @Test
+  void storesTheStartPageOfOneModeAndReadsItBack() throws Exception {
+    putStartPage("member", "{\"key\":\"missions.list\",\"version\":0}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.startPageMember").value("missions.list"))
+        .andExpect(jsonPath("$.startPageAdmin").doesNotExist())
+        .andExpect(jsonPath("$.version").value(1));
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.appearance.startPageMember").value("missions.list"));
+  }
+
+  @Test
+  void aNullKeyReturnsTheModeToTheDashboard() throws Exception {
+    putStartPage("admin", "{\"key\":\"admin.members\",\"version\":0}").andExpect(status().isOk());
+
+    putStartPage("admin", "{\"key\":null,\"version\":1}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.startPageAdmin").doesNotExist());
+  }
+
+  @Test
+  void refusesAMalformedStartPageKey() throws Exception {
+    putStartPage("member", "{\"key\":\"/missions\",\"version\":0}")
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void refusesAMissingStartPageVersionAndCountsItAsRejected() throws Exception {
+    double before = rejected("display");
+
+    putStartPage("member", "{\"key\":\"missions.list\"}").andExpect(status().isBadRequest());
+
+    org.assertj.core.api.Assertions.assertThat(rejected("display")).isEqualTo(before + 1);
+  }
+
+  @Test
+  void refusesAnUnknownStartPageMode() throws Exception {
+    putStartPage("tablet", "{\"key\":null,\"version\":0}").andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void answers409ForAStaleStartPageVersion() throws Exception {
+    putStartPage("member", "{\"key\":\"missions.list\",\"version\":0}").andExpect(status().isOk());
+
+    putStartPage("member", "{\"key\":null,\"version\":0}").andExpect(status().isConflict());
+  }
+
+  @Test
+  void resetClearsEveryPreferenceOfTheCaller() throws Exception {
+    putStartPage("member", "{\"key\":\"missions.list\",\"version\":0}").andExpect(status().isOk());
+    putJson(FAVOURITES, favourites(0, 2), 200);
+
+    mockMvc
+        .perform(post(PREFERENCES + "/reset").with(as(owner)).with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.appearance.startPageMember").doesNotExist())
+        .andExpect(jsonPath("$.appearance.desktopMode").value("DRAWER"))
+        .andExpect(jsonPath("$.favourites.keys").isEmpty())
+        .andExpect(jsonPath("$.favourites.version").value(2));
+  }
+
+  @Test
+  void resetRefusesAnonymousCallers() throws Exception {
+    mockMvc.perform(post(PREFERENCES + "/reset").with(csrf())).andExpect(status().isUnauthorized());
+  }
+
   private double rejected() {
     return meterRegistry
         .counter(

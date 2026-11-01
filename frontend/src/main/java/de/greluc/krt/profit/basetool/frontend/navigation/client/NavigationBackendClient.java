@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.PruneRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.StartPageUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import java.util.List;
@@ -54,6 +55,10 @@ public class NavigationBackendClient {
   private static final String FAVOURITES = PREFERENCES + "/favourites";
 
   private static final String APPEARANCE = PREFERENCES + "/appearance";
+  private static final String START_PAGE = APPEARANCE + "/start-page/{mode}";
+
+  private static final String RESET = PREFERENCES + "/reset";
+
   private static final String HIDDEN = PREFERENCES + "/hidden";
 
   private static final String FAVOURITES_AND_HIDDEN = PREFERENCES + "/favourites-and-hidden";
@@ -97,6 +102,31 @@ public class NavigationBackendClient {
   @Nullable
   public AppearanceResponse replaceAppearance(@NotNull AppearanceUpdateRequest request) {
     return backendApiClient.put(APPEARANCE, request, AppearanceResponse.class);
+  }
+
+  /**
+   * Sets the caller's start page of one mode.
+   *
+   * @param mode the mode whose start page changes
+   * @param request the entry key, or {@code null} for the dashboard, and the version the caller
+   *     last saw
+   * @return the stored appearance with the new version, or {@code null} when the backend sent no
+   *     body
+   */
+  @Nullable
+  public AppearanceResponse replaceStartPage(
+      @NotNull NavigationMode mode, @NotNull StartPageUpdateRequest request) {
+    return backendApiClient.put(START_PAGE, request, AppearanceResponse.class, mode.getSegment());
+  }
+
+  /**
+   * Resets every preference section, both dashboards and both start pages of the caller.
+   *
+   * @return the sections after the reset, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public NavigationPreferencesResponse resetAll() {
+    return backendApiClient.post(RESET, null, NavigationPreferencesResponse.class);
   }
 
   /**

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -41,6 +42,7 @@ public class NavigationPreferencesService {
   private final NavigationPreferencesWriter writer;
   private final NavigationTabBarWriter tabBarWriter;
   private final NavigationAppearanceWriter appearanceWriter;
+  private final NavigationResetWriter resetWriter;
   private final NavigationMetrics metrics;
 
   /**
@@ -191,6 +193,40 @@ public class NavigationPreferencesService {
   }
 
   /**
+   * Sets the caller's start page of one mode inside the "Darstellung" section.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param mode the mode whose start page changes
+   * @param request the new entry key, or {@code null} for the dashboard, and the version the caller
+   *     last saw
+   * @return the stored appearance with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when the key is malformed
+   */
+  public @NotNull AppearanceResponse replaceStartPage(
+      @NotNull UUID userId, @NotNull NavigationMode mode, @NotNull StartPageUpdateRequest request) {
+    return counted(
+        Set.of(NavigationSection.APPEARANCE),
+        () -> appearanceWriter.replaceStartPage(userId, mode, request.key(), request.version()));
+  }
+
+  /**
+   * Resets every preference section of both modes, both dashboards and both start pages; the
+   * desktop mode returns to the drawer.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @return the sections after the reset, each with its bumped version
+   */
+  public @NotNull NavigationPreferencesResponse resetAll(@NotNull UUID userId) {
+    return counted(
+        EnumSet.allOf(NavigationSection.class),
+        () -> {
+          resetWriter.resetAll(userId);
+          return writer.read(userId);
+        });
+  }
+
+  /**
    * Deletes entry keys the caller may no longer see from every section.
    *
    * @param userId the caller's {@code app_user.id}
@@ -200,6 +236,9 @@ public class NavigationPreferencesService {
   public @NotNull NavigationPreferencesResponse prune(
       @NotNull UUID userId, @NotNull List<String> keys) {
     writer.prune(userId, keys).forEach(this::countOk);
+    if (appearanceWriter.prune(userId, keys)) {
+      countOk(NavigationSection.APPEARANCE);
+    }
     return writer.read(userId);
   }
 
