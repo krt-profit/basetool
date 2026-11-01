@@ -8683,7 +8683,6 @@
         }
     }
 
-    /* stylelint-disable-next-line media-feature-name-value-allowed-list */
     @media (width >= 1280px) {
         body[data-nav-mode='pinned'] .nav-rail {
             display: none;

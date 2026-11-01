@@ -580,7 +580,7 @@ page head never runs wider than the content below it:
 
 **Breakpoints are only the class boundaries** (DS-11, ADR-0242, amended 2026-10-03): a media query
 uses `(width <= 768px)`, `(width <= 1024px)` or `(width >= 1440px)` — or a range between two of them —
-and nothing else. Stylelint's `media-feature-name-value-allowed-list` enforces it in both
+and, for the pinned sidebar of REQ-UI-026 only, `(width >= 1280px)`; nothing else (owner decision 24). Stylelint's `media-feature-name-value-allowed-list` enforces it in both
 configurations, for `width`, `min-width` and `max-width`. A component that has to react to its own
 width uses a container query. The tokens `--bp-phone-max`, `--bp-tablet-max` and `--bp-wide-min`
 document the values (a custom property cannot be used inside `@media`). The fifteen earlier values
