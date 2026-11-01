@@ -41,6 +41,7 @@ import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
 const myLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-my',
     basePath: '/inventory/my',
+    storage: 'my',
     stackPerOwner: false,
     stackPersonalFlag: true,
     refreshTable() {
@@ -866,11 +867,11 @@ function filterMyInventory() {
     container.style.opacity = '0.5';
     container.style.pointerEvents = 'none';
 
-    const url = new URL(`${window.location.origin}/inventory/my`);
+    const url = myLager.lagerPageUrl();
     url.searchParams.append('fragment', 'true');
     myLager.appendLagerFilterParams(url.searchParams, selection);
 
-    const visibleUrl = new URL(`${window.location.origin}/inventory/my`);
+    const visibleUrl = myLager.lagerPageUrl();
     myLager.appendLagerFilterParams(visibleUrl.searchParams, selection);
     try {
         window.history.replaceState({}, '', visibleUrl.toString());

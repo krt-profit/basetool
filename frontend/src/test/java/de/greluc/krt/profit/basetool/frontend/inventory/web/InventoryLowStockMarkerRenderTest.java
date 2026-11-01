@@ -113,13 +113,13 @@ class InventoryLowStockMarkerRenderTest {
   void aGameItemWithALowLevelCarriesTheMarkerAndOneWithoutDoesNot() throws Exception {
     stubGroupedItem(true);
     mockMvc
-        .perform(get("/inventory/all").param("view", "items"))
+        .perform(get("/inventory?storage=all").param("view", "items"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(MARKER)));
 
     stubGroupedItem(false);
     mockMvc
-        .perform(get("/inventory/all").param("view", "items"))
+        .perform(get("/inventory?storage=all").param("view", "items"))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString(MARKER))));
   }
@@ -130,7 +130,7 @@ class InventoryLowStockMarkerRenderTest {
     stubGrouped(true);
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(MARKER)));
   }
@@ -141,7 +141,7 @@ class InventoryLowStockMarkerRenderTest {
     stubGrouped(false);
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString(MARKER))));
   }

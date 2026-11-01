@@ -40,8 +40,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Every admin page URL that merged into another page reaches that page and tab, and only the page
- * request is redirected (REQ-UI-026).
+ * Every page URL that merged into another page reaches that page and tab, and only the page request
+ * is redirected (REQ-UI-026).
  */
 @SpringBootTest
 class NavigationLegacyRedirectMvcTest {
@@ -58,6 +58,10 @@ class NavigationLegacyRedirectMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private static RequestPostProcessor member() {
+    return oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"));
   }
 
   private static RequestPostProcessor admin() {
@@ -139,5 +143,66 @@ class NavigationLegacyRedirectMvcTest {
             get("/admin/bank")
                 .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
+  }
+
+  /**
+   * The former Lager list pages lead to the Lager tab with the option selected.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void storageListPagesRedirectToTheLagerTabWithTheOption() throws Exception {
+    mockMvc
+        .perform(get("/inventory/my").with(member()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/inventory?storage=my"));
+    mockMvc
+        .perform(get("/inventory/all").with(member()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/inventory?storage=all"));
+  }
+
+  /**
+   * The filter query of a bookmarked list survives the redirect, and a stale option is replaced.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void storageListRedirectsKeepTheFilterQuery() throws Exception {
+    mockMvc
+        .perform(
+            get("/inventory/all")
+                .param("view", "items")
+                .param("gameItemIds", "a", "b")
+                .param("storage", "my")
+                .with(member()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/inventory?storage=all&view=items&gameItemIds=a&gameItemIds=b"));
+  }
+
+  /**
+   * Only the page request of a list is redirected; its in-place request and its sub-paths are
+   * served as before.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void storageListInPlaceRequestsAndSubPathsAreNotRedirected() throws Exception {
+    int inPlace =
+        mockMvc
+            .perform(
+                get("/inventory/my").header("X-Requested-With", "XMLHttpRequest").with(member()))
+            .andReturn()
+            .getResponse()
+            .getStatus();
+    int subPath =
+        mockMvc
+            .perform(get("/inventory/my/entry-ids").with(member()))
+            .andReturn()
+            .getResponse()
+            .getStatus();
+
+    assertThat(inPlace / 100).isNotEqualTo(3);
+    assertThat(subPath / 100).isEqualTo(2);
   }
 }

@@ -686,9 +686,14 @@ class InventoryPageControllerTest {
 
     String view =
         writeController.bookOutInventoryItem(
-            id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
+            id,
+            form,
+            bindingResult,
+            new ConcurrentModel(),
+            redirectAttributes,
+            "/inventory?storage=all");
 
-    assertEquals("redirect:/inventory/all", view);
+    assertEquals("redirect:/inventory?storage=all", view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
   }
 
@@ -706,9 +711,14 @@ class InventoryPageControllerTest {
 
     String view =
         writeController.bookOutInventoryItem(
-            id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
+            id,
+            form,
+            bindingResult,
+            new ConcurrentModel(),
+            redirectAttributes,
+            "/inventory?storage=all");
 
-    assertEquals("redirect:/inventory/all", view);
+    assertEquals("redirect:/inventory?storage=all", view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
   }
 
@@ -727,13 +737,13 @@ class InventoryPageControllerTest {
         .thenReturn(null);
 
     String referer =
-        "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
+        "https://example.org/inventory?storage=my&materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
     String view =
         writeController.bookOutInventoryItem(
             id, form, bindingResult, new ConcurrentModel(), redirectAttributes, referer);
 
     assertEquals(
-        "redirect:/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222",
+        "redirect:/inventory?storage=my&materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222",
         view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
   }
@@ -750,7 +760,7 @@ class InventoryPageControllerTest {
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
     String referer =
-        "https://example.org/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2";
+        "https://example.org/inventory?storage=all&missionIds=33333333-3333-3333-3333-333333333333&page=2";
     ConcurrentModel renderModel = new ConcurrentModel();
     String view =
         writeController.bookOutInventoryItem(
@@ -764,23 +774,19 @@ class InventoryPageControllerTest {
   @Test
   void buildInventoryRedirectFromReferer_shouldHandleNullAndEmptyReferer() {
     assertEquals(
-        "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer("/inventory/my", null));
+        "/inventory?storage=my",
+        InventoryWriteController.buildInventoryRedirectFromReferer("/inventory?storage=my", null));
     assertEquals(
-        "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer("/inventory/my", ""));
+        "/inventory?storage=my",
+        InventoryWriteController.buildInventoryRedirectFromReferer("/inventory?storage=my", ""));
     assertEquals(
-        "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer(
-                "/inventory/my", "https://example.org/inventory/my"));
+        "/inventory?storage=my",
+        InventoryWriteController.buildInventoryRedirectFromReferer(
+            "/inventory?storage=my", "https://example.org/inventory?storage=my"));
     assertEquals(
-        "/inventory/all",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer(
-                "/inventory/all", "https://example.org/inventory/all?fragment=true"));
+        "/inventory?storage=all",
+        InventoryWriteController.buildInventoryRedirectFromReferer(
+            "/inventory?storage=all", "https://example.org/inventory?storage=all&fragment=true"));
   }
 
   @Test

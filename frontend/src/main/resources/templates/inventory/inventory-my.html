@@ -15,9 +15,10 @@
 <th:block th:fragment="pageContent">
 <main class="lager-page">
     <th:block th:with="lagerBackHref=${view == 'items'} ? @{/inventory(view='items')} : @{/inventory}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.my', eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.overview', eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.my}, count=null, actions=~{::lager-my-actions})}">
         <th:block th:ref="lager-my-actions">
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(selected='my')}"></th:block>
             <a th:href="@{/inventory/input(source='my')}" class="btn btn--cta" data-testid="page-head-primary"
                th:text="#{inventory.input.new}">Einbuchen</a>
         </th:block>
@@ -27,17 +28,18 @@
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 
     <div class="tab-nav lager-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
-        <a th:href="@{/inventory/my}" class="tab" role="tab"
+        <a th:href="@{/inventory(storage='my')}" class="tab" role="tab"
            th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
            data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
-        <a th:href="@{/inventory/my(view='items')}" class="tab" role="tab"
+        <a th:href="@{/inventory(storage='my', view='items')}" class="tab" role="tab"
            th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
            data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
     </div>
 
     <section class="list-panel">
     <div class="toolbar lager-toolbar">
-        <form th:if="${view != 'items'}" th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter lager-filter-form no-track">
+        <form th:if="${view != 'items'}" th:action="@{/inventory}" method="get" id="myFilterForm" class="my-inventory-filter lager-filter-form no-track">
+            <input type="hidden" name="storage" value="my">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
                 selected=${selectedPersonalOnly == true ? 'personal' : (selectedNonPersonalOnly == true ? 'shared' : '')},
                 options=${ {{value: '', labelKey: 'filter.all'}, {value: 'personal', labelKey: 'inventory.filter.scope.personal'}, {value: 'shared', labelKey: 'inventory.filter.scope.shared'}} })}"></th:block>
@@ -139,7 +141,8 @@
                 </th:block>
             </th:block>
         </form>
-        <form th:if="${view == 'items'}" th:action="@{/inventory/my}" method="get" id="myItemsFilterForm" class="my-inventory-filter lager-filter-form no-track">
+        <form th:if="${view == 'items'}" th:action="@{/inventory}" method="get" id="myItemsFilterForm" class="my-inventory-filter lager-filter-form no-track">
+            <input type="hidden" name="storage" value="my">
             <input type="hidden" name="view" value="items">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
                 selected=${selectedPersonalOnly == true ? 'personal' : (selectedNonPersonalOnly == true ? 'shared' : '')},

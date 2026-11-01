@@ -53,8 +53,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Controller for the grouped Lager lists: the personal list ({@code /inventory/my}) and the global
- * list ({@code /inventory/all}), each in the material and the item view (REQ-INV-030).
+ * Controller for the grouped Lager lists on the Lager tab: the personal list ({@code
+ * /inventory?storage=my}) and the global list ({@code /inventory?storage=all}), each in the
+ * material and the item view (REQ-INV-030).
  */
 @Controller
 @UsesLayoutModel
@@ -83,8 +84,8 @@ public class InventoryListPageController {
   }
 
   /**
-   * Renders the personal inventory list ({@code /inventory/my}) with URL-driven filters. {@code
-   * view=items} shows the game-item tree (REQ-INV-030); filter options list only items and
+   * Renders the personal inventory list ({@code /inventory?storage=my}) with URL-driven filters.
+   * {@code view=items} shows the game-item tree (REQ-INV-030); filter options list only items and
    * locations in stock in the caller's scope (REQ-INV-040).
    *
    * @param query the Lager filters bound from the query string
@@ -93,7 +94,7 @@ public class InventoryListPageController {
    * @return either the full {@code inventory-my} view or its table fragment
    */
   @NotNull
-  @GetMapping("/my")
+  @GetMapping(params = LagerStorage.MY_CONDITION)
   public String viewMyInventory(
       @ModelAttribute LagerQuery query,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
@@ -158,8 +159,8 @@ public class InventoryListPageController {
   }
 
   /**
-   * Returns the ids of every own inventory entry matching the current {@code /inventory/my} filter
-   * and view, backing "Alle markieren" (REQ-INV-034).
+   * Returns the ids of every own inventory entry matching the current personal-list filter and
+   * view, backing "Alle markieren" (REQ-INV-034).
    *
    * @param query the Lager filters bound from the query string
    * @return the ids of every matching entry, in creation order; never {@code null}
@@ -302,7 +303,7 @@ public class InventoryListPageController {
   }
 
   /**
-   * Renders the squadron-wide inventory list ({@code /inventory/all}), like {@link
+   * Renders the squadron-wide inventory list ({@code /inventory?storage=all}), like {@link
    * #viewMyInventory} but over all users in scope and without the personal flags.
    *
    * @param requested the Lager filters bound from the query string; the personal flags are ignored
@@ -311,7 +312,7 @@ public class InventoryListPageController {
    * @return either the full {@code inventory-admin} view or its fragment
    */
   @NotNull
-  @GetMapping("/all")
+  @GetMapping(params = LagerStorage.ALL_CONDITION)
   public String viewAllInventory(
       @ModelAttribute LagerQuery requested,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,

@@ -623,14 +623,16 @@ interface KrtHerkunftApi {
 }
 
 /**
- * The per-page settings of the two Lager pages sharing `inventory-common.js`: the global Lager
- * (`/inventory/all`) and the personal one (`/inventory/my`).
+ * The per-page settings of the two Lager lists sharing `inventory-common.js`: the global Lager
+ * (`/inventory?storage=all`) and the personal one (`/inventory?storage=my`).
  */
 interface KrtInventoryLagerConfig {
     /** The page's data-trigger prefix: `inv-admin` or `inv-my`. */
     triggerPrefix: string;
     /** The route root the stack-entries endpoints hang off: `/inventory/all` or `/inventory/my`. */
     basePath: string;
+    /** The option of the Lager tab the page shows: `all` or `my`. */
+    storage: 'all' | 'my';
     /** The global Lager's stacks are per owner: its stack-entries URL carries `userId`. */
     stackPerOwner: boolean;
     /** The personal Lager's stack key carries the personal flag. */
@@ -662,6 +664,8 @@ interface KrtLagerSelection {
 
 /** One page's instance of the shared Lager behaviour, from `krtInventory.createLager`. */
 interface KrtInventoryLager {
+    /** The address of the Lager tab with the page's storage option selected. */
+    lagerPageUrl(): URL;
     /** Whether the Items (game-item) view is active rather than the Material view. */
     lagerIsItemsView(): boolean;
     /** Re-applies the persisted group and stack expansion after a grouped-table re-swap. */

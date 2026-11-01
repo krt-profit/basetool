@@ -184,8 +184,8 @@ class NavigationRenderMvcTest {
         .contains("data-testid=\"palette-action-book-my\"")
         .contains("data-testid=\"palette-action-handbook\"")
         .contains("href=\"/hangar/squadron\"")
-        .contains("href=\"/inventory/my\"")
-        .contains("href=\"/inventory/all\"")
+        .contains("href=\"/inventory?storage=my\"")
+        .contains("href=\"/inventory?storage=all\"")
         .doesNotContain("data-testid=\"palette-action-book-global\"")
         .doesNotContain("/admin/sync-reports/uex");
     assertThat(member.contains("data-testid=\"palette-action-lang-de\""))

@@ -303,8 +303,10 @@
 /impressum GET -> ImpressumController#showImpressum gate=none layout=yes
 /internal/client-error POST -> ClientErrorReportController#report gate=class:isAuthenticated() layout=no
 /inventory GET -> InventoryPageController#viewAggregatedInventory gate=class:isAuthenticated() layout=yes
+/inventory GET params=[storage=all] -> InventoryListPageController#viewAllInventory gate=class:isAuthenticated() layout=yes
+/inventory GET params=[storage=my] -> InventoryListPageController#viewMyInventory gate=class:isAuthenticated() layout=yes
 /inventory/all DELETE -> InventoryDeleteAllProxyController#deleteAllGlobalInventory gate=method:hasRole('ADMIN') layout=no
-/inventory/all GET -> InventoryListPageController#viewAllInventory gate=class:isAuthenticated() layout=yes
+/inventory/all GET headers=[!X-Requested-With] -> LegacyStorageRedirectController#globalLager gate=class:isAuthenticated() layout=yes
 /inventory/all/game-item-stack/entries GET -> InventoryStackEntriesController#viewAllGameItemStackEntries gate=class:isAuthenticated() layout=yes
 /inventory/all/stack/entries GET -> InventoryStackEntriesController#viewAllStackEntries gate=class:isAuthenticated() layout=yes
 /inventory/bulk-checkout POST -> InventoryWriteController#bulkCheckout gate=class:isAuthenticated() layout=yes
@@ -318,7 +320,7 @@
 /inventory/item-search GET -> InventoryPageController#itemSearch gate=class:isAuthenticated() layout=yes
 /inventory/material/{materialId} GET -> InventoryPageController#viewMaterialInventory gate=class:isAuthenticated() layout=yes
 /inventory/merge-candidates GET headers=[X-Requested-With=XMLHttpRequest] -> InventoryMergeProbeProxyController#mergeCandidates gate=class:isAuthenticated() layout=no
-/inventory/my GET -> InventoryListPageController#viewMyInventory gate=class:isAuthenticated() layout=yes
+/inventory/my GET headers=[!X-Requested-With] -> LegacyStorageRedirectController#myLager gate=class:isAuthenticated() layout=yes
 /inventory/my/entry-ids GET -> InventoryListPageController#myEntryIds gate=class:isAuthenticated() layout=yes
 /inventory/my/game-item-stack/entries GET -> InventoryStackEntriesController#viewMyGameItemStackEntries gate=class:isAuthenticated() layout=yes
 /inventory/my/stack/entries GET -> InventoryStackEntriesController#viewMyStackEntries gate=class:isAuthenticated() layout=yes

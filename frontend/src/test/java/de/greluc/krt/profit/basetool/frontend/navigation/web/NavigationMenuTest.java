@@ -194,15 +194,15 @@ class NavigationMenuTest {
         .doesNotContain("promotion.overview");
   }
 
-  /** The storage page has exactly the two tabs; Mein and Globales Lager show the Lager tab. */
+  /** The storage page has exactly the two tabs; the storage option keeps the Lager tab current. */
   @Test
-  void theStoragePageHasTwoTabsAndCoversTheTwoLists() {
+  void theStoragePageHasTwoTabsAndKeepsTheLagerTabForTheStorageOption() {
     NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of());
 
     assertThat(menu.pageTabs("storage.overview", "/inventory"))
         .extracting(tab -> tab.entry().key() + ":" + tab.current())
         .containsExactly("storage.overview:true", "storage.levels:false");
-    assertThat(menu.pageTabs("storage.my", "/inventory/my"))
+    assertThat(menu.pageTabs("storage.overview", "/inventory?storage=my"))
         .filteredOn(NavigationMenu.PageTab::current)
         .extracting(tab -> tab.entry().key())
         .containsExactly("storage.overview");
@@ -242,7 +242,7 @@ class NavigationMenuTest {
     assertThat(menu.areaPaths(registry.entry("hangar.overview").orElseThrow()))
         .isEqualTo("/ship-data");
     assertThat(menu.areaPaths(registry.entry("storage.overview").orElseThrow()))
-        .isEqualTo("/inventory/stock-levels /inventory/my /inventory/all");
+        .isEqualTo("/inventory/stock-levels");
     assertThat(menu.areaPaths(registry.entry("refinery.orders").orElseThrow())).isNull();
   }
 

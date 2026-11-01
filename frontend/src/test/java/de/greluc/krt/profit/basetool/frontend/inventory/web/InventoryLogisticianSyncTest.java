@@ -113,7 +113,7 @@ class InventoryLogisticianSyncTest {
         new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
 
     mockMvc
-        .perform(get("/inventory/all").with(authentication(auth)))
+        .perform(get("/inventory?storage=all").with(authentication(auth)))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Einbuchen")));
   }
@@ -156,7 +156,7 @@ class InventoryLogisticianSyncTest {
         new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
 
     mockMvc
-        .perform(get("/inventory/all").with(authentication(auth)))
+        .perform(get("/inventory?storage=all").with(authentication(auth)))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("Einbuchen"))));
   }

@@ -89,7 +89,8 @@ the Lager's.*
 
 ### REQ-INV-002 — Group-on-read display: Material → Stack
 
-The grouped Lager views (`/inventory/my`, `/inventory/all`) present each material as a group
+The grouped Lager views (the options „Mein Lager" and „Globales Lager" of the Lager tab,
+`/inventory?storage=my` and `/inventory?storage=all`, REQ-UI-026) present each material as a group
 whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. The
 nullable to-one in the stack key — `owningOrgUnit` — (and `material`, which is null on game-item
 rows) is **left-joined** and grouped on its join alias: a stack with no owning org-unit (a personal
@@ -1485,7 +1486,7 @@ moving a member's row — the **previous owner** is told as well.
   material or item, quality (`Q800`) and location: the target location for the new owner, the
   source location for the previous owner, who is also told the new owner's name. At most 20 lots
   are listed, then `…`; the count names them all. No free text (notes) rides the event.
-- **Link:** both notifications open „Mein Lager" (`/inventory/my`).
+- **Link:** both notifications open „Mein Lager" (`/inventory?storage=my`).
 
 **Acceptance**
 

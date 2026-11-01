@@ -188,7 +188,8 @@ class NotificationTargetsTest {
 
   @Test
   void pageSubjectsOpenTheirPage() {
-    assertEquals("/inventory/my", target("INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_ITEM"));
+    assertEquals(
+        "/inventory?storage=my", target("INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_ITEM"));
     assertEquals("/hangar", target("HANGAR_SHIP_ASSIGNED", "MISSION_UNIT"));
     assertEquals(
         "/personal-inventory/blueprints",

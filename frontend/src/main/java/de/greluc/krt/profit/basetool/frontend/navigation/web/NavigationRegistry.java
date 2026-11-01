@@ -259,10 +259,10 @@ public class NavigationRegistry {
         of("storage.levels", "/inventory/stock-levels", "inventory.stockLevels.tab")
             .keywords("palette.keywords.stockLevels")
             .with(PALETTE_ONLY),
-        of("storage.my", "/inventory/my", "palette.page.inventoryMy")
+        of("storage.my", "/inventory?storage=my", "palette.page.inventoryMy")
             .keywords("palette.keywords.inventoryMy")
             .with(PALETTE_ONLY),
-        of("storage.all", "/inventory/all", "palette.page.inventoryAll")
+        of("storage.all", "/inventory?storage=all", "palette.page.inventoryAll")
             .keywords("palette.keywords.inventoryAll")
             .with(PALETTE_ONLY),
         of("refinery.orders", "/refinery-orders", "nav.page.refinery")
@@ -550,8 +550,7 @@ public class NavigationRegistry {
     return List.of(
         NavigationPageTabs.of("missions.list", "operations.list"),
         NavigationPageTabs.of("hangar.overview", "hangar.catalog"),
-        NavigationPageTabs.of("storage.overview", "storage.levels")
-            .covering("storage.overview", "storage.my", "storage.all"),
+        NavigationPageTabs.of("storage.overview", "storage.levels"),
         NavigationPageTabs.of(
             "orders.list",
             "orders.own",

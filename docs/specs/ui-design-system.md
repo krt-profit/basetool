@@ -1739,6 +1739,8 @@ administrators, the quick-access metadata, search terms on menu links, the quick
 and actions per role, no „Rechtliches" group, nothing of it for a signed-out visitor) ·
 `NavigationEntryKeyRenderMvcTest` (every rendered link names a registered entry key) ·
 `NavigationMemberRenderMvcTest` (the four task groups, the footer link, officer-only tabs by flag) ·
+`NavigationLegacyRedirectMvcTest` (the former Lager list URLs redirect to the Lager tab with the option and
+their filter query; in-place requests and sub-paths are not redirected) ·
 `NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
 `NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
@@ -1778,11 +1780,11 @@ its former sibling pages become tabs of it.
 
 - *Shipped:* the groups, links and tabs are the entries of the registry (`NavigationRegistry`),
   every tab bar is `NavigationPageTabs` rendered by `pageHead(tabsKey=…)`, and a page left with fewer
-  than two permitted tabs shows no bar. A tab can cover pages that are not tabs themselves (the
-  Lager lists, Beförderung's Themenbereiche and Rangvoraussetzungen); they show the bar with the
+  than two permitted tabs shows no bar. A tab can cover pages that are not tabs themselves (Beförderung's
+  Themenbereiche and Rangvoraussetzungen); they show the bar with the
   covering tab current. Beschaffung keeps its supply and purchasing tab fragments, which add
   „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. Every former URL still opens
-  its page; an entry gated on a flag or role the caller lacks is neither a link nor a tab, and
+  its page or tab (the Lager lists by redirect); an entry gated on a flag or role the caller lacks is neither a link nor a tab, and
   officer-only tabs follow `canOpenLeitung` and `canManagePromotions`.
 - *Italic* tabs are officer-only (officer reach per org unit, ADR-0300); Beförderung's
   „Verwaltung" holds Bewertungen, Themenbereiche and Rangvoraussetzungen. Officers therefore also
@@ -1795,8 +1797,10 @@ its former sibling pages become tabs of it.
   quick-access entries open the „Lager" tab with that option selected and keep their own stable
   entry keys (REQ-UI-032), so they can still be favourites, tab-bar slots and start pages; the old
   URLs `/inventory/my` and `/inventory/all` redirect to the tab with the option.
-  *Shipped:* the switch sits on the „Lager" tab and the two lists keep their URLs as the pages of
-  the options; both show the „Lager" tab bar with „Lager" current, so the URLs do not redirect.
+  *Shipped:* the options are `/inventory?storage=my` and `/inventory?storage=all`, rendered by the
+  Lager tab with the „Lager" tab bar and the switch (`aria-current` on the selected option); the
+  old page URLs redirect with their filter query kept, while their in-place requests and sub-paths
+  (stack entries, entry ids) keep their endpoints.
 - The ship catalogue, readable by every signed-in user, is a Hangar tab; editing it stays in
   admin mode.
 - A user without profit access who is an assignee of at least one job order sees „Aufträge" with

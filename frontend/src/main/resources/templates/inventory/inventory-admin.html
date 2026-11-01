@@ -10,9 +10,10 @@
 <th:block th:fragment="pageContent">
 <main class="lager-page">
     <th:block th:with="lagerBackHref=${view == 'items'} ? @{/inventory(view='items')} : @{/inventory}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.all', eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.overview', eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.global}, count=null, actions=~{::lager-all-actions})}">
         <th:block th:ref="lager-all-actions">
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(selected='all')}"></th:block>
             <a th:if="${isLogisticianOrAbove}" th:href="@{/inventory/input(source='admin')}"
                class="btn btn--cta" data-testid="page-head-primary" th:text="#{inventory.input.new}">Einbuchen</a>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
@@ -39,16 +40,17 @@
     </div>
 
     <div class="tab-nav lager-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
-        <a th:href="@{/inventory/all}" class="tab" role="tab"
+        <a th:href="@{/inventory(storage='all')}" class="tab" role="tab"
            th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
            data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
-        <a th:href="@{/inventory/all(view='items')}" class="tab" role="tab"
+        <a th:href="@{/inventory(storage='all', view='items')}" class="tab" role="tab"
            th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
            data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
     </div>
 
     <section class="list-panel">
-    <form th:if="${view != 'items'}" th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="global-inventory-filter no-track">
+    <form th:if="${view != 'items'}" th:action="@{/inventory}" method="get" id="globalFilterForm" class="global-inventory-filter no-track">
+        <input type="hidden" name="storage" value="all">
         <div class="toolbar lager-toolbar">
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',
                 testid='lager-filter-toggle', body=~{::lager-all-filter-body})}">
@@ -150,7 +152,8 @@
         </div>
         <th:block th:replace="~{kernel/fragments/components :: filterChips('globalFilterForm')}"></th:block>
     </form>
-    <form th:if="${view == 'items'}" th:action="@{/inventory/all}" method="get" id="globalItemsFilterForm" class="global-inventory-filter no-track">
+    <form th:if="${view == 'items'}" th:action="@{/inventory}" method="get" id="globalItemsFilterForm" class="global-inventory-filter no-track">
+        <input type="hidden" name="storage" value="all">
         <input type="hidden" name="view" value="items">
         <div class="toolbar lager-toolbar">
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',

@@ -163,8 +163,8 @@ class NavigationRegistryTest {
             "/hangar/squadron",
             "/ship-data",
             "/inventory",
-            "/inventory/my",
-            "/inventory/all",
+            "/inventory?storage=my",
+            "/inventory?storage=all",
             "/inventory/stock-levels",
             "/materialboerse",
             "/refinery-orders",
@@ -203,7 +203,9 @@ class NavigationRegistryTest {
   @Test
   void looksEntriesUpByKey() {
     assertThat(registry.entry("missions.list")).map(NavigationEntry::href).contains("/missions");
-    assertThat(registry.entry("storage.my")).map(NavigationEntry::href).contains("/inventory/my");
+    assertThat(registry.entry("storage.my"))
+        .map(NavigationEntry::href)
+        .contains("/inventory?storage=my");
     assertThat(registry.entry("nope.nope")).isEmpty();
   }
 }

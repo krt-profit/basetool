@@ -171,7 +171,7 @@ class InventoryIndexListPatternRenderTest {
         .contains("data-testid=\"lager-view-items\"")
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern(
-            "class=\"row-link\"[^>]*href=\"/inventory/all\\?materialIds=" + MATERIAL_ID)
+            "class=\"row-link\"[^>]*href=\"/inventory\\?storage=all&amp;materialIds=" + MATERIAL_ID)
         .contains(">Laranite<")
         .contains("data-label=\"Ø Qualität\"")
         .contains(">12,500 SCU<")
@@ -221,7 +221,7 @@ class InventoryIndexListPatternRenderTest {
     assertThat(html)
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern(
-            "class=\"row-link\"[^>]*href=\"/inventory/all\\?view=items&amp;gameItemIds="
+            "class=\"row-link\"[^>]*href=\"/inventory\\?storage=all&amp;view=items&amp;gameItemIds="
                 + GAME_ITEM_ID)
         .containsPattern("class=\"cell-sub\">RSI<")
         .doesNotContain("Max. Qualit");

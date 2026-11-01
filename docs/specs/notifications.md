@@ -1294,7 +1294,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
 | `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
-| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory/my` (the notice names a source row, not the recipient's) |
+| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory?storage=my` (the notice names a source row, not the recipient's) |
 | `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
 | `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |
 | `BLUEPRINT_CHANGED_BY_ADMIN`, `BLUEPRINT_PURGED_BY_ADMIN` | `/personal-inventory/blueprints` |

@@ -145,9 +145,9 @@ public class InventoryWriteController {
     }
 
     if ("my".equals(form.getSource())) {
-      return "redirect:/inventory/my";
+      return "redirect:" + LagerStorage.MY_PATH;
     } else if ("admin".equals(form.getSource())) {
-      return "redirect:/inventory/all";
+      return "redirect:" + LagerStorage.ALL_PATH;
     } else if ("aggregated".equals(form.getSource())) {
       return "redirect:/inventory";
     }
@@ -332,10 +332,10 @@ public class InventoryWriteController {
   @NotNull
   private static String inventorySourceTarget(String source) {
     if ("my".equals(source)) {
-      return "/inventory/my";
+      return LagerStorage.MY_PATH;
     }
     if ("admin".equals(source)) {
-      return "/inventory/all";
+      return LagerStorage.ALL_PATH;
     }
     return "/inventory";
   }
@@ -378,8 +378,8 @@ public class InventoryWriteController {
       Model model,
       RedirectAttributes redirectAttributes,
       @RequestHeader(value = "Referer", required = false) String referer) {
-    boolean fromAdminListing = referer != null && referer.contains("/inventory/all");
-    String basePath = fromAdminListing ? "/inventory/all" : "/inventory/my";
+    boolean fromAdminListing = referer != null && referer.contains(LagerStorage.ALL_CONDITION);
+    String basePath = fromAdminListing ? LagerStorage.ALL_PATH : LagerStorage.MY_PATH;
     String redirectPath = buildInventoryRedirectFromReferer(basePath, referer);
 
     if (bindingResult.hasErrors()) {
@@ -419,7 +419,7 @@ public class InventoryWriteController {
 
   /**
    * Builds a redirect to an inventory list view that keeps the filter query parameters of the given
-   * Referer URL, dropping {@code fragment}.
+   * Referer URL, dropping {@code fragment} and the {@code storage} option the base path carries.
    *
    * <p>Returns the plain base path when the referer is empty, unparseable or has no query.
    */
@@ -446,7 +446,7 @@ public class InventoryWriteController {
       }
       int eq = raw.indexOf('=');
       String name = eq < 0 ? raw : raw.substring(0, eq);
-      if (name.isEmpty() || "fragment".equals(name)) {
+      if (name.isEmpty() || "fragment".equals(name) || LagerStorage.PARAM.equals(name)) {
         continue;
       }
       if (!rebuilt.isEmpty()) {
@@ -457,7 +457,7 @@ public class InventoryWriteController {
     if (rebuilt.isEmpty()) {
       return basePath;
     }
-    return basePath + "?" + rebuilt;
+    return basePath + (basePath.contains("?") ? "&" : "?") + rebuilt;
   }
 
   /**

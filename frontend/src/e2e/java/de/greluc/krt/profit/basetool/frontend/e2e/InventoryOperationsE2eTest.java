@@ -45,9 +45,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flows for the inventory operations on {@code /inventory/my}: einbuchen, ausbuchen,
- * umbuchen, verkaufen, job-order and mission allocation, the Herkunft picker (REQ-INV-027), and
- * edge cases (over-booking, no-op transfer, personal entry with allocations).
+ * Functional flows for the inventory operations on {@code /inventory?storage=my}: einbuchen,
+ * ausbuchen, umbuchen, verkaufen, job-order and mission allocation, the Herkunft picker
+ * (REQ-INV-027), and edge cases (over-booking, no-op transfer, personal entry with allocations).
  *
  * <p>Mutations are driven through the UI and verified via the grouped backend endpoint, or via the
  * rendered chip for allocations. Each scenario uses its own material for isolation. Cached
@@ -933,7 +933,7 @@ class InventoryOperationsE2eTest {
 
           E2eSupport.openFilterPanel(page);
           page.waitForResponse(
-              r -> r.url().contains("/inventory/my?") && r.url().contains("stolenOnly=true"),
+              r -> r.url().contains("storage=my") && r.url().contains("stolenOnly=true"),
               () -> page.locator("#stolenFilter").selectOption("only"));
           page.locator("#stolenFilter").press("Escape");
           assertThat(page.locator("#myFilterPanel")).isHidden();
@@ -1014,15 +1014,15 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/my} and expands the material group and its stack until the entry
-   * leaf row appears.
+   * Navigates to {@code /inventory?storage=my} and expands the material group and its stack until
+   * the entry leaf row appears.
    *
    * @param page the authenticated page
    * @param materialId the scenario-unique material whose group and stack to expand
    * @param itemId the seeded inventory item id whose leaf row signals the entries loaded
    */
   private static void openMyInventoryToEntry(Page page, String materialId, String itemId) {
-    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my");
+    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory?storage=my");
     page.waitForLoadState();
     Locator groupRow = page.locator("div.tree-row--group[data-material-id='" + materialId + "']");
     assertThat(groupRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

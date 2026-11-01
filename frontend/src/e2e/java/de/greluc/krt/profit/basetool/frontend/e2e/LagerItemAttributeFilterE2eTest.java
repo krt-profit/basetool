@@ -111,8 +111,8 @@ class LagerItemAttributeFilterE2eTest {
    */
   @ParameterizedTest
   @CsvSource({
-    "/inventory/my?view=items, myFilterPanel",
-    "/inventory/all?view=items, globalFilterPanel"
+    "/inventory?storage=my&view=items, myFilterPanel",
+    "/inventory?storage=all&view=items, globalFilterPanel"
   })
   void componentTypeAndSizeNarrowTheItemsViewInPlace(String path, String panelId) {
     String baseUrl = STACK.baseUrl();
@@ -200,8 +200,8 @@ class LagerItemAttributeFilterE2eTest {
    */
   @ParameterizedTest
   @CsvSource({
-    "/inventory/my?view=items, myFilterPanel",
-    "/inventory/all?view=items, globalFilterPanel"
+    "/inventory?storage=my&view=items, myFilterPanel",
+    "/inventory?storage=all&view=items, globalFilterPanel"
   })
   void itemClassAndSizeNarrowTheItemsViewInPlace(String path, String panelId) {
     String baseUrl = STACK.baseUrl();

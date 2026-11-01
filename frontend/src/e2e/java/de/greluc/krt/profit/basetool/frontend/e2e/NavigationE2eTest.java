@@ -287,6 +287,32 @@ class NavigationE2eTest {
         });
   }
 
+  /**
+   * The former Lager list URLs open the Lager tab with the option selected; the switch moves
+   * between the options without leaving the tab.
+   */
+  @Test
+  void formerLagerListUrlsOpenTheLagerTabWithTheOption() {
+    run(
+        1440,
+        900,
+        "nav-lager-options",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my");
+          page.waitForURL(Pattern.compile(".*/inventory\\?storage=my$"));
+          assertThat(page.getByTestId("inventory-my-link")).hasAttribute("aria-current", "page");
+          assertThat(page.getByTestId("page-tab-storage.overview"))
+              .hasAttribute("aria-current", "page");
+
+          page.getByTestId("inventory-global-link").click();
+          page.waitForURL(Pattern.compile(".*/inventory\\?storage=all$"));
+          assertThat(page.getByTestId("inventory-global-link"))
+              .hasAttribute("aria-current", "page");
+          assertThat(page.getByTestId("page-tab-storage.overview"))
+              .hasAttribute("aria-current", "page");
+        });
+  }
+
   /** A merged admin page shows the tab bar of its siblings and the tabs lead to them. */
   @Test
   void mergedAdminPageShowsItsTabBar() {
