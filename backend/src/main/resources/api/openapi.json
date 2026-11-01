@@ -88637,6 +88637,9 @@
       "MissionFinanceSummaryDto" : {
         "type" : "object",
         "properties" : {
+          "anonymised" : {
+            "type" : "boolean"
+          },
           "entries" : {
             "type" : "array",
             "items" : {
@@ -89585,6 +89588,9 @@
       "OperationMissionFinanceDto" : {
         "type" : "object",
         "properties" : {
+          "anonymised" : {
+            "type" : "boolean"
+          },
           "missionId" : {
             "type" : "string",
             "format" : "uuid"

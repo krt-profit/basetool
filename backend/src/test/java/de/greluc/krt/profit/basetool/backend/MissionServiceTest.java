@@ -126,7 +126,7 @@ class MissionServiceTest {
   @Test
   void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
     when(ownerScopeService.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.empty());
@@ -135,6 +135,27 @@ class MissionServiceTest {
 
     assertEquals(Optional.empty(), result);
     verify(missionRepository, never()).findById(any());
+  }
+
+  @Test
+  void getNextMission_memberWithoutUnit_readsPublicMissionsOnly() {
+    UUID id = UUID.randomUUID();
+    Mission head = new Mission();
+    head.setId(id);
+    Mission detail = new Mission();
+    detail.setId(id);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(missionRepository.findNextPublicMission(any(), eq(List.of("PLANNED", "ACTIVE"))))
+        .thenReturn(Optional.of(head));
+    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+
+    Optional<Mission> result = missionService.getNextMission();
+
+    assertSame(detail, result.orElseThrow());
+    verify(missionRepository, never())
+        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(any(), any());
+    verify(missionRepository, never()).findNextScopedMission(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -215,6 +236,7 @@ class MissionServiceTest {
             eq(List.of("PLANNED", "ACTIVE")),
             eq(false),
             eq(false),
+            eq(false),
             isNull(),
             eq(Set.of(orgA)),
             eq(userId),
@@ -239,6 +261,7 @@ class MissionServiceTest {
             any(),
             eq(false),
             eq(false),
+            eq(false),
             eq(pin),
             eq(Set.of()),
             isNull(),
@@ -250,25 +273,37 @@ class MissionServiceTest {
   }
 
   @Test
-  void getUpcomingOwnAndSignedUp_adminAllScopeAndUnitlessCaller_spanTheOrganisation() {
+  void getUpcomingOwnAndSignedUp_adminAllScope_spansTheOrganisation() {
     when(ownerScopeService.currentScopePredicate())
-        .thenReturn(new ScopePredicate(true, null, Set.of()))
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), eq(false), eq(true), any(), any(), any(), eq(true), any()))
+        .thenReturn(List.of());
+
+    missionService.getUpcomingOwnAndSignedUp(5);
+
+    verify(missionRepository)
+        .findUpcomingOwnOrSignedUp(
+            any(), any(), eq(true), eq(false), eq(true), any(), any(), any(), eq(true), any());
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_unitlessMember_isLimitedToPublicMissions() {
+    when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
     when(missionRepository.findUpcomingOwnOrSignedUp(
-            any(), any(), eq(true), eq(true), any(), any(), any(), eq(true), any()))
-        .thenReturn(List.of());
-    when(missionRepository.findUpcomingOwnOrSignedUp(
-            any(), any(), eq(true), eq(false), any(), any(), any(), eq(true), any()))
+            any(), any(), eq(false), eq(true), eq(false), any(), any(), any(), eq(true), any()))
         .thenReturn(List.of());
 
     missionService.getUpcomingOwnAndSignedUp(5);
-    missionService.getUpcomingOwnAndSignedUp(5);
 
-    verify(missionRepository, times(2))
+    verify(missionRepository)
         .findUpcomingOwnOrSignedUp(
-            any(), any(), eq(true), any(Boolean.class), any(), any(), any(), eq(true), any());
+            any(), any(), eq(false), eq(true), eq(false), any(), any(), any(), eq(true), any());
   }
 
   @Test
@@ -427,6 +462,23 @@ class MissionServiceTest {
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership owner → ownerless mission");
     assertEquals(caller, saved.getOwner());
+  }
+
+  @Test
+  void createMission_internalWithoutOwningOrgUnit_isRejectedAndNotPersisted() {
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        () ->
+            missionService.createMission(
+                new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
+                    "Intern", null, null, "PLANNED", null, null, null, true, null, null, null, null,
+                    null)));
+    verify(missionRepository, never()).save(any(Mission.class));
   }
 
   @Test

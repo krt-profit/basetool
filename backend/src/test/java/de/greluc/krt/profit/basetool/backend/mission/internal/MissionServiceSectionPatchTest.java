@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -259,6 +260,7 @@ class MissionServiceSectionPatchTest {
 
   @Test
   void updateFlagsSection_shouldFlipInternalFlag_whenFlagsVersionMatches() {
+    existing.setOwningOrgUnit(mock(OrgUnit.class));
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -282,7 +284,33 @@ class MissionServiceSectionPatchTest {
   }
 
   @Test
+  void updateFlagsSection_shouldRejectInternal_whenMissionHasNoOwningOrgUnit() {
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+
+    assertThrows(
+        BadRequestException.class, () -> missionService.updateFlagsSection(missionId, true, 6L));
+    assertFalse(existing.getIsInternal());
+    verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  @Test
+  void updateOwningOrgUnit_shouldRejectOwnerlessTarget_whenMissionIsInternal() {
+    OrgUnit previous = mock(OrgUnit.class);
+    existing.setOwningOrgUnit(previous);
+    existing.setIsInternal(true);
+    existing.setOwningOrgUnitVersion(0L);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(ownerScopeService.resolveReassignTargetOrgUnit(null)).thenReturn(null);
+
+    assertThrows(
+        BadRequestException.class, () -> missionService.updateOwningOrgUnit(missionId, null, 0L));
+    assertSame(previous, existing.getOwningOrgUnit());
+    verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  @Test
   void sectionPatches_acrossDisjointSections_doNotInvalidateEachOther() {
+    existing.setOwningOrgUnit(mock(OrgUnit.class));
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 

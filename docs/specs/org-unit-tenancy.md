@@ -296,15 +296,17 @@ as the owning scope:
 - **Organisation-wide** (`is_internal = false`) → visible to every member, whichever unit they
   belong to (the create-time default). It meant "and to the internet" until REQ-SEC-052; the escape
   itself is unchanged, its audience is now the organisation (ADR-0159).
-- **Internal** (`is_internal = true`) → visible to organisation members-or-above
-  (`AuthHelperService.isMemberOrAbove()`), so not to an account below member.
+- **Internal** (`is_internal = true`) is **not available** to an ownerless mission: internal
+  visibility is defined by the owning unit, so an ownerless mission is always organisation-wide
+  (REQ-MISSION-008; check constraint `ck_mission_internal_has_owning_org_unit`, V329 migrated the
+  existing ownerless internal rows to organisation-wide).
 
 Editing follows the mission-management gate with the ownerless rule of REQ-SEC-005:
 `MissionAccessPolicy.canManageMission` admits the owner, co-managers, admins and a caller with a
 Mission Manager grant in an Organisationsleitung or Bereich unit; a squadron Mission Manager does
 not manage an ownerless mission. The list queries
-(`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag so an internal
-ownerless mission surfaces in the lists of members-or-above.
+(`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag that guards the
+ownerless branch of the scope predicate.
 
 `Operation` gains the same carve-out (V145, #500) — `OperationService.createOperation` routes through
 `resolveOrgUnitForPickerOutputNullable` — with two differences, because an operation has no per-user

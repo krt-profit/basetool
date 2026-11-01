@@ -25,11 +25,17 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission Finance Summary payload. */
+/**
+ * Data transfer record carrying Mission Finance Summary payload.
+ *
+ * @param anonymised {@code true} when the viewer may not see the mission; it has no name, entries
+ *     or orders then
+ */
 @DtoMirror
 public record MissionFinanceSummaryDto(
     UUID missionId,
     String missionName,
     BigDecimal totalSum,
     List<MissionFinanceEntryDto> entries,
-    List<RefineryOrderDto> refineryOrders) {}
+    List<RefineryOrderDto> refineryOrders,
+    boolean anonymised) {}
