@@ -91,6 +91,7 @@ class NavigationRenderMvcTest {
         .contains("data-testid=\"palette-open\"")
         .contains("data-testid=\"mobile-search-open\"")
         .contains("id=\"notification-bell\"")
+        .containsPattern("id=\"notification-badge\"[^>]*aria-hidden=\"true\"")
         .contains("id=\"hamburger\"");
     assertThat(sidebar)
         .startsWith("<div id=\"sidebar\" class=\"sidebar\" inert")

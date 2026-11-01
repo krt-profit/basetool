@@ -34,7 +34,7 @@
                         th:title="#{notifications.bell.title}" th:aria-label="#{notifications.bell.aria}"
                         aria-haspopup="true" aria-expanded="false">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
-                    <span id="notification-badge" class="notification-badge"
+                    <span id="notification-badge" class="notification-badge" aria-hidden="true"
                           th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
                           th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
                 </button>
