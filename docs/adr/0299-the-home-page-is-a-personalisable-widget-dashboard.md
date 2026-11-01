@@ -1,6 +1,6 @@
 # ADR-0299 — The home page is a personalisable widget dashboard
 
-- **Status:** Accepted — partially implemented (the member and the admin dashboard with their framework; the remaining widgets and the start page are planned).
+- **Status:** Accepted — partially implemented (the member and the admin dashboard with their framework and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Information, Favoriten and Benachrichtigungen; the remaining widgets and the start page are planned).
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-034, REQ-UI-032) ·

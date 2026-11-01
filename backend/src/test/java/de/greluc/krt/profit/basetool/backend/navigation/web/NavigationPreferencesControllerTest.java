@@ -58,6 +58,7 @@ class NavigationPreferencesControllerTest {
   private static final String APPEARANCE = PREFERENCES + "/appearance";
   private static final String HIDDEN = PREFERENCES + "/hidden";
   private static final String BOTH = PREFERENCES + "/favourites-and-hidden";
+  private static final String ORDER = PREFERENCES + "/order/";
   private static final String TAB_BAR = PREFERENCES + "/tab-bar/";
 
   @Autowired private WebApplicationContext context;
@@ -264,12 +265,29 @@ class NavigationPreferencesControllerTest {
     mockMvc
         .perform(get(PREFERENCES).with(as(owner)))
         .andExpect(jsonPath("$.appearance.desktopMode").value("DRAWER"))
+        .andExpect(jsonPath("$.appearance.shortcutsEnabled").value(true))
         .andExpect(jsonPath("$.appearance.version").value(0));
   }
 
   @Test
+  void refusesAMissingShortcutSwitch() throws Exception {
+    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}").andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void storesTheShortcutSwitch() throws Exception {
+    putAppearance("{\"desktopMode\":\"DRAWER\",\"shortcutsEnabled\":false,\"version\":0}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.shortcutsEnabled").value(false))
+        .andExpect(jsonPath("$.version").value(1));
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.appearance.shortcutsEnabled").value(false));
+  }
+
+  @Test
   void storesTheDesktopModeAndReturnsTheNextVersion() throws Exception {
-    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}")
+    putAppearance("{\"desktopMode\":\"RAIL\",\"shortcutsEnabled\":true,\"version\":0}")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.desktopMode").value("RAIL"))
         .andExpect(jsonPath("$.version").value(1));
@@ -277,24 +295,29 @@ class NavigationPreferencesControllerTest {
 
   @Test
   void refusesAnUnknownDesktopMode() throws Exception {
-    putAppearance("{\"desktopMode\":\"TOP\",\"version\":0}").andExpect(status().isBadRequest());
+    putAppearance("{\"desktopMode\":\"TOP\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isBadRequest());
   }
 
   @Test
   void refusesAMissingAppearanceVersion() throws Exception {
-    putAppearance("{\"desktopMode\":\"RAIL\"}").andExpect(status().isBadRequest());
+    putAppearance("{\"desktopMode\":\"RAIL\",\"shortcutsEnabled\":true}")
+        .andExpect(status().isBadRequest());
   }
 
   @Test
   void answers409ForAStaleAppearanceVersion() throws Exception {
-    putAppearance("{\"desktopMode\":\"RAIL\",\"version\":0}").andExpect(status().isOk());
+    putAppearance("{\"desktopMode\":\"RAIL\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isOk());
 
-    putAppearance("{\"desktopMode\":\"PINNED\",\"version\":0}").andExpect(status().isConflict());
+    putAppearance("{\"desktopMode\":\"PINNED\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isConflict());
   }
 
   @Test
   void anAppearanceWriteLeavesTheFavouritesVersionAlone() throws Exception {
-    putAppearance("{\"desktopMode\":\"PINNED\",\"version\":0}").andExpect(status().isOk());
+    putAppearance("{\"desktopMode\":\"PINNED\",\"shortcutsEnabled\":true,\"version\":0}")
+        .andExpect(status().isOk());
 
     mockMvc
         .perform(get(PREFERENCES).with(as(owner)))
@@ -311,6 +334,60 @@ class NavigationPreferencesControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().is(status));
+  }
+
+  @Test
+  void storesAnOrderScopeAndReadsItBackPerMode() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"bank\"],\"version\":0}", 200);
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.order.member.scopes.groups[0]").value("trade"))
+        .andExpect(jsonPath("$.order.member.scopes.groups[1]").value("bank"))
+        .andExpect(jsonPath("$.order.member.version").value(1))
+        .andExpect(jsonPath("$.order.admin.version").value(0));
+  }
+
+  @Test
+  void answers409ForAStaleOrderVersionAndLeavesTheOtherModeAlone() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\"],\"version\":0}", 200);
+
+    putJson(ORDER + "member/groups", "{\"keys\":[\"bank\"],\"version\":0}", 409);
+    putJson(ORDER + "admin/groups", "{\"keys\":[\"admin-members\"],\"version\":0}", 200);
+  }
+
+  @Test
+  void refusesAMalformedOrderWrite() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"Trade\"],\"version\":0}", 400);
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"trade\"],\"version\":0}", 400);
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\"]}", 400);
+    putJson(ORDER + "guest/groups", "{\"keys\":[\"trade\"],\"version\":0}", 400);
+  }
+
+  @Test
+  void resetsTheOrderOfAMode() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"bank\"],\"version\":0}", 200);
+
+    mockMvc
+        .perform(
+            post(ORDER + "member/reset")
+                .with(as(owner))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":1}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.scopes").isEmpty())
+        .andExpect(jsonPath("$.version").value(2));
+  }
+
+  @Test
+  void aMembersOrderIsInvisibleToAnotherMember() throws Exception {
+    putJson(ORDER + "member/groups", "{\"keys\":[\"trade\",\"bank\"],\"version\":0}", 200);
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(member())))
+        .andExpect(jsonPath("$.order.member.scopes").isEmpty());
   }
 
   @Test

@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
@@ -255,6 +256,7 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("missions.list"), 1),
                 new HiddenResponse(List.of(), 0),
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
 
@@ -271,7 +273,32 @@ class DashboardRenderMvcTest {
     assertThat(html)
         .contains("data-testid=\"dashboard-add-information\"")
         .contains("data-testid=\"dashboard-add-notifications\"")
-        .doesNotContain("data-testid=\"dashboard-add-upcoming-days\"");
+        .doesNotContain("data-testid=\"dashboard-add-upcoming-days\"")
+        .doesNotContain("data-testid=\"dashboard-add-next-mission\"")
+        .contains("data-testid=\"dashboard-add-hangar-readiness\"");
+  }
+
+  @Test
+  @DisplayName(
+      "a member may add the next-mission and hangar-readiness widgets, which have no options")
+  void offersTheSummaryWidgetsWithoutAnOptionsButton() throws Exception {
+    stored(
+        true,
+        1,
+        widget(DashboardWidgetType.NEXT_MISSION, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(
+            DashboardWidgetType.HANGAR_READINESS, DashboardColumn.NARROW, UUID.randomUUID(), null));
+
+    String html = home(member());
+
+    assertThat(html)
+        .contains("data-testid=\"dashboard-add-next-mission\"")
+        .contains("data-testid=\"dashboard-add-hangar-readiness\"")
+        .contains("data-testid=\"dashboard-widget-next-mission\"")
+        .contains("data-testid=\"dashboard-widget-hangar-readiness\"")
+        .contains("data-widget-slug=\"next-mission\"")
+        .contains("data-widget-slug=\"hangar-readiness\"")
+        .doesNotContain("data-testid=\"dashboard-options\"");
   }
 
   @Test
@@ -304,6 +331,7 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(), 0),
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
     assertThat(widget("favourites"))
@@ -315,6 +343,7 @@ class DashboardRenderMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("missions.list"), 1),
                 new HiddenResponse(List.of(), 0),
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
     assertThat(widget("favourites"))

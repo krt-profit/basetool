@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
@@ -85,6 +86,7 @@ class NavigationTabBarMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(favourites, 2),
                 HiddenResponse.EMPTY,
+                OrderResponse.EMPTY,
                 AppearanceResponse.DRAWER,
                 new TabBarsResponse(member, admin)));
   }

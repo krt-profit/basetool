@@ -58,6 +58,14 @@ public class NavigationExportSections implements PersonalDataExportSection {
             JOIN navigation_preferences np ON np.user_id = h.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
+            SELECT 'order.' || o.mode || '.' || o.scope, o.order_index, o.entry_key,
+                   CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR),
+                   CAST(NULL AS UUID), CAST(NULL AS INTEGER), CAST(NULL AS INTEGER),
+                   CAST(NULL AS VARCHAR)
+            FROM navigation_order o
+            JOIN navigation_preferences np ON np.user_id = o.preferences_id
+            WHERE np.user_id = :userId
+            UNION ALL
             SELECT 'tabbar-' || lower(t.mode), t.slot_index, t.entry_key, CAST(NULL AS VARCHAR),
                    CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR), CAST(NULL AS UUID),
                    CAST(NULL AS INTEGER), CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
@@ -68,6 +76,13 @@ public class NavigationExportSections implements PersonalDataExportSection {
             SELECT 'desktopMode', 0, a.desktop_mode, CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR),
                    CAST(NULL AS VARCHAR), CAST(NULL AS UUID), CAST(NULL AS INTEGER),
                    CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
+            FROM navigation_appearance a
+            JOIN navigation_preferences np ON np.user_id = a.preferences_id
+            WHERE np.user_id = :userId
+            UNION ALL
+            SELECT 'shortcutsEnabled', 0, CAST(a.shortcuts_enabled AS VARCHAR), CAST(NULL AS VARCHAR),
+                   CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR), CAST(NULL AS UUID),
+                   CAST(NULL AS INTEGER), CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
             FROM navigation_appearance a
             JOIN navigation_preferences np ON np.user_id = a.preferences_id
             WHERE np.user_id = :userId

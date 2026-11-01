@@ -463,6 +463,60 @@
         white-space: nowrap;
     }
 
+    .krt-modal.shortcuts-modal {
+        max-width: 34rem;
+    }
+
+    .shortcuts-heading {
+        margin: var(--space-4) 0 var(--space-2);
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .shortcuts-heading:first-child {
+        margin-top: 0;
+    }
+
+    .shortcuts-list {
+        margin: 0;
+    }
+
+    .shortcuts-row {
+        display: grid;
+        grid-template-columns: minmax(8rem, 12rem) 1fr;
+        gap: var(--space-3);
+        align-items: baseline;
+        padding: var(--space-1) 0;
+        border-bottom: var(--border-hairline);
+    }
+
+    .shortcuts-row dt {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
+        align-items: center;
+        color: var(--color-gray-1);
+        font-size: var(--fs-sm);
+    }
+
+    .shortcuts-row dd {
+        margin: 0;
+        color: var(--color-gray-1);
+        font-size: var(--fs-sm);
+    }
+
+    .nav-link-button {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
     .header-search-btn {
         display: none;
     }
@@ -3058,6 +3112,7 @@
     }
 
     .nav-edit-control,
+    .nav-edit-controls .krt-reorder__btn,
     .nav-unhide {
         flex: none;
         min-width: var(--touch-target-dense);
@@ -3066,8 +3121,18 @@
     }
 
     .nav-edit-control:hover:not(:disabled),
+    .nav-edit-controls .krt-reorder__btn:hover:not([aria-disabled='true']),
     .nav-unhide:hover:not(:disabled) {
         color: var(--color-primary);
+    }
+
+    .nav-edit-controls .krt-reorder {
+        gap: var(--space-1);
+    }
+
+    .nav-group-controls {
+        justify-content: flex-end;
+        padding-left: 1.25rem;
     }
 
     .nav-unhide {
@@ -3091,6 +3156,7 @@
     @media (width <= 1024px) {
         .nav-edit-toggle,
         .nav-edit-control,
+        .nav-edit-controls .krt-reorder__btn,
         .nav-unhide,
         .nav-edit-reset-btn {
             min-width: var(--touch-target);

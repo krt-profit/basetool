@@ -12,6 +12,12 @@
         </p>
         <th:block th:replace="~{kernel/fragments/nav-appearance :: switch('desktop-mode-profile')}"></th:block>
         <p class="form-hint" th:text="#{profile.appearance.note}">Ab 1025 px Breite.</p>
+        <label class="krt-switch" for="profile-shortcuts-switch">
+            <input type="checkbox" role="switch" id="profile-shortcuts-switch" data-shortcuts-switch
+                   data-testid="profile-shortcuts-switch" th:checked="${navigationAppearance.shortcutsEnabled()}">
+            <span th:text="#{profile.appearance.shortcuts}">Tastenkürzel Alt+1 bis Alt+9 und Alt+0 verwenden</span>
+        </label>
+        <p class="form-hint" th:text="#{profile.appearance.shortcuts.hint}">Alt+1 bis Alt+9 öffnen die Favoriten, Alt+0 die Startseite.</p>
     </div>
 </div>
 </body>

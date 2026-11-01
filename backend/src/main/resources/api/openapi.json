@@ -17294,6 +17294,117 @@
         "x-domain" : "hangar"
       }
     },
+    "/api/v1/hangar/my-ships/readiness" : {
+      "get" : {
+        "operationId" : "getMyReadiness",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ShipReadinessDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "tags" : [ "hangar" ],
+        "x-domain" : "hangar"
+      }
+    },
     "/api/v1/hangar/ships" : {
       "delete" : {
         "description" : "Deletes all ships of the authenticated user. Links to mission units are safely dissolved.",
@@ -32449,6 +32560,127 @@
         "x-domain" : "mission"
       }
     },
+    "/api/v1/missions/next/summary" : {
+      "get" : {
+        "operationId" : "getNextMissionSummary",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionListDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: no-cache, must-revalidate",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Get the next upcoming mission as a list row",
+        "tags" : [ "mission" ],
+        "x-domain" : "mission"
+      }
+    },
     "/api/v1/missions/{id}" : {
       "delete" : {
         "operationId" : "deleteMission",
@@ -39332,6 +39564,263 @@
           "bearer-jwt" : [ ]
         } ],
         "summary" : "Replace the caller's hidden pages.",
+        "tags" : [ "navigation" ],
+        "x-domain" : "navigation"
+      }
+    },
+    "/api/v1/navigation/preferences/order/{mode}/reset" : {
+      "post" : {
+        "operationId" : "resetOrder",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "mode",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OrderResetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrderModeResponse"
+                }
+              }
+            },
+            "description" : "Order cleared."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Reset the order of a mode to the default order.",
+        "tags" : [ "navigation" ],
+        "x-domain" : "navigation"
+      }
+    },
+    "/api/v1/navigation/preferences/order/{mode}/{scope}" : {
+      "put" : {
+        "operationId" : "replaceOrderScope",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "mode",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "scope",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OrderScopeUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrderModeResponse"
+                }
+              }
+            },
+            "description" : "Order stored."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Replace the stored order of one group list or link list of a mode.",
         "tags" : [ "navigation" ],
         "x-domain" : "navigation"
       }
@@ -81224,6 +81713,9 @@
             "type" : "string",
             "enum" : [ "DRAWER", "RAIL", "PINNED" ]
           },
+          "shortcutsEnabled" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -81237,13 +81729,16 @@
             "type" : "string",
             "enum" : [ "DRAWER", "RAIL", "PINNED" ]
           },
+          "shortcutsEnabled" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64",
             "minimum" : 0
           }
         },
-        "required" : [ "desktopMode", "version" ]
+        "required" : [ "desktopMode", "shortcutsEnabled", "version" ]
       },
       "AppointDelegateRequest" : {
         "type" : "object",
@@ -83925,7 +84420,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
           }
         },
         "required" : [ "column", "type" ]
@@ -83983,7 +84478,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
+              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
             },
             "maxItems" : 32,
             "minItems" : 0
@@ -84046,7 +84541,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS" ]
           }
         }
       },
@@ -88541,6 +89036,9 @@
           "hidden" : {
             "$ref" : "#/components/schemas/HiddenResponse"
           },
+          "order" : {
+            "$ref" : "#/components/schemas/OrderResponse"
+          },
           "tabBars" : {
             "$ref" : "#/components/schemas/TabBarsResponse"
           }
@@ -89209,6 +89707,68 @@
           }
         },
         "required" : [ "name", "status", "version" ]
+      },
+      "OrderModeResponse" : {
+        "type" : "object",
+        "properties" : {
+          "scopes" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
+            }
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "OrderResetRequest" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "version" ]
+      },
+      "OrderResponse" : {
+        "type" : "object",
+        "properties" : {
+          "admin" : {
+            "$ref" : "#/components/schemas/OrderModeResponse"
+          },
+          "member" : {
+            "$ref" : "#/components/schemas/OrderModeResponse"
+          }
+        }
+      },
+      "OrderScopeUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "keys" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "maxLength" : 64,
+              "minLength" : 0,
+              "pattern" : "^[a-z][a-z0-9]*([.-][a-z0-9]+)*$"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "keys", "version" ]
       },
       "OrgChartDto" : {
         "type" : "object",
@@ -94336,6 +94896,19 @@
           },
           "pledgeId" : {
             "type" : "string"
+          }
+        }
+      },
+      "ShipReadinessDto" : {
+        "type" : "object",
+        "properties" : {
+          "fitted" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

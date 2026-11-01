@@ -2299,11 +2299,12 @@ page use it; positions there count the reorderable rows of the rendered page.
 > **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store, the
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
-> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", „Darstellung" with the
-> desktop mode (own version, the profile card and the sidebar switch), the phone tab bar with its
-> „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the privacy flows and
-> the metrics. Planned: the order and the up/down controls of „Anpassen", `shortcutsEnabled` and
-> the start pages of „Darstellung" and the full reset; until they ship, the current code stays
+> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the order of groups and
+> links with the up/down controls and „Standardreihenfolge", „Darstellung" with the desktop mode
+> and `shortcutsEnabled` (own version, the profile card and the sidebar switch), the phone tab
+> bar with its „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the
+> privacy flows and the metrics. Planned: the start pages of „Darstellung" and the full reset;
+> until they ship, the current code stays
 > authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
@@ -2437,11 +2438,17 @@ the quick access, no hide control on personal pages, the relays), `NavigationReg
 entries are pages, which tabs leave with a page), `NavigationMenuTest`,
 `NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint, hiding with focus and
 announcement, favourite and hidden excluding each other, the resets, 44 px controls up to 1024 px
-and 32 px above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the
-frozen bar, the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest`
-(the bar per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a
-taken entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin
-bar), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
+and 32 px above), `NavigationOrderTest` (the scopes, the version per mode, independence from the
+other sections, the reset, the deletion of entries, the metric), `NavigationOrderingTest` and
+`NavigationMenuOrderTest` (the stored order and the placement of keys the store does not know),
+`NavigationOrderMvcTest` (the rendered order, the move controls, the relays),
+`NavigationOrderE2eTest` (moving by button and by Alt+Arrow without a drag, focus kept, the live
+announcement, reload, „Standardreihenfolge", the 409 hint, 44 px controls up to 1024 px and 32 px
+above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the frozen bar,
+the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest` (the bar
+per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a taken
+entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin bar),
+the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
 full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
@@ -2574,10 +2581,11 @@ ADR-0282, ADR-0297
 > default, the framework (two columns, up/down, column switch, remove, catalogue and options
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
-> one-time hint), the widgets Nächste Tage, Information (with the inline editor for
-> administrators), Favoriten and Benachrichtigungen, and the admin dashboard with its five widgets.
-> Planned: the other catalogue widgets and their options and the start page; until they ship, the
-> current code stays authoritative for them.
+> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Information
+> (with the inline editor for administrators), Favoriten and Benachrichtigungen, with the options
+> of the matrix below, and the admin dashboard with its five widgets. Planned: the other catalogue
+> widgets and their options and the start page; until they ship, the current code stays
+> authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2681,22 +2689,25 @@ versions, owner isolation, deletion by widget type, the write counters),
 `NavigationDashboardControllerTest` (authentication, the admin mode's gate, 409, 404),
 `DashboardReaderTest` and `DashboardRenderMvcTest` (the board per stored layout, greyed pinned
 instances, the empty and error states, deletion on role loss, the hint, the catalogue),
-`DashboardUpcomingDaysWidgetMvcTest`, `DashboardAdminWidgetMvcTest` (the rows, counts, empty
-states and the admin gate of the admin widgets), `AdminNavigationRenderMvcTest` (the admin board
-and the hub widget), `NavigationLegacyRedirectMvcTest` (`/admin/announcement`),
-`DashboardLayoutControllerTest`,
-`DashboardLayoutBackendClientTest`, `AdminDashboardE2eTest` (the admin default, edit mode and
-range on the admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, catalogue and options, restore,
-phone single column, the 10-minute poll on visibility, the hint, deletion on role loss), the export
+`DashboardUpcomingDaysWidgetMvcTest`, `DashboardSummaryWidgetsMvcTest` (Nächster Einsatz and
+Hangar-Bereitschaft: the row, the counts, the empty states, the member's hangar room),
+`DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
+widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
+`NavigationLegacyRedirectMvcTest` (`/admin/announcement`),
+`DashboardLayoutControllerTest`, `DashboardLayoutBackendClientTest`, `DashboardBackendClientTest`
+(the two summary reads), `AdminDashboardE2eTest` (the admin default, edit mode and range on the
+admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, catalogue and options, restore, the summary
+widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
+the hint, deletion on role loss), the export
 and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** `StartPageRedirectMvcTest` (start
 page per mode, deep-link precedence, fallback) and the tests of the widgets that follow ·
 **Related:** REQ-UI-018,
-REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-SEC-046,
-REQ-SEC-058, ADR-0299
+REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-HANGAR-016,
+REQ-MISSION-031, REQ-SEC-046, REQ-SEC-058, ADR-0299
 
 ### REQ-UI-035 — Favourites and the dashboard have keyboard shortcuts
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code stays authoritative.
+> **Status: shipped** (ADR-0297, map #2800).
 
 | Keys | Opens |
 |---|---|
@@ -2711,6 +2722,8 @@ REQ-SEC-058, ADR-0299
   fields.
 - **Member mode only:** in admin mode Alt+0 … Alt+9 do nothing. No phone counterpart.
 - **Switch:** `shortcutsEnabled` in „Darstellung" (REQ-UI-032), one value per user, default on.
+  It is a switch in the profile card „Darstellung", written in place with the section's version
+  (`nav-appearance.js`), and stays off while the stored section could not be read.
 - **Discoverability:** tooltip and `aria-keyshortcuts` on the favourite links and the dashboard
   link only where the key currently works. A „Tastenkürzel" dialog (REQ-UI-013), opened from the
   quick access and the profile menu, always lists `Strg K` and the dialog keys of REQ-UI-033; for
@@ -2719,9 +2732,18 @@ REQ-SEC-058, ADR-0299
 - Not shortcuts: the desktop mode, „Anpassen" (both stay buttons and quick-access actions), and
   „back" (the browser's Alt+Left). No single-character shortcut, so WCAG 2.1.4 does not apply.
 
-**Enforced by (to be added):** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate,
-switch, admin mode) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard,
-toast on a greyed or empty slot, the „Tastenkürzel" dialog) · **Related:** REQ-UI-026,
+*Shipped:* `krt-shortcuts.js` holds the key matching and the decision per slot, `nav-shortcuts.js`
+reads the favourites of the member group from the navigation, sets the tooltip and
+`aria-keyshortcuts` of the first nine favourites and of the home link where the keys work, and
+opens the dialog `nav-shortcuts` (`kernel/fragments/nav-shortcuts.html`) from the profile menu,
+the rail's avatar flyout and the quick-access action „Tastenkürzel anzeigen".
+
+**Enforced by:** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate, switch, admin
+mode) · `NavigationDesktopModesMvcTest` (the switch on the state, the dialog, its openers, the
+relay) · `NavigationAppearanceServiceTest`, `NavigationPreferencesControllerTest` (the stored
+switch) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard, toast on a
+greyed or empty slot, rest while a dialog is open and in admin mode, the profile switch, the
+„Tastenkürzel" dialog) · `DialogA11yE2eTest` (the dialog contract) · **Related:** REQ-UI-026,
 REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
 
 ### REQ-UI-037 — Number fields use the separators of the page language while typing

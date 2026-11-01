@@ -286,7 +286,9 @@
 /dashboard/widgets/deletion-requests GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#deletionRequests gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/discord-registrations GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#discordRegistrations gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/favourites GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#favourites gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/hangar-readiness GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#hangarReadiness gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/information GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#information gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/next-mission GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#nextMission gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/notifications GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#notifications gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/open-terms GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#openTerms gate=class:hasRole('ADMIN') layout=yes
 /dashboard/widgets/sync-status GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#syncStatus gate=class:hasRole('ADMIN') layout=yes
@@ -452,6 +454,8 @@
 /navigation/favourites-and-hidden PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceFavouritesAndHidden gate=class:isAuthenticated() layout=no
 /navigation/hidden PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceHidden gate=class:isAuthenticated() layout=no
 /navigation/menu GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationMenuFragmentController#fragment gate=class:isAuthenticated() layout=yes
+/navigation/order/{mode}/reset POST headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#resetOrder gate=class:isAuthenticated() layout=no
+/navigation/order/{mode}/{scope} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceOrderScope gate=class:isAuthenticated() layout=no
 /navigation/tab-bar/{mode} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceTabBar gate=class:isAuthenticated() layout=no
 /notifications GET -> NotificationPageController#page gate=class:isAuthenticated() layout=yes
 /notifications/page-items GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#pageItems gate=class:isAuthenticated() layout=yes

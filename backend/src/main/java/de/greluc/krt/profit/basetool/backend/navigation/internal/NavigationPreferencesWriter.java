@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,10 @@ public class NavigationPreferencesWriter {
   private static final String FAVOURITE_AND_HIDDEN =
       "An entry cannot be a favourite and hidden at the same time.";
 
+  private static final String MALFORMED_SCOPE = "The order scope is not a valid key.";
+
+  private static final String TOO_MANY_SCOPES = "The order holds too many scopes.";
+
   private final NavigationPreferencesRepository repository;
   private final NavigationAppearanceWriter appearance;
 
@@ -70,8 +75,66 @@ public class NavigationPreferencesWriter {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(), 0),
-                new AppearanceResponse(DesktopMode.DRAWER, 0),
+                new OrderResponse(
+                    new OrderModeResponse(Map.of(), 0), new OrderModeResponse(Map.of(), 0)),
+                AppearanceResponse.DEFAULT,
                 TabBarsResponse.AUTOMATIC));
+  }
+
+  /**
+   * Replaces the stored order of one scope of a mode when the echoed version is current; no keys
+   * removes the scope.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the navigation mode
+   * @param scope {@code groups} or the key of the group whose links are ordered
+   * @param keys the scope's keys in their new order
+   * @param expectedVersion the order version of the mode the caller last saw
+   * @return the mode's order with the bumped version
+   * @throws BadRequestException when a key repeats, the scope is malformed or the mode would hold
+   *     more scopes than allowed
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   */
+  @Transactional
+  public @NotNull OrderModeResponse replaceOrderScope(
+      @NotNull UUID userId,
+      @NotNull NavigationMode mode,
+      @NotNull String scope,
+      @NotNull List<String> keys,
+      long expectedVersion) {
+    requireDistinct(keys);
+    requireOrderKey(scope);
+    repository.insertIfAbsent(userId);
+    requireScopeRoom(repository.findById(userId).orElseThrow(), mode, scope, keys);
+    if (repository.bumpOrderVersionIfMatches(userId, mode, expectedVersion) == 0) {
+      throw stale(userId);
+    }
+    NavigationPreferences preferences = repository.findById(userId).orElseThrow();
+    preferences.replaceOrderScope(mode, scope, keys);
+    repository.saveAndFlush(preferences);
+    return toOrder(preferences, mode);
+  }
+
+  /**
+   * Clears the stored order of a mode when the echoed version is current.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the navigation mode
+   * @param expectedVersion the order version of the mode the caller last saw
+   * @return the empty order with the bumped version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   */
+  @Transactional
+  public @NotNull OrderModeResponse resetOrder(
+      @NotNull UUID userId, @NotNull NavigationMode mode, long expectedVersion) {
+    repository.insertIfAbsent(userId);
+    if (repository.bumpOrderVersionIfMatches(userId, mode, expectedVersion) == 0) {
+      throw stale(userId);
+    }
+    NavigationPreferences preferences = repository.findById(userId).orElseThrow();
+    preferences.clearOrder(mode);
+    repository.saveAndFlush(preferences);
+    return toOrder(preferences, mode);
   }
 
   /**
@@ -178,9 +241,41 @@ public class NavigationPreferencesWriter {
           if (pruneHidden(preferences, gone)) {
             changed.add(NavigationSection.HIDDEN);
           }
+          if (pruneOrder(preferences.getUserId(), gone)) {
+            changed.add(NavigationSection.ORDER);
+          }
         });
     changed.addAll(tabBarWriter.prune(userId, gone));
     return changed;
+  }
+
+  private boolean pruneOrder(UUID userId, Set<String> gone) {
+    NavigationPreferences current = repository.findById(userId).orElseThrow();
+    Set<NavigationMode> modes = current.removeFromOrder(gone);
+    if (modes.isEmpty()) {
+      return false;
+    }
+    repository.saveAndFlush(current);
+    modes.forEach(mode -> repository.bumpOrderVersion(userId, mode));
+    return true;
+  }
+
+  private static void requireOrderKey(String key) {
+    if (!key.matches(NavigationLimits.ORDER_KEY_PATTERN)
+        || key.length() > NavigationLimits.MAX_ENTRY_KEY_LENGTH) {
+      throw new BadRequestException(MALFORMED_SCOPE);
+    }
+  }
+
+  private static void requireScopeRoom(
+      NavigationPreferences preferences, NavigationMode mode, String scope, List<String> keys) {
+    Set<String> scopes = new HashSet<>(preferences.orderOf(mode).keySet());
+    if (!keys.isEmpty()) {
+      scopes.add(scope);
+    }
+    if (scopes.size() > NavigationLimits.MAX_ORDER_SCOPES) {
+      throw new BadRequestException(TOO_MANY_SCOPES);
+    }
   }
 
   private boolean pruneFavourites(NavigationPreferences preferences, Set<String> gone) {
@@ -224,11 +319,18 @@ public class NavigationPreferencesWriter {
     return new ObjectOptimisticLockingFailureException(NavigationPreferences.class, userId);
   }
 
+  private static OrderModeResponse toOrder(NavigationPreferences preferences, NavigationMode mode) {
+    return new OrderModeResponse(preferences.orderOf(mode), preferences.orderVersionOf(mode));
+  }
+
   private NavigationPreferencesResponse toResponse(NavigationPreferences preferences) {
     return new NavigationPreferencesResponse(
         favouritesOf(preferences),
         new HiddenResponse(
             preferences.getHidden().stream().sorted().toList(), preferences.getHiddenVersion()),
+        new OrderResponse(
+            toOrder(preferences, NavigationMode.MEMBER),
+            toOrder(preferences, NavigationMode.ADMIN)),
         appearance.read(preferences.getUserId(), preferences.getAppearanceVersion()),
         new TabBarsResponse(
             NavigationTabBarWriter.response(preferences, NavigationMode.MEMBER),

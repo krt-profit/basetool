@@ -18,11 +18,13 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { NAV_SHORTCUTS_EVENT } from '/js/kernel/nav-preferences.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 const APPEARANCE_URL = '/navigation/appearance';
 const STATE_SELECTOR = '[data-appearance-state]';
 const SWITCH_SELECTOR = '[data-segmented^="desktop-mode-"]';
+const SHORTCUTS_SELECTOR = 'input[data-shortcuts-switch]';
 const WRITE_LOCK = 'nav-appearance';
 
 /**
@@ -38,7 +40,8 @@ function stateElement() {
  * Puts the page in line with a stored appearance: the mode on the body, the version in the state
  * and the selected option of every switch, then tells the navigation to re-evaluate its layout.
  *
- * @param {{ desktopMode: string, version: number }} stored the appearance section as stored
+ * @param {{ desktopMode: string, shortcutsEnabled: boolean, version: number }} stored the
+ *     appearance section as stored
  */
 function apply(stored) {
     const state = stateElement();
@@ -46,6 +49,7 @@ function apply(stored) {
     if (state) {
         state.dataset.version = String(stored.version);
         state.dataset.mode = mode;
+        state.dataset.shortcuts = String(stored.shortcutsEnabled);
     }
     document.body.dataset.navMode = mode;
     document.querySelectorAll(`${SWITCH_SELECTOR} input[type="radio"]`).forEach((input) => {
@@ -53,7 +57,13 @@ function apply(stored) {
             input.checked = input.value === mode;
         }
     });
+    document.querySelectorAll(SHORTCUTS_SELECTOR).forEach((input) => {
+        if (input instanceof HTMLInputElement) {
+            input.checked = stored.shortcutsEnabled;
+        }
+    });
     document.dispatchEvent(new CustomEvent('krt:nav-mode-changed', { detail: { mode } }));
+    document.dispatchEvent(new CustomEvent(NAV_SHORTCUTS_EVENT));
 }
 
 /**
@@ -67,12 +77,14 @@ async function reload() {
 }
 
 /**
- * Stores the chosen desktop mode and applies it in place; a version conflict drops the change,
- * re-reads the section alone and says so.
+ * Stores a change of the appearance and applies it in place; a version conflict drops the change,
+ * re-reads the section alone and says so. The section is replaced as a whole, so the value the
+ * change leaves alone is echoed from the state.
  *
- * @param {HTMLInputElement} input the radio the member chose
+ * @param {HTMLInputElement} input the control the member used
+ * @param {{ desktopMode?: string, shortcutsEnabled?: boolean }} change the changed value
  */
-function choose(input) {
+function write(input, change) {
     const state = stateElement();
     if (!state) {
         return;
@@ -81,7 +93,8 @@ function choose(input) {
         method: 'PUT',
         url: APPEARANCE_URL,
         payload: () => ({
-            desktopMode: input.value.toUpperCase(),
+            desktopMode: (change.desktopMode ?? state.dataset.mode ?? 'drawer').toUpperCase(),
+            shortcutsEnabled: change.shortcutsEnabled ?? state.dataset.shortcuts === 'true',
             version: Number(state.dataset.version || '0'),
         }),
         serialize: WRITE_LOCK,
@@ -110,11 +123,13 @@ function disableUnlessLoaded() {
     if (state && state.dataset.loaded === 'true') {
         return;
     }
-    document.querySelectorAll(`${SWITCH_SELECTOR} input[type="radio"]`).forEach((input) => {
-        if (input instanceof HTMLInputElement) {
-            input.disabled = true;
-        }
-    });
+    document
+        .querySelectorAll(`${SWITCH_SELECTOR} input[type="radio"], ${SHORTCUTS_SELECTOR}`)
+        .forEach((input) => {
+            if (input instanceof HTMLInputElement) {
+                input.disabled = true;
+            }
+        });
 }
 
 disableUnlessLoaded();
@@ -126,6 +141,8 @@ document.addEventListener('change', (event) => {
         target.type === 'radio' &&
         target.closest(SWITCH_SELECTOR)
     ) {
-        choose(target);
+        write(target, { desktopMode: target.value });
+    } else if (target instanceof HTMLInputElement && target.matches(SHORTCUTS_SELECTOR)) {
+        write(target, { shortcutsEnabled: target.checked });
     }
 });

@@ -27,6 +27,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param favourites the favourites section
  * @param hidden the hidden-pages section
+ * @param order the order section, one order and version per mode
  * @param appearance the appearance section
  * @param tabBars the phone tab-bar sections of both modes
  */
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.NotNull;
 public record NavigationPreferencesResponse(
     @NotNull FavouritesResponse favourites,
     @NotNull HiddenResponse hidden,
+    @NotNull OrderResponse order,
     @NotNull AppearanceResponse appearance,
     @NotNull TabBarsResponse tabBars) {
 
@@ -42,12 +44,14 @@ public record NavigationPreferencesResponse(
    *
    * @param favourites the favourites section
    * @param hidden the hidden-pages section
+   * @param order the order section
    * @param appearance the appearance section
    * @param tabBars the phone tab-bar sections of both modes
    */
   public NavigationPreferencesResponse {
     favourites = favourites == null ? new FavouritesResponse(null, 0) : favourites;
     hidden = hidden == null ? HiddenResponse.EMPTY : hidden;
+    order = order == null ? OrderResponse.EMPTY : order;
     appearance = appearance == null ? AppearanceResponse.DRAWER : appearance;
     tabBars = tabBars == null ? TabBarsResponse.AUTOMATIC : tabBars;
   }

@@ -909,6 +909,12 @@ interface KrtPaletteApi {
     open(query?: string): void;
 }
 
+/** The „Tastenkürzel“ dialog (`nav-shortcuts.js`, REQ-UI-035). */
+interface KrtShortcutsApi {
+    /** Opens the dialog. */
+    open(): void;
+}
+
 interface Window {
     /**
      * Returns `value` when it is a non-empty string; otherwise reports `key` once per page view as

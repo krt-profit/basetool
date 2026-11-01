@@ -68,6 +68,22 @@ public enum DashboardWidgetType {
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
       new DashboardOptions(null, null, 5, DashboardStatus.UNREAD)),
 
+  /** The member's next mission. */
+  NEXT_MISSION(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.noneOf(DashboardOption.class),
+      DashboardOptions.NONE),
+
+  /** The readiness of the member's hangar. */
+  HANGAR_READINESS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.noneOf(DashboardOption.class),
+      DashboardOptions.NONE),
+
   /** The admin links as tiles. */
   ADMIN_HUB(
       DashboardMode.ADMIN,

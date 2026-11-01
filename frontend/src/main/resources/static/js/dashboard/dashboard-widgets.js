@@ -33,7 +33,7 @@ const POLL_STAGGER_MS = 1500;
 const POLL_STAGGER_SLOTS = 8;
 
 /** The widget types a live channel updates; every other type polls. */
-const LIVE_TYPES = new Set(['UPCOMING_DAYS', 'NOTIFICATIONS']);
+const LIVE_TYPES = new Set(['UPCOMING_DAYS', 'NEXT_MISSION', 'NOTIFICATIONS', 'HANGAR_READINESS']);
 
 /** The options a widget request carries, as the item's data attributes name them. */
 const OPTION_PARAMS = ['unit', 'days', 'rows', 'status'];
@@ -157,6 +157,35 @@ async function fillNotifications(content) {
     }
 }
 
+/** @type {KrtReceiver | null} the receiver of the member's own hangar room, once created */
+let hangarReceiver = null;
+
+/** The hangar room the receiver listens to now, so a reload does not subscribe again. */
+let hangarTopic = '';
+
+/**
+ * Listens to the member's own hangar room, whose name the hangar-readiness body carries, and
+ * reloads the hangar-readiness instances when a ship changes.
+ *
+ * @param {string} topic the room, or an empty string while the member is unknown
+ */
+function followHangarRoom(topic) {
+    if (!topic || topic === hangarTopic) return;
+    hangarTopic = topic;
+    if (hangarReceiver) {
+        hangarReceiver.retarget(topic);
+        return;
+    }
+    hangarReceiver = krtLiveSync.createReceiver({
+        topic,
+        sections: { ships: { container: '[data-widget-type="HANGAR_READINESS"]' } },
+        coalesceMs: 1500,
+        refresh() {
+            reloadType('HANGAR_READINESS');
+        },
+    });
+}
+
 /**
  * Loads one instance's body from its own endpoint; a failure shows that instance's error state and
  * leaves the others alone. An instance the active context does not offer loads nothing.
@@ -182,6 +211,9 @@ export async function loadWidget(item) {
         const content = body.querySelector('[data-widget-content]');
         if (item.dataset.widgetType === 'NOTIFICATIONS' && content instanceof HTMLElement) {
             await fillNotifications(content);
+        }
+        if (item.dataset.widgetType === 'HANGAR_READINESS' && content instanceof HTMLElement) {
+            followHangarRoom(content.dataset.liveSyncTopic ?? '');
         }
     } catch (_error) {
         showError(item, body);
@@ -244,17 +276,22 @@ export function loadAll() {
 }
 
 /**
- * Wires the live updates: the missions topic reloads the upcoming-days instances, a new
- * notification the notifications instances, and a tab that becomes visible again reloads every
+ * Wires the live updates: the missions topic reloads the upcoming-days and next-mission instances,
+ * a new notification the notifications instances, and a tab that becomes visible again reloads every
  * polled instance at once.
  */
 export function wireLiveUpdates() {
     krtLiveSync.createReceiver({
         topic: 'missions',
-        sections: { list: { container: '[data-widget-type="UPCOMING_DAYS"]' } },
+        sections: {
+            list: {
+                container: '[data-widget-type="UPCOMING_DAYS"], [data-widget-type="NEXT_MISSION"]',
+            },
+        },
         coalesceMs: 1500,
         refresh() {
             reloadType('UPCOMING_DAYS');
+            reloadType('NEXT_MISSION');
         },
     });
     document.addEventListener(NOTIFICATION_EVENT, () => {

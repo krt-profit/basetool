@@ -110,6 +110,17 @@
         border-top: var(--border-hairline);
     }
 
+    .dash-figure {
+        padding: var(--space-4) var(--space-4) 0;
+        font-size: var(--fs-h1);
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .dash-figure + .cell-sub {
+        padding: var(--space-1) var(--space-4) var(--space-4);
+    }
+
     .dash-info__editor {
         display: flex;
         flex-direction: column;

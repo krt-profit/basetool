@@ -214,7 +214,9 @@ class DashboardReaderTest {
             DashboardWidgetType.UPCOMING_DAYS,
             DashboardWidgetType.INFORMATION,
             DashboardWidgetType.FAVOURITES,
-            DashboardWidgetType.NOTIFICATIONS);
+            DashboardWidgetType.NOTIFICATIONS,
+            DashboardWidgetType.NEXT_MISSION,
+            DashboardWidgetType.HANGAR_READINESS);
     assertThat(read(GUEST, null, List.of()).catalogue())
         .doesNotContain(DashboardWidgetType.UPCOMING_DAYS)
         .contains(DashboardWidgetType.INFORMATION);

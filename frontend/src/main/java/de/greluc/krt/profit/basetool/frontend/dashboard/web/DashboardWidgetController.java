@@ -22,10 +22,13 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
@@ -40,6 +43,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -138,6 +143,42 @@ public class DashboardWidgetController {
   @GetMapping(value = "/favourites", headers = "X-Requested-With=XMLHttpRequest")
   public String favourites() {
     return WIDGETS + "favourites";
+  }
+
+  /**
+   * Renders the member's next mission as one row.
+   *
+   * @param model the Thymeleaf model
+   * @return the {@code nextMission} fragment
+   */
+  @NotNull
+  @GetMapping(value = "/next-mission", headers = "X-Requested-With=XMLHttpRequest")
+  public String nextMission(@NotNull Model model) {
+    model.addAttribute("nextMission", client.nextMission());
+    model.addAttribute(
+        "myOrgUnitIds", SectionFallback.load(log, "own-org-units", this::ownUnits, Set.of()));
+    return WIDGETS + "nextMission";
+  }
+
+  /**
+   * Renders how many of the member's ships are fitted, with the member's own hangar room for the
+   * live update.
+   *
+   * @param model the Thymeleaf model
+   * @param principal the signed-in member, whose id names the room
+   * @return the {@code hangarReadiness} fragment
+   */
+  @NotNull
+  @GetMapping(value = "/hangar-readiness", headers = "X-Requested-With=XMLHttpRequest")
+  public String hangarReadiness(
+      @NotNull Model model, @AuthenticationPrincipal @Nullable OidcUser principal) {
+    ShipReadinessDto readiness = client.hangarReadiness();
+    model.addAttribute("hangarTotal", readiness == null ? 0L : readiness.total());
+    model.addAttribute("hangarFitted", readiness == null ? 0L : readiness.fitted());
+    String id = CurrentUser.userIdText(principal);
+    model.addAttribute(
+        "hangarLiveSyncTopic", id == null ? null : LiveSyncTopicClass.HANGAR_OWN.topic(id));
+    return WIDGETS + "hangarReadiness";
   }
 
   @NotNull

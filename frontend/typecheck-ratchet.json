@@ -141,6 +141,7 @@
       "kernel/krt-palette.js",
       "kernel/krt-reorder.js",
       "kernel/krt-search.js",
+      "kernel/krt-shortcuts.js",
       "kernel/krt-searchable-select.js",
       "kernel/krt-tab-scroll-cue.js",
       "kernel/krt-table-sort.js",
@@ -148,8 +149,10 @@
       "kernel/nav-appearance.js",
       "kernel/nav-edit.js",
       "kernel/nav-favourites.js",
+      "kernel/nav-order.js",
       "kernel/nav-preferences.js",
       "kernel/nav-rail.js",
+      "kernel/nav-shortcuts.js",
       "kernel/nav-tabbar.js",
       "kernel/safe-url.js",
       "kernel/scu-decimal-input.js",
@@ -176,6 +179,7 @@
       "mission/missions.js"
     ],
     "notification": [
+      "notification/notification-bell-label.js",
       "notification/notification-rules.js",
       "notification/notifications-page.js",
       "notification/notifications.js"
