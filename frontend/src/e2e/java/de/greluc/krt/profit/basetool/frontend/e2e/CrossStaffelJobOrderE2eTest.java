@@ -75,7 +75,7 @@ class CrossStaffelJobOrderE2eTest {
           ADMIN_PASSWORD,
           seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
           IRIDIUM_ID,
-          false,
+          true,
           false);
       String staffelBId =
           seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E JobOrder B", "EJOB");
