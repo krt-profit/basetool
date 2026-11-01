@@ -31,7 +31,10 @@ public enum NavigationSection {
   FAVOURITES("favourites"),
 
   /** The hidden pages (REQ-UI-032). */
-  HIDDEN("hidden");
+  HIDDEN("hidden"),
+
+  /** The group and link order of both modes (REQ-UI-032). */
+  ORDER("order");
 
   private final String tag;
 }

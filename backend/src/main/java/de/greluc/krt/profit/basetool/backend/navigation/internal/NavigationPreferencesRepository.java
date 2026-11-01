@@ -113,6 +113,94 @@ public interface NavigationPreferencesRepository
       @Param("expectedHidden") long expectedHidden);
 
   /**
+   * Bumps the order version of a mode when it still equals the expected one, locking the root row
+   * until the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the navigation mode
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  default int bumpOrderVersionIfMatches(UUID userId, NavigationMode mode, long expected) {
+    return mode == NavigationMode.MEMBER
+        ? bumpMemberOrderVersionIfMatches(userId, expected)
+        : bumpAdminOrderVersionIfMatches(userId, expected);
+  }
+
+  /**
+   * Bumps the order version of a mode without a check, for a change the member did not echo a
+   * version for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param mode the navigation mode
+   */
+  default void bumpOrderVersion(UUID userId, NavigationMode mode) {
+    if (mode == NavigationMode.MEMBER) {
+      bumpMemberOrderVersion(userId);
+    } else {
+      bumpAdminOrderVersion(userId);
+    }
+  }
+
+  /**
+   * Bumps the member mode's order version when it still equals the expected one.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderMemberVersion = p.orderMemberVersion + 1"
+          + " WHERE p.userId = :userId AND p.orderMemberVersion = :expected")
+  int bumpMemberOrderVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the administration mode's order version when it still equals the expected one.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderAdminVersion = p.orderAdminVersion + 1"
+          + " WHERE p.userId = :userId AND p.orderAdminVersion = :expected")
+  int bumpAdminOrderVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the member mode's order version without a check.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderMemberVersion = p.orderMemberVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpMemberOrderVersion(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the administration mode's order version without a check.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.orderAdminVersion = p.orderAdminVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpAdminOrderVersion(@Param("userId") UUID userId);
+
+  /**
+   * Counts the members with a stored order in either mode.
+   *
+   * @return the number of members that moved a group or a link
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.orderRows) > 0")
+  long countWithOrder();
+
+  /**
    * Counts the members with at least one hidden page.
    *
    * @return the number of members that hid a page

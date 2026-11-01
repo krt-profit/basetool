@@ -34,6 +34,18 @@ public final class NavigationLimits {
   /** The format of an entry key: lower-case dot-separated segments, e.g. {@code missions.list}. */
   public static final String ENTRY_KEY_PATTERN = "^[a-z][a-z0-9]*(\\.[a-z0-9]+)*$";
 
+  /** The longest mode tag the order table stores. */
+  public static final int MAX_MODE_LENGTH = 8;
+
+  /** The format of a group, link or scope key of an order: dot- or hyphen-separated segments. */
+  public static final String ORDER_KEY_PATTERN = "^[a-z][a-z0-9]*([.-][a-z0-9]+)*$";
+
+  /** The most keys one order scope stores, the links of one group or the groups of one mode. */
+  public static final int MAX_ORDER_KEYS = 100;
+
+  /** The most scopes one mode's order stores, bounding what the caller can accumulate. */
+  public static final int MAX_ORDER_SCOPES = 32;
+
   /** The most keys one prune request names. */
   public static final int MAX_PRUNE_KEYS = 200;
 

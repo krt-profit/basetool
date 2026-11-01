@@ -26,6 +26,9 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param favourites the favourites section
  * @param hidden the hidden-pages section
+ * @param order the order section, one order and version per mode
  */
 public record NavigationPreferencesResponse(
-    @NotNull FavouritesResponse favourites, @NotNull HiddenResponse hidden) {}
+    @NotNull FavouritesResponse favourites,
+    @NotNull HiddenResponse hidden,
+    @NotNull OrderResponse order) {}

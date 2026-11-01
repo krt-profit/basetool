@@ -30,13 +30,18 @@ import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 
 /**
  * The root of one member's navigation preferences: one row per member, holding the version counter
@@ -63,6 +68,24 @@ public class NavigationPreferences {
   @Setter
   @Column(name = "hidden_version", nullable = false)
   private long hiddenVersion;
+
+  @Setter
+  @Column(name = "order_member_version", nullable = false)
+  private long orderMemberVersion;
+
+  @Setter
+  @Column(name = "order_admin_version", nullable = false)
+  private long orderAdminVersion;
+
+  /**
+   * The moved group and link keys of both modes, scope by scope; the list position is the stored
+   * order, and a scope's keys are contiguous per mode.
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @Fetch(FetchMode.SELECT)
+  @CollectionTable(name = "navigation_order", joinColumns = @JoinColumn(name = "preferences_id"))
+  @OrderColumn(name = "order_index")
+  private List<OrderRow> orderRows = new ArrayList<>();
 
   /** The hidden page keys; a page is never both hidden and a favourite. */
   @ElementCollection(fetch = FetchType.EAGER)
@@ -106,5 +129,66 @@ public class NavigationPreferences {
   public void replaceHidden(Collection<String> keys) {
     hidden.clear();
     hidden.addAll(keys);
+  }
+
+  /**
+   * The stored order of a mode.
+   *
+   * @param mode the navigation mode
+   * @return the keys by scope, scopes and keys in stored order
+   */
+  public Map<String, List<String>> orderOf(NavigationMode mode) {
+    Map<String, List<String>> scopes = new LinkedHashMap<>();
+    orderRows.stream()
+        .filter(row -> row.mode().equals(mode.getTag()))
+        .forEach(row -> scopes.computeIfAbsent(row.scope(), _ -> new ArrayList<>()).add(row.entryKey()));
+    return scopes;
+  }
+
+  /**
+   * The order version of a mode.
+   *
+   * @param mode the navigation mode
+   * @return the version the next write of that mode's order echoes
+   */
+  public long orderVersionOf(NavigationMode mode) {
+    return mode == NavigationMode.MEMBER ? orderMemberVersion : orderAdminVersion;
+  }
+
+  /**
+   * Replaces the stored order of one scope of a mode; no keys removes the scope.
+   *
+   * @param mode the navigation mode
+   * @param scope {@code groups} or a group key
+   * @param keys the scope's keys in their new order
+   */
+  public void replaceOrderScope(NavigationMode mode, String scope, List<String> keys) {
+    orderRows.removeIf(row -> row.mode().equals(mode.getTag()) && row.scope().equals(scope));
+    keys.forEach(key -> orderRows.add(new OrderRow(mode.getTag(), scope, key)));
+  }
+
+  /**
+   * Removes the whole stored order of a mode.
+   *
+   * @param mode the navigation mode
+   */
+  public void clearOrder(NavigationMode mode) {
+    orderRows.removeIf(row -> row.mode().equals(mode.getTag()));
+  }
+
+  /**
+   * Removes the given keys from every scope of every mode.
+   *
+   * @param keys the keys to remove
+   * @return the modes in which a stored key was removed
+   */
+  public Set<NavigationMode> removeFromOrder(Collection<String> keys) {
+    Set<NavigationMode> changed = EnumSet.noneOf(NavigationMode.class);
+    for (NavigationMode mode : NavigationMode.values()) {
+      if (orderRows.removeIf(row -> row.mode().equals(mode.getTag()) && keys.contains(row.entryKey()))) {
+        changed.add(mode);
+      }
+    }
+    return changed;
   }
 }

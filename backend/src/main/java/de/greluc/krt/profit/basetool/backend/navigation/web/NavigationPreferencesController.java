@@ -29,6 +29,9 @@ import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPrefe
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationPreferencesService;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationSection;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationWriteOutcome;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderModeResponse;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderResetRequest;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.PruneRequest;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
@@ -47,6 +50,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -147,6 +151,54 @@ public class NavigationPreferencesController {
   }
 
   /**
+   * Replaces the stored order of one scope of a mode.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param scope {@code groups} or the key of the group whose links are ordered
+   * @param request the scope's keys in their new order and the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the mode's order with the new version
+   */
+  @PutMapping("/order/{mode}/{scope}")
+  @Operation(summary = "Replace the stored order of one group list or link list of a mode.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Order stored."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation failed, a key repeats or the mode or scope is malformed."),
+    @ApiResponse(responseCode = "409", description = "The order version of the mode is stale.")
+  })
+  public OrderModeResponse replaceOrderScope(
+      @PathVariable String mode,
+      @PathVariable String scope,
+      @Valid @RequestBody OrderScopeUpdateRequest request,
+      @CurrentUserId UUID userId) {
+    return service.replaceOrderScope(userId, mode, scope, request);
+  }
+
+  /**
+   * Clears the stored order of a mode, back to the default order.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param request the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the empty order with the new version
+   */
+  @PostMapping("/order/{mode}/reset")
+  @Operation(summary = "Reset the order of a mode to the default order.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Order cleared."),
+    @ApiResponse(responseCode = "400", description = "Validation failed or the mode is unknown."),
+    @ApiResponse(responseCode = "409", description = "The order version of the mode is stale.")
+  })
+  public OrderModeResponse resetOrder(
+      @PathVariable String mode,
+      @Valid @RequestBody OrderResetRequest request,
+      @CurrentUserId UUID userId) {
+    return service.resetOrder(userId, mode, request);
+  }
+
+  /**
    * Counts a write that bean validation refused before the service saw it as a rejected write
    * (REQ-OBS-011), then answers it like every other validation failure.
    *
@@ -162,6 +214,8 @@ public class NavigationPreferencesController {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof HiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);
+    } else if (target instanceof OrderScopeUpdateRequest || target instanceof OrderResetRequest) {
+      metrics.recordWrite(NavigationSection.ORDER, NavigationWriteOutcome.REJECTED);
     } else if (target instanceof FavouritesAndHiddenUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
       metrics.recordWrite(NavigationSection.HIDDEN, NavigationWriteOutcome.REJECTED);

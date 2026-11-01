@@ -106,6 +106,46 @@ public class NavigationPreferencesService {
   }
 
   /**
+   * Replaces the stored order of one scope of one of the caller's modes.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param mode the mode tag, {@code member} or {@code admin}
+   * @param scope {@code groups} or the key of the group whose links are ordered
+   * @param request the scope's keys in their new order and the version the caller last saw
+   * @return the mode's order with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when the mode or scope is malformed or a key repeats
+   */
+  public @NotNull OrderModeResponse replaceOrderScope(
+      @NotNull UUID userId,
+      @NotNull String mode,
+      @NotNull String scope,
+      @NotNull OrderScopeUpdateRequest request) {
+    return counted(
+        Set.of(NavigationSection.ORDER),
+        () ->
+            writer.replaceOrderScope(
+                userId, NavigationMode.fromTag(mode), scope, request.keys(), request.version()));
+  }
+
+  /**
+   * Clears the stored order of one of the caller's modes, back to the default order.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param mode the mode tag, {@code member} or {@code admin}
+   * @param request the version the caller last saw
+   * @return the empty order with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when the mode is unknown
+   */
+  public @NotNull OrderModeResponse resetOrder(
+      @NotNull UUID userId, @NotNull String mode, @NotNull OrderResetRequest request) {
+    return counted(
+        Set.of(NavigationSection.ORDER),
+        () -> writer.resetOrder(userId, NavigationMode.fromTag(mode), request.version()));
+  }
+
+  /**
    * Deletes entry keys the caller may no longer see from every section.
    *
    * @param userId the caller's {@code app_user.id}
