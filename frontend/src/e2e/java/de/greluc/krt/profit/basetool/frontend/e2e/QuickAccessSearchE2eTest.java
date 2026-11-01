@@ -103,9 +103,18 @@ class QuickAccessSearchE2eTest {
     }
   }
 
-  /** Releases the browser and the Playwright driver process. */
+  /**
+   * Returns the administrator to the home Staffel alone, so later classes that create entities
+   * without naming an owning unit are not ambiguous, then releases the browser and the Playwright
+   * driver process.
+   */
   @AfterAll
   static void tearDown() {
+    if (STACK.managesStack() && adminUserId != null) {
+      new BackendSeeder()
+          .assignStaffelMembership(
+              USERNAME, PASSWORD, adminUserId, IRIDIUM_SQUADRON_ID, false, false);
+    }
     if (browser != null) {
       browser.close();
     }
