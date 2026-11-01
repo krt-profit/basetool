@@ -78,6 +78,7 @@ public class NavigationAppearanceWriter {
         appearances.findById(userId).orElseGet(() -> new NavigationAppearance(userId, mode));
     row.setDesktopMode(mode);
     appearances.saveAndFlush(row);
-    return new AppearanceResponse(mode, expectedVersion + 1);
+    return new AppearanceResponse(
+        mode, preferences.findById(userId).orElseThrow().getAppearanceVersion());
   }
 }

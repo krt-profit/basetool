@@ -100,7 +100,7 @@ public class DashboardWriter {
     }
     widgets.deleteAll(stored.values());
     widgets.saveAllAndFlush(kept);
-    return storedView(layout.getId(), mode, request.version() + 1, true);
+    return storedView(layout.getId(), mode, layout.getLayoutVersion(), true);
   }
 
   /**
@@ -153,7 +153,7 @@ public class DashboardWriter {
       @NotNull UUID userId, @NotNull DashboardMode mode, long expectedVersion) {
     NavigationDashboardLayout layout = lockLayout(userId, mode, expectedVersion, false);
     widgets.deleteAllOfLayout(layout.getId());
-    return defaults(mode, expectedVersion + 1);
+    return defaults(mode, layout.getLayoutVersion());
   }
 
   /**
