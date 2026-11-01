@@ -96,6 +96,7 @@ public class NavigationFavouritesReader {
     for (String key : stored.keys()) {
       Optional<NavigationEntry> entry = registry.starrable(key);
       if (entry.isEmpty()) {
+        gone.add(key);
         continue;
       }
       NavigationAvailability availability = registry.availability(entry.get(), access);

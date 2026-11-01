@@ -2382,10 +2382,10 @@ optimistic-lock version, so an edit in one never 409s another:
   are the privacy flows, not a preference view.
 - **Not audited:** personal UI preferences lie outside every audited area of REQ-AUDIT-001; the
   absence of audit events is deliberate.
-- **Deletion on next load:** an entry the user may no longer see user-wide is detected by the
-  frontend while it builds the navigation and deleted from every section through the backend,
-  which holds no key-to-permission knowledge. Unavailability in the active context deletes
-  nothing. Regaining a role restores nothing.
+- **Deletion on next load:** an entry the user may no longer see user-wide, and a stored key the
+  entry registry no longer knows, is detected by the frontend while it builds the navigation and
+  deleted from every section through the backend, which holds no key-to-permission knowledge.
+  Unavailability in the active context deletes nothing. Regaining a role restores nothing.
 
 **Browser-side state stays in the browser** (REQ-UI-017, ADR-0120): group collapse
 (`krt.sidebar.*`), the recent pages (`krt.recent`) and the „Häufig" ranking (REQ-UI-033).

@@ -123,15 +123,16 @@ class NavigationFavouritesReaderTest {
   }
 
   @Test
-  @DisplayName("a key the registry does not know is neither rendered nor deleted")
-  void ignoresAnUnknownKey() {
+  @DisplayName("a key the registry does not know is deleted and no longer counts")
+  void deletesAnUnknownKey() {
     when(client.preferences()).thenReturn(stored(1, "future.page", "missions.list"));
+    when(client.prune(List.of("future.page"))).thenReturn(stored(2, "missions.list"));
 
     NavigationFavourites favourites = reader.read(MEMBER);
 
+    verify(client).prune(List.of("future.page"));
     assertThat(keys(favourites.member())).containsExactly("missions.list");
-    assertThat(favourites.keys()).containsExactly("future.page", "missions.list");
-    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+    assertThat(favourites.keys()).containsExactly("missions.list");
   }
 
   @Test
