@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionScope;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.Collection;
@@ -59,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class MissionAccessPolicy {
+public class MissionAccessPolicy implements MissionVisibility {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "missionAccessPolicy";
@@ -116,6 +117,7 @@ public class MissionAccessPolicy {
    * @param mission the loaded mission
    * @return {@code true} iff the caller may read the mission and every ancestor
    */
+  @Override
   public boolean canSeeMission(@NotNull Mission mission) {
     return canSeeMissionChain(mission);
   }

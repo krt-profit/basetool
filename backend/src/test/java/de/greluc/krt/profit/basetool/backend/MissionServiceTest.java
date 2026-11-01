@@ -465,6 +465,23 @@ class MissionServiceTest {
   }
 
   @Test
+  void createMission_internalWithoutOwningOrgUnit_isRejectedAndNotPersisted() {
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        () ->
+            missionService.createMission(
+                new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
+                    "Intern", null, null, "PLANNED", null, null, null, true, null, null, null, null,
+                    null)));
+    verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  @Test
   void createMission_fallsBackToCurrentSquadronScopeWhenNoOwnerResolved() {
     Squadron scopeSquadron = new Squadron();
     scopeSquadron.setId(UUID.randomUUID());

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeReposito
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -326,6 +327,7 @@ public class MissionService implements MissionCommands {
    * @return the persisted mission entity
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when {@code operationId}
    *     does not resolve
+   * @throws BadRequestException when the mission is internal but resolves to no owning org unit
    */
   @Transactional
   public Mission createMission(CreateMissionRequest request) {
@@ -343,6 +345,7 @@ public class MissionService implements MissionCommands {
     } else {
       ownerScopeService.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
     }
+    requireOwningOrgUnitForInternal(mission.getIsInternal(), mission.getOwningOrgUnit());
 
     Mission saved = missionRepository.save(mission);
     auditRecorder.record(
@@ -527,6 +530,8 @@ public class MissionService implements MissionCommands {
    *
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
    *     {@code expectedFlagsVersion} is stale
+   * @throws BadRequestException when {@code isInternal} is {@code true} and the mission has no
+   *     owning org unit
    */
   @Transactional
   public Mission updateFlagsSection(
@@ -534,6 +539,7 @@ public class MissionService implements MissionCommands {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.FLAGS, expectedFlagsVersion, missionId);
+    requireOwningOrgUnitForInternal(isInternal, mission.getOwningOrgUnit());
     mission.setIsInternal(isInternal);
     Mission saved = missionRepository.save(mission);
     auditRecorder.record(
@@ -616,6 +622,7 @@ public class MissionService implements MissionCommands {
     applyCreatePayload(subMission, request);
     subMission.setParent(parent);
     subMission.setOwningOrgUnit(parent.getOwningOrgUnit());
+    requireOwningOrgUnitForInternal(subMission.getIsInternal(), subMission.getOwningOrgUnit());
 
     validateMissionTimes(subMission);
     Mission saved = missionRepository.save(subMission);
@@ -837,6 +844,7 @@ public class MissionService implements MissionCommands {
    *     expectedOwningOrgUnitVersion} is stale.
    * @throws org.springframework.security.access.AccessDeniedException when the caller may not
    *     assign to the requested target.
+   * @throws BadRequestException when the mission is internal and the target is {@code null}.
    */
   @Transactional
   public Mission updateOwningOrgUnit(
@@ -853,6 +861,7 @@ public class MissionService implements MissionCommands {
 
     OrgUnit previous = mission.getOwningOrgUnit();
     OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
+    requireOwningOrgUnitForInternal(mission.getIsInternal(), target);
     mission.setOwningOrgUnit(target);
     Mission saved = missionRepository.save(mission);
     auditRecorder.record(
@@ -863,6 +872,21 @@ public class MissionService implements MissionCommands {
         AuditDetails.of("fromOrgUnit", formatOrgUnitRef(previous))
             .with("toOrgUnit", formatOrgUnitRef(target)));
     return saved;
+  }
+
+  /**
+   * Rejects an internal mission that has no owning org unit: internal visibility is defined by the
+   * owning unit, so an ownerless mission can only be public (REQ-MISSION-008).
+   *
+   * @param isInternal the internal flag the mission would carry
+   * @param owningOrgUnit the owning org unit the mission would carry, or {@code null}
+   * @throws BadRequestException when {@code isInternal} is {@code true} and no unit is given
+   */
+  private static void requireOwningOrgUnitForInternal(
+      @Nullable Boolean isInternal, @Nullable OrgUnit owningOrgUnit) {
+    if (Boolean.TRUE.equals(isInternal) && owningOrgUnit == null) {
+      throw new BadRequestException("A mission without an owning org unit cannot be internal");
+    }
   }
 
   /**

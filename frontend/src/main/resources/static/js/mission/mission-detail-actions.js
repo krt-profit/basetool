@@ -282,6 +282,12 @@ async function changeMissionOwningOrgUnit() {
                 }
                 if (dto) {
                     updateMissionHeadOrgBadge(dto.owningSquadron);
+                    const internalToggle = /** @type {HTMLInputElement | null} */ (
+                        document.getElementById('isInternal')
+                    );
+                    if (internalToggle) {
+                        internalToggle.disabled = !dto.owningSquadron;
+                    }
                 }
                 missionHooks.refresh('mgmt');
                 if (missionHooks.notify) {

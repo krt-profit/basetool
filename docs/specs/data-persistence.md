@@ -804,6 +804,8 @@ materialize an operation's whole finance / refinery ledger under a held Hikari c
 - **Per-mission entry detail loads lazily.** Each finance-tab `<details>` fetches its own mission's
   entry / refinery breakdown on first expand via `GET /api/v1/operations/{id}/finances/{missionId}`
   (operation-scoped `canSeeOperation` authz), so the initial render never materializes every entry.
+  A child mission the caller may not see (REQ-MISSION-008) is returned anonymised: amount kept, no
+  name, entries or orders.
 - **Parallel + fragment-gated operation reads.** The four independent operation-detail reads
   (operation, missions page, finance-summary, payouts) run concurrently via `ParallelPageLoader`; the
   `fragment=missions` pager swap fetches neither finance-summary nor payouts (the regression fence is a

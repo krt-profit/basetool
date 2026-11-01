@@ -94,12 +94,12 @@
                     </div>
                     <th:block th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
                         <a th:each="msnFin : ${operationFinance.missions}" class="op-result-row" data-testid="op-result-row"
-                           th:href="@{/missions/{id}(id=${msnFin.missionId})}">
-                            <span class="op-result-name" th:text="${msnFin.missionName}" th:title="${msnFin.missionName}">Einsatz</span>
+                           th:href="${msnFin.anonymised} ? null : @{/missions/{id}(id=${msnFin.missionId})}">
+                            <span class="op-result-name" th:text="${msnFin.anonymised} ? #{operation.mission.anonymised} : ${msnFin.missionName}" th:title="${msnFin.anonymised} ? #{operation.mission.anonymised} : ${msnFin.missionName}">Einsatz</span>
                             <span class="meter op-result-meter" aria-hidden="true"><i th:attr="data-krtm-width=${(msnFin.totalSum != null and msnFin.totalSum.signum() > 0 and operationMaxMissionResult != null and operationMaxMissionResult.signum() > 0) ? (msnFin.totalSum.doubleValue() * 100 / operationMaxMissionResult.doubleValue()) : 0}"></i></span>
                             <span class="op-result-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'is-neg'"
                                   th:text="${msnFin.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'DEFAULT') : '0'}">0</span>
-                            <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                            <svg th:unless="${msnFin.anonymised}" class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                         </a>
                     </th:block>
                     <th:block th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}">
@@ -274,14 +274,14 @@
             <th:block th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
                 <div class="card card--flush op-fin-list">
                     <details class="op-fin-item" th:each="msnFin : ${operationFinance.missions}"
-                             th:attr="data-op-finance-mission=${msnFin.missionId}">
+                             th:attr="data-op-finance-mission=${msnFin.anonymised ? null : msnFin.missionId}">
                         <summary>
-                            <span class="op-fin-name" th:text="${msnFin.missionName}">Einsatz</span>
+                            <span class="op-fin-name" th:text="${msnFin.anonymised} ? #{operation.mission.anonymised} : ${msnFin.missionName}">Einsatz</span>
                             <span class="op-fin-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'is-neg'"
                                   th:text="${msnFin.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'DEFAULT') : '0'} + ' aUEC'">0 aUEC</span>
                         </summary>
                         <div class="op-finance-detail-body" data-loaded="false">
-                            <p class="op-fin-note" th:text="#{operation.finance.detail.loading}">Details werden geladen&hellip;</p>
+                            <p class="op-fin-note" th:text="${msnFin.anonymised} ? #{operation.mission.anonymised} : #{operation.finance.detail.loading}">Details werden geladen&hellip;</p>
                         </div>
                     </details>
                 </div>
@@ -295,7 +295,9 @@
             <th:block th:fragment="financeDetail">
                 <p th:if="${financeDetailError != null}" class="op-fin-note op-fin-error"
                    th:text="#{operation.finance.detail.error}">Details konnten nicht geladen werden.</p>
-                <th:block th:if="${financeDetailError == null and financeDetail != null}">
+                <p th:if="${financeDetailError == null and financeDetail != null and financeDetail.anonymised}" class="op-fin-note"
+                   th:text="#{operation.mission.anonymised}">Interne Mission einer anderen Einheit</p>
+                <th:block th:if="${financeDetailError == null and financeDetail != null and !financeDetail.anonymised}">
                     <div class="table-responsive">
                         <table class="data-table data-table--compact data-table--stack op-fin-table">
                             <thead>

@@ -86,7 +86,20 @@ the viewer has any:
   does **not** apply to the banner, because the banner answers "what is _my_ unit heading towards".
 - **Internal missions are visible only to the members of the mission's unit**, to the leadership
   cascade above (REQ-ORG-015), to the Mission Manager cascade and to admins. No other viewer sees a
-  foreign internal mission through this lookup or any fallback of it.
+  foreign internal mission through this lookup, any fallback of it, the lists, the search, the
+  calendar, the dashboard widgets or the operation finance views.
+- **A mission without an owning org unit cannot be internal.** Create, the flags patch and the
+  owning-unit reassignment answer `400 Bad Request` when the result would be an internal mission
+  without a unit, and the check constraint `ck_mission_internal_has_owning_org_unit` enforces it in
+  the database. An ownerless mission is therefore always public (REQ-ORG-009). The mission form
+  disables the „Intern" switch while no owning unit is selectable.
+- **The operation finance views anonymise a child mission the viewer may not see** (the visibility
+  rule of the mission detail page, `MissionAccessPolicy#canSeeMission`): `GET
+  /api/v1/operations/{id}/finances`, `/finance-summary` and `/finances/{missionId}` keep the row and
+  its amount, so the operation total stays traceable, and return `anonymised = true` with no name,
+  no entries and no refinery orders. The frontend shows „Interne Mission einer anderen Einheit" (EN
+  „Internal mission of another unit") without link or detail. In the summary the anonymised rows
+  sort behind the named ones.
 - A viewer with **no** effective org-unit scope sees only **public** missions: a member who belongs
   to no org unit gets the soonest eligible public mission across the organisation, never an internal
   one. An admin in "all squadrons" mode (no active pin) keeps the organisation-wide lookup over
@@ -101,6 +114,8 @@ the viewer has any:
 - [ ] A member sees their own org unit's **internal** next mission (it is not hidden by the public-escape removal).
 - [ ] A member with no org-unit membership sees the soonest public mission and never a foreign internal one, even when that one starts earlier.
 - [ ] An admin in "all squadrons" mode still sees the soonest mission across the organisation, internal ones included.
+- [ ] Creating an internal mission that resolves to no owning unit, flagging an ownerless mission internal, or reassigning an internal mission to no unit answers 400; the database refuses such a row.
+- [ ] A viewer who may not see an operation's child mission gets its line anonymised (no name, entries or orders, amount kept) in the full, summary and per-mission finance reads.
 - [ ] A scoped viewer with no upcoming own-unit mission gets `204`, even if other units have upcoming missions.
 
 **Enforced by:** `MissionServiceTest`
@@ -112,8 +127,17 @@ the viewer has any:
 `MissionRepositoryLookupOrderingTest`
 (`findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal`,
 `findNextScopedMission_includesOwnInternalMission`,
-`findNextPublicMission_skipsInternalAndTerminalMissions`).
-**Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead`,
+`findNextPublicMission_skipsInternalAndTerminalMissions`),
+`MissionServiceSectionPatchTest` (`updateFlagsSection_shouldRejectInternal_whenMissionHasNoOwningOrgUnit`,
+`updateOwningOrgUnit_shouldRejectOwnerlessTarget_whenMissionIsInternal`), `MissionServiceTest`
+(`createMission_internalWithoutOwningOrgUnit_isRejectedAndNotPersisted`),
+`MissionInternalConstraintDataTest` (PostgreSQL), `OperationFinanceServiceTest`
+(`*_anonymises*`, `getMissionFinanceDetail_hiddenMission_returnsTheAnonymisedSummary`),
+`OperationPageControllerMvcTest` (anonymised label), `MissionCreatePageTest`
+(`testCreateMissionPage_WithoutPickableUnit_DisablesTheInternalSwitch`).
+**Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead` +
+`#requireOwningOrgUnitForInternal`, `OperationFinanceService`, `MissionVisibility`,
+migration `V329__constrain_internal_mission_to_owning_org_unit.sql`,
 `MissionRepository#findNextScopedMission` + `#findNextPublicMission`,
 `OwnerScopeService#currentScopePredicate` (scope vector + leadership cascade).
 
