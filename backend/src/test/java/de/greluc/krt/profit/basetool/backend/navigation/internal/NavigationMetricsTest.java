@@ -75,7 +75,8 @@ class NavigationMetricsTest {
     when(appearances.countPersonalised()).thenReturn(4L);
     DashboardLayoutRepository layouts = mock(DashboardLayoutRepository.class);
     when(layouts.countCustomised()).thenReturn(3L);
-    NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository, appearances, layouts);
+    NavigationBusinessGauges gauges =
+        new NavigationBusinessGauges(repository, appearances, layouts);
 
     gauges.register(registry);
     assertThat(gauge(NavigationSection.FAVOURITES)).isZero();

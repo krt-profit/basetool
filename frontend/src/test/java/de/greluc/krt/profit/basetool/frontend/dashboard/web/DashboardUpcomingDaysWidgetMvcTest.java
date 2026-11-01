@@ -22,8 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -156,15 +160,16 @@ class DashboardUpcomingDaysWidgetMvcTest {
         .containsPattern("data-testid=\"home-upcoming-count\"[^>]*>7<");
   }
 
-  /** A pinned unit keeps only the missions that unit owns. */
+  /**
+   * A pinned unit is asked of the backend, which owns the filter and the visibility; the widget
+   * shows what comes back instead of cutting a page of unfiltered missions.
+   */
   @Test
-  void widget_ShouldKeepOnlyTheMissionsOfThePinnedUnit() throws Exception {
+  void widget_ShouldAskTheBackendForTheMissionsOfThePinnedUnit() throws Exception {
     UUID unit = UUID.randomUUID();
     MissionListDto mine = owned("Eigener Lauf", new SquadronReferenceDto(unit, "Alpha", "ALF"));
-    MissionListDto foreign =
-        owned("Fremder Lauf", new SquadronReferenceDto(UUID.randomUUID(), "Beta", "BET"));
-    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(mine, foreign), 0, 50, 2, 1, List.of()));
+    when(backendApiClient.get(contains("orgUnitId=" + unit), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(mine), 0, 50, 1, 1, List.of()));
 
     mockMvc
         .perform(
@@ -173,8 +178,18 @@ class DashboardUpcomingDaysWidgetMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .with(oidcLogin()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("Eigener Lauf")))
-        .andExpect(content().string(not(containsString("Fremder Lauf"))));
+        .andExpect(content().string(containsString("Eigener Lauf")));
+  }
+
+  /** Without a pin the request carries no unit filter. */
+  @Test
+  void widget_ShouldNotFilterByUnitWithoutAPin() throws Exception {
+    mockMvc
+        .perform(get(WIDGET).header("X-Requested-With", "XMLHttpRequest").with(oidcLogin()))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient, atLeastOnce()).get(startsWith("/api/v1/missions"), anyTypeRef());
+    verify(backendApiClient, never()).get(contains("orgUnitId="), anyTypeRef());
   }
 
   /** An option outside the offered set falls back to the default instead of breaking the widget. */

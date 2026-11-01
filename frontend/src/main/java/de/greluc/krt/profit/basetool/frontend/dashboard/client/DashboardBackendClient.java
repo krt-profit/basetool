@@ -67,27 +67,29 @@ public class DashboardBackendClient {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Reads the first 50 planned or active missions starting in a period, soonest first.
+   * Reads the first 50 planned or active missions starting in a period, soonest first, optionally
+   * only those of one owning org unit.
    *
    * @param start the period start
    * @param end the period end
+   * @param orgUnitId the owning org unit, or {@code null} for every unit the caller may see
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
   public PageResponse<MissionListDto> upcomingMissions(
-      @NotNull Instant start, @NotNull Instant end) {
-    String uri =
+      @NotNull Instant start, @NotNull Instant end, @Nullable UUID orgUnitId) {
+    UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/missions")
             .queryParam("start", start)
             .queryParam("end", end)
             .queryParam("sort", "plannedStartTime,asc")
             .queryParam("status", "PLANNED")
             .queryParam("status", "ACTIVE")
-            .queryParam("size", 50)
-            .encode()
-            .build()
-            .toUriString();
-    return backendApiClient.get(uri, MISSION_PAGE);
+            .queryParam("size", 50);
+    if (orgUnitId != null) {
+      uri.queryParam("orgUnitId", orgUnitId);
+    }
+    return backendApiClient.get(uri.encode().build().toUriString(), MISSION_PAGE);
   }
 
   /**

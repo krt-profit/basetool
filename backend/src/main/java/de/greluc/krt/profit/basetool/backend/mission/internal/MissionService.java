@@ -178,7 +178,8 @@ public class MissionService implements MissionCommands {
 
   /**
    * Free-text search over mission name, description, location and operation name. Optional filters
-   * narrow by status, time window and operation. Used by the mission list page.
+   * narrow by status, time window, operation and owning org unit; the caller's visibility scope
+   * applies on top. Used by the mission list page.
    *
    * @return paged matching missions
    */
@@ -189,6 +190,7 @@ public class MissionService implements MissionCommands {
       @Nullable List<String> status,
       @Nullable Boolean isInternal,
       @Nullable UUID operationId,
+      @Nullable UUID orgUnitId,
       @NotNull Pageable pageable) {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
@@ -202,6 +204,7 @@ public class MissionService implements MissionCommands {
         status,
         effectiveIsInternal,
         operationId,
+        orgUnitId,
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds(),

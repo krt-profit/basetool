@@ -144,17 +144,8 @@ public class DashboardWidgetController {
   private List<MissionListDto> loadUpcoming(int days, @Nullable UUID unit) {
     Instant now = Instant.now();
     PageResponse<MissionListDto> page =
-        client.upcomingMissions(now, now.plus(days, ChronoUnit.DAYS));
-    if (page == null || page.content() == null) {
-      return List.of();
-    }
-    return page.content().stream()
-        .filter(mission -> unit == null || ownedBy(mission, unit))
-        .toList();
-  }
-
-  private static boolean ownedBy(@NotNull MissionListDto mission, @NotNull UUID unit) {
-    return mission.owningSquadron() != null && unit.equals(mission.owningSquadron().id());
+        client.upcomingMissions(now, now.plus(days, ChronoUnit.DAYS), unit);
+    return page == null || page.content() == null ? List.of() : page.content();
   }
 
   private boolean isUnread(@Nullable AnnouncementDto announcement) {

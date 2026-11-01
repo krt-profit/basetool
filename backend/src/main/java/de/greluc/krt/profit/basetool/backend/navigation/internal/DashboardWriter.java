@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -120,14 +121,11 @@ public class DashboardWriter {
       @NotNull DashboardMode mode,
       @NotNull UUID widgetId,
       @NotNull DashboardOptionsRequest request) {
+    String missing = "No dashboard widget " + widgetId;
     NavigationDashboardLayout layout =
-        layouts
-            .findByPreferencesIdAndMode(userId, mode)
-            .orElseThrow(() -> new NotFoundException("No dashboard widget " + widgetId));
+        Entities.require(layouts.findByPreferencesIdAndMode(userId, mode), missing);
     NavigationDashboardWidget widget =
-        widgets
-            .findByIdAndLayoutId(widgetId, layout.getId())
-            .orElseThrow(() -> new NotFoundException("No dashboard widget " + widgetId));
+        Entities.require(widgets.findByIdAndLayoutId(widgetId, layout.getId()), missing);
     DashboardOptions options = withDefaults(widget.getType(), request);
     String violation = widget.getType().violation(options);
     if (violation != null) {

@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * The navigation module's part of the person search: it holds no free text, only entry keys of
- * pages, so it searches no column (REQ-SEC-060).
+ * pages and the enumerated choices of the dashboard, so it searches no column (REQ-SEC-060).
  */
 @Component
 public class NavigationMentionSource implements PersonMentionSource {
@@ -41,6 +41,10 @@ public class NavigationMentionSource implements PersonMentionSource {
   public @NotNull Set<String> exemptColumns() {
     return Set.of(
         "navigation_appearance.desktop_mode",
+        "navigation_dashboard_layout.mode",
+        "navigation_dashboard_widget.column_side",
+        "navigation_dashboard_widget.status_filter",
+        "navigation_dashboard_widget.widget_type",
         "navigation_favourite.entry_key",
         "navigation_hidden.entry_key");
   }
