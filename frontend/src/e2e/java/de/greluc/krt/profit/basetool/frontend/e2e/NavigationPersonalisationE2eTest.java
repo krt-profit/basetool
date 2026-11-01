@@ -21,13 +21,16 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.BoundingBox;
 import java.nio.file.Path;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,8 +39,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Drives the favourites of REQ-UI-032 in a browser: the header star, the Favoriten group that
- * follows it in place, the cap of twelve and the version conflict of a second window.
+ * Drives the favourites, the hidden pages and „Anpassen“ of REQ-UI-032 in a browser: the header
+ * star, the Favoriten group and „Mehr“ that follow in place, the cap of twelve, the resets, the
+ * touch floor of the edit controls and the version conflict of a second window.
  */
 @Tag("e2e")
 class NavigationPersonalisationE2eTest {
@@ -58,6 +62,12 @@ class NavigationPersonalisationE2eTest {
           payload: { keys: [], version: Number(state.dataset.version) },
           toast: false,
         });
+        await window.krtFetch.write({
+          method: 'PUT',
+          url: '/navigation/hidden',
+          payload: { keys: [], version: Number(state.dataset.hiddenVersion) },
+          toast: false,
+        });
       }
       """;
 
@@ -65,7 +75,11 @@ class NavigationPersonalisationE2eTest {
       """
       async () => {
         const state = document.querySelector('[data-favourites-state]');
-        const keys = Array.from({ length: 12 }, (_, i) => 'filler.page' + i);
+        const keys = [
+          'hangar.overview', 'storage.overview', 'refinery.orders', 'operations.list',
+          'hangar.catalog', 'hangar.unit', 'storage.levels', 'storage.my', 'storage.all',
+          'personal.inventory', 'personal.blueprints', 'personal.profile',
+        ];
         await window.krtFetch.write({
           method: 'PUT',
           url: '/navigation/favourites',
@@ -99,7 +113,7 @@ class NavigationPersonalisationE2eTest {
     }
   }
 
-  /** Leaves the member without favourites, whatever the previous scenario did. */
+  /** Leaves the member without favourites and hidden pages, whatever the previous scenario did. */
   @BeforeEach
   void clearFavourites() {
     run(
@@ -185,16 +199,220 @@ class NavigationPersonalisationE2eTest {
     }
   }
 
+  private static final String HIDE_MISSIONS =
+      "#sidebar [data-trigger='nav-hide'][data-entry-key='missions.list']";
+
+  private static final String UNHIDE_MISSIONS =
+      "#sidebar [data-nav-action='unhide'][data-entry-key='missions.list']";
+
+  /** Opens the drawer and turns on „Anpassen“. */
+  private static void startEditing(Page page) {
+    page.locator("#hamburger").click();
+    page.getByTestId("nav-edit-toggle").click();
+    assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\\bis-editing\\b"));
+  }
+
+  /** Types a page name into the quick access and checks whether a row opens the path. */
+  private static void assertQuickAccessOffers(
+      Page page, String term, String href, boolean offered) {
+    page.keyboard().press("Control+k");
+    page.getByTestId("palette-input").fill(term);
+    assertThat(page.locator("#nav-palette .palette-row[data-href='" + href + "']"))
+        .hasCount(offered ? 1 : 0);
+    page.keyboard().press("Escape");
+    assertThat(page.locator("#nav-palette")).isHidden();
+  }
+
+  /**
+   * Hiding in „Anpassen“ moves the page into „Mehr“ in place with the focus on its show control,
+   * takes the page and its tabs out of the quick access, survives a reload and is undone from
+   * „Mehr“.
+   */
+  @Test
+  void hidingMovesAPageIntoMoreAndOutOfTheQuickAccess() {
+    run(
+        "nav-hide",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          page.evaluate("() => { window.__hideMarker = 'still-here'; }");
+          String operations =
+              page.locator(".palette-source-pages a[href='/operations']").textContent().trim();
+          assertQuickAccessOffers(page, operations, "/operations", true);
+          assertThat(page.getByTestId("nav-more")).hasCount(0);
+          startEditing(page);
+
+          page.locator(HIDE_MISSIONS).click();
+
+          assertThat(page.getByTestId("nav-missions")).hasCount(0);
+          assertThat(page.getByTestId("nav-more")).hasCount(1);
+          assertThat(page.getByTestId("nav-more-missions.list")).hasCount(1);
+          assertThat(page.locator(UNHIDE_MISSIONS)).isFocused();
+          assertThat(page.getByTestId("nav-live")).containsText("Mehr");
+          assertEquals("still-here", page.evaluate("() => window.__hideMarker"));
+          assertQuickAccessOffers(page, operations, "/operations", false);
+
+          page.reload();
+          assertThat(page.getByTestId("nav-more-missions.list")).hasCount(1);
+          assertThat(page.getByTestId("nav-missions")).hasCount(0);
+
+          page.locator("#hamburger").click();
+          assertThat(page.locator(UNHIDE_MISSIONS)).isVisible();
+          page.locator(UNHIDE_MISSIONS).click();
+
+          assertThat(page.getByTestId("nav-missions")).hasCount(1);
+          assertThat(page.getByTestId("nav-more")).hasCount(0);
+          assertQuickAccessOffers(page, operations, "/operations", true);
+        });
+  }
+
+  /**
+   * Starring a hidden page shows it again and hiding a favourite unstars it, each in one write that
+   * checks both versions.
+   */
+  @Test
+  void favouriteAndHiddenExcludeEachOtherInOneWrite() {
+    run(
+        "nav-hide-favourite",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          page.getByTestId("nav-star").click();
+          assertThat(page.getByTestId("nav-favourite-missions.list")).hasCount(1);
+          int favouritesVersion =
+              Integer.parseInt(
+                  page.locator("[data-favourites-state]").getAttribute("data-version"));
+          int hiddenVersion =
+              Integer.parseInt(
+                  page.locator("[data-favourites-state]").getAttribute("data-hidden-version"));
+          startEditing(page);
+
+          page.locator(HIDE_MISSIONS).click();
+
+          assertThat(page.getByTestId("nav-favourites")).hasCount(0);
+          assertThat(page.getByTestId("nav-more-missions.list")).hasCount(1);
+          assertThat(page.locator("[data-favourites-state]"))
+              .hasAttribute("data-version", String.valueOf(favouritesVersion + 1));
+          assertThat(page.locator("[data-favourites-state]"))
+              .hasAttribute("data-hidden-version", String.valueOf(hiddenVersion + 1));
+
+          page.keyboard().press("Escape");
+          page.getByTestId("nav-star").click();
+
+          assertThat(page.getByTestId("nav-star")).hasAttribute("aria-pressed", "true");
+          assertThat(page.getByTestId("nav-favourite-missions.list")).hasCount(1);
+          assertThat(page.getByTestId("nav-more")).hasCount(0);
+          assertThat(page.getByTestId("nav-missions")).hasCount(1);
+        });
+  }
+
+  /** The two resets empty their section in place and leave the other one alone. */
+  @Test
+  void theResetsClearHiddenPagesAndFavourites() {
+    run(
+        "nav-resets",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/hangar");
+          page.getByTestId("nav-star").click();
+          assertThat(page.getByTestId("nav-favourite-hangar.overview")).hasCount(1);
+          startEditing(page);
+          page.locator(HIDE_MISSIONS).click();
+          assertThat(page.getByTestId("nav-more-missions.list")).hasCount(1);
+
+          page.getByTestId("nav-unhide-all").click();
+
+          assertThat(page.getByTestId("nav-more")).hasCount(0);
+          assertThat(page.getByTestId("nav-missions")).hasCount(1);
+          assertThat(page.getByTestId("nav-favourite-hangar.overview")).hasCount(1);
+
+          page.getByTestId("nav-clear-favourites").click();
+
+          assertThat(page.getByTestId("nav-favourites")).hasCount(0);
+          assertThat(page.getByTestId("nav-star")).hasAttribute("aria-pressed", "false");
+        });
+  }
+
+  /** Personal pages can be starred in „Anpassen“ but never hidden. */
+  @Test
+  void personalPagesHaveNoHideControl() {
+    run(
+        "nav-hide-personal",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          startEditing(page);
+          page.locator("#nav-personal").evaluate("el => { el.hidden = false; }");
+
+          assertThat(page.locator("#nav-personal [data-trigger='nav-hide']")).hasCount(0);
+          assertThat(page.locator("#nav-personal [data-favourite-toggle]")).not().hasCount(0);
+        });
+  }
+
+  /** The edit controls are 44 px up to 1024 px and 32 px above. */
+  @Test
+  void theEditControlsFollowTheTouchFloor() {
+    for (int width : new int[] {1024, 1280}) {
+      int floor = width <= 1024 ? 44 : 32;
+      run(
+          width,
+          900,
+          "nav-edit-size-" + width,
+          page -> {
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            startEditing(page);
+
+            for (String selector :
+                new String[] {HIDE_MISSIONS, "#sidebar [data-testid='nav-edit-star']"}) {
+              BoundingBox box = page.locator(selector).first().boundingBox();
+              assertTrue(box.width >= floor && box.height >= floor, selector + " at " + width);
+              assertTrue(box.width < 44 || width <= 1024, selector + " stays dense at " + width);
+            }
+          });
+    }
+  }
+
+  /**
+   * A second window with a stale hidden version has its change dropped: the lists reload with the
+   * other window's page under „Mehr“ and the hint says so.
+   */
+  @Test
+  void aStaleWindowDropsItsHideAndSaysSo() {
+    try (BrowserContext context = newContext()) {
+      Page first = context.newPage();
+      Page second = context.newPage();
+      E2eSupport.navigate(first, STACK.baseUrl() + "/missions");
+      E2eSupport.navigate(second, STACK.baseUrl() + "/hangar");
+      startEditing(first);
+      startEditing(second);
+
+      first.locator(HIDE_MISSIONS).click();
+      assertThat(first.getByTestId("nav-more-missions.list")).hasCount(1);
+
+      second
+          .locator("#sidebar [data-trigger='nav-hide'][data-entry-key='hangar.overview']")
+          .click();
+
+      assertThat(second.getByText("In einem anderen Fenster")).isVisible();
+      assertThat(second.getByTestId("nav-more-missions.list")).hasCount(1);
+      assertThat(second.getByTestId("nav-more-hangar.overview")).hasCount(0);
+    }
+  }
+
   private static BrowserContext newContext() {
+    return newContext(1440, 900);
+  }
+
+  private static BrowserContext newContext(int width, int height) {
     return browser.newContext(
         new Browser.NewContextOptions()
             .setIgnoreHTTPSErrors(true)
             .setStorageStatePath(storageState)
-            .setViewportSize(1440, 900));
+            .setViewportSize(width, height));
   }
 
   private static void run(String label, Consumer<Page> scenario) {
-    try (BrowserContext context = newContext()) {
+    run(1440, 900, label, scenario);
+  }
+
+  private static void run(int width, int height, String label, Consumer<Page> scenario) {
+    try (BrowserContext context = newContext(width, height)) {
       Page page = context.newPage();
       try {
         scenario.accept(page);

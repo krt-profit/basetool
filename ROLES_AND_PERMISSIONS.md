@@ -1305,7 +1305,8 @@ admin reset, and the preferences are not audited. They are part of the data expo
 export for somebody who cannot sign in included (REQ-SEC-058) — and of the admin account merge,
 where the surviving account's choices win (REQ-SEC-046).
 
-The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`
-and `POST /api/v1/navigation/preferences/prune` need only a signed-in user; the owner is always the
-token's subject, no endpoint takes a member id, and a favourite is a key of a page the user already
+The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
+`PUT .../hidden`, `PUT .../favourites-and-hidden` and `POST /api/v1/navigation/preferences/prune`
+need only a signed-in user; the owner is always the
+token's subject, no endpoint takes a member id, and a favourite or hidden page is a key of a page the user already
 sees — the entry's own gate stays authoritative.

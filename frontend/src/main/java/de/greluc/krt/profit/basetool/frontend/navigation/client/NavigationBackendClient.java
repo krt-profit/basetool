@@ -20,8 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.navigation.client;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.PruneRequest;
 import java.util.List;
@@ -41,6 +44,10 @@ public class NavigationBackendClient {
   private static final String PREFERENCES = "/api/v1/navigation/preferences";
 
   private static final String FAVOURITES = PREFERENCES + "/favourites";
+
+  private static final String HIDDEN = PREFERENCES + "/hidden";
+
+  private static final String FAVOURITES_AND_HIDDEN = PREFERENCES + "/favourites-and-hidden";
 
   private static final String PRUNE = PREFERENCES + "/prune";
 
@@ -67,6 +74,31 @@ public class NavigationBackendClient {
   @Nullable
   public FavouritesResponse replaceFavourites(@NotNull FavouritesUpdateRequest request) {
     return backendApiClient.put(FAVOURITES, request, FavouritesResponse.class);
+  }
+
+  /**
+   * Replaces the caller's hidden pages.
+   *
+   * @param request the new keys and the version the caller last saw
+   * @return the stored hidden pages with the new version, or {@code null} when the backend sent no
+   *     body
+   */
+  @Nullable
+  public HiddenResponse replaceHidden(@NotNull HiddenUpdateRequest request) {
+    return backendApiClient.put(HIDDEN, request, HiddenResponse.class);
+  }
+
+  /**
+   * Replaces the caller's favourites and hidden pages in one request that checks both versions.
+   *
+   * @param request both sections' new keys and the versions the caller last saw
+   * @return both sections with their new versions, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public NavigationPreferencesResponse replaceFavouritesAndHidden(
+      @NotNull FavouritesAndHiddenUpdateRequest request) {
+    return backendApiClient.put(
+        FAVOURITES_AND_HIDDEN, request, NavigationPreferencesResponse.class);
   }
 
   /**

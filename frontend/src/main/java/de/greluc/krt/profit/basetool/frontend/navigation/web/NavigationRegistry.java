@@ -46,6 +46,9 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -97,6 +100,13 @@ public class NavigationRegistry {
   private static final String ICON_USER = "user";
 
   private static final String HANDBOOK_URL = "https://github.com/krt-profit/basetool/wiki";
+
+  /** The quick-access-only views that open from a page without being a tab of its tab bar. */
+  private static final Map<String, List<String>> PAGE_VIEWS =
+      Map.of(
+          "hangar.overview", List.of("hangar.unit"),
+          "storage.overview", List.of("storage.my", "storage.all"),
+          "admin.dataimports", List.of("admin.syncreports.uex", "admin.syncreports.scwiki"));
 
   private static final NavigationGate LEITUNG_GATE = NavigationGate.requires(OPEN_LEITUNG);
 
@@ -159,6 +169,17 @@ public class NavigationRegistry {
               keysOf(main).stream(),
               Stream.concat(keysOf(List.of(personal)).stream(), adminKeys.stream()))
           .collect(Collectors.toUnmodifiableSet());
+
+  @Getter(AccessLevel.NONE)
+  private final Set<String> hideableKeys =
+      Stream.concat(main.stream(), admin.stream())
+          .flatMap(group -> group.entries().stream())
+          .filter(entry -> !entry.paletteOnly())
+          .map(NavigationEntry::key)
+          .collect(Collectors.toUnmodifiableSet());
+
+  @Getter(AccessLevel.NONE)
+  private final Map<String, Set<String>> families = buildFamilies();
 
   @NotNull
   private static Set<String> keysOf(@NotNull List<NavigationGroup> groups) {
@@ -232,6 +253,32 @@ public class NavigationRegistry {
   }
 
   /**
+   * Looks up a page a member can hide: a menu link of a member or administration group. Tabs,
+   * quick-access-only entries and the personal pages cannot be hidden.
+   *
+   * @param key the entry key
+   * @return the entry, or empty for an unknown key or an entry that cannot be hidden
+   */
+  @NotNull
+  public Optional<NavigationEntry> hideable(@NotNull String key) {
+    return entry(key).filter(_ -> hideableKeys.contains(key));
+  }
+
+  /**
+   * The entries that leave the quick access with the given hidden pages: the pages themselves, the
+   * tabs of their tab bars and the views they open.
+   *
+   * @param hiddenPages the keys of the hidden pages; keys that are no page are ignored
+   * @return the keys of every entry the hidden pages take with them
+   */
+  @NotNull
+  public Set<String> familyOf(@NotNull Collection<String> hiddenPages) {
+    return hiddenPages.stream()
+        .flatMap(page -> families.getOrDefault(page, Set.of()).stream())
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
+  /**
    * Whether a starrable entry belongs to the administration mode.
    *
    * @param key the entry key
@@ -263,6 +310,39 @@ public class NavigationRegistry {
     return group.gate().permitsRoles(access) && entry.gate().permitsRoles(access)
         ? NavigationAvailability.CONTEXT
         : NavigationAvailability.GONE;
+  }
+
+  /**
+   * Groups the entries that belong to one hideable page: a tab bar belongs to the menu links of its
+   * zone that open one of its tabs; a view that has no tab of its own is listed in {@link
+   * #PAGE_VIEWS}.
+   */
+  @NotNull
+  private Map<String, Set<String>> buildFamilies() {
+    Map<String, Set<String>> byPage = new HashMap<>();
+    List<NavigationEntry> menuLinks =
+        Stream.concat(main.stream(), admin.stream())
+            .flatMap(group -> group.entries().stream())
+            .filter(entry -> !entry.paletteOnly())
+            .toList();
+    menuLinks.forEach(link -> byPage.put(link.key(), new LinkedHashSet<>(Set.of(link.key()))));
+    for (NavigationPageTabs bar : pageTabs) {
+      boolean adminBar = adminKeys.contains(bar.entryKeys().getFirst());
+      Set<String> barKeys = new LinkedHashSet<>(bar.entryKeys());
+      bar.covered().values().forEach(barKeys::addAll);
+      Set<String> tabHrefs =
+          bar.entryKeys().stream()
+              .flatMap(key -> entry(key).stream())
+              .map(NavigationEntry::href)
+              .collect(Collectors.toSet());
+      menuLinks.stream()
+          .filter(link -> adminKeys.contains(link.key()) == adminBar)
+          .filter(link -> tabHrefs.contains(link.href()))
+          .forEach(link -> byPage.get(link.key()).addAll(barKeys));
+    }
+    PAGE_VIEWS.forEach((page, views) -> byPage.get(page).addAll(views));
+    return byPage.entrySet().stream()
+        .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> Set.copyOf(e.getValue())));
   }
 
   @NotNull

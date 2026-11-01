@@ -26,22 +26,22 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * The favourites as a fragment for the in-place swap (REQ-UI-032): after the star wrote the
- * section, the script re-reads both modes' lists and the state from here.
+ * The personalised navigation lists as a fragment for the in-place swap (REQ-UI-032): after a
+ * preference write, the script re-reads both modes' lists and the state from here.
  */
 @Controller
 @UsesLayoutModel
 @PreAuthorize("isAuthenticated()")
-public class NavigationFavouritesFragmentController {
+public class NavigationMenuFragmentController {
 
   /**
-   * Renders the favourites of both modes and their state.
+   * Renders the member and the administration lists with the preference state.
    *
-   * @return the {@code kernel/fragments/nav-favourites} fragment
+   * @return the {@code kernel/fragments/nav-entries} swap fragment
    */
   @NotNull
-  @GetMapping(value = "/navigation/favourites", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/navigation/menu", headers = "X-Requested-With=XMLHttpRequest")
   public String fragment() {
-    return "kernel/fragments/nav-favourites :: both";
+    return "kernel/fragments/nav-entries :: swap";
   }
 }

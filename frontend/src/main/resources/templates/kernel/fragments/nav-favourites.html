@@ -4,8 +4,9 @@
 <div th:fragment="state" hidden data-favourites-state
      th:data-loaded="${navigationFavourites.loaded()}" th:data-version="${navigationFavourites.version()}"
      th:data-keys="${navigationFavourites.keysAttribute()}" th:data-max="${navigationFavourites.max()}"
+     th:data-hidden-version="${navigationHidden.version()}" th:data-hidden-keys="${navigationHidden.keysAttribute()}"
      th:data-error="#{nav.favourites.error}" th:data-conflict="#{nav.favourites.conflict}"
-     th:data-full="#{nav.favourites.full}"></div>
+     th:data-full="#{nav.favourites.full}" th:data-hidden-error="#{nav.hidden.error}"></div>
 
 <div th:fragment="block(mode)" class="nav-favourites" th:data-favourites-mode="${mode}"
      th:with="items=${mode == 'admin'} ? ${navigationFavourites.admin()} : ${navigationFavourites.member()}">
@@ -15,7 +16,7 @@
             <span class="nav-group-label" th:text="#{nav.favourites.title}">Favoriten</span>
         </div>
         <div class="nav-group-links">
-            <th:block th:each="item : ${items}">
+            <div class="nav-row" th:each="item : ${items}" th:data-entry-key="${item.entry().key()}">
                 <a th:if="${item.available()}" class="nav-link" data-nav-skip="true"
                    th:href="@{${item.entry().href()}}" th:data-entry-key="${item.entry().key()}"
                    th:data-testid="|nav-favourite-${item.entry().key()}|"
@@ -28,19 +29,62 @@
                     <span class="nav-unavailable-hint"
                           th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">In Einheit nicht verfügbar</span>
                 </span>
-            </th:block>
+                <div class="nav-edit-controls" data-nav-edit-controls th:if="${navigationFavourites.loaded()}">
+                    <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${item.entry()}, true)}" />
+                </div>
+            </div>
+            <div class="nav-edit-controls nav-edit-reset" data-nav-edit-controls>
+                <button type="button" class="btn btn-ghost nav-edit-reset-btn" data-trigger="nav-clear-favourites"
+                        data-testid="nav-clear-favourites" th:text="#{nav.favourites.clear}">Alle Favoriten entfernen</button>
+            </div>
         </div>
     </section>
 </div>
 
-<th:block th:fragment="both">
-    <th:block th:replace="~{kernel/fragments/nav-favourites :: state}" />
-    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('member')}" />
-    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('admin')}" />
+<th:block th:fragment="more(mode)"
+          th:with="items=${mode == 'admin'} ? ${navigationHidden.admin()} : ${navigationHidden.member()},
+                   groupKey=${mode == 'admin'} ? 'admin-more' : 'more'">
+<section th:unless="${#lists.isEmpty(items)}" class="nav-group nav-more" data-nav-icon="more"
+         data-collapsed="true" th:data-group-key="${groupKey}"
+         th:data-nav-group="#{nav.more.title}" data-testid="nav-more">
+    <button type="button" class="nav-group-head" aria-expanded="false" th:aria-controls="|nav-group-${groupKey}|">
+        <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-more"></use></svg>
+        <span class="nav-group-label" th:text="#{nav.more.title}">Mehr</span>
+        <span class="nav-group-count"></span>
+        <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+    </button>
+    <div class="nav-group-links" th:id="|nav-group-${groupKey}|">
+        <div class="nav-row" th:each="item : ${items}" th:data-entry-key="${item.entry().key()}">
+            <a th:if="${item.available()}" class="nav-link" data-nav-skip="true"
+               th:href="@{${item.entry().href()}}" th:data-entry-key="${item.entry().key()}"
+               th:data-testid="|nav-more-${item.entry().key()}|"
+               th:text="#{${item.entry().labelKey()}}">Seite</a>
+            <span th:unless="${item.available()}" class="nav-link is-unavailable" data-nav-skip="true"
+                  th:data-entry-key="${item.entry().key()}" th:data-testid="|nav-more-${item.entry().key()}|"
+                  aria-disabled="true">
+                <span class="nav-link-label" th:text="#{${item.entry().labelKey()}}">Seite</span>
+                <span class="nav-unavailable-hint"
+                      th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">In Einheit nicht verfügbar</span>
+            </span>
+            <button type="button" class="btn btn-ghost btn-icon nav-unhide" data-trigger="nav-unhide"
+                    data-nav-action="unhide" data-testid="nav-unhide" th:data-entry-key="${item.entry().key()}"
+                    th:with="label=#{__${item.entry().labelKey()}__}" th:data-label="${label}"
+                    th:aria-label="#{nav.hidden.show(${label})}" th:title="#{nav.hidden.show(${label})}">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-eye"></use></svg>
+            </button>
+        </div>
+        <div class="nav-more-reset">
+            <button type="button" class="btn btn-ghost nav-edit-reset-btn" data-trigger="nav-unhide-all"
+                    data-testid="nav-unhide-all" th:text="#{nav.hidden.showAll}">Alle wieder einblenden</button>
+        </div>
+    </div>
+</section>
 </th:block>
 
-<button th:fragment="star(entry)" type="button" class="btn btn-ghost btn-icon nav-star"
-        data-favourite-toggle data-trigger="nav-favourite-toggle" data-testid="nav-star"
+<button th:fragment="star(entry, edit)" type="button" class="btn btn-ghost btn-icon nav-star"
+        th:classappend="${edit} ? 'nav-edit-control'"
+        data-favourite-toggle data-trigger="nav-favourite-toggle"
+        th:data-testid="${edit} ? 'nav-edit-star' : 'nav-star'"
         th:with="label=#{__${entry.labelKey()}__}, pressed=${navigationFavourites.isFavourite(entry.key())}"
         th:data-entry-key="${entry.key()}" th:aria-pressed="${pressed}"
         th:disabled="${!navigationFavourites.loaded() or (!pressed and navigationFavourites.full())}"
@@ -49,6 +93,14 @@
         th:title="${!pressed and navigationFavourites.full()} ? #{nav.favourites.full} : (${pressed} ? #{nav.favourites.remove(${label})} : #{nav.favourites.add(${label})})">
     <svg class="krt-icon nav-star-off" aria-hidden="true"><use href="#krt-icon-star"></use></svg>
     <svg class="krt-icon nav-star-on" aria-hidden="true"><use href="#krt-icon-star-filled"></use></svg>
+</button>
+
+<button th:fragment="hide(entry)" type="button" class="btn btn-ghost btn-icon nav-edit-control nav-hide"
+        data-trigger="nav-hide" data-nav-action="hide" data-testid="nav-hide"
+        th:with="label=#{__${entry.labelKey()}__}" th:data-label="${label}"
+        th:data-entry-key="${entry.key()}" th:aria-label="#{nav.hidden.hide(${label})}"
+        th:title="#{nav.hidden.hide(${label})}">
+    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-eye-off"></use></svg>
 </button>
 </body>
 </html>
