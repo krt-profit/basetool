@@ -15,7 +15,7 @@
             <div class="page-title">
                 <h1 th:text="#{nav.materials.overview}">Preis-Übersicht</h1>
                 <th:block th:if="${navigationCurrent != null and navigationFavourites != null}">
-                    <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${navigationCurrent})}" />
+                    <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${navigationCurrent}, false)}" />
                 </th:block>
                 <span th:if="${uexAge != null}" class="chip chip--muted" data-testid="uex-age"
                       th:title="${uexAge.syncedAt}"

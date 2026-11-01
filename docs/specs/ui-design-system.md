@@ -2294,12 +2294,14 @@ page use it; positions there count the reorderable rows of the rendered page.
 
 ### REQ-UI-032 — Navigation personalisation: favourites, „Mehr", order and the tab bar
 
-> **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store and the
+> **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store, the
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
-> on load, the 409 hint), „Darstellung" with the desktop mode (own version, the profile card and the
-> sidebar switch), the privacy flows and the metrics. Planned: hiding and „Mehr", the order,
-> the tab bar, `shortcutsEnabled` and the start pages of „Darstellung", „Anpassen" with its resets and
-> the full reset; until they ship, the current code stays authoritative for them.
+> on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
+> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", „Darstellung" with the
+> desktop mode (own version, the profile card and the sidebar switch), the privacy flows and the
+> metrics. Planned: the order and the up/down controls of „Anpassen", the tab bar, `shortcutsEnabled`
+> and the start pages of „Darstellung" and the full reset; until they ship, the current code stays
+> authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 
@@ -2427,9 +2429,13 @@ duplicate keys, owner isolation, deletion of entries), `NavigationPreferencesCon
 cap of 12, the key format, the owner from the token, 409), `NavigationFavouritesMvcTest` (Favoriten,
 the greyed favourite, the star, the deletion on load, failing closed, the relay),
 `NavigationFavouritesReaderTest`, `NavigationCurrentEntryTest`, `NavigationBackendClientTest`,
-`NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint), the export and merge
-tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** its edit mode, resets, the full reset's
-confirmation and 44 px controls up to 1024 px, and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+`NavigationHiddenMvcTest` (Mehr only while a page is hidden, the hidden page and its tabs out of
+the quick access, no hide control on personal pages, the relays), `NavigationRegistryTest` (which
+entries are pages, which tabs leave with a page), `NavigationMenuTest`,
+`NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint, hiding with focus and
+announcement, favourite and hidden excluding each other, the resets, 44 px controls up to 1024 px
+and 32 px above), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
+full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use

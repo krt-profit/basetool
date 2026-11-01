@@ -56,6 +56,8 @@ class NavigationPreferencesControllerTest {
   private static final String PREFERENCES = "/api/v1/navigation/preferences";
   private static final String FAVOURITES = PREFERENCES + "/favourites";
   private static final String APPEARANCE = PREFERENCES + "/appearance";
+  private static final String HIDDEN = PREFERENCES + "/hidden";
+  private static final String BOTH = PREFERENCES + "/favourites-and-hidden";
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -297,5 +299,64 @@ class NavigationPreferencesControllerTest {
         .perform(get(PREFERENCES).with(as(owner)))
         .andExpect(jsonPath("$.favourites.version").value(0))
         .andExpect(jsonPath("$.appearance.desktopMode").value("PINNED"));
+  }
+
+  private void putJson(String path, String body, int status) throws Exception {
+    mockMvc
+        .perform(
+            put(path)
+                .with(as(owner))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().is(status));
+  }
+
+  @Test
+  void storesHiddenPagesAndReadsThemBack() throws Exception {
+    mockMvc
+        .perform(
+            put(HIDDEN)
+                .with(as(owner))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"keys\":[\"bank.dashboard\"],\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.keys[0]").value("bank.dashboard"))
+        .andExpect(jsonPath("$.version").value(1));
+
+    mockMvc
+        .perform(get(PREFERENCES).with(as(owner)))
+        .andExpect(jsonPath("$.hidden.keys[0]").value("bank.dashboard"))
+        .andExpect(jsonPath("$.hidden.version").value(1))
+        .andExpect(jsonPath("$.favourites.version").value(0));
+  }
+
+  @Test
+  void answers409ForAStaleHiddenVersionAnd400ForAMalformedKey() throws Exception {
+    putJson(HIDDEN, "{\"keys\":[\"bank.dashboard\"],\"version\":0}", 200);
+    putJson(HIDDEN, "{\"keys\":[\"orders.list\"],\"version\":0}", 409);
+    putJson(HIDDEN, "{\"keys\":[\"/orders\"],\"version\":1}", 400);
+  }
+
+  @Test
+  void theCombinedWriteChecksBothVersionsAndRefusesAKeyInBothLists() throws Exception {
+    putJson(FAVOURITES, "{\"keys\":[\"missions.list\"],\"version\":0}", 200);
+
+    putJson(
+        BOTH,
+        "{\"favourites\":{\"keys\":[\"orders.list\"],\"version\":1},"
+            + "\"hidden\":{\"keys\":[\"orders.list\"],\"version\":0}}",
+        400);
+    putJson(
+        BOTH,
+        "{\"favourites\":{\"keys\":[\"orders.list\"],\"version\":0},"
+            + "\"hidden\":{\"keys\":[\"bank.dashboard\"],\"version\":0}}",
+        409);
+    putJson(
+        BOTH,
+        "{\"favourites\":{\"keys\":[\"orders.list\"],\"version\":1},"
+            + "\"hidden\":{\"keys\":[\"bank.dashboard\"],\"version\":0}}",
+        200);
   }
 }

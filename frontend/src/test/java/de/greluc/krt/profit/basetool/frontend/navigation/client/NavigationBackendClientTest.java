@@ -22,8 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.navigation.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -49,11 +52,14 @@ class NavigationBackendClientTest {
 
   @Test
   void readsTheSections() {
-    backend.answerJson("{\"favourites\":{\"keys\":[\"missions.list\"],\"version\":3}}");
+    backend.answerJson(
+        "{\"favourites\":{\"keys\":[\"missions.list\"],\"version\":3},"
+            + "\"hidden\":{\"keys\":[\"bank.dashboard\"],\"version\":2}}");
 
     NavigationPreferencesResponse read = client.preferences();
 
     assertThat(read.favourites()).isEqualTo(new FavouritesResponse(List.of("missions.list"), 3));
+    assertThat(read.hidden()).isEqualTo(new HiddenResponse(List.of("bank.dashboard"), 2));
     backend.expect("GET", "/api/v1/navigation/preferences");
   }
 
@@ -70,6 +76,35 @@ class NavigationBackendClientTest {
         "PUT",
         "/api/v1/navigation/preferences/favourites",
         "{\"keys\":[\"missions.list\",\"orders.list\"],\"version\":3}");
+  }
+
+  @Test
+  void putsTheHiddenPagesWithTheirVersion() {
+    backend.answerJson("{\"keys\":[\"bank.dashboard\"],\"version\":2}");
+
+    HiddenResponse stored =
+        client.replaceHidden(new HiddenUpdateRequest(List.of("bank.dashboard"), 1L));
+
+    assertThat(stored.version()).isEqualTo(2);
+    backend.expect(
+        "PUT",
+        "/api/v1/navigation/preferences/hidden",
+        "{\"keys\":[\"bank.dashboard\"],\"version\":1}");
+  }
+
+  @Test
+  void putsBothSectionsInOneRequest() {
+    backend.answerJson(
+        "{\"favourites\":{\"keys\":[],\"version\":4},\"hidden\":{\"keys\":[],\"version\":5}}");
+
+    client.replaceFavouritesAndHidden(
+        new FavouritesAndHiddenUpdateRequest(
+            new FavouritesUpdateRequest(List.of(), 3L), new HiddenUpdateRequest(List.of(), 4L)));
+
+    backend.expect(
+        "PUT",
+        "/api/v1/navigation/preferences/favourites-and-hidden",
+        "{\"favourites\":{\"keys\":[],\"version\":3},\"hidden\":{\"keys\":[],\"version\":4}}");
   }
 
   @Test

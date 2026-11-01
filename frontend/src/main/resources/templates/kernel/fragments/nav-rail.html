@@ -43,18 +43,47 @@
     </div>
 </th:block>
 
+<th:block th:fragment="more(mode)"
+          th:with="items=${mode == 'admin'} ? ${navigationHidden.admin()} : ${navigationHidden.member()},
+                   groupKey=${mode == 'admin'} ? 'admin-more' : 'more'">
+    <div th:unless="${#lists.isEmpty(items)}" class="nav-rail-item" th:data-rail-key="${groupKey}">
+        <button type="button" class="nav-rail-btn" th:data-testid="|nav-rail-group-${groupKey}|"
+                th:data-group-key="${groupKey}" aria-expanded="false" th:aria-controls="|nav-rail-flyout-${groupKey}|"
+                th:aria-label="#{nav.more.title}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-more"></use></svg>
+        </button>
+        <div class="nav-rail-flyout" th:id="|nav-rail-flyout-${groupKey}|" hidden>
+            <div class="nav-rail-flyout-head" th:text="#{nav.more.title}">Mehr</div>
+            <div class="nav-rail-flyout-links">
+                <th:block th:each="hid : ${items}">
+                    <th:block th:if="${hid.available()}"
+                              th:replace="~{kernel/fragments/nav-entries :: link(${hid.entry()}, 'nav-link', null, null, true)}" />
+                    <span th:unless="${hid.available()}" class="nav-link is-unavailable" aria-disabled="true"
+                          th:data-entry-key="${hid.entry().key()}">
+                        <span class="nav-link-label" th:text="#{${hid.entry().labelKey()}}">Seite</span>
+                        <span class="nav-unavailable-hint"
+                              th:text="${activeOrgUnit != null} ? #{nav.favourites.unavailableIn(${activeOrgUnit.orgUnitName()})} : #{nav.favourites.unavailable}">nicht verfügbar</span>
+                    </span>
+                </th:block>
+            </div>
+        </div>
+    </div>
+</th:block>
+
 <nav th:fragment="rail" id="nav-rail" class="nav-rail" th:aria-label="#{nav.rail.aria}" sec:authorize="isAuthenticated()">
     <div class="nav-rail-mode" data-nav-rail-mode="main">
         <th:block th:replace="~{kernel/fragments/nav-rail :: favourites('member')}" />
         <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty()}">
             <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
         </th:block>
+        <th:block th:replace="~{kernel/fragments/nav-rail :: more('member')}" />
     </div>
     <div class="nav-rail-mode" data-nav-rail-mode="admin" hidden th:unless="${navigation.admin().isEmpty()}">
         <th:block th:replace="~{kernel/fragments/nav-rail :: favourites('admin')}" />
         <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
             <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
         </th:block>
+        <th:block th:replace="~{kernel/fragments/nav-rail :: more('admin')}" />
     </div>
     <span class="nav-rail-grow"></span>
     <button type="button" class="nav-rail-btn" data-testid="nav-rail-admin" aria-pressed="false"
@@ -100,6 +129,12 @@
                 <th:block th:each="entry : ${navigation.personal().links()}">
                     <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, true)}" />
                 </th:block>
+            </div>
+            <div class="nav-rail-edit" th:if="${navigationFavourites.loaded()}">
+                <button type="button" class="btn btn-ghost" data-trigger="nav-rail-edit" data-testid="nav-rail-edit">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                    <span th:text="#{nav.edit.start}">Anpassen</span>
+                </button>
             </div>
             <div class="nav-rail-mode-switch">
                 <th:block th:replace="~{kernel/fragments/nav-appearance :: switch('desktop-mode-rail')}" />

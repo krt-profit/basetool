@@ -141,3 +141,4 @@ user_roles identity
 navigation_preferences navigation
 navigation_favourite navigation
 navigation_appearance navigation
+navigation_hidden navigation

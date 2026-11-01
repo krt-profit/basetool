@@ -84,6 +84,58 @@ public interface NavigationPreferencesRepository
   void bumpFavouritesVersion(@Param("userId") UUID userId);
 
   /**
+   * Bumps the hidden version when it still equals the expected one, locking the root row until the
+   * transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.hiddenVersion = p.hiddenVersion + 1"
+          + " WHERE p.userId = :userId AND p.hiddenVersion = :expected")
+  int bumpHiddenVersionIfMatches(@Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
+   * Bumps the hidden version without a check, for a change the member did not echo a version for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.hiddenVersion = p.hiddenVersion + 1"
+          + " WHERE p.userId = :userId")
+  void bumpHiddenVersion(@Param("userId") UUID userId);
+
+  /**
+   * Bumps the favourites and the hidden version in one statement when both still equal the expected
+   * ones, so a stale version of either leaves both untouched.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expectedFavourites the favourites version the caller last saw
+   * @param expectedHidden the hidden version the caller last saw
+   * @return {@code 1} when both versions matched, {@code 0} when either is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.favouritesVersion = p.favouritesVersion + 1,"
+          + " p.hiddenVersion = p.hiddenVersion + 1 WHERE p.userId = :userId"
+          + " AND p.favouritesVersion = :expectedFavourites AND p.hiddenVersion = :expectedHidden")
+  int bumpBothVersionsIfMatch(
+      @Param("userId") UUID userId,
+      @Param("expectedFavourites") long expectedFavourites,
+      @Param("expectedHidden") long expectedHidden);
+
+  /**
+   * Counts the members with at least one hidden page.
+   *
+   * @return the number of members that hid a page
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.hidden) > 0")
+  long countWithHidden();
+
+  /**
    * Counts the members with at least one favourite.
    *
    * @return the number of members that personalised the favourites

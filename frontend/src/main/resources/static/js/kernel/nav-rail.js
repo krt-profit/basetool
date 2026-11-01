@@ -17,7 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
+import { NAV_EDIT_EVENT } from '/js/kernel/nav-preferences.js';
 
 const HOVER_OPEN_MS = 200;
 const HOVER_CLOSE_MS = 300;
@@ -181,6 +183,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.addEventListener('krt:nav-mode-changed', () => close(false));
+
+    const editToggle = () => document.querySelector('[data-trigger="nav-edit-toggle"]');
+
+    /**
+     * Opens the labelled sidebar as an overlay with „Anpassen“ on; „Fertig“ closes it again.
+     */
+    krtEvents.on('click', 'nav-rail-edit', () => {
+        close(false);
+        const toggle = editToggle();
+        if (!(toggle instanceof HTMLElement) || !krtChrome.nav) {
+            return;
+        }
+        krtChrome.nav.open(toggle);
+        if (!document.getElementById('sidebar')?.classList.contains('is-editing')) {
+            toggle.click();
+        }
+    });
+    document.addEventListener(NAV_EDIT_EVENT, (event) => {
+        const editing = /** @type {CustomEvent} */ (event).detail?.editing;
+        if (!editing && railShown() && krtChrome.nav) {
+            krtChrome.nav.close();
+            const avatar = rail.querySelector('[data-testid="nav-rail-avatar"]');
+            if (avatar instanceof HTMLElement) avatar.focus({ preventScroll: true });
+        }
+    });
 
     rail.querySelectorAll('[data-rail-switcher]').forEach((select) => {
         select.addEventListener('change', () => {

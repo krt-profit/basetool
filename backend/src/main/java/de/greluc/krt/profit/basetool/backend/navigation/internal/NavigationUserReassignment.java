@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -71,15 +72,19 @@ public class NavigationUserReassignment implements UserReassignmentParticipant {
       return List.of();
     }
     List<String> sourceFavourites = List.copyOf(emptied.get().getFavourites());
+    Set<String> sourceHidden = Set.copyOf(emptied.get().getHidden());
     repository.delete(emptied.get());
     repository.flush();
-    if (!sourceFavourites.isEmpty()) {
+    if (!sourceFavourites.isEmpty() || !sourceHidden.isEmpty()) {
       repository.insertIfAbsent(target);
       NavigationPreferences surviving = repository.findById(target).orElseThrow();
-      surviving.replaceFavourites(
-          FavouritesMerge.union(List.copyOf(surviving.getFavourites()), sourceFavourites));
+      List<String> favourites =
+          FavouritesMerge.union(List.copyOf(surviving.getFavourites()), sourceFavourites);
+      surviving.replaceHidden(HiddenMerge.union(surviving.getHidden(), sourceHidden, favourites));
+      surviving.replaceFavourites(favourites);
       repository.saveAndFlush(surviving);
       repository.bumpFavouritesVersion(target);
+      repository.bumpHiddenVersion(target);
     }
     return List.of(new Moved(FOLLOWS.getFirst().qualified(), 1));
   }

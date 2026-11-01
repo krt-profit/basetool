@@ -25,7 +25,10 @@ import org.jetbrains.annotations.NotNull;
  * Every preference section of the caller, each with its own version.
  *
  * @param favourites the favourites section
+ * @param hidden the hidden-pages section
  * @param appearance the „Darstellung" section
  */
 public record NavigationPreferencesResponse(
-    @NotNull FavouritesResponse favourites, @NotNull AppearanceResponse appearance) {}
+    @NotNull FavouritesResponse favourites,
+    @NotNull HiddenResponse hidden,
+    @NotNull AppearanceResponse appearance) {}

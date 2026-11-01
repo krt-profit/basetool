@@ -2725,13 +2725,15 @@ The navigation concept, the home dashboard, the assignee grant and minimum stock
 signals. Every label is bounded by REQ-OBS-006; **the quick-access search term never reaches a
 label**, a tag, an MDC field or a log line.
 
-- *Shipped for `favourites` and `display`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
+- *Shipped for `favourites`, `hidden` and `display`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
   the `navigation` module (`NavigationMetrics`), one increment per preference or dashboard write
   (REQ-UI-032, REQ-UI-034). `section` ∈ `favourites`, `hidden`, `order`, `tabbar`, `display`,
   `dashboard`; `outcome` ∈ `ok`, `conflict` (the `409` of a stale section version), `rejected` (a
-  `400` / `403` / `422`). A reset counts once per section it wrote. Registered at zero for every
-  pair; today the `section` values that exist are registered, and each further section adds its own.
-- *Shipped for `favourites` and `display`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
+  `400` / `403` / `422`). A reset counts once per section it wrote, and a write that moves a page
+  between the favourites and the hidden pages counts once for each of the two. Registered at zero
+  for every pair; today the `section` values that exist are registered, and each further section
+  adds its own.
+- *Shipped for `favourites`, `hidden` and `display`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
   the `navigation` module's `BusinessGaugeSource` (`NavigationBusinessGauges`) on the
   business-metrics timer: the number of accounts holding a non-default value in that section, same
   `section` values. It is the data base for deciding a second personalisation round; it carries no
@@ -2771,7 +2773,7 @@ rate" on the Operations dashboard.
 - *Shipped:* `QuickAccessSearchSlow` (warning): p95 of the frontend route `/quick-access/search`
   above 1 s for 10 min, pinned by `monitoring/prometheus/tests/quick_access_search_slow_test.yml`.
 - *Shipped:* `NavigationEndpointsErroring` (warning): the 5xx share of the preference endpoints
-  (`/api/v1/navigation/*` on the backend, `/navigation/favourites` and `/navigation/appearance` on the frontend) above 5 % for
+  (`/api/v1/navigation/*` on the backend, `/navigation/*` on the frontend) above 5 % for
   10 min, pinned by `monitoring/prometheus/tests/navigation_endpoints_erroring_test.yml`; the widget
   endpoints join its route pattern with the dashboard.
 

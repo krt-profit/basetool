@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -89,6 +90,7 @@ class NavigationDesktopModesMvcTest {
         .thenReturn(
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(favourites), 0),
+                HiddenResponse.EMPTY,
                 new AppearanceResponse(mode, version)));
   }
 
@@ -252,6 +254,33 @@ class NavigationDesktopModesMvcTest {
         .contains("data-entry-key=\"personal.profile\"")
         .contains("nav-rail-user")
         .contains("data-testid=\"segment-desktop-mode-rail-rail\"");
+  }
+
+  @Test
+  @DisplayName("the Mehr button renders only while a page is hidden, and lists the hidden page")
+  void theMoreButtonNeedsAHiddenPage() throws Exception {
+    stored(DesktopMode.RAIL, 1);
+    assertThat(rail(page(member()))).doesNotContain("nav-rail-group-more");
+
+    when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
+        .thenReturn(
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of(), 0),
+                new HiddenResponse(List.of("refinery.orders"), 2),
+                new AppearanceResponse(DesktopMode.RAIL, 1)));
+    String rail = rail(page(member()));
+
+    assertThat(rail)
+        .contains("data-testid=\"nav-rail-group-more\"")
+        .containsPattern("id=\"nav-rail-flyout-more\"[\\s\\S]*data-entry-key=\"refinery.orders\"");
+  }
+
+  @Test
+  @DisplayName("the avatar flyout offers Anpassen, which opens the sidebar as an overlay")
+  void theAvatarFlyoutOffersAnpassen() throws Exception {
+    stored(DesktopMode.RAIL, 1);
+
+    assertThat(rail(page(member()))).contains("data-testid=\"nav-rail-edit\"");
   }
 
   @Test

@@ -29,6 +29,8 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAppeara
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -44,9 +46,10 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
- * Exposes {@code navigation}, the caller's {@link NavigationMenu}, and {@code
- * navigationFavourites}, the caller's {@link NavigationFavourites}, to every page that renders the
- * layout; the navigation fragments render nothing but them.
+ * Exposes {@code navigation}, the caller's {@link NavigationMenu}, {@code navigationFavourites} and
+ * {@code navigationHidden}, the caller's stored {@link NavigationFavourites} and {@link
+ * NavigationHidden}, to every page that renders the layout; the navigation fragments render nothing
+ * but them.
  *
  * <p>Roles are read through the role hierarchy, as {@code sec:authorize} reads them; the flags come
  * from the other layout advices' model attributes and fail closed when one is missing.
@@ -59,7 +62,7 @@ public class NavigationAdvice {
 
   private final RoleHierarchy roleHierarchy;
 
-  private final NavigationFavouritesReader favouritesReader;
+  private final NavigationPreferencesReader preferencesReader;
 
   private final NavigationPreferencesLoader preferences;
 
@@ -115,9 +118,10 @@ public class NavigationAdvice {
   @ModelAttribute("navigation")
   @NotNull
   public NavigationMenu navigation(
-      @ModelAttribute(name = "navigationAccess", binding = false) @NotNull
-          NavigationAccess access) {
-    return NavigationMenu.resolve(registry, access);
+      @ModelAttribute(name = "navigationAccess", binding = false) @NotNull NavigationAccess access,
+      @ModelAttribute(name = "navigationHidden", binding = false) @NotNull
+          NavigationHidden hidden) {
+    return NavigationMenu.resolve(registry, access, Set.copyOf(hidden.keys()));
   }
 
   /**
@@ -137,23 +141,51 @@ public class NavigationAdvice {
   }
 
   /**
-   * Reads the caller's favourites for the navigation, once per request that renders a layout model;
-   * a signed-out visitor and a handler that renders no model get none.
+   * Reads the caller's favourites and hidden pages for the navigation, once per request that
+   * renders a layout model; a signed-out visitor and a handler that renders no model get none.
    *
    * @param request the current request
    * @param access the caller's roles and flags
-   * @return the favourites to render; never {@code null}
+   * @return the stored preferences to render; never {@code null}
    */
-  @ModelAttribute("navigationFavourites")
+  @ModelAttribute("navigationPersonalisation")
   @NotNull
-  public NavigationFavourites favourites(
+  public NavigationPersonalisation personalisation(
       @NotNull HttpServletRequest request,
       @ModelAttribute(name = "navigationAccess", binding = false) @NotNull
           NavigationAccess access) {
     if (!authHelper.isAuthenticated() || !LayoutContextLoader.needsLayoutModel(request)) {
-      return NavigationFavourites.NOT_LOADED;
+      return NavigationPersonalisation.NOT_LOADED;
     }
-    return favouritesReader.read(access);
+    return preferencesReader.read(access);
+  }
+
+  /**
+   * The caller's favourites, for the star and the Favoriten group.
+   *
+   * @param personalisation the stored preferences
+   * @return the favourites to render
+   */
+  @ModelAttribute("navigationFavourites")
+  @NotNull
+  public NavigationFavourites favourites(
+      @ModelAttribute(name = "navigationPersonalisation", binding = false) @NotNull
+          NavigationPersonalisation personalisation) {
+    return personalisation.favourites();
+  }
+
+  /**
+   * The caller's hidden pages, for the „Mehr“ area and the menu.
+   *
+   * @param personalisation the stored preferences
+   * @return the hidden pages to render
+   */
+  @ModelAttribute("navigationHidden")
+  @NotNull
+  public NavigationHidden hidden(
+      @ModelAttribute(name = "navigationPersonalisation", binding = false) @NotNull
+          NavigationPersonalisation personalisation) {
+    return personalisation.hidden();
   }
 
   /**

@@ -25,6 +25,9 @@ public final class NavigationLimits {
   /** The most favourites a member keeps, shared by both navigation modes. */
   public static final int MAX_FAVOURITES = 12;
 
+  /** The most hidden pages one request stores; bounds the input, the registry holds fewer. */
+  public static final int MAX_HIDDEN = 100;
+
   /** The longest entry key the store accepts. */
   public static final int MAX_ENTRY_KEY_LENGTH = 64;
 

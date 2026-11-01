@@ -3008,6 +3008,96 @@
         display: inline-block;
     }
 
+    .nav-row {
+        display: flex;
+        align-items: center;
+    }
+
+    .nav-row > .nav-link {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .nav-edit-bar {
+        display: flex;
+        padding: var(--space-1) var(--space-3) 0;
+    }
+
+    .nav-edit-toggle {
+        gap: var(--space-2);
+        min-height: var(--touch-target-dense);
+    }
+
+    .nav-edit-hint,
+    .nav-group-emptied-note,
+    .sidebar:not(.is-editing) .nav-edit-controls,
+    .sidebar:not(.is-editing) .nav-group-emptied {
+        display: none;
+    }
+
+    .sidebar.is-editing .nav-edit-hint,
+    .sidebar.is-editing .nav-group-emptied-note {
+        display: block;
+    }
+
+    .nav-edit-hint,
+    .nav-group-emptied-note {
+        margin: 0;
+        padding: var(--space-2) 1.25rem;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-2xs);
+        line-height: 1.4;
+    }
+
+    .nav-edit-controls {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: var(--space-1);
+        padding-right: var(--space-2);
+    }
+
+    .nav-edit-control,
+    .nav-unhide {
+        flex: none;
+        min-width: var(--touch-target-dense);
+        min-height: var(--touch-target-dense);
+        color: var(--color-gray-2-text);
+    }
+
+    .nav-edit-control:hover:not(:disabled),
+    .nav-unhide:hover:not(:disabled) {
+        color: var(--color-primary);
+    }
+
+    .nav-unhide {
+        margin-right: var(--space-2);
+    }
+
+    .nav-edit-reset,
+    .nav-more-reset {
+        justify-content: flex-end;
+        padding: var(--space-1) var(--space-2) var(--space-1) 1.25rem;
+    }
+
+    .nav-edit-reset-btn {
+        min-height: var(--touch-target-dense);
+    }
+
+    .nav-more-reset {
+        display: flex;
+    }
+
+    @media (width <= 1024px) {
+        .nav-edit-toggle,
+        .nav-edit-control,
+        .nav-unhide,
+        .nav-edit-reset-btn {
+            min-width: var(--touch-target);
+            min-height: var(--touch-target);
+        }
+    }
+
     .nav-admin-bar {
         display: flex;
         align-items: center;

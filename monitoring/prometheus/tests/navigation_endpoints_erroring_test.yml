@@ -22,7 +22,24 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Navigation preference endpoints answering 5xx"
-              description: "More than 5 % of the navigation preference requests (/api/v1/navigation/* on the backend, /navigation/favourites and /navigation/appearance on the frontend) failed with a 5xx for 10 minutes (REQ-UI-032). The pages still render with the defaults and the stars off, but members cannot save favourites. Runbook: sum by (application, uri, status) (rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/(favourites|appearance)\", status=~\"5..\"}[10m])) names the failing route; check the backend log for the correlation id and the database connection pool."
+              description: "More than 5 % of the navigation preference requests (/api/v1/navigation/* on the backend, /navigation/* on the frontend) failed with a 5xx for 10 minutes (REQ-UI-032). The pages still render with the defaults and the stars off, but members cannot save their favourites or hidden pages. Runbook: sum by (application, uri, status) (rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/.*\", status=~\"5..\"}[10m])) names the failing route; check the backend log for the correlation id and the database connection pool."
+
+  - name: fires - the hidden-pages relay on the frontend answers 500
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="basetool-frontend", uri="/navigation/hidden", status="200"}'
+        values: "0+20x40"
+      - series: 'http_server_requests_seconds_count{application="basetool-frontend", uri="/navigation/hidden", status="500"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: NavigationEndpointsErroring
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Navigation preference endpoints answering 5xx"
+              description: "More than 5 % of the navigation preference requests (/api/v1/navigation/* on the backend, /navigation/* on the frontend) failed with a 5xx for 10 minutes (REQ-UI-032). The pages still render with the defaults and the stars off, but members cannot save their favourites or hidden pages. Runbook: sum by (application, uri, status) (rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/.*\", status=~\"5..\"}[10m])) names the failing route; check the backend log for the correlation id and the database connection pool."
 
   - name: silent - the preference endpoints answer without a server error
     interval: 1m

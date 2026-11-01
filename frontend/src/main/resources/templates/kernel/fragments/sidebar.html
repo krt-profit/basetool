@@ -48,10 +48,25 @@
                        autocomplete="off" spellcheck="false"
                        th:placeholder="#{nav.filter.placeholder}" th:aria-label="#{nav.filter.aria}">
             </div>
+            <div class="nav-edit-bar" th:if="${navigationFavourites.loaded()}">
+                <button type="button" class="btn btn-ghost nav-edit-toggle" data-trigger="nav-edit-toggle"
+                        data-testid="nav-edit-toggle" aria-controls="nav-list"
+                        th:data-label-start="#{nav.edit.start}" th:data-label-done="#{nav.edit.done}"
+                        th:data-announce-on="#{nav.edit.announce.on}" th:data-announce-off="#{nav.edit.announce.off}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                    <span data-nav-edit-label th:text="#{nav.edit.start}">Anpassen</span>
+                </button>
+            </div>
         </div>
         <div class="nav-list" id="nav-list">
             <th:block sec:authorize="isAuthenticated()">
                 <th:block th:replace="~{kernel/fragments/nav-favourites :: state}" />
+                <p class="nav-edit-hint" data-nav-edit-hint th:text="#{nav.edit.hint}">Stern = Favorit, Auge = ausblenden.</p>
+                <p class="visually-hidden" role="status" aria-live="polite" data-nav-live data-testid="nav-live"
+                   th:data-announce-hidden="#{nav.hidden.announce.hidden('{name}')}"
+                   th:data-announce-shown="#{nav.hidden.announce.shown('{name}')}"
+                   th:data-announce-all-shown="#{nav.hidden.announce.allShown}"
+                   th:data-announce-favourites-cleared="#{nav.favourites.announce.cleared}"></p>
                 <div class="nav-admin-bar" hidden
                      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <button type="button" class="nav-admin-back" data-testid="nav-admin-back">
@@ -61,22 +76,10 @@
                     <span class="admin-mode-chip" th:text="#{nav.adminMode.chip}">ADMIN</span>
                 </div>
                 <div class="nav-mode nav-mode-main" data-nav-mode="main">
-                    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('member')}" />
-                    <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty()}">
-                        <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, #{${item.group().labelKey()}}, false)}" />
-                    </th:block>
-                    <th:block th:replace="~{kernel/fragments/nav-entries :: group(${navigation.personal()}, #{${navigation.personal().group().labelKey()}}, true)}" />
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: mainList}" />
                 </div>
                 <div class="nav-mode nav-mode-admin" data-nav-mode="admin" th:unless="${navigation.admin().isEmpty()}">
-                    <div class="nav-top" th:data-nav-group="#{nav.admin.crumb}">
-                        <th:block th:each="entry : ${navigation.adminTop().links()}">
-                            <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-top-link', null, ${entry.icon()}, false)}" />
-                        </th:block>
-                    </div>
-                    <th:block th:replace="~{kernel/fragments/nav-favourites :: block('admin')}" />
-                    <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
-                        <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false)}" />
-                    </th:block>
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: adminList}" />
                 </div>
                 <p class="nav-filter-empty" hidden th:text="#{nav.filter.empty}">Kein Menüeintrag gefunden.</p>
                 <button type="button" class="nav-filter-to-palette" data-testid="nav-filter-to-palette" hidden>
@@ -115,7 +118,7 @@
                  th:data-nav-group="#{${navigation.personal().group().labelKey()}}" th:data-nav-icon="${navigation.personal().group().icon()}">
                 <span class="nav-personal-title" th:text="#{${navigation.personal().group().labelKey()}}">Persönlich</span>
                 <th:block th:each="entry : ${navigation.personal().links()}">
-                    <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, false)}" />
+                    <th:block th:replace="~{kernel/fragments/nav-entries :: row(${entry}, false)}" />
                 </th:block>
             </div>
             <div class="nav-user-row">
@@ -172,6 +175,7 @@
     <script type="module" th:src="@{/js/kernel/sidebar.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/krt-palette.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-favourites.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-edit.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-appearance.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-rail.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />

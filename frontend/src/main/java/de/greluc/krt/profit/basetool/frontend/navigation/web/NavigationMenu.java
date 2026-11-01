@@ -78,12 +78,30 @@ public record NavigationMenu(
   @NotNull
   public static NavigationMenu resolve(
       @NotNull NavigationRegistry registry, @NotNull NavigationAccess access) {
+    return resolve(registry, access, Set.of());
+  }
+
+  /**
+   * Resolves the registry for one caller who hid pages: a hidden page leaves its group's links and
+   * is listed apart, and its tabs and views leave the quick access's pages.
+   *
+   * @param registry the entry registry
+   * @param access the caller's reachable roles and flags
+   * @param hiddenPages the keys of the pages the caller hid; keys that are no page are ignored
+   * @return the caller's navigation
+   */
+  @NotNull
+  public static NavigationMenu resolve(
+      @NotNull NavigationRegistry registry,
+      @NotNull NavigationAccess access,
+      @NotNull Set<String> hiddenPages) {
+    Set<String> hiddenEntries = registry.familyOf(hiddenPages);
     return new NavigationMenu(
         Group.of(registry.top(), access),
-        groups(registry.main(), access),
+        groups(registry.main(), access, hiddenPages, hiddenEntries),
         Group.of(registry.personal(), access),
         Group.of(registry.adminTop(), access),
-        groups(registry.admin(), access),
+        groups(registry.admin(), access, hiddenPages, hiddenEntries),
         Group.of(registry.anonymous(), access),
         Group.of(registry.legal(), access),
         Group.of(registry.fanKit(), access),
@@ -156,7 +174,9 @@ public record NavigationMenu(
   private Stream<NavigationEntry> starrableEntries() {
     return Stream.concat(
         Stream.concat(main.stream(), admin.stream())
-            .flatMap(group -> Stream.concat(group.links().stream(), group.palettePages().stream())),
+            .flatMap(group ->
+                Stream.of(group.links(), group.hiddenLinks(), group.palettePages())
+                    .flatMap(List::stream)),
         personal.links().stream());
   }
 
@@ -228,34 +248,58 @@ public record NavigationMenu(
 
   @NotNull
   private static List<Group> groups(
-      @NotNull List<NavigationGroup> groups, @NotNull NavigationAccess access) {
+      @NotNull List<NavigationGroup> groups,
+      @NotNull NavigationAccess access,
+      @NotNull Set<String> hiddenPages,
+      @NotNull Set<String> hiddenEntries) {
     return groups.stream()
-        .map(group -> Group.of(group, access))
-        .filter(group -> !group.links().isEmpty() || !group.palettePages().isEmpty())
+        .map(group -> Group.of(group, access, hiddenPages, hiddenEntries))
+        .filter(group ->
+            !group.links().isEmpty()
+                || !group.hiddenLinks().isEmpty()
+                || !group.palettePages().isEmpty())
         .toList();
   }
 
   /**
-   * A group with the entries the caller is permitted, split into menu links and quick-access-only
-   * pages.
+   * A group with the entries the caller is permitted, split into menu links, hidden menu links and
+   * quick-access-only pages.
    *
    * @param group the registry group
-   * @param links the permitted menu links in default order
-   * @param palettePages the permitted quick-access-only pages in default order
+   * @param links the permitted menu links the caller did not hide, in default order
+   * @param hiddenLinks the permitted menu links the caller hid, in default order
+   * @param palettePages the permitted quick-access-only pages of pages that are not hidden, in
+   *     default order
    */
   public record Group(
       @NotNull NavigationGroup group,
       @NotNull List<NavigationEntry> links,
+      @NotNull List<NavigationEntry> hiddenLinks,
       @NotNull List<NavigationEntry> palettePages) {
 
     @NotNull
     private static Group of(@NotNull NavigationGroup group, @NotNull NavigationAccess access) {
+      return of(group, access, Set.of(), Set.of());
+    }
+
+    @NotNull
+    private static Group of(
+        @NotNull NavigationGroup group,
+        @NotNull NavigationAccess access,
+        @NotNull Set<String> hiddenPages,
+        @NotNull Set<String> hiddenEntries) {
       List<NavigationEntry> permitted =
           group.entries().stream().filter(entry -> group.permits(entry, access)).toList();
+      List<NavigationEntry> menu =
+          permitted.stream().filter(entry -> !entry.paletteOnly()).toList();
       return new Group(
           group,
-          permitted.stream().filter(entry -> !entry.paletteOnly()).toList(),
-          permitted.stream().filter(NavigationEntry::paletteOnly).toList());
+          menu.stream().filter(entry -> !hiddenPages.contains(entry.key())).toList(),
+          menu.stream().filter(entry -> hiddenPages.contains(entry.key())).toList(),
+          permitted.stream()
+              .filter(NavigationEntry::paletteOnly)
+              .filter(entry -> !hiddenEntries.contains(entry.key()))
+              .toList());
     }
   }
 

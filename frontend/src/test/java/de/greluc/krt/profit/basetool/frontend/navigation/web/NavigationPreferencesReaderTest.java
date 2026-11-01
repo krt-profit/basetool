@@ -29,12 +29,14 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
-import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites.Item;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import java.util.List;
 import java.util.Set;
@@ -42,27 +44,35 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests of {@link NavigationFavouritesReader}: availability, deletion and failing closed. */
-class NavigationFavouritesReaderTest {
+/** Unit tests of {@link NavigationPreferencesReader}: availability, deletion and failing closed. */
+class NavigationPreferencesReaderTest {
 
   private static final NavigationAccess MEMBER =
       new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
 
   private NavigationBackendClient client;
-  private NavigationFavouritesReader reader;
+  private NavigationPreferencesReader reader;
 
   @BeforeEach
   void setUp() {
     client = mock(NavigationBackendClient.class);
     reader =
-        new NavigationFavouritesReader(
+        new NavigationPreferencesReader(
             new NavigationPreferencesLoader(client), client, new NavigationRegistry());
   }
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
     return new NavigationPreferencesResponse(
         new FavouritesResponse(List.of(keys), version),
-        new AppearanceResponse(DesktopMode.DRAWER, 0));
+        HiddenResponse.EMPTY,
+        AppearanceResponse.DRAWER);
+  }
+
+  private static NavigationPreferencesResponse storedHidden(long version, String... keys) {
+    return new NavigationPreferencesResponse(
+        new FavouritesResponse(List.of(), 0),
+        new HiddenResponse(List.of(keys), version),
+        AppearanceResponse.DRAWER);
   }
 
   private static List<String> keys(List<Item> items) {
@@ -74,7 +84,7 @@ class NavigationFavouritesReaderTest {
   void rendersAvailableEntriesInOrder() {
     when(client.preferences()).thenReturn(stored(2, "refinery.orders", "missions.list"));
 
-    NavigationFavourites favourites = reader.read(MEMBER);
+    NavigationFavourites favourites = reader.read(MEMBER).favourites();
 
     assertThat(favourites.loaded()).isTrue();
     assertThat(favourites.version()).isEqualTo(2);
@@ -88,7 +98,7 @@ class NavigationFavouritesReaderTest {
   void keepsAContextOnlyGapGreyedAndStored() {
     when(client.preferences()).thenReturn(stored(1, "orders.list"));
 
-    NavigationFavourites favourites = reader.read(MEMBER);
+    NavigationFavourites favourites = reader.read(MEMBER).favourites();
 
     assertThat(favourites.member())
         .singleElement()
@@ -106,7 +116,7 @@ class NavigationFavouritesReaderTest {
     when(client.preferences()).thenReturn(stored(4, "missions.list", "admin.terms"));
     when(client.prune(List.of("admin.terms"))).thenReturn(stored(5, "missions.list"));
 
-    NavigationFavourites favourites = reader.read(MEMBER);
+    NavigationFavourites favourites = reader.read(MEMBER).favourites();
 
     verify(client).prune(List.of("admin.terms"));
     assertThat(favourites.version()).isEqualTo(5);
@@ -121,7 +131,7 @@ class NavigationFavouritesReaderTest {
     when(client.preferences()).thenReturn(stored(1, "admin.terms", "missions.list"));
 
     NavigationFavourites favourites =
-        reader.read(new NavigationAccess(Set.of("ADMIN", "KRT_MEMBER"), Set.of()));
+        reader.read(new NavigationAccess(Set.of("ADMIN", "KRT_MEMBER"), Set.of())).favourites();
 
     assertThat(keys(favourites.admin())).containsExactly("admin.terms");
     assertThat(keys(favourites.member())).containsExactly("missions.list");
@@ -134,7 +144,7 @@ class NavigationFavouritesReaderTest {
     when(client.preferences()).thenReturn(stored(1, "future.page", "missions.list"));
     when(client.prune(List.of("future.page"))).thenReturn(stored(2, "missions.list"));
 
-    NavigationFavourites favourites = reader.read(MEMBER);
+    NavigationFavourites favourites = reader.read(MEMBER).favourites();
 
     verify(client).prune(List.of("future.page"));
     assertThat(keys(favourites.member())).containsExactly("missions.list");
@@ -151,7 +161,67 @@ class NavigationFavouritesReaderTest {
     };
     when(client.preferences()).thenReturn(stored(1, twelve));
 
-    assertThat(reader.read(MEMBER).full()).isTrue();
+    assertThat(reader.read(MEMBER).favourites().full()).isTrue();
+  }
+
+  @Test
+  @DisplayName("a hidden page renders in its mode's Mehr list in registry order, with the version")
+  void rendersHiddenPagesInRegistryOrder() {
+    when(client.preferences()).thenReturn(storedHidden(3, "refinery.orders", "missions.list"));
+
+    NavigationHidden hidden = reader.read(MEMBER).hidden();
+
+    assertThat(hidden.loaded()).isTrue();
+    assertThat(hidden.version()).isEqualTo(3);
+    assertThat(hidden.keys()).containsExactly("missions.list", "refinery.orders");
+    assertThat(hidden.member()).allMatch(NavigationHidden.Item::available);
+    assertThat(hidden.admin()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a page the active context refuses stays hidden and renders unavailable")
+  void keepsAHiddenContextGapStored() {
+    when(client.preferences()).thenReturn(storedHidden(1, "orders.list"));
+
+    NavigationHidden hidden = reader.read(MEMBER).hidden();
+
+    assertThat(hidden.keys()).containsExactly("orders.list");
+    assertThat(hidden.member())
+        .singleElement()
+        .satisfies(item -> assertThat(item.available()).isFalse());
+    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+  }
+
+  @Test
+  @DisplayName("a hidden key that is no page, is unknown or lost its role is deleted")
+  void deletesHiddenKeysThatAreNoLongerPages() {
+    when(client.preferences())
+        .thenReturn(
+            storedHidden(2, "missions.list", "operations.list", "future.page", "admin.terms"));
+    when(client.prune(List.of("future.page", "operations.list", "admin.terms")))
+        .thenReturn(storedHidden(3, "missions.list"));
+
+    NavigationHidden hidden = reader.read(MEMBER).hidden();
+
+    verify(client).prune(List.of("future.page", "operations.list", "admin.terms"));
+    assertThat(hidden.keys()).containsExactly("missions.list");
+    assertThat(hidden.version()).isEqualTo(3);
+  }
+
+  @Test
+  @DisplayName("an administrator's hidden pages split by mode")
+  void splitsHiddenAdminPagesFromMemberPages() {
+    when(client.preferences()).thenReturn(storedHidden(1, "admin.members", "missions.list"));
+
+    NavigationHidden hidden =
+        reader.read(new NavigationAccess(Set.of("ADMIN", "KRT_MEMBER"), Set.of())).hidden();
+
+    assertThat(keysOfHidden(hidden.admin())).containsExactly("admin.members");
+    assertThat(keysOfHidden(hidden.member())).containsExactly("missions.list");
+  }
+
+  private static List<String> keysOfHidden(List<NavigationHidden.Item> items) {
+    return items.stream().map(item -> item.entry().key()).toList();
   }
 
   @Test
@@ -159,7 +229,7 @@ class NavigationFavouritesReaderTest {
   void failsClosed() {
     when(client.preferences()).thenThrow(new BackendServiceException("backend down", null, 503));
 
-    assertThat(reader.read(MEMBER)).isEqualTo(NavigationFavourites.NOT_LOADED);
+    assertThat(reader.read(MEMBER)).isEqualTo(NavigationPersonalisation.NOT_LOADED);
     assertThat(NavigationFavourites.NOT_LOADED.loaded()).isFalse();
   }
 
@@ -168,7 +238,7 @@ class NavigationFavouritesReaderTest {
   void failsClosedOnAnEmptyAnswer() {
     when(client.preferences()).thenReturn(null);
 
-    assertThat(reader.read(MEMBER)).isEqualTo(NavigationFavourites.NOT_LOADED);
+    assertThat(reader.read(MEMBER)).isEqualTo(NavigationPersonalisation.NOT_LOADED);
   }
 
   @Test

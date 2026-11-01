@@ -12,7 +12,7 @@
     <div class="page-title">
       <h1 th:text="${titleText}">Titel</h1>
       <th:block th:if="${navigationCurrent != null and navigationFavourites != null}">
-        <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${navigationCurrent})}" />
+        <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${navigationCurrent}, false)}" />
       </th:block>
       <span th:if="${count != null}" class="count-badge count-badge--sm" data-testid="page-head-count"
             th:id="${countId}" th:data-list-count-for="${countFor}" th:text="${count}">0</span>

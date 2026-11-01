@@ -526,6 +526,32 @@ class NavigationE2eTest {
         });
   }
 
+  /** Anpassen in the rail opens the labelled sidebar as an overlay, Fertig returns to the rail. */
+  @Test
+  void anpassenInTheRailOpensTheSidebarOverlayAndFertigReturns() {
+    run(
+        1440,
+        900,
+        "nav-rail-edit",
+        page -> {
+          try {
+            chooseMode(page, "rail");
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            page.getByTestId("nav-rail-avatar").click();
+            page.getByTestId("nav-rail-edit").click();
+            assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\\bopen\\b"));
+            assertThat(page.locator("#sidebar")).hasClass(Pattern.compile("\\bis-editing\\b"));
+            assertThat(page.getByTestId("nav-edit-toggle")).isVisible();
+
+            page.getByTestId("nav-edit-toggle").click();
+            assertThat(page.locator("#sidebar")).not().hasClass(Pattern.compile("\\bopen\\b"));
+            assertThat(page.locator("#nav-rail")).isVisible();
+          } finally {
+            chooseMode(page, "drawer");
+          }
+        });
+  }
+
   /** The rail foot holds the admin toggle, which swaps the groups, and the avatar flyout. */
   @Test
   void railFootSwitchesAdminModeAndOpensTheAvatarFlyout() {

@@ -48,11 +48,16 @@ public class NavigationExportSections implements PersonalDataExportSection {
             JOIN navigation_preferences np ON np.user_id = f.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
+            SELECT 'hidden' AS preference_section, 0 AS position, h.entry_key AS value
+            FROM navigation_hidden h
+            JOIN navigation_preferences np ON np.user_id = h.preferences_id
+            WHERE np.user_id = :userId
+            UNION ALL
             SELECT 'desktopMode', 0, a.desktop_mode
             FROM navigation_appearance a
             JOIN navigation_preferences np ON np.user_id = a.preferences_id
             WHERE np.user_id = :userId
-            ORDER BY 1, 2
+            ORDER BY 1, 2, 3
             """));
   }
 }

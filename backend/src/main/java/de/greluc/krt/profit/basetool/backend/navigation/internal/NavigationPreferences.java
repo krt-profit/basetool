@@ -29,7 +29,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -60,6 +63,16 @@ public class NavigationPreferences {
   @Column(name = "appearance_version", nullable = false)
   private long appearanceVersion;
 
+  @Setter
+  @Column(name = "hidden_version", nullable = false)
+  private long hiddenVersion;
+
+  /** The hidden page keys; a page is never both hidden and a favourite. */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "navigation_hidden", joinColumns = @JoinColumn(name = "preferences_id"))
+  @Column(name = "entry_key", nullable = false, length = NavigationLimits.MAX_ENTRY_KEY_LENGTH)
+  private Set<String> hidden = new LinkedHashSet<>();
+
   /** The favourite entry keys in display order. */
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(
@@ -86,5 +99,15 @@ public class NavigationPreferences {
   public void replaceFavourites(List<String> keys) {
     favourites.clear();
     favourites.addAll(keys);
+  }
+
+  /**
+   * Replaces the hidden page keys.
+   *
+   * @param keys the new hidden keys
+   */
+  public void replaceHidden(Collection<String> keys) {
+    hidden.clear();
+    hidden.addAll(keys);
   }
 }

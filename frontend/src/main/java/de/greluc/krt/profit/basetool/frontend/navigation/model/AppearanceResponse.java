@@ -29,4 +29,8 @@ import org.jetbrains.annotations.NotNull;
  * @param version the section's optimistic-lock version, echoed on the next write
  */
 @DtoMirror
-public record AppearanceResponse(@NotNull DesktopMode desktopMode, long version) {}
+public record AppearanceResponse(@NotNull DesktopMode desktopMode, long version) {
+
+  /** The appearance of a member who never chose: the drawer, at version 0. */
+  public static final AppearanceResponse DRAWER = new AppearanceResponse(DesktopMode.DRAWER, 0);
+}

@@ -582,6 +582,10 @@
       "preference_section" : "favourites",
       "position" : 0,
       "value" : "missions.list"
+    }, {
+      "preference_section" : "hidden",
+      "position" : 0,
+      "value" : "bank.dashboard"
     } ],
     "truncated" : false
   } ]
