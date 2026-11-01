@@ -154,7 +154,7 @@ class InventoryIndexListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Logistik<")
         .containsPattern("<h1>Lagerverwaltung</h1>")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"inventory-results\"")

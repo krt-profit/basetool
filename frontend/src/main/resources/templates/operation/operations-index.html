@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{operations.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='operations.list', eyebrowKey='nav.group.operations', titleText=#{operations.title},
         count=${operationsPage != null ? operationsPage.totalElements() : null}, countId='operations-count', countFor='operations-results', actions=~{::operations-actions})}">
         <th:block th:ref="operations-actions">
             <button th:if="${isMissionManagerOrAbove}"

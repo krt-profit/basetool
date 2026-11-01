@@ -116,7 +116,7 @@ class MissionsListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Einsatzplanung<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Einsatz &amp; Flotte<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"missions-results\"")
         .contains("data-testid=\"missions-create-link\"")

@@ -15,7 +15,7 @@
 <th:block th:fragment="pageContent">
 <main class="lager-page">
     <th:block th:with="lagerBackHref=${view == 'items'} ? @{/inventory(view='items')} : @{/inventory}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.my', eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.my}, count=null, actions=~{::lager-my-actions})}">
         <th:block th:ref="lager-my-actions">
             <a th:href="@{/inventory/input(source='my')}" class="btn btn--cta" data-testid="page-head-primary"

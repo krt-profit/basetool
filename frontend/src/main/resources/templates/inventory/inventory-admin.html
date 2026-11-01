@@ -10,7 +10,7 @@
 <th:block th:fragment="pageContent">
 <main class="lager-page">
     <th:block th:with="lagerBackHref=${view == 'items'} ? @{/inventory(view='items')} : @{/inventory}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.all', eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.global}, count=null, actions=~{::lager-all-actions})}">
         <th:block th:ref="lager-all-actions">
             <a th:if="${isLogisticianOrAbove}" th:href="@{/inventory/input(source='admin')}"

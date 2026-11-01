@@ -9,9 +9,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:with="pmShowMatrix=${!isAllSquadronsMode and members != null and !members.isEmpty()}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.manage.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='promotion.manage', eyebrowKey='nav.promotion', titleText=#{promotion.manage.title},
         count=${pmShowMatrix ? members.size() : null}, countId='pm-count', actions=~{::pm-actions})}">
         <th:block th:ref="pm-actions">
+            <th:block th:replace="~{promotion/fragments/promotion-management-switch :: switch(active='evaluations')}"></th:block>
             <th:block th:if="${pmShowMatrix}">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='pm-more', items=~{::pm-more-items})}">
                     <th:block th:ref="pm-more-items">

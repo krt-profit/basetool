@@ -37,6 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * @param href the context-relative path, a page-relative query, or an absolute URL for {@link
  *     NavigationTrait#EXTERNAL} entries
  * @param labelKey the message key of the label
+ * @param tabLabelKey the message key of the label as a tab of a merged page, or {@code null} to use
+ *     the label
  * @param keywordsKey the message key of the search terms, or {@code null} for none
  * @param testId the {@code data-testid} of the link, or {@code null} for none
  * @param icon the sprite icon name the quick access shows, or {@code null} for the group's
@@ -47,6 +49,7 @@ public record NavigationEntry(
     @NotNull String key,
     @NotNull String href,
     @NotNull String labelKey,
+    @Nullable String tabLabelKey,
     @Nullable String keywordsKey,
     @Nullable String testId,
     @Nullable String icon,
@@ -64,6 +67,7 @@ public record NavigationEntry(
    * @param key the stable entry key
    * @param href the link target
    * @param labelKey the message key of the label
+   * @param tabLabelKey the message key of the tab label, or {@code null}
    * @param keywordsKey the message key of the search terms, or {@code null}
    * @param testId the {@code data-testid}, or {@code null}
    * @param icon the quick-access icon, or {@code null}
@@ -90,7 +94,7 @@ public record NavigationEntry(
   public static NavigationEntry of(
       @NotNull String key, @NotNull String href, @NotNull String labelKey) {
     return new NavigationEntry(
-        key, href, labelKey, null, null, null, NavigationGate.ALWAYS, Set.of());
+        key, href, labelKey, null, null, null, null, NavigationGate.ALWAYS, Set.of());
   }
 
   /**
@@ -111,7 +115,30 @@ public record NavigationEntry(
    */
   @NotNull
   public NavigationEntry keywords(@NotNull String messageKey) {
-    return new NavigationEntry(key, href, labelKey, messageKey, testId, icon, gate, traits);
+    return new NavigationEntry(
+        key, href, labelKey, tabLabelKey, messageKey, testId, icon, gate, traits);
+  }
+
+  /**
+   * This entry with its own label as a tab of a merged page.
+   *
+   * @param messageKey the message key of the tab label
+   * @return the changed entry
+   */
+  @NotNull
+  public NavigationEntry tab(@NotNull String messageKey) {
+    return new NavigationEntry(
+        key, href, labelKey, messageKey, keywordsKey, testId, icon, gate, traits);
+  }
+
+  /**
+   * The message key of the label this entry carries as a tab.
+   *
+   * @return the tab label key, or the label key when the tab has no label of its own
+   */
+  @NotNull
+  public String tabLabel() {
+    return tabLabelKey != null ? tabLabelKey : labelKey;
   }
 
   /**
@@ -122,7 +149,8 @@ public record NavigationEntry(
    */
   @NotNull
   public NavigationEntry testId(@NotNull String id) {
-    return new NavigationEntry(key, href, labelKey, keywordsKey, id, icon, gate, traits);
+    return new NavigationEntry(
+        key, href, labelKey, tabLabelKey, keywordsKey, id, icon, gate, traits);
   }
 
   /**
@@ -133,7 +161,8 @@ public record NavigationEntry(
    */
   @NotNull
   public NavigationEntry icon(@NotNull String name) {
-    return new NavigationEntry(key, href, labelKey, keywordsKey, testId, name, gate, traits);
+    return new NavigationEntry(
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, name, gate, traits);
   }
 
   /**
@@ -144,7 +173,8 @@ public record NavigationEntry(
    */
   @NotNull
   public NavigationEntry gate(@NotNull NavigationGate condition) {
-    return new NavigationEntry(key, href, labelKey, keywordsKey, testId, icon, condition, traits);
+    return new NavigationEntry(
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, condition, traits);
   }
 
   /**
@@ -158,7 +188,8 @@ public record NavigationEntry(
     EnumSet<NavigationTrait> all = EnumSet.noneOf(NavigationTrait.class);
     all.addAll(traits);
     all.addAll(Set.of(more));
-    return new NavigationEntry(key, href, labelKey, keywordsKey, testId, icon, gate, all);
+    return new NavigationEntry(
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, gate, all);
   }
 
   /**

@@ -67,7 +67,7 @@ class NavigationRegistryTest {
   void groupKeysAreUnique() {
     List<String> keys = registry.groups().stream().map(NavigationGroup::key).toList();
 
-    assertThat(keys).doesNotHaveDuplicates().contains("missions", "personal", "admin-operations");
+    assertThat(keys).doesNotHaveDuplicates().contains("operations", "personal", "admin-operations");
   }
 
   /** The phone tab bar holds today's four tabs, each naming registered entries. */
@@ -109,6 +109,94 @@ class NavigationRegistryTest {
         .flatExtracting(tabs -> tabs.entryKeys())
         .doesNotHaveDuplicates()
         .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
+  }
+
+  /** Covered entries of a tab are registered entries. */
+  @Test
+  void coveredEntriesAreRegistered() {
+    List<String> covered =
+        registry.pageTabs().stream()
+            .flatMap(tabs -> tabs.covered().values().stream())
+            .flatMap(List::stream)
+            .toList();
+
+    assertThat(covered)
+        .isNotEmpty()
+        .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
+  }
+
+  /** The member default is four task groups plus bank and the quick-access-only resources. */
+  @Test
+  void theMemberDefaultIsFourTaskGroupsAndBank() {
+    assertThat(registry.main())
+        .extracting(NavigationGroup::key)
+        .containsExactly("operations", "logistics", "trade", "unit", "bank", "resources");
+    assertThat(registry.main().stream().flatMap(group -> group.entries().stream()))
+        .filteredOn(entry -> !entry.paletteOnly())
+        .extracting(NavigationEntry::href)
+        .containsExactlyInAnyOrder(
+            "/missions",
+            "/hangar",
+            "/inventory",
+            "/refinery-orders",
+            "/orders",
+            "/orders",
+            "/orders",
+            "/orders/create",
+            "/materials",
+            "/materialboerse",
+            "/supply/needs",
+            "/purchasing/deals",
+            "/org-chart",
+            "/promotion/overview",
+            "/bank");
+  }
+
+  /** Every URL the former member drawer linked still opens a registered entry's page. */
+  @Test
+  void everyFormerMemberUrlStillHasAnEntry() {
+    List<String> former =
+        List.of(
+            "/missions",
+            "/operations",
+            "/hangar",
+            "/hangar/squadron",
+            "/ship-data",
+            "/inventory",
+            "/inventory/my",
+            "/inventory/all",
+            "/inventory/stock-levels",
+            "/materialboerse",
+            "/refinery-orders",
+            "/orders",
+            "/orders/material-demand",
+            "/blueprint-overview",
+            "/materials",
+            "/materials/overview",
+            "/materials/profit-calculation",
+            "/supply/needs",
+            "/supply/donations/mine",
+            "/purchasing/deals",
+            "/org-chart",
+            "/organisation/leitung",
+            "/org-unit-bank",
+            "/promotion/overview",
+            "/promotion/my-evaluations",
+            "/promotion/manage",
+            "/promotion/admin/topics",
+            "/promotion/admin/rank-requirements",
+            "/bank",
+            "/bank/manage",
+            "/bank/grants",
+            "/bank/requests",
+            "/sc-links",
+            "/personal-inventory",
+            "/personal-inventory/blueprints",
+            "/profile",
+            "/connected-apps",
+            "/notifications");
+
+    assertThat(registry.entries()).extracting(NavigationEntry::href).containsAll(former);
   }
 
   /** A key lookup finds the entry with its path; an unknown key finds nothing. */

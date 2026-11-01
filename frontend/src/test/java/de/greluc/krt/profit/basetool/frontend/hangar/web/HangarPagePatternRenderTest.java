@@ -320,7 +320,7 @@ class HangarPagePatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Einsatz &amp; Flotte<")
         .contains("data-testid=\"hangar-import\"")
         .contains("data-testid=\"hangar-add-ship\"")
         .contains("data-testid=\"overflow-menu-toggle\"")

@@ -10,10 +10,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{nav.inventory},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.overview', eyebrowKey='nav.group.logistics', titleText=#{nav.inventory},
         count=${inventoryPage != null ? inventoryPage.totalElements() : null}, countId='inventory-count', countFor='inventory-results', actions=~{::inventory-actions})}">
         <th:block th:ref="inventory-actions">
-            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(active='storage')}"></th:block>
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch}"></th:block>
         </th:block>
     </th:block>
 

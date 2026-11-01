@@ -154,7 +154,7 @@ class OrdersListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Logistik<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"orders-results\"")
         .contains("data-testid=\"orders-create-link\"")

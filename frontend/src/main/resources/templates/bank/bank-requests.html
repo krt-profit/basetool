@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', titleText=#{bank.requests.title}, actions=~{::bank-requests-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='bank.requests', eyebrowKey='nav.section.bank', titleText=#{bank.requests.title}, actions=~{::bank-requests-actions})}">
         <th:block th:ref="bank-requests-actions">
             <button type="button" class="btn btn-outline" th:if="${canBook}"
                     data-trigger="open-modal-display" data-modal-id="bank-movement-modal"

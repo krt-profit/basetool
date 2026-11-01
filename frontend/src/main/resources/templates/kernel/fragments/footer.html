@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 <th:block th:fragment="footer">
     <footer class="krt-footer" th:classappend="${testSystem} ? 'krt-footer--test-system'">
@@ -15,6 +15,8 @@
             <a th:href="@{/licenses}" th:text="#{nav.licenses}">Open-Source-Lizenzen</a>
         </div>
         <div class="krt-footer-meta">
+            <a class="krt-footer-sc-links" sec:authorize="isAuthenticated()" th:href="@{/sc-links}"
+               data-testid="footer-sc-links" data-entry-key="sclinks.list" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
             <a class="krt-footer-handbook"
                href="https://github.com/krt-profit/basetool/wiki"
                target="_blank" rel="noopener noreferrer"

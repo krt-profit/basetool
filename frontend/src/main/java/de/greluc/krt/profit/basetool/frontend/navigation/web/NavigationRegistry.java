@@ -76,7 +76,13 @@ public class NavigationRegistry {
 
   private static final String ICON_USERS = "users";
 
-  private static final String ICON_BANK = "bank-in";
+  private static final String ICON_BANK = "bank";
+
+  private static final String ICON_WEDGE = "wedge";
+
+  private static final String ICON_CRATE = "crate";
+
+  private static final String ICON_SWAP = "swap";
 
   private static final String ICON_GEAR = "gear";
 
@@ -210,155 +216,197 @@ public class NavigationRegistry {
   @NotNull
   private static List<NavigationGroup> buildMain() {
     return List.of(
-        NavigationGroup.of(
-            "missions",
-            "nav.section.mission_planning",
-            "clipboard-check",
-            of("missions.list", "/missions", "nav.missions")
-                .keywords("palette.keywords.missions")
-                .testId("nav-missions"),
-            of("operations.list", "/operations", "nav.operations")
-                .keywords("palette.keywords.operations")),
+        buildOperations(),
         buildLogistics(),
-        NavigationGroup.of(
-            "trade",
-            "nav.materials",
-            "swap",
-            of("materials.list", "/materials", "nav.materials.list")
-                .keywords("palette.keywords.materials"),
-            of("materials.overview", "/materials/overview", "nav.materials.overview"),
-            of(
-                    "materials.profit",
-                    "/materials/profit-calculation",
-                    "nav.materials.profit_calculation")
-                .keywords("palette.keywords.profit")),
-        NavigationGroup.of(
-            "supply",
-            "nav.section.supply",
-            "download",
-            of("supply.needs", "/supply/needs", "nav.supply.needs")
-                .keywords("palette.keywords.supplyNeeds")
-                .gate(NavigationGate.requires(SUPPLY))
-                .testId("nav-supply-needs"),
-            of("supply.donations", "/supply/donations/mine", "nav.supply.mine")
-                .keywords("palette.keywords.supplyMine")
-                .gate(NavigationGate.requires(SUPPLY))
-                .testId("nav-supply-mine"),
-            of("purchasing.deals", "/purchasing/deals", "nav.purchasing.deals")
-                .keywords("palette.keywords.purchasing")
-                .gate(NavigationGate.requires(PURCHASING))
-                .testId("nav-purchasing-deals")),
-        NavigationGroup.of(
-            "organisation",
-            "nav.section.organisation",
-            ICON_USERS,
-            of("orgchart.view", "/org-chart", "nav.orgChart")
-                .keywords("palette.keywords.orgChart")
-                .testId("nav-org-chart"),
-            of("organisation.leadership", "/organisation/leitung", "nav.leitung")
-                .gate(LEITUNG_GATE)
-                .testId("nav-leitung"),
-            of("orgunitbank.overview", "/org-unit-bank", "nav.bank.myOrgUnit")
-                .keywords("palette.keywords.bank")
-                .gate(
-                    NavigationGate.anyRole(
-                        Roles.ADMIN, Roles.LOGISTICIAN, Roles.MISSION_MANAGER, Roles.KRT_MEMBER))
-                .testId("nav-org-unit-bank")),
-        NavigationGroup.of(
-                "promotion",
-                "nav.promotion",
-                "user-plus",
-                of("promotion.overview", "/promotion/overview", "nav.promotion.overview")
-                    .keywords("palette.keywords.promotion"),
-                of(
-                    "promotion.evaluations",
-                    "/promotion/my-evaluations",
-                    "nav.promotion.my_evaluations"),
-                of("promotion.manage", "/promotion/manage", "nav.promotion.manage")
-                    .gate(PROMOTION_MANAGEMENT_GATE),
-                of("promotion.topics", "/promotion/admin/topics", "nav.promotion.admin_topics")
-                    .gate(PROMOTION_MANAGEMENT_GATE),
-                of(
-                        "promotion.ranks",
-                        "/promotion/admin/rank-requirements",
-                        "nav.promotion.admin_ranks")
-                    .gate(PROMOTION_MANAGEMENT_GATE))
-            .gate(NavigationGate.requires(PROMOTION)),
-        NavigationGroup.of(
-                "bank",
-                "nav.section.bank",
-                ICON_BANK,
-                of("bank.dashboard", "/bank", "nav.bank.dashboard")
-                    .keywords("palette.keywords.bank")
-                    .testId("nav-bank"),
-                of("bank.manage", "/bank/manage", "nav.bank.manage").testId("nav-bank-manage"),
-                of("bank.grants", "/bank/grants", "nav.bank.grants")
-                    .gate(NavigationGate.anyRole(Roles.BANK_MANAGEMENT))
-                    .testId("nav-bank-grants"),
-                of("bank.requests", "/bank/requests", "nav.bank.requests")
-                    .keywords("palette.keywords.bankRequests")
-                    .testId("nav-bank-requests"))
-            .gate(NavigationGate.anyRole(Roles.BANK_EMPLOYEE)),
-        NavigationGroup.of(
-            "resources",
-            "nav.section.resources",
-            ICON_EXTERNAL,
-            of("sclinks.list", "/sc-links", "nav.scLinks")
-                .keywords("palette.keywords.scLinks")
-                .testId("nav-sc-links")));
+        buildTrade(),
+        buildUnit(),
+        buildBank(),
+        buildResources());
+  }
+
+  @NotNull
+  private static NavigationGroup buildOperations() {
+    return NavigationGroup.of(
+        "operations",
+        "nav.group.operations",
+        ICON_WEDGE,
+        of("missions.list", "/missions", "nav.page.missions")
+            .keywords("palette.keywords.missions")
+            .testId("nav-missions"),
+        of("operations.list", "/operations", "nav.page.operations")
+            .keywords("palette.keywords.operations")
+            .with(PALETTE_ONLY),
+        of("hangar.overview", "/hangar", "nav.hangar")
+            .keywords("palette.keywords.hangar")
+            .testId("nav-hangar"),
+        of("hangar.catalog", "/ship-data", "nav.page.shipCatalog")
+            .keywords("palette.keywords.shipCatalog")
+            .with(PALETTE_ONLY),
+        of("hangar.unit", "/hangar/squadron", "palette.page.hangarUnit")
+            .keywords("palette.keywords.hangarUnit")
+            .with(PALETTE_ONLY));
   }
 
   @NotNull
   private static NavigationGroup buildLogistics() {
     return NavigationGroup.of(
         "logistics",
-        "nav.section.logistics",
-        ICON_BOOKOUT,
-        of("hangar.overview", "/hangar", "nav.hangar")
-            .keywords("palette.keywords.hangar")
-            .testId("nav-hangar"),
-        of("storage.overview", "/inventory", "nav.inventory")
-            .keywords("palette.keywords.inventory"),
-        of("materialboerse.board", "/materialboerse", "nav.materialboerse")
-            .keywords("palette.keywords.materialboerse")
-            .testId("nav-materialboerse")
-            .gate(NavigationGate.anyRole(Roles.KRT_MEMBER)),
-        of("refinery.orders", "/refinery-orders", "nav.refinery")
-            .keywords("palette.keywords.refinery")
-            .testId("nav-refinery"),
-        of("orders.list", "/orders", "nav.orders")
-            .keywords("palette.keywords.orders")
-            .gate(NavigationGate.requires(JOB_ORDERS))
-            .testId("nav-orders"),
-        of("orders.own", "/orders", "nav.orders.own")
-            .keywords("palette.keywords.orders")
-            .gate(NavigationGate.requires(OWN_JOB_ORDERS).andExcludes(JOB_ORDERS))
-            .testId("nav-orders-own"),
-        of("orders.assigned", "/orders", "nav.orders")
-            .keywords("palette.keywords.orders")
-            .gate(
-                NavigationGate.requires(ASSIGNED_JOB_ORDERS)
-                    .andExcludes(JOB_ORDERS, OWN_JOB_ORDERS))
-            .testId("nav-orders-assigned"),
-        of("orders.demand", "/orders/material-demand", "nav.orders.materialDemand")
-            .keywords("palette.keywords.materialDemand")
-            .gate(NavigationGate.requires(JOB_ORDERS))
-            .testId("nav-orders-material-demand"),
-        of("orders.create", "/orders/create", "orders.create.link")
-            .gate(NavigationGate.excludes(JOB_ORDERS, OWN_JOB_ORDERS))
-            .testId("nav-orders-create"),
-        of("blueprints.availability", "/blueprint-overview", "nav.blueprint_overview")
-            .keywords("palette.keywords.blueprintOverview")
-            .gate(NavigationGate.requires(BLUEPRINT_OVERVIEW))
-            .testId("nav-blueprint-overview"),
-        of("hangar.unit", "/hangar/squadron", "palette.page.hangarUnit")
-            .keywords("palette.keywords.hangarUnit")
+        "nav.group.logistics",
+        ICON_CRATE,
+        of("storage.overview", "/inventory", "nav.page.storage")
+            .keywords("palette.keywords.inventory")
+            .testId("nav-storage"),
+        of("storage.levels", "/inventory/stock-levels", "inventory.stockLevels.tab")
+            .keywords("palette.keywords.stockLevels")
             .with(PALETTE_ONLY),
         of("storage.my", "/inventory/my", "palette.page.inventoryMy")
             .keywords("palette.keywords.inventoryMy")
             .with(PALETTE_ONLY),
         of("storage.all", "/inventory/all", "palette.page.inventoryAll")
             .keywords("palette.keywords.inventoryAll")
+            .with(PALETTE_ONLY),
+        of("refinery.orders", "/refinery-orders", "nav.page.refinery")
+            .keywords("palette.keywords.refinery")
+            .testId("nav-refinery"),
+        of("orders.list", "/orders", "nav.page.orders")
+            .keywords("palette.keywords.orders")
+            .gate(NavigationGate.requires(JOB_ORDERS))
+            .testId("nav-orders"),
+        of("orders.own", "/orders", "nav.page.orders")
+            .keywords("palette.keywords.orders")
+            .gate(NavigationGate.requires(OWN_JOB_ORDERS).andExcludes(JOB_ORDERS))
+            .testId("nav-orders-own"),
+        of("orders.assigned", "/orders", "nav.page.orders")
+            .keywords("palette.keywords.orders")
+            .gate(
+                NavigationGate.requires(ASSIGNED_JOB_ORDERS)
+                    .andExcludes(JOB_ORDERS, OWN_JOB_ORDERS))
+            .testId("nav-orders-assigned"),
+        of("orders.create", "/orders/create", "orders.create.link")
+            .gate(NavigationGate.excludes(JOB_ORDERS, OWN_JOB_ORDERS))
+            .testId("nav-orders-create"),
+        of("orders.demand", "/orders/material-demand", "nav.orders.materialDemand")
+            .keywords("palette.keywords.materialDemand")
+            .gate(NavigationGate.requires(JOB_ORDERS))
+            .testId("nav-orders-material-demand")
+            .with(PALETTE_ONLY),
+        of("blueprints.availability", "/blueprint-overview", "nav.blueprint_overview")
+            .keywords("palette.keywords.blueprintOverview")
+            .gate(NavigationGate.requires(BLUEPRINT_OVERVIEW))
+            .testId("nav-blueprint-overview")
+            .with(PALETTE_ONLY));
+  }
+
+  @NotNull
+  private static NavigationGroup buildTrade() {
+    return NavigationGroup.of(
+        "trade",
+        "nav.materials",
+        ICON_SWAP,
+        of("materials.list", "/materials", "nav.page.material")
+            .tab("nav.tab.materialList")
+            .keywords("palette.keywords.materials"),
+        of("materials.overview", "/materials/overview", "nav.materials.overview")
+            .tab("nav.tab.materialOverview")
+            .with(PALETTE_ONLY),
+        of("materials.profit", "/materials/profit-calculation", "nav.materials.profit_calculation")
+            .keywords("palette.keywords.profit")
+            .with(PALETTE_ONLY),
+        of("materialboerse.board", "/materialboerse", "nav.materialboerse")
+            .keywords("palette.keywords.materialboerse")
+            .testId("nav-materialboerse")
+            .gate(NavigationGate.anyRole(Roles.KRT_MEMBER)),
+        of("supply.needs", "/supply/needs", "nav.section.supply")
+            .tab("nav.supply.needs")
+            .keywords("palette.keywords.supplyNeeds")
+            .gate(NavigationGate.requires(SUPPLY))
+            .testId("nav-supply-needs"),
+        of("purchasing.deals", "/purchasing/deals", "nav.section.supply")
+            .tab("nav.purchasing.deals")
+            .keywords("palette.keywords.purchasing")
+            .gate(NavigationGate.requires(PURCHASING).andExcludes(SUPPLY))
+            .testId("nav-purchasing-deals"),
+        of("supply.donations", "/supply/donations/mine", "nav.supply.mine")
+            .keywords("palette.keywords.supplyMine")
+            .gate(NavigationGate.requires(SUPPLY))
+            .testId("nav-supply-mine")
+            .with(PALETTE_ONLY));
+  }
+
+  @NotNull
+  private static NavigationGroup buildUnit() {
+    return NavigationGroup.of(
+        "unit",
+        "nav.group.unit",
+        ICON_USERS,
+        of("orgchart.view", "/org-chart", "nav.section.organisation")
+            .tab("nav.orgChart")
+            .keywords("palette.keywords.orgChart")
+            .testId("nav-org-chart"),
+        of("orgunitbank.overview", "/org-unit-bank", "nav.bank.myOrgUnit")
+            .tab("nav.tab.unitBank")
+            .keywords("palette.keywords.bank")
+            .gate(
+                NavigationGate.anyRole(
+                    Roles.ADMIN, Roles.LOGISTICIAN, Roles.MISSION_MANAGER, Roles.KRT_MEMBER))
+            .testId("nav-org-unit-bank")
+            .with(PALETTE_ONLY),
+        of("organisation.leadership", "/organisation/leitung", "nav.leitung")
+            .gate(LEITUNG_GATE)
+            .testId("nav-leitung")
+            .with(PALETTE_ONLY),
+        of("promotion.overview", "/promotion/overview", "nav.promotion")
+            .tab("nav.tab.overview")
+            .keywords("palette.keywords.promotion")
+            .gate(NavigationGate.requires(PROMOTION)),
+        of("promotion.evaluations", "/promotion/my-evaluations", "nav.promotion.my_evaluations")
+            .gate(NavigationGate.requires(PROMOTION))
+            .with(PALETTE_ONLY),
+        of("promotion.manage", "/promotion/manage", "nav.promotion.manage")
+            .tab("nav.tab.manage")
+            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
+            .with(PALETTE_ONLY),
+        of("promotion.topics", "/promotion/admin/topics", "nav.promotion.admin_topics")
+            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
+            .with(PALETTE_ONLY),
+        of("promotion.ranks", "/promotion/admin/rank-requirements", "nav.promotion.admin_ranks")
+            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
+            .with(PALETTE_ONLY));
+  }
+
+  @NotNull
+  private static NavigationGroup buildBank() {
+    return NavigationGroup.of(
+            "bank",
+            "nav.section.bank",
+            ICON_BANK,
+            of("bank.dashboard", "/bank", "nav.section.bank")
+                .tab("nav.tab.dashboard")
+                .keywords("palette.keywords.bank")
+                .testId("nav-bank"),
+            of("bank.manage", "/bank/manage", "nav.bank.manage")
+                .testId("nav-bank-manage")
+                .with(PALETTE_ONLY),
+            of("bank.grants", "/bank/grants", "nav.bank.grants")
+                .gate(NavigationGate.anyRole(Roles.BANK_MANAGEMENT))
+                .testId("nav-bank-grants")
+                .with(PALETTE_ONLY),
+            of("bank.requests", "/bank/requests", "nav.bank.requests")
+                .keywords("palette.keywords.bankRequests")
+                .testId("nav-bank-requests")
+                .with(PALETTE_ONLY))
+        .gate(NavigationGate.anyRole(Roles.BANK_EMPLOYEE));
+  }
+
+  @NotNull
+  private static NavigationGroup buildResources() {
+    return NavigationGroup.of(
+        "resources",
+        "nav.section.resources",
+        ICON_EXTERNAL,
+        of("sclinks.list", "/sc-links", "nav.scLinks")
+            .keywords("palette.keywords.scLinks")
+            .testId("nav-sc-links")
             .with(PALETTE_ONLY));
   }
 
@@ -500,6 +548,22 @@ public class NavigationRegistry {
   @NotNull
   private static List<NavigationPageTabs> buildPageTabs() {
     return List.of(
+        NavigationPageTabs.of("missions.list", "operations.list"),
+        NavigationPageTabs.of("hangar.overview", "hangar.catalog"),
+        NavigationPageTabs.of("storage.overview", "storage.levels")
+            .covering("storage.overview", "storage.my", "storage.all"),
+        NavigationPageTabs.of(
+            "orders.list",
+            "orders.own",
+            "orders.assigned",
+            "orders.demand",
+            "blueprints.availability"),
+        NavigationPageTabs.of("materials.list", "materials.overview", "materials.profit"),
+        NavigationPageTabs.of("supply.needs", "supply.donations", "purchasing.deals"),
+        NavigationPageTabs.of("orgchart.view", "orgunitbank.overview", "organisation.leadership"),
+        NavigationPageTabs.of("promotion.overview", "promotion.evaluations", "promotion.manage")
+            .covering("promotion.manage", "promotion.topics", "promotion.ranks"),
+        NavigationPageTabs.of("bank.dashboard", "bank.manage", "bank.grants", "bank.requests"),
         NavigationPageTabs.of("admin.members.list", "admin.discordregistrations", "admin.terms"),
         NavigationPageTabs.of(
             "admin.orgstructure.structure", "admin.squadrons", "admin.specialcommands"),

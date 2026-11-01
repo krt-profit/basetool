@@ -216,7 +216,7 @@ class JobOrderMaterialDemandRenderTest {
     assertThat(html)
         .as("page head with the logistics eyebrow")
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Logistik<")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box")
         .doesNotContain("btn--cta");

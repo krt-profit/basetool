@@ -146,7 +146,9 @@ class NavigationE2eTest {
         page -> {
           E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
           String overview =
-              page.locator("#sidebar a[href='/materials/overview']").textContent().trim();
+              page.locator(".palette-source-pages a[href='/materials/overview']")
+                  .textContent()
+                  .trim();
           String spelled =
               overview
                   .replace("Ü", "Ue")
@@ -243,6 +245,45 @@ class NavigationE2eTest {
               .click();
           assertThat(page.getByTestId("nav-admin-audit-log")).isVisible();
           assertThat(page.getByTestId("admin-hub")).isVisible();
+        });
+  }
+
+  /**
+   * The member default groups its links by task, shows every group open, and merged pages carry
+   * their siblings as tabs; the Star Citizen links sit in the footer.
+   */
+  @Test
+  void memberDefaultHasTaskGroupsAndTabbedPages() {
+    run(
+        1440,
+        900,
+        "nav-member-default",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          page.locator("#hamburger").click();
+          for (String group : new String[] {"operations", "logistics", "trade", "unit"}) {
+            assertThat(
+                    page.locator(
+                        "#sidebar .nav-mode-main [data-group-key='" + group + "'] .nav-group-head"))
+                .hasAttribute("aria-expanded", "true");
+          }
+          assertThat(page.locator("#sidebar [data-group-key='resources']")).hasCount(0);
+          assertThat(page.getByTestId("nav-missions")).isVisible();
+          assertThat(page.getByTestId("footer-sc-links")).hasAttribute("href", "/sc-links");
+          page.keyboard().press("Escape");
+
+          assertThat(page.getByTestId("page-tab-missions.list"))
+              .hasAttribute("aria-current", "page");
+          page.getByTestId("page-tab-operations.list").click();
+          page.waitForURL(Pattern.compile(".*/operations$"));
+          assertThat(page.getByTestId("page-tab-operations.list"))
+              .hasAttribute("aria-current", "page");
+
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/stock-levels");
+          assertThat(page.getByTestId("page-tab-storage.levels"))
+              .hasAttribute("aria-current", "page");
+          page.getByTestId("page-tab-storage.overview").click();
+          page.waitForURL(Pattern.compile(".*/inventory$"));
         });
   }
 

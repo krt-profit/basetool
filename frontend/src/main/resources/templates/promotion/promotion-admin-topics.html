@@ -10,10 +10,11 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.admin.topics.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='promotion.topics', eyebrowKey='nav.promotion', titleText=#{promotion.admin.topics.title},
         count=${isAllSquadronsMode ? null : #lists.size(topics)}, countId='pa-count', countFor='pa-topics-results',
         actions=~{::pa-actions})}">
         <th:block th:ref="pa-actions">
+            <th:block th:replace="~{promotion/fragments/promotion-management-switch :: switch(active='topics')}"></th:block>
             <button th:unless="${isAllSquadronsMode}" type="button" class="btn btn--cta"
                     data-trigger="pa-open-create-topic" data-testid="page-head-primary">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>

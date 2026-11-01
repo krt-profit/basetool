@@ -224,12 +224,12 @@ class RefineryOrdersListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Logistik<")
         .containsPattern("<h1>Raffinerie</h1>")
         .contains("data-testid=\"refinery-create-link\"")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
-    assertThat(main).doesNotContainPattern("class=\"[^\"]*krtm-");
+    assertThat(main).doesNotContainPattern("class=\"[^\"]*krtm-").doesNotContain(">Staffel<");
     assertThat(html.split("btn--cta", -1)).hasSize(2);
     assertThat(html)
         .contains("data-testid=\"segment-view-running\"")
@@ -245,7 +245,6 @@ class RefineryOrdersListPatternRenderTest {
         .contains("class=\"data-table data-table--stack refinery-table\"")
         .contains(">Ausbeute<")
         .contains(">Fertig<")
-        .doesNotContain(">Staffel<")
         .doesNotContain("colspan")
         .containsPattern(
             "class=\"row-link\"[^>]*href=\"/refinery-orders/00000000-0000-0000-0000-000000001042\"")
