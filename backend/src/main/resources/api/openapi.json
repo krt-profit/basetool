@@ -41684,7 +41684,7 @@
     "/api/v1/orders/by-number" : {
       "get" : {
         "description" : "Returns the orders whose number starts with the given digits that the caller may open: the scoped order list and the orders the caller is an assignee of.",
-        "operationId" : "findJobOrdersByNumber",
+        "operationId" : "findByNumber",
         "parameters" : [ {
           "in" : "query",
           "name" : "number",
