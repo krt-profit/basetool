@@ -2725,19 +2725,21 @@ The navigation concept, the home dashboard, the assignee grant and minimum stock
 signals. Every label is bounded by REQ-OBS-006; **the quick-access search term never reaches a
 label**, a tag, an MDC field or a log line.
 
-- *Shipped for `favourites`, `hidden` and `display`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
+- *Shipped for `favourites`, `hidden`, `display`, `tabbar` and `dashboard`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
   the `navigation` module (`NavigationMetrics`), one increment per preference or dashboard write
   (REQ-UI-032, REQ-UI-034). `section` ∈ `favourites`, `hidden`, `order`, `tabbar`, `display`,
   `dashboard`; `outcome` ∈ `ok`, `conflict` (the `409` of a stale section version), `rejected` (a
   `400` / `403` / `422`). A reset counts once per section it wrote, and a write that moves a page
-  between the favourites and the hidden pages counts once for each of the two. Registered at zero
+  between the favourites and the hidden pages counts once for each of the two. The `tabbar` label
+  covers the bars of both modes. Registered at zero
   for every pair; today the `section` values that exist are registered, and each further section
   adds its own.
-- *Shipped for `favourites`, `hidden` and `display`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
+- *Shipped for `favourites`, `hidden`, `display`, `tabbar` and `dashboard`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
   the `navigation` module's `BusinessGaugeSource` (`NavigationBusinessGauges`) on the
-  business-metrics timer: the number of accounts holding a non-default value in that section (for `display`: a desktop mode
-  other than the drawer, or the shortcuts switched off), same
-  `section` values. It is the data base for deciding a second personalisation round; it carries no
+  business-metrics timer: the number of accounts holding a non-default value in that section (for
+  `display`: a desktop mode other than the drawer, or the shortcuts switched off; for `dashboard`
+  a layout changed from the default), same `section` values. It is the data base for deciding a
+  second personalisation round; it carries no
   account label.
 - *Shipped:* `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
   `InventoryBusinessGauges`: the number of minimum stock levels of active units and listed
@@ -2775,8 +2777,9 @@ rate" on the Operations dashboard.
   above 1 s for 10 min, pinned by `monitoring/prometheus/tests/quick_access_search_slow_test.yml`.
 - *Shipped:* `NavigationEndpointsErroring` (warning): the 5xx share of the preference endpoints
   (`/api/v1/navigation/*` on the backend, `/navigation/*` on the frontend) above 5 % for
-  10 min, pinned by `monitoring/prometheus/tests/navigation_endpoints_erroring_test.yml`; the widget
-  endpoints join its route pattern with the dashboard.
+  10 min, pinned by `monitoring/prometheus/tests/navigation_endpoints_erroring_test.yml`; the
+  dashboard's widget and layout endpoints (`/dashboard/*` on the frontend) are in its route
+  pattern.
 
 A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 

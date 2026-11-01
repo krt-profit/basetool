@@ -250,11 +250,11 @@ class MissionControllerLifecycleTest {
     empty.setId(UUID.randomUUID());
     Page<Mission> page = new PageImpl<>(List.of(crowded, empty), PageRequest.of(0, 20), 2);
     when(missionService.searchMissions(
-            any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+            any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
     when(missionService.registeredCounts(any())).thenReturn(Map.of(crowded.getId(), 7L));
 
-    controller.getAllMissions(null, null, null, null, null, null, null, null);
+    controller.getAllMissions(null, null, null, null, null, null, null, null, null);
 
     ArgumentCaptor<Long> counts = ArgumentCaptor.forClass(Long.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture(), anyBoolean());
@@ -274,12 +274,12 @@ class MissionControllerLifecycleTest {
     other.setId(UUID.randomUUID());
     Page<Mission> page = new PageImpl<>(List.of(joined, other), PageRequest.of(0, 50), 2);
     when(missionService.searchMissions(
-            any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+            any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
     when(missionService.registeredCounts(any())).thenReturn(Map.of());
     when(missionService.signedUpMissionIds(any())).thenReturn(Set.of(joined.getId()));
 
-    controller.getAllMissions(null, null, null, List.of("PLANNED"), null, 0, 50, null);
+    controller.getAllMissions(null, null, null, List.of("PLANNED"), null, null, 0, 50, null);
 
     ArgumentCaptor<Boolean> flags = ArgumentCaptor.forClass(Boolean.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), anyLong(), flags.capture());
@@ -318,17 +318,19 @@ class MissionControllerLifecycleTest {
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
-        controller.getAllMissions(null, null, null, null, null, 0, 20, null);
+        controller.getAllMissions(null, null, null, null, null, null, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(missionService)
         .searchMissions(
+            org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
@@ -343,7 +345,7 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getAllMissions_withQAndFilters_isTheFormerSearchPassedThroughVerbatim() {
+  void getAllMissions_withQAndFilters_isPassedThroughVerbatimIncludingTheOrgUnit() {
     Mission m = new Mission();
     MissionListDto listDto =
         new MissionListDto(
@@ -368,6 +370,7 @@ class MissionControllerLifecycleTest {
     Instant start = Instant.parse("2026-04-01T00:00:00Z");
     Instant end = Instant.parse("2026-06-01T00:00:00Z");
     UUID operationId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
     when(missionService.searchMissions(
             eq("foo"),
             eq(start),
@@ -375,13 +378,14 @@ class MissionControllerLifecycleTest {
             eq(List.of("COMPLETED")),
             eq(null),
             eq(operationId),
+            eq(orgUnitId),
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
         controller.getAllMissions(
-            "foo", start, end, List.of("COMPLETED"), operationId, 0, 20, null);
+            "foo", start, end, List.of("COMPLETED"), operationId, orgUnitId, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     verify(missionService)
@@ -392,6 +396,7 @@ class MissionControllerLifecycleTest {
             eq(List.of("COMPLETED")),
             eq(null),
             eq(operationId),
+            eq(orgUnitId),
             any(Pageable.class));
   }
 

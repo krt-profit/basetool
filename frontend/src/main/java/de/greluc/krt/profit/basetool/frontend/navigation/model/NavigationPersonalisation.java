@@ -26,11 +26,15 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param favourites the favourites section
  * @param hidden the hidden-pages section
+ * @param tabBars the stored phone tab bars of both modes
  */
 public record NavigationPersonalisation(
-    @NotNull NavigationFavourites favourites, @NotNull NavigationHidden hidden) {
+    @NotNull NavigationFavourites favourites,
+    @NotNull NavigationHidden hidden,
+    @NotNull TabBarsResponse tabBars) {
 
   /** The preferences of a caller whose preferences were not read: nothing stored. */
   public static final NavigationPersonalisation NOT_LOADED =
-      new NavigationPersonalisation(NavigationFavourites.NOT_LOADED, NavigationHidden.NOT_LOADED);
+      new NavigationPersonalisation(
+          NavigationFavourites.NOT_LOADED, NavigationHidden.NOT_LOADED, TabBarsResponse.AUTOMATIC);
 }

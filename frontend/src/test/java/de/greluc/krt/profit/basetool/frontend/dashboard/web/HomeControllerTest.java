@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.Collections;
@@ -34,12 +36,20 @@ import org.springframework.ui.Model;
 
 class HomeControllerTest {
 
+  private static DashboardReader reader() {
+    DashboardReader reader = mock(DashboardReader.class);
+    when(reader.read(any(), any(), any(), any()))
+        .thenReturn(DashboardView.notLoaded(DashboardMode.MEMBER));
+    return reader;
+  }
+
   private static final java.util.UUID ANNOUNCEMENT_ID = java.util.UUID.randomUUID();
 
   @Test
   void home_ShouldUsePreferredUsername_InsteadOfFullName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
+    HomeController controller =
+        new HomeController(new DashboardBackendClient(backendApiClient), reader());
     Model model = new ConcurrentModel();
     OidcUser user = mock(OidcUser.class);
 
@@ -58,7 +68,8 @@ class HomeControllerTest {
   @Test
   void markAnnouncementAsReadAjax_success_returns200() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
+    HomeController controller =
+        new HomeController(new DashboardBackendClient(backendApiClient), reader());
 
     var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
 
@@ -70,7 +81,8 @@ class HomeControllerTest {
   @Test
   void markAnnouncementAsReadAjax_backendFailure_reachesTheGlobalHandlerWithItsStatus() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
+    HomeController controller =
+        new HomeController(new DashboardBackendClient(backendApiClient), reader());
     doThrow(new BackendServiceException("not found", null, 404))
         .when(backendApiClient)
         .put(anyString(), any(), any(), any(Object[].class));

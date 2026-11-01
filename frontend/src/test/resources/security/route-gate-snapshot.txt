@@ -284,6 +284,14 @@
 /connected-apps/{clientId} DELETE headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#disconnectClient gate=class:isAuthenticated() layout=no
 /connected-apps/{clientId}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#undo gate=class:isAuthenticated() layout=no
 /csrf GET -> CsrfTokenController#csrf gate=class:isAuthenticated() layout=no
+/dashboard/member/board GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardBoardController#board gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/favourites GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#favourites gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/information GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#information gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/notifications GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#notifications gate=class:isAuthenticated() layout=yes
+/dashboard/widgets/upcoming-days GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#upcomingDays gate=class:isAuthenticated() layout=yes
+/dashboard/{mode} DELETE headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#reset gate=class:isAuthenticated() layout=no
+/dashboard/{mode}/layout PUT headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#replaceLayout gate=class:isAuthenticated() layout=no
+/dashboard/{mode}/widgets/{widgetId}/options PUT headers=[X-Requested-With=XMLHttpRequest] -> DashboardLayoutController#replaceOptions gate=class:isAuthenticated() layout=no
 /error * -> BasicErrorController#error gate=none layout=no
 /error * produces=[text/html] -> BasicErrorController#errorHtml gate=none layout=no
 /hangar GET -> HangarPageController#viewHangar gate=class:isAuthenticated() layout=yes
@@ -441,6 +449,7 @@
 /navigation/favourites-and-hidden PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceFavouritesAndHidden gate=class:isAuthenticated() layout=no
 /navigation/hidden PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceHidden gate=class:isAuthenticated() layout=no
 /navigation/menu GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationMenuFragmentController#fragment gate=class:isAuthenticated() layout=yes
+/navigation/tab-bar/{mode} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceTabBar gate=class:isAuthenticated() layout=no
 /notifications GET -> NotificationPageController#page gate=class:isAuthenticated() layout=yes
 /notifications/page-items GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#pageItems gate=class:isAuthenticated() layout=yes
 /notifications/read DELETE headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#clearRead gate=class:isAuthenticated() layout=yes

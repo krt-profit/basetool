@@ -15,12 +15,169 @@
         margin: 0;
     }
 
-    .home-grid {
+    .home-top {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+
+    .home-top .home-head {
+        flex: 1 1 auto;
+    }
+
+    .dash-hint,
+    .dash-toolbar {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        margin-bottom: var(--space-4);
+    }
+
+    .dash-hint {
+        justify-content: space-between;
+        padding: var(--space-3) var(--space-4);
+        background: var(--surface-panel);
+        border: var(--border-hairline);
+        border-left: 3px solid var(--color-primary);
+    }
+
+    .dash-hint[hidden] {
+        display: none;
+    }
+
+    .dash-board {
+        margin-bottom: var(--space-8);
+    }
+
+    .dash-columns {
         display: grid;
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
         gap: var(--space-6);
         align-items: start;
-        margin-bottom: var(--space-8);
+    }
+
+    .dash-column {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+        min-width: 0;
+    }
+
+    .dash-state {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        align-items: flex-start;
+        margin-bottom: var(--space-4);
+        padding: var(--space-4);
+    }
+
+    .dash-widget.is-unavailable {
+        opacity: 0.6;
+    }
+
+    .dash-widget__body {
+        min-height: var(--space-8);
+    }
+
+    .dash-widget__edit,
+    .dash-widget__edit .krt-reorder {
+        display: none;
+        align-items: center;
+        gap: var(--space-1);
+    }
+
+    .dash-board.is-editing .dash-widget__edit {
+        display: inline-flex;
+    }
+
+    .dash-board.is-editing .dash-widget__edit .krt-reorder {
+        display: inline-flex;
+    }
+
+    .dash-widget__edit .btn {
+        min-width: var(--touch-target-dense);
+        min-height: var(--touch-target-dense);
+    }
+
+    .dash-widget__foot {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: space-between;
+        border-top: var(--border-hairline);
+    }
+
+    .dash-info__editor {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        padding: var(--space-4);
+    }
+
+    .dash-info__admin {
+        padding-top: 0;
+    }
+
+    .dash-info .home-notifs__empty {
+        padding-bottom: var(--space-2);
+    }
+
+    .dash-info .markdown-content,
+    .dash-info .home-info__foot {
+        padding-inline: var(--space-4);
+    }
+
+    .dash-links {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .dash-links > li + li {
+        border-top: var(--border-hairline);
+    }
+
+    .dash-link {
+        display: flex;
+        flex-direction: column;
+        padding: var(--space-3) var(--space-4);
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a.dash-link:hover,
+    a.dash-link:focus-visible {
+        background: var(--control-bg);
+        color: inherit;
+    }
+
+    .dash-link.is-unavailable {
+        color: var(--color-gray-2-text);
+    }
+
+    .dash-catalogue {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .dash-catalogue__item {
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .dash-catalogue__text {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
     }
 
     .home-card-head {
@@ -230,13 +387,18 @@
     }
 
     @media (width <= 1024px) {
-        .home-grid {
+        .dash-columns {
             grid-template-columns: minmax(0, 1fr);
         }
     }
 
     @media (width <= 1024px), (pointer: coarse) {
         .home-card-link {
+            min-height: var(--touch-target);
+        }
+
+        .dash-widget__edit .btn {
+            min-width: var(--touch-target);
             min-height: var(--touch-target);
         }
     }

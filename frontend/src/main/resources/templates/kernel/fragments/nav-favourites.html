@@ -6,7 +6,14 @@
      th:data-keys="${navigationFavourites.keysAttribute()}" th:data-max="${navigationFavourites.max()}"
      th:data-hidden-version="${navigationHidden.version()}" th:data-hidden-keys="${navigationHidden.keysAttribute()}"
      th:data-error="#{nav.favourites.error}" th:data-conflict="#{nav.favourites.conflict}"
-     th:data-full="#{nav.favourites.full}" th:data-hidden-error="#{nav.hidden.error}"></div>
+     th:data-full="#{nav.favourites.full}" th:data-hidden-error="#{nav.hidden.error}"
+     th:data-tabbar-member-version="${navigationTabBars['member'].version()}"
+     th:data-tabbar-member-stored="${navigationTabBars['member'].storedAttribute()}"
+     th:data-tabbar-member-shown="${navigationTabBars['member'].shownAttribute()}"
+     th:data-tabbar-admin-version="${navigationTabBars['admin'].version()}"
+     th:data-tabbar-admin-stored="${navigationTabBars['admin'].storedAttribute()}"
+     th:data-tabbar-admin-shown="${navigationTabBars['admin'].shownAttribute()}"
+     th:data-tabbar-error="#{nav.tabbar.error}"></div>
 
 <div th:fragment="block(mode)" class="nav-favourites" th:data-favourites-mode="${mode}"
      th:with="items=${mode == 'admin'} ? ${navigationFavourites.admin()} : ${navigationFavourites.member()}">

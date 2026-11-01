@@ -59,7 +59,7 @@ class DashboardBackendClientTest {
     Instant start = Instant.parse("2026-10-05T08:30:00.123456Z");
     Instant end = Instant.parse("2026-10-12T08:30:00.123456Z");
 
-    client.upcomingMissions(start, end);
+    client.upcomingMissions(start, end, null);
 
     backend.expect(
         "GET",
@@ -68,6 +68,25 @@ class DashboardBackendClientTest {
             + "&end="
             + end
             + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50");
+  }
+
+  @Test
+  void upcomingMissionsOfAPinnedUnitAskTheBackendForThatUnit() {
+    backend.answerJson(
+        "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}");
+    Instant start = Instant.parse("2026-10-05T08:30:00Z");
+    Instant end = Instant.parse("2026-10-12T08:30:00Z");
+
+    client.upcomingMissions(start, end, ID);
+
+    backend.expect(
+        "GET",
+        "/api/v1/missions?start="
+            + start
+            + "&end="
+            + end
+            + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50&orgUnitId="
+            + ID);
   }
 
   @Test

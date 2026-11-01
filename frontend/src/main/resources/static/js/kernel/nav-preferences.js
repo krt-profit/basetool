@@ -48,6 +48,13 @@ const STATE_FIELDS = [
     'conflict',
     'full',
     'hiddenError',
+    'tabbarMemberVersion',
+    'tabbarMemberStored',
+    'tabbarMemberShown',
+    'tabbarAdminVersion',
+    'tabbarAdminStored',
+    'tabbarAdminShown',
+    'tabbarError',
 ];
 
 /**
@@ -150,6 +157,12 @@ export async function reloadMenu() {
     if (pages && freshPages) {
         krtFetch.setTrustedHtml(pages, freshPages.innerHTML);
     }
+    document.querySelectorAll('[data-nav-swap]').forEach((host) => {
+        const fresh = doc.querySelector(`[data-nav-swap="${host.getAttribute('data-nav-swap')}"]`);
+        if (fresh) {
+            krtFetch.setTrustedHtml(host, fresh.innerHTML);
+        }
+    });
     const state = stateElement();
     const freshState = doc.querySelector(STATE_SELECTOR);
     if (state && freshState instanceof HTMLElement) {

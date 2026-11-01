@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPageTabs;
-import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -50,7 +49,6 @@ import org.jetbrains.annotations.Nullable;
  * @param fanKit the Fan Kit link
  * @param actions the quick access's create and booking actions
  * @param paletteTail the quick access's handbook and language actions
- * @param tabs the phone tab bar's slots that keep a permitted entry
  * @param pageTabs the permitted tab bar of each merged page, by the key of each of its tabs and of
  *     each entry they cover
  */
@@ -65,7 +63,6 @@ public record NavigationMenu(
     @NotNull Group fanKit,
     @NotNull Group actions,
     @NotNull Group paletteTail,
-    @NotNull List<Tab> tabs,
     @NotNull Map<String, Bar> pageTabs) {
 
   /**
@@ -107,7 +104,6 @@ public record NavigationMenu(
         Group.of(registry.fanKit(), access),
         Group.of(registry.actions(), access),
         Group.of(registry.paletteTail(), access),
-        registry.tabs().stream().flatMap(tab -> Tab.of(tab, registry, access).stream()).toList(),
         resolvePageTabs(registry, access));
   }
 
@@ -333,32 +329,4 @@ public record NavigationMenu(
    * @param current whether the tab is the page being shown
    */
   public record PageTab(@NotNull NavigationEntry entry, boolean current) {}
-
-  /**
-   * A phone tab with the entry it opens.
-   *
-   * @param tab the registry slot
-   * @param entry the first permitted candidate entry
-   * @param path the area the tab marks as current: the primary candidate's path
-   */
-  public record Tab(
-      @NotNull NavigationTab tab, @NotNull NavigationEntry entry, @NotNull String path) {
-
-    @NotNull
-    private static Optional<Tab> of(
-        @NotNull NavigationTab tab,
-        @NotNull NavigationRegistry registry,
-        @NotNull NavigationAccess access) {
-      List<NavigationEntry> candidates =
-          tab.entryKeys().stream().flatMap(key -> registry.entry(key).stream()).toList();
-      if (candidates.isEmpty()) {
-        return Optional.empty();
-      }
-      String path = candidates.getFirst().href();
-      return candidates.stream()
-          .filter(entry -> registry.permits(entry, access))
-          .findFirst()
-          .map(entry -> new Tab(tab, entry, path));
-    }
-  }
 }

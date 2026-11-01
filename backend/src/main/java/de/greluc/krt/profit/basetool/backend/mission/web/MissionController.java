@@ -155,6 +155,7 @@ public class MissionController {
    * @param end upper bound on planned start time
    * @param status status filter (one or more)
    * @param operationId optional operation filter
+   * @param orgUnitId optional owning org unit filter; the caller's visibility still applies
    * @return paged mission list DTOs, each saying whether the caller is signed up
    */
   @GetMapping
@@ -169,6 +170,7 @@ public class MissionController {
           Instant end,
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) UUID operationId,
+      @RequestParam(required = false) UUID orgUnitId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -180,7 +182,8 @@ public class MissionController {
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
     Page<Mission> pageResult =
-        missionService.searchMissions(q, start, end, status, null, operationId, pageable);
+        missionService.searchMissions(
+            q, start, end, status, null, operationId, orgUnitId, pageable);
     return PageResponse.of(toListRows(pageResult));
   }
 

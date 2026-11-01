@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,23 +57,29 @@ class NavigationPreferencesReaderTest {
   @BeforeEach
   void setUp() {
     client = mock(NavigationBackendClient.class);
+    NavigationRegistry registry = new NavigationRegistry();
     reader =
         new NavigationPreferencesReader(
-            new NavigationPreferencesLoader(client), client, new NavigationRegistry());
+            new NavigationPreferencesLoader(client),
+            client,
+            registry,
+            new NavigationTabBarResolver(registry));
   }
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
     return new NavigationPreferencesResponse(
         new FavouritesResponse(List.of(keys), version),
         HiddenResponse.EMPTY,
-        AppearanceResponse.DRAWER);
+        AppearanceResponse.DRAWER,
+        TabBarsResponse.AUTOMATIC);
   }
 
   private static NavigationPreferencesResponse storedHidden(long version, String... keys) {
     return new NavigationPreferencesResponse(
         new FavouritesResponse(List.of(), 0),
         new HiddenResponse(List.of(keys), version),
-        AppearanceResponse.DRAWER);
+        AppearanceResponse.DRAWER,
+        TabBarsResponse.AUTOMATIC);
   }
 
   private static List<String> keys(List<Item> items) {

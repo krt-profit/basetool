@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,7 +92,8 @@ class NavigationDesktopModesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(favourites), 0),
                 HiddenResponse.EMPTY,
-                new AppearanceResponse(mode, true, version)));
+                new AppearanceResponse(mode, true, version),
+                TabBarsResponse.AUTOMATIC));
   }
 
   private static RequestPostProcessor member() {
@@ -267,7 +269,8 @@ class NavigationDesktopModesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of("refinery.orders"), 2),
-                new AppearanceResponse(DesktopMode.RAIL, true, 1)));
+                new AppearanceResponse(DesktopMode.RAIL, true, 1),
+                TabBarsResponse.AUTOMATIC));
     String rail = rail(page(member()));
 
     assertThat(rail)
@@ -338,7 +341,8 @@ class NavigationDesktopModesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 HiddenResponse.EMPTY,
-                new AppearanceResponse(DesktopMode.DRAWER, false, 2)));
+                new AppearanceResponse(DesktopMode.DRAWER, false, 2),
+                TabBarsResponse.AUTOMATIC));
     assertThat(page(member())).contains("data-shortcuts=\"false\"");
 
     stored(DesktopMode.DRAWER, 0);

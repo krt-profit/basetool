@@ -54,6 +54,8 @@
     ],
     "dashboard": [
       "dashboard/announcement.js",
+      "dashboard/dashboard-edit.js",
+      "dashboard/dashboard-widgets.js",
       "dashboard/index.js"
     ],
     "exchange": [
@@ -151,6 +153,7 @@
       "kernel/nav-preferences.js",
       "kernel/nav-rail.js",
       "kernel/nav-shortcuts.js",
+      "kernel/nav-tabbar.js",
       "kernel/safe-url.js",
       "kernel/scu-decimal-input.js",
       "kernel/sidebar.js",

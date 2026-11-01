@@ -28,12 +28,14 @@ import org.jetbrains.annotations.NotNull;
  * @param favourites the favourites section
  * @param hidden the hidden-pages section
  * @param appearance the appearance section
+ * @param tabBars the phone tab-bar sections of both modes
  */
 @DtoMirror
 public record NavigationPreferencesResponse(
     @NotNull FavouritesResponse favourites,
     @NotNull HiddenResponse hidden,
-    @NotNull AppearanceResponse appearance) {
+    @NotNull AppearanceResponse appearance,
+    @NotNull TabBarsResponse tabBars) {
 
   /**
    * Fills a section the backend did not send with its empty default.
@@ -41,10 +43,12 @@ public record NavigationPreferencesResponse(
    * @param favourites the favourites section
    * @param hidden the hidden-pages section
    * @param appearance the appearance section
+   * @param tabBars the phone tab-bar sections of both modes
    */
   public NavigationPreferencesResponse {
     favourites = favourites == null ? new FavouritesResponse(null, 0) : favourites;
     hidden = hidden == null ? HiddenResponse.EMPTY : hidden;
     appearance = appearance == null ? AppearanceResponse.DRAWER : appearance;
+    tabBars = tabBars == null ? TabBarsResponse.AUTOMATIC : tabBars;
   }
 }

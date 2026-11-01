@@ -39,6 +39,7 @@ import org.springframework.stereotype.Service;
 public class NavigationPreferencesService {
 
   private final NavigationPreferencesWriter writer;
+  private final NavigationTabBarWriter tabBarWriter;
   private final NavigationAppearanceWriter appearanceWriter;
   private final NavigationMetrics metrics;
 
@@ -104,6 +105,23 @@ public class NavigationPreferencesService {
                 request.favourites().version(),
                 request.hidden().keys(),
                 request.hidden().version()));
+  }
+
+  /**
+   * Replaces the caller's phone tab bar of one mode.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param mode the mode whose bar changes
+   * @param request the three slots and the version the caller last saw
+   * @return the stored bar with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when a key repeats
+   */
+  public @NotNull TabBarResponse replaceTabBar(
+      @NotNull UUID userId, @NotNull NavigationMode mode, @NotNull TabBarUpdateRequest request) {
+    return counted(
+        Set.of(NavigationSection.TAB_BAR),
+        () -> tabBarWriter.replace(userId, mode, request.slots(), request.version()));
   }
 
   /**

@@ -1709,8 +1709,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
   longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
-  safe area) holds Einsätze · Lager · Aufträge · Meldungen (with the unread count) · Menü; the current
-  area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
+  safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
+  default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
   accordion with the current page's group open, the legal links, the handbook and the version at the
   end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
   shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
@@ -1761,7 +1761,7 @@ ADR-0282
 #### Planned amendment (ADR-0297)
 
 **What it replaces.** The *List* zone and the admin groups of „The drawer" and „Information
-architecture", the 769 px drawer threshold, the tab-bar line of „Phones" and the „No data,
+architecture", the 769 px drawer threshold and the „No data,
 nothing mutates" bullet (preferences are written, REQ-UI-032). The header, the context and foot
 zones, the menu filter, tolerant matching, „Rights stay on the server" and accessibility stay; the
 quick access is extended by REQ-UI-033.
@@ -1902,17 +1902,20 @@ stored mode is kept.
   (`nav-appearance.js`). The rail is `nav-rail.js`; `krtChrome.nav.open()` opens the sidebar as an
   overlay in the rail mode, which is what „Anpassen" will call.
 
-**Phone tab bar: five slots.** Slots 1–3 are configurable (REQ-UI-032), slot 4 is the fixed
-„Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
-navigation. One bar per mode.
+**Phone tab bar: five slots** (shipped). Slots 1–3 are configurable (REQ-UI-032), slot 4 is the
+fixed „Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
+navigation. One bar per mode: the member bar shows in member mode, the admin bar in admin mode.
+Every slot is at least 44 px wide and tall and shows the icon of its entry.
 
 | Mode | Default slots 1–3 |
 |---|---|
 | Member | Missionen · Lager · Aufträge |
 | Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
 
-**Enforced by (admin mode shipped):** `AdminNavigationRenderMvcTest` (hub, three collapsed groups,
-13 links, tab bar) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
+**Enforced by (admin mode and phone tab bar shipped):** `AdminNavigationRenderMvcTest` (hub, three
+collapsed groups, 13 links, tab bar) · `NavigationTabBarMvcTest`, `NavigationTabBarResolverTest`
+(the default slots per mode, the fill from the favourites, the stand-in) ·
+`NavigationTabBarE2eTest` (the phone bar at 375 px) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
 tab, in-place requests are not redirected) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
 bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, the tab bar).
 
@@ -1926,7 +1929,7 @@ the admin toggle) · `NavigationAppearanceServiceTest`, `NavigationPreferencesCo
 **Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
 „Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
-tab) · `NavigationE2eTest` (the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
+tab) · **Related:** REQ-UI-032, REQ-UI-033,
 REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
@@ -2298,9 +2301,10 @@ page use it; positions there count the reorderable rows of the rendered page.
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
 > and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", „Darstellung" with the
-> desktop mode and `shortcutsEnabled` (own version, the profile card and the sidebar switch), the
-> privacy flows and the metrics. Planned: the order and the up/down controls of „Anpassen", the tab
-> bar, the start pages of „Darstellung" and the full reset; until they ship, the current code stays
+> desktop mode and `shortcutsEnabled` (own version, the profile card and the sidebar switch), the phone
+> tab bar with its „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the
+> privacy flows and the metrics. Planned: the order and the up/down controls of „Anpassen", the
+> start pages of „Darstellung" and the full reset; until they ship, the current code stays
 > authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
@@ -2434,7 +2438,11 @@ the quick access, no hide control on personal pages, the relays), `NavigationReg
 entries are pages, which tabs leave with a page), `NavigationMenuTest`,
 `NavigationPersonalisationE2eTest` (the star in place, the cap, the 409 hint, hiding with focus and
 announcement, favourite and hidden excluding each other, the resets, 44 px controls up to 1024 px
-and 32 px above), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
+and 32 px above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the
+frozen bar, the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest`
+(the bar per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a
+taken entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin
+bar), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
 full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
@@ -2563,7 +2571,14 @@ ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 
-> **Status: planned** (ADR-0299, map #2800). Until it ships, the current code stays authoritative.
+> **Status: partially shipped** (ADR-0299, map #2800). Shipped: the member dashboard with its
+> default, the framework (two columns, up/down, column switch, remove, catalogue and options
+> dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
+> version per instance, the deletion on role loss, live update or the ten-minute poll, the
+> one-time hint) and the widgets Nächste Tage, Information (with the inline editor for
+> administrators), Favoriten and Benachrichtigungen. Planned: the other catalogue widgets and their
+> options, the admin dashboard and the start page; until they ship, the current code stays
+> authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2662,11 +2677,17 @@ changes the dashboard.
 and alert on a 5xx rate above 5 %; layout and option writes count in
 `basetool_navigation_preference_writes_total` (REQ-OBS-011).
 
-**Enforced by (to be added):** `DashboardLayoutServiceTest` (12-instance cap per mode, layout and
-option versions, owner-only, deletion on role loss) · `DashboardRenderMvcTest` (defaults per mode,
-widgets gated by their data, greyed pinned instances) · `StartPageRedirectMvcTest` (start page per
-mode, deep-link precedence, fallback) · `DashboardE2eTest` (edit mode, catalogue and options,
-phone single column, 10-minute poll on visibility, the hint) · **Related:** REQ-UI-018,
+**Enforced by:** `DashboardServiceTest` (the default, the cap of 12 per mode, layout and option
+versions, owner isolation, deletion by widget type, the write counters),
+`NavigationDashboardControllerTest` (authentication, the admin mode's gate, 409, 404),
+`DashboardReaderTest` and `DashboardRenderMvcTest` (the board per stored layout, greyed pinned
+instances, the empty and error states, deletion on role loss, the hint, the catalogue),
+`DashboardUpcomingDaysWidgetMvcTest`, `DashboardLayoutControllerTest`,
+`DashboardLayoutBackendClientTest`, `DashboardE2eTest` (edit mode, catalogue and options, restore,
+phone single column, the 10-minute poll on visibility, the hint, deletion on role loss), the export
+and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** `StartPageRedirectMvcTest` (start
+page per mode, deep-link precedence, fallback) and the tests of the widgets that follow ·
+**Related:** REQ-UI-018,
 REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-SEC-046,
 REQ-SEC-058, ADR-0299
 

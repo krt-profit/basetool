@@ -1304,10 +1304,13 @@ Favourites, hidden entries, order, tab bar, „Darstellung“, the dashboard and
 **owner-only**: only the user reads, edits and resets their own. There is no admin view and no
 admin reset, and the preferences are not audited. They are part of the data export — the admin
 export for somebody who cannot sign in included (REQ-SEC-058) — and of the admin account merge,
-where the surviving account's choices win (REQ-SEC-046).
+where the surviving account's choices win (REQ-SEC-046). A dashboard widget renders only for a
+user who may read its data: „Nächste Tage“ needs the member role (the mission list is for members
+and above), the others every signed-in user; losing the role deletes the widget's instances on the
+next load, and the admin mode's dashboard is for `ADMIN` only (REQ-UI-034).
 
 The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
-`PUT .../hidden`, `PUT .../favourites-and-hidden` and `POST /api/v1/navigation/preferences/prune`
+`PUT .../hidden`, `PUT .../favourites-and-hidden`, `PUT .../tab-bar/{mode}` and `POST /api/v1/navigation/preferences/prune`
 need only a signed-in user; the owner is always the
 token's subject, no endpoint takes a member id, and a favourite or hidden page is a key of a page the user already
 sees — the entry's own gate stays authoritative.

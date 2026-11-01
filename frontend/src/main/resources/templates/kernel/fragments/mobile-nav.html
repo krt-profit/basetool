@@ -1,18 +1,26 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <body>
-<nav th:fragment="tabbar" class="mobile-tabbar" th:aria-label="#{mobile.tab.aria}">
-    <a th:each="slot : ${navigation.tabs()}" th:href="@{${slot.entry().href()}}" class="mobile-tab"
-       th:data-tab-path="${slot.path()}" th:data-testid="${slot.tab().testId()}"
-       th:data-entry-key="${slot.entry().key()}">
-        <svg th:unless="${slot.entry().unreadBadge()}" class="krt-icon" aria-hidden="true"><use th:href="|#krt-icon-${slot.tab().icon()}|"></use></svg>
-        <span th:if="${slot.entry().unreadBadge()}" class="mobile-tab-icon">
-            <svg class="krt-icon" aria-hidden="true"><use th:href="|#krt-icon-${slot.tab().icon()}|"></use></svg>
+<nav th:fragment="tabbar" class="mobile-tabbar" th:aria-label="#{mobile.tab.aria}"
+     th:with="adminPage=${!navigation.admin().isEmpty() and currentRequestUri != null and (currentRequestUri == '/admin' or currentRequestUri.startsWith('/admin/') or currentRequestUri.startsWith('/admin?'))}">
+    <div class="mobile-tab-slots" data-tabbar-mode="member" th:hidden="${adminPage}"
+         data-nav-swap="tabbar-slots-member">
+        <th:block th:replace="~{kernel/fragments/mobile-nav :: slots('member')}" />
+    </div>
+    <div class="mobile-tab-slots" data-tabbar-mode="admin" th:hidden="${!adminPage}"
+         data-nav-swap="tabbar-slots-admin" th:unless="${navigation.admin().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/mobile-nav :: slots('admin')}" />
+    </div>
+    <a th:each="entry : ${navigation.top().links()}" th:if="${entry.key() == 'notifications.list'}"
+       th:href="@{${entry.href()}}" class="mobile-tab" th:data-tab-path="${entry.href()}"
+       data-testid="mobile-tab-notifications" th:data-entry-key="${entry.key()}">
+        <span class="mobile-tab-icon">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
             <span class="mobile-tab-badge" data-notif-badge
                   th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
                   th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
         </span>
-        <span th:text="#{${slot.tab().labelKey()}}">Einsätze</span>
+        <span th:text="#{mobile.tab.notifications}">Meldungen</span>
     </a>
     <button type="button" class="mobile-tab mobile-tab-menu" id="mobile-menu-toggle" data-testid="mobile-tab-menu"
             aria-controls="sidebar" aria-expanded="false">
@@ -20,5 +28,19 @@
         <span th:text="#{mobile.tab.menu}">Menü</span>
     </button>
 </nav>
+
+<th:block th:fragment="slots(mode)" th:with="bar=${navigationTabBars.get(mode)}">
+    <a th:each="slot : ${bar.slots()}" th:href="@{${slot.entry().href()}}" class="mobile-tab"
+       th:classappend="${slot.standIn()} ? 'is-standin'"
+       th:data-tab-path="${slot.path()}"
+       th:data-nav-paths="${navigation.areaPaths(slot.entry())}"
+       th:data-testid="|mobile-tab-${slot.entry().key()}|"
+       th:data-entry-key="${slot.entry().key()}" th:data-slot-index="${slot.index()}"
+       th:data-stand-in="${slot.standIn()} ? 'true' : null"
+       th:title="${bar.loaded()} ? (${slot.standIn()} ? #{nav.tabbar.standIn} : #{nav.tabbar.longPress}) : null">
+        <svg class="krt-icon" aria-hidden="true"><use th:href="|#krt-icon-${slot.icon()}|"></use></svg>
+        <span th:text="#{${slot.entry().labelKey()}}">Einsätze</span>
+    </a>
+</th:block>
 </body>
 </html>

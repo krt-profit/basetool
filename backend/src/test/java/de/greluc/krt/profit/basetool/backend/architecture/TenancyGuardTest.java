@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationDashboardWidget;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
@@ -128,6 +129,10 @@ class TenancyGuardTest {
   /** Org-unit references that are no tenancy boundary, each with the reason. */
   private static final Map<String, String> NOT_TENANT_SCOPE =
       Map.ofEntries(
+          Map.entry(
+              key(NavigationDashboardWidget.class, "orgUnitId"),
+              "the unit a member pins a widget to, read only by its owner; the widget's data reads"
+                  + " apply the unit's own scope"),
           Map.entry(
               key(JobOrder.class, "requestingOrgUnit"),
               "the customer unit; it grants no queue visibility, the responsible unit scopes the"

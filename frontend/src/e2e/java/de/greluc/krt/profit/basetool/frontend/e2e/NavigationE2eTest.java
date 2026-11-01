@@ -347,7 +347,7 @@ class NavigationE2eTest {
         "nav-phone",
         page -> {
           E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
-          assertThat(page.getByTestId("mobile-tab-missions"))
+          assertThat(page.getByTestId("mobile-tab-missions.list"))
               .hasClass(Pattern.compile("\\bis-active\\b"));
           assertThat(page.locator(".krt-footer")).isHidden();
           assertThat(page.locator("#hamburger")).isHidden();

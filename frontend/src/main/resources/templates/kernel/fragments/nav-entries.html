@@ -39,6 +39,7 @@
         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, #{${item.group().labelKey()}}, false)}" />
     </th:block>
     <th:block th:replace="~{kernel/fragments/nav-favourites :: more('member')}" />
+    <th:block th:replace="~{kernel/fragments/nav-tabbar :: editor('member')}" />
     <th:block th:replace="~{kernel/fragments/nav-entries :: group(${navigation.personal()}, #{${navigation.personal().group().labelKey()}}, true)}" />
 </th:block>
 <th:block th:fragment="adminList">
@@ -52,10 +53,14 @@
         <th:block th:replace="~{kernel/fragments/nav-entries :: group(${item}, |#{nav.admin.crumb} · #{${item.group().labelKey()}}|, false)}" />
     </th:block>
     <th:block th:replace="~{kernel/fragments/nav-favourites :: more('admin')}" />
+    <th:block th:replace="~{kernel/fragments/nav-tabbar :: editor('admin')}" />
 </th:block>
 <th:block th:fragment="swap">
     <th:block th:replace="~{kernel/fragments/nav-favourites :: state}" />
     <div class="palette-source-pages"><th:block th:replace="~{kernel/fragments/palette :: sourcePages}" /></div>
+    <div data-nav-swap="tabbar-slots-member"><th:block th:replace="~{kernel/fragments/mobile-nav :: slots('member')}" /></div>
+    <div data-nav-swap="tabbar-slots-admin" th:unless="${navigation.admin().isEmpty()}"><th:block th:replace="~{kernel/fragments/mobile-nav :: slots('admin')}" /></div>
+    <th:block th:replace="~{kernel/fragments/nav-tabbar :: pickers}" />
     <div class="nav-mode nav-mode-main" data-nav-mode="main"><th:block th:replace="~{kernel/fragments/nav-entries :: mainList}" /></div>
     <div class="nav-mode nav-mode-admin" data-nav-mode="admin" th:unless="${navigation.admin().isEmpty()}"><th:block th:replace="~{kernel/fragments/nav-entries :: adminList}" /></div>
 </th:block>

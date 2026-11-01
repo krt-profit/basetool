@@ -128,6 +128,53 @@ public interface NavigationPreferencesRepository
       @Param("expectedHidden") long expectedHidden);
 
   /**
+   * Bumps one mode's tab-bar version when it still equals the expected one, locking the root row
+   * until the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param member {@code true} for the member bar, {@code false} for the administration bar
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET"
+          + " p.tabBarMemberVersion = CASE WHEN :member = true THEN p.tabBarMemberVersion + 1"
+          + " ELSE p.tabBarMemberVersion END,"
+          + " p.tabBarAdminVersion = CASE WHEN :member = true THEN p.tabBarAdminVersion"
+          + " ELSE p.tabBarAdminVersion + 1 END"
+          + " WHERE p.userId = :userId AND ((:member = true AND p.tabBarMemberVersion = :expected)"
+          + " OR (:member = false AND p.tabBarAdminVersion = :expected))")
+  int bumpTabBarVersionIfMatches(
+      @Param("userId") UUID userId,
+      @Param("member") boolean member,
+      @Param("expected") long expected);
+
+  /**
+   * Bumps one mode's tab-bar version without a check, for a change the member did not echo a
+   * version for.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param member {@code true} for the member bar, {@code false} for the administration bar
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET"
+          + " p.tabBarMemberVersion = CASE WHEN :member = true THEN p.tabBarMemberVersion + 1"
+          + " ELSE p.tabBarMemberVersion END,"
+          + " p.tabBarAdminVersion = CASE WHEN :member = true THEN p.tabBarAdminVersion"
+          + " ELSE p.tabBarAdminVersion + 1 END WHERE p.userId = :userId")
+  void bumpTabBarVersion(@Param("userId") UUID userId, @Param("member") boolean member);
+
+  /**
+   * Counts the members with at least one chosen slot in a phone tab bar.
+   *
+   * @return the number of members that edited a bar
+   */
+  @Query("SELECT COUNT(p) FROM NavigationPreferences p WHERE SIZE(p.tabBar) > 0")
+  long countWithTabBar();
+
+  /**
    * Counts the members with at least one hidden page.
    *
    * @return the number of members that hid a page

@@ -141,4 +141,7 @@ user_roles identity
 navigation_preferences navigation
 navigation_favourite navigation
 navigation_appearance navigation
+navigation_dashboard_layout navigation
+navigation_dashboard_widget navigation
 navigation_hidden navigation
+navigation_tab_bar navigation
