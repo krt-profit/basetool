@@ -406,6 +406,55 @@ class OrgHierarchyMigrationTest {
     }
   }
 
+  /**
+   * Verifies V322 (REQ-ROLE-003): Kommandoleiter and stellv. Kommandoleiter may hold no
+   * Kommandogruppe, while a plain member still may not carry one.
+   */
+  @Test
+  void v322AllowsKommandoleiterWithoutGroup() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    UUID userA = UUID.fromString("ffffff00-0000-0000-0000-000000000322");
+    UUID userB = UUID.fromString("ffffff00-0000-0000-0000-000000000323");
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-000000000324");
+    UUID groupId = UUID.fromString("ffffff00-0000-0000-0000-000000000325");
+    cleanupMemberships(jdbc, userA);
+    cleanupMemberships(jdbc, userB);
+    cleanupKommandoGroups(jdbc, squadronId);
+    cleanup(jdbc, squadronId);
+    cleanupUser(jdbc, userA);
+    cleanupUser(jdbc, userB);
+    try {
+      insertUser(jdbc, userA);
+      insertUser(jdbc, userB);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V322_SQ", "TV322", false, null);
+      insertKommandoGroup(jdbc, groupId, squadronId, "Alpha");
+
+      insertMembership(jdbc, userA, squadronId);
+      updateMembershipRole(jdbc, userA, squadronId, "KOMMANDOLEITER");
+      assertThat(membershipRole(jdbc, userA, squadronId)).isEqualTo("KOMMANDOLEITER");
+      updateMembershipRole(jdbc, userA, squadronId, "STELLV_KOMMANDOLEITER");
+      assertThat(membershipRole(jdbc, userA, squadronId)).isEqualTo("STELLV_KOMMANDOLEITER");
+
+      insertMembership(jdbc, userB, squadronId);
+      assertThatThrownBy(() ->
+              jdbc.update(
+                  "UPDATE org_unit_membership SET kommando_group_id = ?"
+                      + " WHERE user_id = ? AND org_unit_id = ?",
+                  groupId,
+                  userB,
+                  squadronId))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("chk_org_unit_membership_kommando_group_role");
+    } finally {
+      cleanupMemberships(jdbc, userA);
+      cleanupMemberships(jdbc, userB);
+      cleanupKommandoGroups(jdbc, squadronId);
+      cleanup(jdbc, squadronId);
+      cleanupUser(jdbc, userA);
+      cleanupUser(jdbc, userB);
+    }
+  }
+
   private static void insertOrgUnit(
       JdbcTemplate jdbc,
       UUID id,

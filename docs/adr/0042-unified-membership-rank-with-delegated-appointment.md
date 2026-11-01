@@ -2,7 +2,9 @@
 
 - **Status:** Accepted — **amended by [ADR-0300](0300-officer-reach-is-derived-per-org-unit-and-the-keycloak-officer-role-is-retired.md)**
   (planned: a leadership seat also confers officer reach in its unit, the flat `OFFICER` role is
-  retired, and every seat requires `KRT Member`)
+  retired, and every seat requires `KRT Member`) and by
+  [ADR-0322](0322-a-kommandoleiter-needs-no-kommandogruppe.md) (the Kommandogruppe is optional for
+  Kommandoleiter and stellv. as well)
 - **Date:** 2026-06-23
 - **Deciders:** @greluc
 - **Related:** spec [`role-model.md`](../specs/role-model.md) (REQ-ROLE-001..006) · qualifies [ADR-0026](0026-cascading-scope-without-admin.md), [ADR-0027](0027-bereich-ol-aggregate-ownership.md), [ADR-0029](0029-org-chart-visibility-decoupled-from-profit-eligibility.md) · epic #800

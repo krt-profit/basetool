@@ -75,6 +75,11 @@ the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** 
 > `kommando_group`-linked parent (`problem.org_chart.account_managed_in_leitung`), so no chart-only
 > seat can be bolted onto a mirror-managed Kommando. A legacy chart-only Kommando (`kommandoGroupId`
 > = `null`) keeps the full structural CRUD.
+>
+> A **Kommandoleiter or stellv. without a Kommandogruppe** (ADR-0322) is mirrored too: the
+> Kommandoleiter holds an own unnamed Kommando without a group link, whose head offers no rename or
+> remove while an account leads it; the stellv. renders beside the direct Ensigns under the
+> Staffelleiter (`SquadronChartDto.directDeputies`).
 
 ### REQ-ORG-025 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
 
@@ -141,7 +146,7 @@ legacy/ungrouped tier — each its own `role="tree"` (labelled by its tier capti
 every box — person node, unit box, command head, vacant seat — a `role="treeitem"` carrying
 an `aria-level` that matches its depth in that tier's reporting chain (within a Bereich /
 legacy tier: 1 = Bereichsleiter / Area Lead, 2 = Stab member / Staffel- or SK-unit box,
-3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Ensign, 5 = Kommandoleiter,
+3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Stv. / direct Ensign, 5 = Kommandoleiter,
 6 = Stv. Kommandoleiter / Ensign within a Kommando; within the OL tree: 1 = OL root box,
 2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). **Equals are drawn
 as equals: every peer group fans out side by side, never as a vertical spine.** That covers the OL

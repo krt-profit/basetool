@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,6 +50,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mapstruct.factory.Mappers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -721,8 +724,53 @@ class OrgUnitMembershipServiceTest {
                 squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L));
   }
 
+  @ParameterizedTest
+  @EnumSource(
+      value = MembershipRole.class,
+      names = {"KOMMANDOLEITER", "STELLV_KOMMANDOLEITER", "ENSIGN"})
+  void assignSquadronRank_inKommandoRankWithoutGroup_grants(MembershipRole rank) {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved =
+        membershipService.assignSquadronRank(squadronId, userId, rank, null, 0L);
+
+    assertEquals(rank, saved.getRole());
+    assertNull(saved.getKommandoGroup());
+    verify(membershipChangeObserver).onSquadronRankAssigned(squadronId, userId, rank, null);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = MembershipRole.class,
+      names = {"KOMMANDOLEITER", "STELLV_KOMMANDOLEITER", "ENSIGN"})
+  void assignSquadronRank_fifthHolderOfRank_throwsBadRequest(MembershipRole rank) {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership target = squadronMember(squadronId, MembershipRole.MEMBER);
+    List<OrgUnitMembership> roster = new ArrayList<>(List.of(target));
+    for (int i = 0; i < 4; i++) {
+      OrgUnitMembership holder = new OrgUnitMembership();
+      holder.setId(new OrgUnitMembershipId(UUID.randomUUID(), squadronId));
+      holder.setKind(OrgUnitKind.SQUADRON);
+      holder.setRole(rank);
+      roster.add(holder);
+    }
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.of(target));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(roster);
+
+    assertThrows(
+        BadRequestException.class,
+        () -> membershipService.assignSquadronRank(squadronId, userId, rank, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
   @Test
-  void assignSquadronRank_kommandoleiterWithoutGroup_throwsBadRequest() {
+  void assignSquadronRank_staffelleiterWithGroup_throwsBadRequest() {
     UUID squadronId = UUID.randomUUID();
     OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
     when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
@@ -731,7 +779,7 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class,
         () ->
             membershipService.assignSquadronRank(
-                squadronId, userId, MembershipRole.KOMMANDOLEITER, null, 0L));
+                squadronId, userId, MembershipRole.STAFFELLEITER, UUID.randomUUID(), 0L));
     verify(membershipRepository, never()).saveAndFlush(any());
   }
 
