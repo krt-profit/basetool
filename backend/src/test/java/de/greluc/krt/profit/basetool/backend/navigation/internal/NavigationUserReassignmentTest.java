@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant.Moved;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -128,5 +129,27 @@ class NavigationUserReassignmentTest {
 
     assertThat(participant.reassign(member(), target)).isEmpty();
     assertThat(service.read(target).favourites().keys()).containsExactly("a.one");
+  }
+
+  @Test
+  @DisplayName("the tab bar of the target stays and the source's is discarded")
+  void thetargetsTabBarWins() {
+    UUID source = member();
+    UUID target = member();
+    service.replaceTabBar(
+        source,
+        NavigationMode.MEMBER,
+        new TabBarUpdateRequest(List.of("s.one", "s.two", "s.three"), 0L));
+    service.replaceTabBar(
+        target,
+        NavigationMode.MEMBER,
+        new TabBarUpdateRequest(Arrays.asList("t.one", null, null), 0L));
+    store(source, "a.one");
+
+    participant.reassign(source, target);
+
+    assertThat(service.read(target).tabBars().member().slots())
+        .containsExactly("t.one", null, null);
+    assertThat(repository.findById(source)).isEmpty();
   }
 }

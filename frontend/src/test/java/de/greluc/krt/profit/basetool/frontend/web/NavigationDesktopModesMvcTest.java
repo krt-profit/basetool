@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,7 +94,8 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(favourites), 0),
                 HiddenResponse.EMPTY,
                 OrderResponse.EMPTY,
-                new AppearanceResponse(mode, version)));
+                new AppearanceResponse(mode, version),
+                TabBarsResponse.AUTOMATIC));
   }
 
   private static RequestPostProcessor member() {
@@ -270,7 +272,8 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of("refinery.orders"), 2),
                 OrderResponse.EMPTY,
-                new AppearanceResponse(DesktopMode.RAIL, 1)));
+                new AppearanceResponse(DesktopMode.RAIL, 1),
+                TabBarsResponse.AUTOMATIC));
     String rail = rail(page(member()));
 
     assertThat(rail)

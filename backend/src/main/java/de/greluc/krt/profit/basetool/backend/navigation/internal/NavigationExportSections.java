@@ -58,6 +58,12 @@ public class NavigationExportSections implements PersonalDataExportSection {
             JOIN navigation_preferences np ON np.user_id = o.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
+            SELECT 'tabbar-' || lower(t.mode) AS preference_section, t.slot_index AS position,
+                   t.entry_key AS value
+            FROM navigation_tab_bar t
+            JOIN navigation_preferences np ON np.user_id = t.preferences_id
+            WHERE np.user_id = :userId
+            UNION ALL
             SELECT 'desktopMode', 0, a.desktop_mode
             FROM navigation_appearance a
             JOIN navigation_preferences np ON np.user_id = a.preferences_id

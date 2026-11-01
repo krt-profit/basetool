@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersona
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,9 +61,13 @@ class NavigationPreferencesReaderTest {
   @BeforeEach
   void setUp() {
     client = mock(NavigationBackendClient.class);
+    NavigationRegistry registry = new NavigationRegistry();
     reader =
         new NavigationPreferencesReader(
-            new NavigationPreferencesLoader(client), client, new NavigationRegistry());
+            new NavigationPreferencesLoader(client),
+            client,
+            registry,
+            new NavigationTabBarResolver(registry));
   }
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
@@ -70,7 +75,8 @@ class NavigationPreferencesReaderTest {
         new FavouritesResponse(List.of(keys), version),
         HiddenResponse.EMPTY,
         OrderResponse.EMPTY,
-        AppearanceResponse.DRAWER);
+        AppearanceResponse.DRAWER,
+        TabBarsResponse.AUTOMATIC);
   }
 
   private static NavigationPreferencesResponse storedHidden(long version, String... keys) {
@@ -78,7 +84,8 @@ class NavigationPreferencesReaderTest {
         new FavouritesResponse(List.of(), 0),
         new HiddenResponse(List.of(keys), version),
         OrderResponse.EMPTY,
-        AppearanceResponse.DRAWER);
+        AppearanceResponse.DRAWER,
+        TabBarsResponse.AUTOMATIC);
   }
 
   private static List<String> keys(List<Item> items) {
@@ -90,7 +97,8 @@ class NavigationPreferencesReaderTest {
         new FavouritesResponse(List.of(), 0),
         HiddenResponse.EMPTY,
         new OrderResponse(member, OrderModeResponse.EMPTY),
-        AppearanceResponse.DRAWER);
+        AppearanceResponse.DRAWER,
+        TabBarsResponse.AUTOMATIC);
   }
 
   @Test

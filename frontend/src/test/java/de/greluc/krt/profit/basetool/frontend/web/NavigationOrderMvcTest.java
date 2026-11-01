@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import java.util.Map;
 import org.jetbrains.annotations.NotNull;
@@ -88,7 +89,8 @@ class NavigationOrderMvcTest {
                 new FavouritesResponse(List.of(), 0),
                 HiddenResponse.EMPTY,
                 new OrderResponse(member, admin),
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
   }
 
   private static OrderModeResponse order(long version, Map<String, List<String>> scopes) {
@@ -268,9 +270,11 @@ class NavigationOrderMvcTest {
   @DisplayName("the scope write relays the stored order with its new version")
   void relaysTheScopeWrite() throws Exception {
     when(backendApiClient.put(
-            eq(PREFERENCES + "/order/member/groups"),
+            eq(PREFERENCES + "/order/{mode}/{scope}"),
             eq(new OrderScopeUpdateRequest(List.of("logistics", "operations"), 1L)),
-            eq(OrderModeResponse.class)))
+            eq(OrderModeResponse.class),
+            eq("member"),
+            eq("groups")))
         .thenReturn(order(2, Map.of("groups", List.of("logistics", "operations"))));
 
     mockMvc
@@ -313,9 +317,10 @@ class NavigationOrderMvcTest {
   @DisplayName("the reset relays the empty order with its new version")
   void relaysTheReset() throws Exception {
     when(backendApiClient.post(
-            eq(PREFERENCES + "/order/admin/reset"),
+            eq(PREFERENCES + "/order/{mode}/reset"),
             eq(new OrderResetRequest(4L)),
-            eq(OrderModeResponse.class)))
+            eq(OrderModeResponse.class),
+            eq("admin")))
         .thenReturn(order(5, Map.of()));
 
     mockMvc

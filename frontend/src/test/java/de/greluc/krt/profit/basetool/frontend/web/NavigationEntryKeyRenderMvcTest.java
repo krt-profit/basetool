@@ -118,7 +118,7 @@ class NavigationEntryKeyRenderMvcTest {
 
     assertThat(html)
         .containsPattern("<a href=\"/missions\"[^>]*data-entry-key=\"missions\\.list\"")
-        .containsPattern("<a href=\"/missions\"[^>]*data-testid=\"mobile-tab-missions\"")
+        .containsPattern("<a href=\"/missions\"[^>]*data-testid=\"mobile-tab-missions.list\"")
         .containsPattern("<a href=\"/inventory\\?storage=my\"[^>]*data-entry-key=\"storage\\.my\"")
         .containsPattern("<a href=\"/impressum\"[^>]*data-entry-key=\"legal\\.impressum\"");
   }

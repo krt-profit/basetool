@@ -199,6 +199,7 @@ exempt-column|navigation_hidden.entry_key
 exempt-column|navigation_order.entry_key
 exempt-column|navigation_order.mode
 exempt-column|navigation_order.scope
+exempt-column|navigation_tab_bar.entry_key
 exempt-column|notification.entity_type
 exempt-column|notification.params
 exempt-column|notification.type

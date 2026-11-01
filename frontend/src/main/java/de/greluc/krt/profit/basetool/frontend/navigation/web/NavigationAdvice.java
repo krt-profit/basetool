@@ -30,11 +30,15 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationHidden;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationOrder;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPersonalisation;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTabBar;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +72,8 @@ public class NavigationAdvice {
   private final NavigationPreferencesLoader preferences;
 
   private final FrontendAuthHelperService authHelper;
+
+  private final NavigationTabBarResolver tabBarResolver;
 
   /**
    * Resolves what the caller brings to the navigation gates of the current request.
@@ -201,6 +207,34 @@ public class NavigationAdvice {
       @ModelAttribute(name = "navigationPersonalisation", binding = false) @NotNull
           NavigationPersonalisation personalisation) {
     return personalisation.hidden();
+  }
+
+  /**
+   * The caller's phone tab bars, one per mode, for the tab bar and the „Anpassen“ pickers. They
+   * resolve against the defaults when the preferences were not read.
+   *
+   * @param access the caller's roles and flags
+   * @param personalisation the stored preferences
+   * @return the resolved bars by mode; never {@code null}
+   */
+  @ModelAttribute("navigationTabBars")
+  @NotNull
+  public Map<String, NavigationTabBar> tabBars(
+      @ModelAttribute(name = "navigationAccess", binding = false) @NotNull NavigationAccess access,
+      @ModelAttribute(name = "navigationPersonalisation", binding = false) @NotNull
+          NavigationPersonalisation personalisation) {
+    Map<String, NavigationTabBar> bars = new LinkedHashMap<>();
+    for (NavigationMode mode : NavigationMode.values()) {
+      bars.put(
+          mode.getSegment(),
+          tabBarResolver.resolve(
+              mode,
+              personalisation.tabBars().of(mode),
+              personalisation.favourites().loaded(),
+              personalisation.favourites(),
+              access));
+    }
+    return Map.copyOf(bars);
   }
 
   /**

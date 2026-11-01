@@ -345,6 +345,11 @@ class DataExportEndStateTest {
           owner.getId(),
           "logistics");
       jdbc.update(
+          "INSERT INTO navigation_tab_bar (preferences_id, mode, slot_index, entry_key)"
+              + " VALUES (?, 'MEMBER', 1, ?)",
+          owner.getId(),
+          "storage.overview");
+      jdbc.update(
           "INSERT INTO navigation_appearance (preferences_id, desktop_mode) VALUES (?, 'RAIL')",
           owner.getId());
     }

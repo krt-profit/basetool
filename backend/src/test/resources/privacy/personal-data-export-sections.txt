@@ -49,4 +49,4 @@
 49|supplyDonations|ART_15_20|d2a50ef07a187ae8||entry,receiving_unit
 50|purchasingDeals|ART_15_20|671189ea89a219de||entry
 51|purchasingAppointments|ART_15_20|458d0230d3fdb40a||
-52|navigationPreferences|ART_15_20|8380106ce872d3c9||
+52|navigationPreferences|ART_15_20|ab6b40343a144ca6||

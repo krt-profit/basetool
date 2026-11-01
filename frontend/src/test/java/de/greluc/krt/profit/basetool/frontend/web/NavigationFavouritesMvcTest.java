@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateR
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +86,8 @@ class NavigationFavouritesMvcTest {
                 new FavouritesResponse(List.of(keys), version),
                 HiddenResponse.EMPTY,
                 OrderResponse.EMPTY,
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
   }
 
   private static RequestPostProcessor member() {
@@ -157,7 +159,8 @@ class NavigationFavouritesMvcTest {
                 new FavouritesResponse(List.of("refinery.orders"), 4),
                 HiddenResponse.EMPTY,
                 OrderResponse.EMPTY,
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
 
     String html = page(member());
 

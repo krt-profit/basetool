@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +86,8 @@ class NavigationHiddenMvcTest {
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(hidden), hiddenVersion),
                 OrderResponse.EMPTY,
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
   }
 
   private static RequestPostProcessor member() {
@@ -268,7 +270,8 @@ class NavigationHiddenMvcTest {
                 new FavouritesResponse(List.of("a.one"), 2),
                 new HiddenResponse(List.of(), 4),
                 OrderResponse.EMPTY,
-                AppearanceResponse.DRAWER));
+                AppearanceResponse.DRAWER,
+                TabBarsResponse.AUTOMATIC));
 
     mockMvc
         .perform(

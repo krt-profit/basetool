@@ -26,7 +26,7 @@ import jakarta.persistence.Embeddable;
  * One stored key of a mode's order: the key sits in a scope, the groups of the mode or the links of
  * one group, in the position its row has in the member's order list.
  *
- * @param mode the {@link NavigationMode#getTag() mode tag}
+ * @param mode the {@link NavigationMode#getSegment() mode segment}
  * @param scope {@code groups} or the key of the group whose links the key orders
  * @param entryKey the group or link key
  */

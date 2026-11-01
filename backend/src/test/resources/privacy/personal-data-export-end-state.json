@@ -590,6 +590,10 @@
       "preference_section" : "order.member.groups",
       "position" : 0,
       "value" : "logistics"
+    }, {
+      "preference_section" : "tabbar-member",
+      "position" : 1,
+      "value" : "storage.overview"
     } ],
     "truncated" : false
   } ]

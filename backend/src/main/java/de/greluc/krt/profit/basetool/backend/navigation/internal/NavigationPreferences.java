@@ -80,6 +80,14 @@ public class NavigationPreferences {
   @Column(name = "order_admin_version", nullable = false)
   private long orderAdminVersion;
 
+  @Setter
+  @Column(name = "tab_bar_member_version", nullable = false)
+  private long tabBarMemberVersion;
+
+  @Setter
+  @Column(name = "tab_bar_admin_version", nullable = false)
+  private long tabBarAdminVersion;
+
   /**
    * The moved group and link keys of both modes, scope by scope; the list position is the stored
    * order, and a scope's keys are contiguous per mode.
@@ -89,6 +97,11 @@ public class NavigationPreferences {
   @CollectionTable(name = "navigation_order", joinColumns = @JoinColumn(name = "preferences_id"))
   @OrderColumn(name = "order_index")
   private List<OrderRow> orderRows = new ArrayList<>();
+
+  /** The chosen slots of both modes' phone tab bars; a slot without a row is automatic. */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "navigation_tab_bar", joinColumns = @JoinColumn(name = "preferences_id"))
+  private Set<TabBarSlot> tabBar = new LinkedHashSet<>();
 
   /** The hidden page keys; a page is never both hidden and a favourite. */
   @ElementCollection(fetch = FetchType.EAGER)
@@ -125,6 +138,45 @@ public class NavigationPreferences {
   }
 
   /**
+   * Replaces the chosen slots of one mode's tab bar.
+   *
+   * @param mode the mode whose bar changes
+   * @param slots {@link NavigationLimits#TAB_BAR_SLOTS} entries, {@code null} for an automatic slot
+   */
+  public void replaceTabBar(NavigationMode mode, List<String> slots) {
+    tabBar.removeIf(slot -> slot.mode() == mode);
+    for (int index = 0; index < slots.size(); index++) {
+      if (slots.get(index) != null) {
+        tabBar.add(new TabBarSlot(mode, index, slots.get(index)));
+      }
+    }
+  }
+
+  /**
+   * Reads the slots of one mode's tab bar.
+   *
+   * @param mode the mode
+   * @return {@link NavigationLimits#TAB_BAR_SLOTS} entries, {@code null} for an automatic slot
+   */
+  public List<String> tabBarSlots(NavigationMode mode) {
+    List<String> slots = new ArrayList<>(NavigationLimits.automaticSlots());
+    tabBar.stream()
+        .filter(slot -> slot.mode() == mode)
+        .forEach(slot -> slots.set(slot.slotIndex(), slot.entryKey()));
+    return slots;
+  }
+
+  /**
+   * The version of one mode's tab-bar section.
+   *
+   * @param mode the mode
+   * @return the section's current version
+   */
+  public long tabBarVersion(NavigationMode mode) {
+    return mode == NavigationMode.MEMBER ? tabBarMemberVersion : tabBarAdminVersion;
+  }
+
+  /**
    * Replaces the hidden page keys.
    *
    * @param keys the new hidden keys
@@ -143,7 +195,7 @@ public class NavigationPreferences {
   public Map<String, List<String>> orderOf(NavigationMode mode) {
     Map<String, List<String>> scopes = new LinkedHashMap<>();
     orderRows.stream()
-        .filter(row -> row.mode().equals(mode.getTag()))
+        .filter(row -> row.mode().equals(mode.getSegment()))
         .forEach(
             row -> scopes.computeIfAbsent(row.scope(), _ -> new ArrayList<>()).add(row.entryKey()));
     return scopes;
@@ -167,8 +219,8 @@ public class NavigationPreferences {
    * @param keys the scope's keys in their new order
    */
   public void replaceOrderScope(NavigationMode mode, String scope, List<String> keys) {
-    orderRows.removeIf(row -> row.mode().equals(mode.getTag()) && row.scope().equals(scope));
-    keys.forEach(key -> orderRows.add(new OrderRow(mode.getTag(), scope, key)));
+    orderRows.removeIf(row -> row.mode().equals(mode.getSegment()) && row.scope().equals(scope));
+    keys.forEach(key -> orderRows.add(new OrderRow(mode.getSegment(), scope, key)));
   }
 
   /**
@@ -177,7 +229,7 @@ public class NavigationPreferences {
    * @param mode the navigation mode
    */
   public void clearOrder(NavigationMode mode) {
-    orderRows.removeIf(row -> row.mode().equals(mode.getTag()));
+    orderRows.removeIf(row -> row.mode().equals(mode.getSegment()));
   }
 
   /**
@@ -190,7 +242,7 @@ public class NavigationPreferences {
     Set<NavigationMode> changed = EnumSet.noneOf(NavigationMode.class);
     for (NavigationMode mode : NavigationMode.values()) {
       if (orderRows.removeIf(
-          row -> row.mode().equals(mode.getTag()) && keys.contains(row.entryKey()))) {
+          row -> row.mode().equals(mode.getSegment()) && keys.contains(row.entryKey()))) {
         changed.add(mode);
       }
     }

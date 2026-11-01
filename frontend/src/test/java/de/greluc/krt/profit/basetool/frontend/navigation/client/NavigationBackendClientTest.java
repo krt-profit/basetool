@@ -27,11 +27,16 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -157,5 +162,33 @@ class NavigationBackendClientTest {
     client.prune(List.of("admin.terms"));
 
     backend.expect("POST", "/api/v1/navigation/preferences/prune", "{\"keys\":[\"admin.terms\"]}");
+  }
+
+  @Test
+  void readsTheTabBarsOfBothModes() {
+    backend.answerJson(
+        "{\"tabBars\":{\"member\":{\"slots\":[\"a.one\",null,\"c.three\"],\"version\":2},"
+            + "\"admin\":{\"slots\":[null,null,null],\"version\":0}}}");
+
+    TabBarsResponse bars = client.preferences().tabBars();
+
+    assertThat(bars.member().slots()).containsExactly("a.one", null, "c.three");
+    assertThat(bars.member().version()).isEqualTo(2);
+    assertThat(bars.admin()).isEqualTo(TabBarResponse.AUTOMATIC);
+  }
+
+  @Test
+  void putsOneModesTabBarWithItsVersion() {
+    backend.answerJson("{\"slots\":[\"a.one\",null,null],\"version\":3}");
+
+    TabBarResponse stored =
+        client.replaceTabBar(
+            NavigationMode.ADMIN, new TabBarUpdateRequest(Arrays.asList("a.one", null, null), 2L));
+
+    assertThat(stored.version()).isEqualTo(3);
+    backend.expect(
+        "PUT",
+        "/api/v1/navigation/preferences/tab-bar/admin",
+        "{\"slots\":[\"a.one\",null,null],\"version\":2}");
   }
 }

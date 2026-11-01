@@ -39,6 +39,7 @@ import org.springframework.stereotype.Service;
 public class NavigationPreferencesService {
 
   private final NavigationPreferencesWriter writer;
+  private final NavigationTabBarWriter tabBarWriter;
   private final NavigationAppearanceWriter appearanceWriter;
   private final NavigationMetrics metrics;
 
@@ -126,7 +127,11 @@ public class NavigationPreferencesService {
         Set.of(NavigationSection.ORDER),
         () ->
             writer.replaceOrderScope(
-                userId, NavigationMode.fromTag(mode), scope, request.keys(), request.version()));
+                userId,
+                NavigationMode.fromSegment(mode),
+                scope,
+                request.keys(),
+                request.version()));
   }
 
   /**
@@ -143,7 +148,24 @@ public class NavigationPreferencesService {
       @NotNull UUID userId, @NotNull String mode, @NotNull OrderResetRequest request) {
     return counted(
         Set.of(NavigationSection.ORDER),
-        () -> writer.resetOrder(userId, NavigationMode.fromTag(mode), request.version()));
+        () -> writer.resetOrder(userId, NavigationMode.fromSegment(mode), request.version()));
+  }
+
+  /**
+   * Replaces the caller's phone tab bar of one mode.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param mode the mode whose bar changes
+   * @param request the three slots and the version the caller last saw
+   * @return the stored bar with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   * @throws BadRequestException when a key repeats
+   */
+  public @NotNull TabBarResponse replaceTabBar(
+      @NotNull UUID userId, @NotNull NavigationMode mode, @NotNull TabBarUpdateRequest request) {
+    return counted(
+        Set.of(NavigationSection.TAB_BAR),
+        () -> tabBarWriter.replace(userId, mode, request.slots(), request.version()));
   }
 
   /**

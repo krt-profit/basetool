@@ -25,8 +25,10 @@ import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBacken
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -167,6 +169,29 @@ public class NavigationPreferencesController {
 
   private static boolean pathSegment(@NotNull String segment) {
     return SEGMENT.matcher(segment).matches();
+  }
+
+  /**
+   * Replaces the caller's phone tab bar of one mode.
+   *
+   * @param mode the path segment of the mode, {@code member} or {@code admin}
+   * @param request the three slots and the mode's tab-bar version the caller last saw
+   * @return {@code 200} with the stored bar and its version, {@code 404} for an unknown mode,
+   *     {@code 422} with code {@code VALIDATION} for an incomplete payload, or the relayed backend
+   *     {@code problem+json}, a {@code 409} for a stale version included
+   */
+  @PutMapping(value = "/tab-bar/{mode}", headers = AJAX)
+  public ResponseEntity<Object> replaceTabBar(
+      @PathVariable String mode, @RequestBody @Nullable TabBarUpdateRequest request) {
+    NavigationMode target = NavigationMode.fromSegment(mode).orElse(null);
+    if (target == null) {
+      return ResponseEntity.notFound().build();
+    }
+    if (request == null || request.slots() == null || request.version() == null) {
+      return validationError();
+    }
+    return relayed(
+        "replace the navigation tab bar (ajax)", () -> client.replaceTabBar(target, request));
   }
 
   private static boolean complete(@Nullable FavouritesUpdateRequest request) {

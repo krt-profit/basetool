@@ -325,6 +325,7 @@ PUT /api/v1/navigation/preferences/hidden | NavigationPreferencesController#repl
 POST /api/v1/navigation/preferences/order/{mode}/reset | NavigationPreferencesController#resetOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/navigation/preferences/order/{mode}/{scope} | NavigationPreferencesController#replaceOrderScope | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/navigation/preferences/prune | NavigationPreferencesController#prune | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/navigation/preferences/tab-bar/{mode} | NavigationPreferencesController#replaceTabBar | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/notifications | NotificationController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/notifications/admin/rules | NotificationRuleController#list | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/notifications/admin/rules | NotificationRuleController#create | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)

@@ -27,11 +27,14 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesRespons
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderModeResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.PruneRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -54,6 +57,8 @@ public class NavigationBackendClient {
   private static final String HIDDEN = PREFERENCES + "/hidden";
 
   private static final String FAVOURITES_AND_HIDDEN = PREFERENCES + "/favourites-and-hidden";
+
+  private static final String TAB_BAR = PREFERENCES + "/tab-bar/{mode}";
 
   private static final String PRUNE = PREFERENCES + "/prune";
 
@@ -145,6 +150,19 @@ public class NavigationBackendClient {
   public OrderModeResponse resetOrder(@NotNull String mode, @NotNull OrderResetRequest request) {
     return backendApiClient.post(
         PREFERENCES + "/order/{mode}/reset", request, OrderModeResponse.class, mode);
+  }
+
+  /**
+   * Replaces the caller's phone tab bar of one mode.
+   *
+   * @param mode the mode whose bar changes
+   * @param request the three slots and the version the caller last saw
+   * @return the stored bar with the new version, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public TabBarResponse replaceTabBar(
+      @NotNull NavigationMode mode, @NotNull TabBarUpdateRequest request) {
+    return backendApiClient.put(TAB_BAR, request, TabBarResponse.class, mode.getSegment());
   }
 
   /**

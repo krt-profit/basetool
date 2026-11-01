@@ -17,7 +17,7 @@
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
 > ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned; REQ-UI-033
-> partially shipped) ·
+> shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -1709,8 +1709,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
   longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
-  safe area) holds Einsätze · Lager · Aufträge · Meldungen (with the unread count) · Menü; the current
-  area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
+  safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
+  default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
   accordion with the current page's group open, the legal links, the handbook and the version at the
   end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
   shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
@@ -1761,7 +1761,7 @@ ADR-0282
 #### Planned amendment (ADR-0297)
 
 **What it replaces.** The *List* zone and the admin groups of „The drawer" and „Information
-architecture", the 769 px drawer threshold, the tab-bar line of „Phones" and the „No data,
+architecture", the 769 px drawer threshold and the „No data,
 nothing mutates" bullet (preferences are written, REQ-UI-032). The header, the context and foot
 zones, the menu filter, tolerant matching, „Rights stay on the server" and accessibility stay; the
 quick access is extended by REQ-UI-033.
@@ -1902,17 +1902,20 @@ stored mode is kept.
   (`nav-appearance.js`). The rail is `nav-rail.js`; `krtChrome.nav.open()` opens the sidebar as an
   overlay in the rail mode, which is what „Anpassen" will call.
 
-**Phone tab bar: five slots.** Slots 1–3 are configurable (REQ-UI-032), slot 4 is the fixed
-„Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
-navigation. One bar per mode.
+**Phone tab bar: five slots** (shipped). Slots 1–3 are configurable (REQ-UI-032), slot 4 is the
+fixed „Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
+navigation. One bar per mode: the member bar shows in member mode, the admin bar in admin mode.
+Every slot is at least 44 px wide and tall and shows the icon of its entry.
 
 | Mode | Default slots 1–3 |
 |---|---|
 | Member | Missionen · Lager · Aufträge |
 | Admin | Admin-Dashboard · Mitgliederverwaltung · Audit-Logs |
 
-**Enforced by (admin mode shipped):** `AdminNavigationRenderMvcTest` (hub, three collapsed groups,
-13 links, tab bar) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
+**Enforced by (admin mode and phone tab bar shipped):** `AdminNavigationRenderMvcTest` (hub, three
+collapsed groups, 13 links, tab bar) · `NavigationTabBarMvcTest`, `NavigationTabBarResolverTest`
+(the default slots per mode, the fill from the favourites, the stand-in) ·
+`NavigationTabBarE2eTest` (the phone bar at 375 px) · `NavigationLegacyRedirectMvcTest` (every merged admin URL reaches its page and
 tab, in-place requests are not redirected) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
 bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, the tab bar).
 
@@ -1926,7 +1929,7 @@ the admin toggle) · `NavigationAppearanceServiceTest`, `NavigationPreferencesCo
 **Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
 „Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
-tab) · `NavigationE2eTest` (the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
+tab) · **Related:** REQ-UI-032, REQ-UI-033,
 REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
@@ -2299,8 +2302,9 @@ page use it; positions there count the reorderable rows of the rendered page.
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
 > and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the order of groups and
 > links with the up/down controls and „Standardreihenfolge", „Darstellung" with the desktop mode
-> (own version, the profile card and the sidebar switch), the privacy flows and the metrics.
-> Planned: the tab bar, `shortcutsEnabled` and the start pages of „Darstellung" and the full
+> (own version, the profile card and the sidebar switch), the phone tab bar with its
+> „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the privacy flows and
+> the metrics. Planned: `shortcutsEnabled` and the start pages of „Darstellung" and the full
 > reset; until they ship, the current code stays
 > authoritative for them.
 
@@ -2441,17 +2445,15 @@ other sections, the reset, the deletion of entries, the metric), `NavigationOrde
 `NavigationOrderMvcTest` (the rendered order, the move controls, the relays),
 `NavigationOrderE2eTest` (moving by button and by Alt+Arrow without a drag, focus kept, the live
 announcement, reload, „Standardreihenfolge", the 409 hint, 44 px controls up to 1024 px and 32 px
-above), the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the full
-reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
+above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the frozen bar,
+the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest` (the bar
+per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a taken
+entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin bar),
+the export and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the
+full reset's confirmation and the tests of the sections that follow · **Related:** REQ-UI-026, REQ-UI-031, REQ-UI-033, REQ-UI-034, REQ-UI-035,
 REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0298
 
 ### REQ-UI-033 — The quick access finds entities, takes prefixes and ranks by use
-
-> **Status: partially shipped** (ADR-0297, map #2800). Shipped: the entity search for all eight
-> types, the limits, the prefixes with their help, the mixed ranking by match quality and the kept
-> highlight. Still planned, with the current code and the quick-access text of REQ-UI-026
-> authoritative until they ship: „Häufig", the empty state, filtering of hidden pages, the
-> additional actions and the dialog keys.
 
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
@@ -2518,13 +2520,19 @@ The actions follow in their own group. Entity hits arrive later and the list re-
 highlighted hit stays highlighted and Enter opens exactly it. Each entity row shows the type, the
 status and the date as its breadcrumb.
 
-**„Häufig".** A per-device ranking in `localStorage`: every page or tab visit counts, however it
-was reached; entry keys only; each visit decays over about 30 days. It ranks typed results and
-fills the empty state; the navigation never reorders itself by use.
+**„Häufig".** A per-device ranking in `localStorage` (`krt.frequent`): every page or tab visit
+counts, however it was reached; entry keys only; each visit decays over about 30 days. It ranks
+typed results and fills the empty state; the navigation never reorders itself by use. A visit
+weighs 1 and falls linearly to 0 over 30 days; an entry is „häufig" from a summed weight of 2.
+In the ranking the weighted sum lifts a page by up to 1.5 match steps (full lift from a sum of 10), so a
+frequently used weaker match can pass a slightly better unused one and a match two steps better
+still wins. The store keeps at most 30 visits per entry and 200 entries, and every storage access
+is wrapped in a try/catch.
 
-**Empty state.** Favoriten, then Häufig, then Zuletzt (`krt.recent`), without duplicates: an
-entry shown in a higher section is left out of the lower ones. Entity hits never enter Zuletzt or
-Häufig, so no entity or member name reaches `localStorage`.
+**Empty state.** Favoriten, then Häufig (at most 5), then Zuletzt (`krt.recent`, at most 4),
+without duplicates: an entry shown in a higher section is left out of the lower ones. Entries are
+identified by their stable entry key, a page without an entry by its path. Entity hits never
+enter Zuletzt or Häufig, so no entity or member name reaches `localStorage`.
 
 **Filtering.** A hidden page and its tabs, and every entry unavailable in the active context
 (REQ-UI-026), are left out; entity hits and actions of a hidden page stay.
@@ -2532,14 +2540,19 @@ Häufig, so no entity or member name reaches `localStorage`.
 **Actions** (in addition to those of REQ-UI-026):
 
 - Navigation: favourite / unfavourite this page, hide this page, open „Anpassen" (REQ-UI-032).
+  Each is offered only where the drawer's own control exists (the star of the page, its hide
+  control, the „Anpassen" toggle), and the favourite action is left out at the cap of twelve.
+  A favourite toggle is the favourites write of REQ-UI-032: in place, with its 409 handling.
 - Create actions for the tabbed pages, each gated like the form it opens.
 - **Page context actions:** a page may contribute actions that only navigate or open the dialog or
   form it already has; they never mutate, so confirmation, permission, audit and live update stay
-  on the existing path.
+  on the existing path. A page marks the element with `data-palette-action="<name>"` (and an
+  optional `data-palette-icon`); choosing the action clicks it.
 
-**Keys in the dialog.** Ctrl+Enter opens the highlighted hit in a new browser tab; Tab accepts a
-suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or tab (intercepted
-only while the dialog is open).
+**Keys in the dialog.** Ctrl+Enter (Cmd+Enter on macOS) opens the highlighted hit in a new browser
+tab; Tab accepts a suggested prefix row; Ctrl+D favourites or unfavourites the highlighted page or
+tab (intercepted only while the dialog is open). Ctrl+D leaves the dialog open, marks the row with
+a star and says the result in a polite status line.
 
 **Monitoring:** `basetool_quick_access_search_total{kind,outcome}` (REQ-OBS-011); the p95 of
 `/quick-access/search` alerts above 1 s for 10 minutes (`QuickAccessSearchSlow`).
@@ -2551,13 +2564,15 @@ limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTe
 `ShipQuickAccessSearchContributorTest`, `OrgUnitQuickAccessSearchContributorTest`,
 `MemberQuickAccessSearchContributorTest` (exactly the chart's people),
 `JobOrderQuickAccessSearchContributorTest` (the read the page uses) · `QuickAccessFoldTest` · `:frontend:testSearchJs`
-(prefix parsing, ranking, the admin-mode target) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
+(prefix parsing, ranking, the admin-mode target, the decay and the empty-state de-duplication) ·
+`NavigationCurrentEntryTest`, `NavigationRenderMvcTest` (which links can be favourites) ·
+`NavigationE2eTest` (Ctrl+Enter, Tab, Ctrl+D, the empty state without duplicates, hidden pages
+filtered while their hits and actions stay, a page-contributed action) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
 `krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
-`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **To be added:**
-`:frontend:testSearchJs` (decay, empty-state de-duplication) · `NavigationE2eTest` (Ctrl+Enter,
-Tab, Ctrl+D, hidden pages filtered) · **Code:** `shell/web/QuickAccessSearchController.java`,
+`monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **Code:** `shell/web/QuickAccessSearchController.java`,
 `shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
 `kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
+`static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
 `static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
 ADR-0282, ADR-0297
 

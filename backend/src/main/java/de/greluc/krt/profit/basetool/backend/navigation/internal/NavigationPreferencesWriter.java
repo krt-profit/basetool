@@ -58,6 +58,8 @@ public class NavigationPreferencesWriter {
   private final NavigationPreferencesRepository repository;
   private final NavigationAppearanceWriter appearance;
 
+  private final NavigationTabBarWriter tabBarWriter;
+
   /**
    * Reads every section of the member; a member without a row holds the empty defaults.
    *
@@ -75,7 +77,8 @@ public class NavigationPreferencesWriter {
                 new HiddenResponse(List.of(), 0),
                 new OrderResponse(
                     new OrderModeResponse(Map.of(), 0), new OrderModeResponse(Map.of(), 0)),
-                new AppearanceResponse(DesktopMode.DRAWER, 0)));
+                new AppearanceResponse(DesktopMode.DRAWER, 0),
+                TabBarsResponse.AUTOMATIC));
   }
 
   /**
@@ -242,6 +245,7 @@ public class NavigationPreferencesWriter {
             changed.add(NavigationSection.ORDER);
           }
         });
+    changed.addAll(tabBarWriter.prune(userId, gone));
     return changed;
   }
 
@@ -327,7 +331,10 @@ public class NavigationPreferencesWriter {
         new OrderResponse(
             toOrder(preferences, NavigationMode.MEMBER),
             toOrder(preferences, NavigationMode.ADMIN)),
-        appearance.read(preferences.getUserId(), preferences.getAppearanceVersion()));
+        appearance.read(preferences.getUserId(), preferences.getAppearanceVersion()),
+        new TabBarsResponse(
+            NavigationTabBarWriter.response(preferences, NavigationMode.MEMBER),
+            NavigationTabBarWriter.response(preferences, NavigationMode.ADMIN)));
   }
 
   private static FavouritesResponse favouritesOf(NavigationPreferences preferences) {

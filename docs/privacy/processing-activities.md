@@ -57,8 +57,9 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Legal basis:** Art. 6(1)(b) and Art. 6(1)(f).
 - **Where:** the operational tables — `inventory_item*`, `ship`, `mission*`, `operation*`,
   `job_order*`, `refinery_order`, `personal_inventory_item`, `personal_blueprint`,
-  `navigation_preferences`, `navigation_favourite`, `navigation_hidden`, `navigation_order` (the
-  member's own favourites, hidden pages and group and link order as entry keys, no free text),
+  `navigation_preferences`, `navigation_favourite`, `navigation_hidden`, `navigation_order`,
+  `navigation_tab_bar` (the member's own favourites, hidden pages, group and link order and
+  tab-bar slots as entry keys, no free text),
   `navigation_appearance` (the chosen desktop mode, an enumerated value),
   `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,
   `announcement`.

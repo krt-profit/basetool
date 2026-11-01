@@ -443,6 +443,7 @@
 /navigation/menu GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationMenuFragmentController#fragment gate=class:isAuthenticated() layout=yes
 /navigation/order/{mode}/reset POST headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#resetOrder gate=class:isAuthenticated() layout=no
 /navigation/order/{mode}/{scope} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceOrderScope gate=class:isAuthenticated() layout=no
+/navigation/tab-bar/{mode} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceTabBar gate=class:isAuthenticated() layout=no
 /notifications GET -> NotificationPageController#page gate=class:isAuthenticated() layout=yes
 /notifications/page-items GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#pageItems gate=class:isAuthenticated() layout=yes
 /notifications/read DELETE headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#clearRead gate=class:isAuthenticated() layout=yes

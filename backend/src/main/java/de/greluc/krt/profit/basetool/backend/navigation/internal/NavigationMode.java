@@ -25,7 +25,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
-/** A navigation mode whose order is stored apart (REQ-UI-032); its tag is the path segment. */
+/**
+ * The two navigation modes whose sections are stored per mode (REQ-UI-032); its path segment names
+ * the mode in the endpoints.
+ */
 @Getter
 @RequiredArgsConstructor
 public enum NavigationMode {
@@ -36,19 +39,19 @@ public enum NavigationMode {
   /** The administration navigation. */
   ADMIN("admin");
 
-  private final String tag;
+  private final String segment;
 
   /**
-   * Resolves a mode from its path segment.
+   * Resolves the mode named by a path segment.
    *
-   * @param tag the segment, e.g. {@code member}
+   * @param segment the path segment, e.g. {@code member}
    * @return the mode
    * @throws BadRequestException when the segment names no mode
    */
-  public static @NotNull NavigationMode fromTag(@NotNull String tag) {
+  public static @NotNull NavigationMode fromSegment(@NotNull String segment) {
     return Arrays.stream(values())
-        .filter(mode -> mode.tag.equals(tag))
+        .filter(mode -> mode.segment.equals(segment))
         .findFirst()
-        .orElseThrow(() -> new BadRequestException("Unknown navigation mode."));
+        .orElseThrow(() -> new BadRequestException("Unknown navigation mode: " + segment));
   }
 }
