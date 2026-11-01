@@ -166,9 +166,10 @@ const SERVER_MATCH_SCORE = 3;
 
 /**
  * Ranks pages and server hits into one list: by score, a page before a server hit of the same
- * score, then in the given order. Server hits always stay, since the server matched them.
+ * score, the more often used page first, then in the given order. Server hits always stay, since
+ * the server matched them.
  *
- * @template {{ foldLabel: string, foldRest: string, fromServer?: boolean }} T
+ * @template {{ foldLabel: string, foldRest: string, fromServer?: boolean, frequency?: number }} T
  * @param {T[]} items the candidates
  * @param {string} q the folded query
  * @returns {T[]} the matching items, best first
@@ -184,7 +185,10 @@ export function krtSearchRank(items, q) {
         })
         .sort((a, b) => {
             return (
-                a.s - b.s || Number(!!a.item.fromServer) - Number(!!b.item.fromServer) || a.i - b.i
+                a.s - b.s ||
+                Number(!!a.item.fromServer) - Number(!!b.item.fromServer) ||
+                (b.item.frequency || 0) - (a.item.frequency || 0) ||
+                a.i - b.i
             );
         })
         .map((x) => {

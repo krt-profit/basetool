@@ -215,6 +215,26 @@ class NavigationRenderMvcTest {
   }
 
   /**
+   * The quick access can favourite exactly the group pages: their links carry {@code
+   * data-starrable}, and the palette carries the texts of the empty state and its live messages
+   * (REQ-UI-033).
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void quickAccessKnowsWhichLinksAreStarrable() throws Exception {
+    String html = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+
+    assertThat(section(SIDEBAR, html))
+        .containsPattern("href=\"/hangar\"[^>]*data-starrable=\"true\"");
+    assertThat(html)
+        .contains("data-favourites=\"")
+        .contains("data-frequent=\"")
+        .contains("data-live-favourite-added=\"")
+        .contains("data-palette-live");
+  }
+
+  /**
    * A member without profit access who is an assignee gets the „Aufträge" link and an orders tab
    * that opens the list; without an entry neither shows (REQ-ORDERS-040).
    *
