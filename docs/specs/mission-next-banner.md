@@ -33,8 +33,9 @@ something the squadron is heading towards, and returning it as "next mission" is
 The `/next` lookup must also be **org-unit relevant**. A member should get the next mission of their
 _own_ org unit (or, for a Bereich/Organisationsleitung leader, their subordinate units), not the
 organisation-wide next mission that may belong to a squadron they have nothing to do with. A viewer
-who belongs to no org unit (a brand-new account, an admin in "all squadrons" mode) keeps the
-organisation-wide next mission as before. (The home-page grid above deliberately does **not**
+who belongs to no org unit (a brand-new account) gets only the next **public** mission — an internal
+mission is visible only to the members of its unit. An admin in "all squadrons" mode keeps the
+organisation-wide next mission. (The home-page grid above deliberately does **not**
 apply this narrowing — it uses the broad mission-list scope per REQ-MISSION-012.)
 
 ## Requirements
@@ -83,9 +84,13 @@ the viewer has any:
   (REQ-MISSION-003's status filter still applies). Foreign missions are **excluded — including other
   units' public ones**; the cross-staffel public escape that widens the mission _lists_ deliberately
   does **not** apply to the banner, because the banner answers "what is _my_ unit heading towards".
-- A viewer with **no** effective org-unit scope keeps the unchanged organisation-wide behaviour of
-  REQ-MISSION-003: an admin in "all squadrons" mode (no active pin) and a member who belongs to no
-  org unit both see the soonest eligible mission across the whole organisation.
+- **Internal missions are visible only to the members of the mission's unit**, to the leadership
+  cascade above (REQ-ORG-015), to the Mission Manager cascade and to admins. No other viewer sees a
+  foreign internal mission through this lookup or any fallback of it.
+- A viewer with **no** effective org-unit scope sees only **public** missions: a member who belongs
+  to no org unit gets the soonest eligible public mission across the organisation, never an internal
+  one. An admin in "all squadrons" mode (no active pin) keeps the organisation-wide lookup over
+  public and internal missions.
 - When no eligible mission exists in scope, the endpoint returns `204 No Content` and the page
   renders its empty state — unchanged.
 
@@ -94,19 +99,22 @@ the viewer has any:
 - [ ] A member of Staffel A whose own next mission is later than Staffel B's public next mission sees Staffel A's mission, not Staffel B's.
 - [ ] A Bereichsleitung sees the soonest mission across their Bereich's Staffeln/SKs; an OL member sees the soonest across every org unit.
 - [ ] A member sees their own org unit's **internal** next mission (it is not hidden by the public-escape removal).
-- [ ] A member with no org-unit membership still sees the organisation-wide next mission.
+- [ ] A member with no org-unit membership sees the soonest public mission and never a foreign internal one, even when that one starts earlier.
+- [ ] An admin in "all squadrons" mode still sees the soonest mission across the organisation, internal ones included.
 - [ ] A scoped viewer with no upcoming own-unit mission gets `204`, even if other units have upcoming missions.
 
 **Enforced by:** `MissionServiceTest`
 (`getNextMission_scopedMember_usesScopedQueryThenRefetches`,
 `getNextMission_scopedPinned_passesActiveOrgUnitId`,
 `getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch`,
-`getNextMission_refetchesByIdThroughGraph` (unscoped fallback)),
+`getNextMission_refetchesByIdThroughGraph` (admin all-squadrons),
+`getNextMission_memberWithoutUnit_readsPublicMissionsOnly`),
 `MissionRepositoryLookupOrderingTest`
 (`findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal`,
-`findNextScopedMission_includesOwnInternalMission`).
+`findNextScopedMission_includesOwnInternalMission`,
+`findNextPublicMission_skipsInternalAndTerminalMissions`).
 **Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead`,
-`MissionRepository#findNextScopedMission`,
+`MissionRepository#findNextScopedMission` + `#findNextPublicMission`,
 `OwnerScopeService#currentScopePredicate` (scope vector + leadership cascade).
 
 ### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)
@@ -213,7 +221,8 @@ the read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
 
 - **Own units.** The same selection as the `/next` lookup: only `PLANNED` or `ACTIVE` missions
   (REQ-MISSION-003) within the caller's org-unit scope and the pin of the active context
-  (REQ-MISSION-008), including the organisation-wide fallback for a caller without a unit scope.
+  (REQ-MISSION-008); a caller without a unit scope gets the public missions only, an admin in
+  all-squadrons mode every mission.
 - **Sign-ups.** A mission the caller holds a participant row on (`PLANNED` / `ACTIVE`, planned start
   in the future) is included even when another unit owns it, but only inside the caller's mission
   visibility (the scope predicate of the mission list, REQ-MISSION-012): a signed-up internal
@@ -233,6 +242,7 @@ the read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
 - [x] The result holds the upcoming own-unit missions and the upcoming signed-up missions of another visible unit, each once, soonest first.
 - [x] A mission of a foreign unit the caller is not signed up for is not in the result.
 - [x] A signed-up internal mission of a unit the caller cannot see is not in the result.
+- [x] A caller without a unit gets the public upcoming missions and no foreign internal one.
 - [x] The pin narrows the own-unit part to the pinned unit and leaves the sign-ups.
 - [x] `limit` bounds the result and keeps the soonest entries; 1 and 10 are accepted, 0 and 11 answer 400, an absent `limit` means 5.
 - [x] With no upcoming mission the endpoint answers an empty list.

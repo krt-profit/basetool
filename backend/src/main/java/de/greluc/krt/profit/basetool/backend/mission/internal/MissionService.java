@@ -234,8 +234,9 @@ public class MissionService implements MissionCommands {
 
   /**
    * Returns the next {@code PLANNED} or {@code ACTIVE} mission by planned start for the home-page
-   * banner. With an org-unit scope only that scope's missions count (REQ-MISSION-008); without one,
-   * the organisation-wide next mission is returned.
+   * banner. With an org-unit scope only that scope's missions count (REQ-MISSION-008); an admin in
+   * all-squadrons mode sees the organisation-wide next mission, a caller without any unit only the
+   * next public one.
    *
    * @return the next mission, or empty when none upcoming
    */
@@ -243,8 +244,10 @@ public class MissionService implements MissionCommands {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant now = Instant.now();
     Optional<Mission> next;
-    if (isOrganisationWide(scope)) {
+    if (scope.adminAllScope()) {
       next = findNextMissionHead(now);
+    } else if (hasNoUnitScope(scope)) {
+      next = missionRepository.findNextPublicMission(now, NEXT_MISSION_STATUSES);
     } else {
       next = findNextScopedMissionHead(now, scope);
     }
@@ -264,7 +267,8 @@ public class MissionService implements MissionCommands {
     return missionRepository.findUpcomingOwnOrSignedUp(
         Instant.now(),
         NEXT_MISSION_STATUSES,
-        isOrganisationWide(scope),
+        scope.adminAllScope(),
+        !scope.adminAllScope() && hasNoUnitScope(scope),
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds(),
@@ -274,15 +278,14 @@ public class MissionService implements MissionCommands {
   }
 
   /**
-   * Tells whether the caller has no org-unit scope, so the next-mission lookups span the whole
-   * organisation (REQ-MISSION-008).
+   * Tells whether the caller has neither a pinned nor a member org unit, so the next-mission
+   * lookups can show public missions only (REQ-MISSION-008).
    *
    * @param scope the caller's scope predicate
-   * @return {@code true} for an admin in all-squadrons mode or a caller without any unit
+   * @return {@code true} for a caller without any unit
    */
-  private static boolean isOrganisationWide(@NotNull ScopePredicate scope) {
-    return scope.adminAllScope()
-        || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty());
+  private static boolean hasNoUnitScope(@NotNull ScopePredicate scope) {
+    return scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty();
   }
 
   /**
