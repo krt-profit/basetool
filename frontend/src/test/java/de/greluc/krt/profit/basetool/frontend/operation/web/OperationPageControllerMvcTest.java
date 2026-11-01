@@ -110,7 +110,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_rendersOperationStatusViaI18n_inGerman() throws Exception {
     OperationDto op =
         new OperationDto(
@@ -131,7 +131,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_rendersOperationStatusViaI18n_inEnglish() throws Exception {
     OperationDto op =
         new OperationDto(
@@ -250,7 +250,7 @@ class OperationPageControllerMvcTest {
 
   /** An empty result renders the empty state and no table. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_rendersTheEmptyState() throws Exception {
     String html =
         renderList(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()), "");
@@ -264,7 +264,7 @@ class OperationPageControllerMvcTest {
 
   /** The past segment relays only finished statuses and is selected from the URL. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_pastPeriod_relaysOnlyFinishedStatusesAndSelectsTheSegment() throws Exception {
     String html =
         renderList(
@@ -285,7 +285,7 @@ class OperationPageControllerMvcTest {
 
   /** {@code showPast=true} still means all statuses; an unknown period falls back to upcoming. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_legacyShowPast_meansAllAndUnknownPeriodFallsBack() throws Exception {
     when(backendApiClient.get(
             startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
@@ -321,7 +321,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_passesMultiWordSearchAsUriVariable() throws Exception {
     when(backendApiClient.get(
             startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
@@ -340,7 +340,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationsList_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
     when(backendApiClient.get(
             startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
@@ -511,7 +511,7 @@ class OperationPageControllerMvcTest {
 
   /** Without missions, results and participants every section shows its empty state. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_rendersEmptyStates() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
@@ -549,7 +549,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_translatesBothOperationAndMissionStatus() throws Exception {
     UUID opId = UUID.randomUUID();
 
@@ -603,7 +603,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentMissions_rendersOnlyMissionsFragment() throws Exception {
     UUID opId = UUID.randomUUID();
     OperationDto operation =
@@ -654,7 +654,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentOverview_rendersOverviewSection() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
@@ -671,7 +671,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentPayout_rendersPayoutSection_andSkipsFinanceAndMissions()
       throws Exception {
     UUID opId = UUID.randomUUID();
@@ -697,7 +697,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentFinance_rendersFinanceSection_andSkipsOperationRead()
       throws Exception {
     UUID opId = UUID.randomUUID();
@@ -728,7 +728,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentUnknown_rendersFragmentError() throws Exception {
     UUID opId = UUID.randomUUID();
 
@@ -739,7 +739,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentBackendFailure_rendersFragmentError() throws Exception {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
@@ -753,7 +753,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fullPage_doesNotRenderTheSectionRefreshError() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
@@ -780,7 +780,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_fragmentUnknown_stillRendersTheSectionRefreshError() throws Exception {
     UUID opId = UUID.randomUUID();
 
@@ -794,7 +794,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationMissionFinance_rendersEntryBreakdownFragment() throws Exception {
     UUID opId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
@@ -824,7 +824,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationMissionFinance_backendFailure_rendersErrorFragment() throws Exception {
     UUID opId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
@@ -842,7 +842,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_rendersDonationTotals_whenParticipantsDonate() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
@@ -875,7 +875,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_rendersPreliminaryWarning_whenBackendReportsUnfinishedMissions()
       throws Exception {
     UUID opId = UUID.randomUUID();
@@ -896,7 +896,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_hidesPreliminaryWarning_whenBackendReportsAllMissionsFinished()
       throws Exception {
     UUID opId = UUID.randomUUID();
@@ -911,7 +911,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_hidesPreliminaryWarning_whenBackendOmitsFlag() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
@@ -945,7 +945,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void updatePayoutStatus_clearAccepted_isForwardedToTheBackend() throws Exception {
     UUID opId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -1064,7 +1064,7 @@ class OperationPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void operationDetail_withOfficerReach_rendersCanUnsetPaidOutTrue() throws Exception {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))

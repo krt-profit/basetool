@@ -75,7 +75,7 @@ public class OrgUnitBankSettingsService {
    * hasReachableRole(Roles.authority(code))}.
    */
   private static final List<String> SPECIAL_GLOBAL_ROLE_BUCKETS =
-      List.of(Roles.OFFICER, Roles.LOGISTICIAN, Roles.MISSION_MANAGER);
+      List.of(Roles.LOGISTICIAN, Roles.MISSION_MANAGER);
 
   private final OrgUnitBankAccessService accessService;
   private final BankAccountRepository bankAccountRepository;

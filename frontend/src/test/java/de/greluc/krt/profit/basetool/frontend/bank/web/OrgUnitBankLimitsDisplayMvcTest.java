@@ -189,7 +189,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_managerView_omitsReadOnlyLimitsDisplay() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId, true);
@@ -205,7 +205,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_plainViewer_showsReadOnlyLimitsDisplay() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId, false);
@@ -225,7 +225,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
    * @throws Exception if the MockMvc exchange fails
    */
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_limitsDisplay_labelsAllMembersTierWithItsOrgUnitScope() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId, false);

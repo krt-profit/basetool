@@ -123,17 +123,6 @@ class UserServiceRankTest {
   }
 
   @Test
-  void updateUserAttributes_HandGrantedOfficerRoleWithoutSeat_FollowsTheMemberRange() {
-    UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.OFFICER, Roles.KRT_MEMBER);
-
-    assertThrows(
-        RankOutsideRoleRangeException.class,
-        () -> userService.updateUserAttributes(id, 8, null, null, 0L, null));
-    userService.updateUserAttributes(id, 18, null, null, 0L, null);
-  }
-
-  @Test
   void updateUserAttributes_Admin_AnyRankFrom1To20_Passes() {
     UUID id = UUID.randomUUID();
     userWith(id, null, Roles.ADMIN);

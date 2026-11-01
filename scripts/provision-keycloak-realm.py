@@ -33,7 +33,10 @@ def _load_kcadm():
 kcadm = _load_kcadm()
 KcadmError = kcadm.KcadmError
 
-APPLICATION_REALM_ROLES = ["KRT Member", "Officer", "Bank Employee", "Bank Management", "Admin"]
+APPLICATION_REALM_ROLES = ["KRT Member", "Bank Employee", "Bank Management", "Admin"]
+
+RETIRED_REALM_ROLE = "Officer"
+RETIRED_ROLE_REASON = "retired with the OFFICER role, ADR-0300"
 
 RETIRED_CLIENT_ID = "basetool-android"
 RETIRED_DPOP_PROFILE = "krt-mobile-dpop"
@@ -756,6 +759,7 @@ class Planner:
         for spec in self.specs:
             self.plan_client(spec)
         self.plan_retired()
+        self.plan_retired_realm_roles()
         self.plan_reports()
 
     def plan_realm_settings(self) -> None:
@@ -1366,6 +1370,17 @@ class Planner:
             changes.append(Change(
                 f"- client '{RETIRED_CLIENT_ID}' deleted with its roles, mappers and scope "
                 f"mappings ({RETIRED_REASON})", self._delete_retired_client))
+
+    def plan_retired_realm_roles(self) -> None:
+        """Delete the retired `Officer` realm role, ADR-0300; Keycloak drops its user mappings."""
+        changes = self.section(f"retired — realm role '{RETIRED_REALM_ROLE}' (ADR-0300)")
+        present = {role.get("name") for role in (self.kc.get("roles") or [])}
+        if RETIRED_REALM_ROLE in present:
+            changes.append(Change(
+                f"- realm role '{RETIRED_REALM_ROLE}' deleted with its user mappings "
+                f"({RETIRED_ROLE_REASON})",
+                lambda: self.kc.delete(f"roles/{RETIRED_REALM_ROLE}",
+                                       f"realm role '{RETIRED_REALM_ROLE}' deleted")))
 
     def _remove_named(self, path: str, key: str, name: str) -> None:
         current = kcadm.read_list(self.kc, path, key)

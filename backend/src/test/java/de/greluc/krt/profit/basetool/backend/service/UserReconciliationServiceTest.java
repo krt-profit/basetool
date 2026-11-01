@@ -188,6 +188,24 @@ class UserReconciliationServiceTest {
     assertTrue(existing.isEnabledInKeycloak());
   }
 
+  /** The retired {@code Officer} realm role has no catalogue entry, so it is never mirrored. */
+  @Test
+  void doesNotMirrorTheRetiredOfficerRealmRole() {
+    Role krtMember = codeRole("KRT_MEMBER", "KRT Member");
+    when(roleRepository.findAllWithPermissions()).thenReturn(List.of(krtMember));
+    User existing = new User();
+    existing.setId(USER_ID);
+    existing.setApprovalStatus(ApprovalStatus.ACTIVE);
+    existing.setRoles(new HashSet<>());
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    userReconciliationService.syncUser(
+        new KeycloakUserDto(
+            USER_ID, "alice", "alice@example.com", true, Set.of("Officer", "KRT Member"), null));
+
+    assertEquals(Set.of(krtMember), existing.getRoles());
+  }
+
   @Nested
   class SyncJwtUserTests {
 

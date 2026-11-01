@@ -439,9 +439,11 @@ The coverage list gains:
   level the deletion of its material removed), and the write events above for game-item levels. The subject
   is the level, labelled by the material or item name; the details carry ids, the unit as
   `kind:id`, tier codes and amounts.
-- **Bank trail** (`bank_audit_event`) — the removal of the `GLOBAL_ROLE OFFICER` view-grant bucket
-  on special accounts (REQ-BANK-037, ADR-0300) writes one `GRANT_REVOKED` per removed grant, with
-  the system as actor.
+- **Bank trail** (`bank_audit_event`) — the one-time removal of the `GLOBAL_ROLE OFFICER` view-grant
+  and approval-limit buckets on special accounts (REQ-BANK-037, ADR-0300) wrote one
+  `BALANCE_VISIBILITY_REVOKED` per grant and one `APPROVAL_LIMIT_CLEARED` per limit, with the
+  system as actor. Those rows come from the SQL migration and are not counted by
+  `basetool_bank_audit_events_total`.
 
 The new types join the viewer's per-area event-type lists and the DE/EN labels, and are counted
 by `basetool_audit_events_total{domain}` / `basetool_bank_audit_events_total{event_type}`

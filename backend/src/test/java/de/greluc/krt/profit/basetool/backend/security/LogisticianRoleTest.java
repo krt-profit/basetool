@@ -219,7 +219,12 @@ class LogisticianRoleTest {
     mockMvc
         .perform(
             get("/api/v1/inventory/aggregated")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
         .andExpect(status().isOk());
   }
 

@@ -222,7 +222,7 @@ just joined.
 
 ## 2. Roles & base permissions
 
-The five application roles are the Keycloak realm roles `Admin`, `Officer`, `KRT Member`,
+The four application roles are the Keycloak realm roles `Admin`, `KRT Member`,
 `Bank Employee` and `Bank Management` (reference export:
 [`docs/keycloak/realm-config.reference.json`](docs/keycloak/realm-config.reference.json)). Each login
 syncs the token's realm roles by name onto the `app_user` row; the authority is the role name
@@ -236,15 +236,14 @@ applies.
 
 ```
 ROLE_ADMIN   > ROLE_LOGISTICIAN
-ROLE_OFFICER > ROLE_LOGISTICIAN
 ROLE_ADMIN   > ROLE_MISSION_MANAGER
-ROLE_OFFICER > ROLE_MISSION_MANAGER
 ROLE_ADMIN           > ROLE_BANK_MANAGEMENT
 ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
 ```
 
-Admins and Officers therefore automatically satisfy every `LOGISTICIAN` and
-`MISSION_MANAGER` check. Admins additionally satisfy every bank check
+Admins therefore automatically satisfy every `LOGISTICIAN` and
+`MISSION_MANAGER` check. There is no `OFFICER` role: the „Officer“ columns below mean **officer
+reach** in the owning unit of the target (§7.1). Admins additionally satisfy every bank check
 (`BANK_MANAGEMENT` and transitively `BANK_EMPLOYEE`); Bank Management satisfies
 every `BANK_EMPLOYEE` check (REQ-BANK-007).
 
@@ -253,7 +252,6 @@ every `BANK_EMPLOYEE` check (REQ-BANK-007).
 | Role                | Authorities (DataInitializer)                                                                                                                                    |
 |:--------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Admin**           | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via hierarchy) |
-| **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via hierarchy)                |
 | **KRT Member**      | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                    |
 | **Bank Employee**   | *(none — the fine-grained rights are app-managed grant rows, REQ-BANK-009)*                                                                                      |
 | **Bank Management** | *(none — "see everything" visibility comes from the role itself, ADR-0011)*                                                                                      |
@@ -341,39 +339,22 @@ rank — nobody promotes themselves. Every appointment is logged in the audit lo
 „Rollen & Mitglieder" and is reflected in the same transaction in the
 account-bound org-chart seat (REQ-ROLE-006).
 
-### Operational OFFICER grant (leadership & bank)
+### Officer reach (leadership & bank)
 
-> **Planned:** ADR-0300 retires this grant; see
-> [§7](#7-planned-adr-0300-adr-0301-adr-0302). Until it ships, the text below stays authoritative.
+There is no `OFFICER` role: nothing in Keycloak or the database grants it, and no code reads it
+(ADR-0300, REQ-SEC-004). What the „Officer“ columns below mean is **officer reach**, derived from the
+org-unit seat and checked against the owning unit of the target (§7.1, REQ-SEC-015):
 
-The `OFFICER` Keycloak role is granted **operatively** (manually, in Keycloak — no code derives it
-from a rank) in addition to the OrgUnit membership:
-
-- **All members of the Organisationsleitung and the Bereichsleitung, every SK lead and every
-  Staffel leadership rank (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign)
-  receive `OFFICER`.**
-  This way they satisfy the frontend's `OFFICER`-gated surfaces — e.g. the
-  „Leitung" page, whose page **and** write proxies are gated to `ADMIN` /
-  `OFFICER` (`Roles.ADMIN_OR_OFFICER`); the previously accepted
-  `LOGISTICIAN` / `MISSION_MANAGER` were removed, so a capability-only Logistician
-  / Mission-Manager (who has no appointment reach and only saw an empty page) no
-  longer opens it. The backend still evaluates reach **membership-based** via the
-  `OwnerScopeService` (oversight scope, responsible holder) — `OFFICER` only opens
-  the role-gated surfaces, **not** the contextual data reach.
-- **Bank Management (`BANK_MANAGEMENT`) also holds `OFFICER`.** **Bank Employees
-  (`BANK_EMPLOYEE`)** have **at least `KRT Member`** (MEMBER), but **not
-  necessarily `OFFICER`** — the bank gates rely exclusively on `BANK_*`
-  (REQ-BANK-007), never on `OFFICER`.
-- **Consequence for the bank:** Because Officers **and** SK-Leads carry `OFFICER`,
-  the Sonderkonto auto-visibility (`SPECIAL`, REQ-BANK-037) decides **by
-  membership** (OL member or Bereichsleiter), **never** via the `OFFICER` role —
-  Officers/SK-Leads therefore do **not** see Sonderkonten automatically, only via
-  an explicit approval.
-- **The Grand Admiral (org-chart.md REQ-ORG-021) is an OL member with a title, not a
-  distinct permission.** The holder carries the `OL_MEMBER` rank, so their reach is
-  exactly an OL member's (every row above that grants to OL members applies unchanged) —
-  only the org-chart placement differs (rendered at the top of the OL). Designated /
-  vacated under „Leitung" (ADMIN); at most one org-wide.
+- **Every Organisationsleitung member, Bereich rank, SK lead and Staffel leadership rank
+  (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign) has officer reach** in the
+  units the seat reaches — and only there. A seat requires `KRT Member`.
+- **The frontend gates the officer surfaces on the capability flags** the backend reports for the
+  active context (e.g. the „Leitung“ page); the backend decides every action per unit.
+- **Bank Management (`BANK_MANAGEMENT`) gets no officer reach.** Bank Employees and Bank Management
+  rely exclusively on `BANK_*` (REQ-BANK-007).
+- **Consequence for the bank:** the Sonderkonto auto-visibility (`SPECIAL`, REQ-BANK-037) decides
+  **by membership** (OL member or Bereichsleiter), never by officer reach — Staffel officers and
+  SK leads therefore do **not** see Sonderkonten automatically, only via an explicit approval.
 
 ---
 
@@ -381,7 +362,7 @@ from a rank) in addition to the OrgUnit membership:
 
 Columns: **Member** = KRT Member ·
 **Log.** = Member + Logistician flag · **MM** = Member + Mission-Manager flag ·
-**Officer** · **Admin**.
+**Officer** = officer reach in the target's owning unit · **Admin**.
 
 Every table here starts at **Member**, because that is where the tool starts: an account below one
 is refused with `403 NO_ROLE` before a handler runs (REQ-SEC-053), and nobody without an account
@@ -1285,27 +1266,26 @@ backend serves every member) but no control that writes.
 
 ## 7. Planned (ADR-0300, ADR-0301, ADR-0302)
 
-> **Status: planned** (map #2800). The decisions below are accepted and not implemented. Until they
-> ship, §0–§6 and the code stay authoritative; this section changes none of their rows.
+> **Status:** §7.1 is shipped (ADR-0300). §7.2–§7.4 are planned (map #2800): the decisions are
+> accepted and not implemented, and until they ship the code stays authoritative for them.
 
-### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007)
+### 7.1 Officer reach per org unit (ADR-0300, REQ-ROLE-002, REQ-ROLE-007) — shipped
 
 - **Officer reach is derived per org unit from leadership seats only:** a Staffel leadership rank
   (Staffelleiter, Kommandoleiter, stellvertretender Kommandoleiter, Ensign) and an SK lead reach
   their own unit; the three Bereich ranks reach the Bereich and its direct children; an OL member
   reaches every unit. Admin passes every officer check. There is no manual grant.
-- **The Keycloak role `OFFICER` is retired** in one release: no gate reads it, the role mirror
-  ignores it, and the seeded role and its permissions are removed. Every column „Officer“ above then
-  means officer reach in the target's owning unit; lists are filtered to the caller's officer units.
+- **The Keycloak role `OFFICER` is retired:** no gate reads it, the role mirror ignores it, and the
+  seeded role and its permissions are removed. Every column „Officer“ above means officer reach in
+  the target's owning unit; lists are filtered to the caller's officer units.
 - **Bank Management keeps its `BANK_*` rights only** (REQ-BANK-007) and gets no officer reach of its
   own; a bank manager who also holds a leadership seat has reach there like anyone else.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
   whose holder loses it stays in the org chart and confers no reach. Membership rights rest on
-  `KRT Member` alone. The refusal and the reach computation are live already; until the cut the
-  gates in the tables above still read the `OFFICER` role.
+  `KRT Member`.
 - An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
   at least one unit (REQ-ROLE-007). The bank's global
-  `OFFICER` view-grant bucket for special accounts is removed (REQ-BANK-037).
+  `OFFICER` view-grant and approval-limit buckets for special accounts are removed (REQ-BANK-037).
 
 ### 7.2 Navigation of an external assignee (ADR-0301, REQ-ORDERS-040)
 

@@ -133,7 +133,7 @@ class OrderHierarchyVisibilityTest {
         new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(
             java.util.Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_OFFICER")),
+                    "ROLE_LOGISTICIAN")),
             idToken);
     org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken authToken =
         new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(

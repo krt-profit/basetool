@@ -37,8 +37,8 @@ public enum BankAccountViewGranteeKind {
 
   /**
    * Every holder of the global role named by {@link BankAccountViewGrant#getRoleCode()} (e.g.
-   * {@code OFFICER}). Used for {@link BankAccountType#SPECIAL} accounts, which have no owning org
-   * unit and therefore no membership sub-ranks.
+   * {@code LOGISTICIAN}). Used for {@link BankAccountType#SPECIAL} accounts, which have no owning
+   * org unit and therefore no membership sub-ranks.
    */
   GLOBAL_ROLE,
 

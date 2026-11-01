@@ -131,28 +131,11 @@ public interface UserRepository
    * Returns the ids ({@code sub}s) of every user holding the global role with the given stable
    * {@code code} (e.g. {@code ADMIN}). Backs the notification rule engine's {@code ROLE} selector.
    *
-   * @param roleCode the stable role code to match (e.g. {@code ADMIN}, {@code OFFICER})
+   * @param roleCode the stable role code to match (e.g. {@code ADMIN})
    * @return the matching user ids; never {@code null}, possibly empty
    */
   @Query("SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode")
   Set<UUID> findUserIdsByRoleCode(@Param("roleCode") String roleCode);
-
-  /**
-   * Returns the ids of users who hold the global role {@code roleCode} and are members of the given
-   * org unit, for the notification rule engine's {@code ORG_RELATIVE_ROLE} resolution.
-   *
-   * @param roleCode the stable role code to match (e.g. {@code OFFICER})
-   * @param orgUnitId the org unit the user must be a member of
-   * @return the matching user ids; never {@code null}, possibly empty
-   */
-  @Query(
-      """
-      SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode AND EXISTS
-      (SELECT 1 FROM OrgUnitMembership m WHERE m.id.userId = u.id AND m.id.orgUnitId =
-      :orgUnitId)
-      """)
-  Set<UUID> findUserIdsByRoleCodeAndOrgUnitMembership(
-      @Param("roleCode") String roleCode, @Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Paged squadron-scoped user listing (REQ-ORG-017); users without a Staffel membership are always

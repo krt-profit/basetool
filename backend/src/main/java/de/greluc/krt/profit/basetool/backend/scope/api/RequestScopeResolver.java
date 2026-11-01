@@ -373,7 +373,7 @@ public class RequestScopeResolver {
    *
    * <ul>
    *   <li>admin: {@link #currentScopePredicate()};
-   *   <li>officer: their Staffel; SK lead: the SKs they lead;
+   *   <li>squadron rank / SK lead: their own unit;
    *   <li>Bereichsleitung / OL: their seat and everything below it, via {@link
    *       OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}.
    * </ul>
@@ -410,24 +410,14 @@ public class RequestScopeResolver {
   }
 
   /**
-   * The org units a non-admin caller oversees: the Staffeln of an officer, every unit with an SK
-   * lead or functional-rank seat, and the cascaded leadership reach.
+   * The org units a non-admin caller oversees: every unit with an SK lead or functional-rank seat,
+   * and the cascaded leadership reach.
    *
    * @return the overseen org-unit ids, never {@code null}.
    */
   @NotNull
   private Set<UUID> currentOversightOrgUnitIds() {
-    Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
-    List<OrgUnitMembership> memberships = currentCallerMemberships();
-    if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
-      for (OrgUnitMembership m : memberships) {
-        if (m.getKind() == OrgUnitKind.SQUADRON) {
-          oversightOrgUnitIds.add(m.getId().getOrgUnitId());
-        }
-      }
-    }
-    oversightOrgUnitIds.addAll(seatReach(memberships));
-    return oversightOrgUnitIds;
+    return seatReach(currentCallerMemberships());
   }
 
   /**

@@ -175,7 +175,7 @@ class PagePatternTestIdsRenderTest {
                 de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager(),
                 0L));
 
-    String html = render("/operations", "OFFICER", "MISSION_MANAGER");
+    String html = render("/operations", "LOGISTICIAN", "MISSION_MANAGER");
 
     String primary = tagWith(pageActions(html), "data-testid=\"page-head-primary\"");
     assertThat(primary).contains("btn--cta");

@@ -202,7 +202,9 @@ class MissionValidationTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -225,7 +227,9 @@ class MissionValidationTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -248,7 +252,9 @@ class MissionValidationTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))

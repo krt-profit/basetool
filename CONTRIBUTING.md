@@ -946,7 +946,7 @@ you touch these areas.
 ### Multi-user data isolation
 
 - Every read / write must filter by JWT `sub` unless the caller has an
-  elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service
+  elevated role (`ADMIN`, …). Enforce this in the service
   layer, not the controller.
 - For a member below Logistician, the controller must explicitly clear
   sensitive fields (e-mail, real name, internal orders / items) via a

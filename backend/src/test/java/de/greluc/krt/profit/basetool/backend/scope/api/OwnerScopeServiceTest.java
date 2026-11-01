@@ -227,6 +227,13 @@ class OwnerScopeServiceTest {
     return m;
   }
 
+  /** Returns a Staffel membership row that carries a squadron leadership rank. */
+  private static OrgUnitMembership seatMembership(UUID userId, UUID squadronId) {
+    OrgUnitMembership m = staffelMembership(userId, squadronId);
+    m.setRole(MembershipRole.STAFFELLEITER);
+    return m;
+  }
+
   /** Returns an SK membership row pointing the given user at the given Special Command. */
   private static OrgUnitMembership skMembership(UUID userId, UUID skOrgUnitId) {
     OrgUnitMembership m = new OrgUnitMembership();
@@ -1671,7 +1678,6 @@ class OwnerScopeServiceTest {
     @Test
     void blueprintGateAndOversightScopes_shareOneMembershipRead() {
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
@@ -2262,28 +2268,11 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void officer_scopesToOwnStaffel() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOversightScope();
-
-      assertFalse(scope.adminAllScope());
-      assertNull(scope.activeOrgUnitId());
-      assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
-    }
-
-    @Test
     void skLeadOnly_scopesToLedSkNotOwnStaffel() {
       UUID skId = UUID.randomUUID();
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
@@ -2300,10 +2289,9 @@ class OwnerScopeServiceTest {
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+          .thenReturn(List.of(seatMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       ScopePredicate scope = service.currentOversightScope();
@@ -2314,10 +2302,9 @@ class OwnerScopeServiceTest {
     @Test
     void pinWithinOversight_isHonoured() {
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+          .thenReturn(List.of(seatMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
 
@@ -2330,10 +2317,9 @@ class OwnerScopeServiceTest {
     @Test
     void pinOutsideOversight_isIgnored() {
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+          .thenReturn(List.of(seatMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
@@ -2346,7 +2332,6 @@ class OwnerScopeServiceTest {
     @Test
     void plainMember_emptyOversight() {
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
@@ -2366,7 +2351,6 @@ class OwnerScopeServiceTest {
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
       bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(bereichSeat));
@@ -2386,10 +2370,9 @@ class OwnerScopeServiceTest {
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+          .thenReturn(List.of(seatMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
       lenient()
           .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());

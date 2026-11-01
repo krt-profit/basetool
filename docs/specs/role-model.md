@@ -65,9 +65,6 @@ Bereich/OL appointment responses) derive it from `role` at the controller / mapp
 
 ### REQ-ROLE-002 — Baseline grant for squadron leadership ranks
 
-> **Status: planned** (ADR-0300, map #2800). Until it ships, the current text below / the current
-> code stays authoritative.
-
 Each squadron leadership rank (`STAFFELLEITER` / `KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` /
 `ENSIGN`) confers officer-equivalent reach over its **own squadron only**, by minting contextual
 `LOGISTICIAN@<squadronId>` + `MISSION_MANAGER@<squadronId>` exactly as `SK_LEAD` does for an SK. The
@@ -75,17 +72,6 @@ JWT authorities converter derives **no** flat `ROLE_OFFICER` from the rank, **no
 and **no** cascade beyond the squadron. Area ranks keep their current cascading reach (Bereich +
 children, identical across the three area ranks for now). Per-rank / per-feature differentiation
 (including the bank) is deferred to later work.
-
-**"Not `ROLE_OFFICER`" describes what the rank auto-mints, not the roles the person actually
-holds.** Squadron leaders **do** hold the `OFFICER` Keycloak realm role — it is granted
-**operationally / manually** in Keycloak, exactly like OL / Bereich / SK leads (see the "Operational
-OFFICER grant" section of [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)), which is
-what lets them pass `OFFICER`-gated surfaces such as the Leitung page. The converter never
-*synthesises* that realm role from the functional rank — `OFFICER` stays a separate,
-manually-granted authority, enforced by `CustomJwtGrantedAuthoritiesConverterTest`'s
-`staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade` (which drives a role-less user).
-So the realm-role assignment is managed operationally, not derived from — and, per "Out of scope"
-below, not retired by — the rank model.
 
 Like `SK_LEAD` and the area/OL ranks, a squadron rank also carries the flat back-compat
 `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER` (the `confersFlatOfficerRole` surface) so existing
@@ -123,7 +109,7 @@ stamped outside the caller's scope is one the caller cannot read back).
 
 **Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderServiceLifecycleTest` (`getUserRefineryOrdersScoped_*`), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
 
-#### Planned amendment (ADR-0300)
+#### Officer reach is derived from the seats (ADR-0300)
 
 **Officer reach is derived only from the seats.** The rank grants above stay; what changes is that
 the officer standing they stood next to is no longer a Keycloak role.
@@ -148,7 +134,7 @@ the officer standing they stood next to is no longer a Keycloak role.
 - **No new audit event.** Reach follows the seat changes, which `ROLE_GRANTED` / `ROLE_CHANGED` /
   `ROLE_REVOKED` already record (REQ-AUDIT-001).
 
-**Acceptance (planned)**
+**Acceptance**
 
 - [x] A Staffelleiter has officer reach in their Staffel and none in a second Staffel they are a
   plain member of.
@@ -156,13 +142,10 @@ the officer standing they stood next to is no longer a Keycloak role.
   unit; a bank manager without a seat reaches none.
 - [x] An appointment of a member without `KRT Member` is refused; a seat holder who loses the role
   keeps the seat and loses the reach.
-- [ ] Every officer gate reads that reach in the target's owning unit, and nothing reads `OFFICER`.
-
-The first three hold for the reach computation the scope kernel answers
-(`OwnerScopeService#canActAsOfficerIn`, REQ-SEC-015); the gates still read `OFFICER` until the cut.
+- [x] Every officer gate reads that reach in the target's owning unit, and nothing reads `OFFICER`.
 
 **Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`), `OrgUnitCascadeServiceTest`,
-`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`) · **Enforced by (to be added):**
+`OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`),
 `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER`), `PurchasingAccessPolicyTest`
 (`leadsUnit` by reach) · **Related:** REQ-SEC-004, REQ-SEC-015, REQ-ORG-029, ADR-0300
 
