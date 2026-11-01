@@ -2575,10 +2575,11 @@ ADR-0282, ADR-0297
 > default, the framework (two columns, up/down, column switch, remove, catalogue and options
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
-> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Information
-> (with the inline editor for administrators), Favoriten and Benachrichtigungen, with the options
-> of the matrix below. Planned: the other catalogue widgets and their options, the admin dashboard
-> and the start page; until they ship, the current code stays authoritative for them.
+> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
+> bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
+> Favoriten and Benachrichtigungen, with the options of the matrix below. Planned: the other
+> catalogue widgets and their options, the admin dashboard and the start page; until they ship, the
+> current code stays authoritative for them.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2684,8 +2685,11 @@ versions, owner isolation, deletion by widget type, the write counters),
 instances, the empty and error states, deletion on role loss, the hint, the catalogue),
 `DashboardUpcomingDaysWidgetMvcTest`, `DashboardSummaryWidgetsMvcTest` (Nächster Einsatz and
 Hangar-Bereitschaft: the row, the counts, the empty states, the member's hangar room),
+`DashboardWorkWidgetsMvcTest` (Ich bearbeite, Bestand niedrig and Bank: the read per option, the
+page total as count, the rows, the unit label, the target bar and trend, the empty states),
 `DashboardLayoutControllerTest`, `DashboardLayoutBackendClientTest`, `DashboardBackendClientTest`
-(the two summary reads), `DashboardE2eTest` (edit mode, catalogue and options, restore, the summary
+(the two summary reads), `OrgUnitBankAccountsBackendClientTest` and `StockLevelBackendClientTest` (the two work
+reads), `DashboardE2eTest` (edit mode, catalogue and options, restore, the summary and work
 widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
 the hint, deletion on role loss), the export
 and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** `StartPageRedirectMvcTest` (start

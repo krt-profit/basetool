@@ -29,7 +29,16 @@ public enum DashboardStatus {
   UNREAD,
 
   /** Every entry. */
-  ALL;
+  ALL,
+
+  /** Orders that are open or in progress. */
+  OPEN_ACTIVE,
+
+  /** Orders that are open. */
+  OPEN,
+
+  /** Orders that are in progress. */
+  IN_PROGRESS;
 
   /**
    * The key suffix of the status label in the message bundles.

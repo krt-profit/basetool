@@ -298,6 +298,66 @@ class DashboardE2eTest {
   }
 
   /**
+   * The catalogue adds the work widgets, which are not in the default; each loads its own body, and
+   * the status option of "Ich bearbeite" offers only the order statuses.
+   */
+  @Test
+  void theWorkWidgetsLoadTheirBodiesAndOfferTheirOptions() {
+    run(
+        memberState,
+        1440,
+        "dashboard-work-widgets",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/");
+          assertThat(page.getByTestId("dashboard-widget-assigned-orders")).hasCount(0);
+          assertThat(page.getByTestId("dashboard-widget-low-stock")).hasCount(0);
+          assertThat(page.getByTestId("dashboard-widget-bank")).hasCount(0);
+
+          page.getByTestId("dashboard-customise").click();
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-assigned-orders").click();
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-low-stock").click();
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-bank").click();
+
+          assertThat(
+                  page.getByTestId("dashboard-widget-assigned-orders")
+                      .locator(
+                          "[data-testid='dashboard-assigned-order'],"
+                              + " [data-testid='dashboard-assigned-orders-empty']"))
+              .isVisible();
+          assertThat(
+                  page.getByTestId("dashboard-widget-low-stock")
+                      .locator(
+                          "[data-testid='dashboard-low-stock-row'],"
+                              + " [data-testid='dashboard-low-stock-empty']"))
+              .isVisible();
+          assertThat(
+                  page.getByTestId("dashboard-widget-bank")
+                      .locator(
+                          "[data-testid='dashboard-bank-row'],"
+                              + " [data-testid='dashboard-bank-empty']"))
+              .isVisible();
+          assertThat(page.getByTestId("dashboard-widget-bank")).hasAttribute("data-rows", "3");
+
+          page.getByTestId("dashboard-widget-assigned-orders")
+              .getByTestId("dashboard-options")
+              .click();
+          assertThat(page.locator("#dashboard-option-status option:not([hidden])")).hasCount(3);
+          page.locator("#dashboard-option-status").selectOption("IN_PROGRESS");
+          page.getByTestId("dashboard-options-save").click();
+
+          assertThat(page.getByTestId("dashboard-widget-assigned-orders"))
+              .hasAttribute("data-status", "IN_PROGRESS");
+          page.reload();
+          assertThat(page.getByTestId("dashboard-widget-assigned-orders"))
+              .hasAttribute("data-status", "IN_PROGRESS");
+          assertThat(page.getByTestId("dashboard-widget-bank")).hasCount(1);
+        });
+  }
+
+  /**
    * An option change after a reorder is saved without a conflict: the two versions are separate.
    */
   @Test

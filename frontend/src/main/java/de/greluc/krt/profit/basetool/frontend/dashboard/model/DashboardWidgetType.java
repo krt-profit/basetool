@@ -67,7 +67,8 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS)),
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.UNREAD, DashboardStatus.ALL)),
 
   /** The member's next mission; the mission list is for members and above. */
   NEXT_MISSION(
@@ -81,7 +82,32 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
-      EnumSet.noneOf(DashboardOption.class));
+      EnumSet.noneOf(DashboardOption.class)),
+
+  /**
+   * The orders the member is an assignee of; an assignee entry grants the read whatever the
+   * member's roles are (REQ-ORDERS-047).
+   */
+  ASSIGNED_ORDERS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.ALWAYS,
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+
+  /** The low minimum stock levels; the Lager is for members and above. */
+  LOW_STOCK(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS)),
+
+  /** The viewable org-unit bank accounts; the org-unit bank page is for members and above. */
+  BANK(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.ROWS));
 
   /** The day counts the days option offers. */
   public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);
@@ -90,23 +116,33 @@ public enum DashboardWidgetType {
   public static final List<Integer> ROW_CHOICES = List.of(3, 5, 10);
 
   /** The status filters the status option offers. */
-  public static final List<DashboardStatus> STATUS_CHOICES =
-      List.of(DashboardStatus.UNREAD, DashboardStatus.ALL);
+  public static final List<DashboardStatus> STATUS_CHOICES = List.of(DashboardStatus.values());
 
   private final DashboardMode mode;
   private final DashboardColumn defaultColumn;
   private final NavigationGate gate;
   private final Set<DashboardOption> options;
+  private final Set<DashboardStatus> statuses;
 
   DashboardWidgetType(
       DashboardMode mode,
       DashboardColumn defaultColumn,
       NavigationGate gate,
       Set<DashboardOption> options) {
+    this(mode, defaultColumn, gate, options, EnumSet.noneOf(DashboardStatus.class));
+  }
+
+  DashboardWidgetType(
+      DashboardMode mode,
+      DashboardColumn defaultColumn,
+      NavigationGate gate,
+      Set<DashboardOption> options,
+      Set<DashboardStatus> statuses) {
     this.mode = mode;
     this.defaultColumn = defaultColumn;
     this.gate = gate;
     this.options = options;
+    this.statuses = statuses;
   }
 
   /**
@@ -179,6 +215,26 @@ public enum DashboardWidgetType {
     return options.stream()
         .map(option -> option.name().toLowerCase(Locale.ROOT))
         .collect(Collectors.joining(" "));
+  }
+
+  /**
+   * The statuses the widget's status option offers as a space-separated attribute value for the
+   * script that edits the options.
+   *
+   * @return the status names in declaration order, empty when the widget has no status option
+   */
+  public @NotNull String statusesAttribute() {
+    return statuses.stream().map(Enum::name).collect(Collectors.joining(" "));
+  }
+
+  /**
+   * Whether the widget's status option offers a status.
+   *
+   * @param status the status
+   * @return {@code true} iff the status is one of the widget's choices
+   */
+  public boolean offersStatus(@NotNull DashboardStatus status) {
+    return statuses.contains(status);
   }
 
   /**
