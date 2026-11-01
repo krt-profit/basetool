@@ -267,6 +267,22 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
+  void authorize_ordersQueue_allowsAnAssigneeWithoutProfitAccess() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(jsonResponse("{\"canViewJobOrders\":false,\"canViewAssignedJobOrders\":true}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+  }
+
+  @Test
+  void authorize_ordersQueue_deniesWhenNeitherCapabilityIsGranted() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(jsonResponse("{\"canViewJobOrders\":false,\"canViewAssignedJobOrders\":false}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
   void authorize_globalCapabilityWithheld_denies() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
     server.enqueue(jsonResponse("{\"canViewJobOrders\":false}"));

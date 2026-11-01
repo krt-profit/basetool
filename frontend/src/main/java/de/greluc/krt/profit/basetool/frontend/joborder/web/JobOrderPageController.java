@@ -31,12 +31,12 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.ArrayList;
@@ -45,7 +45,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,21 +95,6 @@ public class JobOrderPageController {
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
 
-  /** The list scope listing the orders the caller's own org units requested (REQ-UI-027). */
-  static final String SCOPE_MINE = "MINE";
-
-  /**
-   * The list scope listing the orders one of the caller's own units processes, "Zu bearbeiten"
-   * (REQ-ORDERS-040).
-   */
-  static final String SCOPE_TO_PROCESS = "TO_PROCESS";
-
-  /** The list scope listing the caller's whole visible order queue (REQ-UI-027). */
-  static final String SCOPE_ALL = "ALL";
-
-  /** The accepted values of the list's {@code scope} parameter. */
-  static final Set<String> ORDER_SCOPES = Set.of(SCOPE_MINE, SCOPE_TO_PROCESS, SCOPE_ALL);
-
   /**
    * Selectable page sizes for the order list, large enough that the default active queue fits on
    * one page for drag-and-drop reordering (REQ-ORDERS-020).
@@ -126,15 +110,16 @@ public class JobOrderPageController {
    * Renders the job-order list ({@code /orders}), filtered by scope, status and squadron.
    *
    * <p>Invalid or missing statuses fall back to {@code OPEN} + {@code IN_PROGRESS}; an empty
-   * squadron selection means all squadrons (REQ-ORDERS-027). A caller who may see the queue chooses
-   * its scope with {@code scope} (REQ-ORDERS-040): the own-orders scope reads the
-   * requester-redacted list, the to-process scope reads the queue of the caller's own units; both
-   * ignore the squadron filter.
+   * squadron selection means all squadrons (REQ-ORDERS-027). The caller chooses a segment with
+   * {@code scope} among those {@link OrderListScope#offered} to them (REQ-ORDERS-040): the
+   * own-orders segment reads the requester-redacted list, the to-process segment the queue of the
+   * caller's own units, the assigned segment the orders the caller is an assignee of; all three
+   * ignore the squadron filter. A member who only holds an assignee entry gets that segment alone.
    *
    * @param status optional explicit status filter
    * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
-   * @param scope {@code MINE}, {@code TO_PROCESS} or {@code ALL}; anything else, or a scope the
-   *     caller lacks the capability for, falls back to the caller's default list
+   * @param scope an {@link OrderListScope} name; anything else, or a segment the caller is not
+   *     offered, falls back to the caller's default list
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
    *     #DEFAULT_PAGE_SIZE}
@@ -152,26 +137,30 @@ public class JobOrderPageController {
       @RequestParam(required = false) String scope,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
+      @ModelAttribute("canViewAssignedJobOrders") boolean canViewAssignedJobOrders,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model) {
-    boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
-    if (!canViewJobOrders && !canViewOwnJobOrders) {
+    if (!canViewJobOrders && !canViewOwnJobOrders && !canViewAssignedJobOrders) {
       return "redirect:/orders/create";
     }
-    boolean scopeChoice = canViewJobOrders;
-    boolean mineScopeOffered = canViewJobOrders && canViewOwnJobOrders;
-    String effectiveScope =
-        resolveScope(RelayParams.oneOfOrNull(scope, ORDER_SCOPES), requesterView, mineScopeOffered);
-    boolean ownScope = SCOPE_MINE.equals(effectiveScope);
-    boolean toProcessScope = SCOPE_TO_PROCESS.equals(effectiveScope);
+    List<OrderListScope> offeredScopes =
+        OrderListScope.offered(canViewJobOrders, canViewOwnJobOrders, canViewAssignedJobOrders);
+    OrderListScope effectiveScope =
+        OrderListScope.resolve(
+            OrderListScope.parseOrNull(scope),
+            canViewJobOrders,
+            canViewOwnJobOrders,
+            canViewAssignedJobOrders);
+    boolean requesterView = offeredScopes.isEmpty();
+    boolean ownScope = effectiveScope == OrderListScope.MINE;
     model.addAttribute("requesterView", requesterView);
-    model.addAttribute("scopeChoice", scopeChoice);
-    model.addAttribute("mineScopeOffered", mineScopeOffered);
+    model.addAttribute("scopeOptions", scopeOptions(offeredScopes));
+    model.addAttribute("squadronFilterAvailable", canViewJobOrders);
     model.addAttribute("ownScope", ownScope);
-    model.addAttribute("squadronFilterHidden", ownScope || toProcessScope);
-    model.addAttribute("scope", effectiveScope);
+    model.addAttribute("squadronFilterHidden", effectiveScope != OrderListScope.ALL);
+    model.addAttribute("scope", effectiveScope.name());
     List<String> requestedStatuses = (status == null) ? List.of() : status;
     List<String> validStatuses =
         requestedStatuses.stream().filter(VALID_STATUSES::contains).toList();
@@ -186,13 +175,12 @@ public class JobOrderPageController {
     JobOrderPageReader.OrderListPage list =
         pageReader.readOrderList(
             new JobOrderPageReader.OrderListQuery(
-                ownScope,
-                toProcessScope,
+                effectiveScope,
                 effectivePage,
                 effectiveSize,
                 statuses,
                 selectedSquadronIds,
-                !requesterView));
+                canViewJobOrders));
     if (!list.ordersAvailable()) {
       model.addAttribute("error", "error.joborder.load");
     }
@@ -206,10 +194,12 @@ public class JobOrderPageController {
         "paginationBaseUrl",
         buildPaginationBaseUrl(
             statuses,
-            ownScope || toProcessScope ? List.of() : selectedSquadronIds,
-            scopeChoice && !SCOPE_ALL.equals(effectiveScope) ? effectiveScope : null));
+            effectiveScope == OrderListScope.ALL ? selectedSquadronIds : List.of(),
+            !offeredScopes.isEmpty() && effectiveScope != OrderListScope.ALL
+                ? effectiveScope
+                : null));
     model.addAttribute("selectedStatuses", statuses);
-    if (!requesterView) {
+    if (canViewJobOrders) {
       model.addAttribute("squadrons", list.activeSquadrons());
       model.addAttribute("selectedSquadronIds", selectedSquadronIds);
     }
@@ -220,21 +210,16 @@ public class JobOrderPageController {
   }
 
   /**
-   * Resolves the list scope the caller gets: a requester-only caller always reads their own orders,
-   * {@code MINE} needs both capabilities, and everything else falls back to {@code ALL}.
+   * Maps the offered segments to the options of the scope control.
    *
-   * @param requested the validated {@code scope} parameter, or {@code null} when absent or unknown
-   * @param requesterView whether the caller may only read their own unit's orders
-   * @param mineScopeOffered whether the caller may choose the own-orders scope
-   * @return {@link #SCOPE_MINE}, {@link #SCOPE_TO_PROCESS} or {@link #SCOPE_ALL}
+   * @param offered the segments the caller may choose, in display order
+   * @return one {@code value} / {@code labelKey} option per segment
    */
   @NotNull
-  private static String resolveScope(
-      @Nullable String requested, boolean requesterView, boolean mineScopeOffered) {
-    if (requesterView || (mineScopeOffered && SCOPE_MINE.equals(requested))) {
-      return SCOPE_MINE;
-    }
-    return SCOPE_TO_PROCESS.equals(requested) ? SCOPE_TO_PROCESS : SCOPE_ALL;
+  private static List<Map<String, String>> scopeOptions(@NotNull List<OrderListScope> offered) {
+    return offered.stream()
+        .map(scope -> Map.of("value", scope.name(), "labelKey", scope.labelKey()))
+        .toList();
   }
 
   /**
@@ -242,15 +227,17 @@ public class JobOrderPageController {
    *
    * @param status the resolved (never empty) status filter
    * @param squadronIds the selected squadron ids (empty = no squadron filter)
-   * @param scope the chosen scope carried as {@code scope=…}, or {@code null} to carry none
+   * @param scope the chosen segment carried as {@code scope=…}, or {@code null} to carry none
    * @return {@code /orders?status=...&squadronId=...} carrying the current filter
    */
   @NotNull
   private static String buildPaginationBaseUrl(
-      @NotNull List<String> status, @NotNull List<UUID> squadronIds, @Nullable String scope) {
+      @NotNull List<String> status,
+      @NotNull List<UUID> squadronIds,
+      @Nullable OrderListScope scope) {
     List<String> queryParts = new ArrayList<>();
     if (scope != null) {
-      queryParts.add("scope=" + scope);
+      queryParts.add("scope=" + scope.name());
     }
     for (String s : status) {
       queryParts.add("status=" + s);

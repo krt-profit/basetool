@@ -76,7 +76,29 @@ class CapabilityFlagsAdviceTest {
     assertTrue(caps.canSeeBlueprintOverview());
     assertTrue(caps.canViewJobOrders());
     assertTrue(caps.canViewOwnJobOrders());
+    assertTrue(caps.canViewAssignedJobOrders());
     assertTrue(caps.canMarkStolen());
+  }
+
+  @Test
+  void canViewAssignedJobOrders_mirrorsTheBackendFlagIndependentOfTheProfitGate() {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(authHelper.isAdmin()).thenReturn(false);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, false, true));
+    CapabilityFlagsAdvice advice = advice();
+
+    CapabilitiesResponse caps = advice.meCapabilities(new MockHttpServletRequest());
+
+    assertTrue(advice.canViewAssignedJobOrders(caps));
+    assertFalse(advice.canViewJobOrders(caps));
+    assertFalse(advice.canViewOwnJobOrders(caps));
+  }
+
+  @Test
+  void canViewAssignedJobOrders_failsClosed() {
+    assertFalse(advice().canViewAssignedJobOrders(null));
+    assertFalse(advice().canViewAssignedJobOrders(CapabilitiesResponse.NONE));
   }
 
   @Test

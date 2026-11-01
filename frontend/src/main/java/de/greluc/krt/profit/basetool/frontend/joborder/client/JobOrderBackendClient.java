@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -125,10 +126,7 @@ public class JobOrderBackendClient {
   /**
    * Reads one page of the order list, sorted by priority.
    *
-   * @param ownScope {@code true} to read the caller's own requested orders, which ignore the
-   *     squadron filter
-   * @param toProcess {@code true} to read the queue of the caller's own units, which ignores the
-   *     squadron filter
+   * @param scope the segment to read; only {@link OrderListScope#ALL} carries the squadron filter
    * @param page the zero-based page index
    * @param size the page size
    * @param statuses the status filter, never empty
@@ -137,14 +135,14 @@ public class JobOrderBackendClient {
    */
   @Nullable
   public PageResponse<JobOrderDto> orders(
-      boolean ownScope,
-      boolean toProcess,
+      @NotNull OrderListScope scope,
       int page,
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds) {
     StringBuilder uri =
-        new StringBuilder(ownScope ? "/api/v1/orders/requested" : "/api/v1/orders")
+        new StringBuilder(
+                scope == OrderListScope.MINE ? "/api/v1/orders/requested" : "/api/v1/orders")
             .append("?page={page}&size={size}&sort=priority,asc&status=");
     List<Object> uriVariables = new ArrayList<>();
     uriVariables.add(page);
@@ -156,9 +154,13 @@ public class JobOrderBackendClient {
       uri.append("{status}");
       uriVariables.add(statuses.get(i));
     }
-    if (toProcess) {
-      uri.append("&toProcess=true");
-    } else if (!ownScope) {
+    uri.append(
+        switch (scope) {
+          case TO_PROCESS -> "&toProcess=true";
+          case ASSIGNED -> "&assignedToMe=true";
+          case ALL, MINE -> "";
+        });
+    if (scope == OrderListScope.ALL) {
       for (UUID sid : squadronIds) {
         uri.append("&squadronId={squadronId}");
         uriVariables.add(sid);

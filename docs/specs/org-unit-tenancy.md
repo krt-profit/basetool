@@ -136,8 +136,8 @@ the job-order link above, and a deliberate exception to org-unit tenancy.
 - **Keyed on the person.** The grant matches the caller's own user id against the order's assignee
   entries, like the REQ-ORG-011 owner escape; never an authority, a pin or the admin all-scope.
 - **What it opens.** The order in full — materials, progress, assignees — on its detail page and in
-  the overview's „Alle" list (REQ-ORDERS-040); the „Ich bearbeite" segment follows with the
-  REQ-ORDERS-040 amendment. „Zu bearbeiten" keeps the normal tenancy scope. `canSeeJobOrder` checks
+  the overview's „Alle" list and its „Ich bearbeite" segment (REQ-ORDERS-040). „Zu bearbeiten"
+  keeps the normal tenancy scope. `canSeeJobOrder` checks
   the entry before the scope gate, and the queue list `findScopedJobOrders` adds the same entry as a
   disjunct beside `JOB_ORDER_SCOPE_PREDICATE` (`JobOrderScope`), so the list never returns an order
   the detail gate would deny. The shared fragment itself stays unwidened, because the material

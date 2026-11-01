@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -62,7 +63,44 @@ class MeControllerTest {
 
   @Mock private InventoryProperties inventoryProperties;
 
+  @Mock private JobOrderAssigneeLookup jobOrderAssigneeLookup;
+
   @InjectMocks private MeController controller;
+
+  @Test
+  void getCapabilities_assignedJobOrdersFlagFollowsTheCallersEntries() {
+    UUID callerId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(true);
+    assertTrue(controller.getCapabilities().canViewAssignedJobOrders());
+
+    when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(false);
+    assertFalse(controller.getCapabilities().canViewAssignedJobOrders());
+  }
+
+  @Test
+  void getCapabilities_assignedJobOrdersFlagIsIndependentOfTheProfitGateAndThePin() {
+    UUID callerId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(true);
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(ownerScopeService.canViewOwnJobOrders()).thenReturn(false);
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.canViewAssignedJobOrders());
+    assertFalse(response.canViewJobOrders());
+    assertFalse(response.canViewOwnJobOrders());
+  }
+
+  @Test
+  void getCapabilities_assignedJobOrdersFlagIsFalseWithoutAnIdentifiedCaller() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+
+    assertFalse(controller.getCapabilities().canViewAssignedJobOrders());
+    verify(jobOrderAssigneeLookup, never()).holdsAnyEntry(any());
+  }
 
   @Test
   void getActiveOrgUnit_present_returnsUuid() {

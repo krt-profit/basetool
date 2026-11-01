@@ -96,7 +96,7 @@ class JobOrderPageControllerReaderTest {
   }
 
   private String viewList(Model model) {
-    return controller.viewOrders(null, null, null, true, false, null, null, null, model);
+    return controller.viewOrders(null, null, null, true, false, false, null, null, null, model);
   }
 
   @Test

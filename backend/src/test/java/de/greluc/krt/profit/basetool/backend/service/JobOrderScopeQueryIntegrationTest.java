@@ -43,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -258,6 +259,75 @@ class JobOrderScopeQueryIntegrationTest {
 
     assertThat(visibleIds(new ScopePredicate(false, null, Set.of(squadronAId)), assigneeId))
         .doesNotContain(orderRespB);
+  }
+
+  @Test
+  void assignedToMe_listsOnlyTheOrdersOfTheCallersOwnEntries() {
+    UUID assigneeId = assignNewUser(orderRespB);
+    assign(assigneeId, orderRespSk);
+
+    assertThat(assignedIds(assigneeId, ALL_STATUSES))
+        .containsExactlyInAnyOrder(orderRespB, orderRespSk)
+        .doesNotContain(orderRespA);
+  }
+
+  @Test
+  void assignedToMe_showsNothingForACallerWithoutEntries() {
+    assignNewUser(orderRespB);
+
+    assertThat(assignedIds(newUser().getId(), ALL_STATUSES)).isEmpty();
+  }
+
+  @Test
+  void assignedToMe_appliesTheStatusFilterAndCountsTheWholeResult() {
+    UUID assigneeId = assignNewUser(orderRespB);
+    assign(assigneeId, orderRespA);
+
+    Page<JobOrder> open =
+        jobOrderRepository.findAssignedJobOrders(
+            List.of(JobOrderStatus.OPEN), assigneeId, PageRequest.of(0, 1));
+    Page<JobOrder> completed =
+        jobOrderRepository.findAssignedJobOrders(
+            List.of(JobOrderStatus.COMPLETED), assigneeId, ALL_ROWS);
+
+    assertThat(open.getContent()).hasSize(1);
+    assertThat(open.getTotalElements()).isEqualTo(2);
+    assertThat(completed.getTotalElements()).isZero();
+  }
+
+  @Test
+  void assignedToMe_endsWithTheEntry() {
+    UUID assigneeId = assignNewUser(orderRespB);
+    transactionTemplate.executeWithoutResult(_ -> {
+      JobOrder order = jobOrderRepository.findById(orderRespB).orElseThrow();
+      order.getAssignees().clear();
+      jobOrderRepository.saveAndFlush(order);
+    });
+
+    assertThat(assignedIds(assigneeId, ALL_STATUSES)).doesNotContain(orderRespB);
+  }
+
+  @Test
+  void existsByAssigneesUserId_isTrueOnlyWhileTheUserHoldsAnEntry() {
+    UUID assigneeId = assignNewUser(orderRespB);
+
+    assertThat(jobOrderRepository.existsByAssigneesUserId(assigneeId)).isTrue();
+    assertThat(jobOrderRepository.existsByAssigneesUserId(newUser().getId())).isFalse();
+  }
+
+  private void assign(UUID userId, UUID orderId) {
+    transactionTemplate.executeWithoutResult(_ -> {
+      JobOrder order = jobOrderRepository.findById(orderId).orElseThrow();
+      order.addAssignee(
+          JobOrderAssignee.builder().user(userRepository.getReferenceById(userId)).build());
+      jobOrderRepository.saveAndFlush(order);
+    });
+  }
+
+  private Set<UUID> assignedIds(UUID callerId, List<JobOrderStatus> statuses) {
+    return jobOrderRepository.findAssignedJobOrders(statuses, callerId, ALL_ROWS).stream()
+        .map(JobOrder::getId)
+        .collect(Collectors.toSet());
   }
 
   private UUID assignNewUser(UUID orderId) {

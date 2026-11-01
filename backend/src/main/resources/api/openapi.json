@@ -41392,7 +41392,7 @@
     },
     "/api/v1/orders" : {
       "get" : {
-        "description" : "Returns a paginated list of job orders. toProcess=true keeps only the orders whose profit-eligible responsible unit is one of the caller's own units.",
+        "description" : "Returns a paginated list of job orders. toProcess=true keeps only the orders whose profit-eligible responsible unit is one of the caller's own units. assignedToMe=true lists the orders the caller is an assignee of; it combines with neither toProcess nor squadronId.",
         "operationId" : "getAllJobOrders",
         "parameters" : [ {
           "in" : "query",
@@ -41419,6 +41419,14 @@
         }, {
           "in" : "query",
           "name" : "toProcess",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "assignedToMe",
           "required" : false,
           "schema" : {
             "type" : "boolean",
@@ -81371,6 +81379,9 @@
             "type" : "boolean"
           },
           "canSeeHangarOwnerDetails" : {
+            "type" : "boolean"
+          },
+          "canViewAssignedJobOrders" : {
             "type" : "boolean"
           },
           "canViewBankStaff" : {

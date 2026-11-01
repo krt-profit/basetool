@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry.of;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.ASSIGNED_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.BLUEPRINT_OVERVIEW;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
@@ -333,6 +334,12 @@ public class NavigationRegistry {
             .keywords("palette.keywords.orders")
             .gate(NavigationGate.requires(OWN_JOB_ORDERS).andExcludes(JOB_ORDERS))
             .testId("nav-orders-own"),
+        of("orders.assigned", "/orders", "nav.orders")
+            .keywords("palette.keywords.orders")
+            .gate(
+                NavigationGate.requires(ASSIGNED_JOB_ORDERS)
+                    .andExcludes(JOB_ORDERS, OWN_JOB_ORDERS))
+            .testId("nav-orders-assigned"),
         of("orders.demand", "/orders/material-demand", "nav.orders.materialDemand")
             .keywords("palette.keywords.materialDemand")
             .gate(NavigationGate.requires(JOB_ORDERS))
@@ -614,7 +621,7 @@ public class NavigationRegistry {
             ICON_BOOKOUT,
             "mobile-tab-inventory"),
         new NavigationTab(
-            List.of("orders.list", "orders.own", "orders.create"),
+            List.of("orders.list", "orders.own", "orders.assigned", "orders.create"),
             "mobile.tab.orders",
             ICON_LIST,
             "mobile-tab-orders"),

@@ -143,8 +143,7 @@ public class JobOrderQueryService {
     if (!ownerScopeService.canViewJobOrders()) {
       return Page.empty(pageable);
     }
-    List<JobOrderStatus> effectiveStatuses =
-        (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
+    List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
     if (toProcess) {
@@ -175,6 +174,26 @@ public class JobOrderQueryService {
   }
 
   /**
+   * Paged list of the orders the caller holds an assignee entry on, the "Ich bearbeite" list
+   * (REQ-ORDERS-040). The entry is the visibility grant (REQ-ORDERS-047), so the list is open to a
+   * caller outside the profit gate; an unidentified caller gets an empty page.
+   *
+   * @param statuses optional status filter; null/empty means "all"
+   * @param pageable page request
+   * @return paged job orders the caller is an assignee of, as DTOs
+   */
+  public Page<JobOrderDto> getAssignedJobOrders(
+      @Nullable List<JobOrderStatus> statuses, Pageable pageable) {
+    UUID callerId = authHelper.currentUserId().orElse(null);
+    if (callerId == null) {
+      return Page.empty(pageable);
+    }
+    List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
+    return jobOrderStockProjectionService.mapPageWithStock(
+        jobOrderRepository.findAssignedJobOrders(effectiveStatuses, callerId, pageable));
+  }
+
+  /**
    * Paged list of the orders requested by org units the caller is a direct member of, the "Meine
    * Auftr&auml;ge" list (REQ-ORDERS-023). A memberless caller gets an empty page.
    *
@@ -187,11 +206,15 @@ public class JobOrderQueryService {
     if (requesterOrgUnitIds.isEmpty()) {
       return Page.empty(pageable);
     }
-    List<JobOrderStatus> effectiveStatuses =
-        (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
+    List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     Page<JobOrder> page =
         jobOrderRepository.findRequestedOrders(effectiveStatuses, requesterOrgUnitIds, pageable);
     return jobOrderStockProjectionService.mapPageWithStock(page);
+  }
+
+  private static @NotNull List<JobOrderStatus> statusesOrAll(
+      @Nullable List<JobOrderStatus> statuses) {
+    return statuses == null || statuses.isEmpty() ? List.of(JobOrderStatus.values()) : statuses;
   }
 
   /**

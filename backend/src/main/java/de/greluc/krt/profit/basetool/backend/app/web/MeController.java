@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.app.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -71,6 +72,9 @@ public class MeController {
 
   /** Supplies the server switch of the „gestohlen" marker. */
   private final InventoryProperties inventoryProperties;
+
+  /** Answers whether the caller holds a job-order assignee entry. */
+  private final JobOrderAssigneeLookup jobOrderAssigneeLookup;
 
   /**
    * Returns the org-unit context applied to staffel-scoped queries for this request.
@@ -125,6 +129,7 @@ public class MeController {
         ownerScopeService.canAccessBlueprintOverview(),
         ownerScopeService.canViewJobOrders(),
         ownerScopeService.canViewOwnJobOrders(),
+        holdsAssigneeEntry(),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)),
         ownerScopeService.canActAsLogisticianInActiveContext(),
@@ -137,6 +142,18 @@ public class MeController {
         officerHere,
         officerHere,
         officerHere);
+  }
+
+  /**
+   * Whether the caller holds an assignee entry on any job order; independent of the pinned unit.
+   *
+   * @return {@code true} iff the caller is an assignee of at least one order
+   */
+  private boolean holdsAssigneeEntry() {
+    return authHelperService
+        .currentUserId()
+        .map(jobOrderAssigneeLookup::holdsAnyEntry)
+        .orElse(false);
   }
 
   /**
@@ -229,6 +246,9 @@ public class MeController {
    *     profit-eligible org unit)
    * @param canViewOwnJobOrders whether the caller may view orders their own org unit requested
    *     (admin or any org-unit member; REQ-ORDERS-023)
+   * @param canViewAssignedJobOrders whether the caller holds an assignee entry on at least one
+   *     order, which opens the order list to them without profit access (REQ-ORDERS-040); not
+   *     affected by the pinned unit
    * @param canViewBankStaff whether the caller holds {@code BANK_EMPLOYEE} or above
    * @param canManageBank whether the caller holds {@code BANK_MANAGEMENT}
    * @param isLogisticianOrAbove whether the caller holds a Logistician grant in the active context:
@@ -254,6 +274,7 @@ public class MeController {
       boolean canSeeBlueprintOverview,
       boolean canViewJobOrders,
       boolean canViewOwnJobOrders,
+      boolean canViewAssignedJobOrders,
       boolean canViewBankStaff,
       boolean canManageBank,
       boolean isLogisticianOrAbove,

@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
@@ -433,6 +434,9 @@ public class JobOrderController {
    *     means the full scoped view
    * @param toProcess when {@code true}, keep only the orders one of the caller's own units
    *     processes, the "Zu bearbeiten" queue (REQ-ORDERS-040); narrows the scope, never widens it
+   * @param assignedToMe when {@code true}, list only the orders the caller holds an assignee entry
+   *     on, the "Ich bearbeite" segment (REQ-ORDERS-040); combines with neither {@code toProcess}
+   *     nor {@code squadronId}
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelisted: {@code priority}, {@code createdAt})
@@ -443,19 +447,29 @@ public class JobOrderController {
       summary = "Get all job orders",
       description =
           "Returns a paginated list of job orders. toProcess=true keeps only the orders whose"
-              + " profit-eligible responsible unit is one of the caller's own units.")
+              + " profit-eligible responsible unit is one of the caller's own units."
+              + " assignedToMe=true lists the orders the caller is an assignee of; it combines with"
+              + " neither toProcess nor squadronId.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,
       @RequestParam(required = false) List<UUID> squadronId,
       @RequestParam(required = false, defaultValue = "false") boolean toProcess,
+      @RequestParam(required = false, defaultValue = "false") boolean assignedToMe,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
+    if (assignedToMe) {
+      if (toProcess || (squadronId != null && !squadronId.isEmpty())) {
+        throw new BadRequestException(
+            "assignedToMe combines with neither toProcess nor squadronId");
+      }
+      return PageResponse.of(jobOrderQueryService.getAssignedJobOrders(status, pageable));
+    }
     Page<JobOrderDto> p =
         jobOrderQueryService.getAllJobOrders(status, squadronId, toProcess, pageable);
     return PageResponse.of(p);

@@ -59,6 +59,44 @@ class NavigationMenuTest {
     assertThat(menu.tabs().get(2).entry().href()).isEqualTo("/orders");
   }
 
+  /** An assignee without any order list gets the „Aufträge" link and its tab opens the list. */
+  @Test
+  void assigneeWithoutProfitAccessGetsTheOrdersLink() {
+    NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.ASSIGNED_JOB_ORDERS));
+
+    assertThat(keys(menu, "logistics")).contains("orders.assigned", "orders.create");
+    assertThat(menu.tabs().get(2).entry().key()).isEqualTo("orders.assigned");
+    assertThat(menu.tabs().get(2).path()).isEqualTo("/orders");
+  }
+
+  /** A member who already reaches an order list gets no second „Aufträge" link for the entry. */
+  @Test
+  void anEntryAddsNoSecondOrdersLinkToAMemberWhoSeesTheQueueOrTheOwnList() {
+    assertThat(
+            keys(
+                resolve(
+                    Set.of(),
+                    Set.of(NavigationFlag.JOB_ORDERS, NavigationFlag.ASSIGNED_JOB_ORDERS)),
+                "logistics"))
+        .contains("orders.list")
+        .doesNotContain("orders.assigned");
+    assertThat(
+            keys(
+                resolve(
+                    Set.of(),
+                    Set.of(NavigationFlag.OWN_JOB_ORDERS, NavigationFlag.ASSIGNED_JOB_ORDERS)),
+                "logistics"))
+        .contains("orders.own")
+        .doesNotContain("orders.assigned");
+  }
+
+  /** Without an entry the link is absent. */
+  @Test
+  void withoutAnEntryThereIsNoAssignedLink() {
+    assertThat(keys(resolve(Set.of("KRT_MEMBER"), Set.of()), "logistics"))
+        .doesNotContain("orders.assigned");
+  }
+
   /** A group gated on a role or flag the caller lacks is not offered at all. */
   @Test
   void gatedGroupsDisappear() {
