@@ -130,19 +130,16 @@ Mission responses are cleaned up server-side in [`MissionController`](backend/sr
 through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
-  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for a caller **below
-  Logistician**: owner and managers are emptied (unless the same response tells the caller it may
-  manage the mission, see below), and every nested user — participant, assigned ship's owner — is
-  reduced to the public callsign tuple (username, display/effective name, rank): e-mail, description,
-  roles, permissions, memberships, join date and the Discord-link flag are dropped. The
+  `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for **every non-admin**: the owner, the managers and every nested user — participant, assigned ship's owner — are
+  reduced to the peer shape (display/effective name, rank, description, squadrons; the username only
+  without a display name): e-mail, roles, permissions, flags, join date and the Discord-link flag are dropped. The
   roster itself stays, as do the description, the organisation, the units, the frequencies, the
   Ablauf steps, the Ziele and each participant's payout preference and comment — a peer is a member
   of the organisation and reads the Einsatz's own planning data.
 - The caller's **own** capability flags (`canEdit`, `canManageManagers`) survive the pass. They are
   answers about the caller, not somebody else's data, and forcing them off would hide the management
-  controls from a MISSION_MANAGER — who sits below Logistician in the hierarchy. When either flag is
-  true the owner and manager list survive too, as the callsign tuple, because the caller may rewrite
-  exactly that list.
+  controls from a MISSION_MANAGER — who sits below Logistician in the hierarchy. The owner and the manager
+  list are visible to everyone who may see the mission, in the peer shape.
 
 **There used to be a second, stricter level** (`cleanupOutsiderMissionForGuest`) for anonymous and
 role-less callers, which additionally hid the description and each participant's payout preference
@@ -382,7 +379,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream + mute preferences (`/notifications/**`, `/api/v1/notifications/preferences`, `/profile/notification-preferences`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted below Logistician, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Personal Data
 
@@ -550,7 +547,7 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 
 | Function (gate)                                                                                                              | Member | Log. | MM | Officer | Admin |
 |:-----------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
-| Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted below Logistician, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
+| Read a mission in scope — list, search, `/next`, detail (`isMemberOrAbove()` + `canSeeMission`; peer-redacted for every non-admin, §1.3) |   ✅⁴   |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** mission (`isMemberOrAbove()`)                                                                                     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, read gate⁸)                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Check in/out / change payout preference / edit / leave a participant row (participant gate⁸)                                |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |

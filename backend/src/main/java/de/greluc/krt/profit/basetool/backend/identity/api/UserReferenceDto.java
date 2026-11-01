@@ -20,7 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying User Reference payload. */
 public record UserReferenceDto(
-    UUID id, String username, String displayName, String effectiveName, Integer rank) {}
+    UUID id, @Nullable String username, String displayName, String effectiveName, Integer rank) {}

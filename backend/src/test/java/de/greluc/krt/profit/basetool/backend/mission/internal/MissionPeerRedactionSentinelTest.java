@@ -51,13 +51,23 @@ class MissionPeerRedactionSentinelTest {
 
   /** The components of a peer-visible user; everything else must be empty after redaction. */
   private static final Set<String> PEER_VISIBLE_USER_COMPONENTS =
-      Set.of("id", "username", "displayName", "effectiveName", "rank", "inKeycloak", "version");
+      Set.of(
+          "id",
+          "username",
+          "displayName",
+          "effectiveName",
+          "rank",
+          "description",
+          "inKeycloak",
+          "squadron",
+          "squadrons",
+          "version");
 
   /**
    * Components no record reachable from a mission may declare apart from {@link UserDto} itself.
    */
   private static final Set<String> PRIVATE_COMPONENT_NAMES =
-      Set.of("email", "roles", "permissions", "description", "joinDate", "discordLinked");
+      Set.of("email", "roles", "permissions", "joinDate", "discordLinked");
 
   private final MissionPeerRedactor redactor = new MissionPeerRedactor();
 
@@ -79,15 +89,17 @@ class MissionPeerRedactionSentinelTest {
         .isGreaterThanOrEqualTo(2);
   }
 
-  /** A reader who does not manage the mission sees neither its owner nor its managers. */
+  /** A reader sees the owner and the managers of the mission, without their usernames. */
   @Test
-  void aPeerSeesNeitherOwnerNorManagers() {
+  void aPeerSeesOwnerAndManagersWithoutUsernames() {
     MissionDto full = (MissionDto) fill(MissionDto.class, MissionDto.class, new HashSet<>());
 
     MissionDto asPeer = redactor.cleanupMissionForPeer(withoutManagingRights(full));
 
-    assertThat(asPeer.owner()).isNull();
-    assertThat(asPeer.managers()).isNull();
+    assertThat(asPeer.owner()).isNotNull();
+    assertThat(asPeer.owner().username()).isNull();
+    assertThat(asPeer.managers()).isNotEmpty();
+    assertThat(asPeer.managers()).allSatisfy(m -> assertThat(m.username()).isNull());
   }
 
   /**

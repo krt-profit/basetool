@@ -523,8 +523,7 @@ Goals may additionally be **seeded at mission-create time** (each still recordin
 **Leader.** The sticky facts-bar **"Leiter"** cell shows the mission's **Einsatzleiter** — the
 participant whose `plannedMissionJobType` is the single designated **mission-lead** job type
 (`JobType.isMissionLead`) — falling back to the mission **owner** when no Einsatzleiter is assigned,
-and to "none" otherwise (the owner is redacted for a member below Logistician, so such a viewer
-sees "none" when no Einsatzleiter is assigned). This **replaces** the former behaviour where the facts bar mirrored the built-in
+and to "none" otherwise (the owner is visible to every viewer of the mission in the peer shape). This **replaces** the former behaviour where the facts bar mirrored the built-in
 **Partyleiter** (`partyLeadUser`); the Partyleiter remains a separate field shown in the "Mission auf
 einen Blick" panel and is no longer reflected in the facts bar. The same Einsatzleiter is **also**
 surfaced as a dedicated **"Einsatzleiter" row directly above the Partyleiter** in that overview panel

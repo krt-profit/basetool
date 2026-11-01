@@ -81,25 +81,8 @@ public class UserService {
   private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
   private final OfficerReachDirectory officerReachDirectory;
+  private final CallerUserProjection callerUserProjection;
   private final AuditRecorder auditRecorder;
-
-  /**
-   * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
-   * scope API; a user without any Staffel counts as cross-squadron.
-   *
-   * @param userId the target user's id
-   * @return {@code true} if the caller is a non-admin and shares none of the user's Staffeln
-   */
-  public boolean isCrossSquadronForNonAdmin(@NotNull UUID userId) {
-    if (authHelperService.isAdmin()) {
-      return false;
-    }
-    List<UUID> targetSquadronIds = membershipOperations.findStaffelMembershipOrgUnitIds(userId);
-    if (targetSquadronIds.isEmpty()) {
-      return true;
-    }
-    return targetSquadronIds.stream().noneMatch(squadronVisibility::canSeeSquadron);
-  }
 
   /**
    * Checks whether any user has this exact name, case-insensitively, as username or display name.
@@ -402,7 +385,9 @@ public class UserService {
    */
   public List<UserReferenceDto> findAllReference() {
     Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.findAllReferenceScoped(scope);
+    return userRepository.findAllReferenceScoped(scope).stream()
+        .map(callerUserProjection::forCaller)
+        .toList();
   }
 
   /**
@@ -442,8 +427,9 @@ public class UserService {
   public Page<UserReferenceDto> searchReferencesByUsername(
       @NotNull String query, @NotNull Pageable pageable) {
     Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.searchScopedReferences(
-        LikePatterns.escapeNullable(query), scope, pageable);
+    return userRepository
+        .searchScopedReferences(LikePatterns.escapeNullable(query), scope, pageable)
+        .map(callerUserProjection::forCaller);
   }
 
   /**
