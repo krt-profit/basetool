@@ -251,11 +251,11 @@ class DashboardE2eTest {
   }
 
   /**
-   * The catalogue adds the next-mission and hangar-readiness widgets; each loads its own body and
-   * offers no options.
+   * The catalogue adds the next-mission and hangar-readiness widgets; each loads its own body, the
+   * next-mission widget offers the rows option and the hangar widget none.
    */
   @Test
-  void theSummaryWidgetsLoadTheirBodiesAndOfferNoOptions() {
+  void theSummaryWidgetsLoadTheirBodiesAndOfferTheirOptions() {
     run(
         memberState,
         1440,
@@ -265,6 +265,7 @@ class DashboardE2eTest {
           page.getByTestId("dashboard-customise").click();
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-next-mission").click();
+          assertThat(page.getByTestId("dashboard-widget-next-mission")).hasCount(1);
           page.getByTestId("dashboard-add").click();
           page.getByTestId("dashboard-add-hangar-readiness").click();
 
@@ -283,15 +284,35 @@ class DashboardE2eTest {
                               + " [data-testid='dashboard-hangar-empty']"))
               .isVisible();
           assertThat(
-                  page.getByTestId("dashboard-widget-next-mission")
-                      .getByTestId("dashboard-options"))
-              .hasCount(0);
-          assertThat(
                   page.getByTestId("dashboard-widget-hangar-readiness")
                       .getByTestId("dashboard-options"))
               .hasCount(0);
 
+          page.getByTestId("dashboard-widget-next-mission")
+              .getByTestId("dashboard-options")
+              .click();
+          page.locator("#dashboard-option-rows").selectOption("3");
+          page.getByTestId("dashboard-options-save").click();
+
+          assertThat(page.getByTestId("dashboard-widget-next-mission"))
+              .hasAttribute("data-rows", "3");
+          assertThat(
+                  page.getByTestId("dashboard-widget-next-mission")
+                      .locator(
+                          "[data-testid='home-mission'],"
+                              + " [data-testid='dashboard-next-mission-empty']")
+                      .first())
+              .isVisible();
+          assertTrue(
+              page.getByTestId("dashboard-widget-next-mission")
+                      .locator("[data-testid='home-mission']")
+                      .count()
+                  <= 3,
+              "the rows option bounds the entries");
+
           page.reload();
+          assertThat(page.getByTestId("dashboard-widget-next-mission"))
+              .hasAttribute("data-rows", "3");
           assertThat(page.getByTestId("dashboard-widget-next-mission")).hasCount(1);
           assertThat(page.getByTestId("dashboard-widget-hangar-readiness")).hasCount(1);
         });

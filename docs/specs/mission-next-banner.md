@@ -204,29 +204,45 @@ row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip),
 `MissionController` `/api/v1/missions` endpoint; the only new backend surfaces are the
 kind-agnostic own-membership id lookup and the per-caller `signedUp` field on its rows.
 
-### REQ-MISSION-031 — The next mission is also served as a list row
+### REQ-MISSION-031 — The upcoming missions of the own units and the sign-ups are served as list rows
 
-`GET /api/v1/missions/next/summary` returns the mission of the `/next` lookup as one `MissionListDto`
-row — the shape of `GET /api/v1/missions` — or `204 No Content` when none is upcoming. It is the
-read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
+`GET /api/v1/missions/next/summary?limit=<n>` returns, as `MissionListDto` rows (the shape of
+`GET /api/v1/missions`), the upcoming missions of the caller's own org units **merged** with the
+upcoming missions the caller is signed up for, each mission once, soonest planned start first. It is
+the read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
 
-- **Same selection.** The mission is the one `GET /api/v1/missions/next` returns: only `PLANNED` or
-  `ACTIVE` missions (REQ-MISSION-003), within the caller's org-unit scope and the pin of the active
-  context (REQ-MISSION-008). The summary widens nothing.
-- **Row content.** The row carries the per-caller `signedUp` flag and the registered count from the
-  same batched reads as the list (REQ-MISSION-012, REQ-DATA-003); it holds no participant or unit
-  data, so it needs no peer redaction.
+- **Own units.** The same selection as the `/next` lookup: only `PLANNED` or `ACTIVE` missions
+  (REQ-MISSION-003) within the caller's org-unit scope and the pin of the active context
+  (REQ-MISSION-008), including the organisation-wide fallback for a caller without a unit scope.
+- **Sign-ups.** A mission the caller holds a participant row on (`PLANNED` / `ACTIVE`, planned start
+  in the future) is included even when another unit owns it, but only inside the caller's mission
+  visibility (the scope predicate of the mission list, REQ-MISSION-012): a signed-up internal
+  mission of a unit the caller cannot see stays out. A mission in both sets appears once.
+- **Order and bound.** Sorted by `plannedStartTime` ascending, ties by id. `limit` is the most rows
+  returned, 1 to 10, **5** when absent; a value outside 1 to 10 is `400 Bad Request`. The union,
+  the order and the limit are one query, so a page of ten holds the ten soonest of both sets.
+- **No upcoming mission.** The answer is `200` with an empty list, never `204`.
+- **Row content.** Each row carries the per-caller `signedUp` flag and the registered count from the
+  same batched reads as the list (REQ-MISSION-012, REQ-DATA-003) and its owning org unit from the
+  same query; there is no per-row read. It holds no participant or unit data, so it needs no peer
+  redaction.
 - **Gate.** Authenticated member or above, like `/next`.
 
 **Acceptance**
 
-- [x] The summary names the mission `/next` names and says whether the caller is signed up.
-- [x] With no upcoming mission in scope the endpoint answers 204 and reads nothing further.
+- [x] The result holds the upcoming own-unit missions and the upcoming signed-up missions of another visible unit, each once, soonest first.
+- [x] A mission of a foreign unit the caller is not signed up for is not in the result.
+- [x] A signed-up internal mission of a unit the caller cannot see is not in the result.
+- [x] The pin narrows the own-unit part to the pinned unit and leaves the sign-ups.
+- [x] `limit` bounds the result and keeps the soonest entries; 1 and 10 are accepted, 0 and 11 answer 400, an absent `limit` means 5.
+- [x] With no upcoming mission the endpoint answers an empty list.
 
-**Enforced by:** `MissionNextSummaryControllerTest`,
-`DashboardBackendClientTest` (`nextMissionReadsTheSummaryRowAndNothingWhenNoneIsUpcoming`),
-`DashboardSummaryWidgetsMvcTest` · **Code:** `MissionNextSummaryController#getNextMissionSummary` ·
-**Related:** REQ-MISSION-003, REQ-MISSION-008, REQ-UI-034
+**Enforced by:** `MissionNextSummaryControllerTest`, `MissionServiceTest`
+(`getUpcomingOwnAndSignedUp_*`), `MissionUpcomingOwnOrSignedUpQueryDataTest` (PostgreSQL),
+`DashboardBackendClientTest` (`nextMissionsReadTheSummaryRowsWithTheLimitAndNothingWhenNoneIsUpcoming`),
+`DashboardSummaryWidgetsMvcTest` · **Code:** `MissionNextSummaryController#getNextMissionsSummary`,
+`MissionService#getUpcomingOwnAndSignedUp`, `MissionRepository#findUpcomingOwnOrSignedUp` ·
+**Related:** REQ-MISSION-003, REQ-MISSION-008, REQ-MISSION-012, REQ-UI-034
 
 ## Out of scope
 

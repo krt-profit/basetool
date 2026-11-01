@@ -32562,13 +32562,25 @@
     },
     "/api/v1/missions/next/summary" : {
       "get" : {
-        "operationId" : "getNextMissionSummary",
+        "operationId" : "getNextMissionsSummary",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
         "responses" : {
           "200" : {
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/MissionListDto"
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MissionListDto"
+                  }
                 }
               }
             },
@@ -32676,7 +32688,7 @@
             "description" : "Internal Server Error"
           }
         },
-        "summary" : "Get the next upcoming mission as a list row",
+        "summary" : "Get the next upcoming missions as list rows",
         "tags" : [ "mission" ],
         "x-domain" : "mission"
       }

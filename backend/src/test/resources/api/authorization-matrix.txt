@@ -273,7 +273,7 @@ GET /api/v1/missions/lookup | MissionController#lookupMissions | pre=isAuthentic
 GET /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#getMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#updateMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/missions/next | MissionController#getNextMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
-GET /api/v1/missions/next/summary | MissionNextSummaryController#getNextMissionSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+GET /api/v1/missions/next/summary | MissionNextSummaryController#getNextMissionsSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id} | MissionController#deleteMission | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/missions/{id} | MissionController#getMissionById | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/missions/{id}/core | MissionController#patchMissionCore | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated

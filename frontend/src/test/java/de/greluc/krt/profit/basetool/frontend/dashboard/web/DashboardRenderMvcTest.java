@@ -280,8 +280,9 @@ class DashboardRenderMvcTest {
 
   @Test
   @DisplayName(
-      "a member may add the next-mission and hangar-readiness widgets, which have no options")
-  void offersTheSummaryWidgetsWithoutAnOptionsButton() throws Exception {
+      "a member may add the next-mission widget with its rows option and the hangar-readiness"
+          + " widget without options")
+  void offersTheSummaryWidgetsWithTheirOptions() throws Exception {
     stored(
         true,
         1,
@@ -298,7 +299,8 @@ class DashboardRenderMvcTest {
         .contains("data-testid=\"dashboard-widget-hangar-readiness\"")
         .contains("data-widget-slug=\"next-mission\"")
         .contains("data-widget-slug=\"hangar-readiness\"")
-        .doesNotContain("data-testid=\"dashboard-options\"");
+        .containsPattern("data-widget-type=\"NEXT_MISSION\"[^>]*data-options=\"rows\"");
+    assertThat(html.split("data-testid=\"dashboard-options\"", -1)).hasSize(2);
   }
 
   @Test

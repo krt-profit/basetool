@@ -335,8 +335,8 @@ class DashboardServiceTest {
   }
 
   @Test
-  @DisplayName("the next-mission and hangar-readiness widgets are added without options")
-  void addsTheSummaryWidgetsWithoutOptions() {
+  @DisplayName("the next-mission widget gets the rows option, hangar readiness has none")
+  void addsTheSummaryWidgetsWithTheirOptions() {
     UUID owner = member();
 
     DashboardResponse written =
@@ -352,20 +352,36 @@ class DashboardServiceTest {
     assertThat(written.widgets())
         .extracting(DashboardWidgetResponse::type)
         .containsExactly(DashboardWidgetType.NEXT_MISSION, DashboardWidgetType.HANGAR_READINESS);
-    assertThat(written.widgets())
+    DashboardWidgetResponse next = written.widgets().getFirst();
+    DashboardWidgetResponse hangar = written.widgets().get(1);
+    assertThat(next.rows()).isEqualTo(5);
+    assertThat(List.of(next, hangar))
         .allSatisfy(widget -> {
           assertThat(widget.days()).isNull();
-          assertThat(widget.rows()).isNull();
           assertThat(widget.status()).isNull();
           assertThat(widget.orgUnitId()).isNull();
         });
-    DashboardWidgetResponse next = written.widgets().getFirst();
+    assertThat(hangar.rows()).isNull();
+    DashboardWidgetResponse resized =
+        service.replaceOptions(
+            owner,
+            MEMBER,
+            next.id(),
+            new DashboardOptionsRequest(null, null, 10, null, next.optionsVersion()));
+    assertThat(resized.rows()).isEqualTo(10);
     assertThatThrownBy(() ->
             service.replaceOptions(
                 owner,
                 MEMBER,
                 next.id(),
-                new DashboardOptionsRequest(null, null, 5, null, next.optionsVersion())))
+                new DashboardOptionsRequest(null, null, 4, null, resized.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                hangar.id(),
+                new DashboardOptionsRequest(null, null, 5, null, hangar.optionsVersion())))
         .isInstanceOf(BadRequestException.class);
   }
 
