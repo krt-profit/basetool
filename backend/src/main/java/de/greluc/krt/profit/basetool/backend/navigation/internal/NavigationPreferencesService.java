@@ -172,7 +172,7 @@ public class NavigationPreferencesService {
    * Replaces the caller's "Darstellung" section.
    *
    * @param userId the caller's {@code app_user.id}
-   * @param request the new desktop mode and the version the caller last saw
+   * @param request the new desktop mode and shortcut switch, and the version the caller last saw
    * @return the stored appearance with the new version
    * @throws ObjectOptimisticLockingFailureException when the version is stale
    */
@@ -180,7 +180,8 @@ public class NavigationPreferencesService {
       @NotNull UUID userId, @NotNull AppearanceUpdateRequest request) {
     try {
       AppearanceResponse stored =
-          appearanceWriter.replace(userId, request.desktopMode(), request.version());
+          appearanceWriter.replace(
+              userId, request.desktopMode(), request.shortcutsEnabled(), request.version());
       metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.OK);
       return stored;
     } catch (ObjectOptimisticLockingFailureException e) {

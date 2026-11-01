@@ -860,6 +860,22 @@ val testReorderJs =
     outputs.upToDateWhen { false }
   }
 
+val testShortcutsJs =
+  tasks.register<NodeTask>("testShortcutsJs") {
+    group = "verification"
+    description =
+      "Regression tests for the navigation shortcuts Alt+1 to Alt+9 and Alt+0: digit-row key matching and the per-slot decision."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-shortcuts.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-shortcuts.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-shortcuts.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testSearchJs =
   tasks.register<NodeTask>("testSearchJs") {
     group = "verification"
@@ -1034,6 +1050,7 @@ tasks.named("check").configure {
     testSafeUrl,
     testTableSort,
     testReorderJs,
+    testShortcutsJs,
     testSearchJs,
     testNumberFormatJs,
     testBlueprintStatsJs,

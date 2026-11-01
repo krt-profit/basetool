@@ -25,7 +25,9 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  * Write payload that replaces the appearance section.
  *
  * @param desktopMode the chosen desktop mode
+ * @param shortcutsEnabled whether the navigation shortcuts Alt+0 to Alt+9 are on
  * @param version the appearance version the caller last saw
  */
 @DtoMirror
-public record AppearanceUpdateRequest(DesktopMode desktopMode, Long version) {}
+public record AppearanceUpdateRequest(
+    DesktopMode desktopMode, Boolean shortcutsEnabled, Long version) {}

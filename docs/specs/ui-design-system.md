@@ -2302,10 +2302,10 @@ page use it; positions there count the reorderable rows of the rendered page.
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
 > and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the order of groups and
 > links with the up/down controls and „Standardreihenfolge", „Darstellung" with the desktop mode
-> (own version, the profile card and the sidebar switch), the phone tab bar with its
-> „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the privacy flows and
-> the metrics. Planned: `shortcutsEnabled` and the start pages of „Darstellung" and the full
-> reset; until they ship, the current code stays
+> and `shortcutsEnabled` (own version, the profile card and the sidebar switch), the phone tab
+> bar with its „Tab-Leiste" section in „Anpassen" and the reset „Tab-Leiste zurücksetzen", the
+> privacy flows and the metrics. Planned: the start pages of „Darstellung" and the full reset;
+> until they ship, the current code stays
 > authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
@@ -2700,7 +2700,7 @@ REQ-SEC-058, ADR-0299
 
 ### REQ-UI-035 — Favourites and the dashboard have keyboard shortcuts
 
-> **Status: planned** (ADR-0297, map #2800). Until it ships, the current code stays authoritative.
+> **Status: shipped** (ADR-0297, map #2800).
 
 | Keys | Opens |
 |---|---|
@@ -2715,6 +2715,8 @@ REQ-SEC-058, ADR-0299
   fields.
 - **Member mode only:** in admin mode Alt+0 … Alt+9 do nothing. No phone counterpart.
 - **Switch:** `shortcutsEnabled` in „Darstellung" (REQ-UI-032), one value per user, default on.
+  It is a switch in the profile card „Darstellung", written in place with the section's version
+  (`nav-appearance.js`), and stays off while the stored section could not be read.
 - **Discoverability:** tooltip and `aria-keyshortcuts` on the favourite links and the dashboard
   link only where the key currently works. A „Tastenkürzel" dialog (REQ-UI-013), opened from the
   quick access and the profile menu, always lists `Strg K` and the dialog keys of REQ-UI-033; for
@@ -2723,9 +2725,18 @@ REQ-SEC-058, ADR-0299
 - Not shortcuts: the desktop mode, „Anpassen" (both stay buttons and quick-access actions), and
   „back" (the browser's Alt+Left). No single-character shortcut, so WCAG 2.1.4 does not apply.
 
-**Enforced by (to be added):** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate,
-switch, admin mode) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard,
-toast on a greyed or empty slot, the „Tastenkürzel" dialog) · **Related:** REQ-UI-026,
+*Shipped:* `krt-shortcuts.js` holds the key matching and the decision per slot, `nav-shortcuts.js`
+reads the favourites of the member group from the navigation, sets the tooltip and
+`aria-keyshortcuts` of the first nine favourites and of the home link where the keys work, and
+opens the dialog `nav-shortcuts` (`kernel/fragments/nav-shortcuts.html`) from the profile menu,
+the rail's avatar flyout and the quick-access action „Tastenkürzel anzeigen".
+
+**Enforced by:** `:frontend:testShortcutsJs` (digit-row `code` only, dialog gate, switch, admin
+mode) · `NavigationDesktopModesMvcTest` (the switch on the state, the dialog, its openers, the
+relay) · `NavigationAppearanceServiceTest`, `NavigationPreferencesControllerTest` (the stored
+switch) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dashboard, toast on a
+greyed or empty slot, rest while a dialog is open and in admin mode, the profile switch, the
+„Tastenkürzel" dialog) · `DialogA11yE2eTest` (the dialog contract) · **Related:** REQ-UI-026,
 REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
 
 ### REQ-UI-037 — Number fields use the separators of the page language while typing

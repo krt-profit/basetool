@@ -50,14 +50,21 @@ public class NavigationAppearance {
   @Column(name = "desktop_mode", nullable = false, length = 16)
   private DesktopMode desktopMode = DesktopMode.DRAWER;
 
+  @Setter
+  @Column(name = "shortcuts_enabled", nullable = false)
+  private boolean shortcutsEnabled = true;
+
   /**
    * Creates the appearance of a member.
    *
    * @param preferencesId the owner's {@code app_user.id}
    * @param desktopMode the chosen desktop mode
+   * @param shortcutsEnabled whether the navigation shortcuts are on
    */
-  public NavigationAppearance(UUID preferencesId, DesktopMode desktopMode) {
+  public NavigationAppearance(
+      UUID preferencesId, DesktopMode desktopMode, boolean shortcutsEnabled) {
     this.preferencesId = preferencesId;
     this.desktopMode = desktopMode;
+    this.shortcutsEnabled = shortcutsEnabled;
   }
 }

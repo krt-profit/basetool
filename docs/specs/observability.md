@@ -2737,7 +2737,9 @@ label**, a tag, an MDC field or a log line.
 - *Shipped for `favourites`, `hidden`, `order`, `display`, `tabbar` and `dashboard`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
   the `navigation` module's `BusinessGaugeSource` (`NavigationBusinessGauges`) on the
   business-metrics timer: the number of accounts holding a non-default value in that section (for
-  `dashboard` a layout changed from the default), same `section` values. It is the data base for deciding a second personalisation round; it carries no
+  `display`: a desktop mode other than the drawer, or the shortcuts switched off; for `dashboard`
+  a layout changed from the default), same `section` values. It is the data base for deciding a
+  second personalisation round; it carries no
   account label.
 - *Shipped:* `basetool_inventory_minimum_levels_below` gauge, sampled by the inventory module's
   `InventoryBusinessGauges`: the number of minimum stock levels of active units and listed

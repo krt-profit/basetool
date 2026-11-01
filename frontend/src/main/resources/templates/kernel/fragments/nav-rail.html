@@ -130,6 +130,13 @@
                     <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, 'nav-link', null, null, true)}" />
                 </th:block>
             </div>
+            <div class="nav-rail-edit">
+                <button type="button" class="btn btn-ghost" data-trigger="open-shortcuts" data-testid="nav-rail-shortcuts"
+                        aria-controls="nav-shortcuts">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"></use></svg>
+                    <span th:text="#{shortcuts.open}">Tastenkürzel</span>
+                </button>
+            </div>
             <div class="nav-rail-edit" th:if="${navigationFavourites.loaded()}">
                 <button type="button" class="btn btn-ghost" data-trigger="nav-rail-edit" data-testid="nav-rail-edit">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>

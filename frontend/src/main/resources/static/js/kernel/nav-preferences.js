@@ -32,6 +32,9 @@ export const WRITE_LOCK = 'nav-preferences';
 /** Fired on the document after the personalised lists were swapped in place. */
 export const NAV_RENDERED_EVENT = 'krt:nav-rendered';
 
+/** Fired on the document when the shortcut switch of „Darstellung“ changed. */
+export const NAV_SHORTCUTS_EVENT = 'krt:nav-shortcuts-changed';
+
 /** Fired on the document when „Anpassen“ turns on or off. */
 export const NAV_EDIT_EVENT = 'krt:nav-edit-changed';
 

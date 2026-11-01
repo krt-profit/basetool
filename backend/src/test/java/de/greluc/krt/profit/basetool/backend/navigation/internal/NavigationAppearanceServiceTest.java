@@ -73,7 +73,24 @@ class NavigationAppearanceServiceTest {
     AppearanceResponse read = service.read(member()).appearance();
 
     assertThat(read.desktopMode()).isEqualTo(DesktopMode.DRAWER);
+    assertThat(read.shortcutsEnabled()).isTrue();
     assertThat(read.version()).isZero();
+  }
+
+  @Test
+  @DisplayName("the shortcut switch is stored with the mode and survives a mode change")
+  void storesTheShortcutSwitch() {
+    UUID owner = member();
+
+    AppearanceResponse off =
+        service.replaceAppearance(
+            owner, new AppearanceUpdateRequest(DesktopMode.DRAWER, false, 0L));
+    AppearanceResponse rail =
+        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, false, 1L));
+
+    assertThat(off).isEqualTo(new AppearanceResponse(DesktopMode.DRAWER, false, 1));
+    assertThat(rail).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, false, 2));
+    assertThat(service.read(owner).appearance()).isEqualTo(rail);
   }
 
   @Test
@@ -82,12 +99,12 @@ class NavigationAppearanceServiceTest {
     UUID owner = member();
 
     AppearanceResponse first =
-        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, 0L));
+        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, true, 0L));
     AppearanceResponse second =
-        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.PINNED, 1L));
+        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.PINNED, true, 1L));
 
-    assertThat(first).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, 1));
-    assertThat(second).isEqualTo(new AppearanceResponse(DesktopMode.PINNED, 2));
+    assertThat(first).isEqualTo(new AppearanceResponse(DesktopMode.RAIL, true, 1));
+    assertThat(second).isEqualTo(new AppearanceResponse(DesktopMode.PINNED, true, 2));
     assertThat(service.read(owner).appearance()).isEqualTo(second);
     assertThat(service.read(owner).favourites().version()).isZero();
   }
@@ -99,7 +116,7 @@ class NavigationAppearanceServiceTest {
     service.replaceFavourites(owner, new FavouritesUpdateRequest(List.of("missions.list"), 0L));
 
     AppearanceResponse stored =
-        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, 0L));
+        service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, true, 0L));
 
     assertThat(stored.version()).isEqualTo(1);
     assertThat(service.read(owner).favourites().keys()).containsExactly("missions.list");
@@ -109,11 +126,12 @@ class NavigationAppearanceServiceTest {
   @DisplayName("a stale version is rejected, counted as a conflict and changes nothing")
   void rejectsAStaleVersion() {
     UUID owner = member();
-    service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, 0L));
+    service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.RAIL, true, 0L));
     double conflicts = writes(NavigationWriteOutcome.CONFLICT);
 
     assertThatThrownBy(() ->
-            service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.PINNED, 0L)))
+            service.replaceAppearance(
+                owner, new AppearanceUpdateRequest(DesktopMode.PINNED, true, 0L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
     assertThat(writes(NavigationWriteOutcome.CONFLICT)).isEqualTo(conflicts + 1);
@@ -125,7 +143,7 @@ class NavigationAppearanceServiceTest {
   void countsACommittedWrite() {
     double ok = writes(NavigationWriteOutcome.OK);
 
-    service.replaceAppearance(member(), new AppearanceUpdateRequest(DesktopMode.RAIL, 0L));
+    service.replaceAppearance(member(), new AppearanceUpdateRequest(DesktopMode.RAIL, true, 0L));
 
     assertThat(writes(NavigationWriteOutcome.OK)).isEqualTo(ok + 1);
   }
@@ -135,9 +153,8 @@ class NavigationAppearanceServiceTest {
   void keepsEachMembersModeApart() {
     UUID owner = member();
     UUID other = member();
-    service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.PINNED, 0L));
+    service.replaceAppearance(owner, new AppearanceUpdateRequest(DesktopMode.PINNED, true, 0L));
 
-    assertThat(service.read(other).appearance())
-        .isEqualTo(new AppearanceResponse(DesktopMode.DRAWER, 0));
+    assertThat(service.read(other).appearance()).isEqualTo(AppearanceResponse.DEFAULT);
   }
 }

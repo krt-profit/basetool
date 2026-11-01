@@ -18,10 +18,15 @@
  */
 
 /**
- * The navigation drawer and the command palette, registered by sidebar.js and krt-palette.js when they
- * initialise. Either may be absent (a bare page has no drawer, an anonymous visitor no palette), so the
- * two reach each other through this registry instead of importing each other.
+ * The navigation drawer, the command palette and the shortcuts dialog, registered by sidebar.js,
+ * krt-palette.js and nav-shortcuts.js when they initialise. Any may be absent (a bare page has no
+ * drawer, an anonymous visitor no palette), so they reach each other through this registry instead
+ * of importing each other.
  *
- * @type {{ nav: KrtNavApi | null, palette: KrtPaletteApi | null }}
+ * @type {{
+ *     nav: KrtNavApi | null,
+ *     palette: KrtPaletteApi | null,
+ *     shortcuts: KrtShortcutsApi | null,
+ * }}
  */
-export const krtChrome = { nav: null, palette: null };
+export const krtChrome = { nav: null, palette: null, shortcuts: null };

@@ -77,7 +77,7 @@ public class NavigationPreferencesWriter {
                 new HiddenResponse(List.of(), 0),
                 new OrderResponse(
                     new OrderModeResponse(Map.of(), 0), new OrderModeResponse(Map.of(), 0)),
-                new AppearanceResponse(DesktopMode.DRAWER, 0),
+                AppearanceResponse.DEFAULT,
                 TabBarsResponse.AUTOMATIC));
   }
 

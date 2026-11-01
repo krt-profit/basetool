@@ -94,7 +94,7 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(favourites), 0),
                 HiddenResponse.EMPTY,
                 OrderResponse.EMPTY,
-                new AppearanceResponse(mode, version),
+                new AppearanceResponse(mode, true, version),
                 TabBarsResponse.AUTOMATIC));
   }
 
@@ -272,7 +272,7 @@ class NavigationDesktopModesMvcTest {
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of("refinery.orders"), 2),
                 OrderResponse.EMPTY,
-                new AppearanceResponse(DesktopMode.RAIL, 1),
+                new AppearanceResponse(DesktopMode.RAIL, true, 1),
                 TabBarsResponse.AUTOMATIC));
     String rail = rail(page(member()));
 
@@ -306,7 +306,7 @@ class NavigationDesktopModesMvcTest {
   void relaysTheAppearanceWrite() throws Exception {
     when(backendApiClient.put(
             eq(APPEARANCE), any(AppearanceUpdateRequest.class), eq(AppearanceResponse.class)))
-        .thenReturn(new AppearanceResponse(DesktopMode.PINNED, 4));
+        .thenReturn(new AppearanceResponse(DesktopMode.PINNED, true, 4));
 
     mockMvc
         .perform(
@@ -315,10 +315,63 @@ class NavigationDesktopModesMvcTest {
                 .with(csrf())
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"desktopMode\":\"PINNED\",\"version\":3}"))
+                .content("{\"desktopMode\":\"PINNED\",\"shortcutsEnabled\":false,\"version\":3}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.desktopMode").value("PINNED"))
         .andExpect(jsonPath("$.version").value(4));
+  }
+
+  @Test
+  @DisplayName("an appearance payload without the shortcut switch is refused")
+  void refusesAPayloadWithoutTheShortcutSwitch() throws Exception {
+    mockMvc
+        .perform(
+            put("/navigation/appearance")
+                .with(member())
+                .with(csrf())
+                .header("X-Requested-With", "XMLHttpRequest")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"desktopMode\":\"PINNED\",\"version\":3}"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+  }
+
+  @Test
+  @DisplayName("the state carries the shortcut switch, and a failed read leaves it off")
+  void theStateCarriesTheShortcutSwitch() throws Exception {
+    when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
+        .thenReturn(
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of(), 0),
+                HiddenResponse.EMPTY,
+                OrderResponse.EMPTY,
+                new AppearanceResponse(DesktopMode.DRAWER, false, 2),
+                TabBarsResponse.AUTOMATIC));
+    assertThat(page(member())).contains("data-shortcuts=\"false\"");
+
+    stored(DesktopMode.DRAWER, 0);
+    assertThat(page(member())).contains("data-shortcuts=\"true\"");
+
+    when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
+        .thenThrow(new BackendServiceException("down", null, 503));
+    assertThat(page(member())).contains("data-shortcuts=\"false\"");
+  }
+
+  @Test
+  @DisplayName(
+      "the shortcuts dialog is on every member page, opened from the profile menu and the rail")
+  void theShortcutsDialogIsReachable() throws Exception {
+    stored(DesktopMode.RAIL, 1);
+
+    String html = page(member());
+
+    assertThat(html)
+        .contains("id=\"nav-shortcuts\"")
+        .contains("data-testid=\"shortcuts-favourites\"")
+        .contains("data-testid=\"shortcuts-dashboard\"")
+        .contains("data-testid=\"nav-shortcuts-open\"")
+        .contains("data-testid=\"nav-rail-shortcuts\"")
+        .contains("data-action-shortcuts=");
   }
 
   @Test
@@ -332,7 +385,7 @@ class NavigationDesktopModesMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"desktopMode\":\"PINNED\"}"))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().is(422))
         .andExpect(jsonPath("$.code").value("VALIDATION"));
   }
 
