@@ -147,6 +147,8 @@ class RefineryOrderTenancyE2eTest {
         seeder.createMission(MEMBER_USER, MEMBER_PASSWORD, "E2E Refinery BAC Mission", false);
     seeder.addRegisteredParticipant(
         MEMBER_USER, MEMBER_PASSWORD, bacMissionId, seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD));
+    seeder.addRegisteredParticipant(
+        MEMBER_USER, MEMBER_PASSWORD, bacMissionId, seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD));
     bacOrderId =
         seeder.createRefineryOrder(
             MEMBER_USER, MEMBER_PASSWORD, hubLocationId, materialId, IRIDIUM_ID, bacMissionId);
