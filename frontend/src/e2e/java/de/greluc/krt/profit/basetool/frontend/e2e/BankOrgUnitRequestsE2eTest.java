@@ -80,8 +80,8 @@ class BankOrgUnitRequestsE2eTest {
     seeder = new BackendSeeder();
 
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
-    seeder.assignStaffelMembership(
-        ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
+    seeder.assignStaffelleiterSeat(
+        ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false);
 
     accountId =
         seeder.ensureOrgUnitBankAccount(
