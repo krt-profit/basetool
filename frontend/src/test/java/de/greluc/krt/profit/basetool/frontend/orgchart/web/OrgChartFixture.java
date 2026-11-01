@@ -84,6 +84,7 @@ final class OrgChartFixture {
             node("SQUADRON_LEAD", CARA, "Cara", null),
             List.of(command),
             List.of(),
+            List.of(),
             true,
             true);
     SpecialCommandChartDto sk =
@@ -105,6 +106,7 @@ final class OrgChartFixture {
             "Ungrouped Staffel",
             "UNG",
             null,
+            List.of(),
             List.of(),
             List.of(),
             true,

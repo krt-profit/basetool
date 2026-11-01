@@ -586,6 +586,17 @@
       "row_count" : 5,
       "status_filter" : null
     }, {
+      "preference_section" : "desktopMode",
+      "position" : 0,
+      "entry_key" : "RAIL",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
       "preference_section" : "favourites",
       "position" : 0,
       "entry_key" : "missions.list",

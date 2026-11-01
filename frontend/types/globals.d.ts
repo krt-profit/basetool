@@ -891,6 +891,12 @@ interface KrtNavApi {
 
     /** Whether the drawer shows the administration groups. */
     isAdminMode(): boolean;
+
+    /**
+     * Switches between the member groups and the administration groups without opening the
+     * drawer; only effective for an administrator. Announces the change as `krt:nav-admin-mode`.
+     */
+    setAdminMode(on: boolean): void;
 }
 
 /** The quick-access command palette (`krt-palette.js`, REQ-UI-026). */

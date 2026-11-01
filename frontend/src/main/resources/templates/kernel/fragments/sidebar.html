@@ -13,6 +13,10 @@
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"></use></svg>
             </button>
         </div>
+        <div class="nav-mode-bar" sec:authorize="isAuthenticated()">
+            <th:block th:replace="~{kernel/fragments/nav-appearance :: state}" />
+            <th:block th:replace="~{kernel/fragments/nav-appearance :: switch('desktop-mode-sidebar')}" />
+        </div>
         <div class="nav-context" sec:authorize="isAuthenticated()">
             <form id="squadron-switcher-form"
                   th:if="${availableOrgUnits != null and availableOrgUnits.size() > 1}"
@@ -162,6 +166,9 @@
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
     <th:block sec:authorize="isAuthenticated()">
+        <th:block th:replace="~{kernel/fragments/nav-rail :: rail}" />
+    </th:block>
+    <th:block sec:authorize="isAuthenticated()">
         <th:block th:replace="~{kernel/fragments/mobile-nav :: tabbar}" />
         <th:block th:replace="~{kernel/fragments/palette :: palette}" />
     </th:block>
@@ -169,6 +176,8 @@
     <script type="module" th:src="@{/js/kernel/krt-palette.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-favourites.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-edit.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-appearance.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-rail.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />
     <th:block th:replace="~{kernel/fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{kernel/fragments/footer :: footer}" />

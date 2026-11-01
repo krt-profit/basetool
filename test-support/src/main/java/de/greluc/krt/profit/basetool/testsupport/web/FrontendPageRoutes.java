@@ -175,6 +175,7 @@ public final class FrontendPageRoutes {
           "/dashboard/widgets/notifications",
           "/dashboard/widgets/upcoming-days",
           "/navigation/menu",
+          "/navigation/appearance",
           "/orders/item-search",
           "/pending-approval/status",
           "/personal-inventory/blueprints/craftability",

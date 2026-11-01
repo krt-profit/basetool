@@ -58,7 +58,8 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Where:** the operational tables — `inventory_item*`, `ship`, `mission*`, `operation*`,
   `job_order*`, `refinery_order`, `personal_inventory_item`, `personal_blueprint`,
   `navigation_preferences`, `navigation_favourite`, `navigation_hidden` (the member's own favourites
-  and hidden pages as entry keys, no free text), `navigation_dashboard_layout`,
+  and hidden pages as entry keys, no free text), `navigation_appearance` (the chosen desktop mode, an enumerated value),
+  `navigation_dashboard_layout`,
   `navigation_dashboard_widget` (the member's own dashboard: widget types, columns and option
   choices, no free text),
   `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,

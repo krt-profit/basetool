@@ -36,9 +36,11 @@ import org.springframework.stereotype.Component;
 public class NavigationBusinessGauges implements BusinessGaugeSource {
 
   private final NavigationPreferencesRepository repository;
+  private final NavigationAppearanceRepository appearances;
   private final DashboardLayoutRepository dashboardLayouts;
 
   private final AtomicLong favouriteAccounts = new AtomicLong();
+  private final AtomicLong appearanceAccounts = new AtomicLong();
   private final AtomicLong hiddenAccounts = new AtomicLong();
   private final AtomicLong dashboardAccounts = new AtomicLong();
 
@@ -52,6 +54,10 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
         .tag(NavigationMetrics.TAG_SECTION, NavigationSection.HIDDEN.getTag())
         .register(registry);
     Gauge.builder(
+            NavigationMetrics.PERSONALISED_ACCOUNTS, appearanceAccounts, AtomicLong::doubleValue)
+        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.APPEARANCE.getTag())
+        .register(registry);
+    Gauge.builder(
             NavigationMetrics.PERSONALISED_ACCOUNTS, dashboardAccounts, AtomicLong::doubleValue)
         .tag(NavigationMetrics.TAG_SECTION, NavigationSection.DASHBOARD.getTag())
         .register(registry);
@@ -61,6 +67,7 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
   public void sample() {
     favouriteAccounts.set(repository.countWithFavourites());
     hiddenAccounts.set(repository.countWithHidden());
+    appearanceAccounts.set(appearances.countPersonalised());
     dashboardAccounts.set(dashboardLayouts.countCustomised());
   }
 }

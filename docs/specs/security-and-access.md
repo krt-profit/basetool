@@ -367,7 +367,7 @@ plan guard G-25
 
 Roles: `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles, which the
 matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159) and **`OFFICER` is not one of
-them since `V317`** (ADR-0300): there is no role below member, and a token that maps to none of
+them since `V318`** (ADR-0300): there is no role below member, and a token that maps to none of
 these is refused with `403 NO_ROLE` (REQ-SEC-053).
 Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, and on
 the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never**
@@ -379,7 +379,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
 
 `OFFICER` was retired by a hard cut in one release:
 
-- **Roles:** migration `V317` removed the seeded `OFFICER` role, its `user_roles` rows and its
+- **Roles:** migration `V318` removed the seeded `OFFICER` role, its `user_roles` rows and its
   permissions; `Roles.OFFICER`, `Roles.ADMIN_OR_OFFICER` and their frontend mirrors are gone.
 - **Hierarchy:** the `OFFICER > LOGISTICIAN` and `OFFICER > MISSION_MANAGER` edges are gone, in both
   `SecurityConfig`s. `MISSION_MANAGER > LOGISTICIAN` stays absent.
@@ -396,7 +396,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
   script deletes the realm role (ADR-0202 amendment 6); the test realms, the e2e realm export and
   the sandbox realm dropped it.
 - **Notification rules** that addressed the `ROLE OFFICER` selector were moved to the `SEAT_HOLDERS`
-  selector by `V319` and stay editable (REQ-NOTIF-008).
+  selector by `V320` and stay editable (REQ-NOTIF-008).
 - **Precondition of the cut:** a report of every leadership seat holder who lacks `KRT Member`. The
   cut ships only when that list is empty (REQ-ORG-029). The report ships as
   `scripts/officer-cut-report.sql`: a read-only session, SELECTs only, ids and coded words but no
@@ -3697,8 +3697,9 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row, the
-> favourites and the hidden entries (`NavigationUserReassignment`, position 210,
-> `navigation_preferences.user_id`). The
+> favourites, the hidden entries and the appearance (`NavigationUserReassignment`, position 210,
+> `navigation_preferences.user_id`; the appearance row follows the root's cascade, so the target's
+> wins). The
 > sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
@@ -5153,7 +5154,7 @@ links, beside the separate deletion card) · **Decision:**
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
-> favourites, the hidden entries and the dashboard instances (`preference_section`, `position`, `entry_key`,
+> favourites, the hidden entries, the desktop mode and the dashboard instances (`preference_section`, `position`, `entry_key`,
 > `dashboard_mode`, `widget_type`, `column_side`, `org_unit_id`, `range_days`, `row_count`,
 > `status_filter` per row). The sections that follow are planned and join the same statement.
 

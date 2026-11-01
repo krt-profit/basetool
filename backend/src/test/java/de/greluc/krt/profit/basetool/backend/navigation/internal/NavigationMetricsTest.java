@@ -71,9 +71,11 @@ class NavigationMetricsTest {
     NavigationPreferencesRepository repository = mock(NavigationPreferencesRepository.class);
     when(repository.countWithFavourites()).thenReturn(7L);
     when(repository.countWithHidden()).thenReturn(2L);
+    NavigationAppearanceRepository appearances = mock(NavigationAppearanceRepository.class);
+    when(appearances.countPersonalised()).thenReturn(4L);
     DashboardLayoutRepository layouts = mock(DashboardLayoutRepository.class);
     when(layouts.countCustomised()).thenReturn(3L);
-    NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository, layouts);
+    NavigationBusinessGauges gauges = new NavigationBusinessGauges(repository, appearances, layouts);
 
     gauges.register(registry);
     assertThat(gauge(NavigationSection.FAVOURITES)).isZero();
@@ -82,6 +84,7 @@ class NavigationMetricsTest {
 
     assertThat(gauge(NavigationSection.FAVOURITES)).isEqualTo(7);
     assertThat(gauge(NavigationSection.HIDDEN)).isEqualTo(2);
+    assertThat(gauge(NavigationSection.APPEARANCE)).isEqualTo(4);
     assertThat(gauge(NavigationSection.DASHBOARD)).isEqualTo(3);
   }
 
