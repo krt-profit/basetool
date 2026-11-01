@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userToggleEl = sidebarEl ? sidebarEl.querySelector('.nav-user-toggle') : null;
     const langBtnEl = sidebarEl ? sidebarEl.querySelector('.nav-lang-btn') : null;
     const langMenuEl = document.getElementById('nav-lang-menu');
+    const pinnedQuery = window.matchMedia('(min-width: 1280px)');
 
     /** @type {HTMLElement | null} */
     let returnFocusEl = null;
@@ -279,6 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterEl) filterEl.value = '';
         setPersonalOpen(false);
         renderList();
+        document.dispatchEvent(
+            new CustomEvent('krt:nav-admin-mode', { detail: { admin: adminMode } }),
+        );
     };
 
     /**
@@ -350,6 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const openSidebar = function (focus) {
         if (!sidebarEl) return;
+        if (isDocked()) {
+            const docked = focus || filterEl;
+            if (docked) docked.focus({ preventScroll: true });
+            return;
+        }
         const active = document.activeElement;
         returnFocusEl = active instanceof HTMLElement ? active : null;
         sidebarEl.removeAttribute('inert');
@@ -366,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {boolean} restoreFocus whether focus returns to the control that opened it
      */
     const closeSidebar = function (restoreFocus) {
-        if (!sidebarEl) return;
+        if (!sidebarEl || isDocked()) return;
         sidebarEl.classList.remove('open');
         sidebarEl.setAttribute('inert', '');
         if (overlayEl) overlayEl.classList.remove('visible');
@@ -380,6 +389,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isOpen = function () {
         return !!sidebarEl && sidebarEl.classList.contains('open');
+    };
+
+    /**
+     * Whether the labelled sidebar is fixed beside the page: the pinned mode from 1280 px.
+     *
+     * @returns {boolean} true while the sidebar is docked and always reachable
+     */
+    const isDocked = function () {
+        return document.body.dataset.navMode === 'pinned' && pinnedQuery.matches;
+    };
+
+    /**
+     * Makes the sidebar reachable while docked and inert again when it falls back to the drawer.
+     */
+    const syncDocked = function () {
+        if (!sidebarEl) return;
+        if (isDocked()) {
+            sidebarEl.classList.remove('open');
+            if (overlayEl) overlayEl.classList.remove('visible');
+            setOpeners(false);
+            sidebarEl.removeAttribute('inert');
+        } else if (!isOpen()) {
+            sidebarEl.setAttribute('inert', '');
+        }
     };
 
     krtChrome.nav = {
@@ -398,7 +431,17 @@ document.addEventListener('DOMContentLoaded', () => {
         isAdminMode() {
             return adminMode;
         },
+        setAdminMode(on) {
+            setAdminMode(on);
+            const list = document.getElementById('nav-list');
+            if (list) list.scrollTop = 0;
+        },
     };
+    syncDocked();
+    if (typeof pinnedQuery.addEventListener === 'function') {
+        pinnedQuery.addEventListener('change', syncDocked);
+    }
+    document.addEventListener('krt:nav-mode-changed', syncDocked);
 
     const shownLink = /** @type {HTMLAnchorElement | null} */ (currentLink);
     if (sidebarEl && adminModeEl) {

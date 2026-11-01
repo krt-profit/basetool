@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.navigation.client;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
@@ -48,6 +50,7 @@ public class NavigationBackendClient {
 
   private static final String FAVOURITES = PREFERENCES + "/favourites";
 
+  private static final String APPEARANCE = PREFERENCES + "/appearance";
   private static final String HIDDEN = PREFERENCES + "/hidden";
 
   private static final String FAVOURITES_AND_HIDDEN = PREFERENCES + "/favourites-and-hidden";
@@ -79,6 +82,18 @@ public class NavigationBackendClient {
   @Nullable
   public FavouritesResponse replaceFavourites(@NotNull FavouritesUpdateRequest request) {
     return backendApiClient.put(FAVOURITES, request, FavouritesResponse.class);
+  }
+
+  /**
+   * Replaces the caller's appearance.
+   *
+   * @param request the new desktop mode and the version the caller last saw
+   * @return the stored appearance with the new version, or {@code null} when the backend sent no
+   *     body
+   */
+  @Nullable
+  public AppearanceResponse replaceAppearance(@NotNull AppearanceUpdateRequest request) {
+    return backendApiClient.put(APPEARANCE, request, AppearanceResponse.class);
   }
 
   /**

@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
@@ -84,6 +85,7 @@ class NavigationTabBarMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(favourites, 2),
                 HiddenResponse.EMPTY,
+                AppearanceResponse.DRAWER,
                 new TabBarsResponse(member, admin)));
   }
 

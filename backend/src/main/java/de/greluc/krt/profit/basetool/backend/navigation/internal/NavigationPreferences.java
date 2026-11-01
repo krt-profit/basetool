@@ -60,6 +60,9 @@ public class NavigationPreferences {
   @Column(name = "favourites_version", nullable = false)
   private long favouritesVersion;
 
+  @Column(name = "appearance_version", nullable = false)
+  private long appearanceVersion;
+
   @Setter
   @Column(name = "hidden_version", nullable = false)
   private long hiddenVersion;

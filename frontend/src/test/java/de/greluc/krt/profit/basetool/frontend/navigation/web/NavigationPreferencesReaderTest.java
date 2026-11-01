@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
@@ -58,13 +59,18 @@ class NavigationPreferencesReaderTest {
     client = mock(NavigationBackendClient.class);
     NavigationRegistry registry = new NavigationRegistry();
     reader =
-        new NavigationPreferencesReader(client, registry, new NavigationTabBarResolver(registry));
+        new NavigationPreferencesReader(
+            new NavigationPreferencesLoader(client),
+            client,
+            registry,
+            new NavigationTabBarResolver(registry));
   }
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
     return new NavigationPreferencesResponse(
         new FavouritesResponse(List.of(keys), version),
         HiddenResponse.EMPTY,
+        AppearanceResponse.DRAWER,
         TabBarsResponse.AUTOMATIC);
   }
 
@@ -72,6 +78,7 @@ class NavigationPreferencesReaderTest {
     return new NavigationPreferencesResponse(
         new FavouritesResponse(List.of(), 0),
         new HiddenResponse(List.of(keys), version),
+        AppearanceResponse.DRAWER,
         TabBarsResponse.AUTOMATIC);
   }
 

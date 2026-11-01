@@ -46,11 +46,14 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
    * Binds each section to the count of members that personalised it.
    *
    * @param repository the preferences store
+   * @param appearances the „Darstellung" store
    */
-  public NavigationBusinessGauges(NavigationPreferencesRepository repository) {
+  public NavigationBusinessGauges(
+      NavigationPreferencesRepository repository, NavigationAppearanceRepository appearances) {
     counts.put(NavigationSection.FAVOURITES, repository::countWithFavourites);
     counts.put(NavigationSection.HIDDEN, repository::countWithHidden);
     counts.put(NavigationSection.TAB_BAR, repository::countWithTabBar);
+    counts.put(NavigationSection.APPEARANCE, appearances::countPersonalised);
     counts.keySet().forEach(section -> accounts.put(section, new AtomicLong()));
   }
 

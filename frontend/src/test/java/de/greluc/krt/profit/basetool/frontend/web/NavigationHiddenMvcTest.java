@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
@@ -83,6 +84,7 @@ class NavigationHiddenMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(), 0),
                 new HiddenResponse(List.of(hidden), hiddenVersion),
+                AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
   }
 
@@ -265,6 +267,7 @@ class NavigationHiddenMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("a.one"), 2),
                 new HiddenResponse(List.of(), 4),
+                AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
 
     mockMvc

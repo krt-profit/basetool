@@ -2725,7 +2725,7 @@ The navigation concept, the home dashboard, the assignee grant and minimum stock
 signals. Every label is bounded by REQ-OBS-006; **the quick-access search term never reaches a
 label**, a tag, an MDC field or a log line.
 
-- *Shipped for `favourites`, `hidden` and `tabbar`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
+- *Shipped for `favourites`, `hidden`, `display` and `tabbar`:* `basetool_navigation_preference_writes_total{section, outcome}` counter in
   the `navigation` module (`NavigationMetrics`), one increment per preference or dashboard write
   (REQ-UI-032, REQ-UI-034). `section` ∈ `favourites`, `hidden`, `order`, `tabbar`, `display`,
   `dashboard`; `outcome` ∈ `ok`, `conflict` (the `409` of a stale section version), `rejected` (a
@@ -2734,7 +2734,7 @@ label**, a tag, an MDC field or a log line.
   covers the bars of both modes. Registered at zero
   for every pair; today the `section` values that exist are registered, and each further section
   adds its own.
-- *Shipped for `favourites`, `hidden` and `tabbar`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
+- *Shipped for `favourites`, `hidden`, `display` and `tabbar`:* `basetool_navigation_personalised_accounts{section}` gauge, sampled by
   the `navigation` module's `BusinessGaugeSource` (`NavigationBusinessGauges`) on the
   business-metrics timer: the number of accounts holding a non-default value in that section, same
   `section` values. It is the data base for deciding a second personalisation round; it carries no

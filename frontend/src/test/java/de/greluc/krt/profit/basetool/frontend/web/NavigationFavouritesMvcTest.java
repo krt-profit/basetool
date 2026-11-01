@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
@@ -83,6 +84,7 @@ class NavigationFavouritesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of(keys), version),
                 HiddenResponse.EMPTY,
+                AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
   }
 
@@ -154,6 +156,7 @@ class NavigationFavouritesMvcTest {
             new NavigationPreferencesResponse(
                 new FavouritesResponse(List.of("refinery.orders"), 4),
                 HiddenResponse.EMPTY,
+                AppearanceResponse.DRAWER,
                 TabBarsResponse.AUTOMATIC));
 
     String html = page(member());
