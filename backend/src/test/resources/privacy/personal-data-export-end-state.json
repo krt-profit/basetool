@@ -575,9 +575,13 @@
     "key" : "navigationPreferences",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
+      "preference_section" : "desktopMode",
+      "position" : 0,
+      "value" : "RAIL"
+    }, {
       "preference_section" : "favourites",
       "position" : 0,
-      "entry_key" : "missions.list"
+      "value" : "missions.list"
     } ],
     "truncated" : false
   } ]

@@ -57,6 +57,21 @@ public interface NavigationPreferencesRepository
       @Param("userId") UUID userId, @Param("expected") long expected);
 
   /**
+   * Bumps the appearance version when it still equals the expected one, locking the root row until
+   * the transaction ends.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @param expected the version the caller last saw
+   * @return {@code 1} when the version matched, {@code 0} when it is stale
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "UPDATE NavigationPreferences p SET p.appearanceVersion = p.appearanceVersion + 1"
+          + " WHERE p.userId = :userId AND p.appearanceVersion = :expected")
+  int bumpAppearanceVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expected") long expected);
+
+  /**
    * Bumps the favourites version without a check, for a change the member did not echo a version
    * for.
    *

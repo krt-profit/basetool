@@ -56,7 +56,8 @@ class NavigationEntryKeyRenderMvcTest {
       Pattern.compile("<div id=\"sidebar\".*?/js/kernel/sidebar\\.js", Pattern.DOTALL);
 
   private static final Pattern LANGUAGE_MENU =
-      Pattern.compile("<div class=\"nav-lang-menu\".*?</div>", Pattern.DOTALL);
+      Pattern.compile(
+          "<div class=\"(?:nav-lang-menu|nav-rail-lang-menu)\".*?</div>", Pattern.DOTALL);
 
   private static final Pattern LINK = Pattern.compile("<a\\s[^>]*>", Pattern.DOTALL);
 

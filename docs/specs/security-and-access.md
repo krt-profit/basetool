@@ -3696,8 +3696,10 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 
 #### Amendment (ADR-0298)
 
-> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row and the
-> favourites (`NavigationUserReassignment`, position 210, `navigation_preferences.user_id`). The
+> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row, the
+> favourites and the appearance (`NavigationUserReassignment`, position 210,
+> `navigation_preferences.user_id`; the appearance row follows the root's cascade, so the target's
+> wins). The
 > sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
@@ -5152,7 +5154,7 @@ links, beside the separate deletion card) · **Decision:**
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
-> favourites (`preference_section`, `position`, `entry_key` per row). The sections that follow and
+> favourites and the desktop mode (`preference_section`, `position`, `value` per row). The sections that follow and
 > the dashboards are planned and join the same statement.
 
 - **The navigation preferences and the home dashboards are part of the export, in their own

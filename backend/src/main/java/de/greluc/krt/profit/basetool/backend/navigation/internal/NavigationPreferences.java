@@ -57,6 +57,9 @@ public class NavigationPreferences {
   @Column(name = "favourites_version", nullable = false)
   private long favouritesVersion;
 
+  @Column(name = "appearance_version", nullable = false)
+  private long appearanceVersion;
+
   /** The favourite entry keys in display order. */
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(

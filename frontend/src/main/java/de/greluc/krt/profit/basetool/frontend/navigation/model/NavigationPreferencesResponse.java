@@ -26,6 +26,8 @@ import org.jetbrains.annotations.NotNull;
  * Every navigation preference section of the caller, each with its own version.
  *
  * @param favourites the favourites section
+ * @param appearance the appearance section
  */
 @DtoMirror
-public record NavigationPreferencesResponse(@NotNull FavouritesResponse favourites) {}
+public record NavigationPreferencesResponse(
+    @NotNull FavouritesResponse favourites, @NotNull AppearanceResponse appearance) {}

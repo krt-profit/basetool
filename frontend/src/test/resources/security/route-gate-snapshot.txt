@@ -435,6 +435,8 @@
 /missions/{id}/units/{unitId}/crew/{crewId}/update POST -> MissionWriteController#updateCrew gate=class:isAuthenticated() layout=yes
 /missions/{id}/units/{unitId}/delete POST -> MissionWriteController#deleteUnit gate=class:isAuthenticated() layout=yes
 /missions/{id}/units/{unitId}/update POST -> MissionWriteController#updateUnit gate=class:isAuthenticated() layout=yes
+/navigation/appearance GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationAppearanceController#read gate=class:isAuthenticated() layout=no
+/navigation/appearance PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationAppearanceController#replace gate=class:isAuthenticated() layout=no
 /navigation/favourites GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationFavouritesFragmentController#fragment gate=class:isAuthenticated() layout=yes
 /navigation/favourites PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationFavouritesController#replace gate=class:isAuthenticated() layout=no
 /notifications GET -> NotificationPageController#page gate=class:isAuthenticated() layout=yes

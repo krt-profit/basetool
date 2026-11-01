@@ -362,6 +362,205 @@ class NavigationE2eTest {
   }
 
   /**
+   * Chooses a desktop mode in the profile's „Darstellung" card and waits until the page carries it.
+   *
+   * @param page the page to drive
+   * @param mode the mode to choose: {@code drawer}, {@code rail} or {@code pinned}
+   */
+  private static void chooseMode(Page page, String mode) {
+    E2eSupport.navigate(page, STACK.baseUrl() + "/profile");
+    page.getByTestId("segment-desktop-mode-profile-" + mode).click();
+    assertThat(page.locator("body")).hasAttribute("data-nav-mode", mode);
+  }
+
+  private static String scrollPadding(Page page) {
+    return (String)
+        page.evaluate("getComputedStyle(document.documentElement).scrollPaddingInlineStart");
+  }
+
+  /**
+   * The three desktop modes follow their widths: the drawer by default, the rail from 1025 px, the
+   * pinned sidebar from 1280 px with the rail between 1025 and 1279 px, the stored mode kept below;
+   * the rail and the pinned sidebar reserve their width in {@code scroll-padding-inline-start}
+   * (WCAG 2.4.11).
+   */
+  @Test
+  void desktopModesFollowTheirWidthsAndKeepTheStoredMode() {
+    run(
+        1440,
+        900,
+        "nav-desktop-modes",
+        page -> {
+          try {
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            assertThat(page.locator("body")).hasAttribute("data-nav-mode", "drawer");
+            assertThat(page.locator("#nav-rail")).isHidden();
+            assertThat(page.locator("#hamburger")).isVisible();
+
+            chooseMode(page, "rail");
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            assertThat(page.locator("#nav-rail")).isVisible();
+            assertThat(page.locator("#hamburger")).isHidden();
+            org.junit.jupiter.api.Assertions.assertEquals("64px", scrollPadding(page));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                page.locator("main").boundingBox().x >= 64, "main starts right of the rail");
+            assertThat(page.getByTestId("nav-rail-group-operations"))
+                .hasClass(Pattern.compile("\\bis-current\\b"));
+
+            page.setViewportSize(1100, 900);
+            assertThat(page.locator("#nav-rail")).isVisible();
+            page.setViewportSize(1024, 900);
+            assertThat(page.locator("#nav-rail")).isHidden();
+            assertThat(page.locator("#hamburger")).isVisible();
+            assertThat(page.locator("body")).hasAttribute("data-nav-mode", "rail");
+            org.junit.jupiter.api.Assertions.assertEquals("auto", scrollPadding(page));
+
+            page.setViewportSize(1440, 900);
+            chooseMode(page, "pinned");
+            assertThat(page.locator("#nav-rail")).isHidden();
+            assertThat(page.locator("#sidebar")).isVisible();
+            assertThat(page.locator("#sidebar")).not().hasAttribute("inert", "");
+            org.junit.jupiter.api.Assertions.assertEquals("300px", scrollPadding(page));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                page.locator("main").boundingBox().x >= 300, "main starts right of the sidebar");
+            assertThat(page.getByTestId("nav-missions")).isVisible();
+
+            page.setViewportSize(1100, 900);
+            assertThat(page.locator("#nav-rail")).isVisible();
+            assertThat(page.locator("#sidebar")).hasAttribute("inert", "");
+            page.setViewportSize(1280, 900);
+            assertThat(page.locator("#nav-rail")).isHidden();
+            assertThat(page.locator("#sidebar")).isVisible();
+          } finally {
+            page.setViewportSize(1440, 900);
+            chooseMode(page, "drawer");
+          }
+        });
+  }
+
+  /** The switch in the sidebar head stores the mode, which is still there after a reload. */
+  @Test
+  void theSidebarSwitchStoresTheDesktopMode() {
+    run(
+        1440,
+        900,
+        "nav-mode-switch",
+        page -> {
+          try {
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            page.locator("#hamburger").click();
+            page.getByTestId("segment-desktop-mode-sidebar-rail").click();
+            assertThat(page.locator("body")).hasAttribute("data-nav-mode", "rail");
+            assertThat(page.locator("#nav-rail")).isVisible();
+
+            page.reload();
+            assertThat(page.locator("body")).hasAttribute("data-nav-mode", "rail");
+            assertThat(page.locator("#nav-rail")).isVisible();
+          } finally {
+            page.setViewportSize(1440, 900);
+            chooseMode(page, "drawer");
+          }
+        });
+  }
+
+  /**
+   * A rail flyout is a disclosure: it opens on hover and stays while the pointer is on it (WCAG
+   * 1.4.13), closes after the pointer leaves, a click pins it until an outside click, Escape
+   * returns focus to the icon, and Enter and Space open it.
+   */
+  @Test
+  void railFlyoutsOpenOnHoverClickAndKeyboardAndCloseOnEscape() {
+    run(
+        1440,
+        900,
+        "nav-rail-flyouts",
+        page -> {
+          try {
+            chooseMode(page, "rail");
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            Locator button = page.getByTestId("nav-rail-group-operations");
+            Locator flyout = page.locator("#nav-rail-flyout-operations");
+            assertThat(button).hasAttribute("aria-expanded", "false");
+            assertThat(flyout).isHidden();
+            assertThat(flyout.locator(".nav-rail-flyout-head"))
+                .hasText(button.getAttribute("aria-label"));
+            assertThat(flyout.locator("a[data-entry-key='missions.list']")).hasCount(1);
+
+            button.hover();
+            assertThat(flyout).isVisible();
+            assertThat(button).hasAttribute("aria-expanded", "true");
+            flyout.locator(".nav-rail-flyout-head").hover();
+            page.waitForTimeout(600);
+            assertThat(flyout).isVisible();
+
+            page.mouse().move(900, 500);
+            assertThat(flyout).isHidden();
+            assertThat(button).hasAttribute("aria-expanded", "false");
+
+            button.click();
+            assertThat(flyout).isVisible();
+            page.mouse().move(900, 500);
+            page.waitForTimeout(600);
+            assertThat(flyout).isVisible();
+            page.mouse().click(900, 500);
+            assertThat(flyout).isHidden();
+
+            button.focus();
+            page.keyboard().press("Enter");
+            assertThat(flyout).isVisible();
+            page.keyboard().press("Escape");
+            assertThat(flyout).isHidden();
+            assertThat(button).isFocused();
+
+            page.keyboard().press("Space");
+            assertThat(flyout).isVisible();
+            page.keyboard().press("Escape");
+            assertThat(flyout).isHidden();
+            assertThat(button).isFocused();
+
+            assertThat(page.locator("#nav-rail [role='menu']")).hasCount(0);
+            assertThat(page.locator("#nav-rail [aria-haspopup]")).hasCount(0);
+          } finally {
+            chooseMode(page, "drawer");
+          }
+        });
+  }
+
+  /** The rail foot holds the admin toggle, which swaps the groups, and the avatar flyout. */
+  @Test
+  void railFootSwitchesAdminModeAndOpensTheAvatarFlyout() {
+    run(
+        1440,
+        900,
+        "nav-rail-foot",
+        page -> {
+          try {
+            chooseMode(page, "rail");
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            Locator admin = page.getByTestId("nav-rail-admin");
+            assertThat(admin).hasAttribute("aria-pressed", "false");
+            assertThat(page.getByTestId("nav-rail-group-operations")).isVisible();
+            assertThat(page.getByTestId("nav-rail-group-admin-members")).isHidden();
+
+            admin.click();
+            assertThat(admin).hasAttribute("aria-pressed", "true");
+            assertThat(page.getByTestId("nav-rail-group-admin-members")).isVisible();
+            assertThat(page.getByTestId("nav-rail-group-operations")).isHidden();
+            admin.click();
+            assertThat(page.getByTestId("nav-rail-group-operations")).isVisible();
+
+            page.getByTestId("nav-rail-avatar").click();
+            assertThat(page.locator("#nav-rail-flyout-avatar")).isVisible();
+            assertThat(page.locator("#nav-rail-flyout-avatar a[data-entry-key='personal.profile']"))
+                .isVisible();
+            assertThat(page.getByTestId("nav-rail-logout")).isVisible();
+          } finally {
+            chooseMode(page, "drawer");
+          }
+        });
+  }
+
+  /**
    * Runs one scenario in a fresh authenticated context of the given viewport, dumping the page when
    * it fails.
    *

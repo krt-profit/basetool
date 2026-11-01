@@ -28,6 +28,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFavourites;
@@ -52,11 +54,15 @@ class NavigationFavouritesReaderTest {
   @BeforeEach
   void setUp() {
     client = mock(NavigationBackendClient.class);
-    reader = new NavigationFavouritesReader(client, new NavigationRegistry());
+    reader =
+        new NavigationFavouritesReader(
+            new NavigationPreferencesLoader(client), client, new NavigationRegistry());
   }
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
-    return new NavigationPreferencesResponse(new FavouritesResponse(List.of(keys), version));
+    return new NavigationPreferencesResponse(
+        new FavouritesResponse(List.of(keys), version),
+        new AppearanceResponse(DesktopMode.DRAWER, 0));
   }
 
   private static List<String> keys(List<Item> items) {

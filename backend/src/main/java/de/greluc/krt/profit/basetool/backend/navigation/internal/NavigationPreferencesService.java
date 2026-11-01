@@ -37,6 +37,7 @@ import org.springframework.stereotype.Service;
 public class NavigationPreferencesService {
 
   private final NavigationPreferencesWriter writer;
+  private final NavigationAppearanceWriter appearanceWriter;
   private final NavigationMetrics metrics;
 
   /**
@@ -70,6 +71,27 @@ public class NavigationPreferencesService {
       throw e;
     } catch (BadRequestException e) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
+      throw e;
+    }
+  }
+
+  /**
+   * Replaces the caller's "Darstellung" section.
+   *
+   * @param userId the caller's {@code app_user.id}
+   * @param request the new desktop mode and the version the caller last saw
+   * @return the stored appearance with the new version
+   * @throws ObjectOptimisticLockingFailureException when the version is stale
+   */
+  public @NotNull AppearanceResponse replaceAppearance(
+      @NotNull UUID userId, @NotNull AppearanceUpdateRequest request) {
+    try {
+      AppearanceResponse stored =
+          appearanceWriter.replace(userId, request.desktopMode(), request.version());
+      metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.OK);
+      return stored;
+    } catch (ObjectOptimisticLockingFailureException e) {
+      metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.CONFLICT);
       throw e;
     }
   }

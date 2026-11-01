@@ -28,7 +28,10 @@ import lombok.RequiredArgsConstructor;
 public enum NavigationSection {
 
   /** The favourites (REQ-UI-032). */
-  FAVOURITES("favourites");
+  FAVOURITES("favourites"),
+
+  /** The „Darstellung" section (REQ-UI-032). */
+  APPEARANCE("display");
 
   private final String tag;
 }

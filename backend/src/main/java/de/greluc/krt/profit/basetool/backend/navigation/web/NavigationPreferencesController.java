@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.web;
 
+import de.greluc.krt.profit.basetool.backend.navigation.internal.AppearanceResponse;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.AppearanceUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesResponse;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationMetrics;
@@ -102,6 +104,25 @@ public class NavigationPreferencesController {
   }
 
   /**
+   * Replaces the caller's "Darstellung" section.
+   *
+   * @param request the new desktop mode and the version the caller last saw
+   * @param userId the caller's {@code app_user.id}
+   * @return the stored appearance with the new version
+   */
+  @PutMapping("/appearance")
+  @Operation(summary = "Replace the caller's appearance section (desktop mode).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Appearance stored."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "409", description = "The appearance version is stale.")
+  })
+  public AppearanceResponse replaceAppearance(
+      @Valid @RequestBody AppearanceUpdateRequest request, @CurrentUserId UUID userId) {
+    return service.replaceAppearance(userId, request);
+  }
+
+  /**
    * Counts a favourites write that bean validation refused before the service saw it as a rejected
    * write (REQ-OBS-011), then answers it like every other validation failure.
    *
@@ -114,6 +135,8 @@ public class NavigationPreferencesController {
       MethodArgumentNotValidException ex, HttpServletRequest request) {
     if (ex.getBindingResult().getTarget() instanceof FavouritesUpdateRequest) {
       metrics.recordWrite(NavigationSection.FAVOURITES, NavigationWriteOutcome.REJECTED);
+    } else if (ex.getBindingResult().getTarget() instanceof AppearanceUpdateRequest) {
+      metrics.recordWrite(NavigationSection.APPEARANCE, NavigationWriteOutcome.REJECTED);
     }
     return problems.handleValidationExceptions(ex, request);
   }

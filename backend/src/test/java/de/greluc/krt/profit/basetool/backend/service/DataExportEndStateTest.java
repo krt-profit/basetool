@@ -335,6 +335,9 @@ class DataExportEndStateTest {
               + " VALUES (?, 0, ?)",
           owner.getId(),
           "missions.list");
+      jdbc.update(
+          "INSERT INTO navigation_appearance (preferences_id, desktop_mode) VALUES (?, 'RAIL')",
+          owner.getId());
     }
     UUID partner = UUID.randomUUID();
     jdbc.update(

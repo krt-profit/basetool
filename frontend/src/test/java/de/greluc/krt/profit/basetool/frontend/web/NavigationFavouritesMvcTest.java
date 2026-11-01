@@ -34,6 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
@@ -78,7 +80,9 @@ class NavigationFavouritesMvcTest {
   private void stored(long version, String... keys) {
     when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
         .thenReturn(
-            new NavigationPreferencesResponse(new FavouritesResponse(List.of(keys), version)));
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of(keys), version),
+                new AppearanceResponse(DesktopMode.DRAWER, 0)));
   }
 
   private static RequestPostProcessor member() {
@@ -147,7 +151,8 @@ class NavigationFavouritesMvcTest {
             eq(PREFERENCES + "/prune"), any(), eq(NavigationPreferencesResponse.class)))
         .thenReturn(
             new NavigationPreferencesResponse(
-                new FavouritesResponse(List.of("refinery.orders"), 4)));
+                new FavouritesResponse(List.of("refinery.orders"), 4),
+                new AppearanceResponse(DesktopMode.DRAWER, 0)));
 
     String html = page(member());
 

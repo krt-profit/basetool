@@ -318,6 +318,7 @@ GET /api/v1/missions/{missionId}/finance-entries/summary | MissionFinanceEntryCo
 DELETE /api/v1/missions/{missionId}/finance-entries/{entryId} | MissionFinanceEntryController#deleteFinanceEntry | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/missions/{missionId}/finance-entries/{entryId} | MissionFinanceEntryController#updateFinanceEntry | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/navigation/preferences | NavigationPreferencesController#read | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/navigation/preferences/appearance | NavigationPreferencesController#replaceAppearance | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/navigation/preferences/favourites | NavigationPreferencesController#replaceFavourites | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/navigation/preferences/prune | NavigationPreferencesController#prune | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/notifications | NotificationController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
