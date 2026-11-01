@@ -320,6 +320,57 @@ class NavigationMenuTest {
     return menu.main().stream().flatMap(group -> group.links().stream()).toList();
   }
 
+  /**
+   * A hidden page leaves its group's links, is listed apart and takes its tabs out of the index.
+   */
+  @Test
+  void aHiddenPageLeavesTheLinksAndItsTabsLeaveTheQuickAccess() {
+    NavigationAccess access =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
+
+    NavigationMenu menu = NavigationMenu.resolve(registry, access, Set.of("missions.list"));
+
+    assertThat(keys(menu, "operations")).containsExactly("hangar.overview");
+    assertThat(group(menu, "operations").hiddenLinks())
+        .extracting(NavigationEntry::key)
+        .containsExactly("missions.list");
+    assertThat(menu.palettePages())
+        .extracting(NavigationEntry::key)
+        .doesNotContain("operations.list");
+    assertThat(menu.palettePages()).extracting(NavigationEntry::key).contains("hangar.catalog");
+  }
+
+  /** A hidden page still resolves as the current entry, so its star can show it again. */
+  @Test
+  void aHiddenPageStaysTheCurrentEntry() {
+    NavigationAccess access =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
+
+    NavigationMenu menu = NavigationMenu.resolve(registry, access, Set.of("missions.list"));
+
+    assertThat(menu.currentEntry("/missions")).map(NavigationEntry::key).contains("missions.list");
+  }
+
+  /** A group whose links are all hidden is kept so the edit mode can show it. */
+  @Test
+  void aGroupWithOnlyHiddenLinksIsKept() {
+    NavigationAccess access =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
+
+    NavigationMenu menu =
+        NavigationMenu.resolve(registry, access, Set.of("missions.list", "hangar.overview"));
+
+    assertThat(group(menu, "operations").links()).isEmpty();
+    assertThat(group(menu, "operations").hiddenLinks()).hasSize(2);
+  }
+
+  private static NavigationMenu.Group group(NavigationMenu menu, String key) {
+    return menu.main().stream()
+        .filter(group -> group.group().key().equals(key))
+        .findFirst()
+        .orElseThrow();
+  }
+
   @NotNull
   private static List<String> keys(@NotNull NavigationMenu menu, @NotNull String groupKey) {
     return menu.main().stream()

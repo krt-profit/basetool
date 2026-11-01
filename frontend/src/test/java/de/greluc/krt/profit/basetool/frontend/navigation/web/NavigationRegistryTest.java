@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTab;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link NavigationRegistry}: stable, well-formed and unique entry keys. */
@@ -207,5 +208,41 @@ class NavigationRegistryTest {
         .map(NavigationEntry::href)
         .contains("/inventory?storage=my");
     assertThat(registry.entry("nope.nope")).isEmpty();
+  }
+
+  /** Only menu links of a member or administration group can be hidden. */
+  @Test
+  void onlyMenuLinksAreHideable() {
+    assertThat(registry.hideable("missions.list")).isPresent();
+    assertThat(registry.hideable("admin.members")).isPresent();
+    assertThat(registry.hideable("operations.list")).as("a tab").isEmpty();
+    assertThat(registry.hideable("storage.my")).as("a view").isEmpty();
+    assertThat(registry.hideable("personal.profile")).as("a personal page").isEmpty();
+    assertThat(registry.hideable("home.dashboard")).as("home").isEmpty();
+    assertThat(registry.hideable("future.page")).isEmpty();
+  }
+
+  /** A hidden page takes its tab bar and its views along; pages of other bars stay. */
+  @Test
+  void aHiddenPageTakesItsTabsAndViewsAlong() {
+    assertThat(registry.familyOf(Set.of("missions.list")))
+        .containsExactlyInAnyOrder("missions.list", "operations.list");
+    assertThat(registry.familyOf(Set.of("storage.overview")))
+        .containsExactlyInAnyOrder(
+            "storage.overview", "storage.levels", "storage.my", "storage.all");
+    assertThat(registry.familyOf(Set.of("hangar.overview")))
+        .containsExactlyInAnyOrder("hangar.overview", "hangar.catalog", "hangar.unit");
+    assertThat(registry.familyOf(Set.of("bank.dashboard")))
+        .contains("bank.manage", "bank.grants", "bank.requests");
+    assertThat(registry.familyOf(Set.of("orders.own"))).contains("orders.demand");
+    assertThat(registry.familyOf(Set.of("future.page"))).isEmpty();
+  }
+
+  /** An administration page and a member page that open the same path do not share a family. */
+  @Test
+  void theAdministrationAndTheMemberZoneKeepApart() {
+    assertThat(registry.familyOf(Set.of("admin.shipdata"))).containsExactly("admin.shipdata");
+    assertThat(registry.familyOf(Set.of("admin.dataimports")))
+        .contains("admin.p4kimport", "admin.syncreports", "admin.syncreports.uex");
   }
 }

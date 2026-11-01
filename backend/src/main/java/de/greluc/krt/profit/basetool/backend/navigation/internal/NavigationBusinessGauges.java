@@ -39,6 +39,7 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
   private final DashboardLayoutRepository dashboardLayouts;
 
   private final AtomicLong favouriteAccounts = new AtomicLong();
+  private final AtomicLong hiddenAccounts = new AtomicLong();
   private final AtomicLong dashboardAccounts = new AtomicLong();
 
   @Override
@@ -46,6 +47,9 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
     Gauge.builder(
             NavigationMetrics.PERSONALISED_ACCOUNTS, favouriteAccounts, AtomicLong::doubleValue)
         .tag(NavigationMetrics.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
+        .register(registry);
+    Gauge.builder(NavigationMetrics.PERSONALISED_ACCOUNTS, hiddenAccounts, AtomicLong::doubleValue)
+        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.HIDDEN.getTag())
         .register(registry);
     Gauge.builder(
             NavigationMetrics.PERSONALISED_ACCOUNTS, dashboardAccounts, AtomicLong::doubleValue)
@@ -56,6 +60,7 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
   @Override
   public void sample() {
     favouriteAccounts.set(repository.countWithFavourites());
+    hiddenAccounts.set(repository.countWithHidden());
     dashboardAccounts.set(dashboardLayouts.countCustomised());
   }
 }

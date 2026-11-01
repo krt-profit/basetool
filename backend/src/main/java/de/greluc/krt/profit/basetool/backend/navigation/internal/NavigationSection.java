@@ -30,6 +30,9 @@ public enum NavigationSection {
   /** The favourites (REQ-UI-032). */
   FAVOURITES("favourites"),
 
+  /** The hidden pages (REQ-UI-032). */
+  HIDDEN("hidden"),
+
   /** The dashboard layouts and the options of their instances (REQ-UI-034). */
   DASHBOARD("dashboard");
 

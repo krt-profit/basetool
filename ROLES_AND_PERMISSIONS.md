@@ -1308,7 +1308,8 @@ user who may read its data: „Nächste Tage“ needs the member role (the missi
 and above), the others every signed-in user; losing the role deletes the widget's instances on the
 next load, and the admin mode's dashboard is for `ADMIN` only (REQ-UI-034).
 
-The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`
-and `POST /api/v1/navigation/preferences/prune` need only a signed-in user; the owner is always the
-token's subject, no endpoint takes a member id, and a favourite is a key of a page the user already
+The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
+`PUT .../hidden`, `PUT .../favourites-and-hidden` and `POST /api/v1/navigation/preferences/prune`
+need only a signed-in user; the owner is always the
+token's subject, no endpoint takes a member id, and a favourite or hidden page is a key of a page the user already
 sees — the entry's own gate stays authoritative.

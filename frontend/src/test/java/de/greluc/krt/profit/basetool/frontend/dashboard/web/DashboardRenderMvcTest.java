@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetTyp
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
@@ -249,7 +250,9 @@ class DashboardRenderMvcTest {
     stored(false, 0, widget(DashboardWidgetType.FAVOURITES, DashboardColumn.NARROW, null, null));
     when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
         .thenReturn(
-            new NavigationPreferencesResponse(new FavouritesResponse(List.of("missions.list"), 1)));
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of("missions.list"), 1),
+                new HiddenResponse(List.of(), 0)));
 
     assertThat(home(member())).doesNotContain("data-testid=\"dashboard-hint\"");
   }
@@ -293,14 +296,18 @@ class DashboardRenderMvcTest {
   @DisplayName("the favourites widget lists the favourites and explains the empty case")
   void rendersTheFavouritesWidget() throws Exception {
     when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
-        .thenReturn(new NavigationPreferencesResponse(new FavouritesResponse(List.of(), 0)));
+        .thenReturn(
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of(), 0), new HiddenResponse(List.of(), 0)));
     assertThat(widget("favourites"))
         .contains("data-testid=\"dashboard-favourites-empty\"")
         .contains("Du hast noch keine Favoriten");
 
     when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
         .thenReturn(
-            new NavigationPreferencesResponse(new FavouritesResponse(List.of("missions.list"), 1)));
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of("missions.list"), 1),
+                new HiddenResponse(List.of(), 0)));
     assertThat(widget("favourites"))
         .contains("data-entry-key=\"missions.list\"")
         .doesNotContain("dashboard-favourites-empty");

@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -78,7 +79,8 @@ class NavigationFavouritesMvcTest {
   private void stored(long version, String... keys) {
     when(backendApiClient.get(PREFERENCES, NavigationPreferencesResponse.class))
         .thenReturn(
-            new NavigationPreferencesResponse(new FavouritesResponse(List.of(keys), version)));
+            new NavigationPreferencesResponse(
+                new FavouritesResponse(List.of(keys), version), HiddenResponse.EMPTY));
   }
 
   private static RequestPostProcessor member() {
@@ -147,7 +149,7 @@ class NavigationFavouritesMvcTest {
             eq(PREFERENCES + "/prune"), any(), eq(NavigationPreferencesResponse.class)))
         .thenReturn(
             new NavigationPreferencesResponse(
-                new FavouritesResponse(List.of("refinery.orders"), 4)));
+                new FavouritesResponse(List.of("refinery.orders"), 4), HiddenResponse.EMPTY));
 
     String html = page(member());
 
@@ -235,9 +237,7 @@ class NavigationFavouritesMvcTest {
     String html =
         mockMvc
             .perform(
-                get("/navigation/favourites")
-                    .with(member())
-                    .header("X-Requested-With", "XMLHttpRequest"))
+                get("/navigation/menu").with(member()).header("X-Requested-With", "XMLHttpRequest"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -246,7 +246,6 @@ class NavigationFavouritesMvcTest {
     assertThat(html)
         .contains("data-version=\"7\"")
         .contains("data-favourites-mode=\"member\"")
-        .contains("data-favourites-mode=\"admin\"")
         .contains("nav-favourite-refinery.orders")
         .doesNotContain("<html");
   }
@@ -256,9 +255,7 @@ class NavigationFavouritesMvcTest {
   void swapFragmentNeedsTheBackgroundMarker() throws Exception {
     stored(0);
 
-    mockMvc
-        .perform(get("/navigation/favourites").with(member()))
-        .andExpect(status().is4xxClientError());
+    mockMvc.perform(get("/navigation/menu").with(member())).andExpect(status().is4xxClientError());
   }
 
   @Test

@@ -46,6 +46,7 @@ public class PurchasingQuickAccessContributor implements QuickAccessContributor 
 
   private static final String CRUMB = "nav.section.supply";
   private static final String ICON = "download";
+  private static final String PAGE = "purchasing.deals";
 
   private final PurchasingBackendClient purchasingClient;
   private final PurchasingFeatureState featureState;
@@ -98,6 +99,6 @@ public class PurchasingQuickAccessContributor implements QuickAccessContributor 
 
   private static @NotNull QuickAccessEntry entry(
       @NotNull String href, @NotNull String labelKey, @NotNull String keywordsKey) {
-    return new QuickAccessEntry(href, labelKey, CRUMB, ICON, keywordsKey);
+    return new QuickAccessEntry(href, labelKey, CRUMB, ICON, keywordsKey, PAGE);
   }
 }

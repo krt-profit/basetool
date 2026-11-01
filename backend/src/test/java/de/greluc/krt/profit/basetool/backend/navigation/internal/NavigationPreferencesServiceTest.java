@@ -176,6 +176,122 @@ class NavigationPreferencesServiceTest {
     assertThat(pruned.version()).isEqualTo(1);
   }
 
+  private static HiddenUpdateRequest hidden(long version, String... keys) {
+    return new HiddenUpdateRequest(List.of(keys), version);
+  }
+
+  private static FavouritesAndHiddenUpdateRequest both(
+      FavouritesUpdateRequest favourites, HiddenUpdateRequest hidden) {
+    return new FavouritesAndHiddenUpdateRequest(favourites, hidden);
+  }
+
+  @Test
+  @DisplayName("hidden pages are stored with their own version, apart from the favourites")
+  void storesHiddenPagesWithTheirOwnVersion() {
+    UUID owner = member();
+    service.replaceFavourites(owner, favourites(0, "missions.list"));
+
+    HiddenResponse stored =
+        service.replaceHidden(owner, hidden(0, "bank.dashboard", "orders.list"));
+
+    assertThat(stored.keys()).containsExactly("bank.dashboard", "orders.list");
+    assertThat(stored.version()).isEqualTo(1);
+    assertThat(service.read(owner).favourites().version()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("a stale hidden version is rejected without touching the favourites version")
+  void rejectsAStaleHiddenVersion() {
+    UUID owner = member();
+    service.replaceHidden(owner, hidden(0, "bank.dashboard"));
+
+    assertThatThrownBy(() -> service.replaceHidden(owner, hidden(0, "orders.list")))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+    assertThat(service.read(owner).hidden().keys()).containsExactly("bank.dashboard");
+    assertThat(service.read(owner).favourites().version()).isZero();
+  }
+
+  @Test
+  @DisplayName("a favourite cannot be hidden and a hidden page cannot become a favourite")
+  void refusesAPageThatWouldBeBoth() {
+    UUID owner = member();
+    service.replaceFavourites(owner, favourites(0, "missions.list"));
+    service.replaceHidden(owner, hidden(0, "bank.dashboard"));
+
+    assertThatThrownBy(() -> service.replaceHidden(owner, hidden(1, "missions.list")))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() ->
+            service.replaceFavourites(owner, favourites(1, "missions.list", "bank.dashboard")))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() ->
+            service.replaceFavouritesAndHidden(
+                owner, both(favourites(1, "orders.list"), hidden(1, "orders.list"))))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  @DisplayName("one request moves a page between the sections and bumps both versions")
+  void movesAPageBetweenTheSectionsInOneRequest() {
+    UUID owner = member();
+    service.replaceFavourites(owner, favourites(0, "missions.list"));
+    service.replaceHidden(owner, hidden(0, "bank.dashboard"));
+
+    NavigationPreferencesResponse moved =
+        service.replaceFavouritesAndHidden(
+            owner, both(favourites(1, "missions.list", "bank.dashboard"), hidden(1)));
+
+    assertThat(moved.favourites().keys()).containsExactly("missions.list", "bank.dashboard");
+    assertThat(moved.favourites().version()).isEqualTo(2);
+    assertThat(moved.hidden().keys()).isEmpty();
+    assertThat(moved.hidden().version()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("a stale version of either section drops the whole combined write")
+  void aStaleVersionOfEitherSectionDropsTheCombinedWrite() {
+    UUID owner = member();
+    service.replaceFavourites(owner, favourites(0, "missions.list"));
+
+    assertThatThrownBy(() ->
+            service.replaceFavouritesAndHidden(
+                owner, both(favourites(1, "orders.list"), hidden(5, "bank.dashboard"))))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThatThrownBy(() ->
+            service.replaceFavouritesAndHidden(
+                owner, both(favourites(0, "orders.list"), hidden(0, "bank.dashboard"))))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+    NavigationPreferencesResponse read = service.read(owner);
+    assertThat(read.favourites().keys()).containsExactly("missions.list");
+    assertThat(read.favourites().version()).isEqualTo(1);
+    assertThat(read.hidden().keys()).isEmpty();
+    assertThat(read.hidden().version()).isZero();
+  }
+
+  @Test
+  @DisplayName("hidden pages of one member never reach another member")
+  void keepsEachMembersHiddenPagesApart() {
+    UUID owner = member();
+    service.replaceHidden(owner, hidden(0, "bank.dashboard"));
+
+    assertThat(service.read(member()).hidden().keys()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("pruning deletes hidden keys too and bumps only the sections that changed")
+  void pruneDeletesHiddenKeys() {
+    UUID owner = member();
+    service.replaceFavourites(owner, favourites(0, "missions.list"));
+    service.replaceHidden(owner, hidden(0, "bank.dashboard", "orders.list"));
+
+    NavigationPreferencesResponse pruned = service.prune(owner, List.of("orders.list"));
+
+    assertThat(pruned.hidden().keys()).containsExactly("bank.dashboard");
+    assertThat(pruned.hidden().version()).isEqualTo(2);
+    assertThat(pruned.favourites().version()).isEqualTo(1);
+  }
+
   @Test
   @DisplayName("pruning for a member without a row is a no-op")
   void pruneWithoutARowIsANoOp() {
