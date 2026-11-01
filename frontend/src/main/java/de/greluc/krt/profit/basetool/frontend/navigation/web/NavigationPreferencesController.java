@@ -26,9 +26,12 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHidd
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResetRequest;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderScopeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -38,6 +41,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,6 +60,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class NavigationPreferencesController {
 
   private static final String AJAX = "X-Requested-With=XMLHttpRequest";
+
+  /** The key format a mode or scope segment must have before it joins a backend path. */
+  private static final Pattern SEGMENT = Pattern.compile("^[a-z][a-z0-9]*([.-][a-z0-9]+)*$");
 
   /** Sends the preferences to the backend. */
   private final NavigationBackendClient client;
@@ -113,6 +120,55 @@ public class NavigationPreferencesController {
     return relayed(
         "replace navigation favourites and hidden pages (ajax)",
         () -> client.replaceFavouritesAndHidden(request));
+  }
+
+  /**
+   * Replaces the stored order of one scope of a mode: the groups of the mode or the links of one
+   * group.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param scope {@code groups} or a group key
+   * @param request the scope's keys in their new order and the order version the caller last saw
+   * @return {@code 200} with the mode's order and its version, {@code 422} with code {@code
+   *     VALIDATION} for an incomplete payload or a malformed path, or the relayed backend {@code
+   *     problem+json}, a {@code 409} for a stale version included
+   */
+  @PutMapping(value = "/order/{mode}/{scope}", headers = AJAX)
+  public ResponseEntity<Object> replaceOrderScope(
+      @PathVariable String mode,
+      @PathVariable String scope,
+      @RequestBody @Nullable OrderScopeUpdateRequest request) {
+    if (!pathSegment(mode)
+        || !pathSegment(scope)
+        || request == null
+        || request.keys() == null
+        || request.version() == null) {
+      return validationError();
+    }
+    return relayed(
+        "replace navigation order (ajax)", () -> client.replaceOrderScope(mode, scope, request));
+  }
+
+  /**
+   * Clears the stored order of a mode, back to the default order.
+   *
+   * @param mode {@code member} or {@code admin}
+   * @param request the order version the caller last saw
+   * @return {@code 200} with the empty order and its version, {@code 422} with code {@code
+   *     VALIDATION} for an incomplete payload or a malformed path, or the relayed backend {@code
+   *     problem+json}
+   */
+  @PostMapping(value = "/order/{mode}/reset", headers = AJAX)
+  public ResponseEntity<Object> resetOrder(
+      @PathVariable String mode, @RequestBody @Nullable OrderResetRequest request) {
+    if (!pathSegment(mode) || request == null || request.version() == null) {
+      return validationError();
+    }
+    return relayed("reset navigation order (ajax)", () -> client.resetOrder(mode, request));
+  }
+
+  private static boolean pathSegment(@NotNull String segment) {
+    return SEGMENT.matcher(segment).matches();
   }
 
   /**

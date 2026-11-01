@@ -33,6 +33,9 @@ public enum NavigationSection {
   /** The hidden pages (REQ-UI-032). */
   HIDDEN("hidden"),
 
+  /** The group and link order of both modes (REQ-UI-032). */
+  ORDER("order"),
+
   /** The „Darstellung" section (REQ-UI-032). */
   APPEARANCE("display"),
 

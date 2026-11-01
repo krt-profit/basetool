@@ -25,7 +25,9 @@ const FAVOURITES_URL = '/navigation/favourites';
 const HIDDEN_URL = '/navigation/hidden';
 const BOTH_URL = '/navigation/favourites-and-hidden';
 const STATE_SELECTOR = '[data-favourites-state]';
-const WRITE_LOCK = 'nav-preferences';
+
+/** Lock scope that queues every preference write of the page, so each echoes a current version. */
+export const WRITE_LOCK = 'nav-preferences';
 
 /** Fired on the document after the personalised lists were swapped in place. */
 export const NAV_RENDERED_EVENT = 'krt:nav-rendered';
@@ -48,6 +50,9 @@ const STATE_FIELDS = [
     'conflict',
     'full',
     'hiddenError',
+    'orderMemberVersion',
+    'orderAdminVersion',
+    'orderError',
     'tabbarMemberVersion',
     'tabbarMemberStored',
     'tabbarMemberShown',
@@ -56,6 +61,36 @@ const STATE_FIELDS = [
     'tabbarAdminShown',
     'tabbarError',
 ];
+
+/**
+ * Says something to assistive technology without moving focus.
+ *
+ * @param {string} dataKey the dataset key of the message pattern on the live region
+ * @param {string} [name] the page name that replaces `{name}` in the pattern
+ */
+export function announce(dataKey, name = '') {
+    const region = document.querySelector('[data-nav-live]');
+    const pattern = region instanceof HTMLElement ? region.dataset[dataKey] : undefined;
+    if (region && pattern) {
+        region.textContent = pattern.replace('{name}', name);
+    }
+}
+
+/**
+ * Moves focus to the first of the selectors that matches a visible element, so that the keyboard
+ * position survives a control that was swapped out.
+ *
+ * @param {string[]} selectors candidates in order of preference
+ */
+export function focusFirst(selectors) {
+    for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element instanceof HTMLElement && element.getClientRects().length > 0) {
+            element.focus({ preventScroll: false });
+            return;
+        }
+    }
+}
 
 /**
  * @typedef {object} NavChange
