@@ -21,6 +21,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch, krtReauth, krtTermsGate } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { badgeText, bellAriaLabel } from '/js/notification/notification-bell-label.js';
 
 const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
@@ -49,6 +50,8 @@ function readMessages() {
         confirmClearBody: krtI18nText(data.confirmClearBody, 'data-confirm-clear-body'),
         confirmOk: krtI18nText(data.confirmOk, 'data-confirm-ok'),
         confirmCancel: krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
+        bellOpen: krtI18nText(data.bellOpen, 'data-bell-open'),
+        bellOpenUnread: krtI18nText(data.bellOpenUnread, 'data-bell-open-unread'),
         error: krtI18nText(data.error, 'data-error'),
     };
 }
@@ -101,7 +104,11 @@ function setBadge(count) {
         return;
     }
     const n = typeof count === 'number' ? count : 0;
-    const text = n > 99 ? '99+' : String(n);
+    const text = badgeText(n);
+    const toggle = document.getElementById('notification-toggle');
+    if (toggle) {
+        toggle.setAttribute('aria-label', bellAriaLabel(i18n.bellOpen, i18n.bellOpenUnread, n));
+    }
     [badge, ...Array.from(document.querySelectorAll('[data-notif-badge]'))].forEach((el) => {
         el.textContent = text;
         el.classList.toggle('notification-badge-hidden', n <= 0);
