@@ -202,6 +202,13 @@
         box-shadow: var(--glow-primary);
     }
 
+    :is(.oc-node, .oc-unit-box, .oc-bereich-tier).is-highlighted {
+        border-color: var(--color-primary);
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+        box-shadow: var(--glow-primary);
+    }
+
     .oc-tree :focus-visible {
         outline: 2px solid var(--color-primary);
         outline-offset: 2px;

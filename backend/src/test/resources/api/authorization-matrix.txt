@@ -346,6 +346,7 @@ GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | 
 PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=@operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or @operationAccessPolicy.canClearPayout(#id)) | url=anyRequest -> authenticated
 GET /api/v1/orders | JobOrderController#getAllJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders | JobOrderController#createJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/by-number | JobOrderNumberLookupController#findByNumber | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/lookup | JobOrderController#lookupJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/material-demand | JobOrderController#getMaterialDemand | pre=isAuthenticated() | url=anyRequest -> authenticated

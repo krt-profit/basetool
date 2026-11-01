@@ -344,6 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (list) list.scrollTop = 0;
             openSidebar(null);
         },
+        isAdminMode() {
+            return adminMode;
+        },
     };
 
     if (sidebarEl && adminModeEl) {

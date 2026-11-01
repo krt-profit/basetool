@@ -30,9 +30,29 @@ import org.jetbrains.annotations.Nullable;
  * @param name the entity's name as the page shows it
  * @param statusKey the message key of its status, or {@code null} for a type without one
  * @param date its date as the page shows it, or {@code null} for a type without one
+ * @param adminHref the page the hit opens in administration mode, or {@code null} when it opens
+ *     {@code href} in both modes
  */
 public record QuickAccessHit(
     @NotNull String href,
     @NotNull String name,
     @Nullable String statusKey,
-    @Nullable Instant date) {}
+    @Nullable Instant date,
+    @Nullable String adminHref) {
+
+  /**
+   * A hit that opens the same page in both modes.
+   *
+   * @param href the page the hit opens, starting with {@code /}
+   * @param name the entity's name as the page shows it
+   * @param statusKey the message key of its status, or {@code null}
+   * @param date its date, or {@code null}
+   */
+  public QuickAccessHit(
+      @NotNull String href,
+      @NotNull String name,
+      @Nullable String statusKey,
+      @Nullable Instant date) {
+    this(href, name, statusKey, date, null);
+  }
+}

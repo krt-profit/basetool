@@ -55,6 +55,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -210,6 +211,37 @@ public class JobOrderQueryService {
     Page<JobOrder> page =
         jobOrderRepository.findRequestedOrders(effectiveStatuses, requesterOrgUnitIds, pageable);
     return jobOrderStockProjectionService.mapPageWithStock(page);
+  }
+
+  /**
+   * Finds the orders whose number starts with the given digits among those the caller may open: the
+   * scoped orders for a caller inside the order workflow and, for every caller, the orders they are
+   * an assignee of (REQ-ORDERS-048).
+   *
+   * @param numberPrefix the digits the number starts with
+   * @param limit the most hits to return
+   * @return the matching orders by ascending number, empty for an unidentified caller
+   */
+  public @NotNull List<JobOrderNumberHitDto> findByNumberPrefix(
+      @NotNull String numberPrefix, int limit) {
+    UUID callerId = authHelper.currentUserId().orElse(null);
+    if (callerId == null) {
+      return List.of();
+    }
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return jobOrderRepository
+        .findVisibleByNumberPrefix(
+            numberPrefix,
+            ownerScopeService.canViewJobOrders(),
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            callerId,
+            PageRequest.of(0, limit))
+        .stream()
+        .map(o ->
+            new JobOrderNumberHitDto(o.getId(), o.getDisplayId(), o.getStatus(), o.getCreatedAt()))
+        .toList();
   }
 
   private static @NotNull List<JobOrderStatus> statusesOrAll(

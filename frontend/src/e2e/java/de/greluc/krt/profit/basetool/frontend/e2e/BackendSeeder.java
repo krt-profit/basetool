@@ -1751,6 +1751,62 @@ public final class BackendSeeder {
   }
 
   /**
+   * Reads the name the application shows for a user: the display name, else the username.
+   *
+   * @param username the Keycloak username
+   * @param password the Keycloak password
+   * @return the user's effective name
+   */
+  public String getEffectiveName(String username, String password) {
+    try {
+      String token = passwordGrant(username, password);
+      return getJson("/api/v1/users/me", token).get("effectiveName").getAsString();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getEffectiveName(" + username + ") failed", e);
+    }
+  }
+
+  /**
+   * Reads the human-readable number of a job order.
+   *
+   * @param username the Keycloak username of a user who may read the order
+   * @param password the Keycloak password
+   * @param jobOrderId the order's id
+   * @return the order's {@code displayId}
+   */
+  public int getJobOrderNumber(String username, String password, String jobOrderId) {
+    try {
+      String token = passwordGrant(username, password);
+      return getJson("/api/v1/orders/" + jobOrderId, token).get("displayId").getAsInt();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getJobOrderNumber failed", e);
+    }
+  }
+
+  /**
+   * Makes a user the Staffelleiter of a squadron on the org chart via {@code POST
+   * /api/v1/org-chart/positions}.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param squadronId the squadron's id
+   * @param userId the user's app_user id
+   * @return the created position's id
+   */
+  public String assignSquadronLead(
+      String adminUser, String adminPassword, String squadronId, String userId) {
+    return seedEntity(
+        adminUser,
+        adminPassword,
+        "/api/v1/org-chart/positions",
+        "{\"positionType\":\"SQUADRON_LEAD\",\"orgUnitId\":\""
+            + squadronId
+            + "\",\"userId\":\""
+            + userId
+            + "\"}");
+  }
+
+  /**
    * Posts a {@code RefineryExtract} JSON to {@code POST /api/v1/refinery-orders/import-extract} and
    * returns the backend's draft answer verbatim.
    *

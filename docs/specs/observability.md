@@ -2741,9 +2741,9 @@ label**, a tag, an MDC field or a log line.
   owns the levels.
 - *Shipped:* `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's
   quick-access search (REQ-UI-033, `QuickAccessSearchMetrics`), one increment per entity type per
-  search, every pair registered at zero. `kind` ∈ the `QuickAccessSearchKind` keys — today
-  `mission`, `operation`, `material`; `blueprint`, `ship`, `org_unit`, `job_order`, `member` join
-  with their contributors; `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed),
+  search, every pair registered at zero. `kind` ∈ the `QuickAccessSearchKind` keys
+  (`mission`, `operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`);
+  `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed),
   `timeout` (a contributor that did not answer within 2 s).
 - *Shipped:* `basetool_notification_created_total{notification_type}` and
   `basetool_notification_muted_total{notification_type}` gain `INVENTORY_STOCK_LEVEL_LOW`, and

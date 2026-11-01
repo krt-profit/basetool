@@ -28,6 +28,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -64,6 +65,12 @@ class QuickAccessSearchE2eTest {
   private static Browser browser;
   private static Path storageState;
   private static String missionId;
+  private static String squadronId;
+  private static String squadronName;
+  private static String adminUserId;
+  private static String adminName;
+  private static String jobOrderId;
+  private static int jobOrderNumber;
 
   /** Launches the browser, captures an administrator session and seeds one entity per type. */
   @BeforeAll
@@ -77,7 +84,18 @@ class QuickAccessSearchE2eTest {
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
       missionId = seeder.createMission(USERNAME, PASSWORD, TOKEN + " Mission", false);
       seeder.createOperation(USERNAME, PASSWORD, TOKEN + " Operation");
-      seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, TOKEN + " Material");
+      String materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, TOKEN + " Material");
+      String tag = UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
+      squadronName = TOKEN + " Squad";
+      squadronId = seeder.createSquadron(USERNAME, PASSWORD, squadronName, "QF" + tag);
+      adminUserId = seeder.getUserId(USERNAME, PASSWORD);
+      adminName = seeder.getEffectiveName(USERNAME, PASSWORD);
+      seeder.assignSquadronLead(USERNAME, PASSWORD, squadronId, adminUserId);
+      seeder.setSquadronProfitEligible(USERNAME, PASSWORD, squadronId, true);
+      jobOrderId =
+          seeder.createJobOrder(
+              USERNAME, PASSWORD, squadronId, TOKEN + " Order", materialId, 650, 10);
+      jobOrderNumber = seeder.getJobOrderNumber(USERNAME, PASSWORD, jobOrderId);
     }
   }
 
@@ -181,6 +199,52 @@ class QuickAccessSearchE2eTest {
 
           input.fill("> " + TOKEN);
           assertThat(page.locator(ENTITY_ROWS)).hasCount(0);
+        });
+  }
+
+  /** A single digit after {@code #} finds the seeded order by its number and opens it. */
+  @Test
+  void findsAJobOrderByItsNumber() {
+    Assumptions.assumeTrue(STACK.managesStack(), "needs the seeded entities");
+    run(
+        "quick-search-order",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          page.keyboard().press("Control+k");
+          page.getByTestId("palette-input").fill("#" + jobOrderNumber);
+          Locator hit =
+              page.locator("#nav-palette .palette-row[data-href='/orders/" + jobOrderId + "']");
+          assertThat(hit).isVisible();
+          assertThat(hit.locator(".palette-row-label")).hasText("#" + jobOrderNumber);
+          hit.click();
+          page.waitForURL(Pattern.compile(".*/orders/" + jobOrderId + "$"));
+        });
+  }
+
+  /** An org unit and a member open the org chart with exactly that unit or person highlighted. */
+  @Test
+  void orgUnitAndMemberHighlightTheChart() {
+    Assumptions.assumeTrue(STACK.managesStack(), "needs the seeded entities");
+    run(
+        "quick-search-org-chart",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
+          page.keyboard().press("Control+k");
+          Locator input = page.getByTestId("palette-input");
+          input.fill("unit: " + squadronName);
+          page.locator(
+                  "#nav-palette .palette-row[data-href='/org-chart?highlight=" + squadronId + "']")
+              .click();
+          page.waitForURL(Pattern.compile(".*/org-chart\\?highlight=" + squadronId + "$"));
+          assertThat(page.locator(".oc-unit-box.is-highlighted")).hasCount(1);
+
+          page.keyboard().press("Control+k");
+          page.getByTestId("palette-input").fill("@" + adminName);
+          page.locator(
+                  "#nav-palette .palette-row[data-href='/org-chart?highlight=" + adminUserId + "']")
+              .click();
+          page.waitForURL(Pattern.compile(".*/org-chart\\?highlight=" + adminUserId + "$"));
+          assertThat(page.locator(".oc-node.is-highlighted").first()).isVisible();
         });
   }
 

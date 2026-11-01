@@ -167,4 +167,18 @@ assert.deepEqual(
 );
 assert.equal(rank([item('Lager', '', false)], fold('hangar')).length, 0);
 
+const hitHref = vm.runInContext('krtSearchHitHref', context);
+const memberHit = { href: '/org-chart?highlight=1', adminHref: '/members/1' };
+assert.equal(hitHref(memberHit, true), '/members/1');
+assert.equal(hitHref(memberHit, false), '/org-chart?highlight=1');
+assert.equal(
+    hitHref({ href: '/org-chart?highlight=2', adminHref: null }, true),
+    '/org-chart?highlight=2',
+);
+assert.equal(hitHref({ href: '/orders/3' }, true), '/orders/3');
+assert.equal(
+    hitHref({ href: '/org-chart', adminHref: 'https://evil.example' }, true),
+    '/org-chart',
+);
+
 console.log('krt-search: all assertions passed');
