@@ -43,8 +43,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li><b>Delete</b> (the {@code /delete} form): shown only to an Admin.
  * </ul>
  *
- * <p>Each role logs in within its own browser context. Relies on JUnit running test classes
- * sequentially, so the IRIDIUM home assigned here is not clobbered.
+ * <p>The Officer holds the Logistician grant of IRIDIUM, the unit owning the order: the controls
+ * follow that grant, not the realm role. Each role logs in within its own browser context. Relies
+ * on JUnit running test classes sequentially, so the IRIDIUM home assigned here is not clobbered.
  */
 @Tag("e2e")
 class RolePermissionsE2eTest {
@@ -80,7 +81,7 @@ class RolePermissionsE2eTest {
           ADMIN_PASSWORD,
           seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
           IRIDIUM_ID,
-          false,
+          true,
           false);
       seeder.assignStaffelMembership(
           ADMIN_USER,
