@@ -1629,7 +1629,7 @@ The Keycloak `OFFICER` role is retired (REQ-SEC-004), so a Sonderkonto can no lo
 
 **Enforced by:** `OrgUnitBankSettingsServiceTest` (the offered buckets), `OfficerCutMigrationTest`
 (grants and limits deleted, one audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`,
-`db/migration/V317` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
+`db/migration/V318` · **Related:** REQ-BANK-035, REQ-BANK-041, REQ-SEC-004, ADR-0300
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 

@@ -368,7 +368,7 @@ since the go-live of 2026-09-28, so these risks hold now.
   only from leadership seats (REQ-ROLE-002), is checked against the owning unit of the target, and a
   Staffel's Ensign who is a plain member of a second Staffel has no officer power there. The
   oversight scope no longer adds every squadron membership of a role holder.
-- **The cut is one release and hard to reverse.** Migrations `V316`–`V318` removed the seeded role
+- **The cut is one release and hard to reverse.** Migrations `V317`–`V319` removed the seeded role
   and its permissions, the special accounts' `GLOBAL_ROLE OFFICER` buckets (each with a bank audit
   event) and the `ROLE OFFICER` notification selectors; the provisioner deletes the realm role
   afterwards (ADR-0202 amendment 8). Membership rights rest on `KRT Member`, so a seat holder

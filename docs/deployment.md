@@ -1648,7 +1648,7 @@ chart (vacate the seat); then run the report again. Attach only the `count=` lin
 
 ### Deleting the Officer realm role after the OFFICER retirement
 
-The release carries migrations `V316`–`V318`; the realm role `Officer` is deleted afterwards by the
+The release carries migrations `V317`–`V319`; the realm role `Officer` is deleted afterwards by the
 provisioner (ADR-0202 amendment 8), as a separate step that needs @greluc's explicit approval for
 this host. Order: the release is live and the report above was clean, then the dry run, then the
 apply.

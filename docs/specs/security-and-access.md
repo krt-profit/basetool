@@ -367,7 +367,7 @@ plan guard G-25
 
 Roles: `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles, which the
 matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159) and **`OFFICER` is not one of
-them since `V316`** (ADR-0300): there is no role below member, and a token that maps to none of
+them since `V317`** (ADR-0300): there is no role below member, and a token that maps to none of
 these is refused with `403 NO_ROLE` (REQ-SEC-053).
 Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, and on
 the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never**
@@ -379,7 +379,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
 
 `OFFICER` was retired by a hard cut in one release:
 
-- **Roles:** migration `V316` removed the seeded `OFFICER` role, its `user_roles` rows and its
+- **Roles:** migration `V317` removed the seeded `OFFICER` role, its `user_roles` rows and its
   permissions; `Roles.OFFICER`, `Roles.ADMIN_OR_OFFICER` and their frontend mirrors are gone.
 - **Hierarchy:** the `OFFICER > LOGISTICIAN` and `OFFICER > MISSION_MANAGER` edges are gone, in both
   `SecurityConfig`s. `MISSION_MANAGER > LOGISTICIAN` stays absent.
@@ -396,7 +396,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
   script deletes the realm role (ADR-0202 amendment 6); the test realms, the e2e realm export and
   the sandbox realm dropped it.
 - **Notification rules** that addressed the `ROLE OFFICER` selector were moved to the `SEAT_HOLDERS`
-  selector by `V318` and stay editable (REQ-NOTIF-008).
+  selector by `V319` and stay editable (REQ-NOTIF-008).
 - **Precondition of the cut:** a report of every leadership seat holder who lacks `KRT Member`. The
   cut ships only when that list is empty (REQ-ORG-029). The report ships as
   `scripts/officer-cut-report.sql`: a read-only session, SELECTs only, ids and coded words but no
