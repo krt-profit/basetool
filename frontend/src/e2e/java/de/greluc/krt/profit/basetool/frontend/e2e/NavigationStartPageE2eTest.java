@@ -175,13 +175,13 @@ class NavigationStartPageE2eTest {
         page -> {
           E2eSupport.navigate(page, STACK.baseUrl() + "/profile");
 
-          page.getByTestId("start-page-select-member").selectOption("orders.list");
+          page.getByTestId("start-page-select-member").selectOption("hangar.overview");
 
           assertThat(page.locator("[data-appearance-state]"))
-              .hasAttribute("data-start-member", "orders.list");
+              .hasAttribute("data-start-member", "hangar.overview");
 
           E2eSupport.navigate(page, STACK.baseUrl() + "/start");
-          assertThat(page).hasURL(Pattern.compile("/orders$"));
+          assertThat(page).hasURL(Pattern.compile("/hangar$"));
         });
   }
 
@@ -240,7 +240,7 @@ class NavigationStartPageE2eTest {
           assertThat(page.locator("[data-favourites-state]")).hasAttribute("data-keys", "");
           assertThat(page.locator("[data-favourites-state]")).hasAttribute("data-hidden-keys", "");
           assertThat(page.locator("[data-favourites-state]"))
-              .hasAttribute("data-tabbar-member-stored", "");
+              .hasAttribute("data-tabbar-member-stored", "- - -");
           assertThat(page.getByTestId("start-page-select-member")).hasValue("");
           assertEquals("still-here", page.evaluate("() => window.__resetMarker"));
 

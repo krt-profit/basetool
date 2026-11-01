@@ -184,6 +184,7 @@ public final class FrontendPageRoutes {
           "/dashboard/widgets/sync-status",
           "/dashboard/widgets/upcoming-days",
           "/navigation/menu",
+          "/start",
           "/navigation/appearance",
           "/orders/item-search",
           "/pending-approval/status",

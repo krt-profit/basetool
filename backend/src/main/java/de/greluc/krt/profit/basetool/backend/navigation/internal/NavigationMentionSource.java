@@ -42,6 +42,8 @@ public class NavigationMentionSource implements PersonMentionSource {
     return Set.of(
         "navigation_appearance.desktop_mode",
         "navigation_appearance.shortcuts_enabled",
+        "navigation_appearance.start_page_admin",
+        "navigation_appearance.start_page_member",
         "navigation_dashboard_layout.mode",
         "navigation_dashboard_widget.column_side",
         "navigation_dashboard_widget.status_filter",
