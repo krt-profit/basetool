@@ -123,6 +123,9 @@
                 <th:block th:each="entry : ${navigation.personal().links()}">
                     <th:block th:replace="~{kernel/fragments/nav-entries :: row(${entry}, false)}" />
                 </th:block>
+                <button type="button" class="nav-link nav-link-button" data-trigger="open-shortcuts"
+                        data-testid="nav-shortcuts-open" aria-haspopup="dialog" aria-controls="nav-shortcuts"
+                        th:text="#{shortcuts.open}">Tastenkürzel</button>
             </div>
             <div class="nav-user-row">
                 <button type="button" class="nav-user-toggle" data-testid="nav-user-toggle"
@@ -183,6 +186,10 @@
     <script type="module" th:src="@{/js/kernel/nav-tabbar.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-appearance.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <script type="module" th:src="@{/js/kernel/nav-rail.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/nav-shortcuts.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <th:block sec:authorize="isAuthenticated()">
+        <th:block th:replace="~{kernel/fragments/nav-shortcuts :: dialog}" />
+    </th:block>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />
     <th:block th:replace="~{kernel/fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{kernel/fragments/footer :: footer}" />

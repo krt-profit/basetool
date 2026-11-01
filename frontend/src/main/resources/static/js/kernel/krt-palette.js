@@ -261,6 +261,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }),
             );
         }
+        if (document.getElementById('nav-shortcuts')) {
+            out.push(
+                makeItem({
+                    label: krtI18nText(data.actionShortcuts, 'data-action-shortcuts'),
+                    crumb,
+                    icon: 'list',
+                    keywords: '',
+                    run() {
+                        if (krtChrome.shortcuts) krtChrome.shortcuts.open();
+                    },
+                }),
+            );
+        }
         if (document.querySelector('#sidebar .nav-admin-entry')) {
             out.push(
                 makeItem({

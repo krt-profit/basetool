@@ -58,14 +58,18 @@ public class NavigationAppearanceController {
   /**
    * Replaces the caller's appearance.
    *
-   * @param request the chosen desktop mode and the appearance version the caller last saw
+   * @param request the chosen desktop mode, the shortcut switch and the appearance version the
+   *     caller last saw
    * @return {@code 200} with the stored appearance and its version, {@code 422} with code {@code
    *     VALIDATION} for an incomplete payload, or the relayed backend {@code problem+json}, a
    *     {@code 409} for a stale version included
    */
   @PutMapping(headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> replace(@RequestBody @Nullable AppearanceUpdateRequest request) {
-    if (request == null || request.desktopMode() == null || request.version() == null) {
+    if (request == null
+        || request.desktopMode() == null
+        || request.shortcutsEnabled() == null
+        || request.version() == null) {
       return validationError();
     }
     return relay(
