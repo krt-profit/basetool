@@ -580,7 +580,7 @@ page head never runs wider than the content below it:
 
 **Breakpoints are only the class boundaries** (DS-11, ADR-0242, amended 2026-10-03): a media query
 uses `(width <= 768px)`, `(width <= 1024px)` or `(width >= 1440px)` — or a range between two of them —
-and nothing else. Stylelint's `media-feature-name-value-allowed-list` enforces it in both
+and, for the pinned sidebar of REQ-UI-026 only, `(width >= 1280px)`; nothing else (owner decision 24). Stylelint's `media-feature-name-value-allowed-list` enforces it in both
 configurations, for `width`, `min-width` and `max-width`. A component that has to react to its own
 width uses a container query. The tokens `--bp-phone-max`, `--bp-tablet-max` and `--bp-wide-min`
 document the values (a custom property cannot be used inside `@media`). The fifteen earlier values
@@ -1641,8 +1641,10 @@ SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageC
 
 > **Status: partly shipped** (ADR-0297, map #2800). Admin mode and the member default of the
 > amendment are implemented and replace the *List* zone, the group list and the quick access's page
-> list of the text below; the desktop modes, the personalisation and the phone tab bar of the
-> amendment stay planned, and the current text stays authoritative for them.
+> list of the text below, and so are the three desktop modes (drawer, rail, pinned sidebar) with the
+> „Darstellung" switch; „Mehr" and „Anpassen" in the rail wait for the hiding and editing of
+> REQ-UI-032. The personalisation and the phone tab bar of the amendment stay planned, and the
+> current text stays authoritative for them.
 
 The navigation has grown to about 65 links for a member with many roles, several viewport heights
 of one flat drawer. It is one model on every device
@@ -1891,6 +1893,14 @@ stored mode is kept.
 - „Anpassen" in rail mode opens the labelled sidebar as an overlay; „Fertig" returns to the rail.
 - **Icons** are 24 × 24 with stroke 2 in the sprite's style; missing ones go into the design
   system's sprite.
+- *Shipped:* the mode is the `data-nav-mode` of `body`, rendered from the stored „Darstellung"
+  section, so the first paint is right and a failed read renders the drawer with the switch off.
+  The style sheet applies the width rules; the rail (`nav-rail.html`, one `.nav-rail-item` per
+  group with its flyout) is a sibling of the sidebar, which stays the labelled overlay in the rail
+  mode and is docked in the pinned mode. The switch is a `.krt-segmented` radio group in the
+  sidebar head and in the profile card „Darstellung", and writes in place through `krtFetch`
+  (`nav-appearance.js`). The rail is `nav-rail.js`; `krtChrome.nav.open()` opens the sidebar as an
+  overlay in the rail mode, which is what „Anpassen" will call.
 
 **Phone tab bar: five slots.** Slots 1–3 are configurable (REQ-UI-032), slot 4 is the fixed
 „Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
@@ -1906,11 +1916,17 @@ navigation. One bar per mode.
 tab, in-place requests are not redirected) · `NavigationMenuTest`, `NavigationRegistryTest` (tab
 bars and counts) · `NavigationE2eTest` (collapsed groups behind the hub link, the tab bar).
 
+**Enforced by (desktop modes shipped):** `NavigationDesktopModesMvcTest` (the mode on the body, the
+switch, the rail's groups, flyouts, favourites, foot and avatar flyout, the appearance relay) ·
+`NavigationE2eTest` (the three modes and their width fallbacks at 1024, 1100, 1280 and 1440 px,
+`scroll-padding-inline-start`, flyouts by hover, click and keyboard with Escape returning focus,
+the admin toggle) · `NavigationAppearanceServiceTest`, `NavigationPreferencesControllerTest`
+(the section store).
+
 **Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
 role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
 „Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
-tab) · `NavigationE2eTest` (the three desktop modes and their width fallbacks, rail flyouts by
-hover, click and keyboard, the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
+tab) · `NavigationE2eTest` (the default tab bar per mode) · **Related:** REQ-UI-032, REQ-UI-033,
 REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
@@ -2281,9 +2297,11 @@ page use it; positions there count the reorderable rows of the rendered page.
 > **Status: partially shipped** (ADR-0297, ADR-0298, map #2800). Shipped: the store, the
 > Favoriten section (the group, the header star, the cap of 12, the greyed favourite, the deletion
 > on load, the 409 hint), hiding with „Mehr", „Anpassen" with the per-link star and hide controls
-> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", the privacy flows and the
-> metrics. Planned: the order and the up/down controls of „Anpassen", the tab bar, „Darstellung"
-> and the full reset; until they ship, the current code stays authoritative for them.
+> and the resets „Alle wieder einblenden" and „Alle Favoriten entfernen", „Darstellung" with the
+> desktop mode (own version, the profile card and the sidebar switch), the privacy flows and the
+> metrics. Planned: the order and the up/down controls of „Anpassen", the tab bar, `shortcutsEnabled`
+> and the start pages of „Darstellung" and the full reset; until they ship, the current code stays
+> authoritative for them.
 
 A user may adapt the default of REQ-UI-026 on top of it; nothing here changes the default.
 

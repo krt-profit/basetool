@@ -3697,8 +3697,9 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root row, the
-> favourites and the hidden entries (`NavigationUserReassignment`, position 210,
-> `navigation_preferences.user_id`). The
+> favourites, the hidden entries and the appearance (`NavigationUserReassignment`, position 210,
+> `navigation_preferences.user_id`; the appearance row follows the root's cascade, so the target's
+> wins). The
 > sections that follow and the dashboards are planned and join the same participant.
 
 The navigation preferences and the home dashboards (REQ-UI-032, REQ-UI-034) take part in the
@@ -5153,7 +5154,7 @@ links, beside the separate deletion card) · **Decision:**
 #### Amendment (ADR-0298)
 
 > **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the section with the
-> favourites and the hidden entries (`preference_section`, `position`, `entry_key` per row). The
+> favourites, the hidden entries and the desktop mode (`preference_section`, `position`, `value` per row). The
 > sections that follow and
 > the dashboards are planned and join the same statement.
 

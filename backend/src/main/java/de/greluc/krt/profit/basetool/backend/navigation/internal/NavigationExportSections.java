@@ -43,16 +43,21 @@ public class NavigationExportSections implements PersonalDataExportSection {
             "Chosen by the member: entry keys of pages, never free text.",
             """
             SELECT 'favourites' AS preference_section, f.order_index AS position,
-                   f.entry_key AS entry_key
+                   f.entry_key AS value
             FROM navigation_favourite f
             JOIN navigation_preferences np ON np.user_id = f.preferences_id
             WHERE np.user_id = :userId
             UNION ALL
-            SELECT 'hidden' AS preference_section, 0 AS position, h.entry_key AS entry_key
+            SELECT 'hidden' AS preference_section, 0 AS position, h.entry_key AS value
             FROM navigation_hidden h
             JOIN navigation_preferences np ON np.user_id = h.preferences_id
             WHERE np.user_id = :userId
-            ORDER BY preference_section, position, entry_key
+            UNION ALL
+            SELECT 'desktopMode', 0, a.desktop_mode
+            FROM navigation_appearance a
+            JOIN navigation_preferences np ON np.user_id = a.preferences_id
+            WHERE np.user_id = :userId
+            ORDER BY 1, 2, 3
             """));
   }
 }
