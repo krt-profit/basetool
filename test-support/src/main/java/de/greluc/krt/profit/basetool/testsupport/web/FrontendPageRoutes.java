@@ -170,6 +170,7 @@ public final class FrontendPageRoutes {
           "/quick-access/entries",
           "/quick-access/search",
           "/navigation/menu",
+          "/navigation/appearance",
           "/orders/item-search",
           "/pending-approval/status",
           "/personal-inventory/blueprints/craftability",

@@ -51,6 +51,7 @@ public class NavigationPreferencesWriter {
       "An entry cannot be a favourite and hidden at the same time.";
 
   private final NavigationPreferencesRepository repository;
+  private final NavigationAppearanceWriter appearance;
 
   /**
    * Reads every section of the member; a member without a row holds the empty defaults.
@@ -62,10 +63,12 @@ public class NavigationPreferencesWriter {
   public @NotNull NavigationPreferencesResponse read(@NotNull UUID userId) {
     return repository
         .findById(userId)
-        .map(NavigationPreferencesWriter::toResponse)
+        .map(this::toResponse)
         .orElseGet(() ->
             new NavigationPreferencesResponse(
-                new FavouritesResponse(List.of(), 0), new HiddenResponse(List.of(), 0)));
+                new FavouritesResponse(List.of(), 0),
+                new HiddenResponse(List.of(), 0),
+                new AppearanceResponse(DesktopMode.DRAWER, 0)));
   }
 
   /**
@@ -90,7 +93,7 @@ public class NavigationPreferencesWriter {
     NavigationPreferences preferences = repository.findById(userId).orElseThrow();
     preferences.replaceFavourites(keys);
     repository.saveAndFlush(preferences);
-    return toResponse(preferences).favourites();
+    return favouritesOf(preferences);
   }
 
   /**
@@ -217,11 +220,16 @@ public class NavigationPreferencesWriter {
     return new ObjectOptimisticLockingFailureException(NavigationPreferences.class, userId);
   }
 
-  private static NavigationPreferencesResponse toResponse(NavigationPreferences preferences) {
+  private NavigationPreferencesResponse toResponse(NavigationPreferences preferences) {
     return new NavigationPreferencesResponse(
-        new FavouritesResponse(
-            List.copyOf(preferences.getFavourites()), preferences.getFavouritesVersion()),
+        favouritesOf(preferences),
         new HiddenResponse(
-            preferences.getHidden().stream().sorted().toList(), preferences.getHiddenVersion()));
+            preferences.getHidden().stream().sorted().toList(), preferences.getHiddenVersion()),
+        appearance.read(preferences.getUserId(), preferences.getAppearanceVersion()));
+  }
+
+  private static FavouritesResponse favouritesOf(NavigationPreferences preferences) {
+    return new FavouritesResponse(
+        List.copyOf(preferences.getFavourites()), preferences.getFavouritesVersion());
   }
 }

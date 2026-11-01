@@ -339,6 +339,9 @@ class DataExportEndStateTest {
           "INSERT INTO navigation_hidden (preferences_id, entry_key) VALUES (?, ?)",
           owner.getId(),
           "bank.dashboard");
+      jdbc.update(
+          "INSERT INTO navigation_appearance (preferences_id, desktop_mode) VALUES (?, 'RAIL')",
+          owner.getId());
     }
     UUID partner = UUID.randomUUID();
     jdbc.update(

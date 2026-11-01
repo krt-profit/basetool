@@ -52,6 +52,7 @@
                     <li><a href="#profile-section-payout" th:text="#{profile.section.payout}">Auszahlung</a></li>
                     <li><a href="#profile-section-blueprints" th:text="#{profile.section.blueprints}">Blaupausen</a></li>
                     <li><a href="#profile-section-name-withholding" th:text="#{profile.nameWithholding.label}">Verbundene Anwendungen</a></li>
+                    <li><a href="#profile-appearance-card" th:text="#{profile.appearance.title}">Darstellung</a></li>
                     <li><a href="#profile-notifications-card" th:text="#{profile.notifications.title}">Benachrichtigungen</a></li>
                     <li><a href="#profile-security-card" th:text="#{profile.security.title}">Zugang &amp; Sicherheit</a></li>
                     <li><a href="#profile-export-card" th:text="#{profile.section.export}">Datenexport</a></li>
@@ -176,6 +177,7 @@
                 </div>
 
                 <div id="profile-notifications-host">
+                    <div th:replace="~{navigation/fragments/profile-appearance :: card}"></div>
                     <div th:replace="~{notification/fragments/profile-notification-prefs :: card}"></div>
                 </div>
 

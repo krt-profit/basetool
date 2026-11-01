@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
@@ -55,17 +56,23 @@ class NavigationPreferencesReaderTest {
   @BeforeEach
   void setUp() {
     client = mock(NavigationBackendClient.class);
-    reader = new NavigationPreferencesReader(client, new NavigationRegistry());
+    reader =
+        new NavigationPreferencesReader(
+            new NavigationPreferencesLoader(client), client, new NavigationRegistry());
   }
 
   private static NavigationPreferencesResponse stored(long version, String... keys) {
     return new NavigationPreferencesResponse(
-        new FavouritesResponse(List.of(keys), version), HiddenResponse.EMPTY);
+        new FavouritesResponse(List.of(keys), version),
+        HiddenResponse.EMPTY,
+        AppearanceResponse.DRAWER);
   }
 
   private static NavigationPreferencesResponse storedHidden(long version, String... keys) {
     return new NavigationPreferencesResponse(
-        new FavouritesResponse(List.of(), 0), new HiddenResponse(List.of(keys), version));
+        new FavouritesResponse(List.of(), 0),
+        new HiddenResponse(List.of(keys), version),
+        AppearanceResponse.DRAWER);
   }
 
   private static List<String> keys(List<Item> items) {
