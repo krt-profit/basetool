@@ -30,8 +30,6 @@ import java.util.UUID;
  * @param shorthand short tag
  * @param description free-form text
  * @param active soft-delete flag
- * @param isPromotionEnabled per-squadron promotion-feature flag, deciding whether non-admins see
- *     the promotion menu
  * @param isProfitEligible whether the squadron appears in the Job-Order responsible (processing)
  *     picker
  * @param version optimistic-lock counter
@@ -43,6 +41,5 @@ public record SquadronDto(
     String shorthand,
     String description,
     Boolean active,
-    Boolean isPromotionEnabled,
     Boolean isProfitEligible,
     Long version) {}

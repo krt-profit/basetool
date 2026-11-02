@@ -25,7 +25,7 @@ import java.util.UUID;
 
 /**
  * Wire shape for {@link de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand}; mirrors
- * {@link SquadronDto} without the promotion toggle, which is always off for a Spezialkommando.
+ * {@link SquadronDto} with request validation.
  *
  * @param id Spezialkommando identifier; {@code null} on create, required on update
  * @param name display name, case-insensitively unique across {@link

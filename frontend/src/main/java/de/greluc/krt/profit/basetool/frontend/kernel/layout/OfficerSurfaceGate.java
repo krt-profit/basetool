@@ -40,9 +40,6 @@ public class OfficerSurfaceGate {
   /** {@code @PreAuthorize} expression for {@link #canOpenLeitung()}. */
   public static final String CAN_OPEN_LEITUNG = "@officerSurfaceGate.canOpenLeitung()";
 
-  /** {@code @PreAuthorize} expression for {@link #canManagePromotions()}. */
-  public static final String CAN_MANAGE_PROMOTIONS = "@officerSurfaceGate.canManagePromotions()";
-
   /** {@code @PreAuthorize} expression for {@link #hasOfficerReach()}. */
   public static final String HAS_OFFICER_REACH = "@officerSurfaceGate.hasOfficerReach()";
 
@@ -57,15 +54,6 @@ public class OfficerSurfaceGate {
    */
   public boolean canOpenLeitung() {
     return authHelper.isAdmin() || capabilities().canOpenLeitung();
-  }
-
-  /**
-   * Whether the caller may use promotion management (evaluations, topics, rank requirements).
-   *
-   * @return {@code true} for an admin and for a caller the backend offers promotion management
-   */
-  public boolean canManagePromotions() {
-    return authHelper.isAdmin() || capabilities().canManagePromotions();
   }
 
   /**

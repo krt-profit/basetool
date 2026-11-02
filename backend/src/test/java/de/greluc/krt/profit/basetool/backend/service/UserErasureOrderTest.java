@@ -57,7 +57,6 @@ class UserErasureOrderTest {
           "DELETE:PersonalInventoryErasureService",
           "DELETE:PersonalBlueprintUserErasure",
           "DELETE:NotificationUserErasure",
-          "DELETE:MemberEvaluationErasureService",
           "REASSIGN:MissionOwnerReassignment",
           "REASSIGN:RefineryOwnerReassignment",
           "UNLINK:MissionMemberUnlink",

@@ -23,8 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code SpecialCommandDto}: like {@link SquadronDto} but without
- * {@code isPromotionEnabled}, which is always {@code false} for a Spezialkommando.
+ * Frontend mirror of the backend {@code SpecialCommandDto}, shaped like {@link SquadronDto}.
  *
  * @param id Spezialkommando identifier; nullable on create payloads.
  * @param name display name.

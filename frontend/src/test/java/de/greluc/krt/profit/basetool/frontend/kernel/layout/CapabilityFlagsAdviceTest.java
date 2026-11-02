@@ -190,7 +190,6 @@ class CapabilityFlagsAdviceTest {
 
     assertTrue(caps.hasOfficerReach());
     assertTrue(caps.canOpenLeitung());
-    assertTrue(caps.canManagePromotions());
     assertTrue(caps.canSeeHangarOwnerDetails());
     assertTrue(caps.canManageJobOrders());
     assertTrue(caps.canManageMissionFinance());
@@ -231,13 +230,11 @@ class CapabilityFlagsAdviceTest {
 
     assertTrue(advice.hasOfficerReach(on));
     assertTrue(advice.canOpenLeitung(on));
-    assertTrue(advice.canManagePromotions(on));
     assertTrue(advice.canSeeHangarOwnerDetails(on));
     assertTrue(advice.canManageJobOrders(on));
     assertTrue(advice.canManageMissionFinance(on));
     assertFalse(advice.hasOfficerReach(off));
     assertFalse(advice.canOpenLeitung(off));
-    assertFalse(advice.canManagePromotions(off));
     assertFalse(advice.canSeeHangarOwnerDetails(off));
     assertFalse(advice.canManageJobOrders(off));
     assertFalse(advice.canManageMissionFinance(off));

@@ -78,7 +78,7 @@ class PersonMentionRegistryTest {
   void everyDeclaredTargetOfTheApplicationIsUniqueAndHasAnId() {
     List<Target> targets = MentionSourceDeclarations.targets();
 
-    assertThat(targets).hasSizeGreaterThanOrEqualTo(79);
+    assertThat(targets).hasSizeGreaterThanOrEqualTo(73);
     assertThat(targets).extracting(t -> t.table() + "." + t.column()).doesNotHaveDuplicates();
     assertThat(targets).allSatisfy(t -> assertThat(t.idColumn()).isNotBlank());
   }

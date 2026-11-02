@@ -60,8 +60,8 @@ class AuthorizationMatrixTest {
   /** Handler mappings on 2026-10-02; fewer means the selection lost operations. */
   private static final int OPERATION_FLOOR = 581;
 
-  /** Service-level gates on 2026-10-02; fewer means the selection lost gates. */
-  private static final int SERVICE_GATE_FLOOR = 18;
+  /** Service-level gates; fewer means the selection lost gates. */
+  private static final int SERVICE_GATE_FLOOR = 2;
 
   @Autowired private ApplicationContext applicationContext;
   @Autowired private FilterChainProxy filterChainProxy;

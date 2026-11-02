@@ -228,8 +228,7 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Resolves the Staffel scope set for the user-list, search, typeahead and promotion-matrix
-   * queries (REQ-ORG-017).
+   * Resolves the Staffel scope set for the user-list, search and typeahead queries (REQ-ORG-017).
    *
    * <ul>
    *   <li>admin without a pin: {@code null};
@@ -264,31 +263,6 @@ public class RequestScopeResolver {
       ids.add(m.getId().getOrgUnitId());
     }
     return ids;
-  }
-
-  /**
-   * Whether the non-admin caller holds more than one Staffel and has pinned none, so a
-   * single-Staffel create would have to guess (REQ-ORG-017). Such creates reject with a 400. Always
-   * {@code false} for admins.
-   *
-   * @return {@code true} iff a single-Staffel auto-stamp would be ambiguous for the current caller.
-   */
-  public boolean hasAmbiguousStaffelContext() {
-    if (authHelper.isAdmin()) {
-      return false;
-    }
-    Optional<UUID> callerId = authHelper.currentUserId();
-    if (callerId.isEmpty()) {
-      return false;
-    }
-    List<OrgUnitMembership> rows =
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(callerId.get(), OrgUnitKind.SQUADRON);
-    if (rows.size() <= 1) {
-      return false;
-    }
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    return pinned.isEmpty()
-        || rows.stream().noneMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()));
   }
 
   /**
@@ -472,23 +446,6 @@ public class RequestScopeResolver {
             holdsKrtMember()
                 ? Collections.unmodifiableSet(seatReach(currentCallerMemberships()))
                 : Set.of());
-  }
-
-  /**
-   * The org units whose officer-surface data the caller may read (REQ-ROLE-007): an admin sees
-   * every unit, or the pinned one; any other caller sees the units of {@link
-   * #currentOfficerOrgUnitIds()}, narrowed by {@link #narrowToPin(Set)}.
-   *
-   * @return the readable org-unit ids; empty for a caller without reach; {@code null} for the
-   *     unrestricted admin scope
-   */
-  @Nullable
-  public Set<UUID> currentOfficerReadScope() {
-    Optional<UUID> pin = readActiveSquadronFromHeader();
-    if (authHelper.isAdmin()) {
-      return pin.<Set<UUID>>map(Set::of).orElse(null);
-    }
-    return narrowToPin(currentOfficerOrgUnitIds());
   }
 
   /**

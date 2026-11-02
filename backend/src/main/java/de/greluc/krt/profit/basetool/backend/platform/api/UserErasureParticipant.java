@@ -70,9 +70,6 @@ public interface UserErasureParticipant {
     /** Notification-rule selectors removed. */
     RULE_SELECTORS,
 
-    /** Promotion evaluations removed. */
-    EVALUATIONS,
-
     /** Refinery orders reassigned. */
     REFINERY_ORDERS_REASSIGNED,
 

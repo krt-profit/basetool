@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029),
 > ADR-0300
 
@@ -68,8 +68,8 @@ Bereich/OL appointment responses) derive it from `role` at the controller / mapp
 Each squadron leadership rank (`STAFFELLEITER` / `KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` /
 `ENSIGN`) confers officer-equivalent reach over its **own squadron only**, by minting contextual
 `LOGISTICIAN@<squadronId>` + `MISSION_MANAGER@<squadronId>` exactly as `SK_LEAD` does for an SK. The
-JWT authorities converter derives **no** flat `ROLE_OFFICER` from the rank, **no** promotion rights,
-and **no** cascade beyond the squadron. Area ranks keep their current cascading reach (Bereich +
+JWT authorities converter derives **no** flat `ROLE_OFFICER` from the rank and **no**
+cascade beyond the squadron. Area ranks keep their current cascading reach (Bereich +
 children, identical across the three area ranks for now). Per-rank / per-feature differentiation
 (including the bank) is deferred to later work.
 
@@ -126,9 +126,9 @@ the officer standing they stood next to is no longer a Keycloak role.
   `KRT Member` is refused. A seat whose holder loses the role later stays in the org chart and
   confers no reach until the role is back (REQ-ORG-029).
 - **Gates read the target's owning unit.** An officer check asks for reach in the owning unit of the
-  mission, job order, promotion topic, ship or other target; lists are filtered to the caller's
+  mission, job order, ship or other target; lists are filtered to the caller's
   officer units. The active context only narrows what navigation and lists show, with the union
-  when nothing is pinned. Hangar owner details, the Leitung page, promotion management, job-order
+  when nothing is pinned. Hangar owner details, the Leitung page, job-order
   writes, mission finance and owner change, the operation's unpaid reset and the purchasing
   `leadsUnit` check move to this per-unit reach.
 - **The Keycloak `OFFICER` role is retired** (REQ-SEC-004). The paragraph above on the operational
@@ -350,17 +350,12 @@ writes, a former lead can be given a rank above 12 as soon as their last seat is
 Keycloak change and no reconciliation is needed. The identity module asks the org-unit module through
 its own SPI (`OfficerReachDirectory`).
 
-**Officer surfaces read only the caller's reach.** The Beförderung management pages (evaluation
-matrix, topic and rank-requirement editors) and the Leitung page list and edit only the units where
-the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows A's
-members, evaluations, topics, categories, level texts, rank requirements and eligibility, and
-never B's. A pin narrows this to the pinned unit when it is within reach, widened by the units the
+**Officer surfaces read only the caller's reach.** The Leitung page lists and edits only the units
+where the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows
+A's members and never B's. A pin narrows this to the pinned unit when it is within reach, widened by the units the
 caller's seat on it reaches through the cascade (a Bereich or OL pin covers the units below it), and
-to nothing when it is not within reach (the pages are then hidden); unpinned, the units of reach are
-the union. The Leitung page follows the same pin rule. Admins are not
-restricted beyond their pin. The management catalogue reads take `view=MANAGEMENT`
-(`PromotionReadView`); without it they answer the caller's own squadron, which is what members see
-of their progress and is not an officer surface.
+to nothing when it is not within reach (the page is then hidden); unpinned, the units of reach are
+the union. Admins are not restricted beyond their pin.
 
 A rank that does not fit the range is refused with `400 RANK_OUTSIDE_ROLE_RANGE`
 (`identity.api.RankOutsideRoleRangeException`). Its `detail` is localized and names the basis of the

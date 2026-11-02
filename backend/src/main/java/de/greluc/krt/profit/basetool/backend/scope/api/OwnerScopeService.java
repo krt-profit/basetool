@@ -47,8 +47,7 @@ public class OwnerScopeService implements SquadronVisibility {
 
   /**
    * Delegates to {@link RequestScopeResolver#currentUserListScopeSquadronIds()}: the SQUADRON-scope
-   * set for the admin user-list / search / promotion queries, or {@code null} for the unfiltered
-   * all-scope.
+   * set for the admin user-list / search queries, or {@code null} for the unfiltered all-scope.
    *
    * @return the squadron id set the user-list queries filter on, or {@code null} for the unfiltered
    *     admin/leadership all-scope.

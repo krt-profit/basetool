@@ -59,7 +59,6 @@ class KernelDomainReachTest {
       Set.of(
           "kernel.backend.BackendApiClient -> identity.model.TermsDocumentDto",
           "kernel.backend.QualityTierCatalog -> catalogue.model.QualityTierDto",
-          "kernel.layout.CapabilityFlagsAdvice -> orgunit.model.SquadronDto",
           "kernel.layout.LayoutContextLoader -> orgunit.model.OrgUnitMembershipOptionDto",
           "kernel.layout.LayoutMiscAdvice -> orgunit.model.OrgUnitMembershipOptionDto",
           "kernel.layout.OrgUnitContextAdvice -> orgunit.model.OrgUnitMembershipOptionDto",

@@ -72,7 +72,6 @@ Beim Anlegen wird die OrgUnit zentral gestempelt (`resolveSquadronForPickerOutpu
 - SK und Staffel teilen die `org_unit`-Tabelle mit `kind`-Diskriminator (`SQUADRON` / `SPECIAL_COMMAND`). SK ist also eine vollwertige OrgUnit mit Mitgliedschaften.
 - **SK-Lifecycle** (anlegen/umbenennen/löschen) ist ADMIN-only. **SK-Mitgliederverwaltung** ist offen für ADMIN oder den SK-Lead (Rang `SK_LEAD`) genau dieses SK (`canManageMembers`); den Lead zu setzen bleibt ADMIN-only (kein Self-Escalation). Die Leitungsränge aller OrgUnit-Arten stehen seit epic #800 in der einen Spalte `org_unit_membership.role` (REQ-ROLE-001); die fünf früheren Leitungs-Flags hat V187 entfernt.
 - **SK als besitzende OrgUnit von strict-Aggregaten ist möglich** (Inventar, Ship, Refinery Order, Mission, Operation): die Legacy-Spalte `owning_squadron_id` wurde in V102/V103 entfernt, `owning_org_unit_id` referenziert die polymorphe `org_unit`-Tabelle (und ist seit V132 für die personenbezogenen Aggregate nullable). Ein SK kann also Inventar besitzen — die `memberOrgUnitIds`-Vereinigung umfasst Staffel **und** SK. → UC-14. **Ausnahme Job Order:** ein nicht-profit-fähiges SK darf nicht die *bearbeitende* (responsible) Einheit eines Job Orders sein (400, Profit-Eligibility V128) → UC-11; als *anfragende* (requesting) Einheit ist jede OrgUnit zulässig.
-- **SK können nicht am Beförderungssubsystem teilnehmen** (DB-CHECK + Trigger + JPA-Guards).
 
 ## Cross-Staffel-Mechanik beim Inventar (Kern von UC-08/UC-09)
 

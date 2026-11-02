@@ -53,13 +53,6 @@ public enum AuditDomain {
   ROLE,
 
   /**
-   * Promotion system (Beförderung): the per-Staffel promotion catalogue, the rank-requirement rules
-   * and the per-member evaluations. For an evaluation the subject is the graded category and the
-   * member is the target.
-   */
-  PROMOTION,
-
-  /**
    * Materialbörse, the material-exchange trade board (REQ-MARKET-001): offers, requests and
    * interest registrations. The subject is the offer and the anbieter the target; interested
    * members are recorded only as counts.

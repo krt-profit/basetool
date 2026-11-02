@@ -247,37 +247,13 @@ class DataExportEndStateTest {
     subject.getRoles().add(role);
     userRepository.save(subject);
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
             + " is_profit_eligible, grand_admiral_user_id)"
-            + " VALUES (?, 'ORGANISATIONSLEITUNG', ?, ?, TRUE, FALSE, FALSE, ?)",
+            + " VALUES (?, 'ORGANISATIONSLEITUNG', ?, ?, TRUE, FALSE, ?)",
         UUID.randomUUID(),
         "Zzz Export Leitung",
         "ZXL",
         s);
-    UUID topic = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO promotion_topic (id, name, sort_order, owning_squadron_id)"
-            + " VALUES (?, 'Zzz Export Topic', 0, ?)",
-        topic,
-        Squadron.IRIDIUM_ID);
-    UUID category = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO promotion_category (id, topic_id, name, sort_order)"
-            + " VALUES (?, ?, 'Zzz Export Category', 0)",
-        category,
-        topic);
-    jdbc.update(
-        "INSERT INTO member_evaluation (id, user_id, category_id, assigned_level)"
-            + " VALUES (?, ?, ?, 'LEVEL_A')",
-        UUID.randomUUID(),
-        s,
-        category);
-    jdbc.update(
-        "INSERT INTO member_evaluation (id, user_id, category_id, assigned_level)"
-            + " VALUES (?, ?, ?, 'LEVEL_B')",
-        UUID.randomUUID(),
-        other.getId(),
-        category);
   }
 
   private void seedHoldings() {

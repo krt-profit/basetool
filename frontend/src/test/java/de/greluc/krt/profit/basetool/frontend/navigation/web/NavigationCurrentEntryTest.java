@@ -100,16 +100,16 @@ class NavigationCurrentEntryTest {
   @DisplayName("the registry classifies entries as available, context-only or gone")
   void classifiesAvailability() {
     NavigationAccess member = new NavigationAccess(Set.of("KRT_MEMBER"), Set.of());
-    NavigationEntry promotion = registry.starrable("promotion.overview").orElseThrow();
+    NavigationEntry leitung = registry.starrable("organisation.leadership").orElseThrow();
     NavigationEntry orders = registry.starrable("orders.list").orElseThrow();
     NavigationEntry terms = registry.starrable("admin.terms").orElseThrow();
     NavigationEntry missions = registry.starrable("missions.list").orElseThrow();
 
     assertThat(registry.availability(missions, member).name()).isEqualTo("AVAILABLE");
-    NavigationAccess memberOfAnEnabledUnit =
-        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.PROMOTION_ANYWHERE));
-    assertThat(registry.availability(promotion, memberOfAnEnabledUnit).name()).isEqualTo("CONTEXT");
-    assertThat(registry.availability(promotion, member).name()).isEqualTo("GONE");
+    NavigationAccess officerElsewhere =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.OFFICER_ANYWHERE));
+    assertThat(registry.availability(leitung, officerElsewhere).name()).isEqualTo("CONTEXT");
+    assertThat(registry.availability(leitung, member).name()).isEqualTo("GONE");
     assertThat(registry.availability(orders, member).name()).isEqualTo("GONE");
     assertThat(registry.availability(terms, member).name()).isEqualTo("GONE");
     assertThat(registry.starrable("home.dashboard")).isEmpty();

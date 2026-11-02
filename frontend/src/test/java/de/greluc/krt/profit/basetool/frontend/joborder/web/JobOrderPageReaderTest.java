@@ -129,7 +129,7 @@ class JobOrderPageReaderTest {
   }
 
   private static SquadronDto squadron(String name, boolean active) {
-    return new SquadronDto(UUID.randomUUID(), name, name, null, active, true, true, 1L);
+    return new SquadronDto(UUID.randomUUID(), name, name, null, active, true, 1L);
   }
 
   private static MaterialDto material() {

@@ -1853,11 +1853,7 @@ public final class BackendSeeder {
         adminUser,
         adminPassword,
         "/api/v1/squadrons",
-        "{\"name\":\""
-            + name
-            + "\",\"shorthand\":\""
-            + shorthand
-            + "\",\"isPromotionEnabled\":true}");
+        "{\"name\":\"" + name + "\",\"shorthand\":\"" + shorthand + "\"}");
   }
 
   /**

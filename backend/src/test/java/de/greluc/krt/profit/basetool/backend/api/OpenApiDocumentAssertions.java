@@ -70,9 +70,8 @@ public final class OpenApiDocumentAssertions {
           Map.entry("notification", 13),
           Map.entry("operation", 12),
           Map.entry("orgchart", 5),
-          Map.entry("orgunit", 40),
+          Map.entry("orgunit", 39),
           Map.entry("personalinventory", 9),
-          Map.entry("promotion", 34),
           Map.entry("refinery", 15));
 
   /** The one domain of the exchange's internal relay document. */

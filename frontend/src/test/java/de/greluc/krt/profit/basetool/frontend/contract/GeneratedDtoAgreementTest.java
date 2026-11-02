@@ -56,19 +56,12 @@ class GeneratedDtoAgreementTest {
           Map.entry("PersonSearchResultDto", "PersonSearchResult"),
           Map.entry("DefaultBlueprintDto", "DefaultBlueprintResponse"),
           Map.entry("MaterialCreateAjaxRequest", "MaterialCreateDto"),
-          Map.entry("MemberEvaluationDto", "MemberEvaluationResponse"),
           Map.entry("NotificationCountResponse", "NotificationUnreadCountDto"),
           Map.entry("PersonalBlueprintBatchResultDto", "PersonalBlueprintBatchResult"),
           Map.entry("PersonalBlueprintBulkDeleteResultDto", "PersonalBlueprintBulkDeleteResult"),
           Map.entry("PersonalBlueprintDto", "PersonalBlueprintResponse"),
           Map.entry("PersonalBlueprintRecipeDto", "PersonalBlueprintRecipeResponse"),
           Map.entry("PersonalInventoryItemDto", "PersonalInventoryItemResponse"),
-          Map.entry("PromotionCategoryDto", "PromotionCategoryResponse"),
-          Map.entry("PromotionEligibilityDto", "PromotionEligibilityResponse"),
-          Map.entry("PromotionLevelContentDto", "PromotionLevelContentResponse"),
-          Map.entry("PromotionRequirementCheckDto", "PromotionRequirementCheckResponse"),
-          Map.entry("PromotionTopicDto", "PromotionTopicResponse"),
-          Map.entry("RankRequirementDto", "RankRequirementResponse"),
           Map.entry("UserAttributesUpdateDto", "UserAttributesRequest"));
 
   /**
@@ -162,7 +155,7 @@ class GeneratedDtoAgreementTest {
         .as(
             "mirror-to-schema aliases. A rename on either side raises this and moves the entry, and"
                 + " each one is established by an identical property set rather than by the name")
-        .hasSize(18);
+        .hasSize(11);
     assertThat(KNOWN_DRIFT)
         .as(
             "pre-existing drifts, frozen with their reasons. This number goes DOWN when one is"

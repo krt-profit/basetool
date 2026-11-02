@@ -178,7 +178,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsProperties;
@@ -197,7 +196,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageL
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.privacy.api.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
-import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreService;
@@ -833,7 +831,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 103);
+    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 93);
     mapperLayerShouldNotReachIntoSecurityContextRule().check(CLASSES);
   }
 
@@ -914,7 +912,7 @@ class ArchitectureTest {
 
   @Test
   void toManyAssociationsAreNeverFetchedEagerly() {
-    assertFieldFloor("toManyAssociationsAreNeverFetchedEagerly", TO_MANY_ASSOCIATIONS, 34);
+    assertFieldFloor("toManyAssociationsAreNeverFetchedEagerly", TO_MANY_ASSOCIATIONS, 33);
     toManyAssociationsAreNeverFetchedEagerlyRule().check(CLASSES);
   }
 
@@ -1348,7 +1346,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotDependOnServiceLayer() {
-    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 103);
+    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 93);
     mustNotDependOnServicesRule(MAPPER_CODE)
         .because(
             "the service layer depends on mappers, so a mapper -> service edge re-creates the "
@@ -1619,64 +1617,6 @@ class ArchitectureTest {
                 + " participant signups do not bump Mission.version. Removing the annotation"
                 + " re-opens 409s on parallel \"Anmelden\" clicks — see"
                 + " MissionParticipantConcurrencyTest.");
-  }
-
-  /**
-   * {@code PromotionTopic.owningSquadron} must stay typed {@code Squadron}, not {@code OrgUnit}, so
-   * a special command can never be assigned.
-   */
-  @Test
-  void promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit() {
-    assertClassFloor(
-        "promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit",
-        classesIn(Set.of(PromotionTopic.class)),
-        1);
-    promotionTopicOwningSquadronRule(PromotionTopic.class, Squadron.class).check(CLASSES);
-  }
-
-  static ArchRule promotionTopicOwningSquadronRule(Class<?> topic, Class<?> squadron) {
-    return classes()
-        .that(classesIn(Set.of(topic)))
-        .should(
-            new ArchCondition<JavaClass>(
-                "declare an `owningSquadron` field whose raw type is "
-                    + squadron.getSimpleName()
-                    + " (not OrgUnit)") {
-              @Override
-              public void check(JavaClass javaClass, ConditionEvents events) {
-                var owningSquadronField =
-                    javaClass.getFields().stream()
-                        .filter(f -> "owningSquadron".equals(f.getName()))
-                        .findFirst();
-                if (owningSquadronField.isEmpty()) {
-                  events.add(
-                      SimpleConditionEvent.violated(
-                          javaClass,
-                          javaClass.getSimpleName()
-                              + " is missing the `owningSquadron` field —"
-                              + " SPEZIALKOMMANDO_PLAN.md §3.3 explicitly keeps this field"
-                              + " typed Squadron (not OrgUnit) so promotion data can only"
-                              + " reference Squadron rows. If you renamed it, restore the"
-                              + " field; if you removed it entirely, drop this guard and give"
-                              + " the reason in the commit message and the PR."));
-                  return;
-                }
-                JavaClass rawType = owningSquadronField.get().getRawType();
-                if (!rawType.isEquivalentTo(squadron)) {
-                  events.add(
-                      SimpleConditionEvent.violated(
-                          owningSquadronField.get(),
-                          javaClass.getSimpleName()
-                              + ".owningSquadron has raw type "
-                              + rawType.getFullName()
-                              + " — must stay "
-                              + squadron.getName()
-                              + ". Loosening it to OrgUnit lets a SpecialCommand reference"
-                              + " sneak past the application-side guard"
-                              + " (SPEZIALKOMMANDO_PLAN.md §8.2 / §11 R4)."));
-                }
-              }
-            });
   }
 
   /**

@@ -29,8 +29,6 @@ import java.util.UUID;
  * @param shorthand short tag used on badges / column headers
  * @param description free-form text
  * @param active soft-delete flag; {@code true} for the active reference data
- * @param isPromotionEnabled whether the promotion subsystem is on for this squadron; changed only
- *     through {@code /api/v1/squadrons/{id}/promotion-enabled}
  * @param isProfitEligible whether the squadron may process job orders; changed only through {@code
  *     /api/v1/squadrons/{id}/profit-eligible}
  * @param version optimistic-lock counter
@@ -41,6 +39,5 @@ public record SquadronDto(
     String shorthand,
     String description,
     Boolean active,
-    Boolean isPromotionEnabled,
     Boolean isProfitEligible,
     Long version) {}

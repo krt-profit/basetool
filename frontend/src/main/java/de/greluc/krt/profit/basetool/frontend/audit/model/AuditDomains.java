@@ -44,7 +44,6 @@ public final class AuditDomains {
           "MISSION",
           "OPERATION",
           "ROLE",
-          "PROMOTION",
           "MARKET",
           "HANGAR",
           "BLUEPRINT",

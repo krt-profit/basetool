@@ -46,30 +46,11 @@ public enum NavigationFlag {
   /** The Leitung page is offered in the active context (officer reach). */
   OPEN_LEITUNG,
 
-  /**
-   * Promotion management is offered in the active context: officer reach in a unit with promotion
-   * enabled.
-   */
-  MANAGE_PROMOTIONS,
-
-  /**
-   * The caller manages promotions in at least one unit with promotion enabled, whatever is pinned.
-   */
-  MANAGE_PROMOTIONS_ANYWHERE,
-
   /** The supply surface is on (REQ-SUP-001). */
   SUPPLY,
 
   /** The purchasing surface is on (REQ-PUR-001). */
   PURCHASING,
-
-  /** The promotion subsystem is exposed in the active context. */
-  PROMOTION,
-
-  /**
-   * The caller belongs to or reaches at least one unit with promotion enabled, whatever is pinned.
-   */
-  PROMOTION_ANYWHERE,
 
   /** The page is rendered in German. */
   LANGUAGE_DE,
@@ -88,17 +69,9 @@ public enum NavigationFlag {
    */
   public boolean holdsUserWide(@NotNull Set<NavigationFlag> flags) {
     return switch (this) {
-      case BLUEPRINT_OVERVIEW,
-          JOB_ORDERS,
-          OWN_JOB_ORDERS,
-          ASSIGNED_JOB_ORDERS,
-          OFFICER_ANYWHERE,
-          MANAGE_PROMOTIONS_ANYWHERE,
-          PROMOTION_ANYWHERE ->
+      case BLUEPRINT_OVERVIEW, JOB_ORDERS, OWN_JOB_ORDERS, ASSIGNED_JOB_ORDERS, OFFICER_ANYWHERE ->
           flags.contains(this);
       case OPEN_LEITUNG -> flags.contains(OFFICER_ANYWHERE);
-      case MANAGE_PROMOTIONS -> flags.contains(MANAGE_PROMOTIONS_ANYWHERE);
-      case PROMOTION -> flags.contains(PROMOTION_ANYWHERE);
       case LOGISTICIAN_HERE, SUPPLY, PURCHASING, LANGUAGE_DE, LANGUAGE_EN -> true;
     };
   }

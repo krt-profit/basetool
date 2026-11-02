@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -28,7 +27,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
  * Resolves the caller's UI capability flags once per request and exposes the model attributes the
- * layout menu entries are gated on, including {@code promotionFeatureEnabled}.
+ * layout menu entries are gated on.
  *
  * <p>Fails closed: a backend error turns every flag off. Scoped to {@link UsesLayoutModel}; the
  * flags come from the request's shared {@link LayoutContextLoader} read.
@@ -174,17 +173,6 @@ public class CapabilityFlagsAdvice {
   }
 
   /**
-   * Whether promotion management is offered in the active context.
-   *
-   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
-   * @return {@code true} iff the backend offers promotion management
-   */
-  @ModelAttribute("canManagePromotions")
-  public boolean canManagePromotions(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
-    return caps != null && caps.canManagePromotions();
-  }
-
-  /**
    * Whether hangar owner details are offered in the active context.
    *
    * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
@@ -220,29 +208,6 @@ public class CapabilityFlagsAdvice {
   }
 
   /**
-   * Computes whether the promotion subsystem is exposed to the caller, based on the active
-   * squadron.
-   *
-   * <p>An admin without a pin sees the menu; otherwise the active squadron's promotion flag
-   * decides, and a caller without a squadron sees nothing. {@code PromotionPageController} answers
-   * 403 when this is {@code false}.
-   *
-   * @param activeSquadron the resolved active squadron, or {@code null}
-   * @return {@code true} when the promotion menu should be exposed
-   */
-  @ModelAttribute("promotionFeatureEnabled")
-  public boolean promotionFeatureEnabled(
-      @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
-    if (activeSquadron == null) {
-      return authHelper.isAdmin();
-    }
-    if (activeSquadron.isPromotionEnabled() == null) {
-      return true;
-    }
-    return activeSquadron.isPromotionEnabled();
-  }
-
-  /**
    * Wire-shape mirror of the backend's {@code MeController.CapabilitiesResponse}.
    *
    * @param canSeeBlueprintOverview whether the caller may open the blueprint availability overview
@@ -259,8 +224,6 @@ public class CapabilityFlagsAdvice {
    *     (REQ-INV-053); a server switch, the same for every caller
    * @param hasOfficerReach whether the caller holds officer reach in the active context
    * @param canOpenLeitung whether the Leitung page is offered in the active context
-   * @param canManagePromotions whether promotion management is offered in the active context:
-   *     officer reach in a unit with promotion enabled
    * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
    * @param canManageJobOrders whether the officer job-order writes are offered in the active
    *     context
@@ -268,10 +231,6 @@ public class CapabilityFlagsAdvice {
    *     active context
    * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
    *     whatever unit is pinned
-   * @param canManagePromotionsAnywhere whether the caller manages promotions in at least one unit
-   *     with promotion enabled, whatever unit is pinned
-   * @param canUsePromotionAnywhere whether the caller belongs to or reaches at least one unit with
-   *     promotion enabled, whatever unit is pinned
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -283,19 +242,16 @@ public class CapabilityFlagsAdvice {
       boolean canMarkStolen,
       boolean hasOfficerReach,
       boolean canOpenLeitung,
-      boolean canManagePromotions,
       boolean canSeeHangarOwnerDetails,
       boolean canManageJobOrders,
       boolean canManageMissionFinance,
-      boolean canActAsOfficerAnywhere,
-      boolean canManagePromotionsAnywhere,
-      boolean canUsePromotionAnywhere) {
+      boolean canActAsOfficerAnywhere) {
 
     /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
     public static final CapabilitiesResponse NONE =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false);
+            false);
 
     /**
      * Every role-derived capability on, as an admin passes each gate; the server switch stays the
@@ -306,22 +262,7 @@ public class CapabilityFlagsAdvice {
      */
     public static CapabilitiesResponse admin(boolean canMarkStolen) {
       return new CapabilitiesResponse(
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          canMarkStolen,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true);
+          true, true, true, true, true, true, canMarkStolen, true, true, true, true, true, true);
     }
   }
 }

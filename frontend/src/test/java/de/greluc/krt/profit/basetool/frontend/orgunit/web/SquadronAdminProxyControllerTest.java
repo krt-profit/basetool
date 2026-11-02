@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,21 +56,6 @@ class SquadronAdminProxyControllerTest {
         new SquadronAdminProxyController(
             new OrgUnitBackendClient(backendApiClient),
             new CatalogueCacheEviction(backendApiClient));
-  }
-
-  @Test
-  void setPromotionEnabled_forwardsPatch_thenEvictsStaticDataCache() {
-    SquadronPromotionToggleRequest body = new SquadronPromotionToggleRequest(true);
-
-    ResponseEntity<Void> response = controller.setPromotionEnabled(ID, body);
-
-    assertEquals(204, response.getStatusCode().value());
-    InOrder inOrder = inOrder(backendApiClient);
-    inOrder
-        .verify(backendApiClient)
-        .patch(eq("/api/v1/squadrons/{id}/promotion-enabled"), eq(body), eq(Void.class), eq(ID));
-    inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
-    inOrder.verifyNoMoreInteractions();
   }
 
   @Test

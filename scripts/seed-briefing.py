@@ -497,7 +497,7 @@ class Seeder:
         for index, (name, short) in enumerate(STAFFELN):
             squadron = self.api.post(admin, "/squadrons", {
                 "name": name, "shorthand": short, "active": True, "isProfitEligible": True,
-                "isPromotionEnabled": False, "description": "Testdaten für die Einweisung"})
+                "description": "Testdaten für die Einweisung"})
             self.staffeln[short] = squadron["id"]
             self.staffel_names[short] = name
             self.api.patch(admin, f"/org-units/{squadron['id']}/parent", {

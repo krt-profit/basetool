@@ -83,7 +83,6 @@ public class NavigationAdvice {
    * @param capabilities the caller's capability flags
    * @param supplyEnabled whether the supply surface is on
    * @param purchasingEnabled whether the purchasing surface is on
-   * @param promotionEnabled whether the promotion subsystem is exposed
    * @return the caller's roles and flags; never {@code null}
    */
   @ModelAttribute("navigationAccess")
@@ -95,9 +94,7 @@ public class NavigationAdvice {
           CapabilitiesResponse capabilities,
       @Nullable @ModelAttribute(name = "supplyEnabled", binding = false) Boolean supplyEnabled,
       @Nullable @ModelAttribute(name = "purchasingEnabled", binding = false)
-          Boolean purchasingEnabled,
-      @Nullable @ModelAttribute(name = "promotionFeatureEnabled", binding = false)
-          Boolean promotionEnabled) {
+          Boolean purchasingEnabled) {
     EnumSet<NavigationFlag> flags = EnumSet.noneOf(NavigationFlag.class);
     if (capabilities != null) {
       addIf(flags, capabilities.canSeeBlueprintOverview(), NavigationFlag.BLUEPRINT_OVERVIEW);
@@ -107,16 +104,9 @@ public class NavigationAdvice {
       addIf(flags, capabilities.isLogisticianOrAbove(), NavigationFlag.LOGISTICIAN_HERE);
       addIf(flags, capabilities.canActAsOfficerAnywhere(), NavigationFlag.OFFICER_ANYWHERE);
       addIf(flags, capabilities.canOpenLeitung(), NavigationFlag.OPEN_LEITUNG);
-      addIf(flags, capabilities.canManagePromotions(), NavigationFlag.MANAGE_PROMOTIONS);
-      addIf(
-          flags,
-          capabilities.canManagePromotionsAnywhere(),
-          NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE);
-      addIf(flags, capabilities.canUsePromotionAnywhere(), NavigationFlag.PROMOTION_ANYWHERE);
     }
     addIf(flags, Boolean.TRUE.equals(supplyEnabled), NavigationFlag.SUPPLY);
     addIf(flags, Boolean.TRUE.equals(purchasingEnabled), NavigationFlag.PURCHASING);
-    addIf(flags, Boolean.TRUE.equals(promotionEnabled), NavigationFlag.PROMOTION);
     addIf(flags, "de".equals(locale.getLanguage()), NavigationFlag.LANGUAGE_DE);
     addIf(flags, "en".equals(locale.getLanguage()), NavigationFlag.LANGUAGE_EN);
     boolean rightsKnown = capabilities != null && capabilities != CapabilitiesResponse.NONE;

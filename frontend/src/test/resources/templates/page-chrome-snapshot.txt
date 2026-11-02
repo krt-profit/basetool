@@ -80,7 +80,7 @@ catalogue/admin/material-aliases.html body <body data-nav-mode="drawer">
 catalogue/admin/material-aliases.html parts chrome:320bc0d1b387aef1 x-content
 catalogue/admin/materials.html html <html lang="de">
 catalogue/admin/materials.html head-fixed cdc9f3402f03227c
-catalogue/admin/materials.html head-own <title>Materialien verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/catalogue/admin-materials.css">
+catalogue/admin/materials.html head-own <title>Materialien verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/catalogue/admin-materials.css">
 catalogue/admin/materials.html body <body data-nav-mode="drawer">
 catalogue/admin/materials.html parts chrome:320bc0d1b387aef1 x-content
 catalogue/admin/mission-data.html html <html lang="de">
@@ -388,31 +388,6 @@ personalinventory/personal-inventory.html head-fixed cdc9f3402f03227c
 personalinventory/personal-inventory.html head-own <title>Persönliches Inventar</title><link rel="stylesheet" href="/css/personalinventory/personal-inventory.css">
 personalinventory/personal-inventory.html body <body data-nav-mode="drawer">
 personalinventory/personal-inventory.html parts chrome:320bc0d1b387aef1 x-content toast:a1359ecc4bd4b21d x-tail
-promotion/promotion-admin-rank-requirements.html html <html lang="de">
-promotion/promotion-admin-rank-requirements.html head-fixed cdc9f3402f03227c
-promotion/promotion-admin-rank-requirements.html head-own <title>Rangvoraussetzungen verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion/promotion-admin-rank-requirements.css">
-promotion/promotion-admin-rank-requirements.html body <body data-nav-mode="drawer">
-promotion/promotion-admin-rank-requirements.html parts chrome:320bc0d1b387aef1 x-content
-promotion/promotion-admin-topics.html html <html lang="de">
-promotion/promotion-admin-topics.html head-fixed cdc9f3402f03227c
-promotion/promotion-admin-topics.html head-own <title>Themenbereiche verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion/promotion-admin-topics.css">
-promotion/promotion-admin-topics.html body <body data-nav-mode="drawer">
-promotion/promotion-admin-topics.html parts chrome:320bc0d1b387aef1 x-content toast:a1359ecc4bd4b21d x-tail
-promotion/promotion-manage.html html <html lang="de">
-promotion/promotion-manage.html head-fixed cdc9f3402f03227c
-promotion/promotion-manage.html head-own <title>Bewertungsverwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion/promotion-manage.css">
-promotion/promotion-manage.html body <body data-nav-mode="drawer">
-promotion/promotion-manage.html parts chrome:320bc0d1b387aef1 x-content toast:a1359ecc4bd4b21d x-tail
-promotion/promotion-my-evaluations.html html <html lang="de">
-promotion/promotion-my-evaluations.html head-fixed cdc9f3402f03227c
-promotion/promotion-my-evaluations.html head-own <title>Meine Bewertungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion/promotion-my-evaluations.css">
-promotion/promotion-my-evaluations.html body <body data-nav-mode="drawer">
-promotion/promotion-my-evaluations.html parts chrome:320bc0d1b387aef1 x-content toast:a1359ecc4bd4b21d x-tail
-promotion/promotion-overview.html html <html lang="de">
-promotion/promotion-overview.html head-fixed cdc9f3402f03227c
-promotion/promotion-overview.html head-own <title>Beförderungssystem - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion/promotion-overview.css">
-promotion/promotion-overview.html body <body data-nav-mode="drawer">
-promotion/promotion-overview.html parts chrome:320bc0d1b387aef1 x-content toast:a1359ecc4bd4b21d
 purchasing/admin/purchasing-settings.html html <html lang="de">
 purchasing/admin/purchasing-settings.html head-fixed cdc9f3402f03227c
 purchasing/admin/purchasing-settings.html head-own <title>Ankauf - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/purchasing/purchasing.css">
