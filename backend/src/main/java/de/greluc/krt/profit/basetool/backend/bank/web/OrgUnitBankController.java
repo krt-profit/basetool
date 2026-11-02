@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBalanceTargetRequest;
@@ -528,6 +529,39 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "The caller's requests")})
   public List<BankBookingRequestDto> listOwnBookingRequests() {
     return orgUnitBankRequestService.listOwnBookingRequests();
+  }
+
+  /**
+   * Pages the caller's own booking requests in the given states, with the total over all pages
+   * (REQ-BANK-022). Read-only and per-user isolated; the dashboard widget "Meine Bankantr&auml;ge"
+   * reads its rows and count from it.
+   *
+   * @param status the lifecycle states to include (repeatable or comma-separated); every state when
+   *     omitted
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort whitelisted sort spec
+   * @return one page of the caller's requests, newest first by default
+   */
+  @GetMapping("/requests/page")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Page the caller's own booking requests by state, with the total")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "One page of the caller's requests")
+      })
+  public PageResponse<BankBookingRequestDto> pageOwnBookingRequests(
+      @RequestParam(required = false) Set<BankBookingRequestStatus> status,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
+    return PageResponse.of(
+        orgUnitBankRequestService.pageOwnBookingRequests(
+            status == null ? Set.of() : status, pageable));
   }
 
   /**

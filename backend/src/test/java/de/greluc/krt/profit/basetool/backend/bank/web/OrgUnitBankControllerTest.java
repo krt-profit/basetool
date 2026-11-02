@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,9 +50,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -113,6 +116,41 @@ class OrgUnitBankControllerTest {
 
     verify(orgUnitBankVisibleAccountsQuery).listVisibleAccounts(expected);
     verify(orgUnitBankAccessService, never()).getViewableAccountDetail(any());
+  }
+
+  @Test
+  void pageOwnBookingRequests_pagesTheStatesNewestFirstAndReportsTheTotal() throws Exception {
+    when(orgUnitBankRequestService.pageOwnBookingRequests(any(), any()))
+        .thenAnswer(
+            call -> new PageImpl<>(List.of(requestDto()), call.<Pageable>getArgument(1), 7));
+    MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+    mockMvc
+        .perform(
+            get("/api/v1/bank/org-units/requests/page")
+                .param("status", "CONFIRMED", "REJECTED")
+                .param("size", "3"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(7))
+        .andExpect(jsonPath("$.size").value(3))
+        .andExpect(jsonPath("$.sort[0]").value("createdAt,desc"));
+
+    ArgumentCaptor<Set<BankBookingRequestStatus>> statuses = ArgumentCaptor.captor();
+    verify(orgUnitBankRequestService).pageOwnBookingRequests(statuses.capture(), any());
+    assertEquals(
+        Set.of(BankBookingRequestStatus.CONFIRMED, BankBookingRequestStatus.REJECTED),
+        statuses.getValue());
+  }
+
+  @Test
+  void pageOwnBookingRequests_withoutStatusAsksForEveryState() throws Exception {
+    when(orgUnitBankRequestService.pageOwnBookingRequests(any(), any()))
+        .thenAnswer(call -> new PageImpl<BankBookingRequestDto>(List.of(), call.getArgument(1), 0));
+    MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+    mockMvc.perform(get("/api/v1/bank/org-units/requests/page")).andExpect(status().isOk());
+
+    verify(orgUnitBankRequestService).pageOwnBookingRequests(eq(Set.of()), any());
   }
 
   @Test

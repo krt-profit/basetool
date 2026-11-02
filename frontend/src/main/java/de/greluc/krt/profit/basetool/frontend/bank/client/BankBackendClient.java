@@ -110,9 +110,6 @@ public class BankBackendClient {
   private static final ParameterizedTypeReference<List<OrgUnitBankBalanceDto>> BALANCE_LIST =
       new ParameterizedTypeReference<>() {};
 
-  private static final ParameterizedTypeReference<List<BankBookingRequestDto>>
-      BOOKING_REQUEST_LIST = new ParameterizedTypeReference<>() {};
-
   private static final ParameterizedTypeReference<List<BankAccountRefDto>> ACCOUNT_REF_LIST =
       new ParameterizedTypeReference<>() {};
 
@@ -619,26 +616,6 @@ public class BankBackendClient {
   @Nullable
   public List<OrgUnitBankBalanceDto> orgUnitBalances() {
     return backendApiClient.get("/api/v1/bank/org-units/balances", BALANCE_LIST);
-  }
-
-  /**
-   * Reads the caller's own org-unit booking requests (REQ-BANK-022).
-   *
-   * @return the requests, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public List<BankBookingRequestDto> ownOrgUnitRequests() {
-    return backendApiClient.get("/api/v1/bank/org-units/requests", BOOKING_REQUEST_LIST);
-  }
-
-  /**
-   * Reads the booking requests on the accounts the caller is responsible for.
-   *
-   * @return the requests, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public List<BankBookingRequestDto> foreignOrgUnitRequests() {
-    return backendApiClient.get("/api/v1/bank/org-units/requests/foreign", BOOKING_REQUEST_LIST);
   }
 
   /**

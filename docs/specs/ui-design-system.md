@@ -2699,7 +2699,10 @@ a chosen or pinned unit shows that unit's needs, no pin the union of the member'
 needs, each row labelled with its unit; it is offered only while the supply surface is on
 (REQ-SUP-001). „Meine
 Bankanträge" lists the caller's own requests (REQ-BANK-022) only; „Offen" is pending,
-„Entschieden" every request that has reached a final state. The live-sync rooms are `materialboard`
+„Entschieden" every request that has reached a final state, withdrawn ones included. It reads one
+page of the backend's own-requests page (state filter and page size server-side) and counts its
+total; its rows and „Alle anzeigen" open the „Meine Anträge" tab of `/org-unit-bank` through the
+`#tab=antraege` deeplink. The live-sync rooms are `materialboard`
 (`board`, `requests`), `supply-needs` (`needs`, `stats`) and `orgunit-bank` (`orgUnitBank`). A
 failed load shows the instance's error state with the test id `dashboard-<slug>-error`.
 
