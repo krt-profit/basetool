@@ -216,12 +216,8 @@ public class RefineryOrderPageController {
       model.addAttribute("errorToast", "error.refineryorder.load");
     }
     final Instant now = Instant.now();
-    final UUID viewerId = getCurrentUserId(principal);
-    final boolean manager = logisticianGate.isGranted();
     List<RefineryListRow> rows =
-        contentOf(shown).stream()
-            .map(o -> RefineryListRow.of(o, now, viewerId, manager, locale))
-            .toList();
+        contentOf(shown).stream().map(o -> RefineryListRow.of(o, now, locale)).toList();
     model.addAttribute("orderRows", rows);
     model.addAttribute("ordersPage", shown);
     model.addAttribute("pageSizes", PAGE_SIZES);

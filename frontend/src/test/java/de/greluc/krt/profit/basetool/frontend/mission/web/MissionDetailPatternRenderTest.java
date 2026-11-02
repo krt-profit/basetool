@@ -276,7 +276,8 @@ class MissionDetailPatternRenderTest {
                     "OPEN",
                     List.of(),
                     null,
-                    1L)));
+                    1L,
+                    null)));
     String html = render("/missions/" + MISSION_ID);
 
     String actions = between(html, "class=\"page-actions\"", "class=\"facts-bar\"");

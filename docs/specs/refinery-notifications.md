@@ -50,9 +50,9 @@ The default rule notifies the recipient (`EVENT_RECIPIENT`) and excludes the act
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
 **Enforced by:** `RefineryNoticeIntegrationTest`, `RefineryOrderServiceLifecycleTest`
-(`UpdateRefineryOrderTests`, `DeleteRefineryOrderTests`), `RefineryOrderServiceTest` (`storing…`),
+(`UpdateRefineryOrderTests`, `DeleteRefineryOrderTests`), `RefineryOrderStoreServiceTest` (`storing…`),
 `SeededNotificationRulesIntegrationTest`, `NotificationPageControllerTest` (`targetOf_…`) · **Code:**
 `refinery/api/events/RefineryNotices`, `refinery/internal/RefineryReadyNoticeProducer`,
-`refinery/internal/RefineryOrderService`, `refinery/internal/RefineryOrderRepository#markReadyNotified`,
+`refinery/internal/RefineryOrderService`, `refinery/internal/RefineryOrderStoreService`, `refinery/internal/RefineryOrderRepository#markReadyNotified`,
 `V275__add_refinery_order_ready_marker.sql`, `V276__seed_refinery_notification_rules.sql` ·
 **Issues:** #2414

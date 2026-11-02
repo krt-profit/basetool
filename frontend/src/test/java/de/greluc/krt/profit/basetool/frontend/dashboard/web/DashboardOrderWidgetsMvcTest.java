@@ -185,7 +185,8 @@ class DashboardOrderWidgetsMvcTest {
         "OPEN",
         List.of(),
         null,
-        1L);
+        1L,
+        null);
   }
 
   /** The default status reads the open and in-progress orders of the caller's processing units. */

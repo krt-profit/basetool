@@ -143,6 +143,15 @@ class RefineryOrderMapperTest {
   }
 
   @Test
+  void toListDto_carriesTheCallersEditRightOntoTheRow() {
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+
+    assertEquals(Boolean.TRUE, mapper.toListDto(order, true).canEdit());
+    assertEquals(Boolean.FALSE, mapper.toListDto(order, false).canEdit());
+  }
+
+  @Test
   void toListDto_shouldIncludeComputedProfit() {
     UUID id = UUID.randomUUID();
     RefineryOrder order = new RefineryOrder();
@@ -151,7 +160,7 @@ class RefineryOrderMapperTest {
     order.setExpenses(300.0);
     order.setOtherExpenses(null);
 
-    var dto = mapper.toListDto(order);
+    var dto = mapper.toListDto(order, false);
 
     assertNotNull(dto);
     assertEquals(id, dto.id());
@@ -168,7 +177,7 @@ class RefineryOrderMapperTest {
     order.setId(UUID.randomUUID());
     order.setOwningOrgUnit(squadron);
 
-    var dto = mapper.toListDto(order);
+    var dto = mapper.toListDto(order, false);
 
     assertNotNull(dto);
     assertNotNull(dto.owningSquadron(), "Staffel owner must surface on the list row");
@@ -186,7 +195,7 @@ class RefineryOrderMapperTest {
     order.setId(UUID.randomUUID());
     order.setOwningOrgUnit(sk);
 
-    var dto = mapper.toListDto(order);
+    var dto = mapper.toListDto(order, false);
 
     assertNotNull(dto);
     assertNotNull(dto.owningSquadron(), "SK owner must surface on the list row");
@@ -298,7 +307,7 @@ class RefineryOrderMapperTest {
         mapper.toDto(order).mission());
     assertEquals(
         new MissionReferenceDto(missionId, "Op Sunfire", "ACTIVE", planned),
-        mapper.toListDto(order).mission());
+        mapper.toListDto(order, false).mission());
   }
 
   @Test
@@ -307,7 +316,7 @@ class RefineryOrderMapperTest {
     order.setId(UUID.randomUUID());
 
     assertNull(mapper.toDto(order).mission());
-    assertNull(mapper.toListDto(order).mission());
+    assertNull(mapper.toListDto(order, false).mission());
   }
 
   @Test
@@ -344,7 +353,7 @@ class RefineryOrderMapperTest {
   @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto((RefineryOrder) null));
-    assertNull(mapper.toListDto(null));
+    assertNull(mapper.toListDto(null, false));
     assertNull(mapper.toEntity((RefineryOrderCreateRequest) null));
     assertNull(mapper.toEntity((RefineryOrderUpdateRequest) null));
   }

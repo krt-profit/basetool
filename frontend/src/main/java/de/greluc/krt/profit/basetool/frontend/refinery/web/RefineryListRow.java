@@ -52,7 +52,7 @@ import org.jetbrains.annotations.Nullable;
  * @param inputCount the number of distinct input materials
  * @param inputName the single input material's name, or {@code null} unless there is exactly one
  * @param inputUnits the input quantity of every good, in units
- * @param storable whether the viewer may store the yield: an open order the viewer owns or manages
+ * @param storable whether the viewer may store the yield: an open order the backend lets them edit
  */
 public record RefineryListRow(
     @NotNull RefineryOrderListDto order,
@@ -82,18 +82,12 @@ public record RefineryListRow(
    *
    * @param order the order
    * @param now the instant the state and progress are judged at
-   * @param viewerId the viewing member's id, or {@code null} when unknown
-   * @param manager whether the viewer may manage other members' orders (logistician and up)
    * @param locale the locale the SCU figures are formatted in
    * @return the row
    */
   @NotNull
   public static RefineryListRow of(
-      @NotNull RefineryOrderListDto order,
-      @NotNull Instant now,
-      @Nullable UUID viewerId,
-      boolean manager,
-      @NotNull Locale locale) {
+      @NotNull RefineryOrderListDto order, @NotNull Instant now, @NotNull Locale locale) {
     Instant endsAt = RefineryProgress.endsAt(order.startedAt(), order.durationMinutes());
     RefineryProgress.State state = RefineryProgress.state(order.status(), endsAt, now);
     String remaining =
@@ -105,8 +99,6 @@ public record RefineryListRow(
             ? RefineryProgress.formatDuration(RefineryProgress.minutesSince(endsAt, now))
             : null;
     boolean open = state == RefineryProgress.State.RUNNING || state == RefineryProgress.State.READY;
-    boolean owner =
-        viewerId != null && order.owner() != null && viewerId.equals(order.owner().id());
     List<RefineryGoodDto> goods = order.goods() == null ? List.of() : order.goods();
     Set<String> inputs = new LinkedHashSet<>();
     long inputUnits = 0;
@@ -130,7 +122,7 @@ public record RefineryListRow(
         inputs.size(),
         inputs.size() == 1 ? inputs.iterator().next() : null,
         inputUnits,
-        open && (manager || owner));
+        open && order.callerMayEdit());
   }
 
   /**
