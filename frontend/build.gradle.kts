@@ -908,6 +908,20 @@ val testShortcutsJs =
     outputs.upToDateWhen { false }
   }
 
+val testNavRailJs =
+  tasks.register<NodeTask>("testNavRailJs") {
+    group = "verification"
+    description =
+      "Regression tests for the icon rail: a rail item that survives a navigation refresh is bound once."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/nav-rail.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/nav-rail.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/nav-rail.js"))
+    outputs.upToDateWhen { false }
+  }
+
 val testSearchJs =
   tasks.register<NodeTask>("testSearchJs") {
     group = "verification"
@@ -1101,6 +1115,7 @@ tasks.named("check").configure {
     testTableSort,
     testReorderJs,
     testShortcutsJs,
+    testNavRailJs,
     testFavouriteOrderJs,
     testBoardSyncJs,
     testSearchJs,

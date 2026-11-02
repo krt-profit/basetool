@@ -103,7 +103,7 @@ class RefineryOrdersListPatternRenderTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.get(contains("ready=true"), anyTypeRef(), any(Object[].class)))
-        .thenReturn(onlyOrder(order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium")));
+        .thenReturn(onlyOrder(order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium", true)));
   }
 
   /**
@@ -159,6 +159,7 @@ class RefineryOrdersListPatternRenderTest {
    * @param durationMinutes the run's duration
    * @param ore the input material name
    * @param refined the output material name
+   * @param canEdit whether the backend lets the viewer edit the order
    * @return the order
    */
   private static @NotNull RefineryOrderListDto order(
@@ -166,7 +167,8 @@ class RefineryOrdersListPatternRenderTest {
       long startedMinutesAgo,
       long durationMinutes,
       @NotNull String ore,
-      @NotNull String refined) {
+      @NotNull String refined,
+      boolean canEdit) {
     RefineryGoodDto good =
         new RefineryGoodDto(
             UUID.randomUUID(), material(ore), 2300, material(refined), 1840, 812, 0);
@@ -185,7 +187,8 @@ class RefineryOrdersListPatternRenderTest {
         "OPEN",
         List.of(good),
         null,
-        1L);
+        1L,
+        canEdit);
   }
 
   /**
@@ -196,8 +199,8 @@ class RefineryOrdersListPatternRenderTest {
   private static @NotNull PageResponse<RefineryOrderListDto> twoOpenOrders() {
     return new PageResponse<>(
         List.of(
-            order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium"),
-            order(RUNNING_ID, 10, 200, "Taranite-Erz", "Taranite")),
+            order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium", true),
+            order(RUNNING_ID, 10, 200, "Taranite-Erz", "Taranite", true)),
         0,
         50,
         2L,
@@ -266,6 +269,17 @@ class RefineryOrdersListPatternRenderTest {
             "href=\"/refinery-orders/00000000-0000-0000-0000-000000001051\\?store=open\"[^>]*hidden=\"hidden\"");
   }
 
+  /** An order the backend does not let the viewer edit shows no store action, even when ready. */
+  @Test
+  void rowWithoutTheEditRightHasNoStoreAction() throws Exception {
+    String html =
+        render(onlyOrder(order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium", false)), "");
+
+    assertThat(html)
+        .contains("data-testid=\"refinery-order-row\"")
+        .doesNotContain("data-refinery-store");
+  }
+
   /**
    * The default segment is one backend page of the open orders by end, and every counter is a
    * one-row request; nothing loads a large page to filter in memory.
@@ -323,7 +337,7 @@ class RefineryOrdersListPatternRenderTest {
   void searchIsPassedToTheBackend() throws Exception {
     stubLists(twoOpenOrders());
     when(backendApiClient.get(contains("&q={q}"), anyTypeRef(), eq(0), eq(50), eq("taranite")))
-        .thenReturn(onlyOrder(order(RUNNING_ID, 10, 200, "Taranite-Erz", "Taranite")));
+        .thenReturn(onlyOrder(order(RUNNING_ID, 10, 200, "Taranite-Erz", "Taranite", true)));
 
     String html = perform("view=COMPLETED&onlyMine=true&q=taranite");
 

@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.promotion.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
@@ -70,7 +69,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class MemberEvaluationController {
 
   private final MemberEvaluationService service;
-  private final UserService userService;
   private final UserMapper userMapper;
 
   /**
@@ -180,7 +178,7 @@ public class MemberEvaluationController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("id", "username", "displayName", "userRank"), "username");
-    var result = userService.findEvaluatableMembers(pageable);
+    var result = service.listEvaluatableMembers(pageable);
     userMapper.primeStaffelMemberships(result.getContent());
     return PageResponse.of(result.map(userMapper::toDto));
   }

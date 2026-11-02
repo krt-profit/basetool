@@ -175,6 +175,46 @@ class BankBookingRequestServiceTest {
     verify(bankSecurityService).confirmCheck(caller);
   }
 
+  /** REQ-BANK-022: the caller's page reads strictly the caller's sub, in the given states. */
+  @Test
+  void pageForCurrentRequester_readsTheCallersOwnRequestsInTheStates() {
+    UUID caller = UUID.randomUUID();
+    Set<BankBookingRequestStatus> statuses =
+        Set.of(BankBookingRequestStatus.CONFIRMED, BankBookingRequestStatus.REJECTED);
+    BankBookingRequest request =
+        pending(
+            UUID.randomUUID(),
+            account(UUID.randomUUID()),
+            BankBookingRequestType.DEPOSIT,
+            caller,
+            0L);
+    request.setStatus(BankBookingRequestStatus.CONFIRMED);
+    Pageable pageable = PageRequest.of(0, 3);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(requestRepository.findByRequestedByAndStatusIn(caller, statuses, pageable))
+        .thenReturn(new PageImpl<>(List.of(request), pageable, 7));
+
+    Page<BankBookingRequestDto> result = service.pageForCurrentRequester(statuses, pageable);
+
+    assertThat(result.getTotalElements()).isEqualTo(7);
+    assertThat(result.getContent())
+        .extracting(BankBookingRequestDto::status)
+        .containsExactly(BankBookingRequestStatus.CONFIRMED);
+  }
+
+  /** Without a known caller there is nothing to read. */
+  @Test
+  void pageForCurrentRequester_withoutCallerIsEmptyAndDoesNotQuery() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+
+    Page<BankBookingRequestDto> result =
+        service.pageForCurrentRequester(
+            Set.of(BankBookingRequestStatus.PENDING), PageRequest.of(0, 3));
+
+    assertThat(result.getTotalElements()).isZero();
+    verify(requestRepository, never()).findByRequestedByAndStatusIn(any(), any(), any());
+  }
+
   private static BankAccount account(UUID id) {
     BankAccount account = new BankAccount();
     account.setId(id);

@@ -678,6 +678,11 @@ service layer via the active Staffel context
 `canSeeSquadron` for detail reads, officer reach `canActAsOfficerIn(topic.owningSquadron.id)` for
 maintenance and evaluations, REQ-SEC-015).
 
+- **Only Staffeln with promotion enabled count.** Evaluations, promotion management and the
+  navigation entries for them cover exactly the Staffeln that have promotion switched on; a seat
+  in a Staffel with promotion off reads and maintains nothing there, and a pin on such a Staffel
+  leaves the management pages empty. A caller with no promotion-enabled Staffel among their units
+  and reach does not see the promotion entries at all (REQ-PROMO-004). Admins are not narrowed.
 - **Member/Officer** see only their home Staffel's system.
 - **Admins** see that of the actively pinned Staffel; without a pin (all-Staffeln mode)
   the pages show a „Staffel wählen" (select Staffel) hint instead of mixing all Staffeln.
@@ -693,16 +698,16 @@ maintenance and evaluations, REQ-SEC-015).
 | Function (gate)                                                                                                 | Member | Log. | MM | Officer | Admin |
 |:----------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read topic areas/categories/level contents/rank prerequisites (`isAuthenticated()`, **own Staffel only**)       |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| …**maintain** (service: admin **or** officer of the owning Staffel)                                             |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
+| …**maintain** (service: admin **or** officer of the owning Staffel **with promotion enabled**)                  |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | View own evaluations / eligibility (`/my`, JWT sub, **own Staffel**)                                            |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| View **others'** evaluations/eligibility, member list (officer reach, **only the units of reach**⁵) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
+| View **others'** evaluations/eligibility, member list (officer reach, **only the units of reach with promotion enabled**⁵) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
 | Enable/disable promotion subsystem per Staffel (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)  |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `PromotionAccessPolicy.hasReadAccess()` is false, the menu is hidden, direct call 403.
 ² Admin: the actively pinned Staffel; in all-Staffeln mode a „Staffel wählen" (select Staffel) hint instead of mixing.
 ³ Only for one's own Staffel. **SKs are permanently excluded from the promotion system via DB CHECK/trigger + ArchUnit rule.**
 ⁴ The **member list** to be evaluated (`GET /api/v1/promotion/evaluations/members`) contains only the **plain members** of the Staffel — holders of the `ADMIN` and `OFFICER` roles are filtered out (#817), since they carry out the evaluation instead of being evaluated themselves. Officer/Admin therefore **read** the matrix but do **not appear** as a row in it.
-⁵ Reads on the management pages are filtered, not just the writes refused: with a seat in Staffel A and plain membership of Staffel B, the member list, the evaluations, the topics, categories, level texts, rank requirements and the eligibility of others cover Staffel A only; the Leitung page lists Staffel A only. A pin narrows to the pinned unit (plus what a Bereich or OL seat on it reaches below) when it is within reach and to nothing otherwise (the pages are hidden); unpinned, the units of reach are the union (REQ-ROLE-007).
+⁵ Reads on the management pages are filtered, not just the writes refused: with a seat in Staffel A and plain membership of Staffel B, the member list, the evaluations, the topics, categories, level texts, rank requirements and the eligibility of others cover Staffel A only; the Leitung page lists Staffel A only. A pin narrows to the pinned unit (plus what a Bereich or OL seat on it reaches below) when it is within reach and to nothing otherwise (the pages are hidden); unpinned, the units of reach are the union (REQ-ROLE-007). In every case only Staffeln with promotion enabled count (REQ-PROMO-004).
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 

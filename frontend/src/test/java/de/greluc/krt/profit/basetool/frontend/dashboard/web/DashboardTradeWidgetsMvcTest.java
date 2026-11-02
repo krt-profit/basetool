@@ -76,7 +76,11 @@ class DashboardTradeWidgetsMvcTest {
   private static final String UNIT_NEEDS_URL =
       "/api/v1/supply/needs?page={page}&size={size}&sort=createdAt,desc"
           + "&orgUnitId={orgUnitId}&status={status}";
-  private static final String BANK_REQUESTS_URL = "/api/v1/bank/org-units/requests";
+  private static final String BANK_REQUESTS_PAGE_URL = "/api/v1/bank/org-units/requests/page";
+  private static final String BANK_REQUESTS_PENDING_URL =
+      BANK_REQUESTS_PAGE_URL + "?size=3&status=PENDING";
+  private static final String BANK_REQUESTS_DECIDED_URL =
+      BANK_REQUESTS_PAGE_URL + "?size=3&status=CONFIRMED&status=REJECTED&status=CANCELLED";
   private static final UUID OTHER_UNIT = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
   private static final UUID ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
   private static final UUID UNIT = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
@@ -480,15 +484,16 @@ class DashboardTradeWidgetsMvcTest {
         .contains("Zurzeit gibt es keinen offenen Bedarf.");
   }
 
-  /** The default status shows the pending requests only and counts them. */
+  /** The default status asks the backend for the pending requests and shows its total. */
   @Test
-  void bankRequests_defaultShowsThePendingOnes() throws Exception {
-    when(backendApiClient.get(eq(BANK_REQUESTS_URL), anyTypeRef()))
+  void bankRequests_defaultReadsThePendingOnesFromThePage() throws Exception {
+    when(backendApiClient.get(eq(BANK_REQUESTS_PENDING_URL), anyTypeRef()))
         .thenReturn(
-            List.of(
-                bankRequest("WITHDRAWAL", "PENDING", 5_000),
-                bankRequest("DEPOSIT", "CONFIRMED", 7_000),
-                bankRequest("TRANSFER", "PENDING", 9_000)));
+            page(
+                2,
+                List.of(
+                    bankRequest("WITHDRAWAL", "PENDING", 5_000),
+                    bankRequest("TRANSFER", "PENDING", 9_000))));
 
     String html = render(REQUESTS);
 
@@ -499,19 +504,19 @@ class DashboardTradeWidgetsMvcTest {
         .contains("Ausstehend")
         .contains("5.000")
         .contains("ALF Betriebskonto")
-        .doesNotContain("Einzahlung")
-        .containsPattern("href=\"/org-unit-bank\"");
+        .doesNotContain("Einzahlung");
   }
 
-  /** The decided status shows the requests that reached a final state. */
+  /** The decided status asks for every final state, the withdrawn ones included. */
   @Test
-  void bankRequests_decidedShowsTheFinalOnes() throws Exception {
-    when(backendApiClient.get(eq(BANK_REQUESTS_URL), anyTypeRef()))
+  void bankRequests_decidedReadsTheFinalStates() throws Exception {
+    when(backendApiClient.get(eq(BANK_REQUESTS_DECIDED_URL), anyTypeRef()))
         .thenReturn(
-            List.of(
-                bankRequest("WITHDRAWAL", "PENDING", 5_000),
-                bankRequest("DEPOSIT", "CONFIRMED", 7_000),
-                bankRequest("TRANSFER", "REJECTED", 9_000)));
+            page(
+                2,
+                List.of(
+                    bankRequest("DEPOSIT", "CONFIRMED", 7_000),
+                    bankRequest("TRANSFER", "REJECTED", 9_000))));
 
     String html = render(REQUESTS, Map.of("status", "DECIDED"));
 
@@ -522,30 +527,46 @@ class DashboardTradeWidgetsMvcTest {
         .doesNotContain("Ausstehend");
   }
 
-  /** All requests are cut to the rows (three by default) and counted in full. */
+  /** All asks without a state filter, sizes the page by the rows and counts the page total. */
   @Test
-  void bankRequests_allCutsToTheRowsAndCountsEverything() throws Exception {
-    when(backendApiClient.get(eq(BANK_REQUESTS_URL), anyTypeRef()))
+  void bankRequests_allReadsEveryStateAndCountsThePageTotal() throws Exception {
+    when(backendApiClient.get(eq(BANK_REQUESTS_PAGE_URL + "?size=5"), anyTypeRef()))
         .thenReturn(
-            List.of(
-                bankRequest("DEPOSIT", "PENDING", 1_000),
-                bankRequest("DEPOSIT", "CONFIRMED", 2_000),
-                bankRequest("DEPOSIT", "REJECTED", 3_000),
-                bankRequest("DEPOSIT", "CANCELLED", 4_000)));
+            page(
+                4,
+                List.of(
+                    bankRequest("DEPOSIT", "PENDING", 1_000),
+                    bankRequest("DEPOSIT", "CONFIRMED", 2_000))));
 
-    String html = render(REQUESTS, Map.of("status", "ALL"));
+    String html = render(REQUESTS, Map.of("status", "ALL", "rows", "5"));
 
     assertThat(html)
         .containsPattern("data-testid=\"dashboard-bank-requests-count\"[^>]*>4<")
         .contains("1.000")
-        .contains("3.000")
-        .doesNotContain("4.000");
+        .contains("2.000");
+  }
+
+  /** The rows and "Alle anzeigen" open the "Meine Anträge" tab of the bank page. */
+  @Test
+  void bankRequests_linksToTheMyRequestsTab() throws Exception {
+    when(backendApiClient.get(eq(BANK_REQUESTS_PENDING_URL), anyTypeRef()))
+        .thenReturn(page(1, List.of(bankRequest("DEPOSIT", "PENDING", 1_000))));
+
+    String html = render(REQUESTS);
+
+    assertThat(html)
+        .containsPattern(
+            "data-testid=\"dashboard-bank-requests-row\"[^>]*href=\"/org-unit-bank#tab=antraege\"|"
+                + "href=\"/org-unit-bank#tab=antraege\"[^>]*data-testid=\"dashboard-bank-requests-row\"")
+        .containsPattern("home-card-link[^>]*href=\"/org-unit-bank#tab=antraege\"")
+        .doesNotContain("href=\"/org-unit-bank\"");
   }
 
   /** Without a request the widget says so. */
   @Test
   void bankRequests_withoutRequestsShowTheEmptyState() throws Exception {
-    when(backendApiClient.get(eq(BANK_REQUESTS_URL), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq(BANK_REQUESTS_PENDING_URL), anyTypeRef()))
+        .thenReturn(page(0, List.of()));
 
     String html = render(REQUESTS);
 

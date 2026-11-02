@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -61,6 +63,7 @@ public class MemberEvaluationService {
   private final MemberEvaluationMapper mapper;
   private final OwnerScopeService ownerScopeService;
   private final PromotionAccessPolicy promotionAccessPolicy;
+  private final UserService userService;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -102,6 +105,22 @@ public class MemberEvaluationService {
         .readScope(PromotionReadView.MANAGEMENT)
         .map(scope ->
             repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
+  }
+
+  /**
+   * Pages the ordinary squadron members the caller may evaluate: the members of the squadrons in
+   * the caller's officer reach that have promotion enabled, admins and leadership-seat holders
+   * excluded.
+   *
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of members, empty without officer reach in a promotion-enabled squadron
+   */
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
+  public Page<User> listEvaluatableMembers(@NotNull Pageable pageable) {
+    return promotionAccessPolicy
+        .readScope(PromotionReadView.MANAGEMENT)
+        .map(scope -> userService.findEvaluatableMembers(scope.squadronIds(), pageable))
         .orElseGet(() -> Page.empty(pageable));
   }
 

@@ -157,7 +157,8 @@ public class DashboardWriter {
   }
 
   /**
-   * Deletes the instances of the given types from a mode, bumping the layout version when one went.
+   * Deletes the instances of the given types from a mode, bumping the layout version when one went;
+   * the layout is locked before its instances are read, like a layout write.
    *
    * @param userId the owner's {@code app_user.id}
    * @param mode the mode
@@ -168,7 +169,7 @@ public class DashboardWriter {
   public boolean prune(
       @NotNull UUID userId, @NotNull DashboardMode mode, @NotNull Set<DashboardWidgetType> types) {
     return layouts
-        .findByPreferencesIdAndMode(userId, mode)
+        .lockByPreferencesIdAndMode(userId, mode)
         .map(layout -> pruneLayout(layout, types))
         .orElse(false);
   }

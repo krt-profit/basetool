@@ -44,6 +44,8 @@ final class OrgChartFixture {
   static final UUID DORA = id(14);
   static final UUID ERIC = id(15);
   static final UUID FRED = id(16);
+  static final UUID HUGO = id(17);
+  static final UUID IDA = id(18);
   static final UUID COMMAND_POSITION = id(21);
   static final UUID FREE_TEXT_POSITION = id(22);
 
@@ -107,8 +109,8 @@ final class OrgChartFixture {
             "UNG",
             null,
             List.of(),
-            List.of(),
-            List.of(),
+            List.of(node("DEPUTY_COMMAND_LEAD", HUGO, "Hugo", null)),
+            List.of(node("ENSIGN", IDA, "Ida", null)),
             true,
             true);
     return new OrgChartDto(

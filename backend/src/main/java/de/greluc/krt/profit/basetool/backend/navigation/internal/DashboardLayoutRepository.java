@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
@@ -39,6 +41,21 @@ public interface DashboardLayoutRepository extends JpaRepository<NavigationDashb
    */
   Optional<NavigationDashboardLayout> findByPreferencesIdAndMode(
       UUID preferencesId, DashboardMode mode);
+
+  /**
+   * Finds the member's layout of a mode and locks it until the transaction ends, so a write that
+   * reads the instances afterwards sees every committed change.
+   *
+   * @param preferencesId the owner's root row
+   * @param mode the mode
+   * @return the locked layout, empty when the member never wrote it
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "SELECT l FROM NavigationDashboardLayout l WHERE l.preferencesId = :preferencesId"
+          + " AND l.mode = :mode")
+  Optional<NavigationDashboardLayout> lockByPreferencesIdAndMode(
+      @Param("preferencesId") UUID preferencesId, @Param("mode") DashboardMode mode);
 
   /**
    * Creates the layout row when it does not exist yet; a concurrent creator is not an error.

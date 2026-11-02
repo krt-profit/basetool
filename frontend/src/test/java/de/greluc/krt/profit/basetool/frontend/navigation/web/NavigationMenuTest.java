@@ -152,6 +152,21 @@ class NavigationMenuTest {
         .doesNotContain("supply.needs", "purchasing.deals");
   }
 
+  /** With both surfaces on, the Ankauf tab leaves the menu but is still a quick-access page. */
+  @Test
+  void theAnkaufTabLeavesTheMenuButStaysAPage() {
+    NavigationMenu menu =
+        resolve(Set.of(), Set.of(NavigationFlag.SUPPLY, NavigationFlag.PURCHASING));
+
+    assertThat(keys(menu, "trade")).doesNotContain("purchasing.deals");
+    assertThat(menu.palettePages())
+        .extracting(NavigationEntry::key)
+        .contains("purchasing.deals", "supply.incoming", "supply.stats", "purchasing.partners")
+        .doesNotContain("supply.needs");
+    assertThat(keys(resolve(Set.of(), Set.of(NavigationFlag.PURCHASING)), "trade"))
+        .contains("purchasing.deals");
+  }
+
   /** The Leitung tab follows the capability flag, not a role. */
   @Test
   void leitungFollowsTheFlag() {

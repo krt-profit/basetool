@@ -127,20 +127,24 @@ document.addEventListener('DOMContentLoaded', () => {
         pinned = pin;
     };
 
+    /** The items already wired; a refresh keeps the avatar, which must not be wired twice. */
+    const bound = new WeakSet();
+
     const bindItems = () => {
         railItems().forEach(bindItem);
     };
 
     /**
-     * Wires the click, hover and focus behaviour of one rail item.
+     * Wires the click, hover and focus behaviour of one rail item, once.
      *
      * @param {Element} item the `.nav-rail-item`
      */
     const bindItem = (item) => {
         const { button } = partsOf(item);
-        if (!button) {
+        if (!button || bound.has(item)) {
             return;
         }
+        bound.add(item);
         button.addEventListener('click', () => {
             if (openItem === item) {
                 if (pinned) {

@@ -104,6 +104,7 @@ class RefineryProgressTest {
    */
   private static @NotNull RefineryOrderListDto order(
       @NotNull UUID owner,
+      boolean canEdit,
       @NotNull String status,
       @Nullable Instant startedAt,
       @Nullable Long duration,
@@ -124,7 +125,8 @@ class RefineryProgressTest {
         status,
         goods,
         null,
-        1L);
+        1L,
+        canEdit);
   }
 
   /** An open order is running until its end, ready from it on, and ready without a known end. */
@@ -169,6 +171,7 @@ class RefineryProgressTest {
         RefineryListRow.of(
             order(
                 VIEWER,
+                true,
                 "OPEN",
                 NOW.minusSeconds(3600),
                 30L,
@@ -176,8 +179,6 @@ class RefineryProgressTest {
                     good("Laranite-Erz", "Laranite", 1000, 920),
                     good("Agricium-Erz", "Agricium", 650, 410))),
             NOW,
-            VIEWER,
-            false,
             Locale.GERMAN);
 
     assertThat(row.state()).isEqualTo(RefineryProgress.State.READY);
@@ -192,16 +193,18 @@ class RefineryProgressTest {
     assertThat(row.storable()).isTrue();
   }
 
-  /** Only the owner or a manager may store, and only an open run. */
+  /**
+   * Only an order the backend lets the viewer edit can be stored, and only while the run is open.
+   */
   @Test
-  void storableNeedsOwnerOrManagerAndAnOpenRun() {
-    RefineryOrderListDto foreign =
-        order(UUID.randomUUID(), "OPEN", null, null, List.of(good("Gold-Erz", "Gold", 100, 90)));
-    assertThat(RefineryListRow.of(foreign, NOW, VIEWER, false, Locale.GERMAN).storable()).isFalse();
-    assertThat(RefineryListRow.of(foreign, NOW, VIEWER, true, Locale.GERMAN).storable()).isTrue();
-    RefineryOrderListDto stored =
-        order(VIEWER, "COMPLETED", null, null, List.of(good("Gold-Erz", "Gold", 100, 90)));
-    assertThat(RefineryListRow.of(stored, NOW, VIEWER, true, Locale.GERMAN).storable()).isFalse();
+  void storableNeedsTheEditRightAndAnOpenRun() {
+    List<RefineryGoodDto> goods = List.of(good("Gold-Erz", "Gold", 100, 90));
+    RefineryOrderListDto editable = order(UUID.randomUUID(), true, "OPEN", null, null, goods);
+    RefineryOrderListDto readOnly = order(VIEWER, false, "OPEN", null, null, goods);
+    RefineryOrderListDto stored = order(VIEWER, true, "COMPLETED", null, null, goods);
+    assertThat(RefineryListRow.of(editable, NOW, Locale.GERMAN).storable()).isTrue();
+    assertThat(RefineryListRow.of(readOnly, NOW, Locale.GERMAN).storable()).isFalse();
+    assertThat(RefineryListRow.of(stored, NOW, Locale.GERMAN).storable()).isFalse();
   }
 
   /** A running row carries its time left and an output without a refined material names its ore. */
@@ -209,10 +212,8 @@ class RefineryProgressTest {
   void runningRowAndOreOutput() {
     RefineryListRow row =
         RefineryListRow.of(
-            order(VIEWER, "OPEN", NOW, 90L, List.of(good("Inert Materials", null, 640, 0))),
+            order(VIEWER, true, "OPEN", NOW, 90L, List.of(good("Inert Materials", null, 640, 0))),
             NOW,
-            VIEWER,
-            false,
             Locale.GERMAN);
 
     assertThat(row.state()).isEqualTo(RefineryProgress.State.RUNNING);

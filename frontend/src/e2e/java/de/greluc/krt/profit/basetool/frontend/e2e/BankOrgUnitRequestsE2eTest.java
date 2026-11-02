@@ -248,6 +248,32 @@ class BankOrgUnitRequestsE2eTest {
         "cancelling withdrew the pending request");
   }
 
+  /** The {@code #tab=antraege} deep link the dashboard widget uses opens the requests tab. */
+  @Test
+  void deepLinkOpensTheMyRequestsTab() {
+    String baseUrl = STACK.baseUrl();
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        createRequest(page, "DEPOSIT", "7003");
+
+        Page deepLinked = context.newPage();
+        E2eSupport.navigate(deepLinked, baseUrl + "/org-unit-bank#tab=antraege");
+
+        assertThat(deepLinked.locator("[data-testid='org-unit-bank-tab-requests']"))
+            .hasAttribute("aria-selected", "true");
+        assertThat(deepLinked.locator("[data-testid='org-unit-bank-requests']")).isVisible();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-deep-link");
+        throw failure;
+      }
+    }
+  }
+
   /** F2: a bank employee rejects a pending request with a reason — no money moves. */
   @Test
   void bankEmployeeRejectsPendingRequest() {

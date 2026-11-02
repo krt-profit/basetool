@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOption
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,6 +53,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MeControllerTest {
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private PromotionReach promotionReach;
 
   @Mock private AuthHelperService authHelperService;
 
@@ -168,6 +171,7 @@ class MeControllerTest {
   @Test
   void getCapabilities_officerFlagsFollowTheReachInTheActiveContext() {
     when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+    when(promotionReach.canManageInActiveContext()).thenReturn(true);
 
     MeController.CapabilitiesResponse response = controller.getCapabilities();
 
@@ -202,6 +206,36 @@ class MeControllerTest {
 
     assertFalse(response.hasOfficerReach());
     assertTrue(response.canActAsOfficerAnywhere());
+  }
+
+  @Test
+  void getCapabilities_promotionManagementCountsOnlyUnitsWithPromotionEnabled() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+    when(ownerScopeService.canActAsOfficerAnywhere()).thenReturn(true);
+    when(promotionReach.canManageInActiveContext()).thenReturn(false);
+    when(promotionReach.canManageAnywhere()).thenReturn(false);
+    when(promotionReach.canUseAnywhere()).thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.hasOfficerReach());
+    assertTrue(response.canOpenLeitung());
+    assertFalse(response.canManagePromotions());
+    assertFalse(response.canManagePromotionsAnywhere());
+    assertFalse(response.canUsePromotionAnywhere());
+  }
+
+  @Test
+  void getCapabilities_promotionAnywhereIgnoresThePin() {
+    when(promotionReach.canManageInActiveContext()).thenReturn(false);
+    when(promotionReach.canManageAnywhere()).thenReturn(true);
+    when(promotionReach.canUseAnywhere()).thenReturn(true);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertFalse(response.canManagePromotions());
+    assertTrue(response.canManagePromotionsAnywhere());
+    assertTrue(response.canUsePromotionAnywhere());
   }
 
   @Test

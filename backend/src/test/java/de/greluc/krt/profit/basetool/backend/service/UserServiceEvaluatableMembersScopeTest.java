@@ -44,9 +44,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 /**
- * The evaluatable-member list is scoped to the caller's officer reach, never to the member-list
- * scope (REQ-ROLE-007): a seat in Staffel A and plain membership of Staffel B lists A's members
- * only.
+ * The evaluatable-member list is limited to the Staffel ids the promotion layer hands in (the
+ * caller's officer reach in promotion-enabled units), never to the member-list scope
+ * (REQ-ROLE-007).
  */
 @ExtendWith(MockitoExtension.class)
 class UserServiceEvaluatableMembersScopeTest {
@@ -62,27 +62,23 @@ class UserServiceEvaluatableMembersScopeTest {
   @Test
   void listsOnlyTheMembersOfTheReachUnits() {
     Page<User> members = new PageImpl<>(List.of(new User()));
-    when(squadronVisibility.currentOfficerReadScope()).thenReturn(Set.of(STAFFEL_A));
     when(userRepository.findEvaluatableMembers(Set.of(STAFFEL_A), PAGE)).thenReturn(members);
 
-    assertEquals(members, userService.findEvaluatableMembers(PAGE));
+    assertEquals(members, userService.findEvaluatableMembers(Set.of(STAFFEL_A), PAGE));
     verify(squadronVisibility, never()).currentUserListScopeSquadronIds();
   }
 
   @Test
   void aCallerWithoutReachGetsAnEmptyPageWithoutQuerying() {
-    when(squadronVisibility.currentOfficerReadScope()).thenReturn(Set.of());
-
-    assertTrue(userService.findEvaluatableMembers(PAGE).isEmpty());
+    assertTrue(userService.findEvaluatableMembers(Set.of(), PAGE).isEmpty());
     verify(userRepository, never()).findEvaluatableMembers(any(), any());
   }
 
   @Test
   void anUnrestrictedAdminScopeQueriesEverySquadron() {
     Page<User> members = new PageImpl<>(List.of(new User()));
-    when(squadronVisibility.currentOfficerReadScope()).thenReturn(null);
     when(userRepository.findEvaluatableMembers(null, PAGE)).thenReturn(members);
 
-    assertEquals(members, userService.findEvaluatableMembers(PAGE));
+    assertEquals(members, userService.findEvaluatableMembers(null, PAGE));
   }
 }
