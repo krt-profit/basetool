@@ -319,7 +319,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 > **The `navigation` module** (ADR-0298, map #2800). It holds a user's deliberate navigation and
 > dashboard choices under one root row per member and a version counter per section, in
 > `navigation.internal` and `navigation.web` and without an `api` package (REQ-UI-032,
-> REQ-UI-034). Shipped: the favourites, the hidden pages, the order, the appearance (desktop mode and the start page per mode), the phone tab bars, the member and the admin dashboard (two tables per mode: the layout with its version and the instances with their option versions) and the full reset of all of it (`NavigationResetWriter`, one transaction that moves every version on). It depends
+> REQ-UI-034). It stores the favourites, the hidden pages, the order, the appearance (desktop mode, shortcut switch and the start page per mode), the phone tab bars and the member and the admin dashboard (two tables per mode: the layout with its version and the instances with their option versions), and it resets all of it in one transaction that moves every version on (`NavigationResetWriter`). It depends
 > on no domain module: it stores entry keys and checks only their format, while the frontend's
 > entry registry knows each key's permission and asks for the deletion of keys the user may no
 > longer see. Account deletion removes the rows through the `app_user` foreign key
@@ -349,6 +349,11 @@ anywhere else.
 | `kernel.livesync` | `/ws/sync`, the handler, the Redis fanout and presence |
 | `kernel.observability` | Request logging, log masking, the startup banner, metric names, tracing and observation filters |
 | `kernel.model` | `PageResponse`, `PayoutPreference`, the ingest handoff types, `BackendEnumAsString`, `DtoMirror` and the reference DTOs several domains share (`UserReferenceDto`, `SquadronReferenceDto`, `MaterialReferenceDto`, …) |
+
+The `navigation` domain holds the entry registry (`NavigationRegistry`, the one list of pages, tabs
+and groups with their gates), the personalisation reads and relays, the phone tab-bar and start-page
+resolvers and the redirects of the former URLs; the `dashboard` domain holds the widget catalogue,
+the board reader and one fragment endpoint per widget (REQ-UI-026, REQ-UI-032, REQ-UI-034).
 
 The kernel still reaches into three domains in ten places, frozen by `KernelDomainReachTest` in a
 list that may only shrink (§11.9): the layout advices and loader read `orgunit.model`

@@ -1,8 +1,7 @@
 # ADR-0297 — The navigation is one task-grouped default with desktop modes, a configurable tab bar and a scoped entity search
 
-- **Status:** Accepted — implementation in progress: decision 7 ships for missions, operations
-  and materials with the prefixes, and REQ-UI-033 is shipped in full; the three desktop modes ship
-  (REQ-UI-026); the rest is pending, its requirements marked planned.
+- **Status:** Accepted — implemented (map #2800): the default navigation, admin mode, the three
+  desktop modes, the personalisation, the phone tab bar, the quick-access search and the shortcuts.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Supersedes:** [ADR-0240](0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md)
@@ -71,8 +70,7 @@ legitimate wish; on phones the fixed tab bar shows areas a member may not use mo
 
 ## Consequences
 
-- REQ-UI-026 is amended and REQ-UI-032, REQ-UI-033 and REQ-UI-035 are added, all planned; the
-  current navigation stays authoritative until the implementation ships.
+- REQ-UI-026 is amended and REQ-UI-032, REQ-UI-033 and REQ-UI-035 are added.
 - The frontend needs per-context capability flags from the backend (`/me/capabilities` pin-aware,
   ADR-0300) to gate links, favourites and tab slots.
 - The search term is a query parameter only, never a path, MDC field or metric label;

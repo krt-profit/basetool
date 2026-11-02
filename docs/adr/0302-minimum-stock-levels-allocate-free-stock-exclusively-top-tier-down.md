@@ -1,8 +1,6 @@
 # ADR-0302 — Minimum stock levels allocate free stock exclusively, top tier down
 
-- **Status:** Accepted — partly implemented: the table, material and game-item levels, the
-  allocation, the requested amount, the lifecycle, the API and the „Mindestbestände“ tab are built;
-  the badge, the shortcuts, the notification and the gauge are pending.
+- **Status:** Accepted — implemented (map #2800): the table, material and game-item levels, the allocation, the requested amount, the lifecycle, the API, the „Mindestbestände“ tab, the badge, the shortcuts, the notification, the gauge and the dashboard widget.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** REQ-INV-067 · REQ-INV-068 · REQ-NOTIF-030 · spec [`supply.md`](../specs/supply.md)
@@ -51,7 +49,7 @@ donations, and open supply needs and job orders ask for more that has not arrive
 - REQ-INV-067 (concept, counting, allocation, low and requested) and REQ-INV-068 (maintenance,
   access, API, the „Mindestbestände" tab, the „Bestand niedrig" widget, lifecycle, audit) are
   added, REQ-NOTIF-030 adds the notification, REQ-SUP-003 is reworded to "a Logistician of the unit,
-  the lead included"; all planned.
+  the lead included".
 - `AuditDomain.INVENTORY` gains `MIN_STOCK_LEVEL_SET`, `…_CHANGED`, `…_REMOVED` and
   `…_REMOVED_BY_CASCADE`; `basetool_inventory_minimum_levels_below` counts low levels without a unit
   label. Low stock is a notification, not an alert.

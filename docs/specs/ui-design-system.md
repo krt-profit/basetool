@@ -16,8 +16,8 @@
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
-> ADR-0297, ADR-0298 and ADR-0299 (REQ-UI-026 amendment, REQ-UI-032…035, planned; REQ-UI-033
-> shipped) ·
+> ADR-0297, ADR-0298, ADR-0299 and ADR-0323 (REQ-UI-026 amendment, REQ-UI-032, REQ-UI-033,
+> REQ-UI-035 shipped; REQ-UI-034 partially shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -1641,12 +1641,10 @@ SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageC
 
 ### REQ-UI-026 — Navigation: a structured drawer, a quick access and a phone tab bar
 
-> **Status: partly shipped** (ADR-0297, map #2800). Admin mode and the member default of the
-> amendment are implemented and replace the *List* zone, the group list and the quick access's page
-> list of the text below, and so are the three desktop modes (drawer, rail, pinned sidebar) with the
-> „Darstellung" switch; „Mehr" and „Anpassen" in the rail wait for the hiding and editing of
-> REQ-UI-032. The personalisation and the phone tab bar of the amendment stay planned, and the
-> current text stays authoritative for them.
+> **Status: shipped** (ADR-0297, map #2800). The amendment below — admin mode and the member
+> default, the three desktop modes with „Mehr" and „Anpassen" in the rail, the personalisation of
+> REQ-UI-032 and the phone tab bar — replaces the *List* zone, the group list, the 769 px drawer
+> threshold and the „No data, nothing mutates" bullet of the text above.
 
 The navigation has grown to about 65 links for a member with many roles, several viewport heights
 of one flat drawer. It is one model on every device
@@ -1760,7 +1758,7 @@ chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/si
 `navigation/web/NavigationRegistry.java`, `navigation/web/NavigationAdvice.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
 ADR-0282
 
-#### Planned amendment (ADR-0297)
+#### Amendment (ADR-0297)
 
 **What it replaces.** The *List* zone and the admin groups of „The drawer" and „Information
 architecture", the 769 px drawer threshold and the „No data,
@@ -1901,7 +1899,7 @@ stored mode is kept.
   mode and is docked in the pinned mode. The switch is a `.krt-segmented` radio group in the
   sidebar head and in the profile card „Darstellung", and writes in place through `krtFetch`
   (`nav-appearance.js`). The rail is `nav-rail.js`; `krtChrome.nav.open()` opens the sidebar as an
-  overlay in the rail mode, which is what „Anpassen" will call.
+  overlay in the rail mode, which is what „Anpassen" calls.
 
 **Phone tab bar: five slots** (shipped). Slots 1–3 are configurable (REQ-UI-032), slot 4 is the
 fixed „Meldungen" with the live unread count, slot 5 the fixed „Menü", the only way into the
@@ -1927,10 +1925,10 @@ switch, the rail's groups, flyouts, favourites, foot and avatar flyout, the appe
 the admin toggle) · `NavigationAppearanceServiceTest`, `NavigationPreferencesControllerTest`
 (the section store).
 
-**Enforced by (to be added):** `NavigationRenderMvcTest` (the default groups, links and tabs per
-role and context, the union without a pin, admin mode's three collapsed groups, no „Startseite" or
-„Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page and
-tab) · **Related:** REQ-UI-032, REQ-UI-033,
+**Enforced by (default and context):** `NavigationRenderMvcTest`, `NavigationMemberRenderMvcTest`
+(the default groups, links and tabs per role and context, the union without a pin, no „Startseite"
+or „Benachrichtigungen" link) · `NavigationLegacyRedirectMvcTest` (every old URL reaches its page
+and tab) · **Related:** REQ-UI-032, REQ-UI-033,
 REQ-UI-034, REQ-UI-035, REQ-ORDERS-047, REQ-INV-068, ADR-0297, ADR-0300
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
@@ -2591,8 +2589,9 @@ ADR-0282, ADR-0297
 > one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
 > bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
 > Favoriten and Benachrichtigungen, with the options of the matrix below, the admin
-> dashboard with its five widgets and the start page per mode. Planned: the other catalogue
-> widgets and their options; until they ship, the current code stays authoritative for them.
+> dashboard with its five widgets and the start page per mode. Not built yet (planned): the
+> catalogue widgets Aufträge zu bearbeiten, Meine Aufträge, Materialbedarf, Raffinerie: fertig,
+> Materialbörse, Bedarf & Spenden and Meine Bankanträge with their options.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2729,8 +2728,7 @@ admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, ca
 options, restore, the summary and work
 widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
 the hint, deletion on role loss), the export
-and merge tests of REQ-SEC-058 and REQ-SEC-046 · **to be added:** the tests of the widgets that
-follow ·
+and merge tests of REQ-SEC-058 and REQ-SEC-046 ·
 **Related:** REQ-UI-018,
 REQ-UI-026, REQ-UI-027, REQ-UI-032, REQ-ORDERS-047, REQ-INV-068, REQ-BANK-064, REQ-HANGAR-016,
 REQ-MISSION-031, REQ-SEC-046, REQ-SEC-058, ADR-0299

@@ -1856,8 +1856,8 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   the aggregated Lager marks a material or game item while one of its levels is low.
   *`StockLevelIntegrationTest`, `InventoryIndexListPatternRenderTest`,
   `InventoryLowStockMarkerRenderTest`.*
-- [ ] The widget follows the active context, shows the union with unit labels when nothing is
-  pinned, and honours a pinned unit and the row count.
+- [x] The widget follows the active context, shows the union with unit labels when nothing is
+  pinned, and honours a pinned unit and the row count. *`DashboardWorkWidgetsMvcTest`.*
 
 **Enforced by:** `StockLevelIntegrationTest`, `AuthorizationMatrixTest`, `RouteGateSnapshotTest`,
 `MassAssignmentGuardTest`, `TenancyGuardTest`, `LiveSyncTopicRegistryParityTest`,

@@ -1,8 +1,8 @@
 # ADR-0298 — Navigation preferences live server-side in a navigation module
 
-- **Status:** Accepted — partly implemented: the module, its root table, the favourites section,
-  the hidden-pages section, the order section, the appearance section (desktop mode) and the
-  phone tab-bar sections exist; the other sections and the dashboards follow.
+- **Status:** Accepted — implemented (map #2800): the module, its root table, the favourites,
+  hidden-pages, order, appearance (desktop mode, shortcut switch, start pages) and tab-bar sections,
+  and the dashboards.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-032, REQ-UI-034,
@@ -69,7 +69,7 @@ page to its permission.
   the preferences; the price is that stale rows live until the member's next page load.
 - Preferences are an explicit exemption from the peer live-update rule of REQ-FE-010, stated in
   REQ-UI-032.
-- REQ-SEC-058, REQ-SEC-046 and REQ-DATA-021 gain planned amendments for the export section and
+- REQ-SEC-058, REQ-SEC-046 and REQ-DATA-021 gain amendments for the export section and
   the merge rule.
 - `module-boundaries.md` and arc42 §5 gain the module; `basetool_navigation_preference_writes_total`
   `{section, outcome}`, `basetool_navigation_personalised_accounts{section}` and a 5xx alert on the

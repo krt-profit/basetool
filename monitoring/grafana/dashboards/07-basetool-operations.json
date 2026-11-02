@@ -4534,6 +4534,104 @@
         }
       ],
       "description": "Server errors of the navigation preference endpoints; NavigationEndpointsErroring alerts above 5 % (REQ-UI-032)."
+    },
+    {
+      "id": 95,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 328
+      },
+      "type": "timeseries",
+      "title": "Quick-access searches/hour by kind and outcome",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind, outcome) (increase(basetool_quick_access_search_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{kind}} {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Entity searches of the quick access per type; error is a type that failed closed, timeout one that missed the 2 s cap (REQ-UI-033, REQ-OBS-011)."
+    },
+    {
+      "id": 96,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 328
+      },
+      "type": "timeseries",
+      "title": "Quick-access search p95 (seconds)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"basetool-frontend\", uri=\"/quick-access/search\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "95th percentile of the entity search; QuickAccessSearchSlow alerts above 1 s for 10 minutes (REQ-UI-033)."
     }
   ]
 }

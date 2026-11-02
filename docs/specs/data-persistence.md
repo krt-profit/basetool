@@ -1207,10 +1207,10 @@ implementations, `UserAccountMergeService`, the `UserReassignmentParticipant` im
 
 #### The navigation module (ADR-0298)
 
-> **Status: partially shipped** (ADR-0298, ADR-0299, map #2800). Shipped: the root table, the
-> favourites, the hidden pages, the order, the appearance (desktop mode), the phone tab bars and the dashboards (`navigation_dashboard_layout` per mode with its version, and
-> `navigation_dashboard_widget` per instance with its option version). The sections of REQ-UI-032
-> that follow join the same root.
+> **Status: shipped** (ADR-0298, ADR-0299, map #2800). The root table, the favourites, the hidden
+> pages, the order, the appearance (desktop mode, shortcut switch, start pages), the phone tab bars
+> and the dashboards (`navigation_dashboard_layout` per mode with its version, and
+> `navigation_dashboard_widget` per instance with its option version) are stored.
 
 The `navigation` module keeps one root row per member, `navigation_preferences`, which references
 `app_user (id)` with `ON DELETE CASCADE` and carries the version counter of every section. Every

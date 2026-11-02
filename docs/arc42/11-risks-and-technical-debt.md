@@ -378,7 +378,7 @@ since the go-live of 2026-09-28, so these risks hold now.
   rollback past the cut finds no `OFFICER` grants to fall back on.
 - **Closed by** ADR-0300 with REQ-ROLE-002, REQ-ROLE-007, REQ-SEC-004, REQ-SEC-015, REQ-SEC-047,
   REQ-SEC-065, REQ-ORG-029 and REQ-BANK-037
-  ([`ROLES_AND_PERMISSIONS.md` §7](../../ROLES_AND_PERMISSIONS.md#7-planned-adr-0300-adr-0301-adr-0302)).
+  ([`ROLES_AND_PERMISSIONS.md` §7](../../ROLES_AND_PERMISSIONS.md#7-adr-0300-adr-0301-adr-0302)).
 
 ## 11.8 Smaller, known, and deliberately left
 

@@ -292,6 +292,13 @@ Two binding rules shape every UI change:
   access's own pages and actions are rendered from one entry registry (`navigation.web
   .NavigationRegistry`), every link under its stable entry key (`data-entry-key`), so a change of
   the navigation edits the registry, not the fragments (`NavigationEntryKeyRenderMvcTest`).
+- **Navigation personalisation is a per-user store, not a shared surface.** Favourites, hidden
+  pages, order, tab bar, appearance and the dashboards live server-side in the `navigation` module,
+  one version counter per section and one per widget instance, so an edit in one never 409s another;
+  a stale write is dropped and only that section reloads. Entries are keyed by stable entry keys,
+  never URLs, and the frontend, which knows each key's permission, asks for the deletion of keys the
+  user may no longer see. Nothing is pushed live to other tabs, and nothing is audited (REQ-UI-032,
+  REQ-UI-034, ADR-0298, ADR-0299, `NavigationPreferencesServiceTest`).
 - **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
   overview of the home page (B) or a form (C): one page head with at most one primary action and an
   overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on

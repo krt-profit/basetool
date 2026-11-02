@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029),
-> ADR-0300 (planned)
+> ADR-0300
 
 # Functional rank & permission model (squadron / area / OL)
 
