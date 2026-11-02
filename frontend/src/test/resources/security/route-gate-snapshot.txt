@@ -414,6 +414,8 @@
 /missions/{id}/owning-org-unit/ajax PUT produces=[application/json] -> MissionWriteController#setMissionOwningOrgUnit gate=class:isAuthenticated() layout=yes
 /missions/{id}/participant POST -> MissionWriteController#addParticipant gate=class:isAuthenticated() layout=yes
 /missions/{id}/participants/ajax POST produces=[application/json] -> MissionWriteController#addParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/check-in-all/ajax POST produces=[application/json] -> MissionCheckInWriteController#checkInAllAjax gate=class:isAuthenticated() layout=no
+/missions/{id}/participants/check-out-all/ajax POST produces=[application/json] -> MissionCheckInWriteController#checkOutAllAjax gate=class:isAuthenticated() layout=no
 /missions/{id}/participants/unassigned/ajax GET produces=[application/json] -> MissionPageController#getUnassignedParticipantsAjax gate=class:isAuthenticated() layout=yes
 /missions/{id}/participants/{participantId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteParticipantAjax gate=class:isAuthenticated() layout=yes
 /missions/{id}/participants/{participantId}/ajax PUT produces=[application/json] -> MissionWriteController#updateParticipantAjax gate=class:isAuthenticated() layout=yes

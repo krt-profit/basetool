@@ -554,7 +554,7 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 | **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, read gate⁸)                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Check in/out / change payout preference / edit / leave a participant row (participant gate⁸)                                |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |
 | Record and maintain an **external** participant (`canSeeMission` to record, `canManageMission` to change someone else's row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Manage** mission (edit, sub-missions, participants/units/crew/steps/objectives/frequencies, party lead) (`canManageMission`) |   ✅²⁶  |  ✅²⁶ | ✅³ |   ✅³    |   ✅   |
+| **Manage** mission (edit, sub-missions, participants/units/crew/steps/objectives/frequencies, party lead, check everyone in/out — REQ-MISSION-032) (`canManageMission`) |   ✅²⁶  |  ✅²⁶ | ✅³ |   ✅³    |   ✅   |
 | Add/remove **co-managers** (manage gate⁸)                                                                                    |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
 | Change the **owner** (`canChangeOwner`)                                                                                      |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅   |
 | Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)               |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅   |

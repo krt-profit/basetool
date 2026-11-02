@@ -134,7 +134,8 @@ web, naming its client (REQ-AUDIT-005):
 - **Missionen** — mission create (incl. sub-mission; any goals/steps seeded on the create form each
   additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015) /
   edit (core, schedule, flags) / delete;
-  participant add / remove / edit / check-in / check-out; unit add / edit / remove; crew add / edit /
+  participant add / remove / edit / check-in / check-out (the manager's check-in / check-out of
+  everyone records one event per stamped row with `bulk=true`, REQ-MISSION-032); unit add / edit / remove; crew add / edit /
   remove; frequency change / remove (typed and custom mission-specific channels alike,
   REQ-MISSION-014); owner change; owning-org-unit reassignment (REQ-ORG-018, from/to
   org-unit `kind:id` refs only); party-lead change; manager add / remove; finance

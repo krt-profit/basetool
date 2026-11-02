@@ -286,6 +286,41 @@ Two crew-board writes that REQ-MISSION-007 assumed already lock-safe were not, a
 `MissionUnitDto` / `MissionCrewDto` / `UpdateUnitRequest` / `UpdateCrewRequest`, `mission/mission-detail.html`,
 `mission-detail.js`. **Issues:** #1134, #1131 (epic #1109).
 
+### REQ-MISSION-032 — Check in and check out every participant at once
+
+A caller who may manage the Einsatz (`canEdit`, the `MissionGate.MANAGE` gate: an in-scope elevated
+role, the owner or a co-manager) gets two buttons in the crew board's section head while the
+Einsatz is running (`actualStartTime` set, `actualEndTime` not set): **„Alle einchecken"** while at
+least one participant has not checked in, and **„Alle auschecken"** while at least one participant
+is checked in and not checked out. Both sit inside the `crewBoard` fragment, so they appear and
+disappear with the board's fragment swap and on a peer's live-sync refresh (REQ-FE-001/010).
+
+- `POST /api/v1/missions/{id}/participants/check-in-all` stamps one shared `now()` as `startTime`
+  on every participant whose `startTime` is still `null`; a checked-in row keeps its arrival time
+  (REQ-MISSION-016).
+- `POST /api/v1/missions/{id}/participants/check-out-all` stamps one shared end time on every
+  participant with a `startTime` and no `endTime`, by the same rule as the single check-out; a row
+  that never checked in or already carries an end time stays untouched, so a manual correction is
+  never overwritten.
+- Each stamped row records its own `MISSION_PARTICIPANT_CHECKED_IN` / `_CHECKED_OUT` audit event
+  with `participant=<id> bulk=true` (REQ-AUDIT-001); each bulk check-in publishes the participant's
+  `MISSION_CHECKED_IN` notice like the single one (REQ-MISSION-023).
+- A call on an Einsatz that has not started or has already ended answers `409` and changes nothing.
+  A successful call answers `204`; the board re-renders its `crew` fragment.
+
+**Acceptance**
+
+- [ ] The buttons are shown only to a manager and only while the Einsatz is running, each only
+  while it has a participant to act on.
+- [ ] A bulk check-in leaves an existing `startTime` untouched; a bulk check-out leaves an existing
+  `endTime` and a never-checked-in row untouched.
+- [ ] Every stamped row records one audit event carrying `bulk=true`.
+
+**Enforced by:** `MissionParticipantBulkCheckInTest`, `MissionCheckInBackendClientTest`,
+`AuthorizationMatrixTest`. **Code:** `MissionParticipantService#checkInAll` / `#checkOutAll`,
+`MissionEditor#editEach`, `MissionCheckInController`, `MissionCheckInBackendClient`,
+`MissionCheckInWriteController`, `mission/mission-detail.html`, `mission-detail-participants.js`.
+
 ### REQ-MISSION-017 — DB-enforced mission section-lock counters and row-version decoupling
 
 The per-section optimistic-lock counters (`coreVersion` / `scheduleVersion` / `flagsVersion` /

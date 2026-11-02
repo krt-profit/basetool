@@ -39,7 +39,7 @@ public final class MissionEditorFixture {
   private MissionEditorFixture() {}
 
   /**
-   * Makes {@code editorMock} forward both entry points to a real editor over the test's own
+   * Makes {@code editorMock} forward every entry point to a real editor over the test's own
    * repository and audit mocks.
    *
    * @param editorMock the {@code @Mock MissionEditor} injected into the service under test
@@ -60,6 +60,9 @@ public final class MissionEditorFixture {
     lenient()
         .when(editorMock.edit(any(), any(), any()))
         .thenAnswer(i -> real.edit(i.getArgument(0), i.getArgument(1), i.getArgument(2)));
+    lenient()
+        .when(editorMock.editEach(any(), any(), any()))
+        .thenAnswer(i -> real.editEach(i.getArgument(0), i.getArgument(1), i.getArgument(2)));
     lenient()
         .when(editorMock.editSection(any(), any(), any(), any(), any()))
         .thenAnswer(i ->

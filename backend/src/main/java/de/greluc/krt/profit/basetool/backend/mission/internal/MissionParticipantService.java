@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -511,17 +512,57 @@ public class MissionParticipantService {
             throw new IllegalArgumentException(
                 "Cannot check in before mission actual start time is set");
           }
-          if (participant.getStartTime() != null) {
-            return MissionEdit.unchanged();
-          }
-          participant.setStartTime(Instant.now());
-          missionParticipantRepository.saveAndFlush(participant);
-          notificationPublisher.checkedIn(mission, participant);
-          return MissionEdit.audited(
-              AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
-              participant.getUser() != null ? participant.getUser().getId() : null,
-              AuditDetails.of("participant", participantId));
+          MissionEdit edit =
+              stampCheckIn(
+                  mission,
+                  participant,
+                  Instant.now(),
+                  AuditDetails.of("participant", participantId));
+          missionParticipantRepository.flush();
+          return edit;
         });
+  }
+
+  /**
+   * Checks in every participant of a running mission who has not checked in yet, each with the same
+   * {@code startTime} and its own audit event; checked-in rows keep their time (REQ-MISSION-032).
+   *
+   * @param missionId the mission id
+   * @return the managed mission
+   * @throws BusinessConflictException when the mission has not started or has already ended
+   */
+  @Transactional
+  public Mission checkInAll(@NotNull UUID missionId) {
+    return missionEditor.editEach(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          requireRunning(mission);
+          Instant now = Instant.now();
+          List<MissionEdit> edits = new ArrayList<>();
+          for (MissionParticipant participant : mission.getParticipants()) {
+            if (participant.getStartTime() == null) {
+              edits.add(stampCheckIn(mission, participant, now, bulkDetails(participant)));
+            }
+          }
+          missionParticipantRepository.flush();
+          return edits;
+        });
+  }
+
+  private MissionEdit stampCheckIn(
+      @NotNull Mission mission,
+      @NotNull MissionParticipant participant,
+      @NotNull Instant now,
+      @NotNull AuditDetails details) {
+    if (participant.getStartTime() != null) {
+      return MissionEdit.unchanged();
+    }
+    participant.setStartTime(now);
+    missionParticipantRepository.save(participant);
+    notificationPublisher.checkedIn(mission, participant);
+    return MissionEdit.audited(
+        AuditEventType.MISSION_PARTICIPANT_CHECKED_IN, userIdOf(participant), details);
   }
 
   /**
@@ -539,23 +580,75 @@ public class MissionParticipantService {
         MissionGate.participant(participantId),
         mission -> {
           MissionParticipant participant = findParticipant(mission, participantId);
-          if (mission.getActualEndTime() != null
-              && Instant.now().isAfter(mission.getActualEndTime())) {
-            if (participant.getStartTime() != null
-                && mission.getActualEndTime().isBefore(participant.getStartTime())) {
-              participant.setEndTime(participant.getStartTime());
-            } else {
-              participant.setEndTime(mission.getActualEndTime());
-            }
-          } else {
-            participant.setEndTime(Instant.now());
-          }
-          missionParticipantRepository.saveAndFlush(participant);
-          return MissionEdit.audited(
-              AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
-              participant.getUser() != null ? participant.getUser().getId() : null,
-              AuditDetails.of("participant", participantId));
+          MissionEdit edit =
+              stampCheckOut(
+                  mission,
+                  participant,
+                  Instant.now(),
+                  AuditDetails.of("participant", participantId));
+          missionParticipantRepository.flush();
+          return edit;
         });
+  }
+
+  /**
+   * Checks out every participant of a running mission who is checked in and not yet checked out,
+   * each with the same {@code endTime} and its own audit event; rows that already carry an end time
+   * or never checked in stay untouched (REQ-MISSION-032).
+   *
+   * @param missionId the mission id
+   * @return the managed mission
+   * @throws BusinessConflictException when the mission has not started or has already ended
+   */
+  @Transactional
+  public Mission checkOutAll(@NotNull UUID missionId) {
+    return missionEditor.editEach(
+        missionId,
+        MissionGate.MANAGE,
+        mission -> {
+          requireRunning(mission);
+          Instant now = Instant.now();
+          List<MissionEdit> edits = new ArrayList<>();
+          for (MissionParticipant participant : mission.getParticipants()) {
+            if (participant.getStartTime() != null && participant.getEndTime() == null) {
+              edits.add(stampCheckOut(mission, participant, now, bulkDetails(participant)));
+            }
+          }
+          missionParticipantRepository.flush();
+          return edits;
+        });
+  }
+
+  private MissionEdit stampCheckOut(
+      @NotNull Mission mission,
+      @NotNull MissionParticipant participant,
+      @NotNull Instant now,
+      @NotNull AuditDetails details) {
+    Instant actualEnd = mission.getActualEndTime();
+    if (actualEnd != null && now.isAfter(actualEnd)) {
+      Instant start = participant.getStartTime();
+      participant.setEndTime(start != null && actualEnd.isBefore(start) ? start : actualEnd);
+    } else {
+      participant.setEndTime(now);
+    }
+    missionParticipantRepository.save(participant);
+    return MissionEdit.audited(
+        AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT, userIdOf(participant), details);
+  }
+
+  private static void requireRunning(@NotNull Mission mission) {
+    if (mission.getActualStartTime() == null || mission.getActualEndTime() != null) {
+      throw new BusinessConflictException(
+          "Participants can only be checked in or out together while the mission is running.");
+    }
+  }
+
+  private static AuditDetails bulkDetails(@NotNull MissionParticipant participant) {
+    return AuditDetails.of("participant", participant.getId()).with("bulk", true);
+  }
+
+  private static @Nullable UUID userIdOf(@NotNull MissionParticipant participant) {
+    return participant.getUser() != null ? participant.getUser().getId() : null;
   }
 
   /**

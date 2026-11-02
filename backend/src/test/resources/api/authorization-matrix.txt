@@ -294,6 +294,8 @@ PUT /api/v1/missions/{id}/objectives/{objectiveId} | MissionController#updateObj
 PUT /api/v1/missions/{id}/owner | MissionController#updateMissionOwner | pre=@missionAccessPolicy.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id}/owning-org-unit | MissionController#updateMissionOwningOrgUnit | pre=@missionAccessPolicy.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
 POST /api/v1/missions/{id}/participants | MissionController#addParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants/check-in-all | MissionCheckInController#checkInAll | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants/check-out-all | MissionCheckInController#checkOutAll | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 GET /api/v1/missions/{id}/participants/unassigned | MissionController#getUnassignedParticipants | pre=@missionAccessPolicy.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id}/participants/{participantId} | MissionController#removeParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id}/participants/{participantId} | MissionController#updateParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated

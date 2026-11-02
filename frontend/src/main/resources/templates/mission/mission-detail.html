@@ -262,6 +262,19 @@
             <div class="sec-h">
                 <h2><span th:text="#{mission.crew.planning}">Crew-Planung</span> &middot; <span class="warn" th:text="|${unassignedParticipants.size()} ${#messages.msg('mission.overview.without_unit')}|">0 ohne Einheit</span></h2>
                 <span class="legend" th:if="${mission.canEdit}" th:text="#{mission.crew.legend}">Ziehen oder ausw&auml;hlen und Ziel anklicken</span>
+                <span class="flex-gap-xs" id="crew-bulk-actions"
+                      th:if="${mission.canEdit and mission.actualStartTime != null and mission.actualEndTime == null and mission.participants != null}">
+                    <button th:unless="${mission.participants.?[startTime == null].isEmpty()}" type="button"
+                            class="btn btn-success btn-xs2" data-bulk-participant-action="check-in-all"
+                            th:title="#{mission.participant.checkin_all.tooltip}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-login"/></svg> <span th:text="#{mission.participant.checkin_all}">Alle einchecken</span>
+                    </button>
+                    <button th:unless="${mission.participants.?[startTime != null and endTime == null].isEmpty()}" type="button"
+                            class="btn btn-ghost btn-xs2" data-bulk-participant-action="check-out-all"
+                            th:title="#{mission.participant.checkout_all.tooltip}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-logout"/></svg> <span th:text="#{mission.participant.checkout_all}">Alle auschecken</span>
+                    </button>
+                </span>
             </div>
             <div class="board">
                 <div class="kpanel pool-panel">
