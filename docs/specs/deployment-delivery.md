@@ -3394,6 +3394,42 @@ pull requests never conflict over the changelog (ADR-0306).
 [ADR-0306](../adr/0306-changelog-entries-are-fragments-folded-at-the-release.md) ·
 **Related:** REQ-OPS-029
 
+### REQ-OPS-054 — The dependency scan reads a cached NVD feed that a separate refresh keeps current
+
+The OWASP dependency scan (`dependency-check.yml`) never downloads the NVD. A separate refresh
+(`nvd-feed-refresh.yml`) keeps the dataset in the Actions cache, so a slow nvd.nist.gov delays the
+refresh and never a pull request's scan (ADR-0324).
+
+- **The refresh.** Daily, on `workflow_dispatch`, and on a push to `main` that touches the root
+  `build.gradle.kts` or `gradle/libs.versions.toml`, it restores the newest feed, runs
+  `dependencyCheckUpdate` up to three times with a time limit per attempt, writes the update time
+  as epoch seconds to `refreshed-at` in the data directory, and saves the directory under a key
+  unique to the run (`nvd-feed-v2-<os>-<run id>-<attempt>`). A failed update saves nothing. On
+  `main` it then deletes every other `nvd-feed-` cache, and deletes none when the one it saved is
+  not listed. A failed scheduled refresh opens or comments on the issue *Daily NVD feed refresh
+  failed*.
+- **The scan.** It restores the newest `nvd-feed-v2-<os>-` cache and runs `dependencyCheckAggregate`
+  with `-PdependencyCheckAutoUpdate=false`. Before that it fails, with an error that names the
+  refresh, when no cache was restored or `refreshed-at` is missing or 168 hours old, and warns from
+  48 hours. Everything else stays: `failBuildOnCVSS = 7.0`, the SARIF upload outside pull requests,
+  the report artifact, and the issue *Weekly OWASP Dependency-Check failed* on a failed scheduled
+  scan.
+- **Local runs update.** The Gradle property `dependencyCheckAutoUpdate` defaults to `true`, so a
+  local `dependencyCheckAggregate` keeps building and refreshing its own dataset.
+
+**Acceptance**
+
+- [x] No step of `dependency-check.yml` passes an NVD API key or runs with auto-update on.
+- [x] The refresh saves only after a successful update, and its prune job runs only on `main`
+  with `actions: write`, as the only job of either workflow that holds it.
+- [ ] A manual refresh on `main` saves a feed and a following scan restores it.
+
+**Enforced by:** `.github/workflows/nvd-feed-refresh.yml` · `.github/workflows/dependency-check.yml`
+· `.github/actions/report-failed-run` · the `dependencyCheck {}` block of the root
+`build.gradle.kts` · **Decision:**
+[ADR-0324](../adr/0324-the-dependency-scan-reads-a-cached-nvd-feed-refreshed-on-its-own-schedule.md) ·
+**Related:** REQ-OPS-024, REQ-OPS-034
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
