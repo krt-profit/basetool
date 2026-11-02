@@ -196,6 +196,7 @@ final class OrgChartSearchEntries {
       nodes.add(c.deputy());
       nodes.addAll(orEmpty(c.ensigns()));
     }
+    nodes.addAll(orEmpty(squadron.directDeputies()));
     nodes.addAll(orEmpty(squadron.directEnsigns()));
   }
 

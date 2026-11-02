@@ -34,15 +34,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -62,7 +59,6 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -78,12 +74,12 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link RefineryOrderService#storeRefineryOrder}: access control, per-item lookups,
- * assignee resolution, one new inventory row per output, note normalisation, output quantity
- * conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
+ * Unit tests for {@link RefineryOrderStoreService#storeRefineryOrder}: access control, per-item
+ * lookups, assignee resolution, one new inventory row per output, note normalisation, output
+ * quantity conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
  */
 @ExtendWith(MockitoExtension.class)
-class RefineryOrderServiceTest {
+class RefineryOrderStoreServiceTest {
 
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private UserRepository userRepository;
@@ -112,7 +108,7 @@ class RefineryOrderServiceTest {
 
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
-  @InjectMocks private RefineryOrderService refineryOrderService;
+  @InjectMocks private RefineryOrderStoreService refineryOrderService;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -922,266 +918,5 @@ class RefineryOrderServiceTest {
     good.setOutputMaterial(outputMaterial);
     good.setOutputQuantity(1);
     return good;
-  }
-
-  /**
-   * Tests for the UEX-derived yield-bonus lookup. The contract: pick the right name field
-   * (city.name vs spaceStation.name) and map back to {@code materialId → yieldBonus}; never
-   * fabricate data for a location that has no city/station hook into the universe sync.
-   */
-  @Nested
-  class GetYieldBonusByMaterialForLocationTests {
-
-    @Test
-    void nullLocation_returnsEmpty() {
-      assertTrue(refineryOrderService.getYieldBonusByMaterialForLocation(null).isEmpty());
-    }
-
-    @Test
-    void locationWithoutCityAndStation_returnsEmpty() {
-      Location naked = new Location();
-      naked.setId(UUID.randomUUID());
-      naked.setName("Custom");
-
-      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(naked);
-
-      assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void cityLocation_queriesByCityName_andReturnsMaterialBonusMap() {
-      UUID matA = UUID.randomUUID();
-      UUID matB = UUID.randomUUID();
-      Material a = new Material();
-      a.setId(matA);
-      Material b = new Material();
-      b.setId(matB);
-
-      RefineryYield y1 = new RefineryYield();
-      y1.setMaterial(a);
-      y1.setYieldBonus(5);
-      RefineryYield y2 = new RefineryYield();
-      y2.setMaterial(b);
-      y2.setYieldBonus(-3);
-
-      City lorville = new City();
-      lorville.setName("Lorville");
-
-      Location loc = new Location();
-      loc.setId(UUID.randomUUID());
-      loc.setCity(lorville);
-
-      when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
-          .thenReturn(List.of(y1, y2));
-
-      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
-
-      assertEquals(2, result.size());
-      assertEquals(5, result.get(matA));
-      assertEquals(-3, result.get(matB));
-    }
-
-    @Test
-    void spaceStationLocation_queriesByStationName() {
-      UUID matA = UUID.randomUUID();
-      Material a = new Material();
-      a.setId(matA);
-
-      RefineryYield y = new RefineryYield();
-      y.setMaterial(a);
-      y.setYieldBonus(2);
-
-      SpaceStation arcL1 = new SpaceStation();
-      arcL1.setName("ARC-L1 Wide Forest Station");
-
-      Location loc = new Location();
-      loc.setId(UUID.randomUUID());
-      loc.setSpaceStation(arcL1);
-
-      when(refineryYieldRepository.findAllForLocation(eq(null), eq("ARC-L1 Wide Forest Station")))
-          .thenReturn(List.of(y));
-
-      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
-
-      assertEquals(1, result.size());
-      assertEquals(2, result.get(matA));
-    }
-
-    @Test
-    void zeroBonusValue_isPreserved_notTreatedAsMissing() {
-      UUID matA = UUID.randomUUID();
-      Material a = new Material();
-      a.setId(matA);
-
-      RefineryYield y = new RefineryYield();
-      y.setMaterial(a);
-      y.setYieldBonus(0);
-
-      SpaceStation station = new SpaceStation();
-      station.setName("CRU-L1");
-
-      Location loc = new Location();
-      loc.setId(UUID.randomUUID());
-      loc.setSpaceStation(station);
-
-      when(refineryYieldRepository.findAllForLocation(eq(null), eq("CRU-L1")))
-          .thenReturn(List.of(y));
-
-      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
-
-      assertTrue(result.containsKey(matA));
-      assertEquals(0, result.get(matA));
-    }
-
-    @Test
-    void byLocationId_nullId_returnsEmpty() {
-      assertTrue(refineryOrderService.getYieldBonusByMaterialForLocationId(null).isEmpty());
-    }
-
-    @Test
-    void byLocationId_unknownId_returnsEmpty() {
-      UUID missing = UUID.randomUUID();
-      when(locationRepository.findById(missing)).thenReturn(Optional.empty());
-
-      Map<UUID, Integer> result =
-          refineryOrderService.getYieldBonusByMaterialForLocationId(missing);
-
-      assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void byLocationId_delegatesToLocationVariant() {
-      UUID matA = UUID.randomUUID();
-      Material a = new Material();
-      a.setId(matA);
-
-      RefineryYield y = new RefineryYield();
-      y.setMaterial(a);
-      y.setYieldBonus(7);
-
-      City lorville = new City();
-      lorville.setName("Lorville");
-
-      UUID locId = UUID.randomUUID();
-      Location loc = new Location();
-      loc.setId(locId);
-      loc.setCity(lorville);
-
-      when(locationRepository.findById(locId)).thenReturn(Optional.of(loc));
-      when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
-          .thenReturn(List.of(y));
-
-      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocationId(locId);
-
-      assertEquals(1, result.size());
-      assertEquals(7, result.get(matA));
-    }
-
-    @Test
-    void yieldWithNullMaterial_isSkipped() {
-      RefineryYield orphan = new RefineryYield();
-      orphan.setMaterial(null);
-      orphan.setYieldBonus(99);
-
-      City city = new City();
-      city.setName("Area18");
-
-      Location loc = new Location();
-      loc.setId(UUID.randomUUID());
-      loc.setCity(city);
-
-      when(refineryYieldRepository.findAllForLocation(eq("Area18"), eq(null)))
-          .thenReturn(List.of(orphan));
-
-      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
-
-      assertTrue(result.isEmpty());
-    }
-  }
-
-  @Nested
-  class CreateOrderPickerDelegationTests {
-
-    @Test
-    void createRefineryOrder_delegatesPickerResolutionToOwnerScopeService() {
-      UUID userId = UUID.randomUUID();
-      UUID pickedOrgUnitId = UUID.randomUUID();
-
-      User user = new User();
-      user.setId(userId);
-      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
-          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-      resolved.setId(pickedOrgUnitId);
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
-          .thenReturn(resolved);
-
-      Location loc = new Location();
-      loc.setId(UUID.randomUUID());
-      SpaceStation station = new SpaceStation();
-      station.setHasRefineryTerminal(true);
-      loc.setSpaceStation(station);
-      RefineryOrder transientOrder = new RefineryOrder();
-      transientOrder.setLocation(loc);
-      when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
-      when(refineryOrderRepository.save(any(RefineryOrder.class)))
-          .thenAnswer(i -> i.getArgument(0));
-
-      RefineryOrder saved =
-          refineryOrderService.createRefineryOrder(userId, transientOrder, pickedOrgUnitId);
-
-      assertSame(
-          resolved,
-          saved.getOwningOrgUnit(),
-          "the picker output must be honoured verbatim, not user.getSquadron()");
-    }
-
-    @Test
-    void createRefineryOrder_stripsClientSuppliedIdAndVersion() {
-      UUID userId = UUID.randomUUID();
-      User user = new User();
-      user.setId(userId);
-      user.setDisplayName("PII Owner Name");
-      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-
-      Location loc = new Location();
-      loc.setId(UUID.randomUUID());
-      SpaceStation station = new SpaceStation();
-      station.setHasRefineryTerminal(true);
-      loc.setSpaceStation(station);
-      when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
-      when(refineryOrderRepository.save(any(RefineryOrder.class)))
-          .thenAnswer(i -> i.getArgument(0));
-
-      RefineryOrder transientOrder = new RefineryOrder();
-      transientOrder.setLocation(loc);
-      transientOrder.setId(UUID.randomUUID());
-      transientOrder.setVersion(7L);
-
-      refineryOrderService.createRefineryOrder(userId, transientOrder, null);
-
-      ArgumentCaptor<RefineryOrder> captor = ArgumentCaptor.forClass(RefineryOrder.class);
-      verify(refineryOrderRepository).save(captor.capture());
-      assertNull(
-          captor.getValue().getId(),
-          "client-supplied id must be nulled so save() does an INSERT, not a merge UPSERT");
-      assertNull(
-          captor.getValue().getVersion(), "client-supplied version must be nulled on create");
-
-      ArgumentCaptor<String> labelCaptor = ArgumentCaptor.forClass(String.class);
-      verify(auditService)
-          .record(
-              eq(
-                  de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
-                      .REFINERY_ORDER_CREATED),
-              any(),
-              labelCaptor.capture(),
-              any(),
-              any());
-      org.junit.jupiter.api.Assertions.assertFalse(
-          labelCaptor.getValue().contains("PII Owner Name"),
-          "refinery audit subjectLabel must not contain the owner's personal name");
-    }
   }
 }

@@ -1222,7 +1222,10 @@ with `ON DELETE CASCADE`, in a column that is not named like a member column. Th
 disposition in all three registries: **erasure** by the cascade; **export** in the one section
 `navigationPreferences` (REQ-SEC-058); **merge** as the column
 `navigation_preferences.user_id`, which follows the member, with the navigation-specific overlap
-rule of REQ-SEC-046. None is listed as not exported or not merged.
+rule of REQ-SEC-046. None is listed as not exported or not merged. Every write, a prune included,
+takes the member's root lock (a version bump or a pessimistic read of the root, or of the dashboard
+layout) before it reads the values it decides on, so a write never acts on a snapshot older than a
+committed change, and root-before-child is the one lock order.
 
 **Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
 `UserIdentityColumnForeignKeyTest`, `NavigationUserReassignmentTest` · **Related:** REQ-SEC-046,

@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -58,8 +59,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -1848,7 +1851,9 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankBookingRequestDto withNote =
         requestDto(accountId, UUID.randomUUID(), "Bar uebergeben, Zeuge greluc");
-    when(bankBookingRequestService.listForCurrentRequester()).thenReturn(List.of(withNote));
+    when(bankBookingRequestService.pageForCurrentRequester(
+            eq(EnumSet.allOf(BankBookingRequestStatus.class)), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(withNote)));
 
     List<BankBookingRequestDto> own = requestService.listOwnBookingRequests();
 
@@ -1857,6 +1862,42 @@ class OrgUnitBankAccessServiceTest {
     assertThat(own.getFirst().note()).isEqualTo("from sale");
     assertThat(own.getFirst().id()).isEqualTo(withNote.id());
     assertThat(own.getFirst().version()).isEqualTo(withNote.version());
+  }
+
+  /**
+   * REQ-BANK-022: the dashboard's page of the caller's own requests blanks the staff note too and
+   * keeps the total over all pages; the states are passed through.
+   */
+  @Test
+  void pageOwnBookingRequests_redactsTheStaffNoteAndKeepsTheTotal() {
+    BankBookingRequestDto withNote =
+        requestDto(UUID.randomUUID(), UUID.randomUUID(), "Bar uebergeben, Zeuge greluc");
+    Set<BankBookingRequestStatus> decided =
+        Set.of(BankBookingRequestStatus.CONFIRMED, BankBookingRequestStatus.REJECTED);
+    Pageable pageable = PageRequest.of(0, 3);
+    when(bankBookingRequestService.pageForCurrentRequester(decided, pageable))
+        .thenReturn(new PageImpl<>(List.of(withNote), pageable, 9));
+
+    Page<BankBookingRequestDto> page = requestService.pageOwnBookingRequests(decided, pageable);
+
+    assertThat(page.getTotalElements()).isEqualTo(9);
+    assertThat(page.getContent())
+        .singleElement()
+        .satisfies(row -> {
+          assertThat(row.staffNote()).isNull();
+          assertThat(row.id()).isEqualTo(withNote.id());
+        });
+  }
+
+  /** No state filter means every state. */
+  @Test
+  void pageOwnBookingRequests_withoutStatesReadsEveryState() {
+    Pageable pageable = PageRequest.of(0, 3);
+    when(bankBookingRequestService.pageForCurrentRequester(
+            EnumSet.allOf(BankBookingRequestStatus.class), pageable))
+        .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+    assertThat(requestService.pageOwnBookingRequests(Set.of(), pageable).getContent()).isEmpty();
   }
 
   /**

@@ -30,7 +30,12 @@ import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Refinery Order List payload. */
+/**
+ * Data transfer record carrying Refinery Order List payload.
+ *
+ * @param canEdit whether the caller may edit, cancel or store the order: the owner, or a
+ *     Logistician whose grant covers the order's unit (REQ-REFINERY-019)
+ */
 public record RefineryOrderListDto(
     UUID id,
     UserReferenceDto owner,
@@ -46,7 +51,8 @@ public record RefineryOrderListDto(
     String status,
     List<RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
-    Long version) {
+    Long version,
+    Boolean canEdit) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */

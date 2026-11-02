@@ -24,6 +24,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessEntry;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
+import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationRegistry;
 import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingStateDto;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,23 @@ class PurchasingQuickAccessContributorTest {
     assertThat(contributor.entries())
         .extracting(QuickAccessEntry::href)
         .containsExactly("/purchasing/partners", "/purchasing/delegates", "/purchasing/report");
+  }
+
+  /** Every tab carries the key and the path of the registered tab, so it can be starred. */
+  @Test
+  void everyTabCarriesTheKeyOfItsRegisteredEntry() {
+    when(featureState.enabled()).thenReturn(true);
+    when(purchasingClient.state())
+        .thenReturn(new PurchasingStateDto(true, false, true, false, false, true, false));
+    NavigationRegistry registry = new NavigationRegistry();
+
+    assertThat(contributor.entries())
+        .isNotEmpty()
+        .allSatisfy(entry ->
+            assertThat(registry.starrable(entry.entryKey()))
+                .as(entry.href())
+                .map(NavigationEntry::href)
+                .contains(entry.href()));
   }
 
   /** A delegate gets the partners only. */

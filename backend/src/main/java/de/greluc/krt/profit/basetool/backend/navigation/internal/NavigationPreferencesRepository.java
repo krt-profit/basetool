@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
@@ -40,6 +43,17 @@ public interface NavigationPreferencesRepository
       "INSERT INTO navigation_preferences (user_id) VALUES (:userId) ON CONFLICT (user_id) DO"
           + " NOTHING")
   void insertIfAbsent(@Param("userId") UUID userId);
+
+  /**
+   * Locks the member's root row until the transaction ends, for a write that decides on stored
+   * values and so must read them after it holds the lock.
+   *
+   * @param userId the owner's {@code app_user.id}
+   * @return the locked root, empty when the member has none
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT p FROM NavigationPreferences p WHERE p.userId = :userId")
+  Optional<NavigationPreferences> lockByUserId(@Param("userId") UUID userId);
 
   /**
    * Bumps the favourites version when it still equals the expected one, locking the root row until

@@ -64,6 +64,7 @@ GET /api/v1/bank/org-units/balances | OrgUnitBankController#listOverseenBalances
 GET /api/v1/bank/org-units/requests | OrgUnitBankController#listOwnBookingRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/bank/org-units/requests | OrgUnitBankController#createBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/requests/foreign | OrgUnitBankController#listForeignRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/requests/page | OrgUnitBankController#pageOwnBookingRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#updateOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/bank/org-units/requests/{id}/cancel | OrgUnitBankController#cancelOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#revokeOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -683,6 +684,7 @@ GET /v3/api-docs.yaml | OpenApiWebMvcResource#openapiYaml | pre=none | url=/v3/a
 [service-gates]
 MemberEvaluationService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MemberEvaluationService#listAll(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+MemberEvaluationService#listEvaluatableMembers(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MemberEvaluationService#upsert(3) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MissionFinanceEntryService#deleteEntry(2) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
 MissionFinanceEntryService#updateEntry(3) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)

@@ -84,7 +84,7 @@ the Lager's.*
 - [ ] A `PIECE` write, or an `SCU` write with the opt-in, merges per REQ-INV-026 instead of appending.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
-`InventoryStockMergeTest`, `RefineryOrderServiceTest` · **Code:** `InventoryItemService`,
+`InventoryStockMergeTest`, `RefineryOrderStoreServiceTest` · **Code:** `InventoryItemService`,
 `InventoryCheckoutService`, `RefineryOrderService` · **Issues:** #466, #1182
 
 ### REQ-INV-002 — Group-on-read display: Material → Stack
@@ -928,8 +928,8 @@ already known at storage time.
 - [ ] On a mission-linked refinery order, a personal row carries no mission allocation while a
   shared row of the same call still does.
 
-**Enforced by:** `RefineryOrderServiceTest` (`PersonalMarkerTests`), `RefineryOrderTest`,
-`RefineryStorePersonalMarkerTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
+**Enforced by:** `RefineryOrderStoreServiceTest` (`PersonalMarkerTests`), `RefineryOrderTest`,
+`RefineryStorePersonalMarkerTest` · **Code:** `RefineryOrderStoreService#storeRefineryOrder`,
 `RefineryOrderStoreItemDto`, `RefineryOrderWriteController#storeOrder` / `#storeOrderAjax` /
 `#storePersonalWithJobOrder`, `RefineryOrderStoreItemForm`,
 `templates/refinery/refinery-orders-details.html`, `static/js/refinery/refinery-orders-details.js` · **Issues:** — ·

@@ -83,14 +83,19 @@ params), the `onlyMine` toggle and the search `q` — and the pagination control
   returns it once however many of its goods match, and keeps the caller's scope.
 - [ ] `ready=true` keeps an order whose end is exactly now and drops one whose end is later.
 - [ ] A `?size=` outside {10,50,100} falls back to 50; a negative `?page=` clamps to 0.
+- [ ] Every list row carries `canEdit`, the verdict of `RefineryAccessPolicy.canEditRefineryOrder` for
+  the caller: the owner, or a Logistician whose grant covers the order's unit (cascade included).
+  The list shows the store action only on an open row with `canEdit`; a row without it shows none.
 
 **Enforced by:** `RefineryOrderPaginationMvcTest`, `RefineryOrdersListPatternRenderTest`,
 `RefineryOrderListViewResolutionTest`, `RefineryOrderDurationTest` (`testViewOrders_*`),
 `RefineryOrderRepositoryListFilterTest`, `RefineryOrderControllerTest` (`ListFilterTests`),
-`RefineryOrderServiceLifecycleTest` · **Code:** `RefineryOrderPageController.viewOrders` /
+`RefineryOrderQueryServiceTest`, `RefineryOrderMapperTest`, `RefineryProgressTest`,
+`GrantCascadeAggregateAccessIntegrationTest` · **Code:** `RefineryOrderPageController.viewOrders` /
+`RefineryListRow`, `RefineryOrderMapper.toListDto`, `RefineryAccessPolicy.canEditRefineryOrder`,
 `segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery/refinery-orders-index.html`,
 `templates/kernel/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),
-`RefineryOrderService.getAllRefineryOrders` / `getMyRefineryOrders`,
+`RefineryOrderQueryService.getAllRefineryOrders` / `getMyRefineryOrders`,
 `RefineryOrderRepository.findFilteredScoped` / `findOwnedFiltered` / `LIST_FILTER` · **Issues:** #2
 (performance audit)
 
@@ -230,7 +235,7 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
   are already `COMPLETED`.
 
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
-`RefineryOrderServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
+`RefineryOrderStoreServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
 `storeRefineryOrder`
 
 ### Write requests and settings (wave 6 of the API cut)

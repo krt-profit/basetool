@@ -1688,7 +1688,10 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and —
   loaded on the first opening — „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and
   „Ankauf-Partner", „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members
-  whose tab bar shows them. Empty, it offers up to four recently visited pages (`localStorage`
+  whose tab bar shows them; those five tabs are registry entries (`supply.incoming`,
+  `supply.stats`, `purchasing.partners`, `purchasing.delegates`, `purchasing.report`) and the
+  on-demand answer carries each tab's entry key, so they can be starred, chosen as phone slots and
+  start pages like every other tab. Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
   anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
@@ -1785,7 +1788,9 @@ its former sibling pages become tabs of it.
   than two permitted tabs shows no bar. A tab can cover pages that are not tabs themselves (Beförderung's
   Themenbereiche and Rangvoraussetzungen); they show the bar with the
   covering tab current. Beschaffung keeps its supply and purchasing tab fragments, which add
-  „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. Every former URL still opens
+  „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. With both surfaces on, the
+  Ankauf tab is not a second menu link (`menuUnless`), but stays an available entry: current page,
+  favourite, phone slot and start page. Every former URL still opens
   its page or tab (the Lager lists by redirect); an entry gated on a flag or role the caller lacks is neither a link nor a tab, and
   officer-only tabs follow `canOpenLeitung` and `canManagePromotions`.
 - *Italic* tabs are officer-only (officer reach per org unit, ADR-0300); Beförderung's
@@ -2416,8 +2421,11 @@ optimistic-lock version, so an edit in one never 409s another:
   entry registry no longer knows, is detected by the frontend while it builds the navigation and
   deleted from every section through the backend, which holds no key-to-permission knowledge.
   Unavailability in the active context deletes nothing. Regaining a role restores nothing. A right
-  tied to the pinned unit (the Leitung and promotion-management entries) counts as lost user-wide
-  only when the caller holds officer reach in no unit (`canActAsOfficerAnywhere`); a right that
+  tied to the pinned unit (the Leitung entry) counts as lost user-wide only when the caller holds
+  officer reach in no unit (`canActAsOfficerAnywhere`); the promotion-management entries only when
+  no unit with promotion enabled is in officer reach (`canManagePromotionsAnywhere`) and the
+  promotion pages for a member when none is among their units or reach (`canUsePromotionAnywhere`,
+  REQ-PROMO-004); a right that
   does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
   switches of the installation and the page, and a capability read that failed, delete nothing.
   The stored start pages of both modes are checked like every other stored key. Dashboard widgets
@@ -2694,7 +2702,10 @@ a chosen or pinned unit shows that unit's needs, no pin the union of the member'
 needs, each row labelled with its unit; it is offered only while the supply surface is on
 (REQ-SUP-001). „Meine
 Bankanträge" lists the caller's own requests (REQ-BANK-022) only; „Offen" is pending,
-„Entschieden" every request that has reached a final state. The live-sync rooms are `materialboard`
+„Entschieden" every request that has reached a final state, withdrawn ones included. It reads one
+page of the backend's own-requests page (state filter and page size server-side) and counts its
+total; its rows and „Alle anzeigen" open the „Meine Anträge" tab of `/org-unit-bank` through the
+`#tab=antraege` deeplink. The live-sync rooms are `materialboard`
 (`board`, `requests`), `supply-needs` (`needs`, `stats`) and `orgunit-bank` (`orgUnitBank`). A
 failed load shows the instance's error state with the test id `dashboard-<slug>-error`.
 

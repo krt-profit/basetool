@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** PROMO/UI · **Related ADRs:** [ADR-0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md)
 > (page patterns, REQ-UI-027)
 
@@ -93,6 +93,45 @@ step lists its requirements with edit and delete, and deletes the whole step. Th
 `matrixCellKey`, `templates/promotion/promotion-admin-topics.html`,
 `templates/promotion/promotion-admin-rank-requirements.html`, `static/js/promotion/promotion-admin-topics.js`,
 `static/js/promotion/promotion-admin-rank-requirements.js`.
+
+### REQ-PROMO-004 — Promotion counts only the units with promotion enabled
+
+Promotion evaluations, promotion management and the navigation entries for them count only the
+org units that have promotion enabled (`OrgUnit.isPromotionEnabled`); a Bereich, a Spezialkommando
+and the Organisationsleitung never do. For a caller who is not an admin:
+
+- **Reads.** The management reads (`view=MANAGEMENT` of the topics, categories, level texts and
+  rank requirements, the evaluations of others, the eligibility of others and the member list)
+  cover the Staffeln in the caller's officer reach that have promotion enabled — pin-aware, so a
+  pin on a unit with promotion off, or outside the reach, leaves nothing. A seat in a unit with
+  promotion off reads and manages nothing there.
+- **Actions.** Maintenance and evaluation writes need officer reach in the owning Staffel **and**
+  promotion enabled in it; an evaluation of a member needs such a Staffel among the member's own.
+- **Capabilities.** `canManagePromotions` follows the same reach in the active context;
+  `canManagePromotionsAnywhere` holds when any unit of the reach has promotion enabled whatever the
+  pin, and `canUsePromotionAnywhere` when the caller belongs to or reaches such a unit.
+- **Navigation.** The promotion entries are lost user-wide when `canUsePromotionAnywhere` is off
+  (overview, „Meine Bewertungen") or `canManagePromotionsAnywhere` is off (management): they leave
+  the navigation, favourites, tab-bar slots, start pages and dashboard widgets (REQ-UI-032). With
+  only the pinned unit lacking promotion, the entries stay stored and render unavailable.
+
+An admin is not narrowed. A write still stamps the caller's active Staffel, so an officer whose
+home Staffel has promotion off pins the unit to maintain.
+
+**Acceptance**
+
+- [x] A seat in a unit with promotion off confers no promotion read and no promotion write.
+- [x] A pin on a unit with promotion off leaves the management reads empty.
+- [x] The promotion navigation entries leave the navigation when no unit with promotion enabled is
+  in reach.
+
+**Enforced by:** `PromotionReachTest`, `PromotionAccessPolicyReadScopeTest`,
+`PromotionAccessPolicyOfficerReachTest`, `PromotionPerUnitHttpIntegrationTest`,
+`MeControllerTest` (`getCapabilities_promotion*`), `NavigationFlagTest`,
+`NavigationAdvicePromotionFlagsTest`, `NavigationPreferencesReaderTest` · **Code:**
+`PromotionReach`, `PromotionAccessPolicy#readScope` / `#assertOfficerIn` /
+`#assertOfficerOverMember`, `MemberEvaluationService#listEvaluatableMembers`,
+`MeController#capabilities`, `NavigationFlag#holdsUserWide`.
 
 ## Out of scope
 
