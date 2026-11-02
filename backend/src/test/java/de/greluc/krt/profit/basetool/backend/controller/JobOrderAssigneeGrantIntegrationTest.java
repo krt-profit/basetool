@@ -259,6 +259,29 @@ class JobOrderAssigneeGrantIntegrationTest {
   }
 
   @Test
+  void theAllListHoldsTheAssignedOrderForAnAssigneeWithoutProfitAccessAndNothingElse()
+      throws Exception {
+    assignAsAdmin();
+    String inOrders = "$.content[?(@.id == '" + orderId + "')]";
+
+    as(get("/api/v1/orders").param("size", "1000"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(inOrders).isNotEmpty())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(
+            get("/api/v1/orders")
+                .param("size", "1000")
+                .param("squadronId", UUID.randomUUID().toString()),
+            assigneeId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/orders").param("toProcess", "true"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/orders").param("size", "1000"), unitMateId, "ROLE_KRT_MEMBER")
+        .andExpect(jsonPath("$.totalElements").value(0));
+  }
+
+  @Test
   void assignedToMeAnswers400WithToProcessOrASquadronFilter() throws Exception {
     as(
             get("/api/v1/orders").param("assignedToMe", "true").param("toProcess", "true"),

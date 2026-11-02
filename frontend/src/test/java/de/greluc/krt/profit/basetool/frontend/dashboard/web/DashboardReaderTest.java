@@ -189,6 +189,41 @@ class DashboardReaderTest {
   }
 
   @Test
+  @DisplayName(
+      "an order widget is deleted once the order area is lost, kept while rights are unknown")
+  void deletesAFlagGatedWidgetOnlyOnAKnownUserWideLoss() {
+    DashboardResponse before =
+        new DashboardResponse(
+            DashboardMode.MEMBER,
+            4,
+            true,
+            List.of(
+                widget(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardColumn.WIDE, null),
+                widget(DashboardWidgetType.FAVOURITES, DashboardColumn.NARROW, null)));
+    DashboardResponse after =
+        new DashboardResponse(
+            DashboardMode.MEMBER,
+            5,
+            true,
+            List.of(widget(DashboardWidgetType.FAVOURITES, DashboardColumn.NARROW, null)));
+    when(client.dashboard(DashboardMode.MEMBER)).thenReturn(before);
+    when(client.pruneDashboard(
+            DashboardMode.MEMBER, List.of(DashboardWidgetType.ORDERS_TO_PROCESS)))
+        .thenReturn(after);
+
+    DashboardView view = read(MEMBER, null, List.of());
+
+    assertThat(view.wide()).isEmpty();
+    assertThat(view.version()).isEqualTo(5);
+
+    DashboardView unknown =
+        read(new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(), false), null, List.of());
+
+    assertThat(unknown.wide()).hasSize(1);
+    verify(client, org.mockito.Mockito.times(1)).pruneDashboard(any(), any());
+  }
+
+  @Test
   @DisplayName("the unchanged default is filtered without a write")
   void filtersTheDefaultWithoutAWrite() {
     when(client.dashboard(DashboardMode.MEMBER))

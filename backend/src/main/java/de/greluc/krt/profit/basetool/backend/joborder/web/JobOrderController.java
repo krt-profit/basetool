@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHando
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMissionAllocationRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -116,6 +117,7 @@ public class JobOrderController {
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
+  private final JobOrderMissionAllocationRedactor missionAllocationRedactor;
 
   /**
    * Records a materials handover for the job order, unlinking the handed-over items with a single
@@ -605,7 +607,8 @@ public class JobOrderController {
    * Returns every inventory item linked to a specific material of a job order. Drives the
    * per-material drill-down in the order detail view. The owner/location of each item is blanked
    * for a requesting-side viewer of an SK-public order ({@code canSeeJobOrderInventoryOwners} is
-   * {@code false}, REQ-ORDERS-029 / ADR-0107).
+   * {@code false}, REQ-ORDERS-029 / ADR-0107); mission slices of missions the caller may not read
+   * are anonymised for every viewer.
    *
    * @param id job-order id
    * @param matId material id
@@ -619,11 +622,8 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
-    List<InventoryItemDto> items =
-        jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
-    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(id)
-        ? items
-        : inventoryOwnerRedactor.redactInventoryItems(items);
+    return redactLinkedStock(
+        id, jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId));
   }
 
   /**
@@ -668,10 +668,24 @@ public class JobOrderController {
   @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getOrphanedLinkedInventory(@PathVariable UUID id) {
-    List<InventoryItemDto> items = jobOrderQueryService.getOrphanedLinkedInventory(id);
+    return redactLinkedStock(id, jobOrderQueryService.getOrphanedLinkedInventory(id));
+  }
+
+  /**
+   * Applies the two redactions of an order's linked stock: the mission slices of missions the
+   * caller may not read are anonymised for everyone, owner and location are blanked for a
+   * requesting-side viewer.
+   *
+   * @param id job-order id
+   * @param items the linked-stock rows
+   * @return the redacted rows
+   */
+  private List<InventoryItemDto> redactLinkedStock(UUID id, List<InventoryItemDto> items) {
+    List<InventoryItemDto> missionSafe =
+        missionAllocationRedactor.anonymiseUnreadableMissions(items);
     return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(id)
-        ? items
-        : inventoryOwnerRedactor.redactInventoryItems(items);
+        ? missionSafe
+        : inventoryOwnerRedactor.redactInventoryItems(missionSafe);
   }
 
   /**

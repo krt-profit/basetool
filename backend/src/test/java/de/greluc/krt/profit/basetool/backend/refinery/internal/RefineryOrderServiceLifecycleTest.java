@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -286,7 +287,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_emptyStatusList_filtersOnEveryStatusInTheCallersScope() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
       when(refineryOrderRepository.findFilteredScoped(
               eq(EnumSet.allOf(RefineryOrderStatus.class)),
@@ -309,7 +310,7 @@ class RefineryOrderServiceLifecycleTest {
     void getAllRefineryOrders_withStatusesReadyAndQuery_forwardsThemWithTheCallersScope() {
       UUID callerStaffel = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffel)));
       when(refineryOrderRepository.findFilteredScoped(
               eq(EnumSet.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)),
@@ -336,7 +337,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_secondOverload_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
       when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
           .thenReturn(page);

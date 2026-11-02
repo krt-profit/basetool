@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
@@ -333,7 +334,7 @@ class MissionServiceLifecycleTest {
 
   @Test
   void findAllActiveReference_delegatesToRepository() {
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
             eq(true),
@@ -364,7 +365,7 @@ class MissionServiceLifecycleTest {
   @Test
   void findAllActiveReference_passesCurrentSquadronIdToRepository() {
     java.util.UUID squadronId = java.util.UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, squadronId, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
             eq(false),

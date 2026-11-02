@@ -134,6 +134,21 @@ public record NavigationGate(
     return anyRole.isEmpty() || anyRole.stream().anyMatch(access.roles()::contains);
   }
 
+  /**
+   * Whether a caller still passes this gate in some context: the role condition holds and every
+   * required flag's right is held user-wide ({@link NavigationFlag#holdsUserWide}), whichever
+   * context the current request is in.
+   *
+   * @param access the caller's reachable roles and flags
+   * @return {@code false} iff the caller lost a role or right this gate needs in every context;
+   *     without known rights ({@link NavigationAccess#rightsKnown()}) only the roles decide
+   */
+  public boolean permitsUserWide(@NotNull NavigationAccess access) {
+    return permitsRoles(access)
+        && (!access.rightsKnown()
+            || required.stream().allMatch(flag -> flag.holdsUserWide(access.flags())));
+  }
+
   @NotNull
   private static Set<NavigationFlag> union(
       @NotNull Set<NavigationFlag> base, @NotNull NavigationFlag... more) {

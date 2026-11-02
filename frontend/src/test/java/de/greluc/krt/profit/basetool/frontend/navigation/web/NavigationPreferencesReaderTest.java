@@ -158,10 +158,10 @@ class NavigationPreferencesReaderTest {
   void keepsAContextOnlyOrderKey() {
     when(client.preferences())
         .thenReturn(
-            storedOrder(new OrderModeResponse(Map.of("logistics", List.of("orders.list")), 1)));
+            storedOrder(new OrderModeResponse(Map.of("unit", List.of("promotion.overview")), 1)));
 
-    assertThat(reader.read(MEMBER).order().member().links("logistics"))
-        .containsExactly("orders.list");
+    assertThat(reader.read(MEMBER).order().member().links("unit"))
+        .containsExactly("promotion.overview");
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
   }
 
@@ -182,18 +182,95 @@ class NavigationPreferencesReaderTest {
   @Test
   @DisplayName("an entry only the active context refuses stays stored and renders unavailable")
   void keepsAContextOnlyGapGreyedAndStored() {
-    when(client.preferences()).thenReturn(stored(1, "orders.list"));
+    when(client.preferences()).thenReturn(stored(1, "promotion.overview"));
 
     NavigationFavourites favourites = reader.read(MEMBER).favourites();
 
     assertThat(favourites.member())
         .singleElement()
         .satisfies(item -> {
-          assertThat(item.entry().key()).isEqualTo("orders.list");
+          assertThat(item.entry().key()).isEqualTo("promotion.overview");
           assertThat(item.available()).isFalse();
         });
-    assertThat(favourites.keys()).containsExactly("orders.list");
+    assertThat(favourites.keys()).containsExactly("promotion.overview");
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+  }
+
+  @Test
+  @DisplayName("a leadership entry is deleted once the last seat is gone, kept while one remains")
+  void deletesAFlagBasedEntryOnlyWhenTheRightIsLostEverywhere() {
+    when(client.preferences()).thenReturn(stored(2, "promotion.manage", "missions.list"));
+    when(client.prune(List.of("promotion.manage"))).thenReturn(stored(3, "missions.list"));
+    NavigationAccess seatElsewhere =
+        new NavigationAccess(
+            Set.of("KRT_MEMBER"),
+            Set.of(
+                NavigationFlag.LANGUAGE_DE,
+                NavigationFlag.PROMOTION,
+                NavigationFlag.OFFICER_ANYWHERE));
+
+    NavigationFavourites kept = reader.read(seatElsewhere).favourites();
+
+    assertThat(kept.keys()).containsExactly("promotion.manage", "missions.list");
+    assertThat(kept.member().getFirst().available()).isFalse();
+    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+
+    NavigationFavourites pruned = reader.read(MEMBER).favourites();
+
+    verify(client).prune(List.of("promotion.manage"));
+    assertThat(pruned.keys()).containsExactly("missions.list");
+  }
+
+  @Test
+  @DisplayName("without a capability answer no right counts as lost and nothing is deleted")
+  void deletesNothingWhileTheRightsAreUnknown() {
+    when(client.preferences()).thenReturn(stored(2, "promotion.manage", "orders.list"));
+
+    NavigationFavourites favourites =
+        reader
+            .read(
+                new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.PROMOTION), false))
+            .favourites();
+
+    assertThat(favourites.keys()).containsExactly("promotion.manage", "orders.list");
+    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+  }
+
+  @Test
+  @DisplayName("a start page of a lost role is deleted, one the caller still holds is kept")
+  void deletesStartPagesOfALostRole() {
+    NavigationPreferencesResponse stored = storedStartPages("bank.requests", "admin.terms");
+    when(client.preferences()).thenReturn(stored);
+    when(client.prune(List.of("bank.requests", "admin.terms")))
+        .thenReturn(storedStartPages(null, null));
+
+    reader.read(MEMBER);
+
+    verify(client).prune(List.of("bank.requests", "admin.terms"));
+  }
+
+  @Test
+  @DisplayName("a start page the caller may still open is not deleted")
+  void keepsAStartPageOfAHeldRole() {
+    when(client.preferences()).thenReturn(storedStartPages("missions.list", null));
+
+    reader.read(MEMBER);
+
+    verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
+  }
+
+  private static NavigationPreferencesResponse storedStartPages(String member, String admin) {
+    return new NavigationPreferencesResponse(
+        new FavouritesResponse(List.of(), 0),
+        HiddenResponse.EMPTY,
+        OrderResponse.EMPTY,
+        new AppearanceResponse(
+            de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode.DRAWER,
+            true,
+            member,
+            admin,
+            1),
+        TabBarsResponse.AUTOMATIC);
   }
 
   @Test
@@ -267,11 +344,11 @@ class NavigationPreferencesReaderTest {
   @Test
   @DisplayName("a page the active context refuses stays hidden and renders unavailable")
   void keepsAHiddenContextGapStored() {
-    when(client.preferences()).thenReturn(storedHidden(1, "orders.list"));
+    when(client.preferences()).thenReturn(storedHidden(1, "promotion.overview"));
 
     NavigationHidden hidden = reader.read(MEMBER).hidden();
 
-    assertThat(hidden.keys()).containsExactly("orders.list");
+    assertThat(hidden.keys()).containsExactly("promotion.overview");
     assertThat(hidden.member())
         .singleElement()
         .satisfies(item -> assertThat(item.available()).isFalse());

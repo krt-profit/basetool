@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.navigation.model;
 
+import java.util.Set;
+import org.jetbrains.annotations.NotNull;
+
 /** A per-request fact besides the roles that a {@link NavigationGate} can require or exclude. */
 public enum NavigationFlag {
 
@@ -36,6 +39,9 @@ public enum NavigationFlag {
 
   /** The caller holds a Logistician grant in the active context. */
   LOGISTICIAN_HERE,
+
+  /** The caller holds officer reach in at least one unit, whatever unit is pinned. */
+  OFFICER_ANYWHERE,
 
   /** The Leitung page is offered in the active context (officer reach). */
   OPEN_LEITUNG,
@@ -56,5 +62,23 @@ public enum NavigationFlag {
   LANGUAGE_DE,
 
   /** The page is rendered in English. */
-  LANGUAGE_EN
+  LANGUAGE_EN;
+
+  /**
+   * Whether the right behind this flag is still held in some context when the set of per-request
+   * flags lacks it: a right not tied to the pinned unit holds user-wide only when the flag is set,
+   * a right tied to the pinned unit holds while its user-wide counterpart is set, and a switch of
+   * the installation or the page never counts as a lost right.
+   *
+   * @param flags the per-request flags that are set
+   * @return {@code false} iff the caller lost the right in every context
+   */
+  public boolean holdsUserWide(@NotNull Set<NavigationFlag> flags) {
+    return switch (this) {
+      case BLUEPRINT_OVERVIEW, JOB_ORDERS, OWN_JOB_ORDERS, ASSIGNED_JOB_ORDERS, OFFICER_ANYWHERE ->
+          flags.contains(this);
+      case OPEN_LEITUNG, MANAGE_PROMOTIONS -> flags.contains(OFFICER_ANYWHERE);
+      case LOGISTICIAN_HERE, SUPPLY, PURCHASING, PROMOTION, LANGUAGE_DE, LANGUAGE_EN -> true;
+    };
+  }
 }

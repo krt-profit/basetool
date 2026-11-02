@@ -403,6 +403,8 @@ public class MissionAccessPolicy implements MissionVisibility {
     if (mission.getOwningOrgUnit() == null) {
       return !internal || authHelper.isMemberOrAbove();
     }
-    return !internal || ownerScopeService.canSeeSquadron(mission.getOwningOrgUnit().getId());
+    return !internal
+        || ownerScopeService.canSeeSquadronAsGrantee(
+            mission.getOwningOrgUnit().getId(), Roles.MISSION_MANAGER);
   }
 }

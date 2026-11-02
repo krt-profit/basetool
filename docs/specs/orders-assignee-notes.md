@@ -88,8 +88,10 @@ visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, A
   (responsible) unit first, every other hit marked with its primary unit, no further personal data.
 - **What the grant shows.** An assignee who reaches the order only through the grant reads its
   detail **in full** (materials, progress, assignees, notes, linked-stock drill-downs) with the
-  owner panels redacted as for any viewer outside the unit, and finds it in the „Alle" list (`ALL`)
-  of the overview. The „Ich bearbeite" segment (`assignedToMe=true`, REQ-ORDERS-040) lists the entries
+  owner panels redacted as for any viewer outside the unit and the mission slices of its linked
+  stock anonymised wherever the mission itself is unreadable to them (REQ-ORDERS-029), and finds it
+  in the „Alle" list (`ALL`) of the overview, also without profit access — there the list holds only
+  the assigned orders, narrowed by the display filters. The „Ich bearbeite" segment (`assignedToMe=true`, REQ-ORDERS-040) lists the entries
   without profit access. „Zu bearbeiten" (`TO_PROCESS`) keeps the normal tenancy scope, and the grant
   widens no other list — not the reference lookup of the Lager pickers, not the material board.
 - **What the grant allows.** Such an assignee may edit their own note (REQ-ORDERS-013) and remove

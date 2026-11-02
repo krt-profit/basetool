@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -314,7 +315,7 @@ class MissionServiceTest {
     List<String> status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
     Pageable pageable = PageRequest.of(0, 10);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
             query, start, end, status, null, null, null, false, null, Set.of(), false, pageable))
@@ -333,7 +334,7 @@ class MissionServiceTest {
     UUID unit = UUID.randomUUID();
     List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
             null, null, null, allFour, null, null, unit, false, null, Set.of(), false, pageable))
@@ -354,7 +355,7 @@ class MissionServiceTest {
   void searchMissions_nullEmptyAndExplicitFourStatuses_reachTheRepositoryIdentically() {
     List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
             null, null, null, allFour, null, null, null, false, null, Set.of(), false, pageable))

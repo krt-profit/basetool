@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
@@ -79,7 +80,8 @@ public class OperationAccessPolicy {
           boolean scopeVisible =
               o.getOwningOrgUnit() == null
                   ? authHelper.isMemberOrAbove()
-                  : ownerScopeService.canSeeSquadron(o.getOwningOrgUnit().getId());
+                  : ownerScopeService.canSeeSquadronAsGrantee(
+                      o.getOwningOrgUnit().getId(), Roles.MISSION_MANAGER);
           return scopeVisible || participatedInOperation(operationId);
         })
         .orElse(false);
@@ -98,7 +100,8 @@ public class OperationAccessPolicy {
         .map(o ->
             o.getOwningOrgUnit() == null
                 ? authHelper.isMemberOrAbove()
-                : ownerScopeService.canSeeSquadron(o.getOwningOrgUnit().getId()))
+                : ownerScopeService.canSeeSquadronAsGrantee(
+                    o.getOwningOrgUnit().getId(), Roles.MISSION_MANAGER))
         .orElse(false);
   }
 

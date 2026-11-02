@@ -84,6 +84,28 @@ class StockLevelTabRenderTest {
           false,
           0L);
 
+  private static final QualityTierDto ACTIVE_TIER =
+      new QualityTierDto(
+          UUID.fromString("00000000-0000-0000-0000-0000000000c1"),
+          "GOOD",
+          650,
+          "Gut (650+)",
+          "Good (650+)",
+          650,
+          true,
+          0L);
+
+  private static final QualityTierDto OTHER_INACTIVE_TIER =
+      new QualityTierDto(
+          UUID.fromString("00000000-0000-0000-0000-0000000000c4"),
+          "ANCIENT",
+          100,
+          "Uralt (100+)",
+          "Ancient (100+)",
+          100,
+          false,
+          0L);
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private BackendApiClient backendApiClient;
@@ -94,11 +116,13 @@ class StockLevelTabRenderTest {
 
   private boolean supplyOn;
   private List<SupplyUnitDto> supplyUnits = List.of();
+  private List<QualityTierDto> tierCatalog = List.of();
 
   @BeforeEach
   void resetSupply() {
     supplyOn = false;
     supplyUnits = List.of();
+    tierCatalog = List.of();
     supplyFeatureState.evict();
   }
 
@@ -112,6 +136,8 @@ class StockLevelTabRenderTest {
         .thenReturn(new SupplyStateDto(supplyOn));
     when(backendApiClient.get(eq("/api/v1/supply/units"), anyTypeRef())).thenReturn(supplyUnits);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.getCached(eq(CachedCatalog.QUALITY_TIERS), anyTypeRef()))
+        .thenReturn(tierCatalog);
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(get("/inventory/stock-levels" + query).locale(Locale.GERMAN))
@@ -179,6 +205,24 @@ class StockLevelTabRenderTest {
         .contains("id=\"stock-level-modal\"")
         .contains("aria-current=\"page\"")
         .contains("/js/inventory/stock-levels.js");
+  }
+
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void theTierChoicesKeepTheInactiveTierOfAListedLevelHiddenAndMarked() throws Exception {
+    tierCatalog = List.of(ACTIVE_TIER, INACTIVE_TIER, OTHER_INACTIVE_TIER);
+
+    String html =
+        render(List.of(level("Quantanium", INACTIVE_TIER, 6.0, true, true)), List.of(ARGON), "");
+
+    assertThat(html)
+        .containsPattern(
+            "<option[^>]*value=\""
+                + INACTIVE_TIER.id()
+                + "\"[^>]*hidden[^>]*>[^<]*Alt \\(500\\+\\) \\(Stufe inaktiv\\)")
+        .containsPattern(
+            "<option[^>]*value=\"" + ACTIVE_TIER.id() + "\"[^>]*>[^<]*Gut \\(650\\+\\)")
+        .doesNotContain(OTHER_INACTIVE_TIER.id().toString());
   }
 
   @Test

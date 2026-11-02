@@ -234,19 +234,20 @@ class NavigationTabBarResolverTest {
   }
 
   @Test
-  @DisplayName("a stored key of a lost role, of the other mode or unknown is to be deleted")
+  @DisplayName(
+      "a stored key of a lost role or right, of the other mode or unknown is to be deleted")
   void goneKeysAreDeleted() {
     TabBarResponse stored =
         new TabBarResponse(Arrays.asList("admin.terms", "future.page", "orders.list"), 1);
 
     assertThat(resolver.gone(NavigationMode.MEMBER, stored, MEMBER))
-        .containsExactly("admin.terms", "future.page");
+        .containsExactly("admin.terms", "future.page", "orders.list");
   }
 
   @Test
   @DisplayName("a stored slot only the active context refuses is kept")
   void contextOnlyGapIsNotDeleted() {
-    TabBarResponse stored = new TabBarResponse(Arrays.asList("orders.list", null, null), 1);
+    TabBarResponse stored = new TabBarResponse(Arrays.asList("promotion.overview", null, null), 1);
 
     assertThat(resolver.gone(NavigationMode.MEMBER, stored, MEMBER)).isEmpty();
   }

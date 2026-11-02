@@ -107,7 +107,7 @@ public class DashboardReader {
     List<Item> narrow = new ArrayList<>();
     List<DashboardWidgetType> gone = new ArrayList<>();
     for (DashboardWidgetResponse widget : stored.widgets()) {
-      if (!widget.type().permitsRoles(access)) {
+      if (!widget.type().permitsUserWide(access)) {
         if (!gone.contains(widget.type())) {
           gone.add(widget.type());
         }

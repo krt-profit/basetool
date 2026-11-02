@@ -105,6 +105,7 @@ public class NavigationAdvice {
       addIf(flags, capabilities.canViewOwnJobOrders(), NavigationFlag.OWN_JOB_ORDERS);
       addIf(flags, capabilities.canViewAssignedJobOrders(), NavigationFlag.ASSIGNED_JOB_ORDERS);
       addIf(flags, capabilities.isLogisticianOrAbove(), NavigationFlag.LOGISTICIAN_HERE);
+      addIf(flags, capabilities.canActAsOfficerAnywhere(), NavigationFlag.OFFICER_ANYWHERE);
       addIf(flags, capabilities.canOpenLeitung(), NavigationFlag.OPEN_LEITUNG);
       addIf(flags, capabilities.canManagePromotions(), NavigationFlag.MANAGE_PROMOTIONS);
     }
@@ -113,7 +114,8 @@ public class NavigationAdvice {
     addIf(flags, Boolean.TRUE.equals(promotionEnabled), NavigationFlag.PROMOTION);
     addIf(flags, "de".equals(locale.getLanguage()), NavigationFlag.LANGUAGE_DE);
     addIf(flags, "en".equals(locale.getLanguage()), NavigationFlag.LANGUAGE_EN);
-    return new NavigationAccess(roles(authentication), flags);
+    boolean rightsKnown = capabilities != null && capabilities != CapabilitiesResponse.NONE;
+    return new NavigationAccess(roles(authentication), flags, rightsKnown);
   }
 
   /**

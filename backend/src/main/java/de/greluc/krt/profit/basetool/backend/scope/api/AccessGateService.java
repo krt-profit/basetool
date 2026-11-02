@@ -64,6 +64,35 @@ public class AccessGateService {
   }
 
   /**
+   * {@link #canSeeSquadron(UUID)} widened by the caller's grant of {@code roleName}: true also when
+   * a Logistician or Mission Manager grant covers {@code squadronId}, cascade included, inside the
+   * active context (decision 18, REQ-SEC-005). The grant widens the aggregate checks of the
+   * surfaces the role governs; it is no substitute for the membership scope elsewhere.
+   *
+   * @param squadronId the org-unit id whose data the caller wants to read; never {@code null}
+   * @param roleName the contextual role, {@link Roles#LOGISTICIAN} or {@link Roles#MISSION_MANAGER}
+   * @return {@code true} iff the caller sees the unit by membership or by a covering grant
+   */
+  public boolean canSeeSquadronAsGrantee(@NotNull UUID squadronId, @NotNull String roleName) {
+    return canSeeSquadron(squadronId) || holdsCoveringGrant(squadronId, roleName);
+  }
+
+  /**
+   * Whether a non-admin caller's grant of {@code roleName} covers {@code orgUnitId} inside the
+   * active context.
+   *
+   * @param orgUnitId the unit to cover; never {@code null}
+   * @param roleName the contextual role; never {@code null}
+   * @return {@code true} iff the unit is in the caller's granted set for the active context
+   */
+  private boolean holdsCoveringGrant(@NotNull UUID orgUnitId, @NotNull String roleName) {
+    return !authHelper.isAdmin()
+        && requestScopeResolver
+            .currentGrantedOrgUnitIdsInActiveContext(roleName)
+            .contains(orgUnitId);
+  }
+
+  /**
    * Checks whether the caller may write data owned by {@code squadronId}; currently the same rule
    * as {@link #canSeeSquadron(UUID)}.
    *
@@ -247,5 +276,22 @@ public class AccessGateService {
         || (orgUnit == null
             ? canAccessOwnerlessPersonalRow(owner)
             : (edit ? canEditSquadron(orgUnit.getId()) : canSeeSquadron(orgUnit.getId())));
+  }
+
+  /**
+   * {@link #permitsOwnedRow(User, OrgUnit, boolean)} widened by a grant of {@code roleName} that
+   * covers the row's owning unit, cascade included (decision 18).
+   *
+   * @param owner the row's per-user owner, or {@code null}
+   * @param orgUnit the row's owning org unit; {@code null} marks an ownerless row
+   * @param edit {@code true} for the edit check, {@code false} for the read check
+   * @param roleName the contextual role of the surface, {@link Roles#LOGISTICIAN} or {@link
+   *     Roles#MISSION_MANAGER}
+   * @return {@code true} iff the caller may access the row
+   */
+  public boolean permitsOwnedRow(
+      @Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit, @NotNull String roleName) {
+    return permitsOwnedRow(owner, orgUnit, edit)
+        || (orgUnit != null && holdsCoveringGrant(orgUnit.getId(), roleName));
   }
 }

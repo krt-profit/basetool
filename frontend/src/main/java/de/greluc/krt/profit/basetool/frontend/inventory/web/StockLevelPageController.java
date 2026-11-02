@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -106,7 +107,7 @@ public class StockLevelPageController {
     if (units != null && !units.isEmpty()) {
       List<MaterialReferenceDto> materials = inventoryClient.materials();
       model.addAttribute("materials", materials == null ? List.of() : materials);
-      model.addAttribute("tiers", activeTiers());
+      model.addAttribute("tiers", tierChoices(levels == null ? List.of() : levels));
     }
     return "inventory/stock-levels";
   }
@@ -129,8 +130,20 @@ public class StockLevelPageController {
             .collect(Collectors.toUnmodifiableSet());
   }
 
-  private @NotNull List<QualityTierDto> activeTiers() {
-    return qualityTierCatalog.all().stream().filter(QualityTierDto::active).toList();
+  /**
+   * The tiers the dialog offers: every active tier plus the inactive tier a listed level still
+   * carries, so editing that level keeps its quality floor (REQ-INV-068).
+   */
+  private @NotNull List<QualityTierDto> tierChoices(@NotNull List<StockLevelDto> levels) {
+    Set<UUID> inUse =
+        levels.stream()
+            .map(StockLevelDto::qualityTier)
+            .filter(Objects::nonNull)
+            .map(QualityTierDto::id)
+            .collect(Collectors.toUnmodifiableSet());
+    return qualityTierCatalog.all().stream()
+        .filter(tier -> tier.active() || inUse.contains(tier.id()))
+        .toList();
   }
 
   private static @NotNull List<UnitLevels> byUnit(@NotNull List<StockLevelDto> levels) {

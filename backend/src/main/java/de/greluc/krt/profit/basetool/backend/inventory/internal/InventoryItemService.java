@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -314,7 +315,7 @@ public class InventoryItemService {
    */
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getMissionInventory(UUID missionId) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findByMissionIdScoped(
             missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())

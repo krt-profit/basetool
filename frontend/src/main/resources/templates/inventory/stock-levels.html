@@ -136,7 +136,7 @@
                         <label for="stock-level-tier" th:text="#{inventory.stockLevels.field.tier}">Qualit&auml;tsstufe</label>
                         <select id="stock-level-tier">
                             <option value="" th:text="#{inventory.stockLevels.anyTier}">Jede Qualit&auml;t</option>
-                            <option th:each="t : ${tiers}" th:value="${t.id()}" th:text="${t.label(#locale)}">Gut (650+)</option>
+                            <option th:each="t : ${tiers}" th:value="${t.id()}" th:hidden="${!t.active()}" th:text="${t.active()} ? ${t.label(#locale)} : |${t.label(#locale)} (#{inventory.stockLevels.tierInactive})|">Gut (650+)</option>
                         </select>
                     </div>
                     <div class="form-group">

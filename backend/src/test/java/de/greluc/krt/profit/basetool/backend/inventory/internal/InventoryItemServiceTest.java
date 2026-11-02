@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -161,7 +162,7 @@ class InventoryItemServiceTest {
     InventoryItem b = new InventoryItem();
     InventoryItemDto da = mock(InventoryItemDto.class);
     InventoryItemDto db = mock(InventoryItemDto.class);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMissionIdScoped(missionId, true, null, java.util.Set.of()))
         .thenReturn(List.of(a, b));
@@ -180,7 +181,7 @@ class InventoryItemServiceTest {
   void getAggregatedInventory_shouldReturnPage() {
     Object[] obj = new Object[] {new Material(), 10.0, 900, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.getAggregatedInventory(
             anyBoolean(), any(), any(), any(Pageable.class)))
@@ -201,7 +202,7 @@ class InventoryItemServiceTest {
   void getInventoryByMaterial_shouldReturnPage() {
     UUID materialId = UUID.randomUUID();
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMaterialAndPersonalFalseScoped(
             any(), anyBoolean(), any(), any(), any()))
@@ -232,7 +233,7 @@ class InventoryItemServiceTest {
 
   @Test
   void getAllInventory_shouldReturnAll_whenMaterialIdIsNull() {
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
@@ -265,7 +266,7 @@ class InventoryItemServiceTest {
     List<UUID> jobOrderIds = List.of(jobOrderId);
     List<UUID> missionIds = List.of(missionId);
 
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),

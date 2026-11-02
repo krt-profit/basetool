@@ -100,12 +100,14 @@ class NavigationCurrentEntryTest {
   @DisplayName("the registry classifies entries as available, context-only or gone")
   void classifiesAvailability() {
     NavigationAccess member = new NavigationAccess(Set.of("KRT_MEMBER"), Set.of());
+    NavigationEntry promotion = registry.starrable("promotion.overview").orElseThrow();
     NavigationEntry orders = registry.starrable("orders.list").orElseThrow();
     NavigationEntry terms = registry.starrable("admin.terms").orElseThrow();
     NavigationEntry missions = registry.starrable("missions.list").orElseThrow();
 
     assertThat(registry.availability(missions, member).name()).isEqualTo("AVAILABLE");
-    assertThat(registry.availability(orders, member).name()).isEqualTo("CONTEXT");
+    assertThat(registry.availability(promotion, member).name()).isEqualTo("CONTEXT");
+    assertThat(registry.availability(orders, member).name()).isEqualTo("GONE");
     assertThat(registry.availability(terms, member).name()).isEqualTo("GONE");
     assertThat(registry.starrable("home.dashboard")).isEmpty();
     assertThat(registry.starrable("action.handbook")).isEmpty();

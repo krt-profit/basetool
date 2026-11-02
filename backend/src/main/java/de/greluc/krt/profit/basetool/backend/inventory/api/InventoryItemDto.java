@@ -152,4 +152,34 @@ public record InventoryItemDto(
         canEdit,
         createdAt);
   }
+
+  /**
+   * Returns a copy of this projection with {@link #missionAllocations} replaced.
+   *
+   * @param newMissionAllocations the mission slices the copy carries.
+   * @return a copy of this DTO carrying {@code newMissionAllocations}.
+   */
+  @NotNull
+  public InventoryItemDto withMissionAllocations(List<MissionAllocationDto> newMissionAllocations) {
+    return new InventoryItemDto(
+        id,
+        user,
+        material,
+        gameItem,
+        location,
+        quality,
+        amount,
+        personal,
+        stolen,
+        jobOrderAllocations,
+        jobOrderRest,
+        newMissionAllocations,
+        missionRest,
+        donationAllocations,
+        note,
+        owningSquadron,
+        version,
+        canEdit,
+        createdAt);
+  }
 }

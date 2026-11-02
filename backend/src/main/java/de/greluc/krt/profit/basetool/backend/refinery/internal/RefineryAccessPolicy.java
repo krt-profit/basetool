@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
@@ -77,7 +78,8 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may read the order
    */
   public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
-    return ownerScopeService.permitsOwnedRow(order.getOwner(), order.getOwningOrgUnit(), false);
+    return ownerScopeService.permitsOwnedRow(
+        order.getOwner(), order.getOwningOrgUnit(), false, Roles.LOGISTICIAN);
   }
 
   /**
@@ -90,7 +92,9 @@ public class RefineryAccessPolicy {
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> ownerScopeService.permitsOwnedRow(o.getOwner(), o.getOwningOrgUnit(), true))
+        .map(o ->
+            ownerScopeService.permitsOwnedRow(
+                o.getOwner(), o.getOwningOrgUnit(), true, Roles.LOGISTICIAN))
         .orElse(false);
   }
 

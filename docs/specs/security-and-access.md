@@ -445,8 +445,19 @@ alike, by `OrgUnitCascadeService#unitsBelow` behind
 set (`hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`,
 `canManageMissionsOf`, the supply and purchasing managed units, the exchange's
 `findLogisticianOrgUnitIds`), never the raw contextual authorities. A pin must lie in the covered
-set; a pin outside it covers nothing. Admins are unrestricted. **Enforced by:** `GrantCascadeTest`,
-`OrgUnitCascadeServiceTest`, `LogisticianPerUnitSurfacesTest`.
+set; a pin outside it covers nothing. Admins are unrestricted. The aggregate access checks read the
+same set: a Logistician grant covering a unit also opens the read and edit of that unit's Lager rows
+and refinery orders and the read of its job orders, and a Mission Manager grant the read of its
+internal missions and operations (`AccessGateService#canSeeSquadronAsGrantee`, `permitsOwnedRow` with
+the role), so the cascade needs no leadership seat to reach a child unit. The lists read the same set
+(`RequestScopeResolver#currentScopePredicateGranting(role)`: the membership scope plus the granted
+units, a pin narrowing to the pinned unit when it lies in the union): the Lager lists and mission
+inventory, the stock levels and their maintainable units, the refinery order lists and the job-order
+list, number lookup and material demand take the Logistician grant; the mission picker and search
+and the operation lists take the Mission Manager grant. The „nächster Einsatz" banner and the
+upcoming-missions widget stay on the own units (REQ-MISSION-008). **Enforced by:**
+`GrantCascadeTest`, `GrantCascadeAggregateAccessIntegrationTest`, `OrgUnitCascadeServiceTest`,
+`LogisticianPerUnitSurfacesTest`.
 
 Mission Manager powers apply **per unit**: a grant in unit A (own flag, an officer rank, or the
 cascaded reach of a Bereich or Organisationsleitung grant) manages A's missions and operations and
@@ -3819,7 +3830,8 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
   seat holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
   officer role.
 
-**The officer flags:** `hasOfficerReach`, `canOpenLeitung`,
+**The officer flags:** `canActAsOfficerAnywhere` (reach in at least one unit whatever the pin, which
+tells a lost seat from a pin outside it), `hasOfficerReach`, `canOpenLeitung`,
 `canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`
 (and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);

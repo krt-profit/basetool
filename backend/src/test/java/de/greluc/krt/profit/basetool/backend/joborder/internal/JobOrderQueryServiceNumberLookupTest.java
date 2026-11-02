@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -68,7 +69,7 @@ class JobOrderQueryServiceNumberLookupTest {
     order.setDisplayId(12);
     order.setStatus(JobOrderStatus.OPEN);
     when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, Set.of(UNIT_ID)));
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(jobOrderRepository.findVisibleByNumberPrefix(
@@ -84,7 +85,7 @@ class JobOrderQueryServiceNumberLookupTest {
   @Test
   void aCallerOutsideTheWorkflowOnlyGetsTheAssigneeGrant() {
     when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
     when(jobOrderRepository.findVisibleByNumberPrefix(

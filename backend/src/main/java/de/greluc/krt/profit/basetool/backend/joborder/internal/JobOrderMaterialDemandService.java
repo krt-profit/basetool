@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
@@ -98,7 +99,7 @@ public class JobOrderMaterialDemandService {
     if (!ownerScopeService.canViewJobOrders()) {
       return new MaterialDemandOverviewDto(List.of());
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<JobOrder> orders =
         jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             NON_TERMINAL_STATUSES,

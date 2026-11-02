@@ -194,6 +194,17 @@ class MeControllerTest {
   }
 
   @Test
+  void getCapabilities_officerAnywhereIgnoresThePin() {
+    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+    when(ownerScopeService.canActAsOfficerAnywhere()).thenReturn(true);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertFalse(response.hasOfficerReach());
+    assertTrue(response.canActAsOfficerAnywhere());
+  }
+
+  @Test
   void getLayout_carriesTheSameOfficerFlags() {
     when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
 

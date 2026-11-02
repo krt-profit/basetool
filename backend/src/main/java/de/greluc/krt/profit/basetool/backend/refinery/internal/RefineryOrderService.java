@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -262,8 +263,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   }
 
   /**
-   * Paged list of the orders in the caller's org-unit scope under the list filters
-   * (REQ-REFINERY-019).
+   * Paged list of the in-scope orders under the list filters (REQ-REFINERY-019).
    *
    * @param statuses optional status filter; {@code null} or empty means every status
    * @param readyOnly {@code true} to keep only orders whose end is unknown or has passed
@@ -276,7 +276,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       boolean readyOnly,
       @Nullable String query,
       @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return refineryOrderRepository.findFilteredScoped(
         statusesOrAll(statuses),
         readyOnly,
@@ -295,7 +295,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    * @return paged orders across all users
    */
   public Page<RefineryOrder> getAllRefineryOrders(@NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return refineryOrderRepository.findAllScoped(
         scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }

@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBluep
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMissionAllocationRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -98,6 +99,7 @@ class JobOrderControllerTest {
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
+  @Mock private JobOrderMissionAllocationRedactor missionAllocationRedactor;
 
   @InjectMocks private JobOrderController controller;
 
@@ -456,6 +458,8 @@ class JobOrderControllerTest {
     InventoryItemDto inv = sampleInventoryItem();
     when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(List.of(inv));
+    when(missionAllocationRedactor.anonymiseUnreadableMissions(List.of(inv)))
+        .thenReturn(List.of(inv));
     when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<InventoryItemDto> result =
@@ -473,6 +477,7 @@ class JobOrderControllerTest {
     List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
     when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(raw);
+    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(raw);
     when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
     when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
 
@@ -489,6 +494,7 @@ class JobOrderControllerTest {
     List<InventoryItemDto> raw = List.of(sampleInventoryItem());
     List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
     when(jobOrderQueryService.getOrphanedLinkedInventory(jobOrderId)).thenReturn(raw);
+    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(raw);
     when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
     when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
 

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -162,7 +163,8 @@ class JobOrderAccessPolicyTest {
   @Test
   void canManageAssignees_aLogisticianOfAnotherUnitWhoIsAMemberOfTheOrdersUnitMayNot() {
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.canSeeSquadron(foreignUnitId)).thenReturn(true);
+    when(ownerScopeService.canSeeSquadronAsGrantee(foreignUnitId, Roles.LOGISTICIAN))
+        .thenReturn(true);
     when(ownerScopeService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(false);
 
     assertThat(policy.canSeeJobOrder(order.getId())).isTrue();
