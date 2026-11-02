@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The rows of an order widget: number, status, priority and, when asked, the responsible unit. */-->
+<ul th:fragment="orderRows(orders, rowTestId, unitTestId, showUnit)" class="dash-links">
+    <li th:each="order : ${orders}">
+        <a class="dash-link" th:attr="data-testid=${rowTestId}" th:href="@{/orders/{id}(id=${order.id})}">
+            <span class="cell-title">
+                <span th:text="'#' + ${order.displayId}">#42</span>
+                <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(order.status)}"
+                      th:text="#{__${'status.' + order.status}__}">Offen</span>
+            </span>
+            <span class="cell-sub">
+                <span th:text="#{dashboard.assignedOrders.priority(${order.priority != null ? order.priority : '-'})}">Prio 1</span>
+                <th:block th:if="${showUnit and order.responsibleOrgUnit != null}"> · <span th:attr="data-testid=${unitTestId}"
+                        th:title="${order.responsibleOrgUnit.name()}" th:text="${order.responsibleOrgUnit.shorthand()}">ALF</span></th:block>
+            </span>
+        </a>
+    </li>
+</ul>
+
+<!--/* The foot of a list widget: the total as the count and the link to the page or tab. */-->
+<div th:fragment="foot(countTestId, total, href)" class="home-card-foot dash-widget__foot">
+    <span class="count-badge count-badge--sm" th:attr="data-testid=${countTestId}" th:text="${total}">7</span>
+    <a class="home-card-link" th:href="${href}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+</div>
+
+<div th:fragment="ordersToProcess" data-widget-content data-testid="dashboard-orders-to-process">
+    <th:block th:if="${not #lists.isEmpty(toProcessOrders)}">
+        <th:block th:replace="~{:: orderRows(${toProcessOrders}, 'dashboard-orders-to-process-row', 'dashboard-orders-to-process-unit', ${toProcessShowsUnit})}"></th:block>
+    </th:block>
+    <p th:if="${#lists.isEmpty(toProcessOrders)}" class="home-notifs__empty" data-testid="dashboard-orders-to-process-empty"
+       th:text="#{dashboard.ordersToProcess.empty}">Kein Auftrag zu bearbeiten.</p>
+    <div th:replace="~{:: foot('dashboard-orders-to-process-count', ${toProcessTotal}, @{/orders(scope='TO_PROCESS')})}"></div>
+</div>
+
+<div th:fragment="myOrders" data-widget-content data-testid="dashboard-my-orders">
+    <th:block th:if="${not #lists.isEmpty(myOrders)}">
+        <th:block th:replace="~{:: orderRows(${myOrders}, 'dashboard-my-orders-row', 'dashboard-my-orders-unit', true)}"></th:block>
+    </th:block>
+    <p th:if="${#lists.isEmpty(myOrders)}" class="home-notifs__empty" data-testid="dashboard-my-orders-empty"
+       th:text="#{dashboard.myOrders.empty}">Deine Einheiten haben keinen Auftrag in dieser Auswahl.</p>
+    <div th:replace="~{:: foot('dashboard-my-orders-count', ${myOrdersTotal}, @{/orders(scope='MINE')})}"></div>
+</div>
+
+<div th:fragment="materialDemand" data-widget-content data-testid="dashboard-material-demand">
+    <ul th:if="${not #lists.isEmpty(demandRows)}" class="dash-links">
+        <li th:each="row : ${demandRows}">
+            <a class="dash-link" data-testid="dashboard-material-demand-row" th:href="@{/orders/material-demand}">
+                <span class="cell-title">
+                    <span th:text="${row.material().name()}">Quantanium</span>
+                    <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${row.qualityTier()})}"></th:block>
+                    <span th:if="${demandShowsUnit and row.orgUnit() != null}" class="chip" data-testid="dashboard-material-demand-unit"
+                          th:title="${row.orgUnit().name()}" th:text="${row.orgUnit().shorthand()}">ALF</span>
+                </span>
+                <span class="cell-sub">
+                    <th:block th:replace="~{joborder/fragments/material-amount :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}"></th:block>
+                </span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(demandRows)}" class="home-notifs__empty" data-testid="dashboard-material-demand-empty"
+       th:text="#{dashboard.materialDemand.empty}">Kein offener Materialbedarf.</p>
+    <div th:replace="~{:: foot('dashboard-material-demand-count', ${demandTotal}, @{/orders/material-demand})}"></div>
+</div>
+
+<div th:fragment="refineryReady" data-widget-content data-testid="dashboard-refinery-ready">
+    <ul th:if="${not #lists.isEmpty(readyOrders)}" class="dash-links">
+        <li th:each="order : ${readyOrders}">
+            <a class="dash-link" data-testid="dashboard-refinery-ready-row" th:href="@{/refinery-orders/{id}(id=${order.id()})}">
+                <span class="cell-title" th:text="${order.location() != null ? order.location().name() : '—'}">ARC-L1</span>
+                <span class="cell-sub" th:text="${order.owner() != null ? order.owner().effectiveName() : '—'}">greluc</span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(readyOrders)}" class="home-notifs__empty" data-testid="dashboard-refinery-ready-empty"
+       th:text="#{dashboard.refineryReady.empty}">Keine Raffinerie-Aufträge fertig.</p>
+    <div th:replace="~{:: foot('dashboard-refinery-ready-count', ${readyTotal}, @{/refinery-orders(view='READY')})}"></div>
+</div>
+
+</body>
+</html>

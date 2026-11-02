@@ -35,5 +35,11 @@ public enum DashboardStatus {
   OPEN,
 
   /** Orders that are in progress. */
-  IN_PROGRESS
+  IN_PROGRESS,
+
+  /** Orders that are still running: open or in progress. */
+  RUNNING,
+
+  /** Orders that are done: completed or rejected. */
+  COMPLETED
 }

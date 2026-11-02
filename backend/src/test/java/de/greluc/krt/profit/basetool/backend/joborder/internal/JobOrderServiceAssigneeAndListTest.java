@@ -498,6 +498,45 @@ class JobOrderServiceAssigneeAndListTest {
     }
 
     @Test
+    void toProcess_withAProcessingUnit_forwardsOnlyThatMembership() {
+      Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
+      UUID staffel = UUID.randomUUID();
+      UUID sk = UUID.randomUUID();
+      Set<UUID> union = Set.of(staffel, sk);
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, null, union));
+      when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(union);
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              Set.of(sk),
+              false,
+              null,
+              union,
+              new UUID(0L, 0L),
+              pageable))
+          .thenReturn(page);
+
+      Page<JobOrderDto> result = queryService.getAllJobOrders(null, null, true, sk, pageable);
+
+      assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void toProcess_withAProcessingUnitOutsideTheMemberships_returnsAnEmptyPageWithoutQuerying() {
+      when(ownerScopeService.currentDirectMembershipOrgUnitIds())
+          .thenReturn(Set.of(UUID.randomUUID()));
+
+      Page<JobOrderDto> result =
+          queryService.getAllJobOrders(null, null, true, UUID.randomUUID(), pageable);
+
+      assertEquals(0, result.getTotalElements());
+      verifyNoInteractions(jobOrderRepository);
+    }
+
+    @Test
     void toProcess_withoutAnyUnit_returnsAnEmptyPageWithoutQuerying() {
       when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of());
 

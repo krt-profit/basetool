@@ -3,27 +3,12 @@
 <body>
 
 <div th:fragment="assignedOrders" data-widget-content data-testid="dashboard-assigned-orders">
-    <ul th:if="${not #lists.isEmpty(assignedOrders)}" class="dash-links">
-        <li th:each="order : ${assignedOrders}">
-            <a class="dash-link" data-testid="dashboard-assigned-order" th:href="@{/orders/{id}(id=${order.id})}">
-                <span class="cell-title">
-                    <span th:text="'#' + ${order.displayId}">#42</span>
-                    <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(order.status)}"
-                          th:text="#{__${'status.' + order.status}__}">Offen</span>
-                </span>
-                <span class="cell-sub">
-                    <span th:text="#{dashboard.assignedOrders.priority(${order.priority != null ? order.priority : '-'})}">Prio 1</span>
-                    <th:block th:if="${order.responsibleOrgUnit != null}"> · <span th:title="${order.responsibleOrgUnit.name()}" th:text="${order.responsibleOrgUnit.shorthand()}">ALF</span></th:block>
-                </span>
-            </a>
-        </li>
-    </ul>
+    <th:block th:if="${not #lists.isEmpty(assignedOrders)}">
+        <th:block th:replace="~{dashboard/fragments/order-widgets :: orderRows(${assignedOrders}, 'dashboard-assigned-order', 'dashboard-assigned-order-unit', true)}"></th:block>
+    </th:block>
     <p th:if="${#lists.isEmpty(assignedOrders)}" class="home-notifs__empty" data-testid="dashboard-assigned-orders-empty"
        th:text="#{dashboard.assignedOrders.empty}">Du bearbeitest zurzeit keinen Auftrag.</p>
-    <div class="home-card-foot dash-widget__foot">
-        <span class="count-badge count-badge--sm" data-testid="dashboard-assigned-orders-count" th:text="${assignedTotal}">7</span>
-        <a class="home-card-link" th:href="@{/orders(scope='ASSIGNED')}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
-    </div>
+    <div th:replace="~{dashboard/fragments/order-widgets :: foot('dashboard-assigned-orders-count', ${assignedTotal}, @{/orders(scope='ASSIGNED')})}"></div>
 </div>
 
 <div th:fragment="lowStock" data-widget-content data-testid="dashboard-low-stock">
@@ -46,10 +31,7 @@
     </ul>
     <p th:if="${#lists.isEmpty(lowLevels)}" class="home-notifs__empty" data-testid="dashboard-low-stock-empty"
        th:text="#{dashboard.lowStock.empty}">Kein Bestand unter dem Mindestbestand.</p>
-    <div class="home-card-foot dash-widget__foot">
-        <span class="count-badge count-badge--sm" data-testid="dashboard-low-stock-count" th:text="${lowTotal}">3</span>
-        <a class="home-card-link" th:href="@{/inventory/stock-levels}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
-    </div>
+    <div th:replace="~{dashboard/fragments/order-widgets :: foot('dashboard-low-stock-count', ${lowTotal}, @{/inventory/stock-levels})}"></div>
 </div>
 
 <div th:fragment="bank" data-widget-content data-testid="dashboard-bank">
@@ -93,10 +75,7 @@
     </ul>
     <p th:if="${#lists.isEmpty(bankAccounts)}" class="home-notifs__empty" data-testid="dashboard-bank-empty"
        th:text="#{dashboard.bank.empty}">Keine Konten sichtbar.</p>
-    <div class="home-card-foot dash-widget__foot">
-        <span class="count-badge count-badge--sm" data-testid="dashboard-bank-count" th:text="${bankTotal}">5</span>
-        <a class="home-card-link" th:href="@{/org-unit-bank}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
-    </div>
+    <div th:replace="~{dashboard/fragments/order-widgets :: foot('dashboard-bank-count', ${bankTotal}, @{/org-unit-bank})}"></div>
 </div>
 
 </body>

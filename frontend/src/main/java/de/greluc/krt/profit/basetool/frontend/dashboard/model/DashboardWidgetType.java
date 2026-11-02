@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -142,6 +143,36 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.ROWS)),
+
+  /** The orders one of the member's units processes; the member has to enter the order area. */
+  ORDERS_TO_PROCESS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.requires(NavigationFlag.JOB_ORDERS),
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+
+  /** The orders the member's units requested; the requester view is open to a requester. */
+  MY_ORDERS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.requires(NavigationFlag.OWN_JOB_ORDERS),
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.RUNNING, DashboardStatus.COMPLETED, DashboardStatus.ALL)),
+
+  /** The open material demand; the overview is part of the order area. */
+  MATERIAL_DEMAND(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.requires(NavigationFlag.JOB_ORDERS),
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS)),
+
+  /** The refinery orders that are ready to be stored; the refinery is open to every member. */
+  REFINERY_READY(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.ALWAYS,
       EnumSet.of(DashboardOption.ROWS));
 
   /** The day counts the days option offers. */

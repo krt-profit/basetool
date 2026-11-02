@@ -93,11 +93,11 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Global job-order queue room, authorized by the {@code canViewJobOrders} or the {@code
-   * canViewAssignedJobOrders} capability; its frames carry only a section key, and each viewer
-   * refreshes their own scoped list, so an assignee learns of no order beyond their own. Sections
-   * {@code queue} (the order list) and {@code demand} (the material-demand overview,
-   * REQ-ORDERS-034).
+   * Global job-order queue room, authorized by the {@code canViewJobOrders}, {@code
+   * canViewAssignedJobOrders} or {@code canViewOwnJobOrders} capability; its frames carry only a
+   * section key, and each viewer refreshes their own scoped list, so an assignee or a requester
+   * learns of no order beyond their own. Sections {@code queue} (the order list) and {@code demand}
+   * (the material-demand overview, REQ-ORDERS-034).
    */
   ORDERS_QUEUE(
       "orders",
@@ -106,7 +106,7 @@ public enum LiveSyncTopicClass {
       false,
       "orders_queue",
       "/api/v1/me/capabilities",
-      "canViewJobOrders|canViewAssignedJobOrders"),
+      "canViewJobOrders|canViewAssignedJobOrders|canViewOwnJobOrders"),
 
   /**
    * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET

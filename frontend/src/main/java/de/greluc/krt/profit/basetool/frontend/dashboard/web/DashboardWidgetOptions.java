@@ -44,6 +44,10 @@ final class DashboardWidgetOptions {
 
   private static final String ORDER_IN_PROGRESS = "IN_PROGRESS";
 
+  private static final String ORDER_COMPLETED = "COMPLETED";
+
+  private static final String ORDER_REJECTED = "REJECTED";
+
   private DashboardWidgetOptions() {}
 
   /**
@@ -94,29 +98,36 @@ final class DashboardWidgetOptions {
   }
 
   /**
-   * The status filter of the assigned-orders widget.
+   * The status filter of an order widget.
    *
+   * @param type the order widget
    * @param requested the requested status, or {@code null}
-   * @return the requested status when the widget offers it, else {@link
-   *     DashboardStatus#OPEN_ACTIVE}
+   * @return the requested status when the widget offers it, else the widget's default: {@link
+   *     DashboardStatus#RUNNING} for the requested orders, {@link DashboardStatus#OPEN_ACTIVE}
+   *     otherwise
    */
-  static @NotNull DashboardStatus orderStatus(@Nullable DashboardStatus requested) {
-    return requested != null && DashboardWidgetType.ASSIGNED_ORDERS.offersStatus(requested)
-        ? requested
-        : DashboardStatus.OPEN_ACTIVE;
+  static @NotNull DashboardStatus orderStatus(
+      @NotNull DashboardWidgetType type, @Nullable DashboardStatus requested) {
+    DashboardStatus fallback =
+        type == DashboardWidgetType.MY_ORDERS
+            ? DashboardStatus.RUNNING
+            : DashboardStatus.OPEN_ACTIVE;
+    return requested != null && type.offersStatus(requested) ? requested : fallback;
   }
 
   /**
-   * The order statuses an assigned-orders status filter reads.
+   * The order statuses an order widget's status filter reads.
    *
    * @param status the status filter of the widget, as {@link #orderStatus} resolved it
-   * @return the backend order status names
+   * @return the backend order status names, never empty
    */
   static @NotNull List<String> orderStatuses(@NotNull DashboardStatus status) {
     return switch (status) {
       case OPEN -> List.of(ORDER_OPEN);
       case IN_PROGRESS -> List.of(ORDER_IN_PROGRESS);
-      case OPEN_ACTIVE, UNREAD, ALL -> List.of(ORDER_OPEN, ORDER_IN_PROGRESS);
+      case COMPLETED -> List.of(ORDER_COMPLETED, ORDER_REJECTED);
+      case ALL -> List.of(ORDER_OPEN, ORDER_IN_PROGRESS, ORDER_COMPLETED, ORDER_REJECTED);
+      case OPEN_ACTIVE, RUNNING, UNREAD -> List.of(ORDER_OPEN, ORDER_IN_PROGRESS);
     };
   }
 

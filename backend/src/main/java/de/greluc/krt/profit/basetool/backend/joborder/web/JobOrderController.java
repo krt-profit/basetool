@@ -437,6 +437,8 @@ public class JobOrderController {
    * @param assignedToMe when {@code true}, list only the orders the caller holds an assignee entry
    *     on, the "Ich bearbeite" segment (REQ-ORDERS-040); combines with neither {@code toProcess}
    *     nor {@code squadronId}
+   * @param orgUnitId with {@code toProcess}, keep only the orders this one of the caller's own
+   *     units processes; never widens the caller's processing units
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelisted: {@code priority}, {@code createdAt})
@@ -447,7 +449,8 @@ public class JobOrderController {
       summary = "Get all job orders",
       description =
           "Returns a paginated list of job orders. toProcess=true keeps only the orders whose"
-              + " profit-eligible responsible unit is one of the caller's own units."
+              + " profit-eligible responsible unit is one of the caller's own units; orgUnitId"
+              + " narrows that to one of them."
               + " assignedToMe=true lists the orders the caller is an assignee of; it combines with"
               + " neither toProcess nor squadronId.")
   @PreAuthorize("isAuthenticated()")
@@ -457,6 +460,7 @@ public class JobOrderController {
       @RequestParam(required = false) List<UUID> squadronId,
       @RequestParam(required = false, defaultValue = "false") boolean toProcess,
       @RequestParam(required = false, defaultValue = "false") boolean assignedToMe,
+      @RequestParam(required = false) UUID orgUnitId,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
@@ -471,7 +475,7 @@ public class JobOrderController {
       return PageResponse.of(jobOrderQueryService.getAssignedJobOrders(status, pageable));
     }
     Page<JobOrderDto> p =
-        jobOrderQueryService.getAllJobOrders(status, squadronId, toProcess, pageable);
+        jobOrderQueryService.getAllJobOrders(status, squadronId, toProcess, orgUnitId, pageable);
     return PageResponse.of(p);
   }
 

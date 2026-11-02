@@ -32,28 +32,30 @@ const POLL_STAGGER_MS = 1500;
 /** How many staggered slots the first polls spread over. */
 const POLL_STAGGER_SLOTS = 8;
 
+/**
+ * The global live-sync rooms, each with the widget types that a section of the room reloads
+ * (REQ-FE-015). A room has one receiver, so every type of a room is listed here.
+ *
+ * @type {Record<string, Record<string, string[]>>}
+ */
+const LIVE_ROOMS = {
+    orders: {
+        queue: ['ASSIGNED_ORDERS', 'ORDERS_TO_PROCESS', 'MY_ORDERS'],
+        demand: ['MATERIAL_DEMAND'],
+    },
+    inventory: { 'stock-levels': ['LOW_STOCK'] },
+    'orgunit-bank': { orgUnitBank: ['BANK'] },
+    refinery: { queue: ['REFINERY_READY'] },
+};
+
 /** The widget types a live channel updates; every other type polls. */
 const LIVE_TYPES = new Set([
     'UPCOMING_DAYS',
     'NEXT_MISSION',
     'NOTIFICATIONS',
     'HANGAR_READINESS',
-    'ASSIGNED_ORDERS',
-    'LOW_STOCK',
-    'BANK',
+    ...Object.values(LIVE_ROOMS).flatMap((sections) => Object.values(sections).flat()),
 ]);
-
-/**
- * The global live-sync rooms that reload the instances of a widget type, each with the section of
- * the room that carries the change (REQ-FE-015).
- *
- * @type {Record<string, { topic: string, section: string }>}
- */
-const LIVE_ROOMS = {
-    ASSIGNED_ORDERS: { topic: 'orders', section: 'queue' },
-    LOW_STOCK: { topic: 'inventory', section: 'stock-levels' },
-    BANK: { topic: 'orgunit-bank', section: 'orgUnitBank' },
-};
 
 /** The options a widget request carries, as the item's data attributes name them. */
 const OPTION_PARAMS = ['unit', 'days', 'rows', 'status'];
@@ -97,21 +99,25 @@ function widgetUrl(item) {
 }
 
 /**
- * Shows the error state of one instance, with a button that loads it again.
+ * Shows the error state of one instance, with a button that loads it again. The message carries
+ * the test id `dashboard-<slug>-error`, the button `dashboard-<slug>-retry`.
  *
  * @param {HTMLElement} item the instance
  * @param {Element} body the instance's body
  */
 function showError(item, body) {
     const board = item.closest('#dashboard-board');
+    const slug = item.dataset.widgetSlug ?? '';
     const message = document.createElement('p');
     message.className = 'home-notifs__empty';
     message.setAttribute('role', 'alert');
+    message.dataset.testid = `dashboard-${slug}-error`;
     message.textContent = board instanceof HTMLElement ? (board.dataset.widgetError ?? '') : '';
     const retry = document.createElement('button');
     retry.type = 'button';
     retry.className = 'btn btn-secondary btn-xs';
     retry.dataset.trigger = 'dashboard-widget-retry';
+    retry.dataset.testid = `dashboard-${slug}-retry`;
     retry.textContent = board instanceof HTMLElement ? (board.dataset.retry ?? '') : '';
     body.replaceChildren(message, retry);
 }
@@ -206,25 +212,35 @@ function followHangarRoom(topic) {
     });
 }
 
-/** @type {Set<string>} the widget types whose room already has a receiver */
+/** @type {Set<string>} the rooms that already have a receiver */
 const followedRooms = new Set();
 
 /**
- * Listens to the global room of a widget type once, from the first instance of the type on, and
- * reloads the type's instances when the room announces a change.
+ * Listens to the global room of a widget type once, from the first instance of any type of the
+ * room on, and reloads the instances of the types a changed section carries.
  *
  * @param {string} type the widget type name
  */
 function followRoom(type) {
-    const room = LIVE_ROOMS[type];
-    if (!room || followedRooms.has(type)) return;
-    followedRooms.add(type);
+    const entry = Object.entries(LIVE_ROOMS).find(([, sections]) =>
+        Object.values(sections).some((types) => types.includes(type)),
+    );
+    if (!entry || followedRooms.has(entry[0])) return;
+    const [topic, sections] = entry;
+    followedRooms.add(topic);
     krtLiveSync.createReceiver({
-        topic: room.topic,
-        sections: { [room.section]: { container: `[data-widget-type="${type}"]` } },
+        topic,
+        sections: Object.fromEntries(
+            Object.entries(sections).map(([section, types]) => [
+                section,
+                { container: types.map((name) => `[data-widget-type="${name}"]`).join(', ') },
+            ]),
+        ),
         coalesceMs: 1500,
-        refresh() {
-            reloadType(type);
+        refresh(keys) {
+            keys.forEach((key) => {
+                (sections[key] ?? []).forEach(reloadType);
+            });
         },
     });
 }

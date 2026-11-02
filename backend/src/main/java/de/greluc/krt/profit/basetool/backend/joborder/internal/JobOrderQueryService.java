@@ -141,6 +141,31 @@ public class JobOrderQueryService {
       @Nullable Collection<UUID> squadronIds,
       boolean toProcess,
       Pageable pageable) {
+    return getAllJobOrders(statuses, squadronIds, toProcess, null, pageable);
+  }
+
+  /**
+   * Paged list as {@link #getAllJobOrders(List, Collection, boolean, Pageable)}, with the
+   * processing units narrowed to one (REQ-UI-034).
+   *
+   * <p>A {@code processingOrgUnitId} that is none of the caller's processing units yields an empty
+   * page; it never widens the processing set.
+   *
+   * @param statuses optional status filter; null/empty means "all"
+   * @param squadronIds optional display filter matching the responsible or requesting side;
+   *     null/empty means no restriction
+   * @param toProcess whether to keep only the orders the caller's own units process
+   * @param processingOrgUnitId the one processing unit to keep, {@code null} for all; ignored
+   *     without {@code toProcess}
+   * @param pageable page request
+   * @return paged job orders as DTOs, scoped to the caller's visibility
+   */
+  public Page<JobOrderDto> getAllJobOrders(
+      @Nullable List<JobOrderStatus> statuses,
+      @Nullable Collection<UUID> squadronIds,
+      boolean toProcess,
+      @Nullable UUID processingOrgUnitId,
+      Pageable pageable) {
     if (!ownerScopeService.canViewJobOrders()) {
       return Page.empty(pageable);
     }
@@ -152,6 +177,12 @@ public class JobOrderQueryService {
           scope.activeOrgUnitId() != null
               ? Set.of(scope.activeOrgUnitId())
               : ownerScopeService.currentDirectMembershipOrgUnitIds();
+      if (processingOrgUnitId != null) {
+        processingOrgUnitIds =
+            processingOrgUnitIds.contains(processingOrgUnitId)
+                ? Set.of(processingOrgUnitId)
+                : Set.of();
+      }
       if (processingOrgUnitIds.isEmpty()) {
         return Page.empty(pageable);
       }

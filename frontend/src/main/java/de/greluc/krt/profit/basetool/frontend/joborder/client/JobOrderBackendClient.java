@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
@@ -144,6 +145,31 @@ public class JobOrderBackendClient {
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds) {
+    return readOrders(scope, page, size, statuses, squadronIds, null);
+  }
+
+  /**
+   * Reads the first page of the orders the caller's units process, optionally of one unit only.
+   *
+   * @param orgUnitId the one processing unit, or {@code null} for all of the caller's units
+   * @param size the page size
+   * @param statuses the status filter, never empty
+   * @return the page, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public PageResponse<JobOrderDto> ordersToProcess(
+      @Nullable UUID orgUnitId, int size, @NotNull List<String> statuses) {
+    return readOrders(OrderListScope.TO_PROCESS, 0, size, statuses, List.of(), orgUnitId);
+  }
+
+  @Nullable
+  private PageResponse<JobOrderDto> readOrders(
+      @NotNull OrderListScope scope,
+      int page,
+      int size,
+      @NotNull List<String> statuses,
+      @NotNull List<UUID> squadronIds,
+      @Nullable UUID orgUnitId) {
     StringBuilder uri =
         new StringBuilder(
                 scope == OrderListScope.MINE ? "/api/v1/orders/requested" : "/api/v1/orders")
@@ -169,6 +195,10 @@ public class JobOrderBackendClient {
         uri.append("&squadronId={squadronId}");
         uriVariables.add(sid);
       }
+    }
+    if (orgUnitId != null) {
+      uri.append("&orgUnitId={orgUnitId}");
+      uriVariables.add(orgUnitId);
     }
     return backendApiClient.get(uri.toString(), PAGE_OF_JOB_ORDER, uriVariables.toArray());
   }
@@ -425,6 +455,28 @@ public class JobOrderBackendClient {
   @Nullable
   public MaterialDemandOverviewDto materialDemand() {
     return backendApiClient.get("/api/v1/orders/material-demand", MaterialDemandOverviewDto.class);
+  }
+
+  /**
+   * Reads the open material demand in brief: the count of open buckets and the first rows
+   * (REQ-ORDERS-034, REQ-UI-034).
+   *
+   * @param orgUnitId only this responsible unit, or {@code null} for every unit in scope
+   * @param limit the most rows
+   * @return the summary, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MaterialDemandSummaryDto materialDemandSummary(@Nullable UUID orgUnitId, int limit) {
+    return orgUnitId == null
+        ? backendApiClient.get(
+            "/api/v1/orders/material-demand/summary?limit={limit}",
+            MaterialDemandSummaryDto.class,
+            limit)
+        : backendApiClient.get(
+            "/api/v1/orders/material-demand/summary?limit={limit}&orgUnitId={orgUnitId}",
+            MaterialDemandSummaryDto.class,
+            limit,
+            orgUnitId);
   }
 
   /**

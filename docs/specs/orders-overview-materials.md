@@ -311,7 +311,10 @@ full queue), `canViewOwnJobOrders` and `canViewAssignedJobOrders` (at least one 
   settings). The caller's units are the pinned org unit when one is active, otherwise the caller's
   direct memberships (no leadership cascade). The parameter is AND-ed with the tenancy scope
   *without* the assignee grant, so it only narrows and never widens; a caller with no such unit gets
-  an empty page. The squadron filter is hidden and no squadron parameter is sent.
+  an empty page. The squadron filter is hidden and no squadron parameter is sent. The optional
+  `orgUnitId` parameter (with `toProcess`; the „Aufträge zu bearbeiten" widget of REQ-UI-034 sends
+  it for a pinned unit) keeps one of those units: a unit that is none of the caller's processing
+  units gives an empty page, never a wider one.
 - `ASSIGNED` („Ich bearbeite") reads `/api/v1/orders?assignedToMe=true` with the status filter: the
   orders on which the caller holds a `JobOrderAssignee` entry, with the full progress column. The
   entry is the visibility grant itself, so the read needs no profit access and never shows an order
@@ -341,8 +344,9 @@ The pagination URL carries `scope=` for every chosen segment but `ALL`. The choi
 browser (`orders_scope_filter`, REQ-UI-017) and is restored only when that segment is offered on the
 page; an explicit `scope` query parameter wins. Switching segments swaps the results in place
 (REQ-FE-001). Adding or removing an assignee publishes the `queue` frame of the orders room, so an
-open list refreshes. The room is open to a caller with `canViewJobOrders` or
-`canViewAssignedJobOrders`; its frames carry only a section key and each viewer refetches their own
+open list refreshes. The room is open to a caller with `canViewJobOrders`,
+`canViewAssignedJobOrders` or `canViewOwnJobOrders` (the requester reading „Meine" and the „Meine
+Aufträge" widget of REQ-UI-034); its frames carry only a section key and each viewer refetches their own
 scoped list, so an assignee without profit access learns of no order beyond their own and sees a
 new or removed assignment in place.
 
@@ -353,7 +357,8 @@ new or removed assignment in place.
 `JobOrderQueryServiceAssignedToMeTest`, `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
 `JobOrderScopeQueryIntegrationTest` (`processingFilter_*`, `assigneeGrant_inAllNotInToProcess`,
 `assignedToMe_*`), `JobOrderAssigneeGrantIntegrationTest` (`assignedToMe*`, capability flag),
-`JobOrderToProcessMvcTest`, `MeControllerTest` (`canViewAssignedJobOrders`),
+`JobOrderToProcessMvcTest` (`*OrgUnitId*`), `JobOrderControllerTest`
+(`getAllJobOrders_forwardsTheProcessingOrgUnit`), `MeControllerTest` (`canViewAssignedJobOrders`),
 `CapabilityFlagsAdviceTest` · **Code:** `JobOrderPageController.viewOrders`, `OrderListScope`,
 `joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders` /
