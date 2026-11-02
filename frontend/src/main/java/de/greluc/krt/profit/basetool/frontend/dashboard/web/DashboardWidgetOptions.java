@@ -19,97 +19,81 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardCatalogueResponse;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardOption;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetDescriptor;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.stereotype.Component;
 
 /**
- * Reads the options a widget endpoint receives: a value outside the offered set falls back to the
- * default, so a stale page never breaks a widget (REQ-UI-034).
+ * Reads the options a widget endpoint receives: a value outside the type's choices falls back to
+ * the type's default from the catalogue, so a stale page never breaks a widget (REQ-UI-034).
  */
-final class DashboardWidgetOptions {
-
-  /** The days ahead of a widget that offers the option and was given none. */
-  static final int DEFAULT_DAYS = 7;
-
-  /** The range in days of a sync status that was given none. */
-  static final int DEFAULT_RANGE_DAYS = 7;
-
-  /** The rows of a widget that offers the option and was given none. */
-  static final int DEFAULT_ROWS = 5;
+@Component
+@RequiredArgsConstructor
+class DashboardWidgetOptions {
 
   private static final String ORDER_OPEN = "OPEN";
 
   private static final String ORDER_IN_PROGRESS = "IN_PROGRESS";
 
-  private DashboardWidgetOptions() {}
+  private final DashboardCatalogue catalogue;
 
   /**
-   * The days ahead.
+   * The days ahead, or the range in days, of a widget that offers either.
    *
+   * @param type the widget type
    * @param requested the requested days, or {@code null}
-   * @return the requested days when offered, else {@link #DEFAULT_DAYS}
+   * @return the requested days when the type offers them, else the type's default
    */
-  static int days(@Nullable Integer requested) {
-    return requested != null && DashboardWidgetType.DAY_CHOICES.contains(requested)
+  int days(@NotNull DashboardWidgetType type, @Nullable Integer requested) {
+    DashboardCatalogueResponse all = catalogue.snapshot();
+    DashboardWidgetDescriptor descriptor = catalogue.descriptor(type);
+    List<Integer> choices =
+        descriptor.offers(DashboardOption.RANGE) ? all.rangeChoices() : all.dayChoices();
+    return requested != null && choices.contains(requested)
         ? requested
-        : DEFAULT_DAYS;
+        : defaultOf(descriptor.defaultDays(), type, "days");
   }
 
   /**
-   * The range of the sync status in days.
+   * The rows shown by a widget that offers the option.
    *
-   * @param requested the requested range, or {@code null}
-   * @return the requested range when offered, else {@link #DEFAULT_RANGE_DAYS}
-   */
-  static int range(@Nullable Integer requested) {
-    return requested != null && DashboardWidgetType.RANGE_CHOICES.contains(requested)
-        ? requested
-        : DEFAULT_RANGE_DAYS;
-  }
-
-  /**
-   * The rows shown.
-   *
+   * @param type the widget type
    * @param requested the requested rows, or {@code null}
-   * @return the requested rows when offered, else {@link #DEFAULT_ROWS}
+   * @return the requested rows when the type offers them, else the type's default
    */
-  static int rows(@Nullable Integer requested) {
-    return rows(requested, DEFAULT_ROWS);
-  }
-
-  /**
-   * The rows shown by a widget whose default is not {@link #DEFAULT_ROWS}.
-   *
-   * @param requested the requested rows, or {@code null}
-   * @param fallback the widget's default rows
-   * @return the requested rows when offered, else {@code fallback}
-   */
-  static int rows(@Nullable Integer requested, int fallback) {
-    return requested != null && DashboardWidgetType.ROW_CHOICES.contains(requested)
+  int rows(@NotNull DashboardWidgetType type, @Nullable Integer requested) {
+    DashboardCatalogueResponse all = catalogue.snapshot();
+    return requested != null && all.rowChoices().contains(requested)
         ? requested
-        : fallback;
+        : defaultOf(catalogue.descriptor(type).defaultRows(), type, "rows");
   }
 
   /**
-   * The status filter of an order widget.
+   * The status filter of a widget that offers the option.
    *
-   * @param type the order widget
+   * @param type the widget type
    * @param requested the requested status, or {@code null}
-   * @return the requested status when the widget offers it, else {@link
-   *     DashboardStatus#OPEN_ACTIVE}
+   * @return the requested status when the type offers it, else the type's default
    */
-  static @NotNull DashboardStatus orderStatus(
-      @NotNull DashboardWidgetType type, @Nullable DashboardStatus requested) {
-    return statusOf(type, requested, DashboardStatus.OPEN_ACTIVE);
+  @NotNull
+  DashboardStatus status(@NotNull DashboardWidgetType type, @Nullable DashboardStatus requested) {
+    DashboardWidgetDescriptor descriptor = catalogue.descriptor(type);
+    return requested != null && descriptor.offersStatus(requested)
+        ? requested
+        : defaultOf(descriptor.defaultStatus(), type, "status");
   }
 
   /**
    * The order statuses an order widget's status filter reads.
    *
-   * @param status the status filter of the widget, as {@link #orderStatus} resolved it
+   * @param status the status filter of the widget, as {@link #status} resolved it
    * @return the backend order status names, never empty
    */
   static @NotNull List<String> orderStatuses(@NotNull DashboardStatus status) {
@@ -134,28 +118,11 @@ final class DashboardWidgetOptions {
     return null;
   }
 
-  /**
-   * The status filter of a widget whose choices are the statuses its type offers.
-   *
-   * @param type the widget type
-   * @param requested the requested status, or {@code null}
-   * @param fallback the type's default status
-   * @return the requested status when the type offers it, else {@code fallback}
-   */
-  static @NotNull DashboardStatus statusOf(
-      @NotNull DashboardWidgetType type,
-      @Nullable DashboardStatus requested,
-      @NotNull DashboardStatus fallback) {
-    return requested != null && type.offersStatus(requested) ? requested : fallback;
-  }
-
-  /**
-   * The status filter of the notifications widget.
-   *
-   * @param requested the requested status, or {@code null}
-   * @return the requested status, else {@link DashboardStatus#UNREAD}
-   */
-  static @NotNull DashboardStatus status(@Nullable DashboardStatus requested) {
-    return requested != null ? requested : DashboardStatus.UNREAD;
+  private static <T> @NotNull T defaultOf(
+      @Nullable T value, @NotNull DashboardWidgetType type, @NotNull String option) {
+    if (value == null) {
+      throw new IllegalStateException(type + " has no default " + option + " in the catalogue");
+    }
+    return value;
   }
 }

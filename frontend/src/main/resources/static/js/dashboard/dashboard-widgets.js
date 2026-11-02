@@ -23,8 +23,11 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 
-/** How often a widget without a live topic reloads while the tab is visible (REQ-UI-034). */
-const POLL_INTERVAL_MS = 10 * 60 * 1000;
+/**
+ * How often a widget without a live topic reloads, and the saved board is re-read, while the tab is
+ * visible (REQ-UI-034).
+ */
+export const POLL_INTERVAL_MS = 10 * 60 * 1000;
 
 /** How often a clock-driven widget reloads while the tab is visible. */
 const CLOCK_INTERVAL_MS = 60 * 1000;

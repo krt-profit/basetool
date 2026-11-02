@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -70,6 +71,7 @@ class AdminNavigationRenderMvcTest {
   /** Builds a security-aware MockMvc. */
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

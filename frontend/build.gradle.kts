@@ -876,6 +876,22 @@ val testFavouriteOrderJs =
     outputs.upToDateWhen { false }
   }
 
+val testBoardSyncJs =
+  tasks.register<NodeTask>("testBoardSyncJs") {
+    group = "verification"
+    description =
+      "Regression tests for the dashboard board reconcile: the saved-state signature and the swap decision."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/board-sync.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/board-sync.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/dashboard/board-sync.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testShortcutsJs =
   tasks.register<NodeTask>("testShortcutsJs") {
     group = "verification"
@@ -1101,6 +1117,7 @@ tasks.named("check").configure {
     testShortcutsJs,
     testNavRailJs,
     testFavouriteOrderJs,
+    testBoardSyncJs,
     testSearchJs,
     testNumberFormatJs,
     testNotificationBellLabelJs,

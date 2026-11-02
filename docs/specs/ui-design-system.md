@@ -2630,6 +2630,17 @@ An empty dashboard shows an empty state with „Widget hinzufügen".
 Favoriten without favourites explains how to set one. The Hub holds the 13 admin links of
 REQ-UI-026 as tiles and is an ordinary, removable widget.
 
+**One catalogue.** The backend is the single source of the catalogue below: `DashboardWidgetType`
+holds each widget's mode, default column, whether the default dashboard holds it, its options in
+dialog order, its status choices in display order and its defaults, and
+`GET /api/v1/navigation/dashboard-widgets` serves it with the choice lists of the days, range, rows
+and status options to every authenticated caller (it holds no member data). The frontend builds its
+board, catalogue dialog, options dialog and option defaults from that read, cached like the other
+catalogues, and keeps only what depends on the caller: the gate (roles and flags), the endpoint
+segment and the message key per widget type. A widget type the backend serves without a frontend
+gate fails the build, and the golden file `dashboard-catalogue.json` pins the matrix below for both
+modules (ADR-0325).
+
 **Instances.** A widget may be added more than once; at most **12 instances per mode**, enforced
 by the backend. Each instance renders only for a user allowed to read its data.
 
@@ -2693,6 +2704,10 @@ niedrig". A widget whose area has a live-sync topic updates live (REQ-FE-015); t
 visible again. „Raffinerie: fertig" also reloads every minute while the tab is visible, because
 readiness changes when an order's end time passes without any mutation. „Benachrichtigungen" filters
 „Ungelesen" before the row limit, so older unread notifications show even when the newest are read.
+The page also re-reads the saved board every 10 minutes and when the tab becomes visible, and swaps
+it in place when another window changed its version, its instances or their options (REQ-UI-032),
+also on a dashboard of live widgets only; a board in the edit mode, a write in flight and a hidden
+tab leave the page as it is until the next poll.
 
 **Trade widgets.** Read-only and not audited. „Materialbörse" merges the offer and the wanted
 board, newest first, and counts both page totals. „Bedarf & Spenden" reads the open needs
@@ -2755,6 +2770,9 @@ and alert on a 5xx rate above 5 %; layout and option writes count in
 **Enforced by:** `DashboardServiceTest` (the default, the cap of 12 per mode, layout and option
 versions, owner isolation, deletion by widget type, the write counters),
 `NavigationDashboardControllerTest` (authentication, the admin mode's gate, 409, 404),
+`NavigationDashboardCatalogueControllerTest` (the catalogue read and the golden file),
+`DashboardCatalogueTest` (the frontend mirror, the defaults and choices), `FragmentControllerTest`
+(the composed fragment mappings), `testBoardSyncJs` and `DashboardE2eTest` (the board poll),
 `DashboardReaderTest` and `DashboardRenderMvcTest` (the board per stored layout, greyed pinned
 instances, the empty and error states, deletion on role loss, the hint, the catalogue),
 `DashboardUpcomingDaysWidgetMvcTest`, `DashboardSummaryWidgetsMvcTest` (Nächster Einsatz and

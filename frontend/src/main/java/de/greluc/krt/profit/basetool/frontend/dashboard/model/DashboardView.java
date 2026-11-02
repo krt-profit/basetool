@@ -35,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
  * @param wide the instances of the wide column in order
  * @param narrow the instances of the narrow column in order
  * @param catalogue the widgets the member may add, in catalogue order
+ * @param choices the catalogue the options dialog lists its choices from
  * @param mode the mode
  */
 public record DashboardView(
@@ -43,7 +44,8 @@ public record DashboardView(
     boolean customised,
     @NotNull List<Item> wide,
     @NotNull List<Item> narrow,
-    @NotNull List<DashboardWidgetType> catalogue,
+    @NotNull List<DashboardWidgetDescriptor> catalogue,
+    @NotNull DashboardCatalogueResponse choices,
     @NotNull DashboardMode mode) {
 
   /** The most instances a dashboard holds; the backend enforces the same cap. */
@@ -56,7 +58,8 @@ public record DashboardView(
    * @return the empty, not loaded view
    */
   public static @NotNull DashboardView notLoaded(@NotNull DashboardMode mode) {
-    return new DashboardView(false, 0, false, List.of(), List.of(), List.of(), mode);
+    return new DashboardView(
+        false, 0, false, List.of(), List.of(), List.of(), DashboardCatalogueResponse.EMPTY, mode);
   }
 
   /**
@@ -68,6 +71,7 @@ public record DashboardView(
    * @param wide the wide column
    * @param narrow the narrow column
    * @param catalogue the widgets the member may add
+   * @param choices the catalogue the options dialog lists its choices from
    * @param mode the mode
    */
   public DashboardView {
@@ -107,13 +111,17 @@ public record DashboardView(
    * One instance as the page renders it.
    *
    * @param widget the stored instance or default
+   * @param descriptor the instance's catalogue entry
    * @param available whether the active context offers the instance; an unavailable one renders
    *     greyed with a hint
    * @param unitName the name of the pinned unit, or {@code null} when it follows the context or is
    *     not known to the caller
    */
   public record Item(
-      @NotNull DashboardWidgetResponse widget, boolean available, @Nullable String unitName) {
+      @NotNull DashboardWidgetResponse widget,
+      @NotNull DashboardWidgetDescriptor descriptor,
+      boolean available,
+      @Nullable String unitName) {
 
     /**
      * The key the reorder helper restores the focus by: the stored id, else the widget type.

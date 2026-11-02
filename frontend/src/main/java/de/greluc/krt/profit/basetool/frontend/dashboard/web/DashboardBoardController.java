@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
-
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentController;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentGetMapping;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -31,13 +30,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.server.ResponseStatusException;
 
 /** Serves a mode's dashboard board as a fragment, so the page swaps it in place. */
 @Controller
-@UsesLayoutModel
+@FragmentController
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated() and (#mode != 'admin' or hasRole('ADMIN'))")
 public class DashboardBoardController {
@@ -53,7 +51,7 @@ public class DashboardBoardController {
    * @throws ResponseStatusException with {@code 404} for an unknown mode
    */
   @NotNull
-  @GetMapping(value = "/dashboard/{mode}/board", headers = AJAX)
+  @FragmentGetMapping("/dashboard/{mode}/board")
   public String board(@PathVariable String mode, @NotNull Model model) {
     Optional<DashboardMode> resolved = DashboardMode.fromSlug(mode);
     if (resolved.isEmpty()) {

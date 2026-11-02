@@ -19,14 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
-
 import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentController;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentGetMapping;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
@@ -44,8 +43,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -55,14 +52,10 @@ import org.springframework.web.bind.annotation.RequestParam;
  * state.
  */
 @Controller
-@UsesLayoutModel
-@RequestMapping("/dashboard/widgets")
+@FragmentController("/dashboard/widgets")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class DashboardTradeWidgetController {
-
-  /** The rows of the bank-requests widget while the member chose none. */
-  private static final int BANK_REQUESTS_DEFAULT_ROWS = 3;
 
   private static final String FRAGMENTS = "dashboard/fragments/trade-widgets :: ";
 
@@ -87,6 +80,8 @@ public class DashboardTradeWidgetController {
 
   private final OwnOrgUnits ownOrgUnits;
 
+  private final DashboardWidgetOptions options;
+
   /**
    * Renders the open Materialbörse entries, the newest first.
    *
@@ -96,14 +91,13 @@ public class DashboardTradeWidgetController {
    * @return the {@code market} fragment
    */
   @NotNull
-  @GetMapping(value = "/market", headers = AJAX)
+  @FragmentGetMapping("/market")
   public String market(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.statusOf(DashboardWidgetType.MARKET, status, DashboardStatus.BOTH);
-    int limit = DashboardWidgetOptions.rows(rows);
+    DashboardStatus resolved = options.status(DashboardWidgetType.MARKET, status);
+    int limit = options.rows(DashboardWidgetType.MARKET, rows);
     BoardFilter filter = new BoardFilter(BOARD_TAB, limit, null, null, BOARD_SORT_NEWEST, null);
     List<MarketWidgetRow> lines = new ArrayList<>();
     long total = 0;
@@ -138,17 +132,15 @@ public class DashboardTradeWidgetController {
    * @return the {@code supplyNeeds} fragment
    */
   @NotNull
-  @GetMapping(value = "/supply-needs", headers = AJAX)
+  @FragmentGetMapping("/supply-needs")
   public String supplyNeeds(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.statusOf(
-            DashboardWidgetType.SUPPLY_NEEDS, status, DashboardStatus.ALL_OPEN);
+    DashboardStatus resolved = options.status(DashboardWidgetType.SUPPLY_NEEDS, status);
     UUID scope = unit != null ? unit : DashboardContext.of(model).activeUnitId();
-    int limit = DashboardWidgetOptions.rows(rows);
+    int limit = options.rows(DashboardWidgetType.SUPPLY_NEEDS, rows);
     String coverage = DashboardWidgetOptions.needCoverage(resolved);
     List<NeedDto> needs = new ArrayList<>();
     long total = 0;
@@ -180,17 +172,15 @@ public class DashboardTradeWidgetController {
    * @return the {@code bankRequests} fragment
    */
   @NotNull
-  @GetMapping(value = "/bank-requests", headers = AJAX)
+  @FragmentGetMapping("/bank-requests")
   public String bankRequests(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.statusOf(
-            DashboardWidgetType.BANK_REQUESTS, status, DashboardStatus.OPEN);
+    DashboardStatus resolved = options.status(DashboardWidgetType.BANK_REQUESTS, status);
     PageResponse<BankBookingRequestDto> own =
         bankRequestsClient.ownPage(
-            requestStates(resolved), DashboardWidgetOptions.rows(rows, BANK_REQUESTS_DEFAULT_ROWS));
+            requestStates(resolved), options.rows(DashboardWidgetType.BANK_REQUESTS, rows));
     model.addAttribute("bankRequestRows", own == null ? List.of() : own.content());
     model.addAttribute("bankRequestTotal", own == null ? 0 : own.totalElements());
     return FRAGMENTS + "bankRequests";

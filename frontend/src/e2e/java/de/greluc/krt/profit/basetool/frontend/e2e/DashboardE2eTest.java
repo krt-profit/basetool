@@ -574,6 +574,43 @@ class DashboardE2eTest {
     }
   }
 
+  /**
+   * Another window's saved option reaches an idle dashboard on its ten-minute poll, also when the
+   * changed widget is a live one, and a dashboard in the edit mode keeps its page until the member
+   * leaves it.
+   */
+  @Test
+  void anotherWindowsSavedOptionsArriveOnThePoll() {
+    try (BrowserContext context = newContext(memberState, 1440)) {
+      Page idle = context.newPage();
+      idle.clock().install();
+      Page other = context.newPage();
+      E2eSupport.navigate(idle, STACK.baseUrl() + "/");
+      E2eSupport.navigate(other, STACK.baseUrl() + "/");
+      other.getByTestId("dashboard-customise").click();
+      other.getByTestId("dashboard-widget-upcoming-days").getByTestId("dashboard-options").click();
+      other.locator("#dashboard-option-rows").selectOption("10");
+      other.getByTestId("dashboard-options-save").click();
+      assertThat(other.getByTestId("dashboard-widget-upcoming-days"))
+          .hasAttribute("data-rows", "10");
+      assertThat(idle.getByTestId("dashboard-widget-upcoming-days"))
+          .not()
+          .hasAttribute("data-rows", "10");
+
+      idle.getByTestId("dashboard-customise").click();
+      idle.clock().runFor(11L * 60 * 1000);
+      E2eSupport.settle(idle);
+      assertThat(idle.getByTestId("dashboard-widget-upcoming-days"))
+          .not()
+          .hasAttribute("data-rows", "10");
+
+      idle.getByTestId("dashboard-customise").click();
+      idle.clock().runFor(11L * 60 * 1000);
+      assertThat(idle.getByTestId("dashboard-widget-upcoming-days"))
+          .hasAttribute("data-rows", "10");
+    }
+  }
+
   /** On a phone the wide column comes first and the narrow one follows below it. */
   @Test
   void aPhoneShowsOneColumn() {

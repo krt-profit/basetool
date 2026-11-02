@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -73,6 +74,7 @@ class DashboardSummaryWidgetsMvcTest {
 
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

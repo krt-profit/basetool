@@ -20,11 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardCatalogueResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardColumn;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView.Item;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetDescriptor;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -51,6 +53,8 @@ import org.springframework.stereotype.Component;
 public class DashboardReader {
 
   private final DashboardBackendClient client;
+
+  private final DashboardCatalogue catalogue;
 
   /**
    * Reads and resolves a mode's dashboard.
@@ -103,6 +107,7 @@ public class DashboardReader {
       @NotNull NavigationAccess access,
       @Nullable UUID activeUnitId,
       @NotNull List<OrgUnitMembershipOptionDto> units) {
+    DashboardCatalogueResponse all = catalogue.snapshot();
     List<Item> wide = new ArrayList<>();
     List<Item> narrow = new ArrayList<>();
     List<DashboardWidgetType> gone = new ArrayList<>();
@@ -115,17 +120,26 @@ public class DashboardReader {
       }
       boolean available =
           widget.type().permits(access) && unitAvailable(widget.orgUnitId(), activeUnitId);
-      Item item = new Item(widget, available, unitName(widget.orgUnitId(), units));
+      Item item =
+          new Item(
+              widget, descriptorOf(all, widget), available, unitName(widget.orgUnitId(), units));
       (widget.column() == DashboardColumn.WIDE ? wide : narrow).add(item);
     }
-    List<DashboardWidgetType> catalogue =
-        DashboardWidgetType.ofMode(stored.mode()).stream()
-            .filter(type -> type.permits(access))
+    List<DashboardWidgetDescriptor> addable =
+        catalogue.ofMode(stored.mode()).stream()
+            .filter(descriptor -> descriptor.type().permits(access))
             .toList();
     return new Resolution(
         new DashboardView(
-            true, stored.version(), stored.customised(), wide, narrow, catalogue, stored.mode()),
+            true, stored.version(), stored.customised(), wide, narrow, addable, all, stored.mode()),
         gone);
+  }
+
+  private static DashboardWidgetDescriptor descriptorOf(
+      DashboardCatalogueResponse all, DashboardWidgetResponse widget) {
+    return all.find(widget.type())
+        .orElseThrow(
+            () -> new IllegalStateException("The dashboard catalogue lacks " + widget.type()));
   }
 
   private static boolean unitAvailable(@Nullable UUID pinned, @Nullable UUID activeUnitId) {

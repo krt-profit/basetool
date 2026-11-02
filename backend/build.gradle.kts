@@ -235,4 +235,13 @@ tasks.named<Test>("test") {
   jvmArgumentProviders.add(
     CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) },
   )
+
+  val dashboardCatalogueUpdate =
+    providers.systemProperty("dashboard.catalogue.update").orElse("false")
+  inputs.property("dashboardCatalogueUpdate", dashboardCatalogueUpdate)
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider {
+      listOf("-Ddashboard.catalogue.update=" + dashboardCatalogueUpdate.get())
+    },
+  )
 }

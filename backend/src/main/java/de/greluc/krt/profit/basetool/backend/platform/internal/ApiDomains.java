@@ -118,6 +118,7 @@ public final class ApiDomains {
           Map.entry("MissionFinanceEntryController", "mission"),
           Map.entry("MissionNextSummaryController", "mission"),
           Map.entry("MyRegistrationStatusController", "identity"),
+          Map.entry("NavigationDashboardCatalogueController", "navigation"),
           Map.entry("NavigationDashboardController", "navigation"),
           Map.entry("NavigationPreferencesController", "navigation"),
           Map.entry("NotificationController", "notification"),

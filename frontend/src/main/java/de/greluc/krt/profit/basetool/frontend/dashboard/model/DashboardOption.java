@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+
 /** The kinds of option a widget type may offer (REQ-UI-034). */
+@DtoMirror
 public enum DashboardOption {
 
   /** The org unit, empty for "follows the active context". */

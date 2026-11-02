@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExc
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyRefDto;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -96,6 +97,7 @@ class DashboardTradeWidgetsMvcTest {
 
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

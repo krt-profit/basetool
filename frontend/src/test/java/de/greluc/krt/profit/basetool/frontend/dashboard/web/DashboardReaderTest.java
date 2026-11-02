@@ -33,12 +33,14 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetDescriptor;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +65,8 @@ class DashboardReaderTest {
 
   @BeforeEach
   void setUp() {
-    reader = new DashboardReader(client);
+    DashboardCatalogueFixture.stub(client);
+    reader = new DashboardReader(client, new DashboardCatalogue(client));
   }
 
   private static DashboardWidgetResponse widget(
@@ -114,13 +117,14 @@ class DashboardReaderTest {
     DashboardView forMember = reader.read(DashboardMode.ADMIN, MEMBER, null, List.of());
 
     assertThat(forAdmin.catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .containsExactly(
             DashboardWidgetType.ADMIN_HUB,
             DashboardWidgetType.DELETION_REQUESTS,
             DashboardWidgetType.DISCORD_REGISTRATIONS,
             DashboardWidgetType.SYNC_STATUS,
             DashboardWidgetType.OPEN_TERMS);
-    assertThat(forMember.catalogue()).isEmpty();
+    assertThat(forMember.catalogue()).extracting(DashboardWidgetDescriptor::type).isEmpty();
   }
 
   @Test
@@ -246,6 +250,7 @@ class DashboardReaderTest {
     when(client.dashboard(DashboardMode.MEMBER)).thenReturn(stored(false));
 
     assertThat(read(MEMBER, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .containsExactlyInAnyOrder(
             DashboardWidgetType.UPCOMING_DAYS,
             DashboardWidgetType.INFORMATION,
@@ -260,6 +265,7 @@ class DashboardReaderTest {
             DashboardWidgetType.MARKET,
             DashboardWidgetType.BANK_REQUESTS);
     assertThat(read(GUEST, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .doesNotContain(
             DashboardWidgetType.UPCOMING_DAYS,
             DashboardWidgetType.MARKET,
@@ -275,8 +281,10 @@ class DashboardReaderTest {
         new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.JOB_ORDERS));
 
     assertThat(read(queue, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .contains(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
     assertThat(read(MEMBER, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .doesNotContain(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
   }
 
@@ -288,8 +296,10 @@ class DashboardReaderTest {
         new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.SUPPLY));
 
     assertThat(read(supplyOn, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .contains(DashboardWidgetType.SUPPLY_NEEDS);
     assertThat(read(MEMBER, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
         .doesNotContain(DashboardWidgetType.SUPPLY_NEEDS);
   }
 

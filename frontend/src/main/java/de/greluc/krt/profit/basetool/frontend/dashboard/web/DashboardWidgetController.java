@@ -19,18 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
-
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentController;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentGetMapping;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import java.time.Instant;
@@ -47,8 +47,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -58,8 +56,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 @Slf4j
 @Controller
-@UsesLayoutModel
-@RequestMapping("/dashboard/widgets")
+@FragmentController("/dashboard/widgets")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class DashboardWidgetController {
@@ -72,6 +69,8 @@ public class DashboardWidgetController {
 
   private final OwnOrgUnits ownOrgUnits;
 
+  private final DashboardWidgetOptions options;
+
   /**
    * Renders the missions of the coming days.
    *
@@ -82,14 +81,14 @@ public class DashboardWidgetController {
    * @return the {@code upcomingDays} fragment
    */
   @NotNull
-  @GetMapping(value = "/upcoming-days", headers = AJAX)
+  @FragmentGetMapping("/upcoming-days")
   public String upcomingDays(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
       @RequestParam(required = false) @Nullable Integer days,
       @RequestParam(required = false) @Nullable Integer rows) {
-    int horizonDays = DashboardWidgetOptions.days(days);
-    int limit = DashboardWidgetOptions.rows(rows);
+    int horizonDays = options.days(DashboardWidgetType.UPCOMING_DAYS, days);
+    int limit = options.rows(DashboardWidgetType.UPCOMING_DAYS, rows);
     List<MissionListDto> missions = loadUpcoming(horizonDays, unit);
     model.addAttribute("upcomingTotal", missions.size());
     model.addAttribute("upcomingMissions", missions.stream().limit(limit).toList());
@@ -106,7 +105,7 @@ public class DashboardWidgetController {
    * @return the {@code information} fragment
    */
   @NotNull
-  @GetMapping(value = "/information", headers = AJAX)
+  @FragmentGetMapping("/information")
   public String information(@NotNull Model model) {
     AnnouncementDto announcement = client.announcement();
     model.addAttribute("announcement", announcement);
@@ -126,13 +125,14 @@ public class DashboardWidgetController {
    * @return the {@code notifications} fragment
    */
   @NotNull
-  @GetMapping(value = "/notifications", headers = AJAX)
+  @FragmentGetMapping("/notifications")
   public String notifications(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    model.addAttribute("notificationRows", DashboardWidgetOptions.rows(rows));
-    model.addAttribute("notificationStatus", DashboardWidgetOptions.status(status));
+    model.addAttribute("notificationRows", options.rows(DashboardWidgetType.NOTIFICATIONS, rows));
+    model.addAttribute(
+        "notificationStatus", options.status(DashboardWidgetType.NOTIFICATIONS, status));
     return WIDGETS + "notifications";
   }
 
@@ -142,7 +142,7 @@ public class DashboardWidgetController {
    * @return the {@code favourites} fragment
    */
   @NotNull
-  @GetMapping(value = "/favourites", headers = AJAX)
+  @FragmentGetMapping("/favourites")
   public String favourites() {
     return WIDGETS + "favourites";
   }
@@ -156,10 +156,11 @@ public class DashboardWidgetController {
    * @return the {@code nextMission} fragment
    */
   @NotNull
-  @GetMapping(value = "/next-mission", headers = AJAX)
+  @FragmentGetMapping("/next-mission")
   public String nextMission(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
-    model.addAttribute("nextMissions", client.nextMissions(DashboardWidgetOptions.rows(rows)));
+    model.addAttribute(
+        "nextMissions", client.nextMissions(options.rows(DashboardWidgetType.NEXT_MISSION, rows)));
     model.addAttribute(
         "myOrgUnitIds", SectionFallback.load(log, "own-org-units", ownOrgUnits::ids, Set.of()));
     return WIDGETS + "nextMission";
@@ -174,7 +175,7 @@ public class DashboardWidgetController {
    * @return the {@code hangarReadiness} fragment
    */
   @NotNull
-  @GetMapping(value = "/hangar-readiness", headers = AJAX)
+  @FragmentGetMapping("/hangar-readiness")
   public String hangarReadiness(
       @NotNull Model model, @AuthenticationPrincipal @Nullable OidcUser principal) {
     ShipReadinessDto readiness = client.hangarReadiness();
