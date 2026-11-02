@@ -2670,7 +2670,7 @@ unit.
 | Admin | Offene Löschanträge | pending deletion requests | rows |
 | Admin | Discord-Registrierungen | pending registrations | rows |
 | Admin | Offene Nutzungsbedingungen | members without accepted terms | rows |
-| Admin | Sync- & Importstatus | the latest sync and import runs | range 24 h / **7 Tage** / 30 Tage |
+| Admin | Sync- & Importstatus | the latest run and the runs counted inside the range of each sync and import | range 24 h / **7 Tage** / 30 Tage |
 
 A widget with a list links „Alle anzeigen" to its page or tab („Ich bearbeite" to that segment,
 „Bestand niedrig" to „Mindestbestände", „Bank" to `/org-unit-bank`). Widgets carry no action
@@ -2699,7 +2699,15 @@ total as count; „Materialbedarf" reads the new summary `GET /orders/material-d
 (`orgUnitId`, `limit`; the count of open buckets and the first rows, REQ-ORDERS-034) instead of the
 whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich bearbeite" (section
 `queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig", the inventory room („stock" and „stock-levels") „Bestand
-niedrig". A widget whose area has a live-sync topic updates live (REQ-FE-015); the others poll every
+niedrig". The four admin widgets follow the admin room `admin-dashboard` (REQ-FE-015, ADR-0327), which only
+administrators may join and the backend publishes after the commit: section `deletion-requests`
+(filed, declined or resolved request), `discord-registrations` (filed or decided registration),
+`terms` (accepted terms, a decided registration, a start of the backend) and `sync-status` (a
+finished sync or import run). „Sync- & Importstatus" also reloads every 10 minutes, because a run
+leaves its range with no write; it counts the runs inside the chosen range exactly (`GET
+/api/v1/catalog/admin/sync-reports/runs`: per source the runs whose newest event lies in the range,
+bounded by the 30 retained runs per source) next to the last run of each source. A widget whose
+area has a live-sync topic updates live (REQ-FE-015); the others poll every
 10 minutes, only while the tab is visible, staggered, and reload at once when the tab becomes
 visible again. „Raffinerie: fertig" also reloads every minute while the tab is visible, because
 readiness changes when an order's end time passes without any mutation. „Benachrichtigungen" filters
