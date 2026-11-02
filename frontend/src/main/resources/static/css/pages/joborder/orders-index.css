@@ -78,6 +78,10 @@
         font-size: 0.7rem;
     }
 
+    .orders-table .ord-materials-count {
+        color: var(--color-gray-1);
+    }
+
     .orders-materials-table {
         margin: var(--space-2) 0 0;
         background: transparent;

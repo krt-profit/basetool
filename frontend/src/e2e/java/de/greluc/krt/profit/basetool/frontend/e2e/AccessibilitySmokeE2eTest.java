@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.deque.html.axecore.playwright.AxeBuilder;
 import com.deque.html.axecore.results.AxeResults;
@@ -27,6 +29,7 @@ import com.deque.html.axecore.results.CheckedNode;
 import com.deque.html.axecore.results.Rule;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Files;
@@ -38,14 +41,16 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.FieldSource;
 
 /**
- * Accessibility smoke check: logs in once and runs the axe-core WCAG 2.0/2.1 A+AA rules against
- * each core page, failing on {@code critical} and {@code serious} violations. Read-only, so tagged
- * both {@code smoke} and {@code e2e}.
+ * Accessibility smoke check: logs in once, leaves the user with an unread notification so the
+ * header bell shows its count badge, and runs the axe-core WCAG 2.0/2.1 A+AA rules against each
+ * core page, failing on {@code critical} and {@code serious} violations. Against a staging stack it
+ * stays read-only (nothing is seeded), so it is tagged both {@code smoke} and {@code e2e}.
  *
  * <p>Every violation is written to {@code build/e2e/a11y-<page>.txt}.
  */
@@ -64,6 +69,8 @@ class AccessibilitySmokeE2eTest {
 
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
+  private static final String MEMBER_USER = "test-member";
+  private static final String MEMBER_PASSWORD = "test-member-pw";
 
   private static Playwright playwright;
   private static Browser browser;
@@ -74,6 +81,10 @@ class AccessibilitySmokeE2eTest {
   static void setUp() {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
+    if (STACK.managesStack()) {
+      new BackendSeeder()
+          .seedUnreadNotification(USERNAME, PASSWORD, MEMBER_USER, MEMBER_PASSWORD, "A11y Bell");
+    }
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
   }
@@ -122,8 +133,62 @@ class AccessibilitySmokeE2eTest {
                   + ":\n"
                   + gated.stream()
                       .map(AccessibilitySmokeE2eTest::describe)
-                      .collect(Collectors.joining()));
+                      .collect(Collectors.joining())
+                  + withMarkup(page, gated));
     }
+  }
+
+  /**
+   * Opens a page of the seeded user and asserts that the header bell shows the unread count as
+   * visible text and that its accessible name carries that same text.
+   */
+  @Test
+  void bellAccessibleNameCarriesTheVisibleUnreadCount() {
+    assumeTrue(STACK.managesStack(), "a staging stack seeds no unread notification");
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      E2eSupport.navigate(page, STACK.baseUrl() + "/orders");
+      Locator badge = page.locator("#notification-badge");
+      assertThat(badge).isVisible();
+      String count = badge.textContent().strip();
+      String name = page.locator("#notification-toggle").getAttribute("aria-label");
+      assertTrue(
+          name.contains(count),
+          () -> "bell name '" + name + "' lacks visible count '" + count + "'");
+    }
+  }
+
+  /**
+   * Renders the full markup of every node the gate failed on, so a report shows the children that
+   * axe's own one-line excerpt cuts off.
+   *
+   * @param page the scanned page
+   * @param gated the failing rules
+   * @return one markup block per failing node, or an empty string
+   */
+  private static String withMarkup(Page page, List<Rule> gated) {
+    StringBuilder out = new StringBuilder();
+    for (Rule rule : gated) {
+      for (CheckedNode node : rule.getNodes() == null ? List.<CheckedNode>of() : rule.getNodes()) {
+        String selector =
+            node.getTarget() == null
+                ? ""
+                : String.valueOf(node.getTarget()).replaceAll("^\\[|\\]$", "");
+        if (!selector.isBlank()) {
+          out.append(
+              String.format(
+                  Locale.ROOT,
+                  "%n  markup of %s:%n    %s%n",
+                  selector,
+                  page.locator(selector).first().evaluate("e => e.outerHTML")));
+        }
+      }
+    }
+    return out.toString();
   }
 
   /**
