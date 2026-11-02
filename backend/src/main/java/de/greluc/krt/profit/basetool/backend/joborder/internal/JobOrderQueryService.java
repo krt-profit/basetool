@@ -176,13 +176,11 @@ public class JobOrderQueryService {
     ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
     if (toProcess) {
-      Set<UUID> directUnits = ownerScopeService.currentDirectMembershipOrgUnitIds();
+      UUID pinnedUnit = ownerScopeService.currentScopePredicate().activeOrgUnitId();
       processingOrgUnitIds =
-          scope.activeOrgUnitId() == null
-              ? directUnits
-              : directUnits.contains(scope.activeOrgUnitId())
-                  ? Set.of(scope.activeOrgUnitId())
-                  : Set.of();
+          pinnedUnit != null
+              ? Set.of(pinnedUnit)
+              : ownerScopeService.currentDirectMembershipOrgUnitIds();
       if (processingOrgUnitId != null) {
         processingOrgUnitIds =
             processingOrgUnitIds.contains(processingOrgUnitId)

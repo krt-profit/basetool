@@ -220,6 +220,7 @@ class JobOrderServiceAssigneeAndListTest {
       lenient()
           .when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(adminAllScope);
+      lenient().when(ownerScopeService.currentScopePredicate()).thenReturn(adminAllScope);
       lenient().when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     }
 
@@ -470,8 +471,8 @@ class JobOrderServiceAssigneeAndListTest {
       UUID pinned = UUID.randomUUID();
       when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, pinned, Set.of()));
-      when(ownerScopeService.currentDirectMembershipOrgUnitIds())
-          .thenReturn(Set.of(pinned, UUID.randomUUID()));
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, pinned, Set.of()));
       when(jobOrderRepository.findScopedJobOrders(
               allStatuses,
               true,

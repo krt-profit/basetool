@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimServ
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandRowDto;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
@@ -287,7 +288,7 @@ class ExchangeDemandParityTest {
     when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(units);
     when(jobOrderRepository.findOpenForExchangeDemand(any(), eq(units))).thenReturn(list);
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, units));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(false), eq(null), eq(units)))
