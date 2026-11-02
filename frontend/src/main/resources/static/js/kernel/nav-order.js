@@ -18,6 +18,7 @@
  */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtReorder } from '/js/kernel/krt-reorder.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -98,7 +99,7 @@ async function saveScope(mode, scope, keys) {
     const result = await krtFetch.write({
         method: 'PUT',
         url: `${ORDER_URL}/${mode}/${scope}`,
-        payload: () => ({ keys, version: Number(state.dataset[field] || '0') }),
+        payload: () => ({ keys, version: versionOf(state.dataset, field) }),
         serialize: WRITE_LOCK,
         toast: false,
         errorMessage: state.dataset.orderError,
@@ -201,7 +202,7 @@ function resetOrder(button) {
     krtFetch.write({
         method: 'POST',
         url: `${ORDER_URL}/${mode}/reset`,
-        payload: () => ({ version: Number(state.dataset[field] || '0') }),
+        payload: () => ({ version: versionOf(state.dataset, field) }),
         serialize: WRITE_LOCK,
         submitter: button,
         toast: false,

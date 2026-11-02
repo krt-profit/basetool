@@ -172,17 +172,14 @@ function renderNotifications(content, items) {
 }
 
 /**
- * Fills a freshly loaded notifications instance from the bell's endpoint.
+ * Fills a freshly loaded notifications instance from the bell's endpoint; a failed read rejects so
+ * the instance shows its error state.
  *
  * @param {HTMLElement} content the instance's body content
  */
 async function fillNotifications(content) {
-    try {
-        const items = await krtFetch.getJson('/notifications/recent');
-        renderNotifications(content, Array.isArray(items) ? items : []);
-    } catch (_error) {
-        renderNotifications(content, []);
-    }
+    const items = await krtFetch.getJson('/notifications/recent');
+    renderNotifications(content, Array.isArray(items) ? items : []);
 }
 
 /** @type {KrtReceiver | null} the receiver of the member's own hangar room, once created */
@@ -248,6 +245,16 @@ function followRoom(type) {
 }
 
 /**
+ * The steps a widget type needs once its body is in place, keyed by widget type name.
+ *
+ * @type {Record<string, (content: HTMLElement) => void | Promise<void>>}
+ */
+const AFTER_LOAD = {
+    NOTIFICATIONS: fillNotifications,
+    HANGAR_READINESS: (content) => followHangarRoom(content.dataset.liveSyncTopic ?? ''),
+};
+
+/**
  * Loads one instance's body from its own endpoint; a failure shows that instance's error state and
  * leaves the others alone. An instance the active context does not offer loads nothing.
  *
@@ -261,7 +268,6 @@ export async function loadWidget(item) {
         const response = await krtFetch.get(widgetUrl(item), {
             accept: 'text/html',
             key: `dashboard-${item.dataset.id}`,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (!response) return;
         if (!response.ok) {
@@ -272,11 +278,9 @@ export async function loadWidget(item) {
         document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: body } }));
         followRoom(item.dataset.widgetType ?? '');
         const content = body.querySelector('[data-widget-content]');
-        if (item.dataset.widgetType === 'NOTIFICATIONS' && content instanceof HTMLElement) {
-            await fillNotifications(content);
-        }
-        if (item.dataset.widgetType === 'HANGAR_READINESS' && content instanceof HTMLElement) {
-            followHangarRoom(content.dataset.liveSyncTopic ?? '');
+        const afterLoad = AFTER_LOAD[item.dataset.widgetType ?? ''];
+        if (afterLoad && content instanceof HTMLElement) {
+            await afterLoad(content);
         }
     } catch (_error) {
         showError(item, body);

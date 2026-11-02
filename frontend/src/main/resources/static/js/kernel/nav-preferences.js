@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
@@ -240,8 +241,8 @@ export function writePreferences(compute, options = {}) {
             hiddenChanged: change.hidden !== undefined,
         };
     };
-    const favouritesVersion = () => Number(state.dataset.version || '0');
-    const hiddenVersion = () => Number(state.dataset.hiddenVersion || '0');
+    const favouritesVersion = () => versionOf(state.dataset, 'version');
+    const hiddenVersion = () => versionOf(state.dataset, 'hiddenVersion');
     krtFetch.write({
         method: 'PUT',
         url: () => {

@@ -18,6 +18,7 @@
  */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { reloadMenu, stateElement } from '/js/kernel/nav-preferences.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -133,14 +134,14 @@ function announce(dataKey, values = {}) {
  *
  * @param {HTMLElement} state the state element
  * @param {string} mode `member` or `admin`
- * @returns {{ stored: (string | null)[], shown: (string | null)[], version: number }} the bar
+ * @returns {{ stored: (string | null)[], shown: (string | null)[], version: number | null }} the bar
  */
 function barOf(state, mode) {
     const prefix = `tabbar${mode === 'admin' ? 'Admin' : 'Member'}`;
     return {
         stored: parseSlots(state.dataset[`${prefix}Stored`]),
         shown: parseSlots(state.dataset[`${prefix}Shown`]),
-        version: Number(state.dataset[`${prefix}Version`] || '0'),
+        version: versionOf(state.dataset, `${prefix}Version`),
     };
 }
 

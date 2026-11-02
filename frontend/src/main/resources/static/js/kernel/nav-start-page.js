@@ -18,6 +18,7 @@
  */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { applyAppearance } from '/js/kernel/nav-appearance.js';
 import { NAV_START_PAGE_EVENT } from '/js/kernel/nav-preferences.js';
@@ -93,7 +94,7 @@ function write(mode, key, submitter) {
     krtFetch.write({
         method: 'PUT',
         url: `${APPEARANCE_URL}/start-page/${mode}`,
-        payload: () => ({ key, version: Number(state.dataset.version || '0') }),
+        payload: () => ({ key, version: versionOf(state.dataset, 'version') }),
         serialize: WRITE_LOCK,
         submitter: submitter instanceof HTMLButtonElement ? submitter : undefined,
         toast: false,
