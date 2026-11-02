@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
@@ -63,7 +63,7 @@ class NavigationAdvicePromotionFlagsTest {
     CapabilitiesResponse officerOfDisabledUnitsOnly =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, true, true, false, true, true, true,
-            true, false, false, false, false, false, false, false);
+            true, false, false, false, false, false, false, false, false, false, false);
 
     assertThat(accessFor(officerOfDisabledUnitsOnly).flags())
         .contains(NavigationFlag.OFFICER_ANYWHERE, NavigationFlag.OPEN_LEITUNG)
@@ -79,7 +79,7 @@ class NavigationAdvicePromotionFlagsTest {
     CapabilitiesResponse pinnedToDisabled =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, false, false, false, false, false,
-            false, true, true, true, false, false, false, false, false);
+            false, true, true, true, false, false, false, false, false, false, false, false);
 
     assertThat(accessFor(pinnedToDisabled).flags())
         .contains(NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE, NavigationFlag.PROMOTION_ANYWHERE)

@@ -43,12 +43,11 @@ import { favouriteKeys, stateElement } from '/js/kernel/nav-preferences.js';
  * @param {HTMLElement} paletteRoot the palette's root, which carries its own page list
  * @returns {{
  *     items: PaletteItem[],
- *     addPage: (page: { href: string, label: string, crumb: string, icon: string, keywords: string, entryKey?: string, starrable?: boolean }) => boolean,
  *     rebuild: () => void,
  *     refreshFrequencies: () => void,
  *     emptyStatePages: () => { favourites: PaletteItem[], frequent: PaletteItem[], recent: PaletteItem[] },
- * }} the pages, the way to add one, to collect them again, to reload the often used scores and the
- *     pages of the empty state
+ * }} the pages, the way to collect them again, to reload the often used scores and the pages of
+ *     the empty state
  */
 export function createPageIndex(paletteRoot) {
     /** @type {PaletteItem[]} */
@@ -207,5 +206,5 @@ export function createPageIndex(paletteRoot) {
     recordVisit();
     refreshFrequencies();
 
-    return { items, addPage, rebuild, refreshFrequencies, emptyStatePages };
+    return { items, rebuild, refreshFrequencies, emptyStatePages };
 }

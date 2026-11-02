@@ -167,7 +167,6 @@ public final class FrontendPageRoutes {
           "/notifications/page-items",
           "/notifications/recent",
           "/notifications/unread-count",
-          "/quick-access/entries",
           "/quick-access/search",
           "/dashboard/widgets/admin-hub",
           "/dashboard/widgets/assigned-orders",

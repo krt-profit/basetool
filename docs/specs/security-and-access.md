@@ -3820,7 +3820,7 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 **Enforced by:** `MeControllerTest` (`getCapabilities_assignedJobOrdersFlag*`),
 `JobOrderAssigneeGrantIntegrationTest`, `CapabilityFlagsAdviceTest`
 
-#### The supply and purchasing tab capabilities (ADR-0282)
+#### The supply and purchasing tab capabilities (ADR-0329)
 
 `GET /api/v1/me/capabilities` and the `capabilities` object of `GET /api/v1/me/layout` carry
 `canViewSupplyIncoming`, `canViewSupplyStats`, `canViewPurchasingPartners`,

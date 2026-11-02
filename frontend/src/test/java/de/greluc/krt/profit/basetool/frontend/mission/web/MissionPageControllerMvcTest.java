@@ -98,8 +98,7 @@ class MissionPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(
             "/api/v1/me/capabilities",
-            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
-                .CapabilitiesResponse.class))
+            de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse.class))
         .thenReturn(
             de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager());
   }

@@ -31,8 +31,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.DesktopMode;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
@@ -138,6 +138,31 @@ class NavigationDataTabGateMvcTest {
     int start = html.indexOf("data-testid=\"start-page-select-member\"");
     assertThat(start).as("the member start-page select").isNotNegative();
     return html.substring(start, html.indexOf("</select>", start));
+  }
+
+  @NotNull
+  private static String paletteSource(@NotNull String html) {
+    int start = html.indexOf("data-testid=\"palette-source-pages\"");
+    assertThat(start).as("the quick access's own page list").isNotNegative();
+    return html.substring(start, html.indexOf("data-testid=\"palette-source-actions\"", start));
+  }
+
+  @Test
+  @DisplayName("the quick access indexes exactly the granted tabs from the rendered page")
+  void theQuickAccessIndexesTheGrantedTabs() throws Exception {
+    surfaces(true);
+    flags(LayoutResponses.tabs(true, false, false, false, true));
+    stored(null);
+
+    String source = paletteSource(profile());
+
+    assertThat(source)
+        .contains("data-entry-key=\"supply.incoming\"")
+        .contains("data-entry-key=\"purchasing.report\"")
+        .doesNotContain("data-entry-key=\"supply.stats\"")
+        .doesNotContain("data-entry-key=\"purchasing.partners\"")
+        .doesNotContain("data-entry-key=\"purchasing.delegates\"")
+        .doesNotContainPattern("data-nav-skip=\"true\"[^>]*data-entry-key=\"purchasing.report\"");
   }
 
   @Test
