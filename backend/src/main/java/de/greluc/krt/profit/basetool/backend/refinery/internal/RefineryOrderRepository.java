@@ -293,8 +293,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
 
   /**
    * Bulk-clears the mission link on every refinery order tied to one of the given missions so the
-   * orders survive a mission delete as unassigned (see CLAUDE.md "Operation delete keeps missions
-   * intact" rule for the broader pattern).
+   * orders survive a mission delete as unassigned.
    */
   @Modifying
   @Query("UPDATE RefineryOrder r SET r.missionId = null WHERE r.missionId IN :missionIds")

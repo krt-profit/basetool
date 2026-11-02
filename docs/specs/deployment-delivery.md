@@ -1737,7 +1737,7 @@ for why the missing-probe half is not redundant.
 - [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting
   it does not strip the public anchors; the keystore password appears in no process argument.
 - [ ] No production credential, realm export or Discord application is reused by a
-  non-production environment (`CLAUDE.md`: never use production credentials in test stacks).
+  non-production environment (`AGENTS.md`: never use production credentials in test stacks).
 
 **Enforced by:** `.github/workflows/promote-testing.yml` · `docker-compose.yml`
 (`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · `ansible/roles/basetool_host/tasks/50-podman.yml`
@@ -3438,6 +3438,35 @@ which identifies packages by Package URL and needs no local dataset (ADR-0325).
 `.github/actions/report-failed-run` · **Decision:**
 [ADR-0325](../adr/0325-dependencies-are-checked-against-the-github-advisory-database.md) ·
 **Related:** REQ-OPS-024, REQ-OPS-025, REQ-OPS-034
+
+### REQ-OPS-055 — Agent instructions live in `AGENTS.md`, stay within the reading limit, and every skill has a stub
+
+Coding agents of every vendor read the same instructions (ADR-0327).
+
+- **One source.** The root, `backend/` and `frontend/` each carry an `AGENTS.md` that names no
+  product. Each `CLAUDE.md` imports the `AGENTS.md` of its directory and adds only what is specific
+  to Claude Code; no rule exists in a `CLAUDE.md` alone. `.claude/rules/java-conventions.md`
+  imports `docs/agents/java-conventions.md`.
+- **The reading limit.** For every tracked `AGENTS.md`, the `AGENTS.md` files on its path from the
+  repository root total at most 32 768 bytes — the default `project_doc_max_bytes` of Codex. A
+  section that does not fit moves into a reference file under `docs/agents/`, and the summary that
+  stays names the file and the work it must be read before.
+- **Skill stubs.** Every skill `.claude/skills/<name>/` has a stub `.agents/skills/<name>/SKILL.md`
+  whose frontmatter `name` and `description` equal the original's and whose body points at the
+  original. No stub exists without its skill. A skill that is a submodule absent from the checkout
+  is compared by `name` only.
+
+**Acceptance**
+
+- [x] `scripts/check-agent-instructions.py` fails when root plus a module `AGENTS.md` exceed 32 KiB,
+  when a skill has no stub, when a stub's `name` or `description` differs, when a stub does not
+  name its original and when a stub has no skill; its `--selftest` proves each case.
+- [x] Root plus `backend/AGENTS.md` and root plus `frontend/AGENTS.md` are below 32 KiB.
+
+**Enforced by:** `scripts/check-agent-instructions.py` (the `agent-instructions` steps of
+`.github/workflows/repo-lint.yml`) · **Decision:**
+[ADR-0327](../adr/0327-agents-md-is-the-vendor-neutral-agent-instructions.md) ·
+**Related:** REQ-OPS-051
 
 ## Open questions
 

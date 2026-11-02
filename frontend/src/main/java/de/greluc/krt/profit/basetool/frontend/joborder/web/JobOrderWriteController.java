@@ -447,7 +447,7 @@ public class JobOrderWriteController {
   /**
    * Reorders an order's priority (drag-and-drop between job orders). Backend uses pessimistic
    * locking on the entire job-order priority sequence to serialize concurrent reorders, per the
-   * concurrency pattern in CLAUDE.md.
+   * concurrency pattern in docs/agents/backend-concurrency.md.
    *
    * @return redirect to {@code /orders}
    */

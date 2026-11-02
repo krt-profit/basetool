@@ -892,7 +892,7 @@ pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidd
 `kernel/fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
 `#resolveSquadronForPickerOutput`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `kernel/fragments/head.html` ·
-**Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`
+**Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `AGENTS.md`
 
 ### REQ-ORG-028 — A scoped aggregate carries `@TenantScoped`, and the scope rules select by it
 

@@ -29,7 +29,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 
 ## 2.3 Conventions that function as constraints
 
-These are written down in `CLAUDE.md` and enforced by gates, which makes them binding in practice
+These are written down in `AGENTS.md` and enforced by gates, which makes them binding in practice
 even though they are style rules on paper:
 
 - **Constructor injection only** (no `@Autowired` field, REQ-SEC-003), Lombok maximised, records for DTOs, JetBrains nullity annotations
@@ -55,7 +55,7 @@ even though they are style rules on paper:
 
 ## 2.4 The documentation constraint
 
-`CLAUDE.md` binds every change to update the specs, the ADRs, the README, the role matrix and the
+`AGENTS.md` binds every change to update the specs, the ADRs, the README, the role matrix and the
 German wiki in the same unit of work. Nothing in CI can enforce the wiki half — it is a separate
 git repository — which is why the rule is written into every place an agent or a contributor starts. It is a constraint on how work is done,
 not a suggestion about tidiness.

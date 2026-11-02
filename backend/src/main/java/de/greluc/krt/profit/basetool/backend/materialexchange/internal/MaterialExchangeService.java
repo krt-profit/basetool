@@ -104,7 +104,8 @@ public class MaterialExchangeService {
    * Self-reference used only to run {@link #registerInterestInNewTransaction(UUID, UUID)} in a
    * fresh transaction through the Spring proxy, so a concurrent duplicate-registration race
    * surfaces as a {@link DataIntegrityViolationException} the non-transactional orchestrator can
-   * catch (CLAUDE.md find-or-create rule) instead of poisoning the caller's transaction.
+   * catch (the find-or-create rule of docs/agents/backend-concurrency.md) instead of poisoning the
+   * caller's transaction.
    */
   private final ObjectProvider<MaterialExchangeService> selfProvider;
 

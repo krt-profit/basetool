@@ -5,7 +5,7 @@ description: The full local lint gate that must be green before every push — S
 
 # Lint gate
 
-The root `CLAUDE.md` carries the binding rule: **before every push, `./gradlew spotlessApply`
+The root `AGENTS.md` carries the binding rule: **before every push, `./gradlew spotlessApply`
 (whole repo) plus the full frontend asset-lint gate must be green — no exceptions.** This skill is
 the how-to behind that rule.
 

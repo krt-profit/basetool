@@ -1884,7 +1884,7 @@ REQ-OBS-011 · **Decision:** ADR-0302
   [`org-unit-tenancy.md`](org-unit-tenancy.md) `REQ-ORG-003`; this spec does not change it.
   Grouping is a display concern and never widens visibility.
 - The optimistic-locking, `@Version` and `*WithinTransaction` concurrency rules live in
-  [`data-persistence.md`](data-persistence.md) and [`backend/CLAUDE.md`](../../backend/CLAUDE.md).
+  [`data-persistence.md`](data-persistence.md) and [`backend-concurrency.md`](../agents/backend-concurrency.md).
 
 ## Open questions
 

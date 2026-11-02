@@ -22,7 +22,7 @@ link. The desktop extractor (#436, shipped 2026-06-10 as PR #5 of
 [`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor), then still
 named `basetool-bp-extractor`) lives in its own repo; its binding desktop-side rules —
 the frozen read strategy, the deterministic confidence policy, the resource-safety
-guardrails — are recorded there (`CLAUDE.md`,
+guardrails — are recorded there (`AGENTS.md`,
 `docs/refinery-extractor/PHASE0_FINDINGS.md`, the contract test pinning the §5 example),
 while the cross-repo contract stays governed by `REQ-REFINERY-001` + ADR-0008 here. The
 original master plan is frozen as a historical record in

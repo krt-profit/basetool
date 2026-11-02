@@ -320,7 +320,7 @@ On a successful write whose response carries a `version`, `krtFetch` writes that
 target container **and every descendant `[data-version]`**, so the user's next action on the same
 aggregate sends the fresh version and does not 409. When propagation cannot be made complete in
 place, the handler reloads deliberately (the conflict-confirm path) rather than leaving a stale
-version. This is the client half of the `@Version` rules in `CLAUDE.md`.
+version. This is the client half of the `@Version` rules in `AGENTS.md`.
 
 **Backend obligation.** The contract above only holds if the mutation response carries the
 _post-write_ version. A service (or class-`@Transactional` controller) that maps the response DTO
@@ -331,7 +331,7 @@ increment is otherwise deferred to commit — _after_ the DTO is mapped — so t
 (e.g. `Mission.coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion`), which is
 already current in the DTO regardless of flush timing, nor to writes whose handler re-renders the
 fragment from a fresh server `GET` (the re-swap re-reads the committed version). See the
-optimistic-locking rules in `CLAUDE.md`. (A 2026-06 area audit added
+optimistic-locking rules in `AGENTS.md`. (A 2026-06 area audit added
 `JobOrderService.updateJobOrder` to the `saveAndFlush` set — its edit-modal version writeback
 otherwise 409s the next consecutive order edit. A 2026-07 audit added the participant write path —
 `MissionParticipantService.updateParticipantAttributes` / `checkIn` / `checkOut` — for the same

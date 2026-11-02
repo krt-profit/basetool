@@ -301,7 +301,7 @@ not excluded from the row lock. Three concrete defects (round-2 audit, epic #110
 - **Cross-section 409 on the header sections (#1114).** `name` / `description` / `meetingPoint` /
   `calendarLink` / `status` / the schedule timestamps / `isInternal` were **not** excluded, so any
   core/schedule/flags edit bumped the row `@Version` and 409-ed an *unrelated* concurrent
-  section edit — the coarse, screen-wide lock CLAUDE.md flags as a defect.
+  section edit — the coarse, screen-wide lock AGENTS.md flags as a defect.
 - **Duplicate `orderIndex` on steps/goals (#1147).** Two concurrent `addStep`/`addObjective` both
   computed `orderIndex = max + 1` on the same snapshot and both committed, so `@OrderBy` rendered a
   nondeterministic tie; concurrent reorders/deletes interleaved into gaps.

@@ -28,6 +28,11 @@
 /CONTRIBUTING.md                    @greluc
 /CODE_OF_CONDUCT.md                 @greluc
 /CLAUDE.md                          @greluc
+/AGENTS.md                          @greluc
+/backend/AGENTS.md                  @greluc
+/frontend/AGENTS.md                 @greluc
+/docs/agents/                       @greluc
+/.agents/                           @greluc
 
 /backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/       @greluc
 /backend/src/main/resources/db/migration/                                  @greluc

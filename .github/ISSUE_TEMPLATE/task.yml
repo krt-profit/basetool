@@ -34,7 +34,7 @@ body:
         - Tech debt
         - Dependency upgrade (gradle/libs.versions.toml)
         - Build / CI / GitHub Actions
-        - Docs (CLAUDE.md / README / CHANGELOG / Javadoc)
+        - Docs (AGENTS.md / README / CHANGELOG / Javadoc)
         - Test coverage / test infrastructure
         - Performance
         - Other
