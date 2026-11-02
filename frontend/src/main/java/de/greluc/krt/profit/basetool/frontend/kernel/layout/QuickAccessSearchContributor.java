@@ -24,10 +24,10 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Finds the entities of one type for the quick access's typed search, scoped by the backend read of
- * the page the hits open (REQ-UI-033, ADR-0282, ADR-0297).
+ * the page the hits open (REQ-UI-033, ADR-0297).
  *
- * <p>The sibling seam of {@link QuickAccessContributor}: it takes the search term. The term goes to
- * the backend as a query parameter only, never into a path, a log line or the MDC.
+ * <p>The term goes to the backend as a query parameter only, never into a path, a log line or the
+ * MDC.
  */
 public interface QuickAccessSearchContributor {
 

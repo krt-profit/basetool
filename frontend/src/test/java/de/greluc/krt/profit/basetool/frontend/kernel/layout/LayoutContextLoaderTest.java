@@ -26,9 +26,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.LayoutContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -159,7 +159,7 @@ class LayoutContextLoaderTest {
     MockHttpServletRequest request = requestFor("view");
 
     assertThat(loader.capabilities(request).hasOfficerReach()).isTrue();
-    assertThat(loader.load(request).capabilities().canManagePromotions()).isTrue();
+    assertThat(loader.load(request).capabilities().canSeeHangarOwnerDetails()).isTrue();
 
     verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
   }
@@ -173,7 +173,7 @@ class LayoutContextLoaderTest {
     MockHttpServletRequest request = requestFor("json");
 
     assertThat(loader.capabilities(request).canOpenLeitung()).isTrue();
-    assertThat(loader.capabilities(request).canManagePromotions()).isTrue();
+    assertThat(loader.capabilities(request).canManageJobOrders()).isTrue();
 
     verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
   }

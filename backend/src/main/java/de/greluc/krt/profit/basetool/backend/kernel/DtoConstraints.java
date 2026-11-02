@@ -27,22 +27,11 @@ public final class DtoConstraints {
 
   private DtoConstraints() {}
 
-  /** Max length of a short name / label (e.g. a promotion topic or category name): 120 chars. */
-  public static final int MAX_SHORT_NAME = 120;
-
   /** Max length of a general name / external material name: 255 chars. */
   public static final int MAX_NAME = 255;
 
   /** Max length of a short code (e.g. an external source code): 64 chars. */
   public static final int MAX_CODE = 64;
-
-  /** Max length of a description free-text field: 2000 chars. */
-  public static final int MAX_DESCRIPTION = 2000;
-
-  /**
-   * Max length of a long description free-text field (e.g. promotion level content): 4000 chars.
-   */
-  public static final int MAX_LONG_DESCRIPTION = 4000;
 
   /**
    * Allows an empty value or one that starts with {@code https://} — the "plaintext link must be

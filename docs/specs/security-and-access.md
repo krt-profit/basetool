@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -118,10 +118,7 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
   role-code comparisons that sit outside `@PreAuthorize` entirely and were never covered by the
   original sweep or the programmatic-comparison follow-up above: `UserService` (including the
   Keycloak first-admin bootstrap auto-activation check), `BankGrantService`,
-  `BankHolderReconciliationService` and `RecipientResolutionService`. Finally, the ~35 sites sharing
-  the identical `hasAnyRole('ADMIN','OFFICER')` splice across the promotion/rank/evaluation surface
-  now reference one pre-built compile-time-constant expression, `Roles.ADMIN_OR_OFFICER` /
-  `frontend.kernel.security.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
+  `BankHolderReconciliationService` and `RecipientResolutionService`.
 
 ### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
 
@@ -342,20 +339,18 @@ A call through `this` never reaches the Spring proxy, so the callee's `@PreAutho
 it inherits) that carries such an annotation, or that is a public instance method of a class
 carrying one; a call from a lambda inside the class counts.
 
-- The 18 service-level gates (`MemberEvaluationService` ×3, `MissionFinanceEntryService#updateEntry`
-  / `#deleteEntry`, `PromotionCategoryService` ×3, `PromotionEligibilityService#evaluateAllForUserAsAdmin`,
-  `PromotionLevelContentService` ×3, `PromotionTopicService` ×3, `RankRequirementService` ×3) are
-  each called only from their controller (checked 2026-10-02).
-- The finance-entry edit and delete and the promotion-category writes have no role gate beyond
-  `isAuthenticated()` on their controllers, so their service annotations are the real gate; the
-  rule's test also pins those five annotations to their expressions.
+- The two service-level gates, `MissionFinanceEntryService#updateEntry` and `#deleteEntry`, are
+  each called only from their controller.
+- The finance-entry edit and delete have no role gate beyond `isAuthenticated()` on their
+  controllers, so their service annotations are the real gate; the rule's test also pins those two
+  annotations to their expression.
 - `MeController#getLayout` composed its answer by calling the class-gated `getActiveOrgUnit`,
   `getCapabilities` and `getPinnableOrgUnits` through `this`; it now calls the private helpers those
   endpoints share. Behaviour is unchanged — the layout read carries the same class-level gate.
 
 **Acceptance**
 
-- [x] No main class calls its own gated method; at least 593 gated methods and 18 service gates are
+- [x] No main class calls its own gated method; at least 593 gated methods and two service gates are
   in the rule's selection (`GatedSelfInvocationTest`).
 - [x] A planted direct, lambda and class-gated self-invocation each fail the rule; a gated method
   calling an ungated helper does not.
@@ -385,7 +380,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
   `SecurityConfig`s. `MISSION_MANAGER > LOGISTICIAN` stays absent.
 - **Officer reach replaces the role.** It is derived per org unit from the caller's leadership
   seats (REQ-ROLE-002) and evaluated against the **owning unit of the target** (mission, job order,
-  promotion topic, ship, …); lists are filtered to the caller's officer units. An admin passes every
+  ship, …); lists are filtered to the caller's officer units. An admin passes every
   officer check. No token, realm role or per-membership flag grants it.
 - **Membership rights rest on `KRT_MEMBER`.** The member-list URL rules and `MEMBER_OR_ABOVE` no
   longer list `OFFICER`; the oversight scope no longer adds every squadron membership of a role
@@ -1220,7 +1215,7 @@ here:
 - A Bereich/OL leadership principal gets **officer-equivalent reach** over its scope as a **concrete
   `memberOrgUnitIds` union** (and matching contextual authorities) — it MUST **never** route through the
   `adminAllScope=true` branch and MUST **never satisfy `isAdmin()`**. Every `hasRole('ADMIN')` gate
-  (admin area, SK lifecycle, system settings, stammdaten, promotion-topic guards, bank admin/audit) stays
+  (admin area, SK lifecycle, system settings, stammdaten, bank admin/audit) stays
   closed to it.
 - **Strict silo:** a Bereichsleitung sees/edits only its own Bereich's descendants; only the OL crosses
   Bereiche. No peer-Bereich access, even read-only.
@@ -1278,7 +1273,7 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   `CustomJwtGrantedAuthoritiesConverterTest`.
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too, narrowed to the units with promotion enabled (REQ-PROMO-004). A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
+**Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The member-rank range reads the reach too. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
 
 **Enforced by:** `ScopeKernelTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
@@ -1403,29 +1398,11 @@ per-operation decision to the backend.
 `OperationAccessPolicyClearPayoutTest`, `OperationPayoutPaidOutSecurityTest`,
 `OperationPageControllerMvcTest` · **Related:** REQ-SEC-015, ADR-0300. **Security audit:** finding H1.
 
-### REQ-SEC-020 — Member-evaluation writes are scoped to the evaluated member's squadron
+### REQ-SEC-020 — Member-evaluation writes are scoped to the evaluated member's squadron *(superseded)*
 
-MemberEvaluation create/update/delete (`PUT`/`DELETE /api/v1/promotion/evaluations/...`) gates on
-`MemberEvaluationService` with `@PreAuthorize("hasAnyRole('ADMIN','OFFICER')")`. A non-admin write
-must satisfy TWO squadron-scope checks, not one: the evaluation's **category** must belong to a
-squadron the caller may edit (`assertCallerMayEditCategory`) AND the **evaluated member** must belong
-to a Staffel the caller may edit (`assertCallerMayEvaluateUser` →
-`AccessGateService.canEditSquadron(member's home Staffel)`). Without the member check an officer of
-squadron X could create/overwrite/delete an evaluation row for a member of squadron Y by pairing the
-victim's id with a category owned by X (a cross-tenant write of member-evaluation data). ADMIN spans
-every squadron and short-circuits; the check fails closed on a malformed member id or a member with
-no Staffel the caller can edit.
-
-**Acceptance**
-
-- [x] An officer is denied (`AccessDeniedException`) upserting/deleting an evaluation for a member
-  outside their editable Staffel scope, even with an in-scope category.
-- [x] An officer may evaluate a member of a Staffel within their scope; an admin may evaluate anyone.
-
-**Enforced by:** `MemberEvaluationServiceTest`
-(`upsert_shouldDenyOfficer_evaluatingForeignSquadronMember`,
-`upsert_shouldAllowOfficer_evaluatingOwnSquadronMember`). **Security audit:** gap-fill finding
-(member-evaluation cross-tenant write).
+> [!warning] Superseded 2026-11-02 by ADR-0330
+> The promotion system and its member evaluations are removed, so no evaluation write is left to
+> scope.
 
 ### REQ-SEC-021 — Anonymous outsider mission view withholds payout intent and free-text comments *(superseded)*
 
@@ -2300,7 +2277,6 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
 | `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
-| `/api/v1/promotion/**` | evaluations of named members |
 | `/api/v1/roles/**`, `/api/v1/settings/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the raw key store (ADMIN-only reads, REQ-SEC-083), of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
 | `/api/v1/audit/**` | **new** — who did what, by actor |
 | `/api/v1/supply/**`, `/api/v1/purchasing/**` | the needs' purchase fields, donors, deals, partners and the delegates' limits |
@@ -2378,8 +2354,8 @@ answer from it identically for seventeen paths.
 **Acceptance**
 
 - [x] Every listed family answers with `private, no-store`, including the notification SSE stream.
-- [x] The member bank, mission-finance, personal-inventory, personal-blueprint, inventory, hangar,
-  refinery-order and promotion reads in the frozen external contract are covered — asserted at the
+- [x] The member bank, mission-finance, personal-inventory, personal-blueprint, inventory, hangar
+  and refinery-order reads in the frozen external contract are covered — asserted at the
   bare collection path as well as a child, since the bare path is itself an endpoint a client calls.
 - [x] An encoded spelling of a sensitive path still gets `no-store`.
 - [x] Other `/api/**` GETs are unchanged (the shared listings keep `must-revalidate`), and non-API
@@ -3292,19 +3268,6 @@ on 2026-10-03) are each one entry of the map like every other operation. `EdgeAd
 drives the committed map through the edge's own image in CI: every admitted operation passes, and
 every other verb on every admitted path, near-miss spellings and non-uuid ids answer `404`.
 
-**Phase 4's Beförderung reads are the least remarkable entries on the list, and that is the point
-of naming them.** `GET /api/v1/promotion/evaluations/my` and `…/eligibility/my` are
-`isAuthenticated()` and me-scoped by construction: both end in `/my`, the member is resolved from
-the token, and there is no id an anonymous caller could substitute. They answer `401`. The rule
-here is that every admitted path has its status recorded when it is added — not that the obvious
-ones may be assumed, because "obvious" is exactly what the one wrong entry always looked like
-beforehand. The officers' matrix (`/promotion/manage`, `/evaluations/all`, `/evaluations/members`)
-is **not** on the list at all: the admin area is web-only permanently. Those reads, like every
-list behind an officer surface, are limited to the caller's officer reach, pin-aware, rather than to
-the member-list scope (REQ-ROLE-007, REQ-SEC-015): `SquadronVisibility#currentOfficerReadScope`
-yields the reach units, narrowed to the pin or empty when the pin is out of reach, and `null` only
-for an unpinned admin.
-
 **The live-sync bridge adds a second stream and the vhost's first client-driven publish**
 (ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and
 neither is anonymous. They are worth stating rather than filing under "everything else" because
@@ -3662,7 +3625,7 @@ would not repair an identity, it would falsify history.
 | Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
 | Materialbörse offers, requests and interest                                                         | `user_roles` — re-derived from the token and the roster sync, not owned (REQ-SEC-013, REQ-SEC-036)                    |
 | Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
-| Notifications, rule selectors, promotion evaluations                                                | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
+| Notifications, rule selectors                                                                       | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
 | Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
 
 **The merge is an orchestrator over participants** (plan §7.6, `platform.api`). Each module that
@@ -3820,11 +3783,26 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 **Enforced by:** `MeControllerTest` (`getCapabilities_assignedJobOrdersFlag*`),
 `JobOrderAssigneeGrantIntegrationTest`, `CapabilityFlagsAdviceTest`
 
+#### The supply and purchasing tab capabilities (ADR-0329)
+
+`GET /api/v1/me/capabilities` and the `capabilities` object of `GET /api/v1/me/layout` carry
+`canViewSupplyIncoming`, `canViewSupplyStats`, `canViewPurchasingPartners`,
+`canViewPurchasingDelegates` and `canViewPurchasingReport`: whether the caller may open that tab of
+„Bedarf & Spenden" or „Ankauf". Each is `false` while its surface is off; otherwise the owning
+module decides it through its `api` seam (`SupplyTabAccess`, `PurchasingTabAccess`) with the access
+policy the read behind the tab enforces — the rules are tabulated in REQ-UI-026. None depends on
+the pinned unit. An admin reads the backend's answer, not `true`, because each also needs its
+surface on (and the incoming tab an active unit that accepts donations). The flags steer the
+navigation, the tab bars and the quick access only; every read behind a tab re-checks.
+
+**Enforced by:** `MeControllerTest` (`getCapabilities_*TabFlags*`, `getLayout_carriesTheSameTabFlags`),
+`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeLayoutSingleTransactionTest`
+
 #### Officer reach in the capabilities (ADR-0300)
 
 - **The capabilities are pin-aware.** `GET /api/v1/me/capabilities` and the `capabilities` object of
   `GET /api/v1/me/layout` carry the caller's officer flags (officer reach and the officer-gated
-  surfaces: Leitung, promotion management, hangar owner details, job-order writes, mission finance)
+  surfaces: Leitung, hangar owner details, job-order writes, mission finance)
   for the **active context**: for the pinned unit when one is pinned (REQ-SEC-048), for the union of
   the caller's officer units when none is. An admin reads `true`.
 - **The frontend keeps no reach logic.** Every frontend `ROLE_OFFICER` gate — `sec:authorize`,
@@ -3839,19 +3817,16 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 
 **The officer flags:** `canActAsOfficerAnywhere` (reach in at least one unit whatever the pin, which
 tells a lost seat from a pin outside it), `hasOfficerReach`, `canOpenLeitung`,
-`canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
-`canManageMissionFinance`, each the answer of `RequestScopeResolver#canActAsOfficerInActiveContext()`
-(`canManagePromotions` counts only the reached units with promotion enabled, REQ-PROMO-004, and two
-flags beside it, `canManagePromotionsAnywhere` and `canUsePromotionAnywhere`, ignore the pin;
-and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
+`canSeeHangarOwnerDetails`, `canManageJobOrders` and `canManageMissionFinance`, each the answer of
+`RequestScopeResolver#canActAsOfficerInActiveContext()` (and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
 the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
 pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
 (fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on
-`canOpenLeitung` and the promotion management entries on `canManagePromotions`, and the sidebar's
+`canOpenLeitung`, and the sidebar's
 role badge reads `hasOfficerReach`; the bank member search, the profit calculation and the
-blueprint availability overview no longer admit the `OFFICER` role. The promotion and Leitung
-pages and proxies and the Spezialkommando members page gate on `canManagePromotions`,
-`canOpenLeitung` and `hasOfficerReach` through the frontend `OfficerSurfaceGate`.
+blueprint availability overview no longer admit the `OFFICER` role. The Leitung
+pages and proxies and the Spezialkommando members page gate on `canOpenLeitung` and
+`hasOfficerReach` through the frontend `OfficerSurfaceGate`.
 
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
 carries them), `ScopeKernelTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
@@ -4280,12 +4255,12 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 |                      Relayed value                      |                    Bound as                    |                                                        Mirrors                                                         |
 |---------------------------------------------------------|------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
 | `from`, `to`, `before`                                  | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `AuditAdminController`, `BankAccountController`, `OrgUnitBankController`                                               |
-| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserProfileController`, `UserController` |
+| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `UserProfileController`, `UserController` |
 | `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`, relayed as a `{sort}` URI-template variable (the personal inventory listing did `URLEncoder.encode` first, so the comma went out as `%252C`) | REQ-API-005's backend field whitelist |
 | free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
 | the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
-| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `AnnouncementReadController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
+| an announcement id                                      | `UUID`                                         | `AnnouncementReadController#updateReadAnnouncement`                                                                    |
 | a bank role bucket (`roleCode`), a default-blueprint id | `RelayParams.constantNameOrNull` (enum-literal shape, else `400`), `UUID` | `BankApprovalLimitService` role buckets, `AdminDefaultBlueprintController` |
 | the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
@@ -4312,10 +4287,9 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
 > encode state, and `UriComponents#toUriString()` emits raw components verbatim. All three
 > spellings differ by one call and by whether the value is encoded at all.
 >
-> Both non-encoding spellings have shipped here under a comment asserting the encoding one:
-> `PromotionProxyController` used `buildAndExpand(...).toUriString()` (fixed 2026-09-04, ADR-0158)
-> and `MaterialProxyController#getProfitCalculation` used `build().toUriString()` (fixed
-> 2026-09-04, CodeQL alert 877). Do not read an encoding claim in a comment as evidence that
+> A non-encoding spelling has shipped here under a comment asserting the encoding one:
+> `MaterialProxyController#getProfitCalculation` used `build().toUriString()` (fixed 2026-09-04,
+> CodeQL alert 877; ADR-0158). Do not read an encoding claim in a comment as evidence that
 > encoding happens — read the call.
 
 **Acceptance**
@@ -4358,7 +4332,7 @@ client-id narrowing; the canonical period/actor relay) · `AuditReportProxyContr
 allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system name carrying
 `&`/`=` leaves the controller as a URI variable, opening no second query parameter) ·
 **Code:** `RelayParams`, `AuditDomains`, `AuditReportProxyController`,
-`BankReportProxyController`, `OrgUnitBankProxyController`, `PromotionProxyController`,
+`BankReportProxyController`, `OrgUnitBankProxyController`,
 `AdminAuditLogPageController`, `AdminPersonalInventoryPageController`,
 `AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,
 `MaterialboersePageController`, `MissionPageController#listMissions`,

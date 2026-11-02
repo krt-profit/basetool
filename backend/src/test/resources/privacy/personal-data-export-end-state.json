@@ -83,15 +83,6 @@
     } ],
     "truncated" : false
   }, {
-    "key" : "evaluations",
-    "legalBasis" : "ART_15",
-    "rows" : [ {
-      "category" : "Zzz Export Category",
-      "assigned_level" : "LEVEL_A",
-      "updated_at" : "<instant>"
-    } ],
-    "truncated" : false
-  }, {
     "key" : "warehouseContributions",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

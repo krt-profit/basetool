@@ -89,7 +89,6 @@ class NavigationMemberRenderMvcTest {
             "data-group-key=\"unit\"")
         .doesNotContain("data-group-key=\"resources\"")
         .doesNotContain("data-group-key=\"supply\"")
-        .doesNotContain("data-group-key=\"promotion\"")
         .doesNotContain("data-group-key=\"missions\"")
         .doesNotContain("data-entry-key=\"home.dashboard\"")
         .doesNotContain("data-entry-key=\"notifications.list\"")

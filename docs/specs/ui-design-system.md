@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -403,9 +403,8 @@ hiding it — so the class always wins regardless of how the other side toggled 
 - [x] Every dialog is rendered by `modal-wrapper :: modal`; no other template carries
   `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or `.krt-modal-close`, and the head is an
   `<h2>` and an ✕ (2026-09-23).
-- [x] A dialog renders only where its openers and the script that drives it do. The promotion
-  admin pages in the admin's all-squadrons view, and the admin blueprint page before a member is
-  picked, render none of their dialogs (2026-09-23; until then they rendered dead markup).
+- [x] A dialog renders only where its openers and the script that drives it do. The admin
+  blueprint page before a member is picked renders none of its dialogs.
 - [x] Every dialog on every page route and on a seeded mission, operation, order, refinery order and
   bank account opens modally with a title, an accessible name and a visible ✕, takes focus, and
   closes on Escape and on its ✕. A declared dialog the walk does not reach is listed with its reason.
@@ -417,7 +416,7 @@ hiding it — so the class always wins regardless of how the other side toggled 
 **Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`,
 `everyDialogIsRenderedByTheWrapper`), `ModalWrapperRenderTest`, `DialogA11yE2eTest`
 (`everyDialogFollowsTheContract`), `AdminMissionDataCrudE2eTest`
-(`cancelButtonClosesEachCreateDialog`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
+(`cancelButtonClosesEachCreateDialog`),
 `AdminPersonalBlueprintsPageControllerMvcTest`,
 `TouchClassLayoutE2eTest`
 
@@ -623,7 +622,7 @@ The mechanism is `position: static` inside the `width <= 768px` block, and one c
 optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
 the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because every
 reader of that property — `main`'s reserve, the shared `--krt-panel-viewport-rest` that caps the
-Materialbörse / Preis-Übersicht / Beförderung panels, the `bottom` of the sticky form actions (`.form-actions--sticky`) and of the
+Materialbörse / Preis-Übersicht panels, the `bottom` of the sticky form actions (`.form-actions--sticky`) and of the
 operation payout table's pinned sum row, and the mission-detail padding — would otherwise reserve
 space for a footer that is not there.
 
@@ -724,7 +723,7 @@ dialog shapes in #1891, and the explicit `min-height` is kept only because it is
 Declared `--touch-target-dense` consumers today: `.btn.btn-xs`, `.btn-icon` (`styles.css`),
 `input.item-checkbox` (touch block), `.master-row` and `.krt-bp-imp-suggestion`
 (`personal-inventory.css`), `.matrix-flag`, `.bank-row-toggle` and `.bank-chart-range-btn`
-(`bank.css`), and `.pa-sort-controls .pa-sort-btn` (`promotion-admin.css`).
+(`bank.css`).
 
 The same inversion applies to **which rows wrap on the phone class**: a row that directly contains a
 control or a link wraps, matched structurally with `:has()` rather than by class name. Enumeration
@@ -909,7 +908,7 @@ in `check`, not in the stack-bound `e2e` suite) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
 `static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personalinventory/personal-inventory.css`
-(`.master-row`), `static/css/promotion/promotion-admin.css` (`.pa-sort-btn`), `static/js/kernel/sidebar.js`
+(`.master-row`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
 
 > **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement
@@ -1108,9 +1107,7 @@ view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle
 Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
 Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Zu bearbeiten · Alle" (`orders_scope_filter`,
 REQ-ORDERS-040), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
-Meine Bewertungen
-(only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
-(filters/sort/collapse, migrated sessionStorage → localStorage), Bank-Freigaben (view + account /
+Persönliche Blueprints (refinery + craftable toggles), Bank-Freigaben (view + account /
 employee selection), Bank-Kontodetail chart range (both detail pages) and the Kontodetail tab (both
 detail pages: `bank_account_tab_<user>`, `org_unit_bank_account_tab_<user>`), the bank request
 queue's status segment (one stored segment since 2026-10-03; a stored checkbox list migrates onto
@@ -1661,8 +1658,7 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
     Up to 1024 px the switcher keeps the 44 px touch floor of REQ-UI-009; the hand-off's 40 px
     applies above it.
   - *List* — „Startseite" and „Benachrichtigungen" (with the unread count) on top, then the groups
-    Einsatzplanung · Flotte & Logistik · Handel · Organisation · Beförderung (only with the
-    promotion feature) · Kartellbank · Ressourcen, each with its icon. Group headings are
+    Einsatzplanung · Flotte & Logistik · Handel · Organisation · Kartellbank · Ressourcen, each with its icon. Group headings are
     upper-case; the links are normal case (Lato 400, 0.9 rem), a deliberate, product-owner-approved
     exception to „navigation is upper-case". Every group is open by default; collapsing one is
     remembered per browser (`localStorage` `krt.sidebar.<key>`); the group holding the current page
@@ -1683,13 +1679,25 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
 - **The quick access** (`Strg`/`⌘` + `K` from anywhere, inputs included; the header trigger; the
   phone's search button) is a dialog of the one dialog shape (REQ-UI-013, `#nav-palette`). Its pages
   are the menu's links, the legal links, and sub-pages the menu reaches only as tabs: „Mein Lager",
-  „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and —
-  loaded on the first opening — „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and
-  „Ankauf-Partner", „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members
-  whose tab bar shows them; those five tabs are registry entries (`supply.incoming`,
-  `supply.stats`, `purchasing.partners`, `purchasing.delegates`, `purchasing.report`) and the
-  on-demand answer carries each tab's entry key, so they can be starred, chosen as phone slots and
-  start pages like every other tab. Empty, it offers up to four recently visited pages (`localStorage`
+  „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and
+  „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and „Ankauf-Partner",
+  „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members who may open them.
+  Those five tabs are registry entries (`supply.incoming`, `supply.stats`, `purchasing.partners`,
+  `purchasing.delegates`, `purchasing.report`) rendered into the index like every other tab, so
+  they can be starred, chosen as phone slots and start pages — but only by a member who may open
+  them. Each entry requires its surface switch and its own capability flag of the layout read
+  (ADR-0329):
+
+  | Entry | Capability flag | True when the surface is on and the caller |
+  |---|---|---|
+  | `supply.incoming` | `canViewSupplyIncoming` | manages (lead or Logistician), or as an admin reaches, an active unit that accepts donations |
+  | `supply.stats` | `canViewSupplyStats` | belongs to the governing leadership or manages at least one unit (the gate of the statistics read, REQ-SUP-013) |
+  | `purchasing.partners` | `canViewPurchasingPartners` | is an active trade delegate or the governing leadership |
+  | `purchasing.delegates` | `canViewPurchasingDelegates` | is the governing leadership |
+  | `purchasing.report` | `canViewPurchasingReport` | is a delegate, the governing leadership, bank staff or a unit manager (REQ-PUR-023) |
+
+  The tab bars of „Bedarf & Spenden" and „Ankauf" read the same flags, so the navigation, the tab
+  bars and the quick access offer the same tabs. Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
   anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
@@ -1705,10 +1713,9 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   (`data-nav-keywords`, `palette.keywords.*`) that match like the label.
 - **Rights stay on the server.** The quick access builds its index from links the server rendered
   for this member — the drawer's (`data-nav-group` / `data-nav-icon` on each group) and its own
-  hidden source lists, each under the same condition as the button or tab it mirrors. Sub-pages
-  whose condition needs a backend read come from `GET /quick-access/entries`, which asks each
-  domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
-  longer offered is not shown.
+  hidden source lists, each under the same condition as the button or tab it mirrors; a tab whose
+  condition needs a backend decision is gated on a capability flag of the layout read (ADR-0329),
+  which fails closed. A recently visited page that is no longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
   safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
   default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
@@ -1746,18 +1753,25 @@ and actions per role, no „Rechtliches" group, nothing of it for a signed-out v
 their filter query; in-place requests and sub-paths are not redirected) ·
 `NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
 `NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
-`QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
-`PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
+`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeControllerTest` (each tab flag
+positive and negative, none while its surface is off) · `MeLayoutSingleTransactionTest` (the tab
+flags add no statement per unit) · `NavigationAdvicePromotionFlagsTest`, `NavigationFlagTest` (the
+flags and their user-wide rule) · `NavigationDataTabGateMvcTest` (the start-page select and the
+favourites offer a tab only with its flag, the quick access indexes exactly the granted tabs, a
+lost one is deleted while its surface is on) · `DtoOpenApiContractTest`,
+`DtoMirrorConsistencyTest` (the capability mirror matches the backend schema) ·
+`NavigationDataTabGateE2eTest` (a plain member is not offered „Bericht" as a start page, a trade
+delegate is) ·
 `:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
 `Ctrl+K`, tolerant and search-term matching, the create-mission and administration actions, admin
 mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
 `TouchClassLayoutE2eTest` (`main` reserves the tab bar; header, footer and tab bar within the
 chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
 `kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
-`static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
-`kernel/layout/QuickAccessContributor.java`, `kernel/fragments/nav-entries.html`,
+`static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`,
+`kernel/model/CapabilitiesResponse.java`, `kernel/fragments/nav-entries.html`,
 `navigation/web/NavigationRegistry.java`, `navigation/web/NavigationAdvice.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
-ADR-0282
+ADR-0282, ADR-0329
 
 #### Amendment (ADR-0297)
 
@@ -1770,7 +1784,7 @@ quick access is extended by REQ-UI-033.
 **Counting rule.** A default is measured in clickable links with every group open; group headings
 do not count. Groups are cut by task, at most four for members.
 
-**Member default: 10 links in 4 task groups** (+1 group for bank staff). Each link opens one page;
+**Member default: 9 links in 4 task groups** (+1 group for bank staff). Each link opens one page;
 its former sibling pages become tabs of it.
 
 | Group | Icon | Links (tabs) |
@@ -1778,22 +1792,19 @@ its former sibling pages become tabs of it.
 | Einsatz & Flotte | wedge | Missionen (Missionen · Operationen), Hangar (Hangar · Schiffskatalog) |
 | Logistik | crate | Lager (Lager · Mindestbestände), Raffinerie, Aufträge (Aufträge · Materialbedarf · Blueprint-Verfügbarkeit) |
 | Handel | swap arrows | Material (Liste · Übersicht · Profitberechnung), Materialbörse, Beschaffung (Bedarf · Meine Spenden · Ankauf) |
-| Staffel | users | Org-Einheits-Bank (Staffel-Bank · *Leitung*), Beförderung (Übersicht · Meine Bewertungen · *Verwaltung*) |
+| Staffel | users | Org-Einheits-Bank (Staffel-Bank · *Leitung*) |
 | Kartellbank (bank staff only) | bank | Kartellbank (Dashboard · Verwaltung · Berechtigungen · Anträge) |
 
 - *Shipped:* the groups, links and tabs are the entries of the registry (`NavigationRegistry`),
   every tab bar is `NavigationPageTabs` rendered by `pageHead(tabsKey=…)`, and a page left with fewer
-  than two permitted tabs shows no bar. A tab can cover pages that are not tabs themselves (Beförderung's
-  Themenbereiche and Rangvoraussetzungen); they show the bar with the
-  covering tab current. Beschaffung keeps its supply and purchasing tab fragments, which add
+  than two permitted tabs shows no bar. Beschaffung keeps its supply and purchasing tab fragments, which add
   „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. With both surfaces on, the
   Ankauf tab is not a second menu link (`menuUnless`), but stays an available entry: current page,
   favourite, phone slot and start page. Every former URL still opens
   its page or tab (the Lager lists by redirect); an entry gated on a flag or role the caller lacks is neither a link nor a tab, and
-  officer-only tabs follow `canOpenLeitung` and `canManagePromotions`.
-- *Italic* tabs are officer-only (officer reach per org unit, ADR-0300); Beförderung's
-  „Verwaltung" holds Bewertungen, Themenbereiche and Rangvoraussetzungen. Officers therefore also
-  see 10 links, bank staff 11.
+  officer-only tabs follow `canOpenLeitung`.
+- *Italic* tabs are officer-only (officer reach per org unit, ADR-0300). Officers therefore also
+  see 9 links, bank staff 10.
 - The tab names are i18n labels; „Lager · Mindestbestände" is „Storage · Minimum levels" in English
   (REQ-INV-068).
 - **The storage page has exactly these two tabs.** „Mein Lager" and „Globales Lager" are neither
@@ -1834,7 +1845,7 @@ Page merges this needs:
 
 - All four org-unit kinds are managed on Organisationsstruktur: the tabs Struktur · Staffeln ·
   Spezialkommandos. Staffel CRUD left Missionsdaten (`/admin/mission-data?kind=squadrons` redirects
-  to `/admin/org-structure/squadrons`), and the per-unit switches „Beförderung aktiv" and
+  to `/admin/org-structure/squadrons`), and the per-unit switch
   „Auftragsbearbeitung" left Systemeinstellungen for the unit's row — on the Staffeln tab for
   squadrons and on the Spezialkommandos tab for the „Auftragsbearbeitung" of a special command. The
   switches save in place and need no audit event of their own beyond the existing ones.
@@ -2038,8 +2049,8 @@ the scripts and the breakpoint gate; the list pages, the home page and the forms
 audit (hangar, blueprints, operations, Materialbörse, refinery, Leitung, bank, trade) and the removal
 of `inline-migration.css` follow as their own PRs, each moving its pages onto these patterns.
 
-**On pattern A (phase 1):** Einsätze, Operationen, Benachrichtigungen, Mitglieder, Beförderung
-verwalten, Auftragsverwaltung, Materialbedarf, Lager-Übersicht, Item- und Materialsammelübersicht,
+**On pattern A (phase 1):** Einsätze, Operationen, Benachrichtigungen, Mitglieder,
+Auftragsverwaltung, Materialbedarf, Lager-Übersicht, Item- und Materialsammelübersicht,
 Material-Liste, and the admin lists Audit-Logs, Blueprints, Standard-Blueprints, Löschanträge,
 Discord-Registrierungen (tabs „Offen · Abgelehnt"), Verbundene Anwendungen, Orte, Material-Aliase,
 Materialien, Benachrichtigungsregeln, Organisationsstruktur, Qualitätsstufen, P4K-Import,
@@ -2109,12 +2120,9 @@ Spezialkommandos with Bereich colour, member count and a search over units and p
 selected unit with „Mitglied hinzufügen" and the tabs „Mitglieder · Kommandogruppen" (`?unit=`,
 `?tab=groups`); rank and group selects save on change, rare and destructive actions sit in the row's
 „⋯" menu. The SK member page renders the same roster fragment (name · Rollen as `.matrix-flag`
-toggles · Leiter) (REQ-ROLE-004). Beförderung and Einsatzdaten: „Themenbereiche verwalten" and the
-admin page „Einsatzdaten verwalten" are master-detail pages (topics | categories with their level
-texts; data kinds | list), each selection a deep link (`?topic=`, `?kind=`) and the list driven by
-the arrow keys; „Rangvoraussetzungen verwalten" leads with a Rangsprung × Themenbereich matrix;
-„Beförderungssystem" shows the rank path as `.ablauf` steps; „Meine Bewertungen" opens with a
-progress card to the next rank (REQ-PROMO-002, REQ-PROMO-003). Kartellbank: both account-detail
+toggles · Leiter) (REQ-ROLE-004). Einsatzdaten: the admin page
+„Einsatzdaten verwalten" is a master-detail page (data kinds | list), the selection a deep link
+(`?kind=`) and the list driven by the arrow keys. Kartellbank: both account-detail
 pages lead with four KPI tiles (Saldo, Ziel, ± 30 Tage, Buchungen) over the tabs „Buchungen" and
 „Konto-Info" (bank) or „Ziel & Sichtbarkeit" (org unit); the history has the period segment „30 Tage
 · 90 Tage · Zeitraum …" and a „Saldo nach Buchung" column, and no panel collapses any more. The
@@ -2139,7 +2147,7 @@ account card's type chip as a `bank.css` rule); the two state classes are `is-hi
 overlay's `is-open`, declared in `styles.css`'s `utilities` layer. Dead rules the redesign left
 behind are gone (the bank panel, collapse, facts and filter-bar rules, the 2200 px widening of the
 bank account detail — it now stops at `--content-max-data` like every page — `.hangar-filter*`,
-the unused `promotion-admin.css` toolbar rules, `.oss-unavailable`), and so are the
+`.oss-unavailable`), and so are the
 `components :: filterToggle` fragment, the stored open/closed state of `krt-filter-panel.js`, the
 bank panel-collapse and old request status-filter scripts, and 205 message keys no template, script
 or class read any more (the `*.description` subtitles stay). No template or script may name a
@@ -2420,11 +2428,10 @@ optimistic-lock version, so an edit in one never 409s another:
   deleted from every section through the backend, which holds no key-to-permission knowledge.
   Unavailability in the active context deletes nothing. Regaining a role restores nothing. A right
   tied to the pinned unit (the Leitung entry) counts as lost user-wide only when the caller holds
-  officer reach in no unit (`canActAsOfficerAnywhere`); the promotion-management entries only when
-  no unit with promotion enabled is in officer reach (`canManagePromotionsAnywhere`) and the
-  promotion pages for a member when none is among their units or reach (`canUsePromotionAnywhere`,
-  REQ-PROMO-004); a right that
+  officer reach in no unit (`canActAsOfficerAnywhere`); a right that
   does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
+  five supply and purchasing tabs of REQ-UI-026 are lost when their flag is off while their
+  surface is on; the
   switches of the installation and the page, and a capability read that failed, delete nothing.
   The stored start pages of both modes are checked like every other stored key. Dashboard widgets
   follow the same classification: an instance whose gate (roles and flags) the member lost user-wide
@@ -2480,7 +2487,7 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
-(`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
+(`results(query, limit)`, ADR-0297) in parallel;
 each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
 backend read that backs the page its hits open (missions and operations over every period,
 materials from the visible catalogue, blueprints from the availability overview, ship types from
@@ -2584,7 +2591,7 @@ filtered while their hits and actions stay, a page-contributed action) · `Quick
 `kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
 `static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
 `static/js/kernel/krt-palette.js` (wiring) and its modules `krt-palette-{actions,entity-search,groups,history,index,items,view}.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
-ADR-0282, ADR-0297
+ADR-0297, ADR-0329
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 

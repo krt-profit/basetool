@@ -28,8 +28,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
@@ -177,7 +177,7 @@ class NavigationRenderMvcTest {
     String admin = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
     assertThat(member)
-        .contains("data-entries-url=\"/quick-access/entries\"")
+        .doesNotContain("data-entries-url")
         .contains("data-entity-search-url=\"/quick-access/search\"")
         .contains("data-prefix-kind=\"mission\"")
         .contains("data-testid=\"palette-action-create-order\"")

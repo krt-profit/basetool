@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -106,6 +107,28 @@ public class MissionEditor {
     Mission mission = loadPermitted(missionId, gate);
     MissionEdit edit = mutation.apply(mission);
     audit(mission, edit);
+    return mission;
+  }
+
+  /**
+   * Edits several rows of a mission in one call: load, gate, mutation, one audit event per edit the
+   * mutation reports. The mutation persists the rows it touches; the mission row is not saved.
+   *
+   * @param missionId the mission to edit
+   * @param gate the access the edit demands
+   * @param mutation the change to apply to the managed mission, reporting one outcome per row
+   * @return the managed mission after the edit
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
+   *     unknown
+   * @throws AccessDeniedException when the caller fails the gate
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public Mission editEach(
+      @NotNull UUID missionId,
+      @NotNull MissionGate gate,
+      @NotNull Function<Mission, List<MissionEdit>> mutation) {
+    Mission mission = loadPermitted(missionId, gate);
+    mutation.apply(mission).forEach(edit -> audit(mission, edit));
     return mission;
   }
 

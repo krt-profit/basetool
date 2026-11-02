@@ -44,8 +44,6 @@ import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureMissio
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureParticipantService;
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSettingsAccess;
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSettingsDto;
-import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSquadron;
-import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureTopic;
 import de.greluc.krt.profit.basetool.architecture.fixtures.modules.orders.service.OrderService;
 import de.greluc.krt.profit.basetool.architecture.fixtures.profit.MissionLedgerFixture;
 import de.greluc.krt.profit.basetool.architecture.fixtures.scope.OrgScopeFixture;
@@ -348,11 +346,6 @@ class ArchitectureRuleFailureTest {
         ArchitectureTest.missionParticipantsCollectionRule(FixtureMission.class),
         MISSION,
         "participants");
-    assertReports(
-        ArchitectureTest.promotionTopicOwningSquadronRule(
-            FixtureTopic.class, FixtureSquadron.class),
-        MISSION,
-        "FixtureOrgUnit");
     assertReports(
         ArchitectureTest.addParticipantMustNotSaveRule(
             ArchitectureTest.addParticipantMethods(Set.of(FixtureParticipantService.class)),

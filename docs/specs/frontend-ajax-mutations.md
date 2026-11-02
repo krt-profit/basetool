@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206, ADR-0239
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
@@ -554,25 +554,6 @@ write succeeds but only its follow-up refresh GET bounces, the swap surfaces a d
 reload" message rather than the generic "action failed" text, so a committed money booking is never
 mistaken for a failure.
 
-The **promotion** admin + management pages (#580) drop their last `AJAX-then-location.reload()`
-writes for in-place fragment swaps. The two admin pages re-render their list region after every
-mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
-`promotion-admin-topics :: topicsResults` into `#pa-topics-results`, and the **rank-requirements**
-create / edit / delete + group-delete swap `promotion-admin-rank-requirements :: ranksResults` into
-`#ar-results`. The topics swap requests `?topic=<selected id>` (2026-10-03, REQ-PROMO-003), so the
-master-detail keeps the selected topic open across every write and a freshly created topic opens
-selected. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
-and first/last arrow state, so a second reorder can no longer 409 — and the reorder no longer relies
-on a non-existent GET-by-id proxy route (it now reads the full DTO each PUT needs straight from the
-card's edit-button data attributes). The **manage** matrix already saved grades in place through its
-serialised save queue; #580 finishes it by recomputing each touched member's **eligibility chips**
-once the queue drains, via a lightweight per-member `promotion-manage :: eligibilityCell` swap, and
-by replacing the optimistic-lock **409 reload** with an in-place `promotion-manage :: matrixBody`
-re-render that rebuilds every row with a fresh `@Version` (the client-side collapse / sort / filter
-state is restored on `krt:swapped`). All three pages' bespoke `getCsrfToken` / `getCsrfHeader` +
-`apiCall` helpers were retired onto `krtCsrf` (shared reader + retry-once-on-403); the client-side
-rank filter and the manage CSV export are untouched.
-
 The organisation / members / profile area (#581) converts the member list and the profile +
 home-page writes. The member list converts the delete (a `@DeleteMapping` JSON twin whose success re-swaps the results
 fragment so pagination and the Staffel + SK columns stay coherent); its filter `fragment` param
@@ -658,7 +639,7 @@ their timed reload on a `409`: the conflict goes through `krtFetch`'s reload-con
 the only sanctioned reload.
 
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
-refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), org/members/profile
+refinery-import (#591), asset-management (#578), bank (#579), org/members/profile
 (#581) and admin-CRUD (#582) twin / fragment / endpoint MVC + e2e tests, plus
 `OperationPageControllerMvcTest` (the error fragment is inert on the full page and still renders
 for an unknown fragment name), and `AdminMissionDataCrudE2eTest` (the three include-inactive filters
@@ -669,15 +650,14 @@ swap with no navigation request). **Issues:** the epic children
 `joborder/orders-index.html`, `joborder/orders-detail.html`, `refinery/refinery-orders-create.html`, `datetime-splitter.js`,
 `hangar/hangar.html`, `catalogue/ship-data.html`, `personalinventory/personal-inventory.html`, `blueprint/personal-inventory-blueprints.html`,
 `personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
-`bank/bank-grants.html`, `promotion/promotion-admin-topics.html`, `promotion/promotion-admin-rank-requirements.html`,
-`promotion/promotion-manage.html`, `identity/members.html`, `identity/member-edit.html`, `identity/profile.html`,
+`bank/bank-grants.html`, `identity/members.html`, `identity/member-edit.html`, `identity/profile.html`,
 `dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
 `catalogue/materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
 `catalogue/fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
 `special-command-detail.html`, `p4k-import.js` — over `JobOrderPageController`,
 `RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
 `PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
-`BankManagePageController`, `BankGrantsPageController`, `PromotionPageController`,
+`BankManagePageController`, `BankGrantsPageController`,
 `MemberManagementController`, `ProfileController`, `HomeController`,
 `AdminAnnouncementPageController`, `AdminSyncReportsPageController`, `AdminBankPageController`,
 `AdminLocationsPageController`, `AdminMaterialsPageController`, `AdminMaterialAliasesPageController`,
@@ -2116,7 +2096,7 @@ close that:
   backend read. The second condition is load-bearing — `JobOrderWriteController`'s AJAX create
   handlers are `ResponseBody` and read `canViewJobOrders` as a parameter. A handler that returns a
   view, full page or XHR fragment, always gets the whole model: the list fragments of the hangar,
-  missions, refinery orders, the Lager admin and the promotion pages read `isAllSquadronsMode`, so
+  missions, refinery orders and the Lager admin read `isAllSquadronsMode`, so
   no fragment is skipped on the strength of a request header.
 - **A rendered page reads the layout once.** The three advices take their org-unit context,
   pinnable units, capability flags and unread count from one `GET /api/v1/me/layout`
@@ -2670,8 +2650,7 @@ Java packages: the folder is the domain, and the domains are the packages of the
   snapshot (REQ-FE-025) and the rendered page chrome (REQ-FE-033) are byte-identical apart from the
   asset paths they contain.
 - **A stylesheet or script may be linked by a page of another domain**, and some are: `bank.css`
-  (the audit log), `personal-inventory.css` (the blueprint pages), `promotion-admin.css` (the
-  catalogue's price page), `legal.css`, `materialboerse.css` and `organisation-unit-detail.css` each
+  (the audit log), `personal-inventory.css` (the blueprint pages), `legal.css`, `materialboerse.css` and `organisation-unit-detail.css` each
   have a second user, and the kernel's chrome loads `notifications.js`. The folder is the owner's;
   the later boundary test of plan §5.9 names these as its allow-list.
 

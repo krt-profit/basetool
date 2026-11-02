@@ -126,9 +126,9 @@ class DataExportParticipantSectionsIntegrationTest {
   private @NotNull UUID orgUnitWithGrandAdmiral(@NotNull String name, @NotNull UUID admiral) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
             + " is_profit_eligible, grand_admiral_user_id)"
-            + " VALUES (?, 'ORGANISATIONSLEITUNG', ?, ?, TRUE, FALSE, FALSE, ?)",
+            + " VALUES (?, 'ORGANISATIONSLEITUNG', ?, ?, TRUE, FALSE, ?)",
         id,
         name,
         "G" + id.toString().substring(0, 6),

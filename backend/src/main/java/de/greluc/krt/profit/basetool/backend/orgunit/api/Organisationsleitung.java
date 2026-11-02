@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * The Organisationsleitung (OL) tenant at the top of the Kartell hierarchy (REQ-ORG-014).
  *
  * <p>OL members reach every org unit as a concrete scope union, without admin rights (REQ-ORG-015).
- * The OL has no parent and promotion is always disabled.
+ * The OL has no parent.
  */
 @Entity
 @DiscriminatorValue("ORGANISATIONSLEITUNG")
@@ -53,15 +53,6 @@ public class Organisationsleitung extends OrgUnit {
   private UUID grandAdmiralUserId;
 
   /**
-   * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}
-   * flag to {@code false} before Hibernate flushes the row, keeping the transient state aligned
-   * with the {@code chk_org_unit_promotion_only_squadron} CHECK.
-   */
-  public Organisationsleitung() {
-    super.setPromotionEnabled(false);
-  }
-
-  /**
    * Returns {@link OrgUnitKind#ORGANISATIONSLEITUNG} so the abstract base contract is satisfied
    * without an {@code instanceof} check. Must stay in lockstep with the
    * {@code @DiscriminatorValue("ORGANISATIONSLEITUNG")} marker on this class.
@@ -72,34 +63,5 @@ public class Organisationsleitung extends OrgUnit {
   @Override
   public OrgUnitKind getKind() {
     return OrgUnitKind.ORGANISATIONSLEITUNG;
-  }
-
-  /**
-   * Returns {@code false} unconditionally, overriding {@link OrgUnit#isPromotionEnabled()} so
-   * callers reading the flag on an OL instance always see the DB invariant — promotion is
-   * permanently off.
-   *
-   * @return always {@code false}.
-   */
-  @Override
-  public boolean isPromotionEnabled() {
-    return false;
-  }
-
-  /**
-   * Refuses to enable promotion on the Organisationsleitung.
-   *
-   * @param value the requested flag value; must be {@code false}.
-   * @throws IllegalArgumentException when {@code value} is {@code true}.
-   */
-  @Override
-  public void setPromotionEnabled(boolean value) {
-    if (value) {
-      throw new IllegalArgumentException(
-          "Promotion cannot be enabled on the Organisationsleitung — kind = 'ORGANISATIONSLEITUNG'"
-              + " rows are barred from the promotion subsystem by the"
-              + " chk_org_unit_promotion_only_squadron CHECK constraint");
-    }
-    super.setPromotionEnabled(false);
   }
 }

@@ -85,7 +85,6 @@ class UserReassignmentOrderTest {
           "130:NotificationUserReassignment|notification.recipient_user_id,"
               + "notification_rule_selector.user_id,"
               + "notification_mute.user_id[notification_type]|",
-          "140:PromotionUserReassignment|member_evaluation.user_id[category_id]|",
           "150:ExchangeUserReassignment|exchange_installation.user_id"
               + "[exchange_client_id+key_thumbprint],"
               + "exchange_ship_link.user_id[client_id+installation_key+external_id]"
@@ -131,7 +130,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(72);
+    assertThat(all).doesNotHaveDuplicates().hasSize(71);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

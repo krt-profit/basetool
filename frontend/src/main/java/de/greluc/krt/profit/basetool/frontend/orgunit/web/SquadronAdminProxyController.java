@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -37,10 +36,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Same-origin proxy for the admin-only squadron toggles (promotion feature and profit eligibility),
- * relayed via {@link OrgUnitBackendClient}.
+ * Same-origin proxy for the admin-only squadron profit-eligibility toggle, relayed via {@link
+ * OrgUnitBackendClient}.
  *
- * <p>Each toggle evicts the {@code CacheDomain.SQUADRON} and {@code CacheDomain.ORG_UNIT} caches
+ * <p>The toggle evicts the {@code CacheDomain.SQUADRON} and {@code CacheDomain.ORG_UNIT} caches
  * (REQ-DATA-007). The backend re-checks the {@code ADMIN} role.
  */
 @RestController
@@ -48,27 +47,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SquadronAdminProxyController {
 
-  /** Sends the toggles to the backend. */
+  /** Sends the toggle to the backend. */
   private final OrgUnitBackendClient orgUnitClient;
 
   /** Drops the cached squadron and org-unit catalogues after a toggle. */
   private final CatalogueCacheEviction cacheEviction;
-
-  /**
-   * Forwards a request to set a squadron's promotion-enabled flag.
-   *
-   * @param id squadron primary key
-   * @param body request payload {@code { "enabled": true|false }}
-   * @return 204 No Content on success
-   */
-  @PatchMapping("/{id}/promotion-enabled")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public ResponseEntity<Void> setPromotionEnabled(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull SquadronPromotionToggleRequest body) {
-    orgUnitClient.setSquadronPromotionEnabled(id, body);
-    cacheEviction.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
-    return ResponseEntity.noContent().build();
-  }
 
   /**
    * Forwards a request to set a squadron's profit-eligible flag.

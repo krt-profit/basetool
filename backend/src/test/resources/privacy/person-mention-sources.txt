@@ -67,12 +67,6 @@ target|ORG|org_unit|shorthand|id|ORG
 target|PERSONAL_INVENTORY|personal_blueprint|note|id|null
 target|PERSONAL_INVENTORY|personal_inventory_item|name|id|null
 target|PERSONAL_INVENTORY|personal_inventory_item|note|id|null
-target|PROMOTION|promotion_category|description|id|null
-target|PROMOTION|promotion_category|name|id|null
-target|PROMOTION|promotion_level_content|description|id|null
-target|PROMOTION|promotion_topic|description|id|null
-target|PROMOTION|promotion_topic|name|id|null
-target|PROMOTION|rank_requirement|description|id|null
 target|PURCHASING|purchasing_partner|conditions_note|id|null
 target|PURCHASING|purchasing_partner|name|id|null
 target|PURCHASING|purchasing_partner|org_tag|id|null
@@ -177,7 +171,6 @@ exempt-column|material_external_alias.external_code
 exempt-column|material_external_alias.external_key
 exempt-column|material_external_alias.external_name
 exempt-column|material_external_alias.source_system
-exempt-column|member_evaluation.assigned_level
 exempt-column|member_payout_setting.default_payout_preference
 exempt-column|mission.calendar_link
 exempt-column|mission.status
@@ -232,7 +225,6 @@ exempt-column|personal_blueprint.source
 exempt-column|personal_blueprint.source_client_id
 exempt-column|personal_inventory_item.location_name_snapshot
 exempt-column|personal_inventory_item.location_type
-exempt-column|promotion_level_content.level
 exempt-column|purchasing_deal.payment_model
 exempt-column|purchasing_deal.risk_class
 exempt-column|purchasing_deal.status
@@ -252,7 +244,6 @@ exempt-column|purchasing_unit_pause.reason
 exempt-column|quality_tier.code
 exempt-column|quality_tier.label_de
 exempt-column|quality_tier.label_en
-exempt-column|rank_requirement.minimum_level
 exempt-column|refinery_order.status
 exempt-column|role.code
 exempt-column|role.description

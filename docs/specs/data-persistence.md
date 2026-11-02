@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -53,8 +53,7 @@ Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load f
 `findById`-in-a-loop with one `findAllById` keyed into a map (e.g.
 `MissionService.resolveMembershipOrgUnits`, `BankLedgerService` wipe-reset / reversal holders), and
 memoise a request-constant lookup or verdict on the `HttpServletRequest` — or derive both projections
-from a single load — so repeated per-row / per-resolver reads collapse to one (e.g. the
-`PromotionEligibilityService` evaluation set is loaded once per user across all rank transitions, and
+from a single load — so repeated per-row / per-resolver reads collapse to one (e.g.
 `RequestScopeResolver.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
 and own-level oversight scopes from one membership read). Dead unbounded eager finders
 (`SELECT i FROM InventoryItem i` with no caller) are deleted, not kept as a foot-gun.
@@ -113,7 +112,7 @@ Staffel references per user, and `primeStaffelMemberships(users)` seeds both mem
 with one `findAllByIdUserIdInAndKindIn` and one `findAllById`. Every surface that maps many users
 primes first: the full mission DTO (a `@BeforeMapping` in `MissionMapper` over participants and unit
 ship owners), the job-order Bearbeiter lists (per page in `JobOrderStockProjectionService`, per order
-in `JobOrderMapper`), the user lists and searches, the member-evaluation list and the all-ships list.
+in `JobOrderMapper`), the user lists and searches and the all-ships list.
 
 **Every to-one association is `LAZY`** (BE-PERF-11, 2026-09-23). A `@ManyToOne` / `@OneToOne`
 without an explicit `fetch` is EAGER by the JPA default, and 38 of them were: every load of the owner
@@ -504,8 +503,8 @@ inside its one transaction — by phase (`DELETE`, then `REASSIGN`, then `UNLINK
 position within the phase — clears the member's approval trail, writes the deletion's audit rows
 from the counts the participants return and removes the account row. Each module that holds
 member data owns its participant: `MaterialExchangeOfferErasure`, `InventoryUserErasure`,
-`HangarUserErasure`, `PersonalInventoryErasureService`, `PersonalBlueprintUserErasure`,
-`NotificationUserErasure` and `MemberEvaluationErasureService` purge;
+`HangarUserErasure`, `PersonalInventoryErasureService`, `PersonalBlueprintUserErasure`
+and `NotificationUserErasure` purge;
 `MissionOwnerReassignment` and `RefineryOwnerReassignment` hand shared aggregates to the
 fallback admin; `MissionMemberUnlink` and `JobOrderMemberUnlink` clear back-references. Every
 participant is `MANDATORY` (an `@ObserverSpi`, REQ-AUDIT-007). The order of statements is part of
@@ -529,15 +528,14 @@ Concrete handling, in order:
   squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
   may still physically hold. That is the intended semantics as of this release; a member's
   contribution is not inherited by the squadron.
-- **Purged** (the five identity columns): `personal_inventory_item.owner_user_id`,
-  `personal_blueprint.owner_user_id`, `notification.recipient_user_id`,
-  `notification_rule_selector.user_id` and `member_evaluation.user_id` (the first four were named
-  `*_sub` until V236 renamed them — ADR-0142 point 1, #1640). **Since V235 each carries a
+- **Purged** (the four identity columns): `personal_inventory_item.owner_user_id`,
+  `personal_blueprint.owner_user_id`, `notification.recipient_user_id` and
+  `notification_rule_selector.user_id` (named `*_sub` until V236 renamed them — ADR-0142 point 1, #1640). **Since V235 each carries a
   foreign key to `app_user(id)` with `ON DELETE CASCADE`** (ADR-0142 point 3, issue #1638), so the
   database removes them with the account. The explicit deletes stay: PostgreSQL reports no row count
   for a cascade, and those counts are what the `PERSONAL_DATA_PURGED_ON_USER_DELETION` audit event
   records. **The constraint is the guarantee; the statement is the number.**
-  Until V235 none of the five declared a foreign key, so nothing cascaded and no retention job
+  Until V235 none of them declared a foreign key, so nothing cascaded and no retention job
   reached them — the notification sweep only reaps *read* rows. Left in place they survived the
   account indefinitely (free-text notes included), became undiscoverable because every lookup is
   keyed by a subject no roster can still offer, and were silently re-adopted if the same Keycloak
@@ -545,12 +543,11 @@ Concrete handling, in order:
   returns the dead subject with no existence check and mints a notification row for it on every
   subsequent matching event. V227 purged what earlier deletions had already leaked; V235 re-runs
   that purge before adding the constraints (`ADD CONSTRAINT` validates the whole table, and a
-  surviving orphan would abort the deploy) and recasts the three `VARCHAR(64)` columns —
-  `personal_blueprint.owner_user_id`, `personal_inventory_item.owner_user_id` and
-  `member_evaluation.user_id`
-  — to `UUID` so they can reference the key at all. All five now hold `app_user.id` natively.
+  surviving orphan would abort the deploy) and recasts the `VARCHAR(64)` columns
+  `personal_blueprint.owner_user_id` and `personal_inventory_item.owner_user_id` to `UUID` so they
+  can reference the key at all. All four now hold `app_user.id` natively.
   `notification_rule_selector.user_id` also gained the partial index the cascade needs
-  (`idx_notification_rule_selector_user`); the other four already led one.
+  (`idx_notification_rule_selector_user`); the other three already led one.
   **A new user-identity column without a foreign key fails the build**:
   `UserIdentityColumnForeignKeyTest` sweeps `information_schema` for every column named `user_id`,
   `*_user_id` or `*_sub` and requires a foreign key to `app_user(id)`, a recorded exemption, or —
@@ -867,7 +864,7 @@ fine.
 de-N+1-ing the sort comparator), `JobOrderHandoverService` / `JobOrderItemHandoverService`
 (executing-Staffel stamp), with `JobOrderOrgUnitResolver` as the pre-existing canonical pattern.
 Covered by `StaffelMembershipResolverTest`, `ScopeKernelTest`,
-`OrgUnitMembershipQueryServiceTest`, `PromotionFeatureFlagServiceGateTest`.
+`OrgUnitMembershipQueryServiceTest`.
 
 ### REQ-DATA-014 — an external-catalogue tombstone sweep runs only on an identity-verified census (ADR-0147, ADR-0195)
 
@@ -1114,7 +1111,6 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
-| `promotion` | 5 | `member_evaluation`, `promotion_category`, `promotion_level_content`, `promotion_topic`, `rank_requirement` |
 | `personalinventory` | 1 | `personal_inventory_item` |
 | `navigation` | 8 | `navigation_appearance`, `navigation_dashboard_layout`, `navigation_dashboard_widget`, `navigation_favourite`, `navigation_hidden`, `navigation_order`, `navigation_preferences`, `navigation_tab_bar` |
 | `hangar` | 1 | `ship` |
@@ -1138,7 +1134,6 @@ The listed crossings:
 | The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship`, `inventory_item` (read) | A renamed unit re-announces its ships and, since V296, the lots of its pool in the exchange's key log (REQ-XCH-017, REQ-XCH-042, ADR-0261) |
 | The V296 org-stock triggers on `inventory_item` (extended), both allocation tables and `org_unit_membership` | `exchange_change` (write), `org_unit`, `inventory_item` (read) | A change of a pool's shared rows, an earmark or a join is written to the org-stock feed keyed by unit (REQ-XCH-042, ADR-0257) |
 | The V297 org-stock triggers on `app_user`, `exchange_name_withholding` and `mission` | `exchange_change` (write), `inventory_item`, `inventory_item_mission_allocation`, `org_unit` (read) | A holder's rename or name withholding, or the rename of an earmarked mission, re-announces the lots whose entries show it (REQ-XCH-043, REQ-XCH-044) |
-| `trg_guard_promotion_topic_owner_kind`, `trg_guard_rank_requirement_owner_kind` | `org_unit` (read) | The owning unit must be a squadron; a downward read |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station` (read) | Catalogue names joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
 

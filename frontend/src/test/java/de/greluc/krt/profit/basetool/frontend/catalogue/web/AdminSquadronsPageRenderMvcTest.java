@@ -50,8 +50,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Renders the Staffeln tab of the organisation structure: the tab bar, the squadron rows with the
- * per-squadron switches for the promotion system and job-order processing, and the empty state
- * (REQ-UI-026).
+ * per-squadron switch for job-order processing, and the empty state (REQ-UI-026).
  */
 @SpringBootTest
 class AdminSquadronsPageRenderMvcTest {
@@ -78,12 +77,11 @@ class AdminSquadronsPageRenderMvcTest {
         .getContentAsString();
   }
 
-  /** A squadron row carries both switches in their stored state and the row actions. */
+  /** A squadron row carries the job-order switch in its stored state and the row actions. */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void rendersTheRowsWithBothSwitches() throws Exception {
-    SquadronDto alpha =
-        new SquadronDto(UUID.randomUUID(), "ALPHA", "ALP", "", true, true, false, 0L);
+  void rendersTheRowsWithTheJobOrderSwitch() throws Exception {
+    SquadronDto alpha = new SquadronDto(UUID.randomUUID(), "ALPHA", "ALP", "", true, false, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(alpha), 0, 1000, 1, 1, List.of()));
 
@@ -93,7 +91,6 @@ class AdminSquadronsPageRenderMvcTest {
         .contains("data-testid=\"page-tabs\"")
         .containsPattern("class=\"tab active\"[^>]*data-entry-key=\"admin.squadrons\"")
         .contains("data-entry-key=\"admin.specialcommands\"")
-        .containsPattern("class=\"squadron-promotion-toggle\"[^>]*checked")
         .containsPattern(
             "class=\"squadron-profit-toggle\"[^>]*aria-label=\"Auftragsbearbeitung: ALP\"")
         .doesNotContainPattern("class=\"squadron-profit-toggle\"[^>]*checked")
@@ -113,7 +110,7 @@ class AdminSquadronsPageRenderMvcTest {
 
     assertThat(html)
         .contains("data-testid=\"empty-state\"")
-        .doesNotContain("squadron-promotion-toggle");
+        .doesNotContain("squadron-profit-toggle");
   }
 
   @Test

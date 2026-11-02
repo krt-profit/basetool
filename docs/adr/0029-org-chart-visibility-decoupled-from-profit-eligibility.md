@@ -1,6 +1,6 @@
 # ADR-0029 — Org chart visibility is decoupled from `is_profit_eligible`
 
-- **Status:** Superseded by [ADR-0329](0329-the-org-chart-is-removed-and-the-leitung-view-becomes-the-leadership-module.md) — the org chart is removed
+- **Status:** Superseded by [ADR-0331](0331-the-org-chart-is-removed-and-the-leitung-view-becomes-the-leadership-module.md) — the org chart is removed
 - **Date:** 2026-06-20
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-026 · REQ-ORG-010 · ADR-0025 · ADR-0027 · issue #692

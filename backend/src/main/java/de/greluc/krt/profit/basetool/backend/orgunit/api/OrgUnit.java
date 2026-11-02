@@ -47,9 +47,6 @@ import org.jetbrains.annotations.Nullable;
  * Abstract single-table base entity of the {@code org_unit} table, discriminated by {@link
  * OrgUnitKind} on the {@code kind} column; concrete kinds are {@link Squadron}, {@link
  * SpecialCommand}, {@link Bereich} and {@link Organisationsleitung} (ADR-0025).
- *
- * <p>A database CHECK constraint forces {@link #isPromotionEnabled} to {@code false} on every
- * non-squadron row.
  */
 @Entity
 @Table(name = "org_unit")
@@ -111,13 +108,6 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
    */
   @Column(nullable = false)
   private boolean active = true;
-
-  /**
-   * Whether the promotion subsystem is exposed to non-admin members of this org unit. Defaults to
-   * {@code true}; forced to {@code false} on every non-squadron row by a database CHECK constraint.
-   */
-  @Column(name = "is_promotion_enabled", nullable = false)
-  private boolean isPromotionEnabled = true;
 
   /**
    * Whether this org unit may be picked as the responsible (processing) org unit of a job order.

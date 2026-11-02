@@ -30,7 +30,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Staffel tenant: an {@link OrgUnit} with {@code kind = 'SQUADRON'} in the single-table {@code
  * org_unit} hierarchy. Squadron-typed queries such as {@link SquadronRepository} are narrowed to
- * this kind by the discriminator; all fields and promotion-flag handling live on {@link OrgUnit}.
+ * this kind by the discriminator; all fields live on {@link OrgUnit}.
  */
 @Entity
 @DiscriminatorValue("SQUADRON")

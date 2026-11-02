@@ -1,5 +1,5 @@
 > **Doc type:** Retired spec — the org chart was removed by
-> [ADR-0329](../adr/0329-the-org-chart-is-removed-and-the-leitung-view-becomes-the-leadership-module.md)
+> [ADR-0331](../adr/0331-the-org-chart-is-removed-and-the-leitung-view-becomes-the-leadership-module.md)
 > (#2987). Last reviewed: 2026-11-02.
 > **Owner area:** ORG
 
@@ -26,5 +26,5 @@ The ids stay reserved and are not reused.
 
 ## Stored data
 
-`V331` dropped `org_unit.grand_admiral_display_name` and `V332` dropped `org_chart_position`, an
+`V332` dropped `org_unit.grand_admiral_display_name` and `V333` dropped `org_chart_position`, an
 owner-approved single-phase exception to REQ-DATA-001 recorded in the migration README.

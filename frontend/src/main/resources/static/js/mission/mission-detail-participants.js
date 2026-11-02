@@ -147,6 +147,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        document.addEventListener('click', async (ev) => {
+            const target = /** @type {Element | null} */ (ev.target);
+            const btn =
+                target && typeof target.closest === 'function'
+                    ? /** @type {HTMLButtonElement | null} */ (
+                          target.closest('button[data-bulk-participant-action]')
+                      )
+                    : null;
+            if (!btn) {
+                return;
+            }
+            const action = btn.getAttribute('data-bulk-participant-action');
+            if (action !== 'check-in-all' && action !== 'check-out-all') {
+                return;
+            }
+            ev.preventDefault();
+            btn.disabled = true;
+            const res = await missionHooks.write({
+                method: 'POST',
+                url: `/missions/${window.missionId}/participants/${action}/ajax`,
+                sectionKey: 'participant',
+            });
+            btn.disabled = false;
+            if (res.ok) {
+                missionHooks.refresh(['crew', 'finance', 'overview']);
+            }
+        });
+
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
             dForm.addEventListener('submit', async (ev) => {

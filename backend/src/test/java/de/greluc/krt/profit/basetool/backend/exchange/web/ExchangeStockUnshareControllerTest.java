@@ -608,8 +608,8 @@ class ExchangeStockUnshareControllerTest {
   private @NotNull UUID orgUnit() {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE)",
         id,
         "Unit " + id,
         "U" + id.toString().substring(0, 6));

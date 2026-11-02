@@ -34,9 +34,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.EvaluationResult;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategoryService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.function.Supplier;
@@ -66,7 +64,7 @@ class GatedSelfInvocationTest {
   private static final int GATED_METHOD_FLOOR = 593;
 
   /** Method-level service gates on 2026-10-02. */
-  private static final int SERVICE_GATE_FLOOR = 18;
+  private static final int SERVICE_GATE_FLOOR = 2;
 
   /** The rule: no call from a class to a gated method of that class. */
   private static final ArchRule NO_GATED_SELF_INVOCATION =
@@ -173,15 +171,11 @@ class GatedSelfInvocationTest {
   }
 
   @Test
-  @DisplayName("the finance-entry and promotion-category writes keep their service gates")
+  @DisplayName("the finance-entry writes keep their service gates")
   void theOnlyRealServiceGatesStay() throws NoSuchMethodException {
     String financeGate = "@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)";
     assertThat(gate(MissionFinanceEntryService.class, "updateEntry")).isEqualTo(financeGate);
     assertThat(gate(MissionFinanceEntryService.class, "deleteEntry")).isEqualTo(financeGate);
-    for (String write : new String[] {"create", "update", "delete"}) {
-      assertThat(gate(PromotionCategoryService.class, write))
-          .isEqualTo(Roles.ADMIN_OR_OFFICER_REACH);
-    }
   }
 
   /**

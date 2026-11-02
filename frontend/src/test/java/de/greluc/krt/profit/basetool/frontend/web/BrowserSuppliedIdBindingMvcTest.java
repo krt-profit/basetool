@@ -91,19 +91,6 @@ class BrowserSuppliedIdBindingMvcTest {
   }
 
   @Test
-  void promotionManageEligibilityCell_craftedUserId_is400AndNoBackendCall() throws Exception {
-    mockMvc
-        .perform(
-            get("/promotion/manage")
-                .param("fragment", "eligibilityCell")
-                .param("userId", CRAFTED)
-                .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
-        .andExpect(status().isBadRequest());
-
-    assertNoBackendCallMentions("eligibility/user");
-  }
-
-  @Test
   void defaultBlueprintRemove_craftedId_is400AndNoBackendCall() throws Exception {
     mockMvc
         .perform(post("/admin/default-blueprints/{id}/delete", "a?b#c").with(csrf()).with(admin()))

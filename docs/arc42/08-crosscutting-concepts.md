@@ -100,7 +100,7 @@ Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC
 The tenant is the **OrgUnit**. Scoping happens in the service layer through the scope kernel (`RequestScopeResolver`, `AccessGateService`),
 and the aggregates genuinely differ: strict-Staffel scoping for most, a public escape for
 non-internal Missions, and a separate responsible/requesting pair for Job Orders. Creation stamps
-ownership according to a documented matrix, the admin area and promotion are explicit carve-outs,
+ownership according to a documented matrix, the admin area is an explicit carve-out,
 and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
 and across the module boundary.
 
@@ -283,11 +283,11 @@ Two binding rules shape every UI change:
   `kernel/fragments/header.html` and `kernel/fragments/sidebar.html`; the drawer is also the phone menu sheet, and
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it and into the
   palette's own source lists, so the server alone decides which pages a member is offered; tabs
-  whose visibility needs a backend read come from domain `QuickAccessContributor`s through
-  `GET /quick-access/entries` on the first opening, and entities from domain
+  whose visibility needs a backend decision are gated on capability flags of the layout read
+  (ADR-0329), and entities come from domain
   `QuickAccessSearchContributor`s through `GET /quick-access/search`, asked in parallel, each scoped
   by the backend list its page uses and failing closed on its own; the term stays a query parameter,
-  never a log line, MDC field or label (REQ-UI-026, REQ-UI-033, ADR-0240, ADR-0282, ADR-0297,
+  never a log line, MDC field or label (REQ-UI-026, REQ-UI-033, ADR-0240, ADR-0297, ADR-0329,
   `NavigationRenderMvcTest`, `NavigationE2eTest`, `QuickAccessSearchE2eTest`). The drawer, the phone tab bar and the quick
   access's own pages and actions are rendered from one entry registry (`navigation.web
   .NavigationRegistry`), every link under its stable entry key (`data-entry-key`), so a change of
@@ -375,7 +375,7 @@ removed with the `/v1` routes on 2026-09-28.)*
 ## 8.8 Audit
 
 Thirteen audited areas (Bank, Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen,
-Rollen, Beförderung, Materialbörse, Hangar, Blueprints, Verbundene Anwendungen) log **every** state-mutating activity to an append-only trail. Adding a
+Rollen, Materialbörse, Hangar, Blueprints, Verbundene Anwendungen, Bedarf & Spenden) log **every** state-mutating activity to an append-only trail. Adding a
 mutation to an audited area without its audit event is an incomplete change — including the event
 type, the recording call, the viewer's per-area filter, the DE/EN labels and the coverage list. No
 user free text and no personal data in the details payload.

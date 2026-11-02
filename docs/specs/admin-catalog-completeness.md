@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-19.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** ADMIN · **Related ADRs:** ADR-0102, ADR-0103, ADR-0293
 
 # Admin catalog pages — complete rendering, no silent truncation
@@ -34,7 +34,7 @@ one bounded page. The frontend assembles the complete set by walking the backend
 the last page is reached (shared helper: `CatalogPages.fetchAll`), bounded only by a safety cap
 against inconsistent backend page math. Covered surfaces: `/admin/materials` (materials),
 `/admin/locations` (locations), `/admin/mission-data` (job types, squadrons, frequency types),
-`/admin/special-commands` (Spezialkommandos), `/admin/settings` (the per-Staffel promotion and
+`/admin/special-commands` (Spezialkommandos), `/admin/settings` (the per-Staffel
 order-processing toggles over the active squadrons, and the per-SK order-processing toggle over the
 active Spezialkommandos; the intake-SK picker was removed with the anonymous order form, ADR-0149),
 `/admin/uex-data` (cities, space stations, outposts, POIs, terminals),

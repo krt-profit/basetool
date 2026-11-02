@@ -158,6 +158,11 @@ something broke once.
   - **External exchange** — the client registry, its capabilities, the global switch and the
     mirror's revision sequence (V248, REQ-XCH-003); installations and client revocations (V249,
     REQ-XCH-007/-008).
+  - **Promotion system removal** — V331 drops `promotion_topic`, `promotion_category`,
+    `promotion_level_content`, `rank_requirement`, `member_evaluation`,
+    `org_unit.is_promotion_enabled` with its CHECK `chk_org_unit_promotion_only_squadron`, and
+    the `audit_event` rows of domain `PROMOTION`. The promotion objects V97, V99, V101, V105 and
+    the rank-requirement-owner migration above name do not exist on a migrated schema.
 
 This timeline is curated, not exhaustive (checked against the directory on
 2026-09-27, tip V248). `ls | sort -V | tail -1` in this directory is the only reliable
@@ -248,8 +253,8 @@ Rules:
     backward one. **This is the shape of exception the rule admits: a column whose *content* is
     the risk, approved by the repository owner in the plan, with the rollback written down.** It
     is not a precedent for dropping ordinary data a release early.
-  - **Owner-approved single-phase exception: V331 / V332** (`drop_grand_admiral_display_name`,
-    `drop_org_chart_position`, 2026-11-02, #2987, ADR-0329). The org chart was removed with every
+  - **Owner-approved single-phase exception: V332 / V333** (`drop_grand_admiral_display_name`,
+    `drop_org_chart_position`, 2026-11-02, #2987, ADR-0331). The org chart was removed with every
     reader and writer of `org_chart_position` and `org_unit.grand_admiral_display_name`; the owner
     approved dropping both in the same change rather than keeping dormant personal data, and its
     privacy registrations, for a release. The data was descriptive only and granted nothing. A

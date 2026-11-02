@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) (outbound clients of backend and ingest), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
 >
 > **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
@@ -326,7 +326,7 @@ edit link — typing into a search box, a filter or a form field: a pasted newli
 `ERROR ---` prefix reads as a genuine line during incident triage (CWE-117), and neither the Logback
 pattern nor `PiiMasker` strips it. Every call site that hands a client-supplied string to a logger
 routes through it — the type-ahead query parameters, a rejected live-sync section key and topic, a
-relayed personal-blueprint `productKey`, a promotion-category name, the client-error beacon's message
+relayed personal-blueprint `productKey`, the client-error beacon's message
 and source. `LogSafe` complements the two existing utilities rather than replacing either:
 `PiiMasker` strips secrets from a line that already reached the appender, `LogMasker` redacts a
 known-sensitive value at the call site, `LogSafe` removes structure-breaking characters before the
@@ -1773,7 +1773,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
-  Eight domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
+  Seven domains are excluded from the per-domain rule and never notify at any horizon:
   `PERSONAL_INVENTORY`, `MARKET`, — since 2026-08-16 — `ROLE`, — since 2026-09-26 — `HANGAR` and
   `BLUEPRINT`, — since 2026-09-27, by owner decision — `CONNECTED_APPS`, whose registry changes
   are rare admin actions like `ROLE`'s and are announced by `ExchangeRegistryChanged` anyway, and

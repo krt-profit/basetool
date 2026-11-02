@@ -54,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface for {@link SpecialCommand} (Spezialkommando) CRUD, mirroring {@link
- * SquadronController} without the promotion toggle.
+ * SquadronController}.
  *
  * <p>Writes are ADMIN-only. The list is open to every authenticated caller for the owner picker;
  * the single-row read uses the SK membership-management gate.

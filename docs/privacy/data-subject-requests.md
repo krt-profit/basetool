@@ -1,6 +1,6 @@
 # Handling a data-subject request (Art. 12, 15–21 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-02.
 
 A request can arrive by any channel and in any wording. Somebody writing *"please delete my
 account"* has exercised Art. 17 whether or not they cite it, and the clock starts when the message
@@ -88,7 +88,7 @@ What deletion does, in detail, is REQ-DATA-008, and the privacy policy states it
 In short:
 
 - **Purged**: warehouse stock, hangar, personal inventory and blueprints with their free-text notes,
-  notifications, notification rules, promotion evaluations, material-exchange offers and interests,
+  notifications, notification rules, material-exchange offers and interests,
   account permissions, their own approval records; **connected applications** — installations with
   their labels, client revocations, ship links, the change sequence and the write journal — and,
   with the Keycloak account, the member's consents and the clients' offline sessions.

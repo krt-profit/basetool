@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  * is dropped, which row of a bystander and which row recording an act stays, and the {@code
  * USER_MERGED} audit row with its exact details and key order.
  *
- * <p>The source account owns rows in every one of the 28 followed columns, the target holds the
+ * <p>The source account owns rows in every one of the 27 followed columns, the target holds the
  * same key in every table with a unique constraint, and a bystander owns a row of each kind. The
  * expectation list is spelled out here, independent of the code under test, so the steps can move
  * into the owning modules.
@@ -96,7 +96,6 @@ class UserAccountMergeEndStateTest {
     EXPECTED_MOVED.put("notification.recipient_user_id", 2);
     EXPECTED_MOVED.put("notification_rule_selector.user_id", 1);
     EXPECTED_MOVED.put("notification_mute.user_id", 1);
-    EXPECTED_MOVED.put("member_evaluation.user_id", 1);
     EXPECTED_MOVED.put("exchange_installation.user_id", 1);
     EXPECTED_MOVED.put("exchange_ship_link.user_id", 1);
   }
@@ -119,8 +118,6 @@ class UserAccountMergeEndStateTest {
   private UUID shipType;
   private UUID skUnit;
   private UUID rule;
-  private UUID categoryOne;
-  private UUID categoryTwo;
   private UUID exchangeClient;
 
   @Test
@@ -142,7 +139,7 @@ class UserAccountMergeEndStateTest {
 
     Map<String, Integer> targetBefore = counts(target);
     Map<String, Integer> bystanderBefore = counts(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(28);
+    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(27);
     assertThat(counts(source).values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
@@ -233,7 +230,7 @@ class UserAccountMergeEndStateTest {
   }
 
   private String expectedDetails(UUID source) {
-    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=32");
+    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=31");
     EXPECTED_MOVED.forEach(
         (column, rows) -> details.append(' ').append(column).append('=').append(rows));
     return details.toString();
@@ -298,15 +295,6 @@ class UserAccountMergeEndStateTest {
     sk.setProfitEligible(true);
     skUnit = specialCommandRepository.save(sk).getId();
     rule = jdbc.queryForObject("SELECT id FROM notification_rule LIMIT 1", UUID.class);
-    UUID topic = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO promotion_topic (id, name, sort_order, owning_squadron_id)"
-            + " VALUES (?, ?, 0, ?)",
-        topic,
-        "Merge Topic " + tag,
-        Squadron.IRIDIUM_ID);
-    categoryOne = category(topic, "One");
-    categoryTwo = category(topic, "Two");
     exchangeClient = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO exchange_client (id, client_id, display_name, status, created_at)"
@@ -317,22 +305,12 @@ class UserAccountMergeEndStateTest {
     entityManager.flush();
   }
 
-  private UUID category(UUID topic, String name) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO promotion_category (id, topic_id, name, sort_order) VALUES (?, ?, ?, 0)",
-        id,
-        topic,
-        "Merge " + name + " " + tag);
-    return id;
-  }
-
   private UUID orgUnitWithGrandAdmiral(String name, UUID admiral) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
             + " is_profit_eligible, grand_admiral_user_id)"
-            + " VALUES (?, 'ORGANISATIONSLEITUNG', ?, ?, TRUE, FALSE, FALSE, ?)",
+            + " VALUES (?, 'ORGANISATIONSLEITUNG', ?, ?, TRUE, FALSE, ?)",
         id,
         name,
         "G" + id.toString().substring(0, 6),
@@ -404,9 +382,6 @@ class UserAccountMergeEndStateTest {
     mute(source, "TYPE_X");
     mute(source, "TYPE_Y");
     mute(target, "TYPE_X");
-    evaluation(source, categoryOne);
-    evaluation(source, categoryTwo);
-    evaluation(target, categoryOne);
 
     installation(source, "a");
     installation(source, "b");
@@ -445,7 +420,6 @@ class UserAccountMergeEndStateTest {
     notification(by);
     selector(by);
     mute(by, "TYPE_X");
-    evaluation(by, categoryOne);
     installation(by, "a");
   }
 
@@ -677,15 +651,6 @@ class UserAccountMergeEndStateTest {
         UUID.randomUUID(),
         user,
         type);
-  }
-
-  private void evaluation(UUID user, UUID category) {
-    jdbc.update(
-        "INSERT INTO member_evaluation (id, user_id, category_id, assigned_level)"
-            + " VALUES (?, ?, ?, 'LEVEL_A')",
-        UUID.randomUUID(),
-        user,
-        category);
   }
 
   private void installation(UUID user, String key) {

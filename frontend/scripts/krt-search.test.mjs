@@ -48,7 +48,7 @@ for (const [input, expected] of cases) {
 }
 
 assert.equal(fold('Material-Übersicht'), fold('material-uebersicht'));
-assert.ok(fold('Beförderungssystem').includes(fold('befoerderung')));
+assert.ok(fold('Lagerübersichtsseite').includes(fold('lageruebersicht')));
 
 const hit = find('Material-Übersicht', fold('uebers'));
 assert.deepEqual({ ...hit }, { start: 9, end: 14 });

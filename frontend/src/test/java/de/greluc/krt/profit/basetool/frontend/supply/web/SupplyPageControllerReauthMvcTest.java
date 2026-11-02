@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +52,7 @@ class SupplyPageControllerReauthMvcTest {
                 client,
                 featureState,
                 mock(QualityTierCatalog.class),
-                mock(FrontendAuthHelperService.class)));
+                mock(LayoutContextLoader.class)));
     ReauthPageMvc.signInMember();
   }
 

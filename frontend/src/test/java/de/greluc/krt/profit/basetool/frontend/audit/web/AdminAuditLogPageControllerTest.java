@@ -77,7 +77,6 @@ class AdminAuditLogPageControllerTest {
           "MISSION",
           "OPERATION",
           "ROLE",
-          "PROMOTION",
           "MARKET",
           "HANGAR",
           "BLUEPRINT",
@@ -155,38 +154,6 @@ class AdminAuditLogPageControllerTest {
     AuditRowView row = events.content().get(0);
     assertEquals("Quantanium @ Port Olisar", row.subject());
     assertEquals("admin.audit.event.INVENTORY_ITEM_CREATED", row.eventLabelKey());
-  }
-
-  @Test
-  void promotionTab_readsGenericEndpointAndAdaptsSubjectLabel() {
-    Model model = new ConcurrentModel();
-    AuditEventDto genericRow =
-        new AuditEventDto(
-            UUID.randomUUID(),
-            Instant.now(),
-            "PROMOTION",
-            "PROMOTION_TOPIC_CREATED",
-            "officer_jo",
-            UUID.randomUUID(),
-            "Grundlagen",
-            null,
-            null,
-            "basetool-frontend");
-    when(backendApiClient.get(contains("/api/v1/audit/{domain}"), anyTypeRef(), eq("PROMOTION")))
-        .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
-
-    String view = controller.auditLog("PROMOTION", null, null, null, null, null, 0, null, model);
-
-    assertEquals("audit/admin/audit-log", view);
-    assertEquals("PROMOTION", model.getAttribute("activeDomain"));
-    assertEquals("/api/proxy/audit/PROMOTION/export", model.getAttribute("exportEndpoint"));
-    assertEquals("/api/proxy/audit/PROMOTION", model.getAttribute("purgeEndpoint"));
-    PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
-    AuditRowView row = events.content().get(0);
-    assertEquals("Grundlagen", row.subject());
-    assertEquals("admin.audit.event.PROMOTION_TOPIC_CREATED", row.eventLabelKey());
-    List<String> eventTypes = (List<String>) model.getAttribute("eventTypes");
-    assertTrue(eventTypes.contains("PROMOTION_EVALUATION_CREATED"));
   }
 
   @Test

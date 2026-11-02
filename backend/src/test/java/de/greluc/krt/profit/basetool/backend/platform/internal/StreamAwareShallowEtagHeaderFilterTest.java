@@ -79,7 +79,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
         "/api/v1/personal-inventory",
         "/api/v1/refinery-orders/all",
-        "/api/v1/promotion/eligibility",
         "/api/v1/material-exchange/offers",
         "/api/v1/orders"
       })
@@ -129,7 +128,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/personal-inventory",
         "/api/v1/personal-blueprints",
         "/api/v1/refinery-orders/all",
-        "/api/v1/promotion/eligibility",
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
         "/api/v1/missions",
         "/api/v1/materials/matrix",

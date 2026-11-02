@@ -68,9 +68,9 @@ class OrgHierarchyMigrationTest {
 
   /**
    * Behavioural checks on the org_unit side (no user fixtures needed): the new kinds are accepted,
-   * the three-level parent chain (OL → Bereich → Staffel) is allowed, and every parent/promotion
-   * invariant is rejected. Uses throwaway rows cleaned up in a finally block so the shared
-   * Testcontainers schema is left untouched.
+   * the three-level parent chain (OL → Bereich → Staffel) is allowed, and every parent invariant is
+   * rejected. Uses throwaway rows cleaned up in a finally block so the shared Testcontainers schema
+   * is left untouched.
    */
   @Test
   void v164EnforcesTheThreeLevelParentHierarchy() {
@@ -82,29 +82,24 @@ class OrgHierarchyMigrationTest {
 
     cleanup(jdbc, squadronId, bereichId, olId, rejectedId);
     try {
-      insertOrgUnit(jdbc, olId, "ORGANISATIONSLEITUNG", "TEST_OH_OL", "TOHOL", false, null);
-      insertOrgUnit(jdbc, bereichId, "BEREICH", "TEST_OH_BER", "TOHB", false, olId);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_OH_SQ", "TOHS", true, bereichId);
+      insertOrgUnit(jdbc, olId, "ORGANISATIONSLEITUNG", "TEST_OH_OL", "TOHOL", null);
+      insertOrgUnit(jdbc, bereichId, "BEREICH", "TEST_OH_BER", "TOHB", olId);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_OH_SQ", "TOHS", bereichId);
 
       assertThat(countById(jdbc, olId)).isOne();
       assertThat(countById(jdbc, bereichId)).isOne();
       assertThat(countById(jdbc, squadronId)).isOne();
 
-      assertThatThrownBy(() ->
-              insertOrgUnit(jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", false, squadronId))
+      assertThatThrownBy(
+              () -> insertOrgUnit(jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", squadronId))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must have an ORGANISATIONSLEITUNG parent");
 
       assertThatThrownBy(() ->
-              insertOrgUnit(
-                  jdbc, rejectedId, "ORGANISATIONSLEITUNG", "TEST_OH_X", "TOHX", false, olId))
+              insertOrgUnit(jdbc, rejectedId, "ORGANISATIONSLEITUNG", "TEST_OH_X", "TOHX", olId))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must not have a parent");
 
-      assertThatThrownBy(
-              () -> insertOrgUnit(jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", true, olId))
-          .isInstanceOf(DataAccessException.class)
-          .hasMessageContaining("chk_org_unit_promotion_only_squadron");
     } finally {
       cleanup(jdbc, squadronId, bereichId, olId, rejectedId);
     }
@@ -128,10 +123,10 @@ class OrgHierarchyMigrationTest {
     cleanupUser(jdbc, userId);
     try {
       insertUser(jdbc, userId);
-      insertOrgUnit(jdbc, sqA, "SQUADRON", "TEST_OH_SQA", "TOSA", false, null);
-      insertOrgUnit(jdbc, sqB, "SQUADRON", "TEST_OH_SQB", "TOSB", false, null);
-      insertOrgUnit(jdbc, sqC, "SQUADRON", "TEST_OH_SQC", "TOSC", false, null);
-      insertOrgUnit(jdbc, skX, "SPECIAL_COMMAND", "TEST_OH_SKX", "TOSX", false, null);
+      insertOrgUnit(jdbc, sqA, "SQUADRON", "TEST_OH_SQA", "TOSA", null);
+      insertOrgUnit(jdbc, sqB, "SQUADRON", "TEST_OH_SQB", "TOSB", null);
+      insertOrgUnit(jdbc, sqC, "SQUADRON", "TEST_OH_SQC", "TOSC", null);
+      insertOrgUnit(jdbc, skX, "SPECIAL_COMMAND", "TEST_OH_SKX", "TOSX", null);
 
       insertMembership(jdbc, userId, sqA);
       insertMembership(jdbc, userId, sqB);
@@ -192,8 +187,8 @@ class OrgHierarchyMigrationTest {
     cleanupUser(jdbc, userId);
     try {
       insertUser(jdbc, userId);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_RM_SQ", "TRMS", false, null);
-      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_RM_SK", "TRMK", false, null);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_RM_SQ", "TRMS", null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_RM_SK", "TRMK", null);
 
       insertMembership(jdbc, userId, squadronId);
       assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("MEMBER");
@@ -235,8 +230,8 @@ class OrgHierarchyMigrationTest {
     cleanupKommandoGroups(jdbc, squadronId, skId);
     cleanup(jdbc, squadronId, skId);
     try {
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_KG_SQ", "TKGS", false, null);
-      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_KG_SK", "TKGK", false, null);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_KG_SQ", "TKGS", null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_KG_SK", "TKGK", null);
 
       assertThatThrownBy(() -> insertKommandoGroup(jdbc, g1, skId, "Bad"))
           .isInstanceOf(DataAccessException.class)
@@ -256,11 +251,11 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * Verifies V331 and V332: the free-text Grand Admiral column and the org-chart table are gone,
+   * Verifies V332 and V333: the free-text Grand Admiral column and the org-chart table are gone,
    * and the Grand Admiral account stays confined to the Organisationsleitung row.
    */
   @Test
-  void v331AndV332DropTheOrgChartData() {
+  void v332AndV333DropTheOrgChartData() {
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     assertThat(
             jdbc.queryForObject(
@@ -318,8 +313,8 @@ class OrgHierarchyMigrationTest {
     cleanupUser(jdbc, userId);
     try {
       insertUser(jdbc, userId);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V187_SQ", "TV87S", false, null);
-      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_V187_SK", "TV87K", false, null);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V187_SQ", "TV87S", null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_V187_SK", "TV87K", null);
 
       insertMembership(jdbc, userId, squadronId);
       updateMembershipRole(jdbc, userId, squadronId, "STAFFELLEITER");
@@ -359,7 +354,7 @@ class OrgHierarchyMigrationTest {
     try {
       insertUser(jdbc, userA);
       insertUser(jdbc, userB);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V188_SQ", "TV88S", false, null);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V188_SQ", "TV88S", null);
 
       insertMembership(jdbc, userA, squadronId);
       updateMembershipRole(jdbc, userA, squadronId, "STAFFELLEITER");
@@ -398,7 +393,7 @@ class OrgHierarchyMigrationTest {
     try {
       insertUser(jdbc, userA);
       insertUser(jdbc, userB);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V313_SQ", "TV313", false, null);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V313_SQ", "TV313", null);
       insertKommandoGroup(jdbc, groupId, squadronId, "Alpha");
 
       insertMembership(jdbc, userA, squadronId);
@@ -428,21 +423,14 @@ class OrgHierarchyMigrationTest {
   }
 
   private static void insertOrgUnit(
-      JdbcTemplate jdbc,
-      UUID id,
-      String kind,
-      String name,
-      String shorthand,
-      boolean promotionEnabled,
-      UUID parentId) {
+      JdbcTemplate jdbc, UUID id, String kind, String name, String shorthand, UUID parentId) {
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, ?, FALSE, ?)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, ?)",
         id,
         kind,
         name,
         shorthand,
-        promotionEnabled,
         parentId);
   }
 

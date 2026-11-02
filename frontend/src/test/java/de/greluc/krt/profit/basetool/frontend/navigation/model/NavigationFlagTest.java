@@ -25,31 +25,36 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests of {@link NavigationFlag#holdsUserWide}: when a promotion right is lost for good. */
+/**
+ * Unit tests of {@link NavigationFlag#holdsUserWide}: when a context-bound or data-tab right is
+ * lost for good.
+ */
 class NavigationFlagTest {
 
   @Test
-  @DisplayName("the promotion pages hold user-wide only while an enabled unit is in reach")
-  void promotionHoldsUserWideOnlyWithAnEnabledUnitInReach() {
-    assertThat(NavigationFlag.PROMOTION.holdsUserWide(Set.of())).isFalse();
-    assertThat(NavigationFlag.PROMOTION.holdsUserWide(Set.of(NavigationFlag.OFFICER_ANYWHERE)))
-        .isFalse();
-    assertThat(NavigationFlag.PROMOTION.holdsUserWide(Set.of(NavigationFlag.PROMOTION_ANYWHERE)))
-        .isTrue();
+  @DisplayName("a supply tab is lost user-wide only while the supply surface is on")
+  void aSupplyTabIsJudgedOnlyWhileTheSurfaceIsOn() {
+    for (NavigationFlag tab : Set.of(NavigationFlag.SUPPLY_INCOMING, NavigationFlag.SUPPLY_STATS)) {
+      assertThat(tab.holdsUserWide(Set.of())).as(tab.name()).isTrue();
+      assertThat(tab.holdsUserWide(Set.of(NavigationFlag.PURCHASING))).as(tab.name()).isTrue();
+      assertThat(tab.holdsUserWide(Set.of(NavigationFlag.SUPPLY))).as(tab.name()).isFalse();
+      assertThat(tab.holdsUserWide(Set.of(NavigationFlag.SUPPLY, tab))).as(tab.name()).isTrue();
+    }
   }
 
   @Test
-  @DisplayName("promotion management holds user-wide only with officer reach in an enabled unit")
-  void promotionManagementHoldsUserWideOnlyWithManagingReachInAnEnabledUnit() {
-    assertThat(NavigationFlag.MANAGE_PROMOTIONS.holdsUserWide(Set.of())).isFalse();
-    assertThat(
-            NavigationFlag.MANAGE_PROMOTIONS.holdsUserWide(
-                Set.of(NavigationFlag.OFFICER_ANYWHERE, NavigationFlag.PROMOTION_ANYWHERE)))
-        .isFalse();
-    assertThat(
-            NavigationFlag.MANAGE_PROMOTIONS.holdsUserWide(
-                Set.of(NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE)))
-        .isTrue();
+  @DisplayName("a purchasing tab is lost user-wide only while the purchasing surface is on")
+  void aPurchasingTabIsJudgedOnlyWhileTheSurfaceIsOn() {
+    for (NavigationFlag tab :
+        Set.of(
+            NavigationFlag.PURCHASING_PARTNERS,
+            NavigationFlag.PURCHASING_DELEGATES,
+            NavigationFlag.PURCHASING_REPORT)) {
+      assertThat(tab.holdsUserWide(Set.of())).as(tab.name()).isTrue();
+      assertThat(tab.holdsUserWide(Set.of(NavigationFlag.SUPPLY))).as(tab.name()).isTrue();
+      assertThat(tab.holdsUserWide(Set.of(NavigationFlag.PURCHASING))).as(tab.name()).isFalse();
+      assertThat(tab.holdsUserWide(Set.of(NavigationFlag.PURCHASING, tab))).as(tab.name()).isTrue();
+    }
   }
 
   @Test

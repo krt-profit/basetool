@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** API · **Related:** [`security-and-access.md`](security-and-access.md), [`observability.md`](observability.md)
 
 # API conventions
@@ -462,14 +462,14 @@ own.
 - **One tag per domain.** `OpenApiDomainConfig.domainTagCustomizer` (an `OperationCustomizer`)
   replaces every operation's tags with exactly one, its controller's domain, and mirrors it as
   `x-domain`; the document's `tags` list holds those domains and nothing else, and springdoc's
-  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are those of the REST
-  API cut's *Today's surface* (`admin-system`, `audit`, `bank`, `blueprint`, `catalogue`,
+  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are the 20 of the REST
+  API cut's *Today's surface* that still exist (`admin-system`, `audit`, `bank`, `blueprint`, `catalogue`,
   `dashboard`, `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `leadership`, `livesync`,
-  `materialexchange`, `mission`, `notification`, `operation`, `orgunit`, `personalinventory`,
-  `promotion`, `refinery`). The controller-to-domain table is explicit in main
+  `materialexchange`, `mission`, `notification`, `operation`, `orgunit`,
+  `personalinventory`, `refinery`). The controller-to-domain table is explicit in main
   code, `platform/internal/ApiDomains`: the backend domain map of plan guard G-09
   (`backend/src/test/resources/architecture/domain-map.txt`, REQ-MOD-001) lives in test scope, where
-  the running application cannot read it, and the REST cut's 22 domains are not the map's 26 modules.
+  the running application cannot read it, and these 21 domains are not the map's 28 modules.
   `ApiDomainsMatchTheDomainMapTest` therefore holds the table to the map: a controller's tag is its
   module, or the API domain one of five reviewed entries names — the `privacy` module's endpoints
   are tagged `identity`, the `admin` module's `admin-system`, and `LeitungController`,
@@ -496,7 +496,7 @@ own.
 
 **Acceptance**
 
-- [x] Every operation carries exactly one tag, equal to `x-domain`, from the 22 domains; the tag list
+- [x] Every operation carries exactly one tag, equal to `x-domain`, from the 21 domains; the tag list
   is the domains — asserted by the generator before it writes and on the committed document
   (`OpenApiDocumentAssertionsTest`).
 - [x] Each domain's operation count has a floor at today's count (575 operations: 559 in
@@ -724,8 +724,6 @@ constraint for nothing and record a guess about which fields matter.
 | `PUT …/bank/org-units/requests/{id}`                                                                       | `id`, `amount`, `note`, `targetAccountId`, `version` — **request** requires `amount` only; the account and the kind are not editable                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `POST …/bank/org-units/requests/{id}/cancel`                                                               | `id`, `status`, `version` — **request** requires `version`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `POST`/`DELETE …/requests/{id}/owner-approval`                                                             | `id`, `ownerApprovalGranted`, `version`, plus `ownerApprovalGrantedByHandle` on the `POST` — **no request body on either verb**, so no version is echoed                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `GET /api/v1/promotion/evaluations/my`                                                                     | `categoryName`, `topicName`, `assignedLevel` — me-scoped; the level is a **field**, not a frozen enum, since the levels are the organisation's to name                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `GET /api/v1/promotion/eligibility/my`                                                                     | `fromRank`, `toRank`, `eligible`, `hasConfiguredRules`, `checks`, `topicName`, `categoryName`, `minimumLevel`, `requiredCount`, `achievedCount`, `satisfied` — `hasConfiguredRules` separates "no rules exist" from "you do not meet them"                                                                                                                                                                                                                                                                                                                                            |
 | `GET /api/v1/app/version-policy`                                                                           | `minimumVersionCode`, `latestVersionCode`, `releasesUrl` — **anonymous**, one of the four paths REQ-SEC-052 enumerates; frozen so a shipped app can be told to STOP (REQ-API-010)                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/refinery-orders/my-orders`                                                                    | envelope; row `id`, `status`, `location`, `refiningMethod`, `startedAt`, `durationMinutes`, `endsAt`, `goods`, `oreSales`, `profit`, `version` — `endsAt` is frozen on the LIST only; the detail has none and the app computes it                                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/refinery-orders/{id}`                                                                         | as the list, without `endsAt`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -1311,7 +1309,9 @@ consumer instead of reusing the heaviest projection that happens to contain the 
   transaction, through the same resolvers as `/me/active-org-unit`, `/me/org-units`,
   `/me/capabilities` and `/notifications/unread-count` — so a client may use either shape and gets
   the same answers. It answers all four parts or fails as a whole; ADR-0151's fail-closed handling of
-  the capabilities stays the client's.
+  the capabilities stays the client's. The capabilities include the five supply and purchasing tab
+  flags of REQ-UI-026 (ADR-0329); they read a few rows and add no statement per org
+  unit.
 
 Both serve the web frontend over the internal hop; since the API vhost is gone (ADR-0268) no other
 client reaches them.
@@ -1329,6 +1329,8 @@ client reaches them.
 - [x] The frontend proxies forward to them (`UserProxyControllerTest`).
 - [x] `/me/layout` answers the four parts from the same resolvers (`MeControllerTest`) in exactly one
   transaction, where the separate calls open several (`MeLayoutSingleTransactionTest`).
+- [x] The tab flags cost the same statements for one org unit as for four
+  (`MeLayoutSingleTransactionTest`).
 - [x] The web layout uses `/me/layout` instead of the separate calls — the frontend half of
   BE-PERF-07 / FE-PERF-01, done 2026-09-23 (`LayoutContextLoader`, REQ-FE-020).
 

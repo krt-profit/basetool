@@ -19,7 +19,7 @@ living truth).
 > and `REQ-ORG-018` (mission owning-unit reassignment), while its active-context surfacing (was
 > `REQ-ORG-010`) is now `REQ-ORG-024` and its participant escape (was `REQ-ORG-021`) is now
 > `REQ-ORG-027`. See the renumbering table in [`INDEX.md`](INDEX.md). The Grand Admiral
-> (`REQ-ORG-021`) moved here when the org chart was removed (ADR-0329); `REQ-ORG-010`, `-012`, `-013`,
+> (`REQ-ORG-021`) moved here when the org chart was removed (ADR-0331); `REQ-ORG-010`, `-012`, `-013`,
 > `-020`, `-025` and `-026` are retired with it.
 
 ## Requirements
@@ -36,9 +36,7 @@ release.
 > **Completed (2026-09-22 review):** the soak is over. The dual-write lifecycle hooks were removed
 > (R9 Step 2) and `V103` dropped the legacy `owning_squadron_id` columns from `mission`,
 > `operation`, `ship`, `inventory_item`, `refinery_order` and `job_order` (plus the job order's two
-> squadron columns); `owning_org_unit_id` is the only owner column. Only `promotion_topic` and
-> `rank_requirement` keep an `owning_squadron_id`, deliberately — promotion is Squadron-only
-> (REQ-ORG-005).
+> squadron columns); `owning_org_unit_id` is the only owner column.
 
 > **Amended by epic #692 (REQ-ORG-014):** `org_unit.kind` gains `BEREICH` and `ORGANISATIONSLEITUNG`, and
 > a nullable self-referential `parent_org_unit_id` introduces the fixed three-level hierarchy
@@ -212,7 +210,7 @@ one. A ship created through the exchange runs the Hangar's own create and so
 > Every other aggregate's owning OrgUnit remains create-time-only, except the owner's re-stamp of a
 > personal Lager row above (REQ-INV-052).
 
-### REQ-ORG-005 — Admin area & promotion carve-outs
+### REQ-ORG-005 — Admin area carve-outs
 
 Admin area is admin-only (post-Phase-4 lockdown), with carve-outs: Stammdaten,
 user-management, announcement writes, system settings and **SK lifecycle**
@@ -234,26 +232,11 @@ members of (`LeitungUnitDto.canManageRoster`). Setting the **lead** is never ope
 itself (no self-escalation): it is ADMIN or the Bereichsleiter of the SK's parent Bereich
 (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004). Until 2026-09-22 this sentence
 said the lead toggle was ADMIN-only, and the member page was admin-only in the frontend, so the SK
-lead's right existed in the API alone. **Promotion-system maintenance** is
-re-opened to OFFICER under an org-unit-scope gate (`canEditSquadron(topic.owningSquadron.id)`).
-Admins can toggle the promotion subsystem per Squadron
-(`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `PromotionAccessPolicy.isFeatureEnabledForCurrentScope()`
-short-circuits promotion services when OFF. **SKs can never participate in promotion** —
-enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), app
-(`SpecialCommand` entity), and type layer (ArchUnit
-`promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit`).
+lead's right existed in the API alone.
 
 > **Amended by epic #692 (REQ-ORG-015):** membership in a Bereich's Bereichsleitung or the OL grants
 > **officer-equivalent reach** over the subordinate units, **never admin rights** — every carve-out in
 > this requirement stays `hasRole('ADMIN')`, and an OL/Bereich principal must never satisfy `isAdmin()`.
-> **Promotion does NOT cascade (Phase 3 / #696):** the cascade mints the flat `ROLE_LOGISTICIAN` /
-> `ROLE_MISSION_MANAGER` (mirroring the SK-lead precedent), **not** `ROLE_OFFICER`, and a non-admin
-> Bereichsleitung/OL member holds no Staffel membership (REQ-ORG-017), so `currentSquadronId()` is empty
-> → `PromotionAccessPolicy.hasReadAccess()` is `false` and the OFFICER-gated promotion-topic write paths reject them.
-> Promotion therefore stays **squadron-OFFICER-only** (consistent with "promotion stays Squadron-only");
-> Bereich/OL never own promotion data and SKs stay permanently excluded. This fail-closed boundary is
-> deliberate — widening promotion maintenance to Bereichsleitung is out of scope and would need an
-> explicit owner decision.
 
 ### REQ-ORG-006 — ArchUnit guards for new staffel-scoped aggregates
 
@@ -412,9 +395,7 @@ Raumüberlegenheit) and `ORGANISATIONSLEITUNG` (OL), plus a nullable self-refere
 `parent_org_unit_id`. The hierarchy is **fixed three levels**: OL → Bereich → (Staffel | SK). A CHECK
 constraint pins the parent kind by the child kind (Staffel/SK parent is a `BEREICH`; Bereich parent is
 the `ORGANISATIONSLEITUNG`; OL has no parent), which also forbids cycles at fixed depth.
-`Bereich`/`Organisationsleitung` are JPA subclasses with promotion permanently disabled (like
-`SpecialCommand`); `chk_org_unit_promotion_only_squadron` widens to keep promotion FALSE for both new
-kinds. Roll-out is **additive** (mirror the V97–V100 soak): `parent_org_unit_id` is NULL until an admin
+`Bereich`/`Organisationsleitung` are JPA subclasses, like `SpecialCommand`. Roll-out is **additive** (mirror the V97–V100 soak): `parent_org_unit_id` is NULL until an admin
 assigns Bereiche, and the descent helper (REQ-ORG-015) treats a NULL parent as "no ancestor expansion",
 so the system is byte-identical to today's flat behaviour while the hierarchy is being populated.
 
@@ -468,8 +449,8 @@ Hard invariants:
 
 - The reach is a **concrete `memberOrgUnitIds` union — never** the `adminAllScope=true` branch (one
   narrow, read-only exception below: ADR-0048). An OL/Bereich principal **must never satisfy
-  `isAdmin()`**, so all `hasRole('ADMIN')` carve-outs (SK lifecycle, system settings, stammdaten, the
-  promotion-topic guards in REQ-ORG-005) stay ADMIN-only.
+  `isAdmin()`**, so all `hasRole('ADMIN')` carve-outs (SK lifecycle, system settings, stammdaten in
+  REQ-ORG-005) stay ADMIN-only.
 - **Strict silo:** a Bereichsleitung's union contains only its own Bereich's descendants; only the OL
   crosses Bereiche. No peer-Bereich visibility.
 - An **SK-lead is not expanded** — they keep SK-only reach; their Bereichsleitung membership is
@@ -553,8 +534,7 @@ extended:
   no per-aggregate code change was needed: a `BEREICH`/`OL`-owned row's `owning_org_unit_id` flows
   through the same `canSee*`/`canEdit*` gates and `IN :memberOrgUnitIds` list queries, which the Phase-3
   cascade already widens for the owning leadership and keeps closed for subordinates. The ownerless
-  `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). Promotion stays
-  Squadron-only. The REQ-ORG-011 owner-bypass stays ahead of the scope check.
+  `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). The REQ-ORG-011 owner-bypass stays ahead of the scope check.
 
 **Acceptance**
 
@@ -638,11 +618,10 @@ dropped to one:
   drops a dangling Staffel membership (one whose squadron no longer resolves) **identically whether
   the user holds one Staffel or two**, so a corrupt row never leaks into one branch while being
   filtered from the other.
-- **Union lists** — the admin user list, `/lookup`+`/search` typeaheads and the promotion
-  Bewertungsmatrix scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
+- **Union lists** — the admin user list and the `/lookup`+`/search` typeaheads scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
   unpinned, a two-Staffel officer sees the members of **both**; a pin narrows to the pinned one.
 - **Authorisation gates** OR across **all** of a target's Staffeln — the full-PII gate
-  (`UserService#isCrossSquadronForNonAdmin`, used by `UserDirectoryService#get`) and the member-evaluation gate grant when the caller
+  (`UserService#isCrossSquadronForNonAdmin`, used by `UserDirectoryService#get`) grants when the caller
   shares **any** of the target's Staffeln; an officer's own-Staffel **oversight scope** includes
   every Staffel they belong to.
 - **Order-aligned audit** — a Job-Order handover's `executingSquadron` snapshot records the executor's
@@ -653,9 +632,7 @@ dropped to one:
   honours an active pin: a two-Staffel user with no explicit picker output but a pin onto one of their
   own org units is stamped to the pinned unit; with no pin it still 400s "owningOrgUnitId is required"
   so the create form forces an explicit choice (the owner picker lists **both** Staffeln, sourced from
-  `/api/v1/org-units/members/{id}/memberships` / `/me/pickable-org-units`). A single-stamp is never silent. The
-  same "pin, else choose" applies to promotion topic / rank-requirement create, which additionally
-  reject a two-Staffel officer who has not pinned (`hasAmbiguousStaffelContext`).
+  `/api/v1/org-units/members/{id}/memberships` / `/me/pickable-org-units`). A single-stamp is never silent.
 - The single-Staffel `PATCH /api/v1/users/{id}/squadron` admin endpoint (and its destructive
   `syncStaffelMembership`) were **removed** — it could silently drop a member's second Staffel; all
   Staffel assignment now flows through the additive membership-delta reconcile.
@@ -772,9 +749,9 @@ referenced from the code and `INDEX.md` but had no entry in any spec.)*
 The OL may designate **exactly one** of its members as the **Grand Admiral** (label untranslated,
 DE = EN). The designation is a **title only**: the holder keeps the `OL_MEMBER` rank, so their rights
 are identical to any OL member — the org-wide officer reach and CARTEL-account responsibility of
-REQ-ORG-015 are unchanged. Source of truth is the OL row's nullable `grand_admiral_user_id` (`V215`; the free-text column went with `V331`);
+REQ-ORG-015 are unchanged. Source of truth is the OL row's nullable `grand_admiral_user_id` (`V215`; the free-text column went with `V332`);
 because the OL is a singleton tier, that one column is the org-wide "at most one" guarantee, and
-`chk_org_unit_grand_admiral_only_ol` (`V331`) keeps it on the OL row.
+`chk_org_unit_grand_admiral_only_ol` (`V332`) keeps it on the OL row.
 
 Appointment is **ADMIN-only** via `PUT /api/v1/org-units/organisationsleitung/{id}/grand-admiral`
 with a required `userId`: a user who is not yet an OL member is **auto-added** as one first.
@@ -930,7 +907,7 @@ pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidd
 Every entity whose rows belong to an owning or responsible org unit carries the marker
 `backend.platform.api.TenantScoped`, naming the field that holds that unit. Today that is `Mission`,
 `Operation`, `Ship`, `InventoryItem` and `RefineryOrder` (`owningOrgUnit`), `JobOrder`
-(`responsibleOrgUnit`), and `PromotionTopic` and `RankRequirement` (`owningSquadron`).
+(`responsibleOrgUnit`).
 
 - **Every org-unit reference is classified.** Every persistent field of an entity that refers to an
   org unit — an association to `OrgUnit` or a subtype, a collection of them, or a `UUID` column
@@ -943,8 +920,7 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
   and the membership key. A marker naming a field that is no org-unit reference, a reference both
   marked and listed, and a list entry that matches nothing fail the build too.
 - **Tenant data** is every marked entity and, transitively, every entity with a mandatory to-one
-  association to one (an aggregate part: mission participants, job-order materials, refinery goods,
-  promotion categories, …).
+  association to one (an aggregate part: mission participants, job-order materials, refinery goods, …).
 - **The write gate is selected by what a controller writes, not by its name.** A controller that
   injects a bean writing tenant data or the org-unit tree (`save*`, `delete*` or a `@Modifying`
   query on its repository) has each write mapping with a `UUID` path variable checked: the effective

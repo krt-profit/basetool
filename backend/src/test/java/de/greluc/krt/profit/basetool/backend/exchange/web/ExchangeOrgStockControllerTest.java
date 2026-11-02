@@ -751,8 +751,8 @@ class ExchangeOrgStockControllerTest {
   private @NotNull UUID orgUnit(@NotNull String kind, @Nullable UUID parent) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, FALSE,"
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE,"
             + " ?)",
         id,
         kind,

@@ -26,7 +26,6 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { NAV_RENDERED_EVENT } from '/js/kernel/nav-preferences.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { createActions } from '/js/kernel/krt-palette-actions.js';
@@ -145,52 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
         view.render();
     };
 
-    let extraRequested = false;
-
-    /**
-     * Loads, once per page, the pages whose access the server decides with a backend read, and
-     * shows them when the palette is still open.
-     */
-    const loadExtraPages = function () {
-        const url = data.entriesUrl;
-        if (extraRequested || !url) return;
-        extraRequested = true;
-        krtFetch
-            .getJson(url)
-            .then((list) => {
-                if (!Array.isArray(list)) return;
-                let added = false;
-                list.forEach((/** @type {any} */ e) => {
-                    if (!e || typeof e.href !== 'string' || typeof e.label !== 'string') return;
-                    const iconName = typeof e.icon === 'string' && e.icon ? e.icon : 'list';
-                    const crumb = typeof e.crumb === 'string' ? e.crumb : '';
-                    const keywords = typeof e.keywords === 'string' ? e.keywords : '';
-                    const entryKey = typeof e.key === 'string' && e.key ? e.key : undefined;
-                    if (
-                        pageIndex.addPage({
-                            href: e.href,
-                            label: e.label,
-                            crumb,
-                            icon: iconName,
-                            keywords,
-                            entryKey,
-                            starrable: entryKey !== undefined,
-                        })
-                    ) {
-                        added = true;
-                    }
-                });
-                if (added && krtModal.isOpen(dialog)) view.render(true);
-            })
-            .catch(() => {});
-    };
-
     document.addEventListener(NAV_RENDERED_EVENT, () => {
         pageIndex.rebuild();
-        extraRequested = false;
         if (krtModal.isOpen(dialog)) {
             view.render(true);
-            loadExtraPages();
         }
     });
 
@@ -206,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
         krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
         paletteInput.setSelectionRange(end, end);
-        loadExtraPages();
     };
 
     krtChrome.palette = { open };

@@ -132,7 +132,6 @@ basetool {
         "personalinventory",
         "platform",
         "privacy",
-        "promotion",
         "refinery",
         "scope",
       )

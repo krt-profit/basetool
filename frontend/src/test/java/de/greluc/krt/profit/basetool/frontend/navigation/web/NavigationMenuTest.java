@@ -113,23 +113,21 @@ class NavigationMenuTest {
         .containsExactly("bank.dashboard", "bank.manage", "bank.requests");
   }
 
-  /** Every group is open and a fully entitled member has 10 links, bank staff 11. */
+  /** Every group is open and a fully entitled member has 9 links, bank staff 10. */
   @Test
-  void aFullyEntitledMemberHasTenLinksAndBankStaffEleven() {
+  void aFullyEntitledMemberHasNineLinksAndBankStaffTen() {
     Set<NavigationFlag> flags =
         Set.of(
             NavigationFlag.JOB_ORDERS,
             NavigationFlag.SUPPLY,
             NavigationFlag.PURCHASING,
-            NavigationFlag.PROMOTION,
-            NavigationFlag.OPEN_LEITUNG,
-            NavigationFlag.MANAGE_PROMOTIONS);
+            NavigationFlag.OPEN_LEITUNG);
 
     NavigationMenu member = resolve(Set.of("KRT_MEMBER"), flags);
     NavigationMenu bank = resolve(Set.of("KRT_MEMBER", "BANK_EMPLOYEE"), flags);
 
-    assertThat(links(member)).hasSize(10);
-    assertThat(links(bank)).hasSize(11);
+    assertThat(links(member)).hasSize(9);
+    assertThat(links(bank)).hasSize(10);
     assertThat(member.main()).noneMatch(group -> group.group().collapsed());
   }
 
@@ -161,10 +159,43 @@ class NavigationMenuTest {
     assertThat(keys(menu, "trade")).doesNotContain("purchasing.deals");
     assertThat(menu.palettePages())
         .extracting(NavigationEntry::key)
-        .contains("purchasing.deals", "supply.incoming", "supply.stats", "purchasing.partners")
+        .contains("purchasing.deals")
         .doesNotContain("supply.needs");
     assertThat(keys(resolve(Set.of(), Set.of(NavigationFlag.PURCHASING)), "trade"))
         .contains("purchasing.deals");
+  }
+
+  /** A supply or purchasing tab is a page only with its surface switch and its own flag. */
+  @Test
+  void theDataTabsNeedTheirOwnFlag() {
+    NavigationMenu switchesOnly =
+        resolve(Set.of(), Set.of(NavigationFlag.SUPPLY, NavigationFlag.PURCHASING));
+    NavigationMenu granted =
+        resolve(
+            Set.of(),
+            Set.of(
+                NavigationFlag.SUPPLY,
+                NavigationFlag.PURCHASING,
+                NavigationFlag.SUPPLY_STATS,
+                NavigationFlag.PURCHASING_PARTNERS));
+    NavigationMenu flagsWithoutSwitches =
+        resolve(Set.of(), Set.of(NavigationFlag.SUPPLY_STATS, NavigationFlag.PURCHASING_PARTNERS));
+
+    assertThat(switchesOnly.palettePages())
+        .extracting(NavigationEntry::key)
+        .doesNotContain(
+            "supply.incoming",
+            "supply.stats",
+            "purchasing.partners",
+            "purchasing.delegates",
+            "purchasing.report");
+    assertThat(granted.palettePages())
+        .extracting(NavigationEntry::key)
+        .contains("supply.stats", "purchasing.partners")
+        .doesNotContain("supply.incoming", "purchasing.delegates", "purchasing.report");
+    assertThat(flagsWithoutSwitches.palettePages())
+        .extracting(NavigationEntry::key)
+        .doesNotContain("supply.stats", "purchasing.partners");
   }
 
   /** The Leitung tab follows the capability flag, not a role. */
@@ -177,29 +208,6 @@ class NavigationMenuTest {
     assertThat(withFlag.pageTabs("orgunitbank.overview", "/org-unit-bank"))
         .extracting(tab -> tab.entry().key())
         .containsExactly("orgunitbank.overview", "organisation.leadership");
-  }
-
-  /**
-   * The promotion tabs follow the feature and the management flag; the topic and rank pages show
-   * the Verwaltung tab as current, and a page left without the feature loses its link.
-   */
-  @Test
-  void promotionManagementFollowsTheFlag() {
-    NavigationMenu member = resolve(Set.of("OFFICER"), Set.of(NavigationFlag.PROMOTION));
-    NavigationMenu manager =
-        resolve(Set.of(), Set.of(NavigationFlag.PROMOTION, NavigationFlag.MANAGE_PROMOTIONS));
-
-    assertThat(member.pageTabs("promotion.overview", "/promotion/overview"))
-        .extracting(tab -> tab.entry().key())
-        .containsExactly("promotion.overview", "promotion.evaluations");
-    assertThat(manager.pageTabs("promotion.topics", "/promotion/admin/topics"))
-        .extracting(tab -> tab.entry().key() + ":" + tab.current())
-        .containsExactly(
-            "promotion.overview:false", "promotion.evaluations:false", "promotion.manage:true");
-    assertThat(manager.areaPaths(registry.entry("promotion.overview").orElseThrow()))
-        .contains("/promotion/manage", "/promotion/admin/topics");
-    assertThat(keys(resolve(Set.of("KRT_MEMBER"), Set.of()), "unit"))
-        .doesNotContain("promotion.overview");
   }
 
   /** The storage page has exactly the two tabs; the storage option keeps the Lager tab current. */

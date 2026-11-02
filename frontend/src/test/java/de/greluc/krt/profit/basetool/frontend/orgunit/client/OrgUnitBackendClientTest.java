@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.Organisationsleitung
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -205,16 +204,12 @@ class OrgUnitBackendClientTest {
   void adminToggles() {
     backend.answerEmpty();
     backend.answerEmpty();
-    backend.answerEmpty();
 
     client.setSpecialCommandProfitEligible(SK, new SpecialCommandProfitEligibleToggleRequest(true));
-    client.setSquadronPromotionEnabled(UNIT, new SquadronPromotionToggleRequest(false));
     client.setSquadronProfitEligible(UNIT, new SquadronProfitEligibleToggleRequest(true));
 
     backend.expect(
         "PATCH", "/api/v1/special-commands/" + SK + "/profit-eligible", "{\"eligible\":true}");
-    backend.expect(
-        "PATCH", "/api/v1/squadrons/" + UNIT + "/promotion-enabled", "{\"enabled\":false}");
     backend.expect(
         "PATCH", "/api/v1/squadrons/" + UNIT + "/profit-eligible", "{\"eligible\":true}");
   }

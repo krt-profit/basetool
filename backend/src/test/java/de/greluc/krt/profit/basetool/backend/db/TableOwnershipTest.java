@@ -96,7 +96,6 @@ class TableOwnershipTest {
           "admin",
           "dashboard",
           "leadership",
-          "promotion",
           "personalinventory",
           "hangar",
           "blueprint",
@@ -117,7 +116,7 @@ class TableOwnershipTest {
   private static final int TABLE_FLOOR = 126;
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
-  private static final int TRIGGER_FLOOR = 25;
+  private static final int TRIGGER_FLOOR = 23;
 
   /** Today's count of native statements in repositories and entity formulas. */
   private static final int NATIVE_STATEMENT_FLOOR = 30;
@@ -202,19 +201,7 @@ class TableOwnershipTest {
                   Set.of("exchange_change", "app_user", "ship", "inventory_item"),
                   "V293/V296 change feed: a renamed unit re-announces its ships and the lots of its"
                       + " pool, read from ship and inventory_item, so a client never keeps a stale"
-                      + " unit (REQ-XCH-017, REQ-XCH-042).")),
-          Map.entry(
-              "trg_guard_promotion_topic_owner_kind",
-              new Crossing(
-                  Set.of("org_unit"),
-                  "Read-only guard that a topic's owning unit is a squadron; a downward read into"
-                      + " orgunit.")),
-          Map.entry(
-              "trg_guard_rank_requirement_owner_kind",
-              new Crossing(
-                  Set.of("org_unit"),
-                  "Read-only guard that a rank requirement's owning unit is a squadron; a downward"
-                      + " read into orgunit.")));
+                      + " unit (REQ-XCH-017, REQ-XCH-042).")));
 
   /**
    * The native statements that reach another module's tables, keyed {@code Owner#member}: a

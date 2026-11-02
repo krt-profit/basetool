@@ -253,7 +253,6 @@ class AdminSettingsPageControllerMvcTest {
         .contains("class=\"krt-segmented krt-segmented--block\"")
         .containsPattern("name=\"refineryRoundingMode\" value=\"DOWN\" checked")
         .doesNotContain("value=\"UP\" checked")
-        .doesNotContain("squadron-promotion-toggle")
         .doesNotContain("squadron-profit-toggle")
         .doesNotContain("sk-profit-toggle");
   }

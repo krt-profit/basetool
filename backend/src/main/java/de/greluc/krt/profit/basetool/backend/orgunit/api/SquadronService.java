@@ -162,24 +162,6 @@ public class SquadronService {
   }
 
   /**
-   * Toggles the per-squadron promotion feature. Separate from {@link #updateSquadron(UUID,
-   * SquadronDto)}; promotion data is kept and reappears when re-enabled.
-   *
-   * @param id squadron primary key
-   * @param enabled new value of {@code is_promotion_enabled}; {@code false} hides the promotion
-   *     menu for the squadron's non-admin members.
-   * @return the persisted squadron
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no matching row.
-   */
-  @Transactional
-  @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
-  public Squadron setPromotionEnabled(@NotNull UUID id, boolean enabled) {
-    Squadron squadron = getSquadronById(id);
-    squadron.setPromotionEnabled(enabled);
-    return squadronRepository.save(squadron);
-  }
-
-  /**
    * Sets whether the squadron may be picked as the responsible (processing) org unit of a Job
    * Order. Separate from {@link #updateSquadron(UUID, SquadronDto)}; existing Job Orders are not
    * touched.

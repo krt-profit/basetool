@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -225,8 +225,7 @@ public class LayoutContextLoader {
   }
 
   /**
-   * Wire-shape mirror of the backend's {@code MeController.LayoutResponse}; the nested capabilities
-   * carry only the three flags the layout reads.
+   * Wire-shape mirror of the backend's {@code MeController.LayoutResponse}.
    *
    * @param activeOrgUnitId the effective org-unit context, or {@code null}
    * @param orgUnits the org units the caller may pin; {@code null} only on a malformed answer

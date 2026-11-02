@@ -215,12 +215,6 @@
       "personalinventory/personal-inventory-blueprints.js",
       "personalinventory/personal-inventory.js"
     ],
-    "promotion": [
-      "promotion/promotion-admin-rank-requirements.js",
-      "promotion/promotion-admin-topics.js",
-      "promotion/promotion-manage.js",
-      "promotion/promotion-my-evaluations.js"
-    ],
     "purchasing": [
       "purchasing/purchasing-admin.js",
       "purchasing/purchasing-common.js",

@@ -13,7 +13,6 @@ module scope 5
 module admin 6
 module dashboard 6
 module leadership 7
-module promotion 7
 module personalinventory 7
 module hangar 7
 module blueprint 7
@@ -176,7 +175,6 @@ package dashboard dashboard the dashboard module's package tree (plan 5.2)
 package leadership leadership the leadership module's package tree (plan 5.2)
 package admin admin the admin module's package tree (plan 5.2)
 package operation operation the operation module's package tree (plan 5.2)
-package promotion promotion the promotion module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 package supply supply the supply module's package tree (supply and purchasing plan 5.1 rank 11)
 package purchasing purchasing the purchasing module's package tree (supply and purchasing plan 5.1 rank 12)

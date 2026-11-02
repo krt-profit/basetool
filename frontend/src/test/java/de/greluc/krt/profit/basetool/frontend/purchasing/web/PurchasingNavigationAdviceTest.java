@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
@@ -46,6 +47,7 @@ class PurchasingNavigationAdviceTest {
   @Mock private PurchasingBackendClient purchasingClient;
   @Mock private SupplyBackendClient supplyClient;
   @Mock private QualityTierCatalog qualityTierCatalog;
+  @Mock private LayoutContextLoader layoutContextLoader;
 
   private PurchasingNavigationAdvice advice;
 
@@ -57,7 +59,7 @@ class PurchasingNavigationAdviceTest {
   private MockHttpServletRequest renderingRequest() throws NoSuchMethodException {
     PurchasingPageController pages =
         new PurchasingPageController(
-            purchasingClient, supplyClient, featureState, qualityTierCatalog);
+            purchasingClient, supplyClient, featureState, qualityTierCatalog, layoutContextLoader);
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setAttribute(
         HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE,

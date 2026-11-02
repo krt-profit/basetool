@@ -247,15 +247,16 @@ class NavigationTabBarResolverTest {
   @Test
   @DisplayName("a stored slot only the active context refuses is kept")
   void contextOnlyGapIsNotDeleted() {
-    TabBarResponse stored = new TabBarResponse(Arrays.asList("promotion.overview", null, null), 1);
+    TabBarResponse stored =
+        new TabBarResponse(Arrays.asList("organisation.leadership", null, null), 1);
 
-    NavigationAccess memberOfAnEnabledUnit =
+    NavigationAccess officerElsewhere =
         new NavigationAccess(
             Set.of("KRT_MEMBER"),
-            Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.PROMOTION_ANYWHERE));
+            Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.OFFICER_ANYWHERE));
 
-    assertThat(resolver.gone(NavigationMode.MEMBER, stored, memberOfAnEnabledUnit)).isEmpty();
+    assertThat(resolver.gone(NavigationMode.MEMBER, stored, officerElsewhere)).isEmpty();
     assertThat(resolver.gone(NavigationMode.MEMBER, stored, MEMBER))
-        .containsExactly("promotion.overview");
+        .containsExactly("organisation.leadership");
   }
 }

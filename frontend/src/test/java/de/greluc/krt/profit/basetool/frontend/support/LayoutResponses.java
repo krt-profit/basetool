@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.support;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.UUID;
@@ -82,6 +82,11 @@ public final class LayoutResponses {
             false,
             false,
             false,
+            false,
+            false,
+            false,
+            false,
+            false,
             false),
         0L);
   }
@@ -116,6 +121,11 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        false,
+        false,
+        false,
+        false,
+        false,
         false);
   }
 
@@ -128,7 +138,7 @@ public final class LayoutResponses {
   public static CapabilitiesResponse missionManager() {
     return new CapabilitiesResponse(
         false, false, false, false, false, true, false, false, false, false, false, false, false,
-        false, false, false);
+        false, false, false, false, false, false, false, false);
   }
 
   /**
@@ -162,6 +172,51 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
+  }
+
+  /**
+   * Capability flags with only the supply and purchasing tab flags set as given.
+   *
+   * @param supplyIncoming whether „Eingehende Spenden" is offered
+   * @param supplyStats whether the donation statistics are offered
+   * @param purchasingPartners whether the purchasing partners are offered
+   * @param purchasingDelegates whether the trade delegates are offered
+   * @param purchasingReport whether the purchasing report is offered
+   * @return the capability flags
+   */
+  public static CapabilitiesResponse tabs(
+      boolean supplyIncoming,
+      boolean supplyStats,
+      boolean purchasingPartners,
+      boolean purchasingDelegates,
+      boolean purchasingReport) {
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        supplyIncoming,
+        supplyStats,
+        purchasingPartners,
+        purchasingDelegates,
+        purchasingReport,
         false,
         false,
         false);
@@ -214,9 +269,14 @@ public final class LayoutResponses {
         officerHere,
         officerHere,
         officerHere,
-        officerHere,
-        officerHere,
-        officerHere);
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
   }
 
   /**

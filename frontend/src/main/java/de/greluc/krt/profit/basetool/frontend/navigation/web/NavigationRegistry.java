@@ -26,12 +26,15 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_EN;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LOGISTICIAN_HERE;
-import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.MANAGE_PROMOTIONS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
-import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PROMOTION;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_DELEGATES;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_PARTNERS;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_REPORT;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY_INCOMING;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY_STATS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.EXTERNAL;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.LABEL_WITH_ICON;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.NOT_INDEXED;
@@ -110,9 +113,6 @@ public class NavigationRegistry {
           "admin.dataimports", List.of("admin.syncreports.uex", "admin.syncreports.scwiki"));
 
   private static final NavigationGate LEITUNG_GATE = NavigationGate.requires(OPEN_LEITUNG);
-
-  private static final NavigationGate PROMOTION_MANAGEMENT_GATE =
-      NavigationGate.requires(MANAGE_PROMOTIONS);
 
   /** The two links above the member groups: home and notifications. */
   private final NavigationGroup top = buildTop();
@@ -398,7 +398,6 @@ public class NavigationRegistry {
     for (NavigationPageTabs bar : pageTabs) {
       boolean adminBar = adminKeys.contains(bar.entryKeys().getFirst());
       Set<String> barKeys = new LinkedHashSet<>(bar.entryKeys());
-      bar.covered().values().forEach(barKeys::addAll);
       Set<String> tabHrefs =
           bar.entryKeys().stream()
               .flatMap(key -> entry(key).stream())
@@ -554,32 +553,32 @@ public class NavigationRegistry {
                 "/supply/donations/incoming",
                 "supply.tab.incoming",
                 "supplyIncoming")
-            .gate(NavigationGate.requires(SUPPLY)),
+            .gate(NavigationGate.requires(SUPPLY, SUPPLY_INCOMING)),
         dataTab("supply.stats", "/supply/stats", "supply.tab.stats", "supplyStats")
-            .gate(NavigationGate.requires(SUPPLY)),
+            .gate(NavigationGate.requires(SUPPLY, SUPPLY_STATS)),
         dataTab(
                 "purchasing.partners",
                 "/purchasing/partners",
                 "purchasing.tab.partners",
                 "purchasingPartners")
-            .gate(NavigationGate.requires(PURCHASING)),
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_PARTNERS)),
         dataTab(
                 "purchasing.delegates",
                 "/purchasing/delegates",
                 "purchasing.tab.delegates",
                 "purchasingDelegates")
-            .gate(NavigationGate.requires(PURCHASING)),
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_DELEGATES)),
         dataTab(
                 "purchasing.report",
                 "/purchasing/report",
                 "purchasing.tab.report",
                 "purchasingReport")
-            .gate(NavigationGate.requires(PURCHASING)));
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_REPORT)));
   }
 
   /**
-   * A tab of the supply or purchasing page that only some callers see, offered by the on-demand
-   * quick access rather than by the rendered index (ADR-0282).
+   * A tab of the supply or purchasing page that only some callers see; its gate needs the caller's
+   * tab flag of the layout read (REQ-UI-026).
    */
   @NotNull
   private static NavigationEntry dataTab(
@@ -590,7 +589,7 @@ public class NavigationRegistry {
     return of(key, href, "palette.page." + term)
         .tab(tabLabelKey)
         .keywords("palette.keywords." + term)
-        .with(PALETTE_ONLY, NOT_INDEXED);
+        .with(PALETTE_ONLY);
   }
 
   @NotNull
@@ -609,23 +608,6 @@ public class NavigationRegistry {
         of("organisation.leadership", "/organisation/leitung", "nav.leitung")
             .gate(LEITUNG_GATE)
             .testId("nav-leitung")
-            .with(PALETTE_ONLY),
-        of("promotion.overview", "/promotion/overview", "nav.promotion")
-            .tab("nav.tab.overview")
-            .keywords("palette.keywords.promotion")
-            .gate(NavigationGate.requires(PROMOTION)),
-        of("promotion.evaluations", "/promotion/my-evaluations", "nav.promotion.my_evaluations")
-            .gate(NavigationGate.requires(PROMOTION))
-            .with(PALETTE_ONLY),
-        of("promotion.manage", "/promotion/manage", "nav.promotion.manage")
-            .tab("nav.tab.manage")
-            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
-            .with(PALETTE_ONLY),
-        of("promotion.topics", "/promotion/admin/topics", "nav.promotion.admin_topics")
-            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
-            .with(PALETTE_ONLY),
-        of("promotion.ranks", "/promotion/admin/rank-requirements", "nav.promotion.admin_ranks")
-            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
             .with(PALETTE_ONLY));
   }
 
@@ -822,8 +804,6 @@ public class NavigationRegistry {
             "purchasing.delegates",
             "purchasing.report"),
         NavigationPageTabs.of("orgunitbank.overview", "organisation.leadership"),
-        NavigationPageTabs.of("promotion.overview", "promotion.evaluations", "promotion.manage")
-            .covering("promotion.manage", "promotion.topics", "promotion.ranks"),
         NavigationPageTabs.of("bank.dashboard", "bank.manage", "bank.grants", "bank.requests"),
         NavigationPageTabs.of("admin.members.list", "admin.discordregistrations", "admin.terms"),
         NavigationPageTabs.of(

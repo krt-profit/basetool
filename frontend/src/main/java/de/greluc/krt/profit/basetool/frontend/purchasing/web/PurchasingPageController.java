@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.purchasing.web;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingStateDt
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -98,6 +101,7 @@ public class PurchasingPageController {
   private final SupplyBackendClient supplyClient;
   private final PurchasingFeatureState featureState;
   private final QualityTierCatalog qualityTierCatalog;
+  private final LayoutContextLoader layoutContextLoader;
 
   /**
    * Reads what the caller may do in the purchasing module; a failed read answers nothing.
@@ -112,15 +116,15 @@ public class PurchasingPageController {
   }
 
   /**
-   * Decides which tabs the purchasing pages show.
+   * Decides which tabs the purchasing pages show, from the backend's tab flags of the request's
+   * layout read.
    *
-   * @param state the caller's capabilities
-   * @return the tabs to show
+   * @param request the current request, which carries the memoised layout read
+   * @return the tabs to show; none after a failed layout read
    */
   @ModelAttribute("purchasingTabs")
-  public @NotNull PurchasingTabs purchasingTabs(
-      @ModelAttribute("purchasingState") @NotNull PurchasingStateDto state) {
-    return PurchasingTabs.of(state);
+  public @NotNull PurchasingTabs purchasingTabs(@NotNull HttpServletRequest request) {
+    return PurchasingTabs.of(layoutContextLoader.capabilities(request));
   }
 
   /**
@@ -133,15 +137,20 @@ public class PurchasingPageController {
   public record PurchasingTabs(boolean partners, boolean delegates, boolean report) {
 
     /**
-     * Derives the tabs from what the caller may do.
+     * Reads the tabs from the backend's tab flags (REQ-UI-026), so the tab bar, the quick access
+     * and the navigation offer the same tabs.
      *
-     * @param state the caller's capabilities
+     * @param capabilities the caller's capability flags, or {@code null} when none were read
      * @return the partners for a delegate or a governing member, the delegates for a governing
-     *     member, the report for a caller who may read it
+     *     member, the report for a caller who may read it; none without flags
      */
-    public static @NotNull PurchasingTabs of(@NotNull PurchasingStateDto state) {
-      return new PurchasingTabs(
-          state.delegate() || state.governing(), state.governing(), state.canReadReport());
+    public static @NotNull PurchasingTabs of(@Nullable CapabilitiesResponse capabilities) {
+      return capabilities == null
+          ? new PurchasingTabs(false, false, false)
+          : new PurchasingTabs(
+              capabilities.canViewPurchasingPartners(),
+              capabilities.canViewPurchasingDelegates(),
+              capabilities.canViewPurchasingReport());
     }
   }
 

@@ -72,7 +72,6 @@ class DtoMirrorConsistencyTest {
           entry("AdminDeletionRequestDto", "DeletionRequestDto"),
           entry("DefaultBlueprintDto", "DefaultBlueprintResponse"),
           entry("MaterialCreateAjaxRequest", "MaterialCreateDto"),
-          entry("MemberEvaluationDto", "MemberEvaluationResponse"),
           entry("NotificationCountResponse", "NotificationUnreadCountDto"),
           entry("PersonSearchResultDto", "PersonSearchResult"),
           entry("PersonalBlueprintBatchResultDto", "PersonalBlueprintBatchResult"),
@@ -80,13 +79,7 @@ class DtoMirrorConsistencyTest {
           entry("PersonalBlueprintBulkDeleteResultDto", "PersonalBlueprintBulkDeleteResult"),
           entry("PersonalBlueprintDto", "PersonalBlueprintResponse"),
           entry("PersonalBlueprintRecipeDto", "PersonalBlueprintRecipeResponse"),
-          entry("PersonalInventoryItemDto", "PersonalInventoryItemResponse"),
-          entry("PromotionCategoryDto", "PromotionCategoryResponse"),
-          entry("PromotionEligibilityDto", "PromotionEligibilityResponse"),
-          entry("PromotionLevelContentDto", "PromotionLevelContentResponse"),
-          entry("PromotionRequirementCheckDto", "PromotionRequirementCheckResponse"),
-          entry("PromotionTopicDto", "PromotionTopicResponse"),
-          entry("RankRequirementDto", "RankRequirementResponse"));
+          entry("PersonalInventoryItemDto", "PersonalInventoryItemResponse"));
 
   /** Frontend records that deliberately have no backend record twin, each with its reason. */
   private static final Map<String, String> UNPAIRED_BY_DESIGN =

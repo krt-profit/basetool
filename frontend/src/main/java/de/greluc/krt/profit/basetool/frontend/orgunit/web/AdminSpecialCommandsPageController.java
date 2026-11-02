@@ -58,8 +58,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Controller for the admin Spezialkommando page ({@code /admin/special-commands}): list, create,
- * update, soft-delete and re-activate, plus the admin-only SK-lead toggle. Spezialkommandos carry
- * no promotion toggle.
+ * update, soft-delete and re-activate, plus the admin-only SK-lead toggle.
  *
  * <p>The SK member page is {@link SpecialCommandMembersPageController} (REQ-ORG-005).
  */

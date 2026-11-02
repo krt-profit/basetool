@@ -111,17 +111,6 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   List<UUID> findOrganisationsleitungIdsAmong(@Param("ids") Collection<UUID> ids);
 
   /**
-   * Narrows {@code ids} to the units that have the promotion subsystem switched on; a Bereich, a
-   * Spezialkommando and the Organisationsleitung never have it.
-   *
-   * @param ids the candidate org-unit ids; never {@code null} and non-empty
-   * @return the ids of {@code ids} with {@code is_promotion_enabled}; never {@code null}, possibly
-   *     empty
-   */
-  @Query("SELECT o.id FROM OrgUnit o WHERE o.id IN :ids AND o.isPromotionEnabled = true")
-  List<UUID> findPromotionEnabledIdsAmong(@Param("ids") Collection<UUID> ids);
-
-  /**
    * Id-only batch form of {@link #findChildOrgUnitIds(UUID)}: the direct children of any of {@code
    * parentOrgUnitIds}.
    *
