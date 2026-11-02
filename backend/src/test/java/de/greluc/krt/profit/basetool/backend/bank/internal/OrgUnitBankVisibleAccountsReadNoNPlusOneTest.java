@@ -95,7 +95,7 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
     stats.setStatisticsEnabled(true);
 
     stats.clear();
-    var page = query.listVisibleAccounts(PageRequest.of(0, 100));
+    var page = query.listVisibleAccounts(PageRequest.of(0, 1000));
     long statements = stats.getPrepareStatementCount();
 
     assertThat(page.getContent())
