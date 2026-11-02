@@ -22,14 +22,17 @@ package de.greluc.krt.profit.basetool.backend.scope.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -48,6 +51,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -61,6 +65,9 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
 
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
   @Autowired private AccessGateService accessGateService;
+  @Autowired private RequestScopeResolver requestScopeResolver;
+  @Autowired private OrgUnitMembershipQueryService membershipQueryService;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private BereichRepository bereichRepository;
   @Autowired private SquadronRepository squadronRepository;
@@ -138,7 +145,50 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     assertThat(reachOf(holder, false, squadron)).isEqualTo(new Reach(false, false, true));
   }
 
+  @Test
+  void theOversightSurfacesAndTheLeitungScopeOpenForASeatOnlyWithKrtMember() {
+    User holder = holder(squadron, MembershipRole.STAFFELLEITER, false, false);
+
+    authenticate(holder, true);
+    assertThat(requestScopeResolver.canAccessBlueprintOverview()).isTrue();
+    assertThat(requestScopeResolver.currentOversightScopeIgnoringPin().memberOrgUnitIds())
+        .contains(squadron.getId());
+
+    authenticate(holder, false);
+    assertThat(requestScopeResolver.canAccessBlueprintOverview()).isFalse();
+    assertThat(requestScopeResolver.currentOversightScopeIgnoringPin().memberOrgUnitIds())
+        .isEmpty();
+  }
+
+  @Test
+  @Transactional
+  void theExchangeLogisticianUnitsFollowTheSameRule() {
+    User seat = holder(bereich, MembershipRole.BEREICHSLEITER, false, false);
+    User flagged = holder(squadron, MembershipRole.MEMBER, true, false);
+
+    assertThat(membershipQueryService.findLogisticianOrgUnitIds(seat.getId())).isEmpty();
+    assertThat(membershipQueryService.findLogisticianOrgUnitIds(flagged.getId()))
+        .containsExactly(squadron.getId());
+
+    withStoredKrtMember(seat);
+    assertThat(membershipQueryService.findLogisticianOrgUnitIds(seat.getId()))
+        .contains(bereich.getId(), squadron.getId());
+  }
+
+  private void withStoredKrtMember(User user) {
+    user.getRoles().add(roleRepository.findByCodeIgnoreCase(Roles.KRT_MEMBER).orElseThrow());
+    userRepository.save(user);
+  }
+
   private Reach reachOf(User holder, boolean krtMember, OrgUnit unit) {
+    authenticate(holder, krtMember);
+    return new Reach(
+        accessGateService.canActAsOfficerIn(unit.getId()),
+        accessGateService.canManageMissionsOf(unit.getId()),
+        accessGateService.canActAsLogisticianIn(unit.getId()));
+  }
+
+  private void authenticate(User holder, boolean krtMember) {
     Set<Role> roles = krtMember ? Set.of(namedRole("KRT Member")) : Set.of();
     List<GrantedAuthority> authorities = new ArrayList<>(converter.assembleFor(holder, roles));
     SecurityContextHolder.getContext()
@@ -151,10 +201,6 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
                 authorities));
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
-    return new Reach(
-        accessGateService.canActAsOfficerIn(unit.getId()),
-        accessGateService.canManageMissionsOf(unit.getId()),
-        accessGateService.canActAsLogisticianIn(unit.getId()));
   }
 
   private User holder(

@@ -372,7 +372,7 @@ public class CustomJwtGrantedAuthoritiesConverter
    *       memberships; a rank confers them, and the cascade below applies, only while the holder
    *       holds {@code KRT Member}, whereas the explicit flags always apply;
    *   <li>a contextual {@code LOGISTICIAN} for each membership's own org unit where {@link
-   *       OrgUnitMembership#isLogisticianOfOwnUnit()} holds, and a contextual {@code
+   *       OrgUnitMembership#isLogisticianOfOwnUnit(boolean)} holds, and a contextual {@code
    *       MISSION_MANAGER} per flag or own-unit officer rank;
    *   <li>contextual authorities for the org units a leadership membership reaches downward, via
    *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)} (REQ-ORG-015).
@@ -392,7 +392,7 @@ public class CustomJwtGrantedAuthoritiesConverter
 
     boolean seatsConfer = authorities.contains(KRT_MEMBER_AUTHORITY);
     boolean anyLogistician =
-        memberships.stream().anyMatch(m -> isLogisticianOfOwnUnit(m, seatsConfer));
+        memberships.stream().anyMatch(m -> m.isLogisticianOfOwnUnit(seatsConfer));
     boolean anyMissionManager =
         memberships.stream()
             .anyMatch(m -> m.isMissionManager() || (seatsConfer && confersFlatOfficerRole(m)));
@@ -407,7 +407,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     Set<GrantedAuthority> contextual = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
       UUID orgUnitId = m.getId().getOrgUnitId();
-      if (isLogisticianOfOwnUnit(m, seatsConfer)) {
+      if (m.isLogisticianOfOwnUnit(seatsConfer)) {
         contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId));
       }
       if (m.isMissionManager() || (seatsConfer && m.getRole().confersOwnUnitOfficerReach())) {
@@ -422,18 +422,6 @@ public class CustomJwtGrantedAuthoritiesConverter
       }
     }
     authorities.addAll(contextual);
-  }
-
-  /**
-   * Whether {@code m} makes its holder Logistician of its own unit: the explicit flag, or a rank
-   * while its holder holds {@code KRT Member} (REQ-SEC-015).
-   *
-   * @param m the membership row
-   * @param seatsConfer whether the holder holds {@code KRT Member}
-   * @return {@code true} iff the flag is set, or the rank confers it and {@code seatsConfer}
-   */
-  private static boolean isLogisticianOfOwnUnit(@NonNull OrgUnitMembership m, boolean seatsConfer) {
-    return m.isLogistician() || (seatsConfer && confersFlatOfficerRole(m));
   }
 
   /**

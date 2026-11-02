@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -179,7 +181,7 @@ class LogisticianRoleTest {
             .header("alg", "none")
             .claim("sub", userId.toString())
             .claim("preferred_username", "sk_lead_user")
-            .claim("realm_access", java.util.Map.of("roles", java.util.List.of("KRT Member")))
+            .claim("realm_access", Map.of("roles", List.of("KRT Member")))
             .build();
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);

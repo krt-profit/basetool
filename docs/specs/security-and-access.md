@@ -1271,7 +1271,10 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029): the
   authority converter then mints no rank-derived `LOGISTICIAN` / `MISSION_MANAGER` authority, flat
   or contextual, and no cascaded one; only the explicit `is_logistician` / `is_mission_manager`
-  flags stay in force. **Enforced by:** `RetainedSeatWithoutKrtMemberIntegrationTest`,
+  flags stay in force. The same holds wherever else a rank is read: the exchange's Logistician
+  units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`), the oversight scope of the
+  blueprint overview and the org-unit bank balances, and the Leitung page.
+  **Enforced by:** `RetainedSeatWithoutKrtMemberIntegrationTest`,
   `CustomJwtGrantedAuthoritiesConverterTest`.
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
