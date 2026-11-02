@@ -1,4 +1,4 @@
-# ADR-0325 — The backend serves the dashboard widget catalogue, and widget fragments share one controller kind
+# ADR-0326 — The backend serves the dashboard widget catalogue, and widget fragments share one controller kind
 
 - **Status:** Accepted
 - **Date:** 2026-11-02

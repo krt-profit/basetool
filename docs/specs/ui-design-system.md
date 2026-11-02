@@ -2639,7 +2639,7 @@ board, catalogue dialog, options dialog and option defaults from that read, cach
 catalogues, and keeps only what depends on the caller: the gate (roles and flags), the endpoint
 segment and the message key per widget type. A widget type the backend serves without a frontend
 gate fails the build, and the golden file `dashboard-catalogue.json` pins the matrix below for both
-modules (ADR-0325).
+modules (ADR-0326).
 
 **Instances.** A widget may be added more than once; at most **12 instances per mode**, enforced
 by the backend. Each instance renders only for a user allowed to read its data.

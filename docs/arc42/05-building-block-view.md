@@ -352,7 +352,7 @@ anywhere else.
 
 The `navigation` domain holds the entry registry (`NavigationRegistry`, the one list of pages, tabs
 and groups with their gates), the personalisation reads and relays, the phone tab-bar and start-page
-resolvers and the redirects of the former URLs; the `dashboard` domain holds the frontend's mirror of the backend's widget catalogue (ADR-0325),
+resolvers and the redirects of the former URLs; the `dashboard` domain holds the frontend's mirror of the backend's widget catalogue (ADR-0326),
 the board reader and one fragment endpoint per widget, declared with `kernel.web`'s
 `@FragmentController` (REQ-UI-026, REQ-UI-032, REQ-UI-034).
 
