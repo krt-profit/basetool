@@ -124,7 +124,6 @@ class UserDeletionEndStateTest {
   private ShipType shipType;
   private Squadron squadron;
   private UUID ruleId;
-  private UUID categoryId;
 
   @Test
   void deletingAMember_purgesReassignsAndUnlinksEveryStore_andLeavesAnotherMemberUntouched() {
@@ -157,7 +156,6 @@ class UserDeletionEndStateTest {
     assertThat(count("personal_blueprint", "owner_user_id", leaverId)).isZero();
     assertThat(count("notification", "recipient_user_id", leaverId)).isZero();
     assertThat(count("notification_rule_selector", "user_id", leaverId)).isZero();
-    assertThat(count("member_evaluation", "user_id", leaverId)).isZero();
     assertThat(count("material_exchange_offer", "owner_id", leaverId)).isZero();
     assertThat(count("job_order_assignees", "user_id", leaverId)).isZero();
     assertThat(count("mission_managers", "user_id", leaverId)).isZero();
@@ -198,7 +196,6 @@ class UserDeletionEndStateTest {
     assertThat(count("personal_blueprint", "owner_user_id", stayerId)).isEqualTo(1);
     assertThat(count("notification", "recipient_user_id", stayerId)).isEqualTo(1);
     assertThat(count("notification_rule_selector", "user_id", stayerId)).isEqualTo(1);
-    assertThat(count("member_evaluation", "user_id", stayerId)).isEqualTo(1);
     assertThat(count("material_exchange_offer", "owner_id", stayerId)).isEqualTo(1);
     assertThat(count("job_order_assignees", "user_id", stayerId)).isEqualTo(1);
     assertThat(count("mission_managers", "user_id", stayerId)).isEqualTo(1);
@@ -219,13 +216,13 @@ class UserDeletionEndStateTest {
                 + " fromUser="
                 + leaverId,
             "PERSONAL_DATA_PURGED_ON_USER_DELETION|reason=user-deletion personalInventory=1"
-                + " blueprints=2 notifications=3 ruleSelectors=1 evaluations=1",
+                + " blueprints=2 notifications=3 ruleSelectors=1",
             "REFINERY_ORDERS_REASSIGNED|reason=user-deletion rows=2 fromUser="
                 + leaverId
                 + " toAdmin="
                 + newOwner,
             "USER_DELETED|inventoryRows=2 ships=3 personalInventory=1 blueprints=2 notifications=3"
-                + " ruleSelectors=1 evaluations=1 refineryOrdersReassignedTo="
+                + " ruleSelectors=1 refineryOrdersReassignedTo="
                 + newOwner));
   }
 
@@ -247,7 +244,7 @@ class UserDeletionEndStateTest {
         before,
         List.of(
             "USER_DELETED|inventoryRows=0 ships=0 personalInventory=0 blueprints=0"
-                + " notifications=0 ruleSelectors=0 evaluations=0 refineryOrdersReassignedTo="
+                + " notifications=0 ruleSelectors=0 refineryOrdersReassignedTo="
                 + adminId));
   }
 
@@ -348,19 +345,6 @@ class UserDeletionEndStateTest {
     shipType.setManufacturer(manufacturer);
     shipTypeRepository.save(shipType);
     ruleId = jdbc.queryForObject("SELECT id FROM notification_rule LIMIT 1", UUID.class);
-    UUID topicId = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO promotion_topic (id, name, sort_order, owning_squadron_id)"
-            + " VALUES (?, ?, 0, ?)",
-        topicId,
-        "End Topic " + tag,
-        Squadron.IRIDIUM_ID);
-    categoryId = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO promotion_category (id, topic_id, name, sort_order) VALUES (?, ?, ?, 0)",
-        categoryId,
-        topicId,
-        "End Category " + tag);
   }
 
   /**
@@ -446,12 +430,6 @@ class UserDeletionEndStateTest {
         UUID.randomUUID(),
         ruleId,
         owner.getId());
-    jdbc.update(
-        "INSERT INTO member_evaluation (id, user_id, category_id, assigned_level)"
-            + " VALUES (?, ?, ?, 'LEVEL_A')",
-        UUID.randomUUID(),
-        owner.getId(),
-        categoryId);
     Seeded seeded = new Seeded();
     for (int i = 0; i < refineryOrders; i++) {
       RefineryOrder order = new RefineryOrder();

@@ -39,7 +39,6 @@
                             <th th:text="#{admin.squadron.name}">Name</th>
                             <th th:text="#{admin.squadron.shorthand}">K&uuml;rzel</th>
                             <th th:text="#{admin.squadron.description}">Beschreibung</th>
-                            <th th:text="#{admin.settings.squadron.column.promotion}">Bef&ouml;rderung aktiv</th>
                             <th th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
                             <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
                         </tr>
@@ -51,15 +50,6 @@
                             </td>
                             <td th:attr="data-label=#{admin.squadron.shorthand}" th:text="${sq.shorthand}">K&uuml;rzel</td>
                             <td class="md-desc" th:text="${sq.description}">Desc</td>
-                            <td th:attr="data-label=#{admin.settings.squadron.column.promotion}">
-                                <label class="krt-switch">
-                                    <input type="checkbox" role="switch" class="squadron-promotion-toggle"
-                                           th:attr="data-squadron-id=${sq.id}"
-                                           th:aria-label="|#{admin.settings.squadron.column.promotion}: ${sq.shorthand}|"
-                                           th:checked="${sq.isPromotionEnabled}" th:disabled="${!sq.active}">
-                                    <span class="toggle-state-text" th:text="${sq.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
-                                </label>
-                            </td>
                             <td th:attr="data-label=#{admin.settings.squadron.column.profit}">
                                 <label class="krt-switch">
                                     <input type="checkbox" role="switch" class="squadron-profit-toggle"
@@ -147,10 +137,6 @@
         error:   /*[[#{notification.error.save}]]*/ '',
         createTitle: /*[[#{admin.squadron.create}]]*/ '',
         editTitle:   /*[[#{admin.edit}]]*/ '',
-        promotionOn:  /*[[#{admin.settings.squadron.promotion.enabled}]]*/ '',
-        promotionOff: /*[[#{admin.settings.squadron.promotion.disabled}]]*/ '',
-        promotionSaved: /*[[#{admin.settings.squadron.promotion.saved}]]*/ '',
-        promotionError: /*[[#{admin.settings.squadron.promotion.error}]]*/ '',
         profitOn:  /*[[#{admin.settings.squadron.profit.enabled}]]*/ '',
         profitOff: /*[[#{admin.settings.squadron.profit.disabled}]]*/ '',
         profitSaved: /*[[#{admin.settings.squadron.profit.saved}]]*/ '',

@@ -29,8 +29,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
  * represents.
  *
  * <p>The names are referenced literally by database CHECK constraints, triggers and the
- * {@code @DiscriminatorValue}s, so a rename needs a coordinated migration. Only {@link #SQUADRON}
- * may carry the promotion subsystem.
+ * {@code @DiscriminatorValue}s, so a rename needs a coordinated migration.
  */
 public enum OrgUnitKind {
 
@@ -40,20 +39,19 @@ public enum OrgUnitKind {
   /**
    * The Spezialkommando tenant — a cross-cutting unit that members may join on top of their
    * Squadron membership, or instead of one. Mapped to {@code org_unit.kind = 'SPECIAL_COMMAND'} via
-   * {@code @DiscriminatorValue} on {@link SpecialCommand}. Permanently barred from the promotion
-   * subsystem by the database CHECK constraint introduced in V94.
+   * {@code @DiscriminatorValue} on {@link SpecialCommand}.
    */
   SPECIAL_COMMAND,
 
   /**
    * The Bereich tenant, one level above Staffeln and Spezialkommandos (REQ-ORG-014), mapped to
-   * {@link Bereich}; groups its child units and never carries promotion.
+   * {@link Bereich}; groups its child units.
    */
   BEREICH,
 
   /**
    * The Organisationsleitung tenant at the top of the hierarchy (REQ-ORG-014), mapped to {@link
-   * Organisationsleitung}; has no parent and never carries promotion.
+   * Organisationsleitung}; has no parent.
    */
   ORGANISATIONSLEITUNG;
 

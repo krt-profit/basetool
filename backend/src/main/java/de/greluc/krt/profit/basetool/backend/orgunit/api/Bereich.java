@@ -30,22 +30,11 @@ import org.jetbrains.annotations.NotNull;
  *
  * <p>Groups Staffeln and SKs as children and sits below the {@link Organisationsleitung}; its
  * leadership gets a cascading, officer-equivalent scope over the children, no admin rights.
- * Promotion is always disabled, so the constructor sets the inherited flag to {@code false}.
  */
 @Entity
 @DiscriminatorValue("BEREICH")
 @ToString(callSuper = true)
 public class Bereich extends OrgUnit {
-
-  /**
-   * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}
-   * flag to {@code false} before Hibernate flushes the row — the {@link OrgUnit} default of {@code
-   * true} would otherwise violate the {@code chk_org_unit_promotion_only_squadron} CHECK. The
-   * bypass through {@link #setPromotionEnabled} writes directly via the inherited setter.
-   */
-  public Bereich() {
-    super.setPromotionEnabled(false);
-  }
 
   /**
    * Returns {@link OrgUnitKind#BEREICH} so the abstract base contract is satisfied without an
@@ -58,34 +47,5 @@ public class Bereich extends OrgUnit {
   @Override
   public OrgUnitKind getKind() {
     return OrgUnitKind.BEREICH;
-  }
-
-  /**
-   * Returns {@code false} unconditionally, overriding {@link OrgUnit#isPromotionEnabled()} so
-   * callers reading the flag on a Bereich instance always see the DB invariant — the promotion
-   * subsystem is permanently off for Bereiche.
-   *
-   * @return always {@code false}.
-   */
-  @Override
-  public boolean isPromotionEnabled() {
-    return false;
-  }
-
-  /**
-   * Refuses to enable promotion on a Bereich.
-   *
-   * @param value the requested flag value; must be {@code false}
-   * @throws IllegalArgumentException when {@code value} is {@code true}
-   */
-  @Override
-  public void setPromotionEnabled(boolean value) {
-    if (value) {
-      throw new IllegalArgumentException(
-          "Promotion cannot be enabled on a Bereich — the kind = 'BEREICH' rows are barred from the"
-              + " promotion subsystem by the chk_org_unit_promotion_only_squadron CHECK"
-              + " constraint");
-    }
-    super.setPromotionEnabled(false);
   }
 }

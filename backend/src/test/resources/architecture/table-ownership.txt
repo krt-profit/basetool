@@ -70,7 +70,6 @@ material_exchange_request_interest materialexchange
 material_external_alias catalogue
 material_price catalogue
 member_blueprint_sharing blueprint
-member_evaluation promotion
 member_payout_setting mission
 mission mission
 mission_crew mission
@@ -102,9 +101,6 @@ personal_blueprint blueprint
 personal_inventory_item personalinventory
 planet catalogue
 poi catalogue
-promotion_category promotion
-promotion_level_content promotion
-promotion_topic promotion
 purchasing_deal purchasing
 purchasing_deal_delivery purchasing
 purchasing_deal_settlement purchasing
@@ -117,7 +113,6 @@ purchasing_setting_allowed_tier purchasing
 purchasing_setting_governing_area purchasing
 purchasing_unit_pause purchasing
 quality_tier catalogue
-rank_requirement promotion
 refinery_good refinery
 refinery_order refinery
 refinery_yield catalogue

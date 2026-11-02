@@ -360,24 +360,6 @@ public class UserService {
   }
 
   /**
-   * Returns the squadron members the promotion system evaluates within {@code scope}, excluding
-   * admins and leadership-seat holders; delegates to {@link
-   * UserRepository#findEvaluatableMembers(java.util.Collection, Pageable)}.
-   *
-   * @param scope the Staffel ids whose members to list, empty for none, or {@code null} for every
-   *     Staffel
-   * @param pageable page request
-   * @return paged evaluatable members
-   */
-  @NotNull
-  public Page<User> findEvaluatableMembers(@Nullable Set<UUID> scope, @NotNull Pageable pageable) {
-    if (scope != null && scope.isEmpty()) {
-      return Page.empty(pageable);
-    }
-    return userRepository.findEvaluatableMembers(scope, pageable);
-  }
-
-  /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
    * Squadron-scoped via {@link SquadronVisibility#currentUserListScopeSquadronIds()} — a non-admin
    * sees the members of every Staffel they belong to in pickers (REQ-ORG-017).

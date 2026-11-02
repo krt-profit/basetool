@@ -26,8 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Wire shape for {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich} (REQ-ORG-014).
- * Like {@link SpecialCommandDto} plus the {@code parentOrgUnitId} link, without profit eligibility
- * or promotion.
+ * Like {@link SpecialCommandDto} plus the {@code parentOrgUnitId} link, without profit eligibility.
  *
  * @param id Bereich identifier; {@code null} on create requests, populated on responses.
  * @param name display name; case-insensitive unique across all org-unit kinds; required, max 255.

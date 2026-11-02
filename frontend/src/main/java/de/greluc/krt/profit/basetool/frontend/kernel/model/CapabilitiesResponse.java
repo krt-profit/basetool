@@ -37,18 +37,12 @@ package de.greluc.krt.profit.basetool.frontend.kernel.model;
  *     (REQ-INV-053); a server switch, the same for every caller
  * @param hasOfficerReach whether the caller holds officer reach in the active context
  * @param canOpenLeitung whether the Leitung page is offered in the active context
- * @param canManagePromotions whether promotion management is offered in the active context: officer
- *     reach in a unit with promotion enabled
  * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
  * @param canManageJobOrders whether the officer job-order writes are offered in the active context
  * @param canManageMissionFinance whether mission finance and owner change are offered in the active
  *     context
  * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
  *     whatever unit is pinned
- * @param canManagePromotionsAnywhere whether the caller manages promotions in at least one unit
- *     with promotion enabled, whatever unit is pinned
- * @param canUsePromotionAnywhere whether the caller belongs to or reaches at least one unit with
- *     promotion enabled, whatever unit is pinned
  * @param canViewSupplyIncoming whether „Eingehende Spenden" is offered: the supply surface is on
  *     and the caller manages an active unit that accepts donations
  * @param canViewSupplyStats whether the donation statistics are offered: the supply surface is on
@@ -74,13 +68,10 @@ public record CapabilitiesResponse(
     boolean canMarkStolen,
     boolean hasOfficerReach,
     boolean canOpenLeitung,
-    boolean canManagePromotions,
     boolean canSeeHangarOwnerDetails,
     boolean canManageJobOrders,
     boolean canManageMissionFinance,
     boolean canActAsOfficerAnywhere,
-    boolean canManagePromotionsAnywhere,
-    boolean canUsePromotionAnywhere,
     boolean canViewSupplyIncoming,
     boolean canViewSupplyStats,
     boolean canViewPurchasingPartners,
@@ -94,7 +85,7 @@ public record CapabilitiesResponse(
   public static final CapabilitiesResponse NONE =
       new CapabilitiesResponse(
           false, false, false, false, false, false, false, false, false, false, false, false, false,
-          false, false, false, false, false, false, false, false, false, false, false);
+          false, false, false, false, false, false, false, false);
 
   /**
    * Every role-derived capability on, as an admin passes each gate; the server switch, the tab
@@ -112,9 +103,6 @@ public record CapabilitiesResponse(
         true,
         true,
         backend.canMarkStolen(),
-        true,
-        true,
-        true,
         true,
         true,
         true,

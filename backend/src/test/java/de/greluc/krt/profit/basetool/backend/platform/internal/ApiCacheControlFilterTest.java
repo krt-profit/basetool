@@ -110,8 +110,7 @@ class ApiCacheControlFilterTest {
         "/api/v1/inventory/aggregated",
         "/api/v1/hangar/my-ships",
         "/api/v1/refinery-orders/my-orders",
-        "/api/v1/refinery-orders/all",
-        "/api/v1/promotion/eligibility/my"
+        "/api/v1/refinery-orders/all"
       })
   void memberFinancialAndPersonalFamilies_areNeverStored(String uri) throws Exception {
     assertEquals("private, no-store", run("GET", uri).getHeader(CACHE_CONTROL));

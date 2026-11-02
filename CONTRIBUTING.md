@@ -691,7 +691,7 @@ commit of the branch and to the PR title.
 ```
 
 - **`<type>`** — one of `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `style`, `build`, `ci`, `perf`. Add a `!` (e.g. `feat!`) for breaking changes, or use a `BREAKING CHANGE:` footer.
-- **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `multi-tenant`, `db/V80`, `frontend/orders`, `admin/uex`, `operations`, `missions`, `materials`, `promotion`, `actions`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
+- **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `multi-tenant`, `db/V80`, `frontend/orders`, `admin/uex`, `operations`, `missions`, `materials`, `actions`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
 - **`<short summary>`** — imperative mood (*"add foo"*, not *"added foo"* or *"adds foo"*), lower-case start, no trailing period, ≤ 72 characters including the prefix.
 - **Body** — explain the *why*. Reference Issues / PRs (`closes #123`, `refs #456`). Keep lines ≤ 100 characters.
 - **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, and — required on every commit — the `Signed-off-by:` trailer from `git commit -s` (see [DCO sign-off](#developer-certificate-of-origin-dco-sign-off)). A commit an AI agent authored also names the agent and its model, e.g. `Co-Authored-By: Codex <Model> <noreply@openai.com>` ([`docs/agents/git-and-commits.md`](docs/agents/git-and-commits.md)).

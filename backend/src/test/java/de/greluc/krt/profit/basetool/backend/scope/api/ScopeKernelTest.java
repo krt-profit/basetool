@@ -2421,7 +2421,7 @@ class ScopeKernelTest {
     private static final String KRT_MEMBER_AUTHORITY = "ROLE_KRT_MEMBER";
 
     private void stubCaller(boolean krtMember, OrgUnitMembership... memberships) {
-      when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole(KRT_MEMBER_AUTHORITY)).thenReturn(krtMember);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       lenient()
@@ -2498,17 +2498,19 @@ class ScopeKernelTest {
     }
 
     @Test
-    void readScope_seatInA_memberOfB_unpinned_isAOnly() {
+    void officerReachNarrowedToPin_seatInA_memberOfB_unpinned_isAOnly() {
       stubCaller(
           true,
           rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
           staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
 
-      assertEquals(Set.of(SQUADRON_A_ID), requestScopeResolver.currentOfficerReadScope());
+      assertEquals(
+          Set.of(SQUADRON_A_ID),
+          requestScopeResolver.narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds()));
     }
 
     @Test
-    void readScope_pinnedToAUnitWithReach_isThatUnit() {
+    void officerReachNarrowedToPin_pinnedToAUnitWithReach_isThatUnit() {
       stubCaller(
           true,
           rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
@@ -2516,11 +2518,13 @@ class ScopeKernelTest {
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
 
-      assertEquals(Set.of(SQUADRON_A_ID), requestScopeResolver.currentOfficerReadScope());
+      assertEquals(
+          Set.of(SQUADRON_A_ID),
+          requestScopeResolver.narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds()));
     }
 
     @Test
-    void readScope_pinnedToAUnitWithoutReach_isEmpty() {
+    void officerReachNarrowedToPin_pinnedToAUnitWithoutReach_isEmpty() {
       stubCaller(
           true,
           rankedStaffelSeat(SQUADRON_A_ID, MembershipRole.ENSIGN),
@@ -2528,11 +2532,14 @@ class ScopeKernelTest {
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
-      assertTrue(requestScopeResolver.currentOfficerReadScope().isEmpty());
+      assertTrue(
+          requestScopeResolver
+              .narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds())
+              .isEmpty());
     }
 
     @Test
-    void readScope_pinnedToABereichWithASeat_widensToItsCascade() {
+    void officerReachNarrowedToPin_pinnedToABereichWithASeat_widensToItsCascade() {
       UUID bereichId = UUID.randomUUID();
       UUID skId = UUID.randomUUID();
       OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
@@ -2544,11 +2551,12 @@ class ScopeKernelTest {
           .thenReturn(bereichId.toString());
 
       assertEquals(
-          Set.of(bereichId, SQUADRON_A_ID, skId), requestScopeResolver.currentOfficerReadScope());
+          Set.of(bereichId, SQUADRON_A_ID, skId),
+          requestScopeResolver.narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds()));
     }
 
     @Test
-    void readScope_pinnedToAUnitBelowTheSeat_isThatUnitOnly() {
+    void officerReachNarrowedToPin_pinnedToAUnitBelowTheSeat_isThatUnitOnly() {
       UUID bereichId = UUID.randomUUID();
       OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
       seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
@@ -2558,7 +2566,9 @@ class ScopeKernelTest {
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
 
-      assertEquals(Set.of(SQUADRON_A_ID), requestScopeResolver.currentOfficerReadScope());
+      assertEquals(
+          Set.of(SQUADRON_A_ID),
+          requestScopeResolver.narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds()));
     }
 
     @Test
@@ -2578,26 +2588,13 @@ class ScopeKernelTest {
     }
 
     @Test
-    void readScope_plainMember_isEmpty() {
+    void officerReachNarrowedToPin_plainMember_isEmpty() {
       stubCaller(true, staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
 
-      assertTrue(requestScopeResolver.currentOfficerReadScope().isEmpty());
-    }
-
-    @Test
-    void readScope_adminUnpinned_isUnrestricted() {
-      when(authHelper.isAdmin()).thenReturn(true);
-
-      assertNull(requestScopeResolver.currentOfficerReadScope());
-    }
-
-    @Test
-    void readScope_adminPinned_isThePin() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_B_ID.toString());
-
-      assertEquals(Set.of(SQUADRON_B_ID), requestScopeResolver.currentOfficerReadScope());
+      assertTrue(
+          requestScopeResolver
+              .narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds())
+              .isEmpty());
     }
 
     @Test

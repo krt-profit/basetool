@@ -59,7 +59,6 @@ class OfficerSurfaceGateTest {
     OfficerSurfaceGate gate = gate();
 
     assertThat(gate.canOpenLeitung()).isTrue();
-    assertThat(gate.canManagePromotions()).isTrue();
     assertThat(gate.hasOfficerReach()).isTrue();
   }
 
@@ -70,7 +69,6 @@ class OfficerSurfaceGateTest {
     OfficerSurfaceGate gate = gate();
 
     assertThat(gate.canOpenLeitung()).isTrue();
-    assertThat(gate.canManagePromotions()).isTrue();
     assertThat(gate.hasOfficerReach()).isTrue();
   }
 
@@ -81,7 +79,6 @@ class OfficerSurfaceGateTest {
     OfficerSurfaceGate gate = gate();
 
     assertThat(gate.canOpenLeitung()).isFalse();
-    assertThat(gate.canManagePromotions()).isFalse();
     assertThat(gate.hasOfficerReach()).isFalse();
   }
 
@@ -89,6 +86,7 @@ class OfficerSurfaceGateTest {
   void aFailedBackendReadFailsClosed() {
     backendOffers(CapabilitiesResponse.NONE);
 
-    assertThat(gate().canManagePromotions()).isFalse();
+    assertThat(gate().canOpenLeitung()).isFalse();
+    assertThat(gate().hasOfficerReach()).isFalse();
   }
 }

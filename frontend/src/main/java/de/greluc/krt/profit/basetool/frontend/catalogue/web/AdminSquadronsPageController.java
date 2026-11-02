@@ -58,8 +58,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Controller for the Staffeln tab of the organisation structure ({@code
  * /admin/org-structure/squadrons}): the squadron catalogue with create, update, soft delete and
- * re-activate, and the per-squadron switches for the promotion system and job-order processing
- * (REQ-UI-026, REQ-ADMIN-001).
+ * re-activate, and the per-squadron switch for job-order processing (REQ-UI-026, REQ-ADMIN-001).
  */
 @Controller
 @UsesLayoutModel
@@ -126,7 +125,6 @@ public class AdminSquadronsPageController {
                     s.shorthand(),
                     s.description(),
                     Boolean.TRUE.equals(s.active()),
-                    Boolean.TRUE.equals(s.isPromotionEnabled()),
                     Boolean.TRUE.equals(s.isProfitEligible()),
                     versionOrZero(s.version())))
             .collect(Collectors.toCollection(ArrayList::new));
@@ -159,8 +157,7 @@ public class AdminSquadronsPageController {
     }
     try {
       SquadronDto body =
-          new SquadronDto(
-              null, form.name(), form.shorthand(), form.description(), true, true, false, 0L);
+          new SquadronDto(null, form.name(), form.shorthand(), form.description(), true, false, 0L);
       catalogueClient.createSquadron(body);
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -201,14 +198,7 @@ public class AdminSquadronsPageController {
     try {
       SquadronDto body =
           new SquadronDto(
-              id,
-              form.name(),
-              form.shorthand(),
-              form.description(),
-              true,
-              true,
-              false,
-              form.version());
+              id, form.name(), form.shorthand(), form.description(), true, false, form.version());
       catalogueClient.updateSquadron(id, body);
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -289,7 +279,7 @@ public class AdminSquadronsPageController {
     return okOrRelay(() ->
         catalogueClient.createSquadron(
             new SquadronDto(
-                null, form.name(), form.shorthand(), form.description(), true, true, false, 0L)));
+                null, form.name(), form.shorthand(), form.description(), true, false, 0L)));
   }
 
   /**
@@ -318,7 +308,6 @@ public class AdminSquadronsPageController {
                 form.name(),
                 form.shorthand(),
                 form.description(),
-                true,
                 true,
                 false,
                 form.version())));

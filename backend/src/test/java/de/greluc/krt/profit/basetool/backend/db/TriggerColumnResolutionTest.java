@@ -69,7 +69,7 @@ class TriggerColumnResolutionTest {
           "trg_mission_exchange_change");
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
-  private static final int TRIGGER_FLOOR = 25;
+  private static final int TRIGGER_FLOOR = 23;
 
   /** Row variables and keywords that stand where a table name may otherwise be expected. */
   private static final Set<String> NOT_TABLES = Set.of("new", "old");

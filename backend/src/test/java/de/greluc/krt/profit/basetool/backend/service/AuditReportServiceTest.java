@@ -84,7 +84,6 @@ class AuditReportServiceTest {
           Map.entry(AuditDomain.MISSION, AuditEventType.MISSION_AUDIT_EXPORTED),
           Map.entry(AuditDomain.OPERATION, AuditEventType.OPERATION_AUDIT_EXPORTED),
           Map.entry(AuditDomain.ROLE, AuditEventType.ROLE_AUDIT_EXPORTED),
-          Map.entry(AuditDomain.PROMOTION, AuditEventType.PROMOTION_AUDIT_EXPORTED),
           Map.entry(AuditDomain.MARKET, AuditEventType.MARKET_AUDIT_EXPORTED),
           Map.entry(AuditDomain.HANGAR, AuditEventType.HANGAR_AUDIT_EXPORTED),
           Map.entry(AuditDomain.BLUEPRINT, AuditEventType.BLUEPRINT_AUDIT_EXPORTED),

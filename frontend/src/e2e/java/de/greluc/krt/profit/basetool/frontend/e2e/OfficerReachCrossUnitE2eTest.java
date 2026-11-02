@@ -20,11 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -32,11 +29,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Officer reach is bounded by the leadership seat (REQ-SEC-065, REQ-ORG-004): the Staffelleiter of
- * unit A is refused on unit B's mission, job order and inventory, and the officer member list shows
- * only A's members.
+ * unit A is refused on unit B's mission, job order and inventory.
  *
  * <p>{@code test-officer} leads a fresh Staffel A only; the canonical IRIDIUM squadron plays unit
- * B, with {@code test-member} as its ordinary member.
+ * B.
  */
 @Tag("e2e")
 class OfficerReachCrossUnitE2eTest {
@@ -48,8 +44,6 @@ class OfficerReachCrossUnitE2eTest {
   private static final String ADMIN_PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
   private static final String OFFICER_USER = "test-officer";
   private static final String OFFICER_PASSWORD = "test-officer-pw";
-  private static final String MEMBER_USER = "test-member";
-  private static final String MEMBER_PASSWORD = "test-member-pw";
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
 
   private static BackendSeeder seeder;
@@ -59,9 +53,8 @@ class OfficerReachCrossUnitE2eTest {
   private static String materialId;
   private static String locationId;
   private static String officerId;
-  private static String memberId;
 
-  /** Seats the officer in Staffel A and seeds a mission, a job order and a member in unit B. */
+  /** Seats the officer in Staffel A and seeds a mission and a job order in unit B. */
   @BeforeAll
   static void setUp() {
     if (!STACK.managesStack()) {
@@ -70,11 +63,9 @@ class OfficerReachCrossUnitE2eTest {
     seeder = new BackendSeeder();
     seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
     officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
-    memberId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
 
     staffelAId = seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Reach A", "ERCA");
     seeder.assignStaffelleiterSeat(ADMIN_USER, ADMIN_PASSWORD, officerId, staffelAId, true);
-    seeder.assignStaffelMembership(ADMIN_USER, ADMIN_PASSWORD, memberId, IRIDIUM_ID, false, false);
 
     missionBId = seeder.createMission(ADMIN_USER, ADMIN_PASSWORD, "E2E Reach B Mission", true);
     materialId = seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Reach Material");
@@ -120,20 +111,6 @@ class OfficerReachCrossUnitE2eTest {
         seeder.attemptCreateInventoryStatus(
             OFFICER_USER, OFFICER_PASSWORD, materialId, locationId, 700, 5, staffelAId);
     assertTrue(own >= 200 && own < 300, "the seat's own unit is accepted, was HTTP " + own);
-  }
-
-  /** Unpinned, the evaluation member list covers A and leaves B's members out. */
-  @Test
-  void evaluatableMembersExcludeBMembers() {
-    String path = "/api/v1/promotion/evaluations/members?size=200";
-    assertEquals(200, seeder.attemptGetStatus(OFFICER_USER, OFFICER_PASSWORD, path));
-    String body = seeder.getBody(OFFICER_USER, OFFICER_PASSWORD, path);
-    boolean listsB = false;
-    for (JsonElement row :
-        JsonParser.parseString(body).getAsJsonObject().getAsJsonArray("content")) {
-      listsB |= memberId.equals(row.getAsJsonObject().get("id").getAsString());
-    }
-    assertFalse(listsB, "a member of unit B must not appear in A's evaluation list");
   }
 
   /**

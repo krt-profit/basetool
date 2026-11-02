@@ -93,29 +93,6 @@ class AuditAdminControllerSecurityTest {
   }
 
   @Test
-  void auditLog_promotion_officer_isForbidden() throws Exception {
-    mockMvc
-        .perform(
-            get("/api/v1/audit/PROMOTION")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
-  void auditLog_promotion_admin_isAllowed() throws Exception {
-    when(auditService.getEvents(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Page.empty());
-    mockMvc
-        .perform(
-            get("/api/v1/audit/PROMOTION")
-                .with(
-                    jwt()
-                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
-        .andExpect(status().isOk());
-  }
-
-  @Test
   void auditExport_officer_isForbidden() throws Exception {
     mockMvc
         .perform(

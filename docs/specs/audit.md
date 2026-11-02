@@ -1,6 +1,6 @@
 # Activity audit logs — the unified admin audit trail
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 
 Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-BANK-012),
 [`observability.md`](observability.md) (the log-stream PII rule), [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -8,15 +8,14 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to thirteen more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to twelve more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
 Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
-**Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Beförderung** (the promotion
-catalogue + member gradings), **Materialbörse** (`MaterialExchangeOffer` /
+**Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Materialbörse** (`MaterialExchangeOffer` /
 `MaterialExchangeInterest`), **Hangar** (`Ship`), **Blueprints** (`PersonalBlueprint`,
 `DefaultBlueprint`), **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`) and **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`). Every
 activity in each area is captured into a separate, admin-only
-log; all fourteen logs (the thirteen here plus the bank's) are read on one page with a tab switcher, and
+log; all thirteen logs (the twelve here plus the bank's) are read on one page with a tab switcher, and
 each can be exported as a PDF or JSON for a chosen period.
 
 The generic areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
@@ -130,8 +129,8 @@ web, naming its client (REQ-AUDIT-005):
   (`REFINERY_ORDERS_REASSIGNED`).
 - **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user); and the
   purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
-  notifications, notification-rule selectors and promotion evaluations — as a single summary event
-  (`PERSONAL_DATA_PURGED_ON_USER_DELETION`, REQ-DATA-008) carrying the five row counts.
+  notifications and notification-rule selectors — as a single summary event
+  (`PERSONAL_DATA_PURGED_ON_USER_DELETION`, REQ-DATA-008) carrying the four row counts.
 - **Missionen** — mission create (incl. sub-mission; any goals/steps seeded on the create form each
   additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015) /
   edit (core, schedule, flags) / delete;
@@ -185,15 +184,6 @@ web, naming its client (REQ-AUDIT-005):
   that moves rows across two dozen tables, naming **both** account ids and the per-table counts, and
   never the callsign: a shared username is what makes a merge necessary, so writing it into the
   payload would put a member's handle in the trail.
-- **Beförderung** (`PromotionTopic` / `PromotionCategory` / `PromotionLevelContent` /
-  `RankRequirement` / `MemberEvaluation`) — every promotion-catalogue and member-grading mutation:
-  topic create / edit / delete; category create / edit / delete; level-content create / edit /
-  delete; rank-requirement create / edit / delete; and member-evaluation create / change / delete.
-  For catalogue events the subject is the mutated entity (its non-personal title / name / rank-step
-  label, e.g. `20->19`); for an evaluation the subject is the **graded category** (its
-  `topic / category` label) and the **evaluated member** is the target reference. The details
-  payload carries only the assigned `PromotionLevel` enum (evaluations) or the minimum level + count
-  (rank requirements) — never a user handle, a member name or the free-text rubric description.
 - **Materialbörse** (`MaterialExchangeOffer` / `MaterialExchangeInterest`, `AuditDomain.MARKET`,
   REQ-MARKET-008) — every trade-board mutation: offer release (`MARKET_OFFER_RELEASED`), offer
   edit — offered amount + remark (`MARKET_REMARK_UPDATED`), offer deactivate
@@ -461,7 +451,7 @@ audited (`basetool_navigation_preference_writes_total`, REQ-OBS-011).
 
 All thirteen logs are read on **one** admin page (`/admin/audit-log`) with a **tab switcher**
 (Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen ·
-Beförderung · Materialbörse · Hangar · Blueprints · Verbundene Anwendungen) built from the design-system `.tab-nav` component. The bank tab reads
+Materialbörse · Hangar · Blueprints · Verbundene Anwendungen · Bedarf & Spenden) built from the design-system `.tab-nav` component. The bank tab reads
 the existing `/api/v1/bank/admin/audit` endpoint; the generic area tabs read `/api/v1/audit/{domain}`;
 both DTO
 shapes are adapted into one uniform row view so a single

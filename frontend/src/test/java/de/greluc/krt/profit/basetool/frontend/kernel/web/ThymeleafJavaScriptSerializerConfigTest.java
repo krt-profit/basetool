@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -38,6 +37,16 @@ import org.thymeleaf.standard.serializer.IStandardJavaScriptSerializer;
  * with {@link Instant} timestamps serialize, and the XSS-protection escapes stay in place.
  */
 class ThymeleafJavaScriptSerializerConfigTest {
+
+  /**
+   * A page-bootstrap DTO shape with two {@link Instant} timestamps.
+   *
+   * @param id the row id
+   * @param name the display name
+   * @param createdAt the creation instant
+   * @param updatedAt the last-update instant
+   */
+  record StampedDto(UUID id, String name, Instant createdAt, Instant updatedAt) {}
 
   private final IStandardJavaScriptSerializer serializer =
       new ThymeleafJavaScriptSerializerConfig.JavaTimeAwareJavaScriptSerializer();
@@ -67,15 +76,10 @@ class ThymeleafJavaScriptSerializerConfigTest {
 
   @Test
   void serializeDtoWithInstantField_doesNotThrowAndContainsTimestamp() {
-    PromotionCategoryDto dto =
-        new PromotionCategoryDto(
+    StampedDto dto =
+        new StampedDto(
             UUID.randomUUID(),
-            1L,
-            UUID.randomUUID(),
-            "Topic",
             "Cat",
-            "Desc",
-            1,
             Instant.parse("2026-05-15T13:45:30Z"),
             Instant.parse("2026-05-15T13:45:31Z"));
 
@@ -89,26 +93,21 @@ class ThymeleafJavaScriptSerializerConfigTest {
 
   @Test
   void serializeMapOfListsOfDtos_reproducesOriginalFailureShapeWithoutThrowing() {
-    UUID topicId = UUID.randomUUID();
-    Map<String, List<PromotionCategoryDto>> categoriesByTopic =
+    UUID groupId = UUID.randomUUID();
+    Map<String, List<StampedDto>> byGroup =
         Map.of(
-            topicId.toString(),
+            groupId.toString(),
             List.of(
-                new PromotionCategoryDto(
+                new StampedDto(
                     UUID.randomUUID(),
-                    1L,
-                    topicId,
-                    "Topic",
                     "Cat",
-                    "Desc",
-                    1,
                     Instant.parse("2026-05-15T13:45:30Z"),
                     Instant.parse("2026-05-15T13:45:30Z"))));
 
     StringWriter writer = new StringWriter();
-    serializer.serializeValue(categoriesByTopic, writer);
+    serializer.serializeValue(byGroup, writer);
 
-    assertThat(writer.toString()).contains("2026-05-15T13:45:30Z").contains(topicId.toString());
+    assertThat(writer.toString()).contains("2026-05-15T13:45:30Z").contains(groupId.toString());
   }
 
   @Test

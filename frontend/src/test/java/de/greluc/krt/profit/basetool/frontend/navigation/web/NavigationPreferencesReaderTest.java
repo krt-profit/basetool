@@ -55,10 +55,10 @@ class NavigationPreferencesReaderTest {
   private static final NavigationAccess MEMBER =
       new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
 
-  private static final NavigationAccess MEMBER_OF_AN_ENABLED_UNIT =
+  private static final NavigationAccess OFFICER_ELSEWHERE =
       new NavigationAccess(
           Set.of("KRT_MEMBER"),
-          Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.PROMOTION_ANYWHERE));
+          Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.OFFICER_ANYWHERE));
 
   private NavigationBackendClient client;
   private NavigationPreferencesReader reader;
@@ -163,10 +163,11 @@ class NavigationPreferencesReaderTest {
   void keepsAContextOnlyOrderKey() {
     when(client.preferences())
         .thenReturn(
-            storedOrder(new OrderModeResponse(Map.of("unit", List.of("promotion.overview")), 1)));
+            storedOrder(
+                new OrderModeResponse(Map.of("unit", List.of("organisation.leadership")), 1)));
 
-    assertThat(reader.read(MEMBER_OF_AN_ENABLED_UNIT).order().member().links("unit"))
-        .containsExactly("promotion.overview");
+    assertThat(reader.read(OFFICER_ELSEWHERE).order().member().links("unit"))
+        .containsExactly("organisation.leadership");
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
   }
 
@@ -187,87 +188,50 @@ class NavigationPreferencesReaderTest {
   @Test
   @DisplayName("an entry only the active context refuses stays stored and renders unavailable")
   void keepsAContextOnlyGapGreyedAndStored() {
-    when(client.preferences()).thenReturn(stored(1, "promotion.overview"));
+    when(client.preferences()).thenReturn(stored(1, "organisation.leadership"));
 
-    NavigationFavourites favourites = reader.read(MEMBER_OF_AN_ENABLED_UNIT).favourites();
+    NavigationFavourites favourites = reader.read(OFFICER_ELSEWHERE).favourites();
 
     assertThat(favourites.member())
         .singleElement()
         .satisfies(item -> {
-          assertThat(item.entry().key()).isEqualTo("promotion.overview");
+          assertThat(item.entry().key()).isEqualTo("organisation.leadership");
           assertThat(item.available()).isFalse();
         });
-    assertThat(favourites.keys()).containsExactly("promotion.overview");
+    assertThat(favourites.keys()).containsExactly("organisation.leadership");
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
   }
 
   @Test
   @DisplayName("a leadership entry is deleted once the last seat is gone, kept while one remains")
   void deletesAFlagBasedEntryOnlyWhenTheRightIsLostEverywhere() {
-    when(client.preferences()).thenReturn(stored(2, "promotion.manage", "missions.list"));
-    when(client.prune(List.of("promotion.manage"))).thenReturn(stored(3, "missions.list"));
-    NavigationAccess seatElsewhere =
-        new NavigationAccess(
-            Set.of("KRT_MEMBER"),
-            Set.of(
-                NavigationFlag.LANGUAGE_DE,
-                NavigationFlag.PROMOTION_ANYWHERE,
-                NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE));
+    when(client.preferences()).thenReturn(stored(2, "organisation.leadership", "missions.list"));
+    when(client.prune(List.of("organisation.leadership"))).thenReturn(stored(3, "missions.list"));
+    NavigationFavourites kept = reader.read(OFFICER_ELSEWHERE).favourites();
 
-    NavigationFavourites kept = reader.read(seatElsewhere).favourites();
-
-    assertThat(kept.keys()).containsExactly("promotion.manage", "missions.list");
+    assertThat(kept.keys()).containsExactly("organisation.leadership", "missions.list");
     assertThat(kept.member().getFirst().available()).isFalse();
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
 
     NavigationFavourites pruned = reader.read(MEMBER).favourites();
 
-    verify(client).prune(List.of("promotion.manage"));
+    verify(client).prune(List.of("organisation.leadership"));
     assertThat(pruned.keys()).containsExactly("missions.list");
-  }
-
-  @Test
-  @DisplayName("promotion entries are deleted once no unit with promotion enabled is in reach")
-  void deletesPromotionEntriesWhenNoEnabledUnitIsInReach() {
-    when(client.preferences())
-        .thenReturn(stored(2, "promotion.overview", "promotion.manage", "missions.list"));
-    when(client.prune(List.of("promotion.overview", "promotion.manage")))
-        .thenReturn(stored(3, "missions.list"));
-    NavigationAccess officerOfDisabledUnitsOnly =
-        new NavigationAccess(
-            Set.of("KRT_MEMBER"),
-            Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.OFFICER_ANYWHERE));
-
-    NavigationFavourites favourites = reader.read(officerOfDisabledUnitsOnly).favourites();
-
-    verify(client).prune(List.of("promotion.overview", "promotion.manage"));
-    assertThat(favourites.keys()).containsExactly("missions.list");
-  }
-
-  @Test
-  @DisplayName("management entries are deleted while the overview stays for a plain member")
-  void deletesOnlyTheManagementEntryWhenNoManagingUnitIsInReach() {
-    when(client.preferences()).thenReturn(stored(2, "promotion.overview", "promotion.manage"));
-    when(client.prune(List.of("promotion.manage"))).thenReturn(stored(3, "promotion.overview"));
-
-    NavigationFavourites favourites = reader.read(MEMBER_OF_AN_ENABLED_UNIT).favourites();
-
-    verify(client).prune(List.of("promotion.manage"));
-    assertThat(favourites.keys()).containsExactly("promotion.overview");
   }
 
   @Test
   @DisplayName("without a capability answer no right counts as lost and nothing is deleted")
   void deletesNothingWhileTheRightsAreUnknown() {
-    when(client.preferences()).thenReturn(stored(2, "promotion.manage", "orders.list"));
+    when(client.preferences()).thenReturn(stored(2, "organisation.leadership", "orders.list"));
 
     NavigationFavourites favourites =
         reader
             .read(
-                new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.PROMOTION), false))
+                new NavigationAccess(
+                    Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE), false))
             .favourites();
 
-    assertThat(favourites.keys()).containsExactly("promotion.manage", "orders.list");
+    assertThat(favourites.keys()).containsExactly("organisation.leadership", "orders.list");
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
   }
 
@@ -379,11 +343,11 @@ class NavigationPreferencesReaderTest {
   @Test
   @DisplayName("a page the active context refuses stays hidden and renders unavailable")
   void keepsAHiddenContextGapStored() {
-    when(client.preferences()).thenReturn(storedHidden(1, "promotion.overview"));
+    when(client.preferences()).thenReturn(storedHidden(1, "supply.needs"));
 
-    NavigationHidden hidden = reader.read(MEMBER_OF_AN_ENABLED_UNIT).hidden();
+    NavigationHidden hidden = reader.read(MEMBER).hidden();
 
-    assertThat(hidden.keys()).containsExactly("promotion.overview");
+    assertThat(hidden.keys()).containsExactly("supply.needs");
     assertThat(hidden.member())
         .singleElement()
         .satisfies(item -> assertThat(item.available()).isFalse());

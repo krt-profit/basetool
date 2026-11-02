@@ -173,8 +173,8 @@ class MeLayoutSingleTransactionTest {
     UUID id = UUID.randomUUID();
     String shorthand = "T" + id.toString().substring(0, 7);
     jdbcTemplate.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE)",
         id,
         "Layout tabs " + id,
         shorthand);

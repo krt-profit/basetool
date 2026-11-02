@@ -99,13 +99,10 @@ class PersonSearchEndStateTest {
     VALID.put("bank_audit_event.event_type", "ACCOUNT_CREATED");
     VALID.put("org_chart_position.position_type", "COMMAND_LEAD");
     VALID.put("org_unit.kind", "ORGANISATIONSLEITUNG");
-    VALID.put("org_unit.is_promotion_enabled", Boolean.FALSE);
     VALID.put("org_chart_position.org_unit_id", UUID.randomUUID());
     VALID.put("bank_booking_request.counterparty_user_id", UUID.randomUUID());
     VALID.put("material_external_alias.source_system", "UEX");
     VALID.put("blueprint_external_alias.source_system", "SCMDB");
-    VALID.put("promotion_level_content.level", "LEVEL_A");
-    VALID.put("rank_requirement.minimum_level", "LEVEL_A");
     VALID.put("audit_event.domain", "JOB_ORDER");
     VALID.put("audit_event.event_type", "JOB_ORDER_CREATED");
     VALID.put("job_order.type", "MATERIAL");

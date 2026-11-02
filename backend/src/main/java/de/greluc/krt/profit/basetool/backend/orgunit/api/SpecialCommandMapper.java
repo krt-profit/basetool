@@ -25,14 +25,14 @@ import org.mapstruct.Mapping;
 
 /**
  * Maps between {@link SpecialCommand} entities and {@link SpecialCommandDto}, mirroring {@link
- * SquadronMapper} except that {@code isPromotionEnabled} is not exposed.
+ * SquadronMapper}.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface SpecialCommandMapper {
 
   /**
    * Maps a {@link SpecialCommand} to its DTO, including {@code isProfitEligible} but omitting audit
-   * fields and {@code isPromotionEnabled}.
+   * fields.
    *
    * @param entity the persisted entity
    * @return the DTO; never {@code null}
@@ -43,15 +43,14 @@ public interface SpecialCommandMapper {
   /**
    * Builds a new {@link SpecialCommand} entity from the DTO.
    *
-   * <p>Ignores the server-managed fields, {@code promotionEnabled}, {@code profitEligible} (changed
-   * only through its dedicated toggle endpoint) and the {@code parent} hierarchy link.
+   * <p>Ignores the server-managed fields, {@code profitEligible} (changed only through its
+   * dedicated toggle endpoint) and the {@code parent} hierarchy link.
    *
    * @param dto the inbound DTO; never {@code null}
    * @return a transient {@link SpecialCommand} ready to be saved
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  @Mapping(target = "promotionEnabled", ignore = true)
   @Mapping(target = "profitEligible", ignore = true)
   @Mapping(target = "parent", ignore = true)
   @Mapping(target = "department", ignore = true)

@@ -464,8 +464,8 @@ class ExchangeWireContractTest {
 
     UUID orgUnit = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, TRUE)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, TRUE)",
         orgUnit,
         "Wire unit " + orgUnit,
         "W" + orgUnit.toString().substring(0, 8));

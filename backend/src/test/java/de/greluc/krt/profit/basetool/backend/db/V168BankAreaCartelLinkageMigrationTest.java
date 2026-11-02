@@ -98,8 +98,8 @@ class V168BankAreaCartelLinkageMigrationTest {
   private static void insertOrgUnit(
       JdbcTemplate jdbc, UUID id, String kind, String name, String shorthand, UUID parentId) {
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, FALSE, ?)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, ?)",
         id,
         kind,
         name,
