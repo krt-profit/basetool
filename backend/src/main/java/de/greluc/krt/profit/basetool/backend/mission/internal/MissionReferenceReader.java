@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferences;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,12 +34,17 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Tells other modules the name, status and planned start of the missions they link to. */
+/**
+ * Tells other modules the name, status and planned start of the missions they link to; a mission
+ * the caller may not read (REQ-MISSION-008) comes back without name and planned start.
+ */
 @Component
 @RequiredArgsConstructor
 public class MissionReferenceReader implements MissionReferences {
 
   private final MissionRepository missionRepository;
+  private final MissionVisibility missionVisibility;
+  private final MissionMapper missionMapper;
 
   @Override
   @Transactional(readOnly = true)
@@ -45,8 +53,11 @@ public class MissionReferenceReader implements MissionReferences {
     if (ids.isEmpty()) {
       return byId;
     }
-    for (MissionReferenceDto reference : missionRepository.findReferencesByIdIn(ids)) {
-      byId.put(reference.id(), reference);
+    for (Mission mission : missionRepository.findAllById(ids)) {
+      MissionReferenceDto reference = missionMapper.toReferenceDto(mission);
+      byId.put(
+          reference.id(),
+          missionVisibility.canSeeMission(mission) ? reference : reference.withoutDetails());
     }
     return byId;
   }

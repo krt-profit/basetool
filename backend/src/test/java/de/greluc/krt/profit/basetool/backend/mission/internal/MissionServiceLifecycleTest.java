@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -101,7 +102,8 @@ class MissionServiceLifecycleTest {
             authHelperService,
             auditService,
             null,
-            mock(MissionNotificationPublisher.class));
+            mock(MissionNotificationPublisher.class),
+            mock(MissionVisibility.class));
   }
 
   private static final UUID MISSION_ID = UUID.randomUUID();
