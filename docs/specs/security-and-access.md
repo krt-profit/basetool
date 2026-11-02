@@ -445,8 +445,13 @@ alike, by `OrgUnitCascadeService#unitsBelow` behind
 set (`hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`,
 `canManageMissionsOf`, the supply and purchasing managed units, the exchange's
 `findLogisticianOrgUnitIds`), never the raw contextual authorities. A pin must lie in the covered
-set; a pin outside it covers nothing. Admins are unrestricted. **Enforced by:** `GrantCascadeTest`,
-`OrgUnitCascadeServiceTest`, `LogisticianPerUnitSurfacesTest`.
+set; a pin outside it covers nothing. Admins are unrestricted. The aggregate access checks read the
+same set: a Logistician grant covering a unit also opens the read and edit of that unit's Lager rows
+and refinery orders and the read of its job orders, and a Mission Manager grant the read of its
+internal missions and operations (`AccessGateService#canSeeSquadronAsGrantee`, `permitsOwnedRow` with
+the role), so the cascade needs no leadership seat to reach a child unit. **Enforced by:**
+`GrantCascadeTest`, `GrantCascadeAggregateAccessIntegrationTest`, `OrgUnitCascadeServiceTest`,
+`LogisticianPerUnitSurfacesTest`.
 
 Mission Manager powers apply **per unit**: a grant in unit A (own flag, an officer rank, or the
 cascaded reach of a Bereich or Organisationsleitung grant) manages A's missions and operations and

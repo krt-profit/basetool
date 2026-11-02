@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -100,7 +101,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
     if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
       return true;
     }
-    return ownerScopeService.canSeeSquadron(responsible.getId());
+    return ownerScopeService.canSeeSquadronAsGrantee(responsible.getId(), Roles.LOGISTICIAN);
   }
 
   /**

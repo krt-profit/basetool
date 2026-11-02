@@ -564,6 +564,18 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canSeeSquadronAsGrantee(UUID, String)}: whether the
+   * caller may read data owned by {@code squadronId} by membership or by a covering grant.
+   *
+   * @param squadronId the org-unit id whose data the caller wants to read; never {@code null}.
+   * @param roleName the contextual role of the surface; never {@code null}.
+   * @return {@code true} iff the caller sees the unit by membership or by a covering grant.
+   */
+  public boolean canSeeSquadronAsGrantee(@NotNull UUID squadronId, @NotNull String roleName) {
+    return accessGateService.canSeeSquadronAsGrantee(squadronId, roleName);
+  }
+
+  /**
    * Delegates to {@link AccessGateService#canEditSquadron(UUID)}: whether the caller may write data
    * owned by {@code squadronId}.
    *
@@ -609,5 +621,20 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean permitsOwnedRow(@Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit) {
     return accessGateService.permitsOwnedRow(owner, orgUnit, edit);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#permitsOwnedRow(User, OrgUnit, boolean, String)}: the
+   * per-row gate widened by a covering grant of {@code roleName}.
+   *
+   * @param owner the row's per-user owner, or {@code null}
+   * @param orgUnit the row's owning org unit; {@code null} marks an ownerless row
+   * @param edit {@code true} for the edit check, {@code false} for the read check
+   * @param roleName the contextual role of the surface; never {@code null}
+   * @return {@code true} iff the caller may access the row
+   */
+  public boolean permitsOwnedRow(
+      @Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit, @NotNull String roleName) {
+    return accessGateService.permitsOwnedRow(owner, orgUnit, edit, roleName);
   }
 }
