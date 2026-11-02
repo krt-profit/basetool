@@ -80,7 +80,7 @@ dieser Skill schreibt auf dem Host nichts und darf es auch nicht.
 > - Gib dem Nutzer den Befehl aus Schritt 1 (mit `--month` und `--host`) zum Ausführen in
 >   seinem eigenen PowerShell-Terminal. Er fügt die Ausgabe in den Chat ein, und du arbeitest
 >   ab der Gegenprobe damit weiter.
-> - `podman exec` ist laut `CLAUDE.md` ein Schreibvorgang mit Freigabepflicht. Der Nutzer gibt
+> - `podman exec` ist laut `AGENTS.md` ein Schreibvorgang mit Freigabepflicht. Der Nutzer gibt
 >   die Freigabe, indem er den Befehl selbst ausführt; die SQL bleibt dabei schreibgeschützt.
 
 > [!note] SSH geht auf diesem Rechner nur über den Windows-Client
@@ -119,7 +119,7 @@ mit Fehler.
 Diese sind entschieden und werden **nicht jeden Monat neu gefragt**:
 
 1. **Keine Namen.** Der Bericht nennt **keine** Spender, Halter oder Antragsteller.
-   Das ist keine Stilfrage: die `CLAUDE.md` verbietet, Personennamen oder Handles vom
+   Das ist keine Stilfrage: die `AGENTS.md` verbietet, Personennamen oder Handles vom
    Produktionshost in ein Artefakt zu schreiben. Stattdessen Anzahlen („13
    Einzahlungen"). **Will der Nutzer Namen, muss er die Regel ausdrücklich für diesen
    Lauf aufheben** — dann erst liest du `counterparty_handle` aus.

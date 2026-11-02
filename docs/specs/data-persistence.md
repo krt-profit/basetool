@@ -11,8 +11,8 @@ prod and test run identical, reviewed DDL. Queries avoid N+1 by construction.
 > **Concurrency note.** The locking rules are **deliberately kept in the agent guidance** rather
 > than here, because they are "read this before you touch multi-step transactions" guidance that
 > must load where an agent starts: the two cross-cutting rules (`@Version` echo, lock as
-> fine-grained as the data allows) in the root `CLAUDE.md` → "Concurrency", and the full landmine
-> list in [`backend/CLAUDE.md`](../../backend/CLAUDE.md) — the `kernel.OptimisticLock` helpers
+> fine-grained as the data allows) in the root `AGENTS.md` → "Concurrency", and the full landmine
+> list in [`backend-concurrency.md`](../agents/backend-concurrency.md) — the `kernel.OptimisticLock` helpers
 > (`check` / `checkOptionalClient` / `checkRequired`), `Mission`'s DB-enforced section counters
 > ([ADR-0080](../adr/0080-mission-section-lock-db-enforcement.md)), pessimistic locking for bulk
 > reorders, the `…WithinTransaction` pattern, bulk-updates-inside-loops and the find-or-create
@@ -227,7 +227,7 @@ row.
 Consequences that must hold:
 
 - The UEX manufacturer sync upserts **each company in its own `REQUIRES_NEW` transaction** (via the
-  `self`-proxy `…WithinTransaction` pattern — see `backend/CLAUDE.md` → Concurrency), so one row that fails
+  `self`-proxy `…WithinTransaction` pattern — see [`backend-concurrency.md`](../agents/backend-concurrency.md)), so one row that fails
   rolls back only itself and the remaining companies still commit. A bad row may be counted as
   *skipped*; it may never roll back the batch.
 - The feed is processed in **ascending `id` order**. The **canonical** company of a brand — the
@@ -1430,5 +1430,5 @@ spec — [`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-003
 SCU/PIECE quantity rules end-to-end. It is a persistence-boundary rule, but kept with its sibling
 input rules for one place to look.
 
-Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented in the root and
-`backend/CLAUDE.md` (see the concurrency note above).
+Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented in the root `AGENTS.md` and
+[`backend-concurrency.md`](../agents/backend-concurrency.md) (see the concurrency note above).

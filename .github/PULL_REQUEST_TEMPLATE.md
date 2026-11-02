@@ -70,7 +70,7 @@ don't use "tests pass" as a stand-in.
 
 - [ ] New features / fixes have tests (naming: `*Test`, Given/When/Then structure).
 - [ ] Tests run **exclusively** via `./gradlew test` — no IDE test runner.
-- [ ] For concurrency/locking changes: optimistic-lock paths tested, `*WithinTransaction` pattern respected (see [`backend/CLAUDE.md`](../backend/CLAUDE.md) > Concurrency).
+- [ ] For concurrency/locking changes: optimistic-lock paths tested, `*WithinTransaction` pattern respected (see [`docs/agents/backend-concurrency.md`](../docs/agents/backend-concurrency.md)).
 - [ ] No production credentials in tests or in locally spun-up test stacks (use `.env.test` + throwaway keystore + stripped realm).
 
 ### API & Database (if affected)

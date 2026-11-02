@@ -36,7 +36,7 @@ import org.springframework.stereotype.Repository;
  * Spring Data repository for {@link Notification}. Every non-admin lookup MUST filter by {@code
  * recipientUserId} so a caller can never see another user's inbox (REQ-NOTIF-004); the bulk
  * mutations are single atomic statements to avoid the optimistic-locking traps documented in {@code
- * CLAUDE.md}.
+ * docs/agents/backend-concurrency.md}.
  */
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {

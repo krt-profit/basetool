@@ -31,7 +31,7 @@ The layout and the realm name are decided in
 
 > [!danger] For AI agents: reading the production host is free, writing to it is gated
 > Every command below that changes the host — a restart, a file edit, a role run, a deploy — is a
-> **write** under the production-host access rule in the repository `CLAUDE.md`, and needs an
+> **write** under the production-host access rule in the repository `AGENTS.md`, and needs an
 > explicit per-action yes from @greluc first. A recipe in this file is documentation, never approval.
 
 ---

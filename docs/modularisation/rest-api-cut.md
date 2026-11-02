@@ -722,7 +722,7 @@ first calls race the wall, which is harmless for showing it.
 - Raising the floor is runbook step S8 (`docs/archive/EXCHANGE_GO_LIVE_RUNBOOK.md:533-559`): set both codes
   in `.env`, run `render-env-d.py`, restart `backend.service`, start `ingest` and `frontend` again
   (both `Requires=backend.service`). It is a production write and needs the owner's per-action
-  approval (root `CLAUDE.md`).
+  approval (root `AGENTS.md`).
 
 **What the app does (v0.3.1).** It reads the policy once per process (a `started` flag,
 `UpdateGate.kt:100`, triggered by `LaunchedEffect(Unit)` at `:156`) and fails open on any failure
@@ -814,7 +814,7 @@ what wave 1 already needs.
 - **Requirements first.** A new ADR records the hard cut with forced update and supersedes the
   retirement clause of ADR-0136 (decision bullet 4); REQ-API-001 (breaking changes to `/api/v2`,
   retirement through `@ApiDeprecation` with a sunset), REQ-API-009 (retirement through `/api/v2`
-  rather than deletion) and REQ-API-010 are amended to match. The root `CLAUDE.md` requires the
+  rather than deletion) and REQ-API-010 are amended to match. The root `AGENTS.md` requires the
   amendment before the code diverges.
 - **Declared-break ledger (G-23).** `backend/src/test/resources/api/declared-breaks.txt`: one line
   per removed or changed frozen operation or field, with the app `versionCode` that absorbs it.

@@ -32,7 +32,7 @@ It never protected anything. It was built to be published, and three properties 
 
 The subject of every certificate says `NOT FOR PRODUCTION`.
 
-**This changes nothing about the rule it looks like it contradicts.** CLAUDE.md's *never use
+**This changes nothing about the rule it looks like it contradicts.** AGENTS.md's *never use
 production or real credentials in tests or local test stacks* stands unchanged — deliberately
 publishing a throwaway artefact is the opposite of leaking a real one. Production mints its own
 material on the host (`docs/deployment.md` → *Internal TLS*), bind-mounted at runtime, and

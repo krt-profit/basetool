@@ -218,7 +218,7 @@ needed and must be written down here.
 - **Data version:** store `payload.v` / `branch` with the loadout so a later patch can flag stale
   loadouts.
 
-### Repo obligations when this is implemented (root `CLAUDE.md`)
+### Repo obligations when this is implemented (root `AGENTS.md`)
 
 - Spec: new `REQ-HANGAR-0NN` entries; ADR for the erkul dependency and the loadout model.
 - Audit: Hangar is an audited area — new `AuditEventType`s for loadout import/edit/clear, viewer
@@ -246,7 +246,7 @@ needed and must be written down here.
 ### Re-running the catalogue match
 
 The read-only query used in §2 (run inside the `db-backend` container with `psql -At -f -`;
-production access follows the root `CLAUDE.md` gate — each run needs @greluc's explicit yes):
+production access follows the root `AGENTS.md` gate — each run needs @greluc's explicit yes):
 
 ```sql
 SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;

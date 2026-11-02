@@ -76,7 +76,7 @@ editing unrelated parts of the same mission collide is treated as a defect, not 
 Large aggregates carry independent per-section counters, each bumped and echoed on its own.
 
 This is the rule most likely to be "simplified" by someone who has not been bitten by it, which is
-why it sits in `CLAUDE.md` in the agent-critical section and not only here.
+why it sits in `AGENTS.md` in the agent-critical section and not only here.
 
 ## 4.6 Deliver as a signed, promotable bundle onto a rootless runtime
 
@@ -100,7 +100,7 @@ security posture being bent to preserve it.
 | Security, access, the role model | [`security-and-access.md`](../specs/security-and-access.md), `ROLES_AND_PERMISSIONS.md` |
 | Tenancy and scoping | [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) |
 | API shape and versioning | [`api-conventions.md`](../specs/api-conventions.md) |
-| Persistence, migrations, concurrency | [`data-persistence.md`](../specs/data-persistence.md), `backend/CLAUDE.md` |
+| Persistence, migrations, concurrency | [`data-persistence.md`](../specs/data-persistence.md), [`backend-concurrency.md`](../agents/backend-concurrency.md) |
 | Frontend behaviour and live update | [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md), [`ui-design-system.md`](../specs/ui-design-system.md) |
 | Delivery and deployment | [`deployment-delivery.md`](../specs/deployment-delivery.md) |
 | Observability | [`observability.md`](../specs/observability.md) |

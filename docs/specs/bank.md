@@ -691,7 +691,7 @@ Bank endpoints live under `/api/v1/bank/**` (the org-unit-facing slice at
 upkeep) and `docs/specs/data-persistence.md` (Flyway-only schema, no N+1). Mutable rows
 (`bank_account`, `bank_account_grant`, `bank_holder`) carry `@Version` and
 echo it through DTOs and `data-version` DOM attributes; ledger and audit rows are
-insert-only and deliberately version-less. The booking flow observes the CLAUDE.md
+insert-only and deliberately version-less. The booking flow observes the AGENTS.md
 concurrency rules (`…WithinTransaction` pattern, no bulk updates in loops).
 
 The bank endpoints have no client outside the in-repo frontend: the Android app that read them over

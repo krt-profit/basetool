@@ -46,7 +46,7 @@ parts of §8 with it. The Docker-era shape is not lost — it is recorded in the
 description.
 
 > [!important] This folder is binding, and updating it is part of the change
-> [`CLAUDE.md`](../../CLAUDE.md) states the rule explicitly: **the arc42 documentation moves with the
+> [`AGENTS.md`](../../AGENTS.md) states the rule explicitly: **the arc42 documentation moves with the
 > change whenever it is affected**, in the same PR — a module boundary or a new building block (§5),
 > a runtime scenario (§6), the host, a deployment unit, a timer or the delivery path (§7), a
 > cross-cutting rule (§8), a quality scenario (§10), a known risk (§11), a new domain term (§12), or

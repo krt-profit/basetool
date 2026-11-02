@@ -34,7 +34,7 @@ The backend always serves HTTPS (`server.ssl.enabled: true`, key alias `basetool
 ## Credentials
 
 **Never use production / real credentials in a local stack** — this is the hard rule from the
-root `CLAUDE.md` Testing section. Always source `.env.test` (never `.env`), point Docker Compose
+root `AGENTS.md` Testing section. Always source `.env.test` (never `.env`), point Docker Compose
 at `--env-file .env.test`, and tear the stack down with `down --volumes` after the verification.
 
 The dev-profile Postgres/Redis data lives in project-prefixed **named volumes**, so worktrees do not

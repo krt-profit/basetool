@@ -34,7 +34,7 @@ this file is the **written, binding** contract that ships with the repo. Where t
 disagree, the skill wins and this file is corrected in the same PR.
 
 > New UI/visual decisions are recorded in an ADR and reflected here and in the design
-> skill — see the governance rules in `CLAUDE.md`.
+> skill — see the governance rules in `AGENTS.md`.
 
 **Supported browsers — "Baseline 2025".** The UI targets at least **Chrome 122, Firefox 131 and
 Safari / iOS 18.4** (owner decision D-16, [ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)).

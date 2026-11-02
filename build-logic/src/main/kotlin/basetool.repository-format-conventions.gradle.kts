@@ -49,7 +49,7 @@ spotless {
 
   format("markdown") {
     target(sources("**/*.md"))
-    targetExclude("CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md")
+    targetExclude("CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md", "AGENTS.md")
     trimTrailingWhitespace()
     endWithNewline()
   }

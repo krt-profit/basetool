@@ -304,7 +304,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * Acquires a {@link LockModeType#PESSIMISTIC_WRITE} on every job-order ordered by id. Used by the
    * bulk priority-reorder flow to serialise concurrent re-shuffles and avoid the optimistic-locking
    * conflicts that would otherwise fall out of the {@code @Version} bumps - see the "Pessimistic
-   * locking for bulk reorders" note in CLAUDE.md.
+   * locking for bulk reorders" note in docs/agents/backend-concurrency.md.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
