@@ -1,6 +1,6 @@
 # ADR-0324 — The dependency scan reads a cached NVD feed, refreshed on its own schedule
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0325](0325-dependencies-are-checked-against-the-github-advisory-database.md) (2026-11-02) — the OWASP scan and its NVD feed are retired; dependencies are checked against the GitHub Advisory Database.
 - **Date:** 2026-11-02
 - **Deciders:** @greluc
 - **Related:** REQ-OPS-054 · REQ-OPS-024 · issue #2775 ·

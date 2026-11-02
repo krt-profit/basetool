@@ -1850,9 +1850,9 @@ the scan job's step summary and raised as a `::warning::` in the approval record
 exercised invisibly, and the reason belongs in the deployment notes.
 
 **Not scanned:** `basetool-config` and `basetool-keycloak-spi`. Both are `FROM scratch` artifacts
-with no base image and no OS package database; the provider JAR's Java dependencies are scanned by
-OWASP Dependency-Check at `failBuildOnCVSS = 7.0`. That scan is a signal, not a merge gate: it is
-not a required check (corrected 2026-09-22 — this said "gated more strictly", as ADR-0155 did).
+with no base image and no OS package database; the provider JAR's Java dependencies are scanned through its
+SBOM by the dependency scan of REQ-OPS-054. That scan is a signal, not a merge gate: it is not a
+required check.
 
 **Not gated:** `promote-testing.yml`. A vulnerable build must stay exercisable in an environment
 that is not production — gating it would make the bypass routine and wear it out.
@@ -2523,7 +2523,7 @@ there.
 The build verifies what it downloads, not only which version it asks for (SEC-15, 2026-09-23).
 `gradle/verification-metadata.xml` lists a **SHA-256 for every jar, POM and Gradle module file**
 the build resolves — the applications' runtime and test classpaths, the Gradle plugins, the tool
-configurations (Checkstyle, SpotBugs, PIT, JaCoCo, Spotless, the OWASP scan) and the Node.js
+configurations (Checkstyle, SpotBugs, PIT, JaCoCo, Spotless) and the Node.js
 archive the frontend's linters run on — and Gradle refuses an artifact whose bytes do not match, or
 that has no entry at all, before it is used.
 
@@ -3120,7 +3120,7 @@ isolated projects have nothing to reject and a module added later inherits no de
   jars (`plexus-utils`, `commons-lang3`, Jackson) are constraints there.
 - **Dependency verification covers the included build** with the one root
   `gradle/verification-metadata.xml` (REQ-OPS-034); the image builds copy `build-logic/`, which makes
-  it a shared image input, and `build-logic/**` is a path filter of the dependency-check and
+  it a shared image input, and `build-logic/**` is a path filter of the vulnerability-scan and
   sandbox-image workflows.
 - **The plugin classpath resolves from the portal with Maven Central behind it.** Both settings
   files declare `pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }`, which
@@ -3394,48 +3394,50 @@ pull requests never conflict over the changelog (ADR-0306).
 [ADR-0306](../adr/0306-changelog-entries-are-fragments-folded-at-the-release.md) ·
 **Related:** REQ-OPS-029
 
-### REQ-OPS-054 — The dependency scan reads a cached NVD feed that a separate refresh keeps current
+### REQ-OPS-054 — Dependencies are checked against the GitHub Advisory Database on every pull request and on `main`
 
-The OWASP dependency scan (`dependency-check.yml`) never downloads the NVD. A separate refresh
-(`nvd-feed-refresh.yml`) keeps the dataset in the Actions cache, so a slow nvd.nist.gov delays the
-refresh and never a pull request's scan (ADR-0324).
+No CI job matches dependencies through the NVD. Two checks read the GitHub Advisory Database,
+which identifies packages by Package URL and needs no local dataset (ADR-0325).
 
-- **The refresh.** Daily, on `workflow_dispatch`, and on a push to `main` that touches the root
-  `build.gradle.kts` or `gradle/libs.versions.toml`, it restores the newest feed, runs
-  `dependencyCheckUpdate` up to three times with a 25-minute limit per attempt, writes the update time
-  as epoch seconds to `refreshed-at` in the data directory, and saves the directory under a key
-  unique to the run (`nvd-feed-v2-<os>-<run id>-<attempt>`). A failed update saves nothing. On
-  `main` it then deletes every other `nvd-feed-` cache, and deletes none when the one it saved is
-  not listed. A failed scheduled refresh opens or comments on the issue *Daily NVD feed refresh
-  failed*.
-- **Attempts build on each other.** The data directory stays on the runner between attempts, so a
-  retry continues from the years an earlier attempt already stored. After a failed or timed-out
-  attempt the refresh stops the Gradle daemon, which `timeout` does not kill and which would keep
-  the dataset locked, and deletes the dataset's lock files before the next attempt. The build
-  declares `dependencyCheckUpdate` incompatible with the configuration cache, since the plugin's
-  task holds the `Project`; Gradle runs it without the cache instead of failing the build.
-- **The scan.** It restores the newest `nvd-feed-v2-<os>-` cache and runs `dependencyCheckAggregate`
-  with `-PdependencyCheckAutoUpdate=false`. Before that it fails, with an error that names the
-  refresh, when no cache was restored or `refreshed-at` is missing or 168 hours old, and warns from
-  48 hours. Everything else stays: `failBuildOnCVSS = 7.0`, the SARIF upload outside pull requests,
-  the report artifact, and the issue *Weekly OWASP Dependency-Check failed* on a failed scheduled
-  scan.
-- **Local runs update.** The Gradle property `dependencyCheckAutoUpdate` defaults to `true`, so a
-  local `dependencyCheckAggregate` keeps building and refreshing its own dataset.
+- **The pull-request gate.** `dependency-submission.yml` runs on every pull request to `main`: the
+  job *Submit the Gradle dependency graph* submits the resolved Gradle graph of the pull request
+  (`gradle/actions/dependency-submission`), then *Dependency review*
+  (`actions/dependency-review-action`) fails when the pull request adds a dependency with a HIGH or
+  CRITICAL advisory in the `runtime`, `development` or `unknown` scope. On a push to `main` the
+  workflow submits the graph that Dependabot alerts and the next review compare against. A pull
+  request from a fork skips the submission and is reviewed on its manifests.
+- **The full scan.** `vulnerability-scan.yml` runs on every push to `main`, weekly, on
+  `workflow_dispatch`, and on pull requests that touch the Gradle build files, the catalog, the
+  verification metadata, an npm lockfile or the scan's own files. It builds the CycloneDX SBOMs of
+  `backend`, `frontend`, `ingest` and `keycloak-spi` from their resolved runtime classpaths
+  (REQ-OPS-025) and runs Trivy over each SBOM and over `frontend/package-lock.json` and
+  `.github/tools/markdownlint/package-lock.json`, dev dependencies included, with the settings of
+  the image scans (REQ-OPS-024): `HIGH,CRITICAL`, `ignore-unfixed`. A finding fails that target's
+  `Scan (<target>)` job. Outside pull requests each target's SARIF goes to the Security tab under
+  the category `trivy-deps-<target>`. A failed scheduled scan opens or comments on the issue
+  *Weekly vulnerability scan failed*.
+- **Accepted findings expire.** An advisory that does not apply is listed in
+  `.github/trivy/ignore.yaml` with its id, the `purls` or `paths` it is limited to, a `statement`
+  why it does not apply and an `expired_at` no more than six months ahead; from that day on the
+  scan fails on it again.
+- **Dependabot alerts** report a new advisory against `main` between scans.
 
 **Acceptance**
 
-- [x] No step of `dependency-check.yml` passes an NVD API key or runs with auto-update on.
-- [x] The refresh saves only after a successful update, and its prune job runs only on `main`
-  with `actions: write`, as the only job of either workflow that holds it.
-- [x] `./gradlew dependencyCheckUpdate -m` succeeds with the configuration cache switched on.
-- [ ] A manual refresh on `main` saves a feed and a following scan restores it.
+- [x] No workflow downloads the NVD or holds an NVD API key, and the root build applies no OWASP
+  Dependency-Check plugin.
+- [x] The Trivy step of the scan sets `limit-severities-for-sarif`, so the `HIGH,CRITICAL` filter
+  applies to the exit code with SARIF output.
+- [x] A local Trivy 0.70.0 run over the four SBOMs with these settings exits 0, and exits 1 on the
+  MEDIUM finding of the backend SBOM once MEDIUM is included.
+- [ ] *Dependency review* and every `Scan (<target>)` job pass on the pull request that introduces
+  them.
 
-**Enforced by:** `.github/workflows/nvd-feed-refresh.yml` · `.github/workflows/dependency-check.yml`
-· `.github/actions/report-failed-run` · the `dependencyCheck {}` block of the root
-`build.gradle.kts` · **Decision:**
-[ADR-0324](../adr/0324-the-dependency-scan-reads-a-cached-nvd-feed-refreshed-on-its-own-schedule.md) ·
-**Related:** REQ-OPS-024, REQ-OPS-034
+**Enforced by:** `.github/workflows/dependency-submission.yml` ·
+`.github/workflows/vulnerability-scan.yml` · `.github/trivy/ignore.yaml` ·
+`.github/actions/report-failed-run` · **Decision:**
+[ADR-0325](../adr/0325-dependencies-are-checked-against-the-github-advisory-database.md) ·
+**Related:** REQ-OPS-024, REQ-OPS-025, REQ-OPS-034
 
 ## Open questions
 

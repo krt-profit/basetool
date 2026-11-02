@@ -146,8 +146,9 @@ measures below are accordingly proportionate rather than exhaustive.
 
 ## Secure development
 
-- **Static analysis in CI** — Checkstyle, SpotBugs, secret scanning (gitleaks), CodeQL, and an OWASP
-  dependency check that fails the build at CVSS ≥ 7.0.
+- **Static analysis in CI** — Checkstyle, SpotBugs, secret scanning (gitleaks), CodeQL, a
+  dependency review on every pull request and a Trivy scan of the SBOMs, both failing on a HIGH or
+  CRITICAL advisory.
 - **An SBOM per shipped module** (REQ-OPS-025) and build provenance anchored outside the registry
   (REQ-OPS-023).
 - **ArchUnit tests encode the security invariants** so they fail the build rather than a review.

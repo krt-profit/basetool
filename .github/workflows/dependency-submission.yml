@@ -3,6 +3,8 @@ name: Dependency Graph
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +17,7 @@ jobs:
   submit:
     name: Submit the Gradle dependency graph
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 30
     permissions:
       contents: write
@@ -35,3 +38,23 @@ jobs:
         uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c
         with:
           additional-arguments: --dependency-verification lenient
+
+  review:
+    name: Dependency review
+    needs: submit
+    if: >-
+      always() && github.event_name == 'pull_request'
+      && (needs.submit.result == 'success' || needs.submit.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Review the dependency changes against the GitHub Advisory Database
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development, unknown
+          retry-on-snapshot-warnings: true
+          license-check: false

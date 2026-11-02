@@ -116,5 +116,5 @@ jobs:
           usage="$(gh api "repos/${GH_REPO}/actions/cache/usage" --jq '.active_caches_size_in_bytes')"
           echo "Cache usage after pruning: $((usage / 1048576)) MiB of 10240 MiB." | tee -a "$GITHUB_STEP_SUMMARY"
           if [ "$usage" -gt $((8 * 1024 * 1024 * 1024)) ]; then
-            echo "::warning::Actions cache usage $((usage / 1048576)) MiB is above the 8192 MiB budget; GitHub evicts the least recently used caches at 10240 MiB, the NVD dataset among them"
+            echo "::warning::Actions cache usage $((usage / 1048576)) MiB is above the 8192 MiB budget; GitHub evicts the least recently used caches at 10240 MiB, the Gradle caches among them"
           fi

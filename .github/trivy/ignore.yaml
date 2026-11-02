@@ -1,0 +1,4 @@
+# Accepted findings of the dependency scan (vulnerability-scan.yml, REQ-OPS-054).
+# Each entry names the finding id, narrows it with `purls` or `paths`, states why it does not
+# apply in `statement`, and expires through `expired_at` (YYYY-MM-DD), after which it fails again.
+vulnerabilities: []
