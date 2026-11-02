@@ -54,6 +54,12 @@ const LIVE_ROOMS = {
     materialboard: { board: ['MARKET'], requests: ['MARKET'] },
     'supply-needs': { needs: ['SUPPLY_NEEDS'], stats: ['SUPPLY_NEEDS'] },
     refinery: { queue: ['REFINERY_READY'] },
+    'admin-dashboard': {
+        'deletion-requests': ['DELETION_REQUESTS'],
+        'discord-registrations': ['DISCORD_REGISTRATIONS'],
+        terms: ['OPEN_TERMS'],
+        'sync-status': ['SYNC_STATUS'],
+    },
 };
 
 /** The widget types a live channel updates; every other type polls. */
@@ -65,8 +71,17 @@ const LIVE_TYPES = new Set([
     ...Object.values(LIVE_ROOMS).flatMap((sections) => Object.values(sections).flat()),
 ]);
 
-/** The widget types whose content changes with the clock, so they reload besides their live channel. */
-const CLOCK_TYPES = new Set(['REFINERY_READY']);
+/**
+ * The widget types whose content changes with the clock, so they reload besides their live channel,
+ * with the interval of that reload: the refinery's ready segment moves when an order's end time
+ * passes, the sync status when a run leaves its range.
+ *
+ * @type {Map<string, number>}
+ */
+const CLOCK_INTERVALS_MS = new Map([
+    ['REFINERY_READY', CLOCK_INTERVAL_MS],
+    ['SYNC_STATUS', POLL_INTERVAL_MS],
+]);
 
 /**
  * Whether an instance of a type reloads on a timer: every type without a live channel, and the
@@ -77,7 +92,7 @@ const CLOCK_TYPES = new Set(['REFINERY_READY']);
  */
 function isPolled(type) {
     const name = type ?? '';
-    return !LIVE_TYPES.has(name) || CLOCK_TYPES.has(name);
+    return !LIVE_TYPES.has(name) || CLOCK_INTERVALS_MS.has(name);
 }
 
 /** The options a widget request carries, as the item's data attributes name them. */
@@ -343,7 +358,7 @@ export function stopPolling() {
  * @returns {number} the interval in milliseconds
  */
 function pollInterval(type) {
-    return CLOCK_TYPES.has(type ?? '') ? CLOCK_INTERVAL_MS : POLL_INTERVAL_MS;
+    return CLOCK_INTERVALS_MS.get(type ?? '') ?? POLL_INTERVAL_MS;
 }
 
 /**

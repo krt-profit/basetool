@@ -310,25 +310,6 @@ class CatalogueBackendClientTest {
   }
 
   @Test
-  void syncReports() {
-    backend.answerJson(EMPTY_PAGE);
-    backend.answerJson(EMPTY_PAGE);
-    backend.answerJson("{\"deleted\":3}");
-    backend.answerJson("{\"deleted\":0}");
-
-    client.syncReportPage(2, "UEX");
-    client.syncReportPage(0, null);
-    assertThat(client.purgeSyncReports("SCWIKI", 30).deleted()).isEqualTo(3);
-    client.purgeSyncReports(null, 7);
-
-    backend.expect("GET", "/api/v1/catalog/admin/sync-reports?page=2&size=100&source=UEX");
-    backend.expect("GET", "/api/v1/catalog/admin/sync-reports?page=0&size=100");
-    backend.expect(
-        "DELETE", "/api/v1/catalog/admin/sync-reports?olderThanDays=30&source=SCWIKI", null);
-    backend.expect("DELETE", "/api/v1/catalog/admin/sync-reports?olderThanDays=7", null);
-  }
-
-  @Test
   void missionReferenceData() {
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);

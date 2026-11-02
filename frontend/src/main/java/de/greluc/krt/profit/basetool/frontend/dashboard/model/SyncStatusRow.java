@@ -24,16 +24,19 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The latest run of one synchronisation or import, as the sync status widget lists it.
+ * The latest run and the runs inside the range of one synchronisation or import, as the sync status
+ * widget lists it.
  *
  * @param source the synchronisation or import
  * @param lastRunAt when the latest run happened, {@code null} when there never was one
  * @param status the latest run's status for an import ({@code SUCCEEDED}, {@code FAILED}, ...),
  *     {@code null} for a synchronisation
  * @param inRange whether the latest run lies inside the widget's range
+ * @param runs how many runs finished inside the widget's range
  */
 public record SyncStatusRow(
     @NotNull SyncSource source,
     @Nullable Instant lastRunAt,
     @Nullable String status,
-    boolean inRange) {}
+    boolean inRange,
+    long runs) {}

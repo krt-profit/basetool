@@ -27,7 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.SyncReportBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** Proves the sync-report pages send a lost session to the login instead of an empty table. */
 class AdminSyncReportsPageControllerReauthMvcTest {
 
-  private final CatalogueBackendClient client = mock(CatalogueBackendClient.class);
+  private final SyncReportBackendClient client = mock(SyncReportBackendClient.class);
 
   private MockMvc mockMvc;
 

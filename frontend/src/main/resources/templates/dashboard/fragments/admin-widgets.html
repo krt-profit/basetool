@@ -67,6 +67,8 @@
                 <span th:text="${#temporals.format(@relativeDays.local(row.lastRunAt()), 'dd.MM.yyyy HH:mm')}">01.01.2026 12:00</span>
                 <span th:if="${!row.inRange()}" th:text="#{dashboard.widget.sync-status.outside(${syncRange})}">· außerhalb des Zeitraums</span>
             </span>
+            <span class="cell-sub" th:data-testid="|admin-sync-runs-${#strings.toLowerCase(row.source().name())}|"
+                  th:text="${row.runs() == 1} ? #{dashboard.widget.sync-status.runs.one} : #{dashboard.widget.sync-status.runs.many(${row.runs()})}">3 Läufe im Zeitraum</span>
             <span th:if="${row.status() != null}" class="status-pill"
                   th:classappend="${row.status() == 'FAILED'} ? 'status-failed'"
                   th:text="#{${'dashboard.widget.sync-status.status.' + #strings.toLowerCase(row.status())}}">Erfolgreich</span>
