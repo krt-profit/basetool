@@ -41,8 +41,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
+import org.keycloak.authentication.authenticators.broker.AbstractIdpAuthenticator;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.AuthenticatorConfigModel;
+import org.keycloak.sessions.AuthenticationSessionModel;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -60,6 +62,7 @@ class DiscordGuildRoleGateAuthenticatorTest {
   @Mock private LoginFormsProvider form;
   @Mock private HttpClient discord;
   @Mock private HttpResponse<String> member;
+  @Mock private AuthenticationSessionModel authSession;
 
   private static final Map<String, String> VALID_CONFIG =
       Map.of("guildId", "123", "krtMitgliedRoleId", "999");
@@ -124,6 +127,7 @@ class DiscordGuildRoleGateAuthenticatorTest {
     when(context.form()).thenReturn(form);
     when(form.setError(anyString())).thenReturn(form);
     when(form.createErrorPage(any())).thenReturn(mock(Response.class));
+    when(context.getAuthenticationSession()).thenReturn(authSession);
   }
 
   @Test
@@ -169,7 +173,26 @@ class DiscordGuildRoleGateAuthenticatorTest {
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
     verify(form).setError(DiscordGuildRoleGateAuthenticator.ERROR_MESSAGE_KEY);
+    verify(authSession).removeAuthNote(AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE);
     verifyNoInteractions(backendChecker);
+  }
+
+  /** A denial without an authentication session still renders the error page. */
+  @Test
+  void denies_whenAuthenticationSessionAbsent() {
+    stubConfig(VALID_CONFIG);
+    when(context.form()).thenReturn(form);
+    when(form.setError(anyString())).thenReturn(form);
+    when(form.createErrorPage(any())).thenReturn(mock(Response.class));
+    when(checker.lookup(any(), any(), any(), any()))
+        .thenReturn(
+            DiscordMembershipChecker.MemberLookup.denied(
+                DiscordMembershipChecker.Result.DENIED_NOT_MEMBER));
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
+    verifyNoInteractions(authSession);
   }
 
   @Test
@@ -198,6 +221,7 @@ class DiscordGuildRoleGateAuthenticatorTest {
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
     verify(form).setError(DiscordGuildRoleGateAuthenticator.ACCOUNT_EXISTS_MESSAGE_KEY);
+    verify(authSession).removeAuthNote(AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE);
   }
 
   @Test
