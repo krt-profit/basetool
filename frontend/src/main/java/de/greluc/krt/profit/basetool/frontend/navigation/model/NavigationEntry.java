@@ -44,6 +44,8 @@ import org.jetbrains.annotations.Nullable;
  * @param icon the sprite icon name the quick access shows, or {@code null} for the group's
  * @param gate the condition under which the entry renders, on top of its group's
  * @param traits the rendering traits
+ * @param menuUnless flags that turn the menu link into a quick-access-only page for a caller who
+ *     has one of them, without touching the entry's availability
  */
 public record NavigationEntry(
     @NotNull String key,
@@ -54,7 +56,8 @@ public record NavigationEntry(
     @Nullable String testId,
     @Nullable String icon,
     @NotNull NavigationGate gate,
-    @NotNull Set<NavigationTrait> traits) {
+    @NotNull Set<NavigationTrait> traits,
+    @NotNull Set<NavigationFlag> menuUnless) {
 
   /** The longest entry key the format allows. */
   public static final int KEY_MAX_LENGTH = 64;
@@ -73,6 +76,7 @@ public record NavigationEntry(
    * @param icon the quick-access icon, or {@code null}
    * @param gate the entry's own condition
    * @param traits the rendering traits
+   * @param menuUnless flags that take the entry out of the menu
    * @throws IllegalArgumentException if the key does not follow the entry-key format
    */
   public NavigationEntry {
@@ -80,6 +84,7 @@ public record NavigationEntry(
       throw new IllegalArgumentException("Malformed navigation entry key: " + key);
     }
     traits = traits.isEmpty() ? Set.of() : Set.copyOf(EnumSet.copyOf(traits));
+    menuUnless = Set.copyOf(menuUnless);
   }
 
   /**
@@ -94,7 +99,7 @@ public record NavigationEntry(
   public static NavigationEntry of(
       @NotNull String key, @NotNull String href, @NotNull String labelKey) {
     return new NavigationEntry(
-        key, href, labelKey, null, null, null, null, NavigationGate.ALWAYS, Set.of());
+        key, href, labelKey, null, null, null, null, NavigationGate.ALWAYS, Set.of(), Set.of());
   }
 
   /**
@@ -116,7 +121,7 @@ public record NavigationEntry(
   @NotNull
   public NavigationEntry keywords(@NotNull String messageKey) {
     return new NavigationEntry(
-        key, href, labelKey, tabLabelKey, messageKey, testId, icon, gate, traits);
+        key, href, labelKey, tabLabelKey, messageKey, testId, icon, gate, traits, menuUnless);
   }
 
   /**
@@ -128,7 +133,7 @@ public record NavigationEntry(
   @NotNull
   public NavigationEntry tab(@NotNull String messageKey) {
     return new NavigationEntry(
-        key, href, labelKey, messageKey, keywordsKey, testId, icon, gate, traits);
+        key, href, labelKey, messageKey, keywordsKey, testId, icon, gate, traits, menuUnless);
   }
 
   /**
@@ -150,7 +155,7 @@ public record NavigationEntry(
   @NotNull
   public NavigationEntry testId(@NotNull String id) {
     return new NavigationEntry(
-        key, href, labelKey, tabLabelKey, keywordsKey, id, icon, gate, traits);
+        key, href, labelKey, tabLabelKey, keywordsKey, id, icon, gate, traits, menuUnless);
   }
 
   /**
@@ -162,7 +167,7 @@ public record NavigationEntry(
   @NotNull
   public NavigationEntry icon(@NotNull String name) {
     return new NavigationEntry(
-        key, href, labelKey, tabLabelKey, keywordsKey, testId, name, gate, traits);
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, name, gate, traits, menuUnless);
   }
 
   /**
@@ -174,7 +179,32 @@ public record NavigationEntry(
   @NotNull
   public NavigationEntry gate(@NotNull NavigationGate condition) {
     return new NavigationEntry(
-        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, condition, traits);
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, condition, traits, menuUnless);
+  }
+
+  /**
+   * This entry as a quick-access-only page for a caller who has one of the flags: another menu link
+   * already opens the page, but the entry stays available for favourites, start pages and tab
+   * slots.
+   *
+   * @param flags the flags that take the entry out of the menu
+   * @return the changed entry
+   */
+  @NotNull
+  public NavigationEntry menuUnless(@NotNull NavigationFlag... flags) {
+    return new NavigationEntry(
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, gate, traits, Set.of(flags));
+  }
+
+  /**
+   * Whether the entry is a menu link for a caller: neither quick-access-only nor taken out of the
+   * menu by a flag the caller has.
+   *
+   * @param access the caller's reachable roles and flags
+   * @return {@code true} iff the entry is rendered as a menu link
+   */
+  public boolean menuLink(@NotNull NavigationAccess access) {
+    return !paletteOnly() && menuUnless.stream().noneMatch(access.flags()::contains);
   }
 
   /**
@@ -189,7 +219,7 @@ public record NavigationEntry(
     all.addAll(traits);
     all.addAll(Set.of(more));
     return new NavigationEntry(
-        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, gate, all);
+        key, href, labelKey, tabLabelKey, keywordsKey, testId, icon, gate, all, menuUnless);
   }
 
   /**

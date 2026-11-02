@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,13 +55,16 @@ public class QuickAccessController {
    * @param crumb the group it is shown under
    * @param icon the sprite symbol without its {@code krt-icon-} prefix
    * @param keywords additional search terms, space-separated
+   * @param key the stable entry key of the registered tab, or {@code null}; with a key the page can
+   *     be starred and chosen as a start page
    */
   public record QuickAccessItem(
       @NotNull String href,
       @NotNull String label,
       @NotNull String crumb,
       @NotNull String icon,
-      @NotNull String keywords) {}
+      @NotNull String keywords,
+      @Nullable String key) {}
 
   /**
    * Lists the pages every contributor offers the caller, in contributor order, without the tabs of
@@ -86,6 +90,7 @@ public class QuickAccessController {
         messageSource.getMessage(entry.labelKey(), null, entry.labelKey(), locale),
         messageSource.getMessage(entry.crumbKey(), null, entry.crumbKey(), locale),
         entry.icon(),
-        messageSource.getMessage(entry.keywordsKey(), null, "", locale));
+        messageSource.getMessage(entry.keywordsKey(), null, "", locale),
+        entry.entryKey());
   }
 }

@@ -269,4 +269,26 @@ class NavigationRegistryTest {
     assertThat(registry.familyOf(Set.of("admin.dataimports")))
         .contains("admin.p4kimport", "admin.syncreports", "admin.syncreports.uex");
   }
+
+  /** The supply and purchasing tabs the page shows by data are registered, so they have a key. */
+  @Test
+  void theDataDependentTabsHaveStableKeys() {
+    assertThat(registry.starrable("supply.incoming"))
+        .map(NavigationEntry::href)
+        .contains("/supply/donations/incoming");
+    assertThat(registry.starrable("supply.stats"))
+        .map(NavigationEntry::href)
+        .contains("/supply/stats");
+    assertThat(registry.starrable("purchasing.partners"))
+        .map(NavigationEntry::href)
+        .contains("/purchasing/partners");
+    assertThat(registry.starrable("purchasing.delegates"))
+        .map(NavigationEntry::href)
+        .contains("/purchasing/delegates");
+    assertThat(registry.starrable("purchasing.report"))
+        .map(NavigationEntry::href)
+        .contains("/purchasing/report");
+    assertThat(registry.familyOf(Set.of("supply.needs")))
+        .contains("supply.incoming", "supply.stats", "purchasing.partners", "purchasing.report");
+  }
 }

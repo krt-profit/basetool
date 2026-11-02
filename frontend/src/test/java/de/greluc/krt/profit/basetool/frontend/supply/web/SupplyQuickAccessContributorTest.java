@@ -25,6 +25,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessEntry;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
+import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationRegistry;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
 import java.util.List;
@@ -64,6 +66,22 @@ class SupplyQuickAccessContributorTest {
     assertThat(contributor.entries())
         .extracting(QuickAccessEntry::href)
         .containsExactly("/supply/donations/incoming", "/supply/stats");
+  }
+
+  /** Every tab carries the key and the path of the registered tab, so it can be starred. */
+  @Test
+  void everyTabCarriesTheKeyOfItsRegisteredEntry() {
+    when(featureState.enabled()).thenReturn(true);
+    when(supplyClient.units()).thenReturn(List.of(unit(true, true)));
+    NavigationRegistry registry = new NavigationRegistry();
+
+    assertThat(contributor.entries())
+        .isNotEmpty()
+        .allSatisfy(entry ->
+            assertThat(registry.starrable(entry.entryKey()))
+                .as(entry.href())
+                .map(NavigationEntry::href)
+                .contains(entry.href()));
   }
 
   /** An administrator who manages no unit gets the statistics only. */
