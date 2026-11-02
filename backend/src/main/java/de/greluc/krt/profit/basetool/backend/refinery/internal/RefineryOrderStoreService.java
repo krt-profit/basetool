@@ -40,7 +40,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -69,7 +69,7 @@ public class RefineryOrderStoreService {
   private final MaterialRepository materialRepository;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemService jobOrderItemService;
-  private final OwnerScopeService ownerScopeService;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final StockCommands stockCommands;
   private final AuditRecorder auditRecorder;
 
@@ -162,7 +162,7 @@ public class RefineryOrderStoreService {
       }
 
       final OrgUnit owningOrgUnit =
-          ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
               assignee, itemDto.owningOrgUnitId());
 
       String incomingNote = StringNormalization.trimToNull(itemDto.note());

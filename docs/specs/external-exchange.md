@@ -1219,7 +1219,7 @@ member's blueprints the way the order's blueprint coverage does (variant family 
 variants). Lines with nothing open are left out; `bt` is the material's or game item's id.
 
 Only a member who passes the web's job-order gate gets the demand: `ExchangeDemandService` asks
-`OwnerScopeService.canViewJobOrders()` — the same rule that opens the Aufträge area and the
+`RequestScopeResolver.canViewJobOrders()` — the same rule that opens the Aufträge area and the
 Materialbedarf (REQ-ORDERS-034) — before reading any order. Any other member gets `200` with two
 empty lists and `reason: "NOT_PERMITTED"`; a permitted member's answer carries no `reason`, even
 when nothing is open. The rule is evaluated with the exchange's reduced authorities (REQ-XCH-009),

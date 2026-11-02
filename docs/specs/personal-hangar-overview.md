@@ -320,7 +320,7 @@ of a connected application's create (REQ-XCH-017) plus the pin, and an exception
 - [x] With an active org unit among the member's memberships, the ships carry that unit.
 - [x] A member of exactly one unit, or of none, imports as before.
 
-**Enforced by:** `OwnerScopeServiceTest` (`resolveOrgUnitForImport_*`),
+**Enforced by:** `ScopeKernelTest` (`resolveOrgUnitForImport_*`),
 `HangarImportIntegrationTest#importFleetview_memberOfSeveralUnitsWithoutPin_importsShipsWithoutUnit`,
 `HangarImportServiceTest` · **Code:** `OrgUnitStampingService#resolveOrgUnitForImport`,
 `HangarImportService#importShips`.

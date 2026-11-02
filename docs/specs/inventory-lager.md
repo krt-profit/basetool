@@ -292,7 +292,7 @@ the source row's current flag, never from the client:
 
 - **personal → shared** (entpersonalisieren): the moved quantity becomes shared squadron stock
   (`personal = false`) stamped on an org-unit pool resolved through
-  `OwnerScopeService.resolveOrgUnitForPickerOutputNullable` — the same create-time stamping matrix as
+  `OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable` — the same create-time stamping matrix as
   [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-004 (the owner picks the pool when they belong
   to more than one org unit; a sole membership auto-stamps; a membershipless owner yields an
   ownerless shared row the reconciler promotes later, REQ-INV-004). The owner's picker lists their

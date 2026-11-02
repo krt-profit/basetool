@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.List;
 import java.util.Set;
@@ -58,7 +58,7 @@ public class PromotionCategoryService {
   private final PromotionCategoryRepository repository;
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryMapper mapper;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
@@ -242,7 +242,7 @@ public class PromotionCategoryService {
     if (topic == null || topic.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canSeeSquadron(topic.getOwningSquadron().getId())) {
+    if (!accessGateService.canSeeSquadron(topic.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not match this category's owning squadron");
     }

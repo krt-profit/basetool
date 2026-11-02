@@ -109,7 +109,7 @@ stamped outside the caller's scope is one the caller cannot read back).
   the target's orders stamped to the other unit (finding SEC-01) — the coarse `anyMatch` gate is not
   relied on for per-row isolation.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderQueryServiceTest` (`getUserRefineryOrdersScoped_*`), `GrantCascadeAggregateAccessIntegrationTest` (on-behalf gates, `/users/{userId}` list), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderQueryService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `ScopeKernelTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderQueryServiceTest` (`getUserRefineryOrdersScoped_*`), `GrantCascadeAggregateAccessIntegrationTest` (on-behalf gates, `/users/{userId}` list), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderQueryService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
 
 #### Officer reach is derived from the seats (ADR-0300)
 
@@ -146,7 +146,7 @@ the officer standing they stood next to is no longer a Keycloak role.
   keeps the seat and loses the reach.
 - [x] Every officer gate reads that reach in the target's owning unit, and nothing reads `OFFICER`.
 
-**Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`), `OrgUnitCascadeServiceTest`,
+**Enforced by:** `ScopeKernelTest` (`OfficerReachTests`), `OrgUnitCascadeServiceTest`,
 `OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`),
 `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER`), `PurchasingAccessPolicyTest`
 (`leadsUnit` by reach) · **Related:** REQ-SEC-004, REQ-SEC-015, REQ-ORG-029, ADR-0300
@@ -273,7 +273,7 @@ widened for a Bereichsleiter.
 - [x] A Bereichsleiter's reach is its Bereich + children, never org-wide; a pure OL member reaches
   every org unit (Phase 2).
 
-**Enforced by:** `OrgUnitCascadeServiceTest`, `OwnerScopeServiceTest` · **Code:** `OrgUnitCascadeService` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgUnitCascadeServiceTest`, `ScopeKernelTest` · **Code:** `OrgUnitCascadeService` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-006 — Roles are the source of truth; the org chart mirrors
 

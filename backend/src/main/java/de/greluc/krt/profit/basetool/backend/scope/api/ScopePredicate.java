@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The caller's effective org-unit scope, resolved by {@link
- * OwnerScopeService#currentScopePredicate()}.
+ * RequestScopeResolver#currentScopePredicate()}.
  *
  * <ul>
  *   <li>Admin without selection ({@link #adminAllScope()}): no filter applies.

@@ -40,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -222,12 +221,10 @@ class PromotionAccessPolicyVerdictTest {
             mock(OrgUnitCascadeService.class),
             staffelResolver,
             request);
-    OwnerScopeService ownerScopeService =
-        new OwnerScopeService(
-            resolver, mock(AccessGateService.class), mock(OrgUnitStampingService.class));
     PromotionAccessPolicy policy =
         new PromotionAccessPolicy(
-            ownerScopeService,
+            resolver,
+            mock(AccessGateService.class),
             authHelper,
             mock(OrgUnitMembershipQueryService.class),
             mock(PromotionReach.class));

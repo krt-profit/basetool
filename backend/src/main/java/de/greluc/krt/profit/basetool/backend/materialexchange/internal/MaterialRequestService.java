@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialRequestFulfillmentSignalledEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -91,7 +91,7 @@ public class MaterialRequestService {
    * badge — a request has no source Lager row to copy from, so the badge is stamped from the
    * requester (exactly as a free-stated item offer stamps its owner).
    */
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /**
    * Publishes the {@link MaterialRequestFulfillmentSignalledEvent} that drives the requester's
@@ -135,7 +135,7 @@ public class MaterialRequestService {
     entity.setRequestedAmount(amount);
     entity.setMinQuality(request.minQuality());
     entity.setOwner(owner);
-    entity.setOwningOrgUnit(ownerScopeService.currentOrgUnit().orElse(null));
+    entity.setOwningOrgUnit(requestScopeResolver.currentOrgUnit().orElse(null));
     entity.setRemark(request.remark());
     entity.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     entity.setPostedAt(Instant.now());
@@ -181,7 +181,7 @@ public class MaterialRequestService {
     entity.setItemQuantity(request.quantity());
     entity.setMinQuality(request.minQuality());
     entity.setOwner(owner);
-    entity.setOwningOrgUnit(ownerScopeService.currentOrgUnit().orElse(null));
+    entity.setOwningOrgUnit(requestScopeResolver.currentOrgUnit().orElse(null));
     entity.setRemark(request.remark());
     entity.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     entity.setPostedAt(Instant.now());

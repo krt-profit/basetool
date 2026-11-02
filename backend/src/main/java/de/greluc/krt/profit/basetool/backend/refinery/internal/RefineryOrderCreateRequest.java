@@ -38,8 +38,8 @@ import java.util.UUID;
  * <p>It carries no id, owner, profit, owning squadron, version or status: the owner comes from the
  * token or the path, the profit is computed, and the order always starts {@code OPEN}. {@code
  * owningOrgUnitId} is the picker output, resolved by {@code
- * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}; an inadmissible pick is rejected with
- * 400 (REQ-ORG-016).
+ * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable}; an inadmissible pick is rejected
+ * with 400 (REQ-ORG-016).
  *
  * @param location the refinery location
  * @param mission the linked mission, or {@code null}

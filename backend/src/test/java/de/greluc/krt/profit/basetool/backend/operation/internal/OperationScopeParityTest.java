@@ -85,8 +85,7 @@ class OperationScopeParityTest {
                 .map(Operation::getId)
                 .collect(Collectors.toSet()),
         (wired, id) ->
-            new OperationAccessPolicy(
-                    wired.ownerScopeService(), wired.authHelper(), operationRepository)
+            new OperationAccessPolicy(wired.gate(), wired.authHelper(), operationRepository)
                 .canSeeOperation(id));
   }
 

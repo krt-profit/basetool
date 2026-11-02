@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -61,7 +61,7 @@ class MemberEvaluationServiceTest {
 
   @Mock private MemberEvaluationMapper mapper;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private AuditService auditService;
@@ -100,7 +100,7 @@ class MemberEvaluationServiceTest {
             PromotionLevel.LEVEL_A,
             null,
             null);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(requestScopeResolver.currentSquadronId()).thenReturn(Optional.of(scopeId));
     when(repository.findAllByUserIdScoped(userA, scopeId)).thenReturn(List.of(evalA));
     when(mapper.toResponse(evalA)).thenReturn(responseA);
 

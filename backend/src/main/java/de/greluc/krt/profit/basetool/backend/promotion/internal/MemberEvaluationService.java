@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -61,7 +61,7 @@ public class MemberEvaluationService {
   private final MemberEvaluationRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
   private final PromotionAccessPolicy promotionAccessPolicy;
   private final UserService userService;
   private final AuditRecorder auditRecorder;
@@ -76,7 +76,7 @@ public class MemberEvaluationService {
         || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    UUID scope = requestScopeResolver.currentSquadronId().orElse(null);
     return repository.findAllByUserIdScoped(userId, scope).stream()
         .map(mapper::toResponse)
         .toList();
@@ -89,7 +89,7 @@ public class MemberEvaluationService {
         || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    UUID scope = requestScopeResolver.currentSquadronId().orElse(null);
     return repository.findAllByUserIdScoped(userId, scope, pageable).map(mapper::toResponse);
   }
 

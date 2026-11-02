@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -39,12 +39,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class OperationAccessPolicyClearPayoutTest {
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AccessGateService accessGateService;
   @Mock private AuthHelperService authHelper;
   @Mock private OperationRepository operationRepository;
 
   private OperationAccessPolicy policy() {
-    return new OperationAccessPolicy(ownerScopeService, authHelper, operationRepository);
+    return new OperationAccessPolicy(accessGateService, authHelper, operationRepository);
   }
 
   private Operation operationOwnedBy(UUID operationId, UUID unitId) {
@@ -64,7 +64,7 @@ class OperationAccessPolicyClearPayoutTest {
     UUID operationId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     operationOwnedBy(operationId, unitId);
-    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(true);
+    when(accessGateService.canActAsOfficerInOwner(unitId)).thenReturn(true);
 
     assertTrue(policy().canClearPayout(operationId));
   }
@@ -74,7 +74,7 @@ class OperationAccessPolicyClearPayoutTest {
     UUID operationId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     operationOwnedBy(operationId, unitId);
-    when(ownerScopeService.canActAsOfficerInOwner(unitId)).thenReturn(false);
+    when(accessGateService.canActAsOfficerInOwner(unitId)).thenReturn(false);
 
     assertFalse(policy().canClearPayout(operationId));
   }
@@ -83,7 +83,7 @@ class OperationAccessPolicyClearPayoutTest {
   void canClearPayout_OwnerlessOperation_AsksTheOwnerlessRuleOfTheScopeKernel() {
     UUID operationId = UUID.randomUUID();
     operationOwnedBy(operationId, null);
-    when(ownerScopeService.canActAsOfficerInOwner(null)).thenReturn(false);
+    when(accessGateService.canActAsOfficerInOwner(null)).thenReturn(false);
 
     assertFalse(policy().canClearPayout(operationId));
   }

@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -34,16 +35,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class HangarAccessPolicyOfficerGatesTest {
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AccessGateService accessGateService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private ShipRepository shipRepository;
 
   private HangarAccessPolicy policy() {
-    return new HangarAccessPolicy(ownerScopeService, shipRepository);
+    return new HangarAccessPolicy(requestScopeResolver, accessGateService, shipRepository);
   }
 
   @Test
   void ownerDetailsAndFittedReset_FollowTheOfficerReachOfTheActiveContext() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(true);
 
     assertTrue(policy().canSeeOwnerDetails());
     assertTrue(policy().canResetFitted());
@@ -51,7 +53,7 @@ class HangarAccessPolicyOfficerGatesTest {
 
   @Test
   void ownerDetailsAndFittedReset_AreRefusedWithoutOfficerReachInTheActiveContext() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(false);
 
     assertFalse(policy().canSeeOwnerDetails());
     assertFalse(policy().canResetFitted());

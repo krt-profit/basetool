@@ -193,7 +193,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
 
   /**
    * Whether the given user participated in at least one mission linked to the operation; backs the
-   * participant escape of {@code OwnerScopeService.canSeeOperation}. Guest participants never
+   * participant escape of {@code OperationAccessPolicy.canSeeOperation}. Guest participants never
    * match.
    *
    * @param operationId the operation to test; never {@code null}

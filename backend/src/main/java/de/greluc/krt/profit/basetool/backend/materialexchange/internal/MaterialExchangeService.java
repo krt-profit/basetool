@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -92,7 +92,7 @@ public class MaterialExchangeService {
    * badge — the item-offer counterpart of copying {@code inventoryItem.getOwningOrgUnit()} for a
    * material offer (an item offer has no source Lager row to copy from).
    */
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /**
    * Publishes the {@link MaterialExchangeInterestRegisteredEvent} that notifies the offer's owner
@@ -254,7 +254,7 @@ public class MaterialExchangeService {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setKind(MaterialExchangeOfferKind.ITEM);
     offer.setOwner(owner);
-    offer.setOwningOrgUnit(ownerScopeService.currentOrgUnit().orElse(null));
+    offer.setOwningOrgUnit(requestScopeResolver.currentOrgUnit().orElse(null));
     offer.setItemProductKey(product.productKey());
     offer.setItemName(product.productName());
     offer.setItemQuantity(request.quantity());

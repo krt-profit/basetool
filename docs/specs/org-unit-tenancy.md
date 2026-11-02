@@ -45,9 +45,9 @@ release.
 
 ### REQ-ORG-002 — Scope is enforced in the service layer
 
-Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java)
+Use [`RequestScopeResolver.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/RequestScopeResolver.java)
 for list-endpoint filters (three-component record `ScopePredicate`: `boolean adminAllScope`,
-`UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `OwnerScopeService.canSee*` /
+`UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `AccessGateService.canSee*` /
 `canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin
 get all-scope visibility; admins with a pin get the same restrictive view as a member;
 non-admins see the union of their memberships unless they pin one.
@@ -165,7 +165,7 @@ REQ-ORDERS-040, REQ-ORG-011, ADR-0301
 
 ### REQ-ORG-004 — Create-time OrgUnit stamping
 
-Stamp the OrgUnit via the central picker resolvers on `OwnerScopeService` — never read
+Stamp the OrgUnit via the central picker resolvers on `OrgUnitStampingService` — never read
 `user.getSquadron()` directly. Two variants share the §5.5.1 picker matrix (1 + no output →
 auto-stamp; 1 + valid → honoured; 1 + foreign → 400; >1 + no output → 400 (force choice); >1 +
 valid → honoured) and differ only on the **0-membership** row:
@@ -258,7 +258,7 @@ enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), ap
 
 [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
 breaks the build if a staffel-scoped service stops injecting `AuthHelperService` /
-`OwnerScopeService` (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper` — update the
+a scope-kernel service (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper` — update the
 whitelist when adding an aggregate), and `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities`
 prevents new `@JoinColumn(name = "squadron_id")`. Its allow-list names only `User`, and that
 entity no longer maps the column at all (V104 dropped `app_user`'s legacy squadron fields);
@@ -377,7 +377,7 @@ product owner called out:
   `NULL` has not happened / does not apply).
 
 Enforced in the scope kernel's `permitsOwnedRow`
-([`OwnerScopeService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java)),
+([`AccessGateService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/AccessGateService.java)),
 which the module access policies call (`canSee/canEditInventoryItem`, `canSee/canEditShip`,
 `canSee/canEditRefineryOrder`; corrected 2026-10-10, the gates had moved out of the scope hub): a shared
 `isCurrentUserOwner(owner)` check runs **before** the strict `owning_org_unit_id` scope check (and
@@ -397,7 +397,7 @@ views (`/inventory/all`, the squadron Hangar/refinery lists) still filter by `ow
 and never surface a foreign-org row, so this carve-out does **not** widen cross-org visibility of the
 shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` scope.
 
-**Enforced by:** `OwnerScopeServiceTest` (`PersonalAggregateOwnerRetainsAccessTests`),
+**Enforced by:** `ScopeKernelTest` (`PersonalAggregateOwnerRetainsAccessTests`),
 `InventoryTenancyE2eTest` (`ownerRetainsEditAfterLeavingOwningOrgUnit`) · **Code:**
 `InventoryAccessPolicy#canSeeInventoryItem` / `#canEditInventoryItem`, `HangarAccessPolicy#canSeeShip` /
 `#canEditShip`, `RefineryAccessPolicy#canSeeRefineryOrder` / `#canEditRefineryOrder` (corrected
@@ -423,7 +423,7 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
   accept them; `ddl-auto=validate` passes.
 - [x] `parent_org_unit_id` is nullable with the kind-pairing CHECK; no row can parent a kind other than
   the one its level allows; the OL row has a NULL parent.
-- [x] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
+- [x] With every `parent_org_unit_id` NULL and no leadership flags set, scope-kernel scope output
   is byte-identical to pre-change (snapshot test).
 - [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
   and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-units`
@@ -432,7 +432,7 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
-`OwnerScopeServiceTest` — the cascade is delegated to `OrgUnitCascadeService` with a no-leadership default
+`ScopeKernelTest` — the cascade is delegated to `OrgUnitCascadeService` with a no-leadership default
 stub so every pre-#692 scenario stays byte-identical (the degrade-to-flat proof), pinned structurally by
 `ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext`; the admin management UI by
 `AdminOrgStructurePageControllerMvcTest` (ADMIN gate + AJAX create/set-parent relay) and the
@@ -448,7 +448,7 @@ originally named were dropped by V187, REQ-ROLE-001) gets
 officer-equivalent reach over **all Staffeln + SKs of its Bereich** (and its Bereich's own data); the
 **OL** (rank `OL_MEMBER`) over **everything**. This reach is computed in **exactly one** helper
 `OrgUnitCascadeService.expandWithDescendants(...)` (with `cascadedOfficerReach(...)` for the
-leadership-only subset), consumed by `OwnerScopeService.currentMemberOrgUnitIds()`;
+leadership-only subset), consumed by `RequestScopeResolver.currentMemberOrgUnitIds()`;
 `ScopePredicate.permits()` and the `IN :memberOrgUnitIds` JPQL cascade automatically once fed the
 expanded set, so lists and per-row gates widen together (ADR-0026).
 
@@ -477,7 +477,7 @@ Hard invariants:
   flat `ROLE_LOGISTICIAN`/`ROLE_MISSION_MANAGER` (so `hasRole(...)` menu gates work) **and** a contextual
   `OrgUnitContextualAuthority(role, x)` for every `x` in `cascadedOfficerReach(...)` — the Bereich itself
   plus its descendants, or every org unit for the OL — so existing
-  `@PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#id, '…')")` gates (e.g. the SK material-claim
+  `@PreAuthorize("@accessGateService.hasRoleInOrgUnit(#id, '…')")` gates (e.g. the SK material-claim
   gate) resolve for the units a leader reaches.
 - The cascade **composes with** the personal-aggregate owner-bypass (REQ-ORG-011) and the opt-in global
   blueprint union ([ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)); neither is weakened —
@@ -487,7 +487,7 @@ Hard invariants:
 > **Amended by [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
 > the hangar **unit overview** (`/hangar/squadron`, the hangar tab „Org-Einheit", until 2026-10-03 the page "Org-Einheitsübersicht") is the single, deliberate
 > exception to the first hard invariant above. A non-pinned **OL member** is upgraded to
-> `adminAllScope=true` **for that one aggregation read alone** (`OwnerScopeService.currentUnitOverviewScope()`),
+> `adminAllScope=true` **for that one aggregation read alone** (`RequestScopeResolver.currentUnitOverviewScope()`),
 > so the OL's fleet view also includes ownerless personal ships (`owningOrgUnit == null`) of
 > membership-less members — which a concrete id union can never reach. The exception is read-only and
 > confined to that method: it grants **no** `isAdmin()` and leaves every other `can*` gate, scoped list
@@ -506,7 +506,7 @@ Hard invariants:
   principal.
 
 **Enforced by:** `OrgUnitCascadeServiceTest` (cascade math + strict silo + no-flag short-circuit +
-SK-lead no-cascade + per-request memoisation), `OwnerScopeServiceTest` (cascade routed into the
+SK-lead no-cascade + per-request memoisation), `ScopeKernelTest` (cascade routed into the
 scope predicate; `adminAllScope` never set),
 `CustomJwtGrantedAuthoritiesConverterTest` (flat + cascaded contextual authorities),
 `OrgHierarchyVisibilityMatrixE2eTest` (strict silo, no admin escalation, a plain member sees no Bereich
@@ -527,7 +527,7 @@ extended:
   stamping is unchanged.
 - **Create-on-behalf is authorised by `canEditOrgUnit(target)`** (cascades per REQ-ORG-015), not by
   admin-ness. This gate lives in the shared **owning-org-unit picker resolver**
-  (`OrgUnitStampingService.resolveStampedOrgUnit`, reached through the `OwnerScopeService` facade): an explicit pick is accepted when it is a DIRECT
+  (`OrgUnitStampingService.resolveStampedOrgUnit`, reached directly): an explicit pick is accepted when it is a DIRECT
   membership of the **target user** *or* an org unit the current **caller** may edit. The gate keys
   `canEditOrgUnit` on the caller while the membership set is the target user's, so the two coincide for
   every **self-service** create (caller = target) — there an ordinary member, whose `canEditOrgUnit`
@@ -572,7 +572,7 @@ extended:
   stays profit-eligible Staffel/SK only — Bereiche/OL are never profit-eligible, so they can be the
   customer but never the processor.
 
-**Enforced by:** `OwnerScopeServiceTest` (the `BereichOlOwnershipStampingTests` nest — Bereich **and OL**
+**Enforced by:** `ScopeKernelTest` (the `BereichOlOwnershipStampingTests` nest — Bereich **and OL**
 resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `canEditOrgUnit`, the
 caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
 read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
@@ -628,7 +628,7 @@ Staffel" and silently strip the member's memberships.
 Two-Staffel support is then honoured **project-wide** so a dual-Staffel member is never silently
 dropped to one:
 
-- **Active single Staffel** — `OwnerScopeService.currentSquadronId()` / `readPersistentSquadronFromUser`
+- **Active single Staffel** — `RequestScopeResolver.currentSquadronId()` / `readPersistentSquadronFromUser`
   (the single value used for create-time auto-stamp and current-context surfaces) is pin-aware for
   non-admins, mirroring `currentScopePredicate()`: an `X-Active-Org-Unit-Id` pin onto one of the
   caller's Staffeln wins; otherwise it falls back to the deterministic **name-sorted primary** (the
@@ -713,7 +713,7 @@ served by `MissionService.updateOwningOrgUnit` and recorded as the audited
 
 1. Per-mission write gate `@missionAccessPolicy.canChangeOwner` — the same gate as the user-owner
    change beside it: admin, a scope-officer who may edit the mission, or the mission owner.
-2. Target gate `OwnerScopeService.resolveReassignTargetOrgUnit` — an **admin** may assign to any
+2. Target gate `OrgUnitStampingService.resolveReassignTargetOrgUnit` — an **admin** may assign to any
    OrgUnit or to ownerless; a **non-admin** may only pick a target that is one of their direct
    memberships or within their editable scope (`canEditOrgUnit`, the REQ-ORG-016 cascade), and may
    pick **ownerless only when membershipless** (mirroring who may create an ownerless mission). An
@@ -747,7 +747,7 @@ badge in place (REQ-FE-001).
   does **not** 409.
 
 **Decided by:** ADR-0050. **Enforced by:** `MissionServiceSectionPatchTest` /
-`MissionServiceLifecycleTest` (happy path, 409, target validation, audit), `OwnerScopeServiceTest`
+`MissionServiceLifecycleTest` (happy path, 409, target validation, audit), `ScopeKernelTest`
 (`resolveReassignTargetOrgUnit`), `MissionControllerSecurityTest` (the `canChangeOwner` gate).
 
 ### REQ-ORG-019 — Bereich and OL own their bank accounts through the org-unit FK
@@ -917,7 +917,7 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
 - **The write gate is selected by what a controller writes, not by its name.** A controller that
   injects a bean writing tenant data or the org-unit tree (`save*`, `delete*` or a `@Modifying`
   query on its repository) has each write mapping with a `UUID` path variable checked: the effective
-  `@PreAuthorize` must gate **every** top-level `or` branch on a scope bean (`ownerScopeService`,
+  `@PreAuthorize` must gate **every** top-level `or` branch on a scope bean (`requestScopeResolver`, `accessGateService`,
   `accessGateService`, `missionAccessPolicy`, `specialCommandSecurityService`,
   `orgRoleManagementSecurityService`) or on `hasRole('ADMIN')` alone, read from the SpEL syntax tree.
   A handler whose scope check lives in the service layer is listed with its reason and must reach a

@@ -47,7 +47,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvide
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -100,7 +101,8 @@ public class MissionService implements MissionCommands {
   private final OperationSummaryProvider operationSummaryProvider;
   private final MissionDeletionObserver missionDeletionObserver;
   private final UserService userService;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
   private final MissionTimelineService missionTimelineService;
@@ -131,12 +133,13 @@ public class MissionService implements MissionCommands {
   /**
    * Returns the missions for the Lager mission pickers: all visible {@code PLANNED} / {@code
    * ACTIVE} missions plus {@code COMPLETED} / {@code CANCELLED} ones planned within the last three
-   * months, scoped via {@link OwnerScopeService#currentScopePredicate()}.
+   * months, scoped via {@link RequestScopeResolver#currentScopePredicate()}.
    *
    * @return lightweight reference projection of the picker-visible missions for the caller
    */
   public List<MissionReferenceDto> findAllActiveReference() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
+    ScopePredicate scope =
+        requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     Instant terminalCutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
     return missionRepository.findAllActiveReference(
         scope.adminAllScope(),
@@ -203,7 +206,8 @@ public class MissionService implements MissionCommands {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
     Boolean effectiveIsInternal = isInternal;
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
+    ScopePredicate scope =
+        requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     return missionRepository.searchMissions(
         LikePatterns.escapeNullable(query),
         start,
@@ -251,7 +255,7 @@ public class MissionService implements MissionCommands {
    * @return the next mission, or empty when none upcoming
    */
   public Optional<Mission> getNextMission() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
     Instant now = Instant.now();
     Optional<Mission> next;
     if (scope.adminAllScope()) {
@@ -277,7 +281,7 @@ public class MissionService implements MissionCommands {
    * @return the missions with their owning org unit loaded, empty when none is upcoming
    */
   public List<Mission> getUpcomingOwnAndSignedUp(int limit) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
     Instant now = Instant.now();
     UUID userId = authHelperService.currentUserId().orElse(null);
     List<Mission> visible = new ArrayList<>();
@@ -366,10 +370,10 @@ public class MissionService implements MissionCommands {
 
     if (mission.getOwner() != null) {
       mission.setOwningOrgUnit(
-          ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
               mission.getOwner(), request.owningOrgUnitId()));
     } else {
-      ownerScopeService.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
+      requestScopeResolver.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
     }
     requireOwningOrgUnitForInternal(mission.getIsInternal(), mission.getOwningOrgUnit());
 
@@ -886,7 +890,7 @@ public class MissionService implements MissionCommands {
         missionId);
 
     OrgUnit previous = mission.getOwningOrgUnit();
-    OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
+    OrgUnit target = orgUnitStampingService.resolveReassignTargetOrgUnit(targetOrgUnitId);
     requireOwningOrgUnitForInternal(mission.getIsInternal(), target);
     mission.setOwningOrgUnit(target);
     Mission saved = missionRepository.save(mission);

@@ -61,7 +61,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | Package | What lives there |
 | --- | --- |
 | `controller` | REST endpoints, `@PreAuthorize`, `@Valid`, RFC 7807 problem responses |
-| `service` | Business rules, transactions, audit recording; the **scoping** hub (`OwnerScopeService`) lives in the `scope` module since P4-6 |
+| `service` | Business rules, transactions, audit recording; the **scoping** kernel (`RequestScopeResolver`, `AccessGateService`) lives in the `scope` module since P4-6 |
 | `repository` | Spring Data JPA; fetch strategies that keep the no-N+1 rule |
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |

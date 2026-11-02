@@ -61,7 +61,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -92,7 +92,7 @@ class ExchangeDemandServiceTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private PersonalBlueprintRepository blueprintRepository;
   @Mock private BlueprintVariantFamilyResolver familyResolver;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private ExchangeOrgUnitService orgUnitService;
   @InjectMocks private ExchangeDemandService service;
 
@@ -102,7 +102,7 @@ class ExchangeDemandServiceTest {
 
   @BeforeEach
   void setUp() {
-    lenient().when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    lenient().when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     stock = mock(OrderLinkedStockIndex.class);
     lenient().when(stockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(stock);
     lenient()
@@ -126,7 +126,7 @@ class ExchangeDemandServiceTest {
 
   @Test
   void aMemberWhoFailsTheJobOrderGateGetsNotPermittedAndNothingIsRead() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
 
@@ -148,7 +148,7 @@ class ExchangeDemandServiceTest {
 
     assertThat(demand.reason()).isNull();
     assertThat(demand.materials()).hasSize(1);
-    verify(ownerScopeService).canViewJobOrders();
+    verify(requestScopeResolver).canViewJobOrders();
   }
 
   @Test
@@ -372,7 +372,7 @@ class ExchangeDemandServiceTest {
 
   @Test
   void theJobOrderGateAppliesBeforeTheDetails() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
 

@@ -58,7 +58,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -98,7 +98,7 @@ class MaterialRequestServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private ExchangeItemReferences exchangeItemReferences;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialRequestService> selfProvider;
@@ -127,7 +127,7 @@ class MaterialRequestServiceTest {
             auditService,
             boardService,
             blueprintProductService,
-            ownerScopeService,
+            requestScopeResolver,
             eventPublisher,
             selfProvider);
     owner = user(ownerId, "Suchende");
@@ -257,7 +257,7 @@ class MaterialRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
-    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
 
     MaterialRequestDto dto =
         service.createMaterialRequest(
@@ -295,7 +295,7 @@ class MaterialRequestServiceTest {
         .thenReturn(
             Optional.of(
                 new ResolvedProduct("venture_helmet", "Venture Helmet", UUID.randomUUID())));
-    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
 
     MaterialRequestDto dto =
         service.createItemRequest(

@@ -82,7 +82,7 @@ public class Operation extends AbstractEntity<UUID> {
 
   /**
    * Org-unit owner of this operation, stamped by the caller via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}.
+   * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable}.
    *
    * <p>{@code null} marks an organisation-wide leadership operation, visible to organisation
    * members and above only (REQ-ORG-009).

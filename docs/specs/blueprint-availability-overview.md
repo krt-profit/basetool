@@ -105,7 +105,7 @@ in-scope owners (placeholder „Blueprint oder Person suchen …"), read only wh
 ## Out of scope
 
 - The availability list aggregation itself (page load, one query per view) and its
-  scope-gate — see `PersonalBlueprintOverviewService` and `OwnerScopeService`.
+  scope-gate — see `PersonalBlueprintOverviewService` and `RequestScopeResolver`.
 - The identically-structured expandable rows on other pages (e.g. the squadron hangar);
   they have their own row counts and are governed by their own specs.
 

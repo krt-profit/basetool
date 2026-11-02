@@ -261,7 +261,7 @@ independent of org-unit membership**: a bank employee or bank manager may, but n
 not, also be a member of a Staffel, Spezialkommando or any other org unit. Org-unit
 memberships neither qualify nor disqualify anyone for the bank, and joining or leaving
 an org unit has **no effect** on bank roles, grants or access. Consequently, bank
-authorization decisions **never consult org-unit scope**: `OwnerScopeService` scoping,
+authorization decisions **never consult org-unit scope**: org-unit scope-service scoping (`RequestScopeResolver`, `AccessGateService`),
 contextual `ROLE_X@orgUnitId` authorities and the `X-Active-Org-Unit-Id` admin pin have
 no influence on any bank gate — `BankSecurityService` evaluates only the bank roles and
 the grant table.
@@ -271,7 +271,7 @@ the grant table.
 > against, their own org unit's account. This does **not** weaken the rule above:
 > `BankSecurityService` and the ledger stay 100% org-unit-blind. All org-unit logic is
 > isolated in one deliberately non-`Bank*`-named seam, `OrgUnitBankAccessService` (ADR-0020),
-> which is the **only** class permitted to bridge `OwnerScopeService` and the bank
+> which is the **only** class permitted to bridge the org-unit scope services and the bank
 > (pinned by `ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`). The officer/lead
 > surface lives beside the bank-employee one at `/api/v1/bank/org-units/**` (moved there from
 > `/api/v1/org-units/bank/**` in wave 4 of the API cut) and is decided in that seam, not by a bank role.
@@ -541,7 +541,7 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > Bereichsfarbe (`--color-dept-*`, REQ-ORG-026), mirroring the org chart. The account→Bereich mapping
 > is a display-only owner-label read resolved from the account's owning org unit + its parent via one
 > bounded query (no per-account N+1); the bank stays org-unit-blind (REQ-BANK-008 —
-> `BankDashboardService` reads `OrgUnitRepository`, never `OwnerScopeService`). The account-name
+> `BankDashboardService` reads `OrgUnitRepository`, never an org-unit scope service). The account-name
 > filter (REQ-BANK-046) applies across every view.
 >
 > **Amended (2026-07-05) — view options as checkboxes + dashboard Kontobewegung CTA:** the two per-user view options are now **independent checkboxes** (a "Tabellenansicht" toggle and a "Nach Bereich gruppieren" toggle, `bank.dashboard.view.tableToggle` / `.groupToggle`) rather than filled orange segmented buttons — **both unchecked is the default card grid ordered A→Z**; each still persists per user in `localStorage` and replays through the `layout` / `group` query parameters on the `bankGrid` fragment swap (`bank.js` reads their `checked` state on `change`, not a button's `aria-pressed`). The dashboard header additionally gains the shared direct-booking **"Kontobewegung"** CTA + unified movement modal (REQ-BANK-023/-017, shown when an active account exists); a successful booking re-renders the `bankGrid` in place so balances and 30-day deltas refresh without a reload (`bankGrid` refresh target, REQ-FE-005). The **Verwaltung / Berechtigungen** links are removed from the header — they remain reachable from the sidebar (`nav.bank.manage` / `nav.bank.grants`) — while the three-month report stays bank-management-only. `BankPageController#addMovementModalData` assembles the modal's catalogs (active accounts, holders, counterparty users, org units, fee rate) only on the full-page render, not the `bankGrid` fragment swap, and reuses the unchanged `/deposits` · `/withdrawals` · `/transfers` endpoints, so this adds **no new endpoint, audit event or metric**.
@@ -841,9 +841,9 @@ org-unit-blind.
   delta/sparkline aggregates only.
 - [x] Each card shows the 30-day delta + sparkline trend, derived from the windowed posting slices
   with no per-account N+1 (`OrgUnitBankAccessServiceTest`, frontend `OrgUnitBankPageControllerMvcTest`).
-- [x] The seam is the only class bridging `OwnerScopeService` and the bank — any bank-domain class,
+- [x] The seam is the only class bridging the org-unit scope services and the bank — any bank-domain class,
   the accounts repository included (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
-  never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
+  never depends on an org-unit scope service (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
 - [x] A client-side account-name live filter sits above the Konten list and hides non-matching
@@ -1169,7 +1169,7 @@ Bereich/OL are first-class `org_unit` rows (REQ-ORG-014), an `AREA` account poin
 per org unit for free (one `AREA` per Bereich, one `CARTEL` per OL). `V168` only **relaxes the
 `chk_bank_account_owner_ref` CHECK** (no column, no backfill — the legacy `areaName` form stays valid
 during the soak; `BankAccountService` validates `kind = BEREICH`/`ORGANISATIONSLEITUNG` on creation). The
-seam uses the cascading `OwnerScopeService.currentOversightScope()` for the F1 view; since REQ-BANK-039
+seam uses the cascading `RequestScopeResolver.currentOversightScope()` for the F1 view; since REQ-BANK-039
 the F2 request gate is `canView(account)` (request-capable types only), and the balance DTO's
 `canRequest` flag now marks any request-capable account the caller may view. The bank-management create
 form sources its picker from `GET /api/v1/org-units/active-all-kinds` (all four kinds) and filters the
@@ -1177,11 +1177,11 @@ options by the selected account type.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (cascading view incl. AREA + child accounts and the
 foreign-Bereich exclusion, view-based request eligibility per REQ-BANK-039),
-`OwnerScopeServiceTest` (`CurrentOversightScopeTests` cascade, `CurrentOwnLevelOversightScopeTests`,
+`ScopeKernelTest` (`CurrentOversightScopeTests` cascade, `CurrentOwnLevelOversightScopeTests`,
 `CanAccessBlueprintOverviewTests` Bereich/OL), `BankAccountServiceTest` (AREA→Bereich / CARTEL→OL
 creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax + one-account-per-org-unit),
 `ArchitectureTest` (both bank pins) · **Code:** `bank/internal/OrgUnitBankAccessService`,
-`scope/api/OwnerScopeService#currentOversightScope` (the own-level scope was removed 2026-10-10, unused since REQ-BANK-039),
+`scope/api/RequestScopeResolver#currentOversightScope` (the own-level scope was removed 2026-10-10, unused since REQ-BANK-039),
 `bank/internal/BankAccountService`, `db/migration/V168`, `orgunit/web/OrgUnitController#listActiveOrgUnitsAllKinds`,
 `templates/bank/bank-manage.html` + `static/js/bank/bank.js`, `templates/bank/org-unit-bank.html` ·
 **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) · **Issues:** #692, #699.
@@ -1220,7 +1220,7 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 
 - [x] A Bereich/OL overseer (or admin) sees the active `SPECIAL` accounts, view-only (`canRequest`
   false) and without an org-unit identity; an officer / SK lead does not see them
-  (`OrgUnitBankAccessServiceTest`, `OwnerScopeServiceTest.CurrentUserHasAreaOrOlOversightTests`).
+  (`OrgUnitBankAccessServiceTest`, `ScopeKernelTest.CurrentUserHasAreaOrOlOversightTests`).
 - [x] A `CLOSED` account (org-unit or special) never appears on the page; only `ACTIVE` accounts are
   listed (`OrgUnitBankAccessServiceTest`).
 - [x] A booking request cannot target a special account (it carries no org unit; the F2 own-level
@@ -1231,10 +1231,10 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
   green; the bank stays org-unit-blind.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (special-account view-only + active-only filter),
-`OwnerScopeServiceTest` (`CurrentUserHasAreaOrOlOversightTests`), `OrgUnitBankControllerTest`, frontend
+`ScopeKernelTest` (`CurrentUserHasAreaOrOlOversightTests`), `OrgUnitBankControllerTest`, frontend
 `OrgUnitBankPageControllerMvcTest`, `ArchitectureTest` (both bank pins) · **Code:**
 `bank/internal/OrgUnitBankAccessService#listOverseenOrgUnitBalances`,
-`scope/api/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter`, `bank/internal/OrgUnitBankBalanceDto`, frontend
+`scope/api/RequestScopeResolver#currentUserIsOlMember` / `#currentUserIsBereichsleiter`, `bank/internal/OrgUnitBankBalanceDto`, frontend
 `templates/bank/org-unit-bank.html` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md)
 (amendment) · **Issues:** #666, #692.
 
@@ -1613,7 +1613,7 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
   **tightens** the prior REQ-BANK-028 rule (which granted SPECIAL to all Bereich oversight ranks):
   Bereichskoordinatoren/-operatoren and officers no longer auto-see Sonderkonten.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/RequestScopeResolver#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 #### The Sonderkonto role audiences are retired (ADR-0300)
 
@@ -1972,7 +1972,7 @@ Withdrawals and transfers are **unchanged**: still gated by `canView` + `isReque
 (REQ-BANK-039), restricted to `ORG_UNIT` / `AREA` / `CARTEL`, and subject to the per-tier approval
 limits (REQ-BANK-041). The carve-out lives entirely in the `OrgUnitBankAccessService` seam, so the
 bank stays org-unit-blind (REQ-BANK-008): the deposit branch of `createBookingRequest` consults
-neither `OwnerScopeService` nor the limit rows. The org-unit bank page reflects this — the request
+neither an org-unit scope service nor the limit rows. The org-unit bank page reflects this — the request
 CTA + modal are shown whenever any active account exists, the (merged) source picker lists every
 active account for a deposit but narrows to the caller's request-capable accounts for a
 withdrawal/transfer, and no approval-limit warning is shown for a deposit.
@@ -2012,7 +2012,7 @@ entering the bank) and never applies to a withdrawal or transfer.
   never split targets. The **named account is excluded** from the distribution set (even when it is
   itself a squadron account): it only ever receives the remainder. The enumeration reads the
   `org_unit.kind` via `OrgUnit#getKind()` (an owner *label*, not a scope), so the bank stays
-  org-unit-blind (REQ-BANK-008) — no `OwnerScopeService`, both ArchUnit pins green.
+  org-unit-blind (REQ-BANK-008) — no org-unit scope service, both ArchUnit pins green.
 - **Math (whole-aUEC, REQ-BANK-005).** `slice = round(gross × P / 100)` (HALF_UP, whole). The slice
   is split across the `N` squadron accounts with the **largest-remainder** rule: `base = floor(slice
   / N)`, and the leftover `slice − base·N` aUEC go one each to the first accounts by ascending id, so
@@ -2995,7 +2995,7 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
   over the active accounts (REQ-BANK-021, -035, -037). The bank-staff view (`/bank`) does not count.
   Every member sees at least the KRT (`CARTEL`) account, so the result is never empty for a member.
 - **Context-free set.** The set is computed for the caller's whole reach and does not follow the
-  active org-unit pin (`OwnerScopeService#currentOversightScopeIgnoringPin`; an admin sees every
+  active org-unit pin (`RequestScopeResolver#currentOversightScopeIgnoringPin`; an admin sees every
   active account); only the order below uses the active context.
 - **Paged and sorted in the backend.** The read takes the standard `page` / `size` and answers a
   `PageResponse` (REQ-API-005) with the true `totalElements`; visibility is decided in Java, so the
@@ -3027,7 +3027,7 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
 **Enforced by:** `OrgUnitBankAccessServiceTest` (visible set equals the page's set unpinned, pin
 ignored for the set, KRT for a plain member, active context), `OrgUnitBankVisibleAccountsQueryTest`
 (backend order, paging, figures), `OrgUnitBankControllerTest` (route, member gate, `page` / `size`
-binding, no sort), `OrgUnitBankVisibleAccountDtoTest` (no holder field), `OwnerScopeServiceTest`
+binding, no sort), `OrgUnitBankVisibleAccountDtoTest` (no holder field), `ScopeKernelTest`
 (pin-free oversight scope), `AuthorizationMatrixTest`, `NoStoreApiScopesTest` · **Code:**
 `bank/internal/OrgUnitBankAccessService#listViewableActiveAccounts`,
 `bank/internal/OrgUnitBankVisibleAccountsQuery`, `bank/internal/OrgUnitBankVisibleAccountDto`,

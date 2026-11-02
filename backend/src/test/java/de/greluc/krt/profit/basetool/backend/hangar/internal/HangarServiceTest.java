@@ -47,6 +47,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -75,7 +78,9 @@ class HangarServiceTest {
   @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private EntityManager entityManager;
   @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserRepository userRepository;
-  @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private AccessGateService accessGateService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -281,7 +286,8 @@ class HangarServiceTest {
     unitless.setOwner(owner);
     List<UUID> ids = List.of(inFrom.getId(), unitless.getId());
     when(shipRepository.lockAllByIdOrderById(ids)).thenReturn(List.of(inFrom, unitless));
-    when(ownerScopeService.resolveOwnerMembershipTarget(owner, target.getId())).thenReturn(target);
+    when(orgUnitStampingService.resolveOwnerMembershipTarget(owner, target.getId()))
+        .thenReturn(target);
 
     hangarService.bulkChangeShipOrgUnit(userId, ids, target.getId());
 
@@ -340,7 +346,7 @@ class HangarServiceTest {
     when(a.getShipCount()).thenReturn(3L);
     when(b.getOwnerId()).thenReturn(second);
     when(b.getShipCount()).thenReturn(1L);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(shipRepository.countFittedByOwnerScoped(false, null, Set.of())).thenReturn(List.of(a, b));
     when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(4);
@@ -413,10 +419,10 @@ class HangarServiceTest {
   void resetAllFittedStatus_unpinnedOfficer_resetsOnlyTheUnitsInReach() {
     UUID reachedUnit = UUID.randomUUID();
     UUID foreignUnit = UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
-    when(ownerScopeService.canActAsOfficerIn(reachedUnit)).thenReturn(true);
-    when(ownerScopeService.canActAsOfficerIn(foreignUnit)).thenReturn(false);
+    when(accessGateService.canActAsOfficerIn(reachedUnit)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(foreignUnit)).thenReturn(false);
     when(shipRepository.resetAllFittedScoped(false, null, Set.of(reachedUnit))).thenReturn(2);
     when(userService.currentActor()).thenReturn(ACTOR);
 
@@ -428,9 +434,9 @@ class HangarServiceTest {
   @Test
   void resetAllFittedStatus_pinnedUnit_resetsThePinnedUnitOnly() {
     UUID pinned = UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pinned, Set.of(UUID.randomUUID())));
-    when(ownerScopeService.canActAsOfficerIn(pinned)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(pinned)).thenReturn(true);
     when(shipRepository.resetAllFittedScoped(false, null, Set.of(pinned))).thenReturn(0);
 
     hangarService.resetAllFittedStatus();
@@ -440,19 +446,19 @@ class HangarServiceTest {
 
   @Test
   void resetAllFittedStatus_adminAllScope_staysUnnarrowed() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(shipRepository.resetAllFittedScoped(true, null, Set.of())).thenReturn(0);
 
     hangarService.resetAllFittedStatus();
 
     verify(shipRepository).resetAllFittedScoped(true, null, Set.of());
-    verify(ownerScopeService, never()).canActAsOfficerIn(any());
+    verify(accessGateService, never()).canActAsOfficerIn(any());
   }
 
   @Test
   void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(0, 4);
     org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ACTOR);
@@ -488,7 +494,7 @@ class HangarServiceTest {
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));
     org.mockito.Mockito.when(
-            ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
+            orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(resolved);
     org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
         .thenAnswer(i -> i.getArguments()[0]);
@@ -501,7 +507,8 @@ class HangarServiceTest {
     org.junit.jupiter.api.Assertions.assertSame(
         resolved,
         saved.getOwningOrgUnit(),
-        "picker output must flow through OwnerScopeService.resolveOrgUnitForPickerOutputNullable");
+        "picker output must flow through"
+            + " OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable");
     verify(unitLiveSync).shipsChanged(List.of(resolved));
   }
 
@@ -520,7 +527,8 @@ class HangarServiceTest {
         .thenReturn(java.util.Optional.of(user));
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));
-    org.mockito.Mockito.when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null))
+    org.mockito.Mockito.when(
+            orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, null))
         .thenReturn(null);
     org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
         .thenAnswer(i -> i.getArguments()[0]);
@@ -541,7 +549,7 @@ class HangarServiceTest {
   void getSquadronOverview_withOwnerDetails_scopesDetailLookupBySamePredicateAsCounts() {
     UUID squadronId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentUnitOverviewScope())
+    when(requestScopeResolver.currentUnitOverviewScope())
         .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
 
     ShipType fighter = new ShipType();
@@ -561,7 +569,7 @@ class HangarServiceTest {
     inScopeShip.setOwner(owner);
     inScopeShip.setFitted(true);
     inScopeShip.setOwningOrgUnit(unit(squadronId));
-    when(ownerScopeService.canActAsOfficerInOwner(squadronId)).thenReturn(true);
+    when(accessGateService.canActAsOfficerInOwner(squadronId)).thenReturn(true);
     when(shipRepository.findByShipTypeInScoped(List.of(fighter), false, squadronId, Set.of()))
         .thenReturn(List.of(inScopeShip));
     when(shipTypeMapper.toDto(any())).thenReturn(null);
@@ -580,7 +588,7 @@ class HangarServiceTest {
     UUID reachedUnit = UUID.randomUUID();
     UUID foreignUnit = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentUnitOverviewScope())
+    when(requestScopeResolver.currentUnitOverviewScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
     ShipType fighter = new ShipType();
     fighter.setId(UUID.randomUUID());
@@ -593,9 +601,9 @@ class HangarServiceTest {
     when(shipRepository.findByShipTypeInScoped(
             eq(List.of(fighter)), eq(false), isNull(), eq(Set.of(reachedUnit, foreignUnit))))
         .thenReturn(List.of(reached, foreign, ownerless));
-    when(ownerScopeService.canActAsOfficerInOwner(reachedUnit)).thenReturn(true);
-    when(ownerScopeService.canActAsOfficerInOwner(foreignUnit)).thenReturn(false);
-    when(ownerScopeService.canActAsOfficerInOwner(null)).thenReturn(false);
+    when(accessGateService.canActAsOfficerInOwner(reachedUnit)).thenReturn(true);
+    when(accessGateService.canActAsOfficerInOwner(foreignUnit)).thenReturn(false);
+    when(accessGateService.canActAsOfficerInOwner(null)).thenReturn(false);
 
     var details = hangarService.getSquadronOverview(pageable, true, null).getContent().get(0);
 
@@ -609,7 +617,7 @@ class HangarServiceTest {
   void getSquadronOverview_normalizesBlankQueryToNullAndTrimsTerms() {
     UUID squadronId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 10);
-    when(ownerScopeService.currentUnitOverviewScope())
+    when(requestScopeResolver.currentUnitOverviewScope())
         .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
     Page<Object[]> empty = new PageImpl<>(List.of(), pageable, 0);
     when(shipRepository.countShipsByType(

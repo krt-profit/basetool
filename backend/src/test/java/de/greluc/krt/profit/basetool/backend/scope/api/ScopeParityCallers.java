@@ -51,8 +51,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The caller matrix of the scope-fragment parity tests (REQ-DATA-010), wired on the real scope
  * kernel: the nine callers of the access-policy differential tests, each with the {@link
- * ScopePredicate} the list queries receive and the {@link OwnerScopeService} the access policies
- * ask.
+ * ScopePredicate} the list queries receive and the {@link RequestScopeResolver} and {@link
+ * AccessGateService} the access policies ask.
  *
  * <p>The units are real rows of the test schema, so a list query can match them; the Bereich that
  * reaches the child Staffel through the cascade exists only in the memberships.
@@ -86,13 +86,15 @@ public final class ScopeParityCallers {
    *
    * @param caller the scenario
    * @param predicate the scope vector the list queries receive
-   * @param ownerScopeService the hub the access policies ask
+   * @param resolver the request-scoped context the access policies ask
+   * @param gate the authorization gates the access policies ask
    * @param authHelper the caller's identity and roles
    */
   public record Wired(
       Caller caller,
       ScopePredicate predicate,
-      OwnerScopeService ownerScopeService,
+      RequestScopeResolver resolver,
+      AccessGateService gate,
       AuthHelperService authHelper) {}
 
   /**
@@ -177,9 +179,7 @@ public final class ScopeParityCallers {
             new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
             request);
     AccessGateService gate = new AccessGateService(resolver, authHelper);
-    OwnerScopeService ownerScopeService =
-        new OwnerScopeService(resolver, gate, mock(OrgUnitStampingService.class));
-    return new Wired(caller, resolver.currentScopePredicate(), ownerScopeService, authHelper);
+    return new Wired(caller, resolver.currentScopePredicate(), resolver, gate, authHelper);
   }
 
   /**

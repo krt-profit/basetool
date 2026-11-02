@@ -73,7 +73,7 @@ side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ
 - [ ] A requester edit records a `byRequester=true` audit event and publishes a
   `JobOrderUpdatedByRequesterEvent`.
 
-**Enforced by:** `OwnerScopeServiceTest` (RequesterEscapeGateTests), `JobOrderServiceTest`
+**Enforced by:** `ScopeKernelTest` (RequesterEscapeGateTests), `JobOrderServiceTest`
 (updateJobOrderAsRequester\_\*) · **Code:** `JobOrderAccessPolicy.canSeeJobOrderAsRequester` /
 `canEditJobOrderAsRequester` (via the private `isOrderRequesterRow` →
 `RequestScopeResolver.currentUserIsMemberOfOrgUnit`), `RequestScopeResolver`

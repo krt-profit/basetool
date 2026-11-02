@@ -71,7 +71,7 @@ import org.springframework.web.bind.annotation.RestController;
  * update and delete.
  *
  * <p>Reads and mutations are limited to the caller's visibility scope via {@code
- * @ownerScopeService}: SK-responsible orders are public, squadron-responsible orders private to
+ * @accessGateService}: SK-responsible orders are public, squadron-responsible orders private to
  * that squadron and admins. Creation needs a login only (ADR-0149); other mutations require
  * LOGISTICIAN or above, delete requires ADMIN. Handovers live in {@link
  * JobOrderHandoverController}, materials and linked stock in {@link JobOrderMaterialController}.
@@ -252,7 +252,7 @@ public class JobOrderController {
       description =
           "Returns a paginated list of the orders the caller's own org unit(s) requested"
               + " (Auftraggeber view), redacted (no Bearbeiter / no materials summary).")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canViewOwnJobOrders()")
+  @PreAuthorize("isAuthenticated() and @requestScopeResolver.canViewOwnJobOrders()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getRequestedJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,

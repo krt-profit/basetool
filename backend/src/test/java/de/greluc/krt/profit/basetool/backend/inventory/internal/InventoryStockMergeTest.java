@@ -44,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -74,7 +73,6 @@ class InventoryStockMergeTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private StockOfferLookup stockOfferLookup;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private OwnerScopeService ownerScopeService;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;

@@ -47,7 +47,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTa
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -81,7 +80,6 @@ class InventoryItemServiceAllocationTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private InventoryEarmarkLookup earmarkTargets;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private AuditService auditService;
   @Mock private InventoryAggregationService inventoryAggregationService;

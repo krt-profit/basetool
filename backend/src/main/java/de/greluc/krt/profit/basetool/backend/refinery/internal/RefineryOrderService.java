@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.Objects;
@@ -72,6 +73,7 @@ public class RefineryOrderService {
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
   private final OwnerScopeService ownerScopeService;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
 
   /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
@@ -128,7 +130,7 @@ public class RefineryOrderService {
 
     order.setOwner(user);
     order.setOwningOrgUnit(
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId));
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId));
     if (onBehalf) {
       ownerScopeService.requireLogisticianInOwner(order.getOwningOrgUnit());
     }

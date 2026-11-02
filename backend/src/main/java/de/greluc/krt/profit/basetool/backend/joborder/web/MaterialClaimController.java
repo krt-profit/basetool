@@ -106,7 +106,7 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order not found")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canViewJobOrders()")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @requestScopeResolver.canViewJobOrders()")
   public ClaimDto upsertClaim(
       @PathVariable UUID jobOrderId, @RequestBody @Valid CreateClaimDto dto) {
     return materialClaimService.upsertClaim(jobOrderId, dto);
@@ -129,7 +129,7 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order or claim not found")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canViewJobOrders()")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @requestScopeResolver.canViewJobOrders()")
   public void withdrawClaim(@PathVariable UUID jobOrderId, @PathVariable UUID claimId) {
     materialClaimService.withdrawClaim(jobOrderId, claimId);
   }

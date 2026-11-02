@@ -33,7 +33,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionScope;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -66,7 +66,7 @@ public class MissionAccessPolicy implements MissionVisibility {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "missionAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final MissionRepository missionRepository;
   private final UserService userService;
@@ -378,7 +378,7 @@ public class MissionAccessPolicy implements MissionVisibility {
 
   /** Whether the caller holds the Mission Manager grant for the unit that owns {@code mission}. */
   private boolean holdsMissionManagerGrant(@NotNull Mission mission) {
-    return ownerScopeService.canManageMissionsOf(OrgUnit.idOf(mission.getOwningOrgUnit()));
+    return accessGateService.canManageMissionsOf(OrgUnit.idOf(mission.getOwningOrgUnit()));
   }
 
   /**
@@ -386,7 +386,7 @@ public class MissionAccessPolicy implements MissionVisibility {
    * mission is reserved to admins.
    */
   private boolean hasOfficerReachInOwningUnit(@NotNull Mission mission) {
-    return ownerScopeService.canActAsOfficerInOwner(OrgUnit.idOf(mission.getOwningOrgUnit()));
+    return accessGateService.canActAsOfficerInOwner(OrgUnit.idOf(mission.getOwningOrgUnit()));
   }
 
   private boolean canSeeMissionChain(@NotNull Mission mission) {
@@ -404,7 +404,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return !internal || authHelper.isMemberOrAbove();
     }
     return !internal
-        || ownerScopeService.canSeeSquadronAsGrantee(
+        || accessGateService.canSeeSquadronAsGrantee(
             mission.getOwningOrgUnit().getId(), Roles.MISSION_MANAGER);
   }
 }

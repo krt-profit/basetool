@@ -57,7 +57,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.Arrays;
@@ -99,7 +99,7 @@ class ExchangeDemandParityTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private PersonalBlueprintRepository blueprintRepository;
   @Mock private BlueprintVariantFamilyResolver familyResolver;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private MaterialClaimService materialClaimService;
   @Mock private SquadronMapper squadronMapper;
 
@@ -122,12 +122,12 @@ class ExchangeDemandParityTest {
             materialRepository,
             blueprintRepository,
             familyResolver,
-            ownerScopeService,
+            requestScopeResolver,
             null);
     web =
         new JobOrderMaterialDemandService(
             jobOrderRepository,
-            ownerScopeService,
+            requestScopeResolver,
             requirementResolver,
             stockProjectionService,
             materialClaimService,
@@ -184,7 +184,7 @@ class ExchangeDemandParityTest {
 
   @Test
   void theJobOrderGateWithholdsTheDemandOnBothSurfaces() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     MaterialDemandOverviewDto overview = web.getMaterialDemandOverview();
     ExchangeOrgDemandDto demand = exchange.demand(MEMBER, false);
@@ -287,8 +287,8 @@ class ExchangeDemandParityTest {
     List<JobOrder> list = Arrays.asList(orders);
     when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(units);
     when(jobOrderRepository.findOpenForExchangeDemand(any(), eq(units))).thenReturn(list);
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, units));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(false), eq(null), eq(units)))

@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -81,7 +81,7 @@ class HangarImportServiceTest {
   @Mock private ShipRepository shipRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private UserRepository userRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private AuditService auditService;
   @Mock private HangarUnitLiveSync unitLiveSync;
 
@@ -97,14 +97,14 @@ class HangarImportServiceTest {
             shipTypeRepository,
             userRepository,
             objectMapper,
-            ownerScopeService,
+            orgUnitStampingService,
             auditService,
             unitLiveSync);
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stubSquadron =
         new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     stubSquadron.setId(UUID.randomUUID());
     org.mockito.Mockito.lenient()
-        .when(ownerScopeService.resolveOrgUnitForImport(any()))
+        .when(orgUnitStampingService.resolveOrgUnitForImport(any()))
         .thenReturn(stubSquadron);
   }
 
@@ -328,7 +328,7 @@ class HangarImportServiceTest {
     assertThat(result.duplicateCount()).isEqualTo(2);
     verify(shipRepository, times(2)).save(any(Ship.class));
     verify(shipRepository, times(1)).lockAllOwnedByOrderById(userId);
-    verify(ownerScopeService, times(1)).resolveOrgUnitForImport(any());
+    verify(orgUnitStampingService, times(1)).resolveOrgUnitForImport(any());
   }
 
   @Test
@@ -1500,7 +1500,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(ownerScopeService.resolveOrgUnitForImport(any())).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForImport(any())).thenReturn(null);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
@@ -1528,7 +1528,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(ownerScopeService.resolveOrgUnitForImport(any()))
+    when(orgUnitStampingService.resolveOrgUnitForImport(any()))
         .thenThrow(new BadRequestException("multi-membership importer needs a picker"));
 
     assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));

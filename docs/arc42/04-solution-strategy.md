@@ -61,7 +61,7 @@ if Discord cannot be asked, nobody gets in that way.
 ## 4.4 Make the org unit the tenant, and scope in the service layer
 
 Visibility follows the real command structure (Organisationsleitung → Bereiche → Staffeln and
-Spezialkommandos). Scoping is applied in the service layer through `OwnerScopeService` rather than
+Spezialkommandos). Scoping is applied in the service layer through the scope kernel (`RequestScopeResolver`, `AccessGateService`) rather than
 in controllers or repositories, because it has to hold for every path into an aggregate, including
 the ones added later. Different aggregates genuinely need different rules — a Mission escapes its
 unit when it is not internal, a Job Order is scoped by the processing unit and the customer

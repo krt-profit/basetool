@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +56,7 @@ public class RefineryAccessPolicy {
        )
       """;
 
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final RefineryOrderRepository refineryOrderRepository;
   private final UserAccessPolicy userAccessPolicy;
 
@@ -78,7 +78,7 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may read the order
    */
   public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
-    return ownerScopeService.permitsOwnedRow(
+    return accessGateService.permitsOwnedRow(
         order.getOwner(), order.getOwningOrgUnit(), false, Roles.LOGISTICIAN);
   }
 
@@ -101,7 +101,7 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may edit the order
    */
   public boolean canEditRefineryOrder(@NotNull RefineryOrder order) {
-    return ownerScopeService.permitsOwnedRow(
+    return accessGateService.permitsOwnedRow(
         order.getOwner(), order.getOwningOrgUnit(), true, Roles.LOGISTICIAN);
   }
 
@@ -118,7 +118,7 @@ public class RefineryAccessPolicy {
     return refineryOrderRepository
         .findById(orderId)
         .map(o ->
-            ownerScopeService.canActAsLogisticianInOwner(
+            accessGateService.canActAsLogisticianInOwner(
                 o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
         .orElse(false);
   }

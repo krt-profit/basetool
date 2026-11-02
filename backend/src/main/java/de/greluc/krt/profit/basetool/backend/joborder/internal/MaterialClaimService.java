@@ -50,7 +50,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -93,7 +93,7 @@ public class MaterialClaimService implements ClaimBucketSource {
   private final OrgUnitRepository orgUnitRepository;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final AuditRecorder auditRecorder;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
@@ -612,8 +612,8 @@ public class MaterialClaimService implements ClaimBucketSource {
     }
     UUID responsibleSkId = order.getResponsibleOrgUnit().getId();
     boolean managesResponsibleSk =
-        ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");
-    boolean managesOwnSquadron = ownerScopeService.canActAsLogisticianIn(claimingOrgUnitId);
+        accessGateService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");
+    boolean managesOwnSquadron = accessGateService.canActAsLogisticianIn(claimingOrgUnitId);
     if (!managesResponsibleSk && !managesOwnSquadron) {
       throw new AccessDeniedException(
           "You may only manage claims for your own squadron, or any claim as a logistician or lead"

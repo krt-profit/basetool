@@ -51,7 +51,7 @@ class PromotionReachTest {
   private static final UUID DISABLED = UUID.randomUUID();
   private static final UUID BEREICH = UUID.randomUUID();
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private AuthHelperService authHelper;
   @Mock private OrgUnitRepository orgUnitRepository;
 
@@ -69,28 +69,28 @@ class PromotionReachTest {
 
   @Test
   void managementScope_seatInAnEnabledAndADisabledUnit_keepsTheEnabledOne() {
-    when(ownerScopeService.currentOfficerReadScope()).thenReturn(Set.of(ENABLED, DISABLED));
+    when(requestScopeResolver.currentOfficerReadScope()).thenReturn(Set.of(ENABLED, DISABLED));
 
     assertThat(reach.currentManagementScope()).containsExactly(ENABLED);
   }
 
   @Test
   void managementScope_seatOnlyInADisabledUnit_isEmpty() {
-    when(ownerScopeService.currentOfficerReadScope()).thenReturn(Set.of(DISABLED));
+    when(requestScopeResolver.currentOfficerReadScope()).thenReturn(Set.of(DISABLED));
 
     assertThat(reach.currentManagementScope()).isEmpty();
   }
 
   @Test
   void managementScope_aBereichSeatReachesTheEnabledSquadronsBelowIt() {
-    when(ownerScopeService.currentOfficerReadScope()).thenReturn(Set.of(BEREICH, ENABLED));
+    when(requestScopeResolver.currentOfficerReadScope()).thenReturn(Set.of(BEREICH, ENABLED));
 
     assertThat(reach.currentManagementScope()).containsExactly(ENABLED);
   }
 
   @Test
   void managementScope_withoutReach_doesNotQuery() {
-    when(ownerScopeService.currentOfficerReadScope()).thenReturn(Set.of());
+    when(requestScopeResolver.currentOfficerReadScope()).thenReturn(Set.of());
 
     assertThat(reach.currentManagementScope()).isEmpty();
     verify(orgUnitRepository, never()).findPromotionEnabledIdsAmong(anyCollection());
@@ -99,14 +99,14 @@ class PromotionReachTest {
   @Test
   void managementScope_adminIsNotNarrowedAndKeepsAPinOnADisabledUnit() {
     when(authHelper.isAdmin()).thenReturn(true);
-    when(ownerScopeService.currentOfficerReadScope()).thenReturn(Set.of(DISABLED));
+    when(requestScopeResolver.currentOfficerReadScope()).thenReturn(Set.of(DISABLED));
 
     assertThat(reach.currentManagementScope()).containsExactly(DISABLED);
   }
 
   @Test
   void managementScope_unrestrictedAdminScopeStaysUnrestricted() {
-    when(ownerScopeService.currentOfficerReadScope()).thenReturn(null);
+    when(requestScopeResolver.currentOfficerReadScope()).thenReturn(null);
 
     assertThat(reach.currentManagementScope()).isNull();
   }
@@ -114,8 +114,8 @@ class PromotionReachTest {
   @Test
   void manageInActiveContext_pinnedToAnEnabledUnitInReach_isTrue() {
     Set<UUID> seats = Set.of(ENABLED, DISABLED);
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(seats);
-    when(ownerScopeService.narrowToPin(seats)).thenReturn(Set.of(ENABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(seats);
+    when(requestScopeResolver.narrowToPin(seats)).thenReturn(Set.of(ENABLED));
 
     assertThat(reach.canManageInActiveContext()).isTrue();
   }
@@ -123,8 +123,8 @@ class PromotionReachTest {
   @Test
   void manageInActiveContext_pinnedToADisabledUnitInReach_isFalse() {
     Set<UUID> seats = Set.of(ENABLED, DISABLED);
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(seats);
-    when(ownerScopeService.narrowToPin(seats)).thenReturn(Set.of(DISABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(seats);
+    when(requestScopeResolver.narrowToPin(seats)).thenReturn(Set.of(DISABLED));
 
     assertThat(reach.canManageInActiveContext()).isFalse();
   }
@@ -132,8 +132,8 @@ class PromotionReachTest {
   @Test
   void manageInActiveContext_pinOutOfReach_isFalse() {
     Set<UUID> seats = Set.of(ENABLED);
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(seats);
-    when(ownerScopeService.narrowToPin(seats)).thenReturn(Set.of());
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(seats);
+    when(requestScopeResolver.narrowToPin(seats)).thenReturn(Set.of());
 
     assertThat(reach.canManageInActiveContext()).isFalse();
   }
@@ -143,18 +143,18 @@ class PromotionReachTest {
     when(authHelper.isAdmin()).thenReturn(true);
 
     assertThat(reach.canManageInActiveContext()).isTrue();
-    verify(ownerScopeService, never()).currentOfficerOrgUnitIds();
+    verify(requestScopeResolver, never()).currentOfficerOrgUnitIds();
   }
 
   @Test
   void manageAnywhere_followsTheEnabledUnitsOfTheSeatsWhateverIsPinned() {
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(Set.of(DISABLED, ENABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(Set.of(DISABLED, ENABLED));
     assertThat(reach.canManageAnywhere()).isTrue();
 
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(Set.of(DISABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(Set.of(DISABLED));
     assertThat(reach.canManageAnywhere()).isFalse();
 
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(Set.of());
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(Set.of());
     assertThat(reach.canManageAnywhere()).isFalse();
   }
 
@@ -167,19 +167,19 @@ class PromotionReachTest {
 
   @Test
   void useAnywhere_countsMembershipAndSeatsInEnabledUnits() {
-    when(ownerScopeService.currentMemberOrgUnitIds()).thenReturn(Set.of(ENABLED));
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(Set.of());
+    when(requestScopeResolver.currentMemberOrgUnitIds()).thenReturn(Set.of(ENABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(Set.of());
     assertThat(reach.canUseAnywhere()).isTrue();
 
-    when(ownerScopeService.currentMemberOrgUnitIds()).thenReturn(Set.of(DISABLED));
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(Set.of(ENABLED));
+    when(requestScopeResolver.currentMemberOrgUnitIds()).thenReturn(Set.of(DISABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(Set.of(ENABLED));
     assertThat(reach.canUseAnywhere()).isTrue();
   }
 
   @Test
   void useAnywhere_onlyDisabledUnits_isFalse() {
-    when(ownerScopeService.currentMemberOrgUnitIds()).thenReturn(Set.of(DISABLED));
-    when(ownerScopeService.currentOfficerOrgUnitIds()).thenReturn(Set.of(DISABLED, BEREICH));
+    when(requestScopeResolver.currentMemberOrgUnitIds()).thenReturn(Set.of(DISABLED));
+    when(requestScopeResolver.currentOfficerOrgUnitIds()).thenReturn(Set.of(DISABLED, BEREICH));
 
     assertThat(reach.canUseAnywhere()).isFalse();
   }

@@ -59,7 +59,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -92,7 +92,7 @@ class MaterialClaimServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AccessGateService accessGateService;
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
   @Spy private QualityTierMapper qualityTierMapper = new QualityTierMapperImpl();
@@ -507,8 +507,8 @@ class MaterialClaimServiceTest {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
-      when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(ownerScopeService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(false);
+      when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
+      when(accessGateService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(false);
 
       assertThrows(
           org.springframework.security.access.AccessDeniedException.class,
@@ -521,8 +521,8 @@ class MaterialClaimServiceTest {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
-      when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(ownerScopeService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(true);
+      when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
+      when(accessGateService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
               ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
@@ -545,7 +545,7 @@ class MaterialClaimServiceTest {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
-      when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(true);
+      when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
               ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());

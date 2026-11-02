@@ -50,7 +50,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -95,7 +95,7 @@ public class JobOrderItemProductionService {
   private final UserService userService;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
-  private final OwnerScopeService ownerScopeService;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuthHelperService authHelperService;
 
   /**
@@ -331,9 +331,9 @@ public class JobOrderItemProductionService {
    * Books the produced units into the Lager as one fresh game-item stock row (REQ-INV-032).
    *
    * <p>The owner defaults to the acting user and the owning org unit is resolved through {@link
-   * OwnerScopeService#resolveOrgUnitForPickerOutputNullable}. Unless {@code personal}, the row is
-   * earmarked to the producing order; it is then merged via the Lager's merge and audited as {@code
-   * INVENTORY_RECEIVED_FROM_PRODUCTION}.
+   * OrgUnitStampingService#resolveOrgUnitForPickerOutputNullable}. Unless {@code personal}, the row
+   * is earmarked to the producing order; it is then merged via the Lager's merge and audited as
+   * {@code INVENTORY_RECEIVED_FROM_PRODUCTION}.
    *
    * @param jobOrder the producing order, managed in the current transaction
    * @param line the produced item line supplying the stock row's game item
@@ -368,7 +368,8 @@ public class JobOrderItemProductionService {
     final Location location =
         Entities.require(locationRepository.findById(bookIn.locationId()), "Location not found");
     final OrgUnit owningOrgUnit =
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, bookIn.owningOrgUnitId());
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+            owner, bookIn.owningOrgUnitId());
 
     stockCommands.bookInFromProduction(
         jobOrder.getId(),

@@ -194,7 +194,7 @@ The inbox is isolated by the JWT `sub` only; it is **not** org-unit scoped. Ever
 mutation is keyed by the caller's `sub`; an id that is unknown **or** owned by someone else
 yields HTTP 404 (never 403), so a caller can neither read, mark, nor delete a peer's
 notification, nor probe foreign ids. The notification service therefore wires neither
-`OwnerScopeService` nor `AuthHelperService` and is excluded from the ArchUnit staffel-scoped
+a scope-kernel service nor `AuthHelperService` and is excluded from the ArchUnit staffel-scoped
 service whitelist (bank `REQ-BANK-008` precedent).
 
 **Acceptance**

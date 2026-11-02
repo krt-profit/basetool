@@ -22,8 +22,9 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -41,7 +42,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PromotionAccessPolicy {
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final PromotionReach promotionReach;
@@ -53,7 +55,7 @@ public class PromotionAccessPolicy {
    * @return {@code true} when the promotion menu may be exposed for the caller
    */
   public boolean isFeatureEnabledForCurrentScope() {
-    return ownerScopeService.currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
+    return requestScopeResolver.currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
   }
 
   /**
@@ -63,7 +65,7 @@ public class PromotionAccessPolicy {
    * @return {@code true} for admins and for non-admins with an effective squadron
    */
   public boolean hasReadAccess() {
-    return authHelper.isAdmin() || ownerScopeService.currentSquadronId().isPresent();
+    return authHelper.isAdmin() || requestScopeResolver.currentSquadronId().isPresent();
   }
 
   /**
@@ -82,7 +84,10 @@ public class PromotionAccessPolicy {
           isFeatureEnabledForCurrentScope() && hasReadAccess()
               ? Optional.of(
                   new PromotionReadScope(
-                      ownerScopeService.currentSquadronId().<Set<UUID>>map(Set::of).orElse(null)))
+                      requestScopeResolver
+                          .currentSquadronId()
+                          .<Set<UUID>>map(Set::of)
+                          .orElse(null)))
               : Optional.empty();
       case MANAGEMENT -> managementScope();
     };
@@ -121,7 +126,7 @@ public class PromotionAccessPolicy {
    *     the squadron has promotion disabled
    */
   public void assertOfficerIn(@NotNull UUID squadronId) {
-    if (!ownerScopeService.canActAsOfficerIn(squadronId)) {
+    if (!accessGateService.canActAsOfficerIn(squadronId)) {
       throw new AccessDeniedException("Caller holds no officer reach in the owning squadron");
     }
     if (!authHelper.isAdmin() && !promotionReach.isEnabled(squadronId)) {
@@ -145,7 +150,7 @@ public class PromotionAccessPolicy {
     boolean reaches =
         orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId).stream()
             .anyMatch(
-                id -> ownerScopeService.canActAsOfficerIn(id) && promotionReach.isEnabled(id));
+                id -> accessGateService.canActAsOfficerIn(id) && promotionReach.isEnabled(id));
     if (!reaches) {
       throw new AccessDeniedException("Caller holds no officer reach over this member");
     }

@@ -21,7 +21,8 @@ package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipScope;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -45,7 +46,8 @@ public class HangarAccessPolicy {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "hangarAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
   private final ShipRepository shipRepository;
 
   /**
@@ -58,7 +60,7 @@ public class HangarAccessPolicy {
   public boolean canSeeShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> ownerScopeService.permitsOwnedRow(s.getOwner(), s.getOwningOrgUnit(), false))
+        .map(s -> accessGateService.permitsOwnedRow(s.getOwner(), s.getOwningOrgUnit(), false))
         .orElse(false);
   }
 
@@ -72,7 +74,7 @@ public class HangarAccessPolicy {
   public boolean canEditShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> ownerScopeService.permitsOwnedRow(s.getOwner(), s.getOwningOrgUnit(), true))
+        .map(s -> accessGateService.permitsOwnedRow(s.getOwner(), s.getOwningOrgUnit(), true))
         .orElse(false);
   }
 
@@ -84,7 +86,7 @@ public class HangarAccessPolicy {
    * @return {@code true} iff the caller's unit-overview scope admits the unit
    */
   public boolean canSeeUnitHangar(@NotNull UUID orgUnitId) {
-    return ownerScopeService.currentUnitOverviewScope().permits(orgUnitId);
+    return requestScopeResolver.currentUnitOverviewScope().permits(orgUnitId);
   }
 
   /**
@@ -95,7 +97,7 @@ public class HangarAccessPolicy {
    * @return {@code true} iff the caller is an admin or holds officer reach in the active context
    */
   public boolean canSeeOwnerDetails() {
-    return ownerScopeService.canActAsOfficerInActiveContext();
+    return requestScopeResolver.canActAsOfficerInActiveContext();
   }
 
   /**
@@ -105,6 +107,6 @@ public class HangarAccessPolicy {
    * @return {@code true} iff the caller is an admin or holds officer reach in the active context
    */
   public boolean canResetFitted() {
-    return ownerScopeService.canActAsOfficerInActiveContext();
+    return requestScopeResolver.canActAsOfficerInActiveContext();
   }
 }

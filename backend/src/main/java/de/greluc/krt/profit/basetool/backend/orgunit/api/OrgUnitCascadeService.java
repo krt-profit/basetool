@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Collection;
 import java.util.HashMap;
@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Computes which org units a set of memberships reaches through the leadership cascade
- * (REQ-ORG-015), shared by {@link OwnerScopeService} and {@code
+ * (REQ-ORG-015), shared by {@link RequestScopeResolver} and {@code
  * CustomJwtGrantedAuthoritiesConverter}.
  *
  * <ul>

@@ -38,7 +38,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgRoleManagementSecuri
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.Analysis;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
@@ -66,7 +67,8 @@ class SecurityExpressionRulesTest {
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
       Map.ofEntries(
-          Map.entry("ownerScopeService", 3),
+          Map.entry("requestScopeResolver", 4),
+          Map.entry("accessGateService", 12),
           Map.entry("operationAccessPolicy", 8),
           Map.entry("refineryAccessPolicy", 8),
           Map.entry("missionAccessPolicy", 19),
@@ -88,7 +90,8 @@ class SecurityExpressionRulesTest {
    */
   private static final Map<String, Class<?>> NAMED_SECURITY_BEANS =
       Map.ofEntries(
-          Map.entry("ownerScopeService", OwnerScopeService.class),
+          Map.entry("requestScopeResolver", RequestScopeResolver.class),
+          Map.entry("accessGateService", AccessGateService.class),
           Map.entry("operationAccessPolicy", OperationAccessPolicy.class),
           Map.entry("refineryAccessPolicy", RefineryAccessPolicy.class),
           Map.entry("missionAccessPolicy", MissionAccessPolicy.class),

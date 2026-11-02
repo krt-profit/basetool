@@ -163,7 +163,7 @@ public class RefineryOrder extends AbstractEntity<UUID> {
    * Org-unit owner of this refinery order, or {@code null} for an ownerless personal order raised
    * by a user in no Staffel/SK. Such an order is visible and editable only by its {@link #owner}
    * (plus admins in all-scopes mode). Stamped via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}.
+   * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable}.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)

@@ -63,7 +63,8 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -96,7 +97,8 @@ class InventoryItemServiceBookOutTest {
   @Mock private StockOfferLookup stockOfferLookup;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
 
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -123,7 +125,8 @@ class InventoryItemServiceBookOutTest {
             stockOfferLookup,
             offerRatchet,
             inventoryItemMapper,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             auditService,
             eventPublisher);
     owner = new User();
@@ -597,7 +600,8 @@ class InventoryItemServiceBookOutTest {
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(orgB);
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(any(), any()))
+          .thenReturn(orgB);
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
@@ -628,7 +632,8 @@ class InventoryItemServiceBookOutTest {
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser, pickedOrgUnitId))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+              targetUser, pickedOrgUnitId))
           .thenReturn(picked);
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));

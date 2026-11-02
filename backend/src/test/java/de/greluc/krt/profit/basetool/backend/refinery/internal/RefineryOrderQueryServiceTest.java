@@ -44,7 +44,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldReposito
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -76,7 +77,8 @@ class RefineryOrderQueryServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private RefineryYieldRepository refineryYieldRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private AccessGateService accessGateService;
   @InjectMocks private RefineryOrderQueryService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
@@ -179,7 +181,7 @@ class RefineryOrderQueryServiceTest {
     @Test
     void getUserRefineryOrdersScoped_adminAllScope_forwardsAdminAllScopeToScopedQuery() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentLogisticianScope())
+      when(accessGateService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, true, null, Set.of(), pageable))
           .thenReturn(page);
@@ -193,7 +195,7 @@ class RefineryOrderQueryServiceTest {
     void getUserRefineryOrdersScoped_nonAdmin_forwardsOnlyTheLogisticianUnits() {
       UUID callerStaffelA = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentLogisticianScope())
+      when(accessGateService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffelA)));
       when(refineryOrderRepository.findByOwnerIdScoped(
               OWNER_ID, false, null, Set.of(callerStaffelA), pageable))
@@ -208,7 +210,7 @@ class RefineryOrderQueryServiceTest {
     void getUserRefineryOrdersScoped_pinnedCaller_forwardsActiveOrgUnitId() {
       UUID pinned = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentLogisticianScope())
+      when(accessGateService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, pinned, Set.of()));
       when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, false, pinned, Set.of(), pageable))
           .thenReturn(page);
@@ -221,7 +223,7 @@ class RefineryOrderQueryServiceTest {
     @Test
     void getAllRefineryOrders_emptyStatusList_filtersOnEveryStatusInTheCallersScope() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
       when(refineryOrderRepository.findFilteredScoped(
               eq(EnumSet.allOf(RefineryOrderStatus.class)),
@@ -242,7 +244,7 @@ class RefineryOrderQueryServiceTest {
     void getAllRefineryOrders_withStatusesReadyAndQuery_forwardsThemWithTheCallersScope() {
       UUID callerStaffel = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffel)));
       when(refineryOrderRepository.findFilteredScoped(
               eq(EnumSet.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)),
@@ -269,7 +271,7 @@ class RefineryOrderQueryServiceTest {
     @Test
     void getMissionRefineryOrdersForCaller_listsTheLogisticianUnitsAndTheCallersOwnOrdersOnce() {
       UUID squadronA = UUID.randomUUID();
-      when(ownerScopeService.currentLogisticianScope())
+      when(accessGateService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, null, Set.of(squadronA)));
       RefineryOrder inUnitA = orderWithId();
       RefineryOrder ownElsewhere = orderWithId();
@@ -286,7 +288,7 @@ class RefineryOrderQueryServiceTest {
 
     @Test
     void getMissionRefineryOrdersForCaller_withoutALogisticianGrant_returnsOnlyTheOwnOrders() {
-      when(ownerScopeService.currentLogisticianScope())
+      when(accessGateService.currentLogisticianScope())
           .thenReturn(new ScopePredicate(false, null, Set.of()));
       RefineryOrder own = orderWithId();
       when(refineryOrderRepository.findByMissionIdAndOwnerId(MISSION_ID, OWNER_ID))

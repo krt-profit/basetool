@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -61,7 +61,7 @@ public class OperationAccessPolicy {
        )
       """;
 
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final OperationRepository operationRepository;
 
@@ -80,7 +80,7 @@ public class OperationAccessPolicy {
           boolean scopeVisible =
               o.getOwningOrgUnit() == null
                   ? authHelper.isMemberOrAbove()
-                  : ownerScopeService.canSeeSquadronAsGrantee(
+                  : accessGateService.canSeeSquadronAsGrantee(
                       o.getOwningOrgUnit().getId(), Roles.MISSION_MANAGER);
           return scopeVisible || participatedInOperation(operationId);
         })
@@ -100,7 +100,7 @@ public class OperationAccessPolicy {
         .map(o ->
             o.getOwningOrgUnit() == null
                 ? authHelper.isMemberOrAbove()
-                : ownerScopeService.canSeeSquadronAsGrantee(
+                : accessGateService.canSeeSquadronAsGrantee(
                     o.getOwningOrgUnit().getId(), Roles.MISSION_MANAGER))
         .orElse(false);
   }
@@ -117,7 +117,7 @@ public class OperationAccessPolicy {
     return operationRepository
         .findById(operationId)
         .map(o ->
-            ownerScopeService.canManageMissionsOf(
+            accessGateService.canManageMissionsOf(
                 o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
@@ -134,7 +134,7 @@ public class OperationAccessPolicy {
     return operationRepository
         .findById(operationId)
         .map(o ->
-            ownerScopeService.canActAsOfficerInOwner(
+            accessGateService.canActAsOfficerInOwner(
                 o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
         .orElse(false);
   }

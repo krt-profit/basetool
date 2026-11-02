@@ -97,7 +97,7 @@ Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC
 
 ## 8.2 Multi-org-unit tenancy
 
-The tenant is the **OrgUnit**. Scoping happens in the service layer through `OwnerScopeService`,
+The tenant is the **OrgUnit**. Scoping happens in the service layer through the scope kernel (`RequestScopeResolver`, `AccessGateService`),
 and the aggregates genuinely differ: strict-Staffel scoping for most, a public escape for
 non-internal Missions, and a separate responsible/requesting pair for Job Orders. Creation stamps
 ownership according to a documented matrix, the admin area and promotion are explicit carve-outs,

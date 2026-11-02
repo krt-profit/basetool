@@ -125,7 +125,9 @@ class MembershipRoleMigrationEquivalenceTest {
     return f.bereichsleiter() || f.bereichskoordinator() || f.bereichsoperator();
   }
 
-  /** {@code OwnerScopeService.currentOversightScope} own-unit (SK-lead) branch before Phase 2. */
+  /**
+   * {@code RequestScopeResolver.currentOversightScope} own-unit (SK-lead) branch before Phase 2.
+   */
   private static boolean legacyOversightOwnUnit(LegacyFlags f) {
     return f.lead();
   }

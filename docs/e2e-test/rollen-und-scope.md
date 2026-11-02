@@ -49,7 +49,7 @@ Die Rollen-Matrix oben prüft im Browser [`RolePermissionsE2eTest`](../../fronte
 
 ## Mandanten-Scope-Modell
 
-Der Scope wird **im Service-Layer** durchgesetzt (`OwnerScopeService`), nicht im Controller. Drei Aggregat-Scope-Arten:
+Der Scope wird **im Service-Layer** durchgesetzt (`RequestScopeResolver`, `AccessGateService`), nicht im Controller. Drei Aggregat-Scope-Arten:
 
 - **Strict-Staffel** (kein staffel-übergreifender Zugriff): `Ship`, `InventoryItem` (direkte Lager-View), `RefineryOrder`, **`Operation`**. Listen filtern auf `owning_org_unit_id`; Detail-/Schreibendpunkte gaten über `canSee*`/`canEdit*`.
 - **Cross-Staffel mit organisationsweitem Escape**: `Mission` (Einsatz). Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.

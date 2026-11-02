@@ -26,8 +26,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -47,7 +47,7 @@ class PromotionAccessPolicyReadScopeTest {
   private static final UUID STAFFEL_A = UUID.randomUUID();
   private static final UUID STAFFEL_B = UUID.randomUUID();
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private AuthHelperService authHelper;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private PromotionReach promotionReach;
@@ -83,7 +83,7 @@ class PromotionAccessPolicyReadScopeTest {
     Squadron off = new Squadron();
     off.setPromotionEnabled(false);
     when(authHelper.isAdmin()).thenReturn(true);
-    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(off));
+    when(requestScopeResolver.currentSquadron()).thenReturn(Optional.of(off));
 
     assertThat(policy.readScope(PromotionReadView.MANAGEMENT)).isEmpty();
   }
@@ -92,7 +92,7 @@ class PromotionAccessPolicyReadScopeTest {
   void management_officerWhoseHomeSquadronHasPromotionOff_stillReadsHerEnabledUnit() {
     Squadron off = new Squadron();
     off.setPromotionEnabled(false);
-    lenient().when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(off));
+    lenient().when(requestScopeResolver.currentSquadron()).thenReturn(Optional.of(off));
     when(authHelper.isAdmin()).thenReturn(false);
     when(promotionReach.currentManagementScope()).thenReturn(Set.of(STAFFEL_A));
 
@@ -111,7 +111,7 @@ class PromotionAccessPolicyReadScopeTest {
   @Test
   void member_readsTheActiveSquadronOnly() {
     when(authHelper.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(STAFFEL_B));
+    when(requestScopeResolver.currentSquadronId()).thenReturn(Optional.of(STAFFEL_B));
 
     assertThat(policy.readScope(PromotionReadView.MEMBER))
         .contains(new PromotionReadScope(Set.of(STAFFEL_B)));
@@ -120,7 +120,7 @@ class PromotionAccessPolicyReadScopeTest {
   @Test
   void member_withoutAnySquadron_readsNothing() {
     when(authHelper.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentSquadronId()).thenReturn(Optional.empty());
 
     assertThat(policy.readScope(PromotionReadView.MEMBER)).isEmpty();
   }

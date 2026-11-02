@@ -36,9 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  * on, evaluated against the same scope as {@link RequestScopeResolver} so per-row checks match the
  * scoped lists.
  *
- * <p>Invoked from SpEL through the {@link OwnerScopeService} facade. Read-only transactional.
+ * <p>Referenced from SpEL as the {@code accessGateService} bean. Read-only transactional.
  */
-@Service
+@Service("accessGateService")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AccessGateService {

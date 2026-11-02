@@ -78,7 +78,7 @@ class JobOrderScopeParityTest {
         true,
         rows,
         wired ->
-            wired.ownerScopeService().canViewJobOrders()
+            wired.resolver().canViewJobOrders()
                 ? jobOrderRepository
                     .findScopedOrdersWithMaterialRequirements(
                         List.of(JobOrderStatus.OPEN),
@@ -91,7 +91,8 @@ class JobOrderScopeParityTest {
                 : Collections.<UUID>emptySet(),
         (wired, id) ->
             new JobOrderAccessPolicy(
-                    wired.ownerScopeService(),
+                    wired.resolver(),
+                    wired.gate(),
                     wired.authHelper(),
                     jobOrderRepository,
                     jobOrderHandoverRepository,

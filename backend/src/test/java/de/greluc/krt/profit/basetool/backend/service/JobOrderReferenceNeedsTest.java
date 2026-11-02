@@ -56,7 +56,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialN
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -98,7 +98,7 @@ class JobOrderReferenceNeedsTest {
 
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private JobOrderMapper jobOrderMapper;
@@ -129,7 +129,7 @@ class JobOrderReferenceNeedsTest {
             jobOrderRepository,
             null,
             new InventoryStockReads(inventoryItemRepository, null, null, null),
-            ownerScopeService,
+            requestScopeResolver,
             jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
@@ -138,7 +138,7 @@ class JobOrderReferenceNeedsTest {
             requirementResolver,
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
     when(jobOrderItemService.requiredGameItemIds(any(JobOrder.class))).thenReturn(Set.of());

@@ -41,7 +41,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -65,7 +65,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Read-only query side of the job-order domain: the scoped list, the requester-side "Meine
  * Aufträge" list, the reference typeahead, the order detail and the link-inventory pickers.
  *
- * <p>Every read applies the caller's visibility scope ({@link OwnerScopeService}) in the query.
+ * <p>Every read applies the caller's visibility scope ({@link RequestScopeResolver}) in the query.
  */
 @Service
 @RequiredArgsConstructor
@@ -78,7 +78,7 @@ public class JobOrderQueryService {
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final StockReads stockReads;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderMapper jobOrderMapper;
   private final SquadronMapper squadronMapper;
@@ -104,8 +104,8 @@ public class JobOrderQueryService {
    * caller's visibility scope.
    *
    * <p>SK-responsible orders are public, squadron-responsible orders private to that squadron and
-   * admins; a caller outside the order workflow ({@link OwnerScopeService#canViewJobOrders()}) gets
-   * an empty page. {@code squadronIds} can only narrow the result.
+   * admins; a caller outside the order workflow ({@link RequestScopeResolver#canViewJobOrders()})
+   * gets an empty page. {@code squadronIds} can only narrow the result.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -167,20 +167,20 @@ public class JobOrderQueryService {
       boolean toProcess,
       @Nullable UUID processingOrgUnitId,
       Pageable pageable) {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return toProcess
           ? Page.empty(pageable)
           : assignedOnly(statusesOrAll(statuses), squadronIds, pageable);
     }
     List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
     if (toProcess) {
-      UUID pinnedUnit = ownerScopeService.currentScopePredicate().activeOrgUnitId();
+      UUID pinnedUnit = requestScopeResolver.currentScopePredicate().activeOrgUnitId();
       processingOrgUnitIds =
           pinnedUnit != null
               ? Set.of(pinnedUnit)
-              : ownerScopeService.currentDirectMembershipOrgUnitIds();
+              : requestScopeResolver.currentDirectMembershipOrgUnitIds();
       if (processingOrgUnitId != null) {
         processingOrgUnitIds =
             processingOrgUnitIds.contains(processingOrgUnitId)
@@ -263,7 +263,7 @@ public class JobOrderQueryService {
    * @return paged job orders requested by the caller's org units
    */
   public Page<JobOrderDto> getRequestedJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
-    Set<UUID> requesterOrgUnitIds = ownerScopeService.currentDirectMembershipOrgUnitIds();
+    Set<UUID> requesterOrgUnitIds = requestScopeResolver.currentDirectMembershipOrgUnitIds();
     if (requesterOrgUnitIds.isEmpty()) {
       return Page.empty(pageable);
     }
@@ -288,11 +288,11 @@ public class JobOrderQueryService {
     if (callerId == null) {
       return List.of();
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return jobOrderRepository
         .findVisibleByNumberPrefix(
             numberPrefix,
-            ownerScopeService.canViewJobOrders(),
+            requestScopeResolver.canViewJobOrders(),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
@@ -317,7 +317,7 @@ public class JobOrderQueryService {
    * @return active job orders the caller may see, as reference DTOs
    */
   public List<JobOrderReferenceDto> findAllActiveReference(boolean withNeeds) {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return List.of();
     }
     List<JobOrder> visible =

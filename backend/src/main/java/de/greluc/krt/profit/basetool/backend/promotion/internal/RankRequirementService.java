@@ -27,7 +27,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -59,7 +60,8 @@ public class RankRequirementService {
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryRepository categoryRepository;
   private final RankRequirementMapper mapper;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
+  private final RequestScopeResolver requestScopeResolver;
   private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
@@ -130,13 +132,13 @@ public class RankRequirementService {
   public RankRequirementResponse create(@NotNull RankRequirementWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
-    if (ownerScopeService.hasAmbiguousStaffelContext()) {
+    if (requestScopeResolver.hasAmbiguousStaffelContext()) {
       throw new BadRequestException(
           "You belong to two Staffeln — pin the Staffel this rank requirement belongs to via the"
               + " sidebar switcher before creating it.");
     }
     Squadron squadron =
-        ownerScopeService
+        requestScopeResolver
             .currentSquadron()
             .orElseThrow(() ->
                 new BadRequestException(
@@ -247,7 +249,7 @@ public class RankRequirementService {
     if (entity.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canSeeSquadron(entity.getOwningSquadron().getId())) {
+    if (!accessGateService.canSeeSquadron(entity.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not match the rank requirement's owning squadron");
     }

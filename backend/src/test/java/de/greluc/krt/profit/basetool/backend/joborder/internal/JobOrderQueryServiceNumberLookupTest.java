@@ -32,7 +32,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.List;
 import java.util.Optional;
@@ -57,7 +57,7 @@ class JobOrderQueryServiceNumberLookupTest {
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private AuthHelperService authHelper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
 
   @InjectMocks private JobOrderQueryService queryService;
 
@@ -69,9 +69,9 @@ class JobOrderQueryServiceNumberLookupTest {
     order.setDisplayId(12);
     order.setStatus(JobOrderStatus.OPEN);
     when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, Set.of(UNIT_ID)));
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(jobOrderRepository.findVisibleByNumberPrefix(
             "1", true, false, null, Set.of(UNIT_ID), CALLER_ID, PageRequest.of(0, 5)))
         .thenReturn(List.of(order));
@@ -85,9 +85,9 @@ class JobOrderQueryServiceNumberLookupTest {
   @Test
   void aCallerOutsideTheWorkflowOnlyGetsTheAssigneeGrant() {
     when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
     when(jobOrderRepository.findVisibleByNumberPrefix(
             any(), anyBoolean(), anyBoolean(), any(), any(), any(), any()))
         .thenReturn(List.of());

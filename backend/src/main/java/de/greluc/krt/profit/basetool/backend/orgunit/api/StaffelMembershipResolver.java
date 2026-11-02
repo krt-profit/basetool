@@ -40,8 +40,9 @@ import org.springframework.stereotype.Component;
  * (REQ-ORG-017).
  *
  * <p>The single definition of the primary Staffel, shared by the membership service, {@code
- * UserMapper} and {@code OwnerScopeService}; lives in the dependency-leaf {@code support} package
- * (ADR-0047). Dangling memberships are skipped, and it joins the caller's transaction, if any.
+ * UserMapper} and {@code RequestScopeResolver}; lives in the dependency-leaf {@code support}
+ * package (ADR-0047). Dangling memberships are skipped, and it joins the caller's transaction, if
+ * any.
  */
 @Component
 @RequiredArgsConstructor

@@ -73,7 +73,7 @@ literal, referenced from another compilation unit, is a constant expression), so
 the byte-identical original string before the annotation is even written to the class file — the
 wire behavior, and everything the write-gate rule of `TenancyGuardTest` /
 `writeEndpointsMustDeclareAnAuthorisationAnnotation` inspect via the resolved annotation value, is
-unchanged. Bean-method-only expressions (`@ownerScopeService.canEdit*`, `isAuthenticated()`,
+unchanged. Bean-method-only expressions (`@accessGateService.canEdit*`, `isAuthenticated()`,
 `permitAll()`) are untouched — only the literal-role/permission subset was in scope, matching the
 `@PreAuthorize` value's constant-concatenation seam so a role literal can sit alongside an untouched
 bean-method call in the same string (e.g. `hasRole('" + Roles.LOGISTICIAN + "') and
@@ -88,7 +88,7 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
 - **Programmatic authority-string comparisons** outside `@PreAuthorize` — backend
   `AuthHelperService.hasReachableRole(...)` call sites (`BankSecurityService`,
-  `MissionAccessPolicy`, `OwnerScopeService`, `OrgUnitBankAccessService`) and frontend raw
+  `MissionAccessPolicy`, `RequestScopeResolver`, `AccessGateService`, `OrgUnitBankAccessService`) and frontend raw
   `getAuthority().equals("ROLE_X")` / `"ROLE_X".equals(...)` checks (`BackendRoleSyncFilter`,
   `InventoryPageController`, `JobOrderPageController`, `OperationPageController`,
   `RefineryOrderPageController`) now reference `Roles`/`Permissions` constants and the
@@ -187,7 +187,7 @@ equivalents — a new violation fails `./gradlew test`:
   `everyPostMappingShouldBeAuthorisationAnnotated`).
 - `permitAll()` appears on exactly four backend handlers — the two anonymous reads, the Keycloak SPI
   precheck and `/error` (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`, REQ-SEC-052).
-- Staffel-scoped services wire `OwnerScopeService` or `AuthHelperService`
+- Staffel-scoped services wire a scope-kernel service or `AuthHelperService`
   (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
   the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007). Write endpoints of
   every controller that writes tenant data gate on a scope service, selected by the `@TenantScoped`
@@ -271,7 +271,7 @@ select the **bank domain**: the classes listed by class literal in `BANK_CLASSES
 nested in them, MapStruct's implementations of the bank mappers, and every class of a `bank` module
 package. `everyBankNamedClassIsClassified` puts every class named after the bank into either that
 list or the reviewed org-unit side (`ORG_UNIT_BANK_SIDE`). The containment rule treats any class
-depending on `OwnerScopeService` and on any bank-domain class as a bridge, and the bridge set is
+depending on an org-unit scope service and on any bank-domain class as a bridge, and the bridge set is
 exactly `OrgUnitBankAccessService`.
 
 **Acceptance criteria**
@@ -303,8 +303,8 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
   public method of that name whose parameter count equals the argument count (a varargs method
   accepts one less or more). 166 references to 8 beans on 2026-10-02.
 - **Explicit bean names.** Every bean a security expression names declares that name in its
-  stereotype (`@Service("ownerScopeService")`, `@Component("exchangeGate")`, …), so renaming the
-  class cannot rename the bean: `ownerScopeService`, `missionAccessPolicy`, `authHelperService`,
+  stereotype (`@Service("accessGateService")`, `@Component("exchangeGate")`, …), so renaming the
+  class cannot rename the bean: `requestScopeResolver`, `accessGateService`, `missionAccessPolicy`, `authHelperService`,
   `orgRoleManagementSecurityService`, `bankSecurityService`, `specialCommandSecurityService`,
   `exchangeGate`, `connectedAppsGate`.
 - **A ratchet per bean.** The number of references to each bean may not fall below its recorded
@@ -328,7 +328,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
   (`SecurityExpressionAnalyzerTest`).
 
 **Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
-`SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
+`SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `RequestScopeResolver`, `AccessGateService`,
 `OperationAccessPolicy`,
 `MissionAccessPolicy`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
 `BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
@@ -430,7 +430,7 @@ The flat authority is the OR-union over *all* of a caller's memberships and ther
 **no** OrgUnit context on its own — it MUST never authorise a write against another OrgUnit's
 aggregate by itself. Every elevated-mission-role write path (mission edit, manager/owner change,
 **and participant management** — check-in/out, attribute edit, payout-preference, removal) reads the
-contextual `MISSION_MANAGER@<owningOrgUnitId>` grant through `OwnerScopeService.canManageMissionsOf(...)`,
+contextual `MISSION_MANAGER@<owningOrgUnitId>` grant through `AccessGateService.canManageMissionsOf(...)`,
 never the flat role; `MissionAccessPolicy.canAccessLoadedParticipant` does so by delegating its
 management branch to `canManageMission` rather than short-circuiting on the bare `ROLE_MISSION_MANAGER`
 authority. (Unlinked **guest** participants stay openly editable per REQ-SEC-009; this scope gate
@@ -466,8 +466,8 @@ Mission Manager grant in an Organisationsleitung or Bereich unit (or an admin); 
 Manager does not manage it. Creating an operation requires the grant in the unit the operation is
 stamped to. Finance edits and the owner change of an ownerless mission stay admin-only (REQ-SEC-065).
 `isMissionManagerOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
-pinned (`OwnerScopeService#canActAsMissionManagerInActiveContext()`); the frontend gates read it
-through `MissionManagerGate`. **Enforced by:** `OwnerScopeServiceTest.MissionManagerGateTests`,
+pinned (`RequestScopeResolver#canActAsMissionManagerInActiveContext()`); the frontend gates read it
+through `MissionManagerGate`. **Enforced by:** `ScopeKernelTest.MissionManagerGateTests`,
 `MissionAccessPolicyGateTest`, `OperationServiceTest`, `MeControllerTest`, `MissionManagerGateTest`.
 
 **A Logistician grant is per unit.** A contextual `LOGISTICIAN@unit` authority (own membership flag,
@@ -483,7 +483,7 @@ and handover reports (the responsible unit, SK-queue orders included), the earma
 material claim is made for, and the refinery order read, edit, delete, store, creation for another member (the stamped unit),
 the user order list and the mission order list (own orders plus those of the Logistician units).
 `isLogisticianOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
-pinned (`OwnerScopeService#canActAsLogisticianInActiveContext()`, true when `currentLogisticianScope()`
+pinned (`AccessGateService#canActAsLogisticianInActiveContext()`, true when `currentLogisticianScope()`
 reaches a unit, so the cascade of a Bereich or Organisationsleitung grant applies); the frontend
 gates for the inventory, job-order and refinery pages and their write proxies read it through
 `LogisticianGate`, and per-object controls follow the backend's per-unit answer. **Enforced by:**
@@ -1237,7 +1237,7 @@ here:
 - [x] A new scoped controller/service is caught by the ArchUnit scope/whitelist rules (a deliberately
   ungated one fails the build).
 
-**Enforced by:** `OwnerScopeServiceTest` (`CascadingScopeTests`: `cascade_neverSetsAdminAllScope`,
+**Enforced by:** `ScopeKernelTest` (`CascadingScopeTests`: `cascade_neverSetsAdminAllScope`,
 strict-silo foreign-unit denial, OL concrete-union) and `OrgUnitCascadeServiceTest`;
 `ArchitectureTest` — `cascadeServiceMustNotConsultTheSecurityContext` (the cascade can never branch on
 admin status, so it can never grant admin), the `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
@@ -1278,9 +1278,9 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   `CustomJwtGrantedAuthoritiesConverterTest`.
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Where it is read.** The scope kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too, narrowed to the units with promotion enabled (REQ-PROMO-004). A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
+**Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too, narrowed to the units with promotion enabled (REQ-PROMO-004). A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
 
-**Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
+**Enforced by:** `ScopeKernelTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
 `OrgUnitMembershipServiceTest` (`*_withoutKrtMember_isRefused`), `DomainProblemContractTest`,
 `PurchasingAccessPolicyTest` (a seat in one unit leads no other unit), `GameItemControllerTest` ·
@@ -1410,7 +1410,7 @@ MemberEvaluation create/update/delete (`PUT`/`DELETE /api/v1/promotion/evaluatio
 must satisfy TWO squadron-scope checks, not one: the evaluation's **category** must belong to a
 squadron the caller may edit (`assertCallerMayEditCategory`) AND the **evaluated member** must belong
 to a Staffel the caller may edit (`assertCallerMayEvaluateUser` →
-`OwnerScopeService.canEditSquadron(member's home Staffel)`). Without the member check an officer of
+`AccessGateService.canEditSquadron(member's home Staffel)`). Without the member check an officer of
 squadron X could create/overwrite/delete an evaluation row for a member of squadron Y by pairing the
 victim's id with a category owned by X (a cross-tenant write of member-evaluation data). ADMIN spans
 every squadron and short-circuits; the check fails closed on a malformed member id or a member with
@@ -3840,7 +3840,7 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 **The officer flags:** `canActAsOfficerAnywhere` (reach in at least one unit whatever the pin, which
 tells a lost seat from a pin outside it), `hasOfficerReach`, `canOpenLeitung`,
 `canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
-`canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`
+`canManageMissionFinance`, each the answer of `RequestScopeResolver#canActAsOfficerInActiveContext()`
 (`canManagePromotions` counts only the reached units with promotion enabled, REQ-PROMO-004, and two
 flags beside it, `canManagePromotionsAnywhere` and `canUsePromotionAnywhere`, ignore the pin;
 and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
@@ -3854,7 +3854,7 @@ pages and proxies and the Spezialkommando members page gate on `canManagePromoti
 `canOpenLeitung` and `hasOfficerReach` through the frontend `OfficerSurfaceGate`.
 
 **Enforced by:** `MeControllerTest` (flags follow the reach in the active context, the layout
-carries them), `OwnerScopeServiceTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
+carries them), `ScopeKernelTest` (`OfficerReachTests`: pinned unit with a seat, pinned unit
 without one, the unpinned union, admin), `CapabilityFlagsAdviceTest`, `LayoutModelScopeMvcTest`, `NavigationMenuTest`,
 `SidebarRoleBadgeMvcTest`, `OfficerRoleRetiredSourceScanTest` (no main source or template names
 `ROLE_OFFICER` or `ADMIN_OR_OFFICER`) · **Related:** REQ-SEC-013, REQ-SEC-048, REQ-ROLE-002,
@@ -6109,7 +6109,7 @@ Two reviewed lists hold today's deliberate exceptions, and a stale entry fails t
   components and proof do not match, so the exception is proven safe rather than frozen. The split
   follows each domain's API cut (ADR-0060).
 - **Reviewed client inputs:** components that look server-managed but are a validated choice — the
-  create-time owning unit resolved by `OwnerScopeService.resolveOrgUnitForPickerOutput`
+  create-time owning unit resolved by `OrgUnitStampingService.resolveOrgUnitForPickerOutput`
   (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
   counterparty, an ADMIN's org-chart or hierarchy choice, and the lifecycle `status` of the mission
   and operation sections, each with its reason.

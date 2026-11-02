@@ -49,7 +49,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -109,7 +109,7 @@ public class ExchangeDemandService {
   private final BlueprintFamilies familyResolver;
 
   /** The web's job-order gate, evaluated for the acting member. */
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /** Names the units the member is a Logistician of, for the details. */
   private final ExchangeOrgUnitService orgUnitService;
@@ -123,12 +123,12 @@ public class ExchangeDemandService {
    * @param details whether the client holds {@code exchange.demand.details}
    * @return the demand; empty lists when the member belongs to no unit or no order is open, and
    *     empty lists with {@link ExchangeOrgDemandDto.Reason#NOT_PERMITTED} when {@link
-   *     OwnerScopeService#canViewJobOrders()} refuses the member; with {@code details}, the open
+   *     RequestScopeResolver#canViewJobOrders()} refuses the member; with {@code details}, the open
    *     orders of the member's Logistician units when the member is one in at least one unit
    */
   @Transactional(readOnly = true)
   public @NotNull ExchangeOrgDemandDto demand(@NotNull UUID member, boolean details) {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return ExchangeOrgDemandDto.withheld(
           ExchangeOrgDemandDto.Reason.NOT_PERMITTED, clock.instant());
     }

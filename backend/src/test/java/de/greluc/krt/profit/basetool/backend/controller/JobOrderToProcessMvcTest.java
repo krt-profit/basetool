@@ -34,7 +34,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -161,7 +161,7 @@ class JobOrderToProcessMvcTest {
     }
     if (pinnedOrgUnitId != null) {
       request =
-          request.header(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER, pinnedOrgUnitId.toString());
+          request.header(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, pinnedOrgUnitId.toString());
     }
     String body =
         mockMvc

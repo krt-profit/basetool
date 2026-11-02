@@ -35,8 +35,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,8 @@ class InventoryMergeProbeTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private InventoryAccessPolicy inventoryAccessPolicy;
 
   private InventoryItemService service;
@@ -80,7 +82,8 @@ class InventoryMergeProbeTest {
         null,
         null,
         null,
-        ownerScopeService,
+        requestScopeResolver,
+        orgUnitStampingService,
         inventoryAccessPolicy,
         new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null, null),
         null,
@@ -96,7 +99,8 @@ class InventoryMergeProbeTest {
     Squadron unit = new Squadron();
     unit.setId(unitId);
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(unit);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(unit);
     when(inventoryItemRepository.countMergeCandidates(
             CALLER, MATERIAL, LOCATION, 500, false, false, unitId))
         .thenReturn(2L);
@@ -108,7 +112,8 @@ class InventoryMergeProbeTest {
   @Test
   void answersFalseWhenNoRowMatches() {
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
             CALLER, MATERIAL, LOCATION, 500, true, false, null))
         .thenReturn(0L);
@@ -120,7 +125,7 @@ class InventoryMergeProbeTest {
   @Test
   void answersFalseWhenTheOwningUnitCannotBeResolved() {
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenThrow(new OwnerOrgUnitRequiredException("ambiguous"));
 
     assertFalse(
@@ -133,7 +138,7 @@ class InventoryMergeProbeTest {
   void answersFalseWhenThePickedUnitIsRefused() {
     UUID foreignUnit = UUID.randomUUID();
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, foreignUnit))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, foreignUnit))
         .thenThrow(new BadRequestException("not a membership"));
 
     assertFalse(
@@ -160,7 +165,8 @@ class InventoryMergeProbeTest {
     target.setId(other);
     when(inventoryAccessPolicy.canManageUserInventory(other)).thenReturn(true);
     when(userRepository.findById(other)).thenReturn(Optional.of(target));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(target, null)).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(target, null))
+        .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
             other, MATERIAL, LOCATION, 500, false, false, null))
         .thenReturn(1L);
@@ -190,7 +196,8 @@ class InventoryMergeProbeTest {
   void probesStolenStockWhileMarkingIsOn() {
     InventoryItemService marking = serviceWithStolenMarking(true);
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
             CALLER, MATERIAL, LOCATION, 500, false, true, null))
         .thenReturn(1L);

@@ -27,7 +27,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * <p>Dependency-free so both the org-unit-blind bank core and the seam can share it.
  *
- * <p>It must not import {@code OwnerScopeService} or read org-unit state, or ArchUnit breaks.
+ * <p>It must not import the scope kernel or read org-unit state, or ArchUnit breaks.
  */
 public final class BankAmounts {
 

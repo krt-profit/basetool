@@ -34,8 +34,8 @@ import java.util.UUID;
  *       QuantityAware}.
  *   <li>{@code note} is copied to the resulting {@code InventoryItem}.
  *   <li>{@code owningOrgUnitId} stamps the item's owning OrgUnit via {@code
- *       OwnerScopeService.resolveOrgUnitForPickerOutputNullable}; an inadmissible pick is rejected
- *       with 400.
+ *       OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable}; an inadmissible pick is
+ *       rejected with 400.
  *   <li>{@code personal} marks the item as the receiver's private stock (REQ-INV-035); {@code null}
  *       means {@code false}, and combining it with {@code jobOrderId} is rejected with 400.
  * </ul>

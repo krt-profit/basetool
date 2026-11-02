@@ -105,7 +105,7 @@ this gate — it changes only which owners are counted *inside* the view, never 
   coverage endpoint, and the detail page renders without the section.
 - [ ] An admin receives the coverage view for any order.
 
-**Enforced by:** `OwnerScopeServiceTest` (canSeeJobOrderBlueprintOwners),
+**Enforced by:** `ScopeKernelTest` (canSeeJobOrderBlueprintOwners),
 `JobOrderAccessPolicyDifferentialTest`, `JobOrderControllerTest` (getItemBlueprintOwners auth) ·
 **Code:** `JobOrderAccessPolicy.canSeeJobOrderBlueprintOwners` · **Issues:** —
 

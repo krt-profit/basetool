@@ -37,7 +37,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Comparator;
 import java.util.List;
@@ -77,7 +77,7 @@ public class StockLevelService {
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
   private final QualityTierRepository qualityTierRepository;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
   private final StockLevelAccessPolicy accessPolicy;
   private final AuditRecorder auditRecorder;
 
@@ -125,7 +125,7 @@ public class StockLevelService {
   }
 
   private @NotNull List<StockLevel> visibleLevels(@Nullable UUID orgUnitId) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return stockLevelRepository.findVisible(
         scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), orgUnitId);
   }
@@ -148,7 +148,7 @@ public class StockLevelService {
    */
   @Transactional(readOnly = true)
   public @NotNull List<OrgUnitReferenceDto> maintainableUnits() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<OrgUnit> candidates;
     if (scope.adminAllScope()) {
       candidates = orgUnitRepository.findActiveSquadronsAndSpecialCommands();

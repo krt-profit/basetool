@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.guardfixture.tenancy;
 
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +33,7 @@ public class FixtureAggregateWriter {
   private final FixtureAggregateRepository repository;
 
   /** The scope service consulted by the checked write. */
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
 
   /**
    * Saves the aggregate without consulting the scope service.
@@ -50,7 +50,7 @@ public class FixtureAggregateWriter {
    * @param id the aggregate id
    */
   public void touchChecked(UUID id) {
-    if (!ownerScopeService.canEditSquadron(id)) {
+    if (!accessGateService.canEditSquadron(id)) {
       throw new IllegalStateException("out of scope");
     }
     repository.save(repository.findById(id).orElseThrow());

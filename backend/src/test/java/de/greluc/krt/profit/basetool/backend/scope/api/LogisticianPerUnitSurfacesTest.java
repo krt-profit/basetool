@@ -132,7 +132,8 @@ class LogisticianPerUnitSurfacesTest {
   /** The real gate chain for one caller. */
   private static final class Chain {
 
-    final OwnerScopeService ownerScopeService;
+    final RequestScopeResolver requestScopeResolver;
+    final AccessGateService accessGateService;
 
     final AuthHelperService authHelper;
 
@@ -158,11 +159,8 @@ class LogisticianPerUnitSurfacesTest {
                       .collect(Collectors.toUnmodifiableSet())
                   : (caller.grants().contains(pin) ? Set.of(pin) : Set.of()));
       when(resolver.canViewJobOrders()).thenReturn(true);
-      ownerScopeService =
-          new OwnerScopeService(
-              resolver,
-              new AccessGateService(resolver, authHelper),
-              mock(OrgUnitStampingService.class));
+      requestScopeResolver = resolver;
+      accessGateService = new AccessGateService(resolver, authHelper);
     }
   }
 
@@ -185,7 +183,7 @@ class LogisticianPerUnitSurfacesTest {
   void inventoryRowsOfAUnitNeedALogisticianGrantInThatUnit(Caller caller) {
     InventoryItemRepository items = mock(InventoryItemRepository.class);
     InventoryAccessPolicy policy =
-        new InventoryAccessPolicy(new Chain(caller).ownerScopeService, items, null);
+        new InventoryAccessPolicy(new Chain(caller).accessGateService, items, null);
 
     assertReaches(
         caller,
@@ -203,7 +201,7 @@ class LogisticianPerUnitSurfacesTest {
   void refineryOrdersOfAUnitNeedALogisticianGrantInThatUnit(Caller caller) {
     RefineryOrderRepository orders = mock(RefineryOrderRepository.class);
     RefineryAccessPolicy policy =
-        new RefineryAccessPolicy(new Chain(caller).ownerScopeService, orders, null);
+        new RefineryAccessPolicy(new Chain(caller).accessGateService, orders, null);
 
     assertReaches(
         caller,
@@ -223,7 +221,8 @@ class LogisticianPerUnitSurfacesTest {
     Chain chain = new Chain(caller);
     JobOrderAccessPolicy policy =
         new JobOrderAccessPolicy(
-            chain.ownerScopeService,
+            chain.requestScopeResolver,
+            chain.accessGateService,
             chain.authHelper,
             orders,
             mock(JobOrderHandoverRepository.class),
@@ -244,17 +243,17 @@ class LogisticianPerUnitSurfacesTest {
   @ParameterizedTest
   @MethodSource("callers")
   void anOwnerlessRowIsReservedToAdmins(Caller caller) {
-    OwnerScopeService scope = new Chain(caller).ownerScopeService;
+    AccessGateService accessGateService = new Chain(caller).accessGateService;
 
-    assertThat(scope.canActAsLogisticianInOwner(null)).isEqualTo(caller.admin());
+    assertThat(accessGateService.canActAsLogisticianInOwner(null)).isEqualTo(caller.admin());
   }
 
   @ParameterizedTest
   @MethodSource("callers")
   void theListScopeHoldsExactlyTheLogisticianUnitsInsideTheActiveScope(Caller caller) {
-    OwnerScopeService scope = new Chain(caller).ownerScopeService;
+    AccessGateService accessGateService = new Chain(caller).accessGateService;
 
-    ScopePredicate listScope = scope.currentLogisticianScope();
+    ScopePredicate listScope = accessGateService.currentLogisticianScope();
 
     if (caller.admin()) {
       assertThat(listScope).isEqualTo(caller.scope());
@@ -268,9 +267,9 @@ class LogisticianPerUnitSurfacesTest {
   @ParameterizedTest
   @MethodSource("callers")
   void theCapabilityFlagIsOnExactlyWhereTheCallerHandlesAUnitInTheActiveScope(Caller caller) {
-    OwnerScopeService scope = new Chain(caller).ownerScopeService;
+    AccessGateService accessGateService = new Chain(caller).accessGateService;
 
-    assertThat(scope.canActAsLogisticianInActiveContext())
+    assertThat(accessGateService.canActAsLogisticianInActiveContext())
         .isEqualTo(caller.admin() || !caller.reachable().isEmpty());
   }
 
@@ -284,6 +283,6 @@ class LogisticianPerUnitSurfacesTest {
             new ScopePredicate(false, null, Set.of(UNIT_A)),
             Set.of());
 
-    assertThat(new Chain(caller).ownerScopeService.currentLogisticianOrgUnitIds()).isEmpty();
+    assertThat(new Chain(caller).accessGateService.currentLogisticianOrgUnitIds()).isEmpty();
   }
 }

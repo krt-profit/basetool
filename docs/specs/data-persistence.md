@@ -55,7 +55,7 @@ Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load f
 memoise a request-constant lookup or verdict on the `HttpServletRequest` — or derive both projections
 from a single load — so repeated per-row / per-resolver reads collapse to one (e.g. the
 `PromotionEligibilityService` evaluation set is loaded once per user across all rank transitions, and
-`OwnerScopeService.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
+`RequestScopeResolver.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
 and own-level oversight scopes from one membership read). Dead unbounded eager finders
 (`SELECT i FROM InventoryItem i` with no caller) are deleted, not kept as a foot-gun.
 
@@ -94,7 +94,7 @@ embedded key, and the V95 kind trigger then refused memberships inserted ahead o
 created in the same flush (`HangarIntegrationTest`).
 
 A **request-constant verdict or lookup** consulted more than once per request (e.g. per row) must be
-memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.canViewJobOrders()` and
+memoised on the `HttpServletRequest` so it resolves once: `RequestScopeResolver.canViewJobOrders()` and
 `currentMemberOrgUnitIds()` cache on a request attribute, and `UserMapper` memoises the per-user
 Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
 direct query outside an HTTP request). The delegated appointment verdicts
@@ -191,7 +191,7 @@ rather than loading the parent aggregate to stream it (`MissionParticipantServic
 material `SUM` on the list path, plus the in-memory sum reproducing the native per-bucket semantics
 at each quality floor), `JobOrderMaterialStockRowQueryDataTest` (the batched projection runs on the
 real Postgres schema, returns only order-linked rows, and its floor sum equals the native
-`sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `OwnerScopeServiceTest` (profit-eligibility
+`sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `ScopeKernelTest` (profit-eligibility
 count runs once across repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per
 user within a request, direct-query fallback without one), `MissionServicePayoutTest` (check-in/out/
 payout resolve the participant without an aggregate load), `UserMappingNoNPlusOneTest` (a
@@ -733,7 +733,7 @@ checks. The six scope fragments are pinned byte for byte by `ScopeFragmentsGolde
 (`ShipScopeParityTest`, `InventoryScopeParityTest`, `RefineryScopeParityTest`, `OperationScopeParityTest`, `MissionScopeParityTest`,
 `JobOrderScopeParityTest`) runs the list query against the real schema and the row gate over the nine callers of the access-policy
 differential tests (`ScopeParityCallers`): the list never shows a row the gate refuses, and the two agree on every row another member
-owns in a unit (for Mission, Operation and JobOrder on every row). `RefineryOrderRepositoryScopedTest` and `OwnerScopeServiceTest` still cover the scoped queries.
+owns in a unit (for Mission, Operation and JobOrder on every row). `RefineryOrderRepositoryScopedTest` and `ScopeKernelTest` still cover the scoped queries.
 
 **Code:** `backend/src/main/java/.../backend/catalogue/internal/LookupTableRepository.java`,
 `mission/api/MissionScope.java`, `hangar/api/ShipScope.java`, `joborder/api/JobOrderScope.java`, `inventory/api/InventoryScope.java`
@@ -866,7 +866,7 @@ fine.
 `OrgUnitMembershipQueryService.listOptionsForUser` / `findAllMembershipsForUser` (batched, also
 de-N+1-ing the sort comparator), `JobOrderHandoverService` / `JobOrderItemHandoverService`
 (executing-Staffel stamp), with `JobOrderOrgUnitResolver` as the pre-existing canonical pattern.
-Covered by `StaffelMembershipResolverTest`, `OwnerScopeServiceTest`,
+Covered by `StaffelMembershipResolverTest`, `ScopeKernelTest`,
 `OrgUnitMembershipQueryServiceTest`, `PromotionFeatureFlagServiceGateTest`.
 
 ### REQ-DATA-014 — an external-catalogue tombstone sweep runs only on an identity-verified census (ADR-0147, ADR-0195)

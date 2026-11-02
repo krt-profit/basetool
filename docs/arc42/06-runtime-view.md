@@ -29,7 +29,7 @@ performs routinely.
 
 1. A controller takes the request; `@PreAuthorize` decides whether the caller may perform the
    operation at all.
-2. The **service layer** applies scope through `OwnerScopeService`: which org units this caller may
+2. The **service layer** applies scope through the scope kernel (`RequestScopeResolver`, `AccessGateService`): which org units this caller may
    see, and by which of the aggregate's scope kinds.
 3. The repository is asked only for what the scope allows.
 
