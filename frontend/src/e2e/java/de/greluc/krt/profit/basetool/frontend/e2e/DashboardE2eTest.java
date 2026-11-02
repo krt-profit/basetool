@@ -426,6 +426,8 @@ class DashboardE2eTest {
 
           page.getByTestId("dashboard-widget-market").getByTestId("dashboard-options").click();
           assertThat(page.locator("#dashboard-option-status option:not([hidden])")).hasCount(3);
+          assertThat(page.locator("#dashboard-option-status option:not([hidden])").first())
+              .hasAttribute("value", "BOTH");
           page.locator("#dashboard-option-status").selectOption("REQUESTS");
           page.getByTestId("dashboard-options-save").click();
 

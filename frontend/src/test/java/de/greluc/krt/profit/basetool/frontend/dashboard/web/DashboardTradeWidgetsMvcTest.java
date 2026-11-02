@@ -32,12 +32,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyRefDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -70,7 +72,11 @@ class DashboardTradeWidgetsMvcTest {
       "/api/v1/material-exchange/requests?tab=alle&size=5&sort=neu";
   private static final String NEEDS_URL =
       "/api/v1/supply/needs?page={page}&size={size}&sort=createdAt,desc&status={status}";
+  private static final String UNIT_NEEDS_URL =
+      "/api/v1/supply/needs?page={page}&size={size}&sort=createdAt,desc"
+          + "&orgUnitId={orgUnitId}&status={status}";
   private static final String BANK_REQUESTS_URL = "/api/v1/bank/org-units/requests";
+  private static final UUID OTHER_UNIT = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
   private static final UUID ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
   private static final UUID UNIT = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
 
@@ -159,6 +165,10 @@ class DashboardTradeWidgetsMvcTest {
   }
 
   private static NeedDto need(String material, double amount, double fulfilled) {
+    return need(material, amount, fulfilled, Instant.parse("2026-10-01T10:00:00Z"));
+  }
+
+  private static NeedDto need(String material, double amount, double fulfilled, Instant raised) {
     return new NeedDto(
         ID,
         UNIT,
@@ -182,7 +192,7 @@ class DashboardTradeWidgetsMvcTest {
         null,
         false,
         1L,
-        Instant.parse("2026-10-01T10:00:00Z"));
+        raised);
   }
 
   private static BankBookingRequestDto bankRequest(String type, String status, long amount) {
@@ -330,10 +340,21 @@ class DashboardTradeWidgetsMvcTest {
         .contains("Zurzeit gibt es keine offenen Einträge.");
   }
 
+  private void ownUnits(UUID... ids) {
+    when(backendApiClient.get(eq("/api/v1/org-units/me/ids"), anyTypeRef()))
+        .thenReturn(List.of(ids));
+  }
+
+  private void activeContext(UUID activeUnit) {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.activeOrgUnit(activeUnit));
+  }
+
   /** The open needs are counted by the page total and show their unit while following. */
   @Test
   void supplyNeeds_listTheOpenNeedsWithTheirCoverage() throws Exception {
-    when(backendApiClient.get(eq(NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN")))
+    ownUnits(UNIT);
+    when(backendApiClient.get(eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(UNIT), eq("OPEN")))
         .thenReturn(page(9, List.of(need("Quantanium", 100, 40))));
 
     String html = render(NEEDS);
@@ -351,11 +372,13 @@ class DashboardTradeWidgetsMvcTest {
   /** The uncovered status asks the backend for the uncovered coverage. */
   @Test
   void supplyNeeds_uncoveredStatusAsksForTheCoverage() throws Exception {
+    ownUnits(UNIT);
     when(backendApiClient.get(
-            eq(NEEDS_URL + "&coverage={coverage}"),
+            eq(UNIT_NEEDS_URL + "&coverage={coverage}"),
             anyTypeRef(),
             eq(0),
             eq(5),
+            eq(UNIT),
             eq("OPEN"),
             eq("UNCOVERED")))
         .thenReturn(page(1, List.of(need("Taranite", 10, 0))));
@@ -387,10 +410,65 @@ class DashboardTradeWidgetsMvcTest {
         .containsPattern("href=\"/supply/needs\\?orgUnitId=" + UNIT + "\"");
   }
 
+  /** Without a pin the needs of all the member's own units are merged, newest first. */
+  @Test
+  void supplyNeeds_withoutAPinShowTheUnionOfTheOwnUnitsLabelled() throws Exception {
+    ownUnits(UNIT, OTHER_UNIT);
+    when(backendApiClient.get(eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(UNIT), eq("OPEN")))
+        .thenReturn(
+            page(2, List.of(need("Old-Need", 10, 0, Instant.parse("2026-09-01T10:00:00Z")))));
+    when(backendApiClient.get(
+            eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(OTHER_UNIT), eq("OPEN")))
+        .thenReturn(
+            page(3, List.of(need("New-Need", 10, 0, Instant.parse("2026-10-05T10:00:00Z")))));
+
+    String html = render(NEEDS);
+
+    assertThat(html)
+        .containsPattern("data-testid=\"dashboard-supply-needs-count\"[^>]*>5<")
+        .containsPattern("(?s)New-Need.*Old-Need")
+        .contains("data-testid=\"dashboard-supply-needs-unit\"");
+    verify(backendApiClient, never()).get(eq(NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN"));
+  }
+
+  /** A pinned context shows that unit's needs only, without reading the other own units. */
+  @Test
+  void supplyNeeds_followThePinnedContext() throws Exception {
+    ownUnits(UNIT, OTHER_UNIT);
+    activeContext(OTHER_UNIT);
+    when(backendApiClient.get(
+            eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(OTHER_UNIT), eq("OPEN")))
+        .thenReturn(page(1, List.of(need("Pinned-Need", 10, 0))));
+
+    String html = render(NEEDS);
+
+    assertThat(html)
+        .contains("Pinned-Need")
+        .doesNotContain("dashboard-supply-needs-unit")
+        .containsPattern("href=\"/supply/needs\\?orgUnitId=" + OTHER_UNIT + "\"");
+    verify(backendApiClient, never())
+        .get(eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(UNIT), eq("OPEN"));
+  }
+
+  /** A unit chosen in the options wins over the pinned context. */
+  @Test
+  void supplyNeeds_aChosenUnitWinsOverThePinnedContext() throws Exception {
+    activeContext(OTHER_UNIT);
+    when(backendApiClient.get(eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(UNIT), eq("OPEN")))
+        .thenReturn(page(1, List.of(need("Chosen-Need", 10, 0))));
+
+    String html = render(NEEDS, Map.of("unit", UNIT.toString()));
+
+    assertThat(html).contains("Chosen-Need");
+    verify(backendApiClient, never())
+        .get(eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(OTHER_UNIT), eq("OPEN"));
+  }
+
   /** Without an open need the widget says so. */
   @Test
   void supplyNeeds_withoutNeedsShowTheEmptyState() throws Exception {
-    when(backendApiClient.get(eq(NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN")))
+    ownUnits(UNIT);
+    when(backendApiClient.get(eq(UNIT_NEEDS_URL), anyTypeRef(), eq(0), eq(5), eq(UNIT), eq("OPEN")))
         .thenReturn(page(0, List.of()));
 
     String html = render(NEEDS);

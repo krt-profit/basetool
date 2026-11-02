@@ -27,14 +27,12 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -70,6 +68,8 @@ public class DashboardWidgetController {
 
   private final FrontendAuthHelperService authHelper;
 
+  private final OwnOrgUnits ownOrgUnits;
+
   /**
    * Renders the missions of the coming days.
    *
@@ -93,7 +93,7 @@ public class DashboardWidgetController {
     model.addAttribute("upcomingMissions", missions.stream().limit(limit).toList());
     model.addAttribute("upcomingDays", horizonDays);
     model.addAttribute(
-        "myOrgUnitIds", SectionFallback.load(log, "own-org-units", this::ownUnits, Set.of()));
+        "myOrgUnitIds", SectionFallback.load(log, "own-org-units", ownOrgUnits::ids, Set.of()));
     return WIDGETS + "upcomingDays";
   }
 
@@ -159,7 +159,7 @@ public class DashboardWidgetController {
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     model.addAttribute("nextMissions", client.nextMissions(DashboardWidgetOptions.rows(rows)));
     model.addAttribute(
-        "myOrgUnitIds", SectionFallback.load(log, "own-org-units", this::ownUnits, Set.of()));
+        "myOrgUnitIds", SectionFallback.load(log, "own-org-units", ownOrgUnits::ids, Set.of()));
     return WIDGETS + "nextMission";
   }
 
@@ -198,28 +198,5 @@ public class DashboardWidgetController {
     }
     UserDto currentUser = SectionFallback.load(log, "current-user", client::currentUser, null);
     return currentUser == null || !announcement.id().equals(currentUser.lastReadAnnouncementId());
-  }
-
-  @NotNull
-  private Set<UUID> ownUnits() {
-    Set<UUID> ids = new HashSet<>();
-    UserDto currentUser = client.currentUser();
-    if (currentUser != null) {
-      if (currentUser.squadrons() != null) {
-        for (SquadronReferenceDto squadron : currentUser.squadrons()) {
-          if (squadron != null && squadron.id() != null) {
-            ids.add(squadron.id());
-          }
-        }
-      }
-      if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
-        ids.add(currentUser.squadron().id());
-      }
-    }
-    List<UUID> direct = client.myOrgUnitIds();
-    if (direct != null) {
-      direct.stream().filter(java.util.Objects::nonNull).forEach(ids::add);
-    }
-    return ids;
   }
 }

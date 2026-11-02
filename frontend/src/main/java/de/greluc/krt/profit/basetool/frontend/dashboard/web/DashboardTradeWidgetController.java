@@ -32,7 +32,9 @@ import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialReq
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -76,6 +78,8 @@ public class DashboardTradeWidgetController {
 
   private final BankBackendClient bankClient;
 
+  private final OwnOrgUnits ownOrgUnits;
+
   /**
    * Renders the open Materialbörse entries, the newest first.
    *
@@ -117,10 +121,11 @@ public class DashboardTradeWidgetController {
   }
 
   /**
-   * Renders the open supply needs, the newest first.
+   * Renders the open supply needs, the newest first: those of the chosen or pinned unit, else the
+   * union of the member's own units.
    *
    * @param model the Thymeleaf model
-   * @param unit the pinned org unit, or {@code null} to follow the active context
+   * @param unit the chosen org unit, or {@code null} to follow the active context
    * @param rows the rows shown
    * @param status the coverage filter
    * @return the {@code supplyNeeds} fragment
@@ -136,15 +141,26 @@ public class DashboardTradeWidgetController {
         DashboardWidgetOptions.statusOf(
             DashboardWidgetType.SUPPLY_NEEDS, status, DashboardStatus.ALL_OPEN);
     UUID scope = unit != null ? unit : DashboardContext.of(model).activeUnitId();
-    PageResponse<NeedDto> page =
-        supplyClient.needs(
-            scope,
-            NEED_OPEN,
-            DashboardWidgetOptions.needCoverage(resolved),
-            0,
-            DashboardWidgetOptions.rows(rows));
-    model.addAttribute("needRows", page == null ? List.of() : page.content());
-    model.addAttribute("needTotal", page == null ? 0L : page.totalElements());
+    int limit = DashboardWidgetOptions.rows(rows);
+    String coverage = DashboardWidgetOptions.needCoverage(resolved);
+    List<NeedDto> needs = new ArrayList<>();
+    long total = 0;
+    for (UUID read : scope != null ? Set.of(scope) : ownOrgUnits.ids()) {
+      PageResponse<NeedDto> page = supplyClient.needs(read, NEED_OPEN, coverage, 0, limit);
+      if (page != null) {
+        needs.addAll(page.content());
+        total += page.totalElements();
+      }
+    }
+    model.addAttribute(
+        "needRows",
+        needs.stream()
+            .sorted(
+                Comparator.comparing(
+                    NeedDto::createdAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .limit(limit)
+            .toList());
+    model.addAttribute("needTotal", total);
     model.addAttribute("needShowsUnit", scope == null);
     model.addAttribute("needScope", scope);
     return FRAGMENTS + "supplyNeeds";

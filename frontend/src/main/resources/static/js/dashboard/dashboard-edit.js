@@ -332,6 +332,10 @@ function openOptions(trigger) {
                 choice.hidden = !statuses.includes(choice.value);
                 choice.disabled = choice.hidden;
             });
+            const shown = statuses.flatMap((value) =>
+                Array.from(select.options).filter((choice) => choice.value === value),
+            );
+            select.append(...shown);
         }
         const field = /** @type {HTMLElement} */ (group).dataset.field ?? option;
         select.value = item.dataset[field] ?? '';

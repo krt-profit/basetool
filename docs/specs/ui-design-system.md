@@ -2665,8 +2665,9 @@ reload at once when the tab becomes visible again.
 board, newest first, and counts both page totals. „Bedarf & Spenden" reads the open needs
 (REQ-SUP-006) and counts the page total; „Ungedeckt" is an open need nothing is credited to,
 „Teilweise gedeckt" one that is credited in part (the `coverage` filter of the needs list);
-unpinned and following no pinned context it shows every unit's open needs, each row labelled with
-its unit, and it is offered only while the supply surface is on (REQ-SUP-001). „Meine
+a chosen or pinned unit shows that unit's needs, no pin the union of the member's own units' open
+needs, each row labelled with its unit; it is offered only while the supply surface is on
+(REQ-SUP-001). „Meine
 Bankanträge" lists the caller's own requests (REQ-BANK-022) only; „Offen" is pending,
 „Entschieden" every request that has reached a final state. The live-sync rooms are `materialboard`
 (`board`, `requests`), `supply-needs` (`needs`, `stats`) and `orgunit-bank` (`orgUnitBank`). A

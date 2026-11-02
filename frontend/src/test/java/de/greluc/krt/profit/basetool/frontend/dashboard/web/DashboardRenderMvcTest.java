@@ -328,7 +328,7 @@ class DashboardRenderMvcTest {
         .contains("data-widget-slug=\"bank-requests\"")
         .contains("data-status-choices=\"BOTH OFFERS REQUESTS\"")
         .contains("data-status-choices=\"ALL_OPEN UNCOVERED PARTIAL\"")
-        .contains("data-status-choices=\"ALL OPEN DECIDED\"")
+        .contains("data-status-choices=\"OPEN DECIDED ALL\"")
         .contains("data-options=\"unit rows status\"")
         .contains("data-options=\"rows status\"");
   }
