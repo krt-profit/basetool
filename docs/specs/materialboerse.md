@@ -602,7 +602,7 @@ Any member who can supply a request signals it ("Ich kann liefern"); the request
 sees the supplier names, every other viewer sees only the count — the request-side mirror of
 REQ-MARKET-006. A member cannot signal on their own request; the signal is idempotent and guarded by
 a unique `(request, user)` constraint through the non-transactional find-or-create retry of
-`backend/CLAUDE.md`
+[`backend-concurrency.md`](../agents/backend-concurrency.md)
 (`ObjectProvider<Self>` self-proxy, `REQUIRES_NEW` inner method, catch `DataIntegrityViolationException`).
 Withdrawing removes the signal (idempotent). Supplier identities never cross the live-sync socket.
 

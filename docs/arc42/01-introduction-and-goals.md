@@ -52,4 +52,4 @@ page timeouts, not a scaling ambition.
 arc42 asks *what the architecture is*. This repository already answers *what a feature must do*
 (specs) and *why a decision was taken* (ADRs). Those two are the authorities. Where this folder and one of them
 disagree, **they are right and this folder is stale** — fix it in the same session, the way
-`CLAUDE.md` requires of everything else.
+`AGENTS.md` requires of everything else.

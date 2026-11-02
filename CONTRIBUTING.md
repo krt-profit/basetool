@@ -79,7 +79,7 @@ matches what you are about to change *before* you open a PR:
 | Project overview, prerequisites, local dev/test stack, deployment runbook                           | [`README.md`](README.md)                                                                                                                                                         |
 | Release notes and every user-visible change                                                         | [`CHANGELOG.md`](CHANGELOG.md), unreleased entries as fragments in [`changelog.d/`](changelog.d/README.md)                                                                          |
 | Security vulnerability reporting, supported versions, scope, safe harbor                            | [`.github/SECURITY.md`](.github/SECURITY.md)                                                                                                                                     |
-| Architectural invariants, build/test commands, AI-assistant guardrails                              | [`CLAUDE.md`](CLAUDE.md)                                                                                                                                                         |
+| Architectural invariants, build/test commands, AI-assistant guardrails                              | [`AGENTS.md`](AGENTS.md)                                                                                                                                                         |
 | Role and permission matrix (realm roles + contextual `LOGISTICIAN` / `MISSION_MANAGER` grants)       | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
 | Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist) | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md)                                                                         |
 | "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette)                    | [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md) (binding rules: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)) |
@@ -89,10 +89,18 @@ matches what you are about to change *before* you open a PR:
 | Architecture overview (arc42) and archived plans / one-time runbooks                                | [`docs/arc42/README.md`](docs/arc42/README.md), [`docs/archive/README.md`](docs/archive/README.md)                                                                               |
 | License                                                                                             | [`LICENSE.md`](LICENSE.md) — GPL-3.0                                                                                                                                             |
 
-CLAUDE.md and the SECURITY.md are the two documents that most often
+AGENTS.md and the SECURITY.md are the two documents that most often
 surprise first-time contributors — please read them before touching the
 backend security model, the multi-squadron data paths, or anything that
 could conceivably leak data across users.
+
+**Working with an AI coding agent.** [`AGENTS.md`](AGENTS.md) (root,
+[`backend/`](backend/AGENTS.md), [`frontend/`](frontend/AGENTS.md)) is the one set of agent
+instructions, for every agent; `CLAUDE.md` imports it for Claude Code, and the full rules behind its
+summaries are in [`docs/agents/`](docs/agents/README.md). Skills live in `.claude/skills/`, each
+with a stub under `.agents/skills/`. A change to these files keeps root plus one module
+`AGENTS.md` below 32 KiB and every skill paired with its stub — `repo-lint.yml` checks both
+(REQ-OPS-055, ADR-0327).
 
 ---
 
@@ -106,7 +114,7 @@ could conceivably leak data across users.
 
 Before asking, please:
 
-- Search the [README](README.md), this document, [CLAUDE.md](CLAUDE.md),
+- Search the [README](README.md), this document, [AGENTS.md](AGENTS.md),
   and the [CHANGELOG](CHANGELOG.md). Most "why does the build do X?" /
   "how do I run the test stack?" / "what is `owning_org_unit_id`?"
   questions are answered there.
@@ -180,7 +188,7 @@ The template intentionally asks for:
 
 If your proposal needs a Flyway migration or touches the role model or
 the squadron-scope rules, please link to the relevant sections of
-[CLAUDE.md](CLAUDE.md) so the discussion can move quickly.
+[AGENTS.md](AGENTS.md) so the discussion can move quickly.
 
 Refactors, dependency upgrades, build / CI work, and docs-only changes
 use the
@@ -209,7 +217,7 @@ The README is the canonical place. The relevant sections:
 - [Prerequisites](README.md#prerequisites) — Java 25 + Docker + Compose.
 - [Local development (apps from Gradle)](README.md#local-development-apps-from-gradle) — recommended for active development (apps on the host JVM, dependencies in containers).
 - [Full stack via Docker Compose](README.md#full-stack-via-docker-compose) — when you need the whole thing in containers.
-- [Running the local test stack](README.md#running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [CLAUDE.md → Testing](CLAUDE.md) for the rationale.
+- [Running the local test stack](README.md#running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [AGENTS.md → Testing](AGENTS.md) for the rationale.
 - [Running tests](README.md#tests) — Gradle wrapper only, never the IDE test runner.
 - [Linting, static analysis and SBOM](README.md#linting-static-analysis-and-sbom) — `./gradlew check`, Checkstyle, SpotBugs, Spotless, CycloneDX.
 
@@ -686,7 +694,7 @@ commit of the branch and to the PR title.
 - **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `multi-tenant`, `db/V80`, `frontend/orders`, `admin/uex`, `operations`, `missions`, `materials`, `promotion`, `actions`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
 - **`<short summary>`** — imperative mood (*"add foo"*, not *"added foo"* or *"adds foo"*), lower-case start, no trailing period, ≤ 72 characters including the prefix.
 - **Body** — explain the *why*. Reference Issues / PRs (`closes #123`, `refs #456`). Keep lines ≤ 100 characters.
-- **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, and — required on every commit — the `Signed-off-by:` trailer from `git commit -s` (see [DCO sign-off](#developer-certificate-of-origin-dco-sign-off)).
+- **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, and — required on every commit — the `Signed-off-by:` trailer from `git commit -s` (see [DCO sign-off](#developer-certificate-of-origin-dco-sign-off)). A commit an AI agent authored also names the agent and its model, e.g. `Co-Authored-By: Codex <Model> <noreply@openai.com>` ([`docs/agents/git-and-commits.md`](docs/agents/git-and-commits.md)).
 
 ### Examples (taken from real history)
 
@@ -783,8 +791,8 @@ that — promotion to `:stable` and the host rollout — is in
   where exhaustiveness genuinely helps.
 - **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`,
   `@Unmodifiable`) only where the code actually establishes the contract
-  — see the *Java conventions* section of [CLAUDE.md](CLAUDE.md) for the
-  exact rules.
+  — see [`docs/agents/java-conventions.md`](docs/agents/java-conventions.md)
+  for the exact rules.
 
 ### Javadoc
 
@@ -830,7 +838,7 @@ The UI follows the *DAS KARTELL* Corporate Design Manual strictly — see
 (a git submodule that follows the design system's `main`: run `git submodule update --init
 --remote .claude/skills/das-kartell-design` if it is empty or stale, ADR-0259), the
 binding rules in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)
-and [`frontend/CLAUDE.md`](frontend/CLAUDE.md). Highlights:
+and [`frontend/AGENTS.md`](frontend/AGENTS.md). Highlights:
 
 - **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
   or black.
@@ -897,7 +905,7 @@ all of them.
 The codebase has a small number of invariants that exist because real
 bugs hit production when they were violated. They are enforced by
 ArchUnit, Checkstyle, the CI build, and — where automation cannot reach
-— by review. Read the matching CLAUDE.md / README.md sections **before**
+— by review. Read the matching AGENTS.md / README.md sections **before**
 you touch these areas.
 
 ### Security model
@@ -966,7 +974,7 @@ you touch these areas.
 ### Concurrency: optimistic locking and the `*WithinTransaction` pattern
 
 The codebase has been bitten by optimistic-locking traps multiple times.
-The rules in [`backend/CLAUDE.md` → Concurrency](backend/CLAUDE.md) exist
+The rules in [`docs/agents/backend-concurrency.md`](docs/agents/backend-concurrency.md) exist
 because of real bugs that shipped. The short version:
 
 - **Optimistic locking via `@Version`** — every write DTO carries
@@ -1070,7 +1078,7 @@ because of real bugs that shipped. The short version:
   expensive than always using the `.env.test` / throwaway `keystore.p12` /
   stripped `realm-export.json` route described in
   [README → Running the local test stack](README.md#running-the-local-test-stack) and
-  [CLAUDE.md → Testing](CLAUDE.md).
+  [`docs/agents/testing.md`](docs/agents/testing.md).
 
 ---
 

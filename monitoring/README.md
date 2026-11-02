@@ -19,7 +19,7 @@ them that recurs lives here.
 > Quadlet units are generated from and still runs on a Docker workstation, so Docker commands in
 > this file are for local validation only. Any production command below runs on the Rocky host; on
 > production, reading is standing-permitted and **every write needs @greluc's explicit per-action
-> approval** (repository `CLAUDE.md` → *Production host access*).
+> approval** (`docs/agents/production-host-access.md`).
 
 ## Overview
 
@@ -221,7 +221,7 @@ section above.
 | **PostgresConnectionsCritical** | Connection pool near max. Check for a connection leak or runaway query; inspect HikariCP and `pg_stat_activity`. |
 | **PostgresWraparoundCritical** | XID wraparound age > 1.5 billion (the metric value is an XID count, not seconds). Autovacuum is not freezing; the DB nears a forced read-only shutdown. Check autovacuum progress and terminate long-idle transactions urgently. |
 | **PostgresFatalOrPanic** | **CRITICAL.** A PostgreSQL container logged a `PANIC` or a non-benign `FATAL` (the restart-lifecycle FATALs are excluded). Read `{app=~"postgres-.+"} \|~ "FATAL\|PANIC"` in Loki; a PANIC means the server restarted — check disk space on `/var/lib/basetool`, then `journalctl CONTAINER_NAME=db-backend` (or `db-keycloak`). |
-| **PostgresDeadlocks** | Deadlocks in the last 15 minutes. The PostgreSQL log names both statements; in the backend it is usually two transactions locking the same rows in opposite order — check the multi-step transaction rules in `backend/CLAUDE.md`. |
+| **PostgresDeadlocks** | Deadlocks in the last 15 minutes. The PostgreSQL log names both statements; in the backend it is usually two transactions locking the same rows in opposite order — check the multi-step transaction rules in `docs/agents/backend-concurrency.md`. |
 | **PostgresLongTransaction** | A transaction has been open for over an hour and blocks autovacuum (bloat, XID age). Find it in `pg_stat_activity` (`state`, `xact_start`, `application_name`) and end it with `pg_terminate_backend(pid)` once you know what it is — a gated write on production. |
 | **PostgresCacheHitLow** | The buffer-cache hit ratio of one database stayed under 90 % for 30 minutes — queries read from disk. Check recent query or plan changes and `shared_buffers` against the container's memory. |
 | **PostgresTempFiles** | More than 1 GB of temp files in an hour — queries spill to disk (a bad plan or `work_mem` too small). Find the heavy queries by `temp_blks_written` in `pg_stat_statements` if it is loaded, else the PostgreSQL log. |
