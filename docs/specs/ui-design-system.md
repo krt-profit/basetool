@@ -1688,7 +1688,10 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and —
   loaded on the first opening — „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and
   „Ankauf-Partner", „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members
-  whose tab bar shows them. Empty, it offers up to four recently visited pages (`localStorage`
+  whose tab bar shows them; those five tabs are registry entries (`supply.incoming`,
+  `supply.stats`, `purchasing.partners`, `purchasing.delegates`, `purchasing.report`) and the
+  on-demand answer carries each tab's entry key, so they can be starred, chosen as phone slots and
+  start pages like every other tab. Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
   anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
@@ -1785,7 +1788,9 @@ its former sibling pages become tabs of it.
   than two permitted tabs shows no bar. A tab can cover pages that are not tabs themselves (Beförderung's
   Themenbereiche and Rangvoraussetzungen); they show the bar with the
   covering tab current. Beschaffung keeps its supply and purchasing tab fragments, which add
-  „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. Every former URL still opens
+  „Ankauf" and „Bedarf" · „Meine Spenden" across the two surfaces. With both surfaces on, the
+  Ankauf tab is not a second menu link (`menuUnless`), but stays an available entry: current page,
+  favourite, phone slot and start page. Every former URL still opens
   its page or tab (the Lager lists by redirect); an entry gated on a flag or role the caller lacks is neither a link nor a tab, and
   officer-only tabs follow `canOpenLeitung` and `canManagePromotions`.
 - *Italic* tabs are officer-only (officer reach per org unit, ADR-0300); Beförderung's

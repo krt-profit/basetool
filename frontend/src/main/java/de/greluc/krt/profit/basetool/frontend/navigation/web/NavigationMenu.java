@@ -343,13 +343,13 @@ public record NavigationMenu(
       List<NavigationEntry> permitted =
           group.entries().stream().filter(entry -> group.permits(entry, access)).toList();
       List<NavigationEntry> menu =
-          permitted.stream().filter(entry -> !entry.paletteOnly()).toList();
+          permitted.stream().filter(entry -> entry.menuLink(access)).toList();
       return new Group(
           group,
           menu.stream().filter(entry -> !hiddenPages.contains(entry.key())).toList(),
           menu.stream().filter(entry -> hiddenPages.contains(entry.key())).toList(),
           permitted.stream()
-              .filter(NavigationEntry::paletteOnly)
+              .filter(entry -> !entry.menuLink(access))
               .filter(entry -> !hiddenEntries.contains(entry.key()))
               .toList());
     }

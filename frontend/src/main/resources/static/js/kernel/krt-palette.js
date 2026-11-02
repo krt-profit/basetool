@@ -919,8 +919,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const iconName = typeof e.icon === 'string' && e.icon ? e.icon : 'list';
                     const crumb = typeof e.crumb === 'string' ? e.crumb : '';
                     const keywords = typeof e.keywords === 'string' ? e.keywords : '';
+                    const entryKey = typeof e.key === 'string' && e.key ? e.key : undefined;
                     if (
-                        addPage({ href: e.href, label: e.label, crumb, icon: iconName, keywords })
+                        addPage({
+                            href: e.href,
+                            label: e.label,
+                            crumb,
+                            icon: iconName,
+                            keywords,
+                            entryKey,
+                            starrable: entryKey !== undefined,
+                        })
                     ) {
                         added = true;
                     }
