@@ -174,10 +174,6 @@ public final class HandleErasureCoverage {
               "job_order_handover.recipient_squadron",
               "A squadron, not a person: an organisational unit's name."),
           notTheMember(
-              "org_unit.grand_admiral_display_name",
-              "The organisation's own office holder, carried as configuration rather than as a"
-                  + " membership record."),
-          notTheMember(
               "purchasing_partner.name",
               "A trade partner, a third party; an admin erases an individual partner's handle and"
                   + " notes on request."),
@@ -246,11 +242,6 @@ public final class HandleErasureCoverage {
               "operation.name",
               "An operation survives its participants and carries payout history."),
           byHand("operation.description", "See operation.name."),
-          byHand(
-              "org_chart_position.name",
-              "An org-chart entry. A placeholder position can carry a person's name where no"
-                  + " account backs it."),
-          byHand("org_chart_position.display_name", "See org_chart_position.name."),
           byHand("org_unit.description", "An organisational unit's prose."),
           byHand("promotion_category.description", "Promotion catalogue prose."),
           byHand("promotion_topic.description", "Promotion catalogue prose."),

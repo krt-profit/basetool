@@ -37,7 +37,6 @@ public class OrgUnitMentionSource implements PersonMentionSource {
     return List.of(
         new Target("ORG", "kommando_group", "name", "id", LinkKind.ORG),
         new Target("ORG", "org_unit", "description", "id", LinkKind.ORG),
-        new Target("ORG", "org_unit", "grand_admiral_display_name", "id", LinkKind.ORG),
         new Target("ORG", "org_unit", "name", "id", LinkKind.ORG),
         new Target("ORG", "org_unit", "shorthand", "id", LinkKind.ORG));
   }

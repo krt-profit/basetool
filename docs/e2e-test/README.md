@@ -46,7 +46,7 @@ Die Suite liegt im Source-Set `e2e` des Moduls `frontend` (`frontend/src/e2e/jav
 | [UC-14](UC-14-inventar-mandanten-scope.md)         | Inventar-Mandanten-Scope über alle Mitgliedschaftsprofile + Admin-Pin                 | `e2e` | `InventoryTenancyE2eTest`                      |
 | [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md) | Job Order: SK-Warteschlange vs. staffel-privat, Requester-Escape                      | `e2e` | `JobOrderTenancyE2eTest`                       |
 | [UC-21](UC-21-refinery-order-mandanten-scope.md)   | Refinery-Mandanten-Scope + Admin-Pin + BAC-004                                        | `e2e` | `RefineryOrderTenancyE2eTest`                  |
-| [UC-40](UC-40-organigramm-hierarchie-ernennungen.md) | Organigramm, Bereichs-Hierarchie & Ernennungen                                      | `e2e` | `OrgChartPositionCrudE2eTest` · `OrgChartKeyboardA11yE2eTest` · `OrgHierarchyVisibilityMatrixE2eTest` · `RoleAppointmentMatrixE2eTest` |
+| [UC-40](UC-40-bereichs-hierarchie-ernennungen.md) | Bereichs-Hierarchie & Ernennungen | `e2e` | `OrgHierarchyVisibilityMatrixE2eTest` · `RoleAppointmentMatrixE2eTest` |
 
 > **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel**. Die staffel-übergreifende Zusammenarbeit läuft über organisationsweite Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
 

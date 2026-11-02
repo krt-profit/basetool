@@ -833,7 +833,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 103);
+    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 101);
     mapperLayerShouldNotReachIntoSecurityContextRule().check(CLASSES);
   }
 
@@ -1348,7 +1348,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotDependOnServiceLayer() {
-    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 103);
+    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 101);
     mustNotDependOnServicesRule(MAPPER_CODE)
         .because(
             "the service layer depends on mappers, so a mapper -> service edge re-creates the "

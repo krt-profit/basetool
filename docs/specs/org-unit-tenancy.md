@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -13,13 +13,14 @@ behind this spec are archived: [`MULTI_SQUADRON_PLAN.md`](../archive/MULTI_SQUAD
 [`SPEZIALKOMMANDO_PLAN.md`](../archive/SPEZIALKOMMANDO_PLAN.md) (history only — this spec is the
 living truth).
 
-> **Numbering note.** The ORG ids are shared with [`org-chart.md`](org-chart.md). Four of them had
-> each named one requirement here and a different one there; on 2026-09-22, on the owner's decision,
-> they were renumbered once: this file keeps `REQ-ORG-011` (owner retains see/edit) and `REQ-ORG-018`
-> (mission owning-unit reassignment), while its active-context surfacing (was `REQ-ORG-010`) is now
-> `REQ-ORG-024` and its participant escape (was `REQ-ORG-021`) is now `REQ-ORG-027`. See the
-> renumbering table in [`INDEX.md`](INDEX.md). `REQ-ORG-010`, `-012`, `-013`, `-020`, `-021`, `-025`
-> and `-026` live only in `org-chart.md`.
+> **Numbering note.** The ORG ids are shared with the retired [`org-chart.md`](org-chart.md). Four
+> of them had each named one requirement here and a different one there; on 2026-09-22, on the
+> owner's decision, they were renumbered once: this file keeps `REQ-ORG-011` (owner retains see/edit)
+> and `REQ-ORG-018` (mission owning-unit reassignment), while its active-context surfacing (was
+> `REQ-ORG-010`) is now `REQ-ORG-024` and its participant escape (was `REQ-ORG-021`) is now
+> `REQ-ORG-027`. See the renumbering table in [`INDEX.md`](INDEX.md). The Grand Admiral
+> (`REQ-ORG-021`) moved here when the org chart was removed (ADR-0329); `REQ-ORG-010`, `-012`, `-013`,
+> `-020`, `-025` and `-026` are retired with it.
 
 ## Requirements
 
@@ -343,7 +344,7 @@ construction, no creator-owner fallback and no ownerless-leadership use case).
 
 ### REQ-ORG-024 — Active-context surfacing in the UI
 
-> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-010` until 2026-09-22; that id also named the descriptive, ADMIN-edited org chart in [`org-chart.md`](org-chart.md), which keeps it.
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-010` until 2026-09-22; that id also named the descriptive, ADMIN-edited org chart in [`org-chart.md`](org-chart.md), retired with the chart.
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
 title (`appTitle`, resolved in
@@ -428,7 +429,7 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
 - [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
   and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-units`
   API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
-  single `GET /api/v1/org-units`. Leadership seating stays on the org chart (REQ-ORG-026).
+  single `GET /api/v1/org-units`. Leadership seats are appointed under Organisation → Leitung (REQ-ROLE-004).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
@@ -592,7 +593,7 @@ read/edit lock); existing picker-resolver + per-aggregate stamping/visibility te
 2. An **SK-lead** (`is_lead=true`) belongs to **no Staffel** and is **always** an (organisational,
    reach-less per REQ-ORG-015) member of the **Bereichsleitung of the Bereich its SK belongs to**.
    This Bereichsleitung membership is **derived, not stored**: it is computed from `is_lead` + the
-   SK's `parent_org_unit_id` wherever it is needed (e.g. the org chart), so there is no separate
+   SK's `parent_org_unit_id` wherever it is needed, so there is no separate
    membership row to keep in sync and no stale seat on demotion or SK re-parenting. (An admin may
    still grant such a user an *explicit, flagged* Bereichsleitung role via
    `POST /api/v1/org-units/bereiche/{id}/members` — that is an additive, reach-bearing grant,
@@ -766,9 +767,39 @@ referenced from the code and `INDEX.md` but had no entry in any spec.)*
 `BankAccountService`, `BankAccount`, `OrgUnitController#listActiveOrgUnitsAllKinds`,
 `V168__link_bank_area_cartel_to_org_unit.sql` · **Issues:** #692, #699.
 
+### REQ-ORG-021 — The Organisationsleitung has a single Grand Admiral
+
+The OL may designate **exactly one** of its members as the **Grand Admiral** (label untranslated,
+DE = EN). The designation is a **title only**: the holder keeps the `OL_MEMBER` rank, so their rights
+are identical to any OL member — the org-wide officer reach and CARTEL-account responsibility of
+REQ-ORG-015 are unchanged. Source of truth is the OL row's nullable `grand_admiral_user_id` (`V215`; the free-text column went with `V331`);
+because the OL is a singleton tier, that one column is the org-wide "at most one" guarantee, and
+`chk_org_unit_grand_admiral_only_ol` (`V331`) keeps it on the OL row.
+
+Appointment is **ADMIN-only** via `PUT /api/v1/org-units/organisationsleitung/{id}/grand-admiral`
+with a required `userId`: a user who is not yet an OL member is **auto-added** as one first.
+`DELETE …/grand-admiral` vacates the post and leaves the OL membership intact; removing the holder's
+OL membership vacates it too. Setting and clearing are audited as `ROLE_CHANGED` with a
+`grandAdmiral` detail. The Leitung view (REQ-ROLE-004) returns the holder as
+`LeitungUnitDto.grandAdmiralUserId` and marks them in the OL roster.
+
+**Acceptance**
+
+- [x] `PUT …/grand-admiral` designates the user (auto-adding OL membership when needed), is
+  idempotent and holds the org-wide singleton; a request without `userId` is a 400.
+- [x] `DELETE …/grand-admiral` vacates and leaves the OL membership intact.
+- [x] Removing the Grand Admiral's OL membership vacates the post, also when the OL is loaded as a
+  Hibernate proxy.
+- [x] The holder's rights are exactly an OL member's.
+
+**Enforced by:** `OrgUnitMembershipServiceTest` (`setGrandAdmiral*`, `removeGrandAdmiral*`),
+`OrgUnitMembershipServiceProxyIntegrationTest`, `LeitungPagePatternRenderTest` · **Code:**
+`OrgUnitMembershipService#setGrandAdmiral` / `#removeGrandAdmiral`,
+`Organisationsleitung#grandAdmiralUserId`, `OrgHierarchyController` · **Issues:** #2987
+
 ### REQ-ORG-027 — The participant escape opens the operation, not its ledger
 
-> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-021` until 2026-09-22; that id also named the single Grand Admiral at the top of the Organisationsleitung in [`org-chart.md`](org-chart.md), which keeps it.
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-021` until 2026-09-22; that id names the single Grand Admiral of the Organisationsleitung, now [REQ-ORG-021](#req-org-021--the-organisationsleitung-has-a-single-grand-admiral) in this file.
 
 `OperationAccessPolicy.canSeeOperation` (bean `operationAccessPolicy`, the operation module's
 access policy since 2026-10-05; the scope hub's `OwnerScopeService.canSeeOperation` before) admits
@@ -908,7 +939,7 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
   today: the job order's customer unit, the executing unit of the two handovers, the material
   claim's claiming unit, the participant's affiliation, the Materialbörse's offer and request
   attribution (the board is organisation-wide), the bank account holder and the two bank
-  counterparties, the Kommandogruppe's Staffel, the org-chart position's unit, the hierarchy parent
+  counterparties, the Kommandogruppe's Staffel, the hierarchy parent
   and the membership key. A marker naming a field that is no org-unit reference, a reference both
   marked and listed, and a list entry that matches nothing fail the build too.
 - **Tenant data** is every marked entity and, transitively, every entity with a mandatory to-one

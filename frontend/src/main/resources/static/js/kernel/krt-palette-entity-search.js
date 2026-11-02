@@ -65,7 +65,6 @@ function toHit(e) {
         .join(CRUMB_SEPARATOR);
     return makeItem({
         href: e.href,
-        adminHref: typeof e.adminHref === 'string' ? e.adminHref : undefined,
         label: e.label,
         crumb,
         icon: typeof e.icon === 'string' && e.icon ? e.icon : 'list',

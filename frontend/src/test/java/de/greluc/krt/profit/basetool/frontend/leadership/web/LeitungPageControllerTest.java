@@ -45,10 +45,6 @@ import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungMemberDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitContext;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungViewDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.BereichChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.SpecialCommandChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
@@ -79,7 +75,7 @@ class LeitungPageControllerTest {
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
     LeitungViewDto view = emptyView();
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(view);
+    when(backend.get("/api/v1/leadership", LeitungViewDto.class)).thenReturn(view);
     Model model = new ConcurrentModel();
 
     String result = controller.leitung(null, null, null, model);
@@ -95,7 +91,7 @@ class LeitungPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(emptyView());
+    when(backend.get("/api/v1/leadership", LeitungViewDto.class)).thenReturn(emptyView());
     Model model = new ConcurrentModel();
 
     String result = controller.leitung("leitungSections", null, null, model);
@@ -121,7 +117,17 @@ class LeitungPageControllerTest {
       boolean canManageRoster,
       List<LeitungMemberDto> members) {
     return new LeitungUnitDto(
-        id, "Unit " + id, "U", kind, canAppointLead, canManageRoster, members, List.of(), null);
+        id,
+        "Unit " + id,
+        "U",
+        kind,
+        canAppointLead,
+        canManageRoster,
+        members,
+        List.of(),
+        null,
+        null,
+        null);
   }
 
   @Test
@@ -131,7 +137,7 @@ class LeitungPageControllerTest {
         new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadron = UUID.randomUUID();
     UUID sk = UUID.randomUUID();
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
+    when(backend.get("/api/v1/leadership", LeitungViewDto.class))
         .thenReturn(
             new LeitungViewDto(
                 false,
@@ -152,61 +158,57 @@ class LeitungPageControllerTest {
   }
 
   @Test
-  void leitung_orgChart_placesUnitsUnderTheirBereich() {
+  void leitung_unitContext_placesUnitsUnderTheirBereich() {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
+    UUID ol = UUID.randomUUID();
     UUID bereich = UUID.randomUUID();
     UUID squadron = UUID.randomUUID();
     UUID sk = UUID.randomUUID();
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(emptyView());
-    when(backend.get("/api/v1/org-chart", OrgChartDto.class))
+    when(backend.get("/api/v1/leadership", LeitungViewDto.class))
         .thenReturn(
-            new OrgChartDto(
-                null,
-                List.of(
-                    new BereichChartDto(
-                        bereich,
-                        "Logistik",
-                        "LOG",
-                        "SEARCH_RESCUE",
-                        null,
-                        List.of(
-                            new SquadronChartDto(
-                                squadron, "ALPHA", "ALP", null, List.of(), List.of(), List.of(),
-                                false, false)),
-                        List.of(
-                            new SpecialCommandChartDto(sk, "Bergung", "BRG", List.of(), false)))),
-                null,
-                List.of(),
-                List.of()));
+            new LeitungViewDto(
+                true,
+                List.of(unit(ol, OrgUnitKind.ORGANISATIONSLEITUNG, true, false, List.of())),
+                List.of(placed(bereich, OrgUnitKind.BEREICH, null)),
+                List.of(placed(squadron, OrgUnitKind.SQUADRON, "Logistik")),
+                List.of(placed(sk, OrgUnitKind.SPECIAL_COMMAND, "Logistik"))));
     Model model = new ConcurrentModel();
 
     controller.leitung(null, null, null, model);
 
     Map<UUID, LeitungUnitContext> context =
         assertInstanceOf(Map.class, model.getAttribute("unitContext"));
+    assertNull(context.get(ol), "the Organisationsleitung sits in no Bereich");
     assertNull(context.get(bereich).bereichName());
     assertEquals("search-rescue", context.get(bereich).departmentModifier());
     assertEquals("Logistik", context.get(squadron).bereichName());
+    assertEquals("search-rescue", context.get(squadron).departmentModifier());
     assertEquals("Logistik", context.get(sk).bereichName());
   }
 
-  @Test
-  void leitung_orgChartFails_rendersWithoutContext() {
-    BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller =
-        new LeitungPageController(new LeadershipBackendClient(backend));
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(emptyView());
-    when(backend.get("/api/v1/org-chart", OrgChartDto.class))
-        .thenThrow(new BackendServiceException("down", null, 503));
-    Model model = new ConcurrentModel();
-
-    String result = controller.leitung(null, null, null, model);
-
-    assertEquals("leadership/organisation/leitung", result);
-    assertTrue(assertInstanceOf(Map.class, model.getAttribute("unitContext")).isEmpty());
-    assertNull(model.getAttribute("error"));
+  /**
+   * A unit of the Search &amp; Rescue department, placed under a Bereich of the given name.
+   *
+   * @param id the unit id
+   * @param kind the unit kind
+   * @param bereichName the enclosing Bereich's name, {@code null} for a Bereich itself
+   * @return the unit
+   */
+  private static LeitungUnitDto placed(UUID id, OrgUnitKind kind, String bereichName) {
+    return new LeitungUnitDto(
+        id,
+        "Unit " + id,
+        "U",
+        kind,
+        true,
+        true,
+        List.of(),
+        List.of(),
+        null,
+        bereichName,
+        "SEARCH_RESCUE");
   }
 
   @Test
@@ -218,7 +220,7 @@ class LeitungPageControllerTest {
     UUID leadOnly = UUID.randomUUID();
     UUID pilot = UUID.randomUUID();
     UUID lead = UUID.randomUUID();
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
+    when(backend.get("/api/v1/leadership", LeitungViewDto.class))
         .thenReturn(
             new LeitungViewDto(
                 false,
@@ -280,7 +282,7 @@ class LeitungPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
-    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
+    when(backend.get("/api/v1/leadership", LeitungViewDto.class))
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
 

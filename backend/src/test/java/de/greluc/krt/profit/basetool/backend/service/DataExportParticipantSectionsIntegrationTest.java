@@ -194,8 +194,7 @@ class DataExportParticipantSectionsIntegrationTest {
     assertThat(rows.get(0))
         .containsEntry("org_unit", "Zzz Leitung Eins")
         .containsEntry("kind", "ORGANISATIONSLEITUNG")
-        .containsKey("shorthand")
-        .doesNotContainKey("grand_admiral_display_name");
+        .containsKey("shorthand");
   }
 
   @Test

@@ -33,10 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.leadership.model.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungMemberDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungViewDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.BereichChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.SpecialCommandChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -95,7 +91,7 @@ class LeitungPagePatternRenderTest {
         .getContentAsString();
   }
 
-  /** Stubs one unit of each kind, the org chart above them and the SK's role flags. */
+  /** Stubs one unit of each kind, placed under the Bereich, and the SK's role flags. */
   private void stubFullView() {
     LeitungUnitDto ol =
         new LeitungUnitDto(
@@ -107,7 +103,9 @@ class LeitungPagePatternRenderTest {
             true,
             List.of(new LeitungMemberDto(LEAD, "Lead", "OL_MEMBER", null, 0L, true)),
             List.of(),
-            LEAD);
+            LEAD,
+            null,
+            null);
     LeitungUnitDto bereich =
         new LeitungUnitDto(
             BEREICH,
@@ -118,7 +116,9 @@ class LeitungPagePatternRenderTest {
             true,
             List.of(new LeitungMemberDto(PILOT, "Pilot", "BEREICHSKOORDINATOR", null, 0L, false)),
             List.of(),
-            null);
+            null,
+            null,
+            "FORSCHUNG");
     LeitungUnitDto squadron =
         new LeitungUnitDto(
             SQUADRON,
@@ -131,7 +131,9 @@ class LeitungPagePatternRenderTest {
                 new LeitungMemberDto(LEAD, "Lead", "STAFFELLEITER", null, 4L, true),
                 new LeitungMemberDto(PILOT, "Pilot", "ENSIGN", GROUP, 2L, false)),
             List.of(new KommandoGroupDto(GROUP, SQUADRON, "Alpha", 0, 1L)),
-            null);
+            null,
+            "Logistik",
+            "FORSCHUNG");
     LeitungUnitDto sk =
         new LeitungUnitDto(
             SK,
@@ -142,31 +144,14 @@ class LeitungPagePatternRenderTest {
             true,
             List.of(new LeitungMemberDto(PILOT, "Pilot", "MEMBER", null, 3L, false)),
             List.of(),
-            null);
-    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
+            null,
+            "Logistik",
+            "FORSCHUNG");
+    when(backendApiClient.get("/api/v1/leadership", LeitungViewDto.class))
         .thenReturn(
             new LeitungViewDto(
                 true, List.of(ol), List.of(bereich), List.of(squadron), List.of(sk)));
-    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
-        .thenReturn(
-            new OrgChartDto(
-                null,
-                List.of(
-                    new BereichChartDto(
-                        BEREICH,
-                        "Logistik",
-                        "LOG",
-                        "FORSCHUNG",
-                        null,
-                        List.of(
-                            new SquadronChartDto(
-                                SQUADRON, "ALPHA", "ALP", null, List.of(), List.of(), List.of(),
-                                false, false)),
-                        List.of(
-                            new SpecialCommandChartDto(SK, "Bergung", "BRG", List.of(), false)))),
-                null,
-                List.of(),
-                List.of()));
+
     when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(SK)))
         .thenReturn(
             List.of(
@@ -298,7 +283,7 @@ class LeitungPagePatternRenderTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void rendersTheEmptyState() throws Exception {
     stubOfficerReach();
-    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
+    when(backendApiClient.get("/api/v1/leadership", LeitungViewDto.class))
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of()));
 
     String html = render(get("/organisation/leitung"));

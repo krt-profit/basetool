@@ -10,7 +10,7 @@
                          │                                               │       guild/role gate,
                          │   missions · hangar · Lager · job orders ·    │       via Keycloak)
                          │   refinery · Materialbörse · Kartellbank ·    │
-                         │   notifications · audit · org chart           │◄──── UEX · SC Wiki
+                         │   notifications · audit · Leitung             │◄──── UEX · SC Wiki
    Exchange clients ◄───►│                                               │      (game data)
    (SC Extractor,        │                                               │
     VerseKit)            │                                               │

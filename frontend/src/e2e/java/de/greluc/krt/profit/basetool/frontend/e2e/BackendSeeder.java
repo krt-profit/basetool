@@ -1773,22 +1773,6 @@ public final class BackendSeeder {
   }
 
   /**
-   * Reads the name the application shows for a user: the display name, else the username.
-   *
-   * @param username the Keycloak username
-   * @param password the Keycloak password
-   * @return the user's effective name
-   */
-  public String getEffectiveName(String username, String password) {
-    try {
-      String token = passwordGrant(username, password);
-      return getJson("/api/v1/users/me", token).get("effectiveName").getAsString();
-    } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.getEffectiveName(" + username + ") failed", e);
-    }
-  }
-
-  /**
    * Reads the human-readable number of a job order.
    *
    * @param username the Keycloak username of a user who may read the order
@@ -2468,8 +2452,8 @@ public final class BackendSeeder {
 
   /**
    * Adds a second Staffel membership to {@code targetUserId} next to its existing home Staffel and
-   * appoints them that Staffel's Staffelleiter, so the user shows up on the org chart as a seat
-   * holder without losing the home Staffel.
+   * appoints them that Staffel's Staffelleiter, so the user holds a leadership seat without losing
+   * the home Staffel.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password

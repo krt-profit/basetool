@@ -68,7 +68,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantR
 import de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptionsRequest;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
-import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrganisationsleitungDto;
@@ -365,9 +364,6 @@ class MassAssignmentGuardTest {
                   "orgUnitId",
                   "the id inside an exchange ship upsert's orgUnit, checked against the member's"
                       + " direct memberships (REQ-XCH-017)")),
-          Map.entry(
-              OrgChartPositionCreateRequest.class,
-              Map.of("orgUnitId", "the unit an ADMIN-edited org-chart position describes")),
           Map.entry(
               OrgUnitParentUpdateRequest.class,
               Map.of("parentOrgUnitId", "the parent an ADMIN chooses (REQ-ORG-014)")),

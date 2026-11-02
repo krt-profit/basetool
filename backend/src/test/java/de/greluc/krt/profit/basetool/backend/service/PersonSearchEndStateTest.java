@@ -97,10 +97,8 @@ class PersonSearchEndStateTest {
     VALID.put("bank_booking_request.status", "PENDING");
     VALID.put("bank_booking_request.amount", 1);
     VALID.put("bank_audit_event.event_type", "ACCOUNT_CREATED");
-    VALID.put("org_chart_position.position_type", "COMMAND_LEAD");
     VALID.put("org_unit.kind", "ORGANISATIONSLEITUNG");
     VALID.put("org_unit.is_promotion_enabled", Boolean.FALSE);
-    VALID.put("org_chart_position.org_unit_id", UUID.randomUUID());
     VALID.put("bank_booking_request.counterparty_user_id", UUID.randomUUID());
     VALID.put("material_external_alias.source_system", "UEX");
     VALID.put("blueprint_external_alias.source_system", "SCMDB");

@@ -96,14 +96,13 @@ class NavigationMemberRenderMvcTest {
         .doesNotContain("data-entry-key=\"operations.list\"")
         .doesNotContain("data-entry-key=\"hangar.catalog\"")
         .doesNotContain("data-entry-key=\"storage.levels\"")
-        .doesNotContain("data-entry-key=\"orgunitbank.overview\"")
         .contains("data-entry-key=\"missions.list\"")
         .contains("data-entry-key=\"hangar.overview\"")
         .contains("data-entry-key=\"storage.overview\"")
         .contains("data-entry-key=\"refinery.orders\"")
         .contains("data-entry-key=\"materials.list\"")
         .contains("data-entry-key=\"materialboerse.board\"")
-        .contains("data-entry-key=\"orgchart.view\"");
+        .contains("data-entry-key=\"orgunitbank.overview\"");
   }
 
   /**
@@ -123,7 +122,8 @@ class NavigationMemberRenderMvcTest {
   }
 
   /**
-   * The Leitung tab sits inside the Organisation page and shows only with the officer-reach flag.
+   * The Leitung tab sits beside the unit bank and shows only with the officer-reach flag; without
+   * it the unit bank has no tab bar.
    *
    * @throws Exception if the page cannot be rendered
    */
@@ -131,14 +131,13 @@ class NavigationMemberRenderMvcTest {
   void theLeitungTabShowsOnlyWithTheFlag() throws Exception {
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(LayoutResponses.officerReach(false));
-    List<String> without = tabKeys(render("/org-chart"));
+    List<String> without = tabKeys(render("/org-unit-bank"));
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(LayoutResponses.officerReach(true));
-    List<String> with = tabKeys(render("/org-chart"));
+    List<String> with = tabKeys(render("/org-unit-bank"));
 
-    assertThat(without).contains("orgchart.view", "orgunitbank.overview");
     assertThat(without).doesNotContain("organisation.leadership");
-    assertThat(with).contains("orgchart.view", "orgunitbank.overview", "organisation.leadership");
+    assertThat(with).contains("orgunitbank.overview", "organisation.leadership");
   }
 
   @NotNull

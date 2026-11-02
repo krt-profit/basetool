@@ -57,7 +57,7 @@ public class AdminPersonSearchController {
       summary = "Find every mention of a name across the free-text surfaces",
       description =
           "Case-insensitive substring search over every registered free-text column - external "
-              + "mission participants, party leads, handover recipients, org-chart placeholders, "
+              + "mission participants, party leads, handover recipients, "
               + "notes, booking reasons and the audit trails. Bounded: 25 hits per column, 300 in "
               + "total, and the response says when it was capped. Run it for EVERY Art. 16 or "
               + "Art. 17 request: a rectification that fixes one of four occurrences is not one.")

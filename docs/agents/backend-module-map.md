@@ -18,9 +18,9 @@ its target module, first matching rule wins (REQ-MOD-001…006).
   `AuditDomain` and `AuditDetails` from the same package. `AuditService` and the rest of the audit
   trail are the audit module's internals; the listener and controller audit rules key on all three
   recorder types, so a new recorder type is added there too.
-- **A lower module reacts upward only through an observer it owns** (plan §5.3). The org-unit
-  services report leadership and Kommandogruppe changes to `orgunit.api.MembershipChangeObserver`;
-  `OrgChartService` implements it. An implementation is `@Transactional(propagation = MANDATORY)`
+- **A lower module reacts upward only through an observer it owns** (plan §5.3), for example
+  `orgunit.api.FirstMembershipObserver` or `catalogue.api.MaterialDeletionObserver`. An
+  implementation is `@Transactional(propagation = MANDATORY)`
   and the interface carries `@ObserverSpi` (`ListenerAndObserverRulesTest` fails otherwise); never
   call a higher module's service from `orgunit` directly.
 - **There is no `support` package** (split 2026-10-04, plan §7.3 P1-9). A domain-free helper

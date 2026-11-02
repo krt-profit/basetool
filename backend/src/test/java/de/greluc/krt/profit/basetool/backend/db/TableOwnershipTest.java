@@ -95,7 +95,7 @@ class TableOwnershipTest {
           "scope",
           "admin",
           "dashboard",
-          "orgchart",
+          "leadership",
           "promotion",
           "personalinventory",
           "hangar",
@@ -114,7 +114,7 @@ class TableOwnershipTest {
           "app");
 
   /** Today's table count; the sweep must see at least this many. */
-  private static final int TABLE_FLOOR = 127;
+  private static final int TABLE_FLOOR = 126;
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
   private static final int TRIGGER_FLOOR = 25;

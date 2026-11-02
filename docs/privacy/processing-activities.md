@@ -23,7 +23,7 @@ requires it and duplicating it into further files spreads personal data for no g
 | **Members**                      | Register via Keycloak (credentials or Discord), approved by an admin                                                        |
 | **Applicants**                   | Registered but not yet decided (`PENDING`) or refused (`REJECTED`)                                                          |
 | **External trade partners** | Entered by a trade delegate as a partner of a purchasing deal; individuals by handle, organisations by name (A12) |
-| **Non-registered third parties** | Named in free-text fields by a member: external mission participants, job-order handover recipients, org-chart placeholders |
+| **Non-registered third parties** | Named in free-text fields by a member: external mission participants, job-order handover recipients |
 | **Visitors**                     | Reach the landing page, Impressum, terms and privacy pages without an account — the only pages without a login (ADR-0159)  |
 
 ---
@@ -64,7 +64,7 @@ requires it and duplicating it into further files spreads personal data for no g
   `navigation_dashboard_layout`,
   `navigation_dashboard_widget` (the member's own dashboard: widget types, columns and option
   choices, no free text),
-  `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,
+  `material_exchange_*`, `material_claim`, `member_evaluation`,
   `announcement`.
 - **Transient only:** while a member has a mission open, the frontend shares their handle and the
   section they are editing with the other members viewing it (editor presence, ADR-0126). It is held
@@ -346,7 +346,7 @@ relies on.
 ## Third parties who are not users
 
 A member can type another person's name into a free-text field — an external mission participant, a
-handover recipient, an org-chart placeholder. Those people never see this tool, so the Art. 14
+handover recipient. Those people never see this tool, so the Art. 14
 information obligation cannot be discharged the usual way. The privacy policy names this category and
 points them at the controller. Operationally, an admin can locate such entries across the free-text
 surfaces so a rectification or erasure request from one of them can actually be served; the procedure

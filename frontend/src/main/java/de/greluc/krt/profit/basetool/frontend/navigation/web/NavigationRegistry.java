@@ -599,18 +599,13 @@ public class NavigationRegistry {
         "unit",
         "nav.group.unit",
         ICON_USERS,
-        of("orgchart.view", "/org-chart", "nav.section.organisation")
-            .tab("nav.orgChart")
-            .keywords("palette.keywords.orgChart")
-            .testId("nav-org-chart"),
         of("orgunitbank.overview", "/org-unit-bank", "nav.bank.myOrgUnit")
             .tab("nav.tab.unitBank")
             .keywords("palette.keywords.bank")
             .gate(
                 NavigationGate.anyRole(
                     Roles.ADMIN, Roles.LOGISTICIAN, Roles.MISSION_MANAGER, Roles.KRT_MEMBER))
-            .testId("nav-org-unit-bank")
-            .with(PALETTE_ONLY),
+            .testId("nav-org-unit-bank"),
         of("organisation.leadership", "/organisation/leitung", "nav.leitung")
             .gate(LEITUNG_GATE)
             .testId("nav-leitung")
@@ -826,7 +821,7 @@ public class NavigationRegistry {
             "purchasing.partners",
             "purchasing.delegates",
             "purchasing.report"),
-        NavigationPageTabs.of("orgchart.view", "orgunitbank.overview", "organisation.leadership"),
+        NavigationPageTabs.of("orgunitbank.overview", "organisation.leadership"),
         NavigationPageTabs.of("promotion.overview", "promotion.evaluations", "promotion.manage")
             .covering("promotion.manage", "promotion.topics", "promotion.ranks"),
         NavigationPageTabs.of("bank.dashboard", "bank.manage", "bank.grants", "bank.requests"),

@@ -54,7 +54,6 @@ class KommandoGroupServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private AuditService auditService;
-  @Mock private MembershipChangeObserver membershipChangeObserver;
 
   @Spy private KommandoGroupMapper kommandoGroupMapper = new KommandoGroupMapperImpl();
 
@@ -89,7 +88,6 @@ class KommandoGroupServiceTest {
     assertEquals("Jagd", dto.name(), "name is trimmed");
     assertEquals(2, dto.sortIndex(), "appended at the end (count = 2)");
     assertEquals(squadronId, dto.squadronId());
-    verify(membershipChangeObserver).onKommandoGroupCreated(any(KommandoGroup.class));
     verify(auditService)
         .record(eq(AuditEventType.KOMMANDO_GROUP_CREATED), any(), eq("Jagd"), eq(null), any());
   }
@@ -135,7 +133,6 @@ class KommandoGroupServiceTest {
 
     assertEquals("Renamed", dto.name());
     assertEquals(1, dto.sortIndex());
-    verify(membershipChangeObserver).onKommandoGroupUpdated(any(KommandoGroup.class));
     verify(auditService)
         .record(
             eq(AuditEventType.KOMMANDO_GROUP_UPDATED), eq(groupId), eq("Renamed"), eq(null), any());
@@ -167,7 +164,6 @@ class KommandoGroupServiceTest {
 
     service.deleteGroup(groupId);
 
-    verify(membershipChangeObserver).onKommandoGroupDeleted(groupId);
     verify(kommandoGroupRepository).delete(group);
     verify(auditService)
         .record(

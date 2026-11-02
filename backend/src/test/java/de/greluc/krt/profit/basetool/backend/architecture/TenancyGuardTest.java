@@ -55,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationDashb
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
-import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -173,9 +172,6 @@ class TenancyGuardTest {
               key(KommandoGroup.class, "squadron"),
               "org structure under a Staffel, authorised by the delegated appointment ladder,"
                   + " which never consults owner scope (ADR-0042)"),
-          Map.entry(
-              key(OrgChartPosition.class, "orgUnit"),
-              "the unit a descriptive, ADMIN-edited org-chart position describes"),
           Map.entry(
               key(SupplyNeed.class, "orgUnitId"),
               "the raising unit of a need that every member reads; it is a role scope"

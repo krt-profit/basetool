@@ -128,8 +128,8 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
   private boolean isProfitEligible = false;
 
   /**
-   * The Kartell department of a {@link Bereich}, driving its colour tint in the org chart
-   * (REQ-ORG-026). {@code null} for every other kind and for a Bereich without an assigned
+   * The Kartell department of a {@link Bereich}, driving its colour tint in the Leitung tree
+   * (REQ-ROLE-004). {@code null} for every other kind and for a Bereich without an assigned
    * department.
    */
   @Enumerated(EnumType.STRING)

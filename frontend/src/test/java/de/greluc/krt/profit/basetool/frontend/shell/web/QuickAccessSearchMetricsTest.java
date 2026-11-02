@@ -44,15 +44,7 @@ class QuickAccessSearchMetricsTest {
     assertThat(meters).hasSize(QuickAccessSearchKind.values().length * 4);
     assertThat(meters)
         .extracting(m -> m.getId().getTag(MetricNames.TAG_KIND))
-        .containsOnly(
-            "mission",
-            "operation",
-            "material",
-            "blueprint",
-            "ship",
-            "org_unit",
-            "job_order",
-            "member");
+        .containsOnly("mission", "operation", "material", "blueprint", "ship", "job_order");
     assertThat(meters)
         .extracting(m -> m.getId().getTag(MetricNames.TAG_OUTCOME))
         .containsOnly("hits", "empty", "error", "timeout");

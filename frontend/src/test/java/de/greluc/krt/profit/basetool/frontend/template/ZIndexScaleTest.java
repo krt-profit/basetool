@@ -53,7 +53,6 @@ class ZIndexScaleTest {
           "--z-popover-raised",
           "--z-dropdown",
           "--z-sticky-head",
-          "--z-chart-scrollbar",
           "--z-footer",
           "--z-header",
           "--z-header-control",

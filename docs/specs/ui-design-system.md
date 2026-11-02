@@ -87,7 +87,6 @@ components in `krt-components.css`.
   | `--z-popover-raised` | 60 | the inventory allocation popover; an open row overflow menu on the bank pages |
   | `--z-dropdown` | 99 | autocomplete list, searchable-select listbox |
   | `--z-sticky-head` | 900 | the mission detail's sticky head |
-  | `--z-chart-scrollbar` | 998 | the org chart's fixed scrollbar |
   | `--z-footer` | 999 | footer |
   | `--z-header` | 1000 | header |
   | `--z-header-control` | 1001 | hamburger button |
@@ -211,10 +210,10 @@ values exactly:
 
 - [ ] Department tags/badges use the official token names with the exact hex values.
 
-> **Amended by epic #692 (REQ-ORG-026):** these frozen Bereichsfarben are also applied to **org-chart
-> nodes**, tinting each Bereich's sub-tree with its colour. This applies the existing tokens (no new
-> hues); node text must keep ≥ 4.5:1 contrast (use the accessible `--color-*-text` tints where the hue
-> would become small text).
+> **Amended:** these frozen Bereichsfarben also mark each unit of the **Leitung tree** with its
+> Bereich's colour (REQ-ROLE-004) and tint the bank's Bereich groups. This applies the existing
+> tokens (no new hues); text must keep ≥ 4.5:1 contrast (use the accessible `--color-*-text` tints
+> where the hue would become small text).
 
 ### REQ-UI-006 — Semantic status colours
 
@@ -331,7 +330,7 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 >
 > **FE-SIMP-04b.** Every `.krt-modal-overlay` is a `<dialog>` element, and `krtModal.open` shows it
 > with `showModal()`: it goes to the top layer and the page behind it becomes inert — the focus trap
-> and background lock that before existed only on the mission page and the org chart. The class
+> and background lock that before existed only on two pages. The class
 > stays on the element (live sync's "is a dialog open?" probe, the layout guard and the E2E suite key
 > on it), `styles.css` undoes the user-agent dialog box so it is the same full-viewport scrim, and a
 > dialog shown by its class alone (a server-rendered open dialog, the layout guard revealing every
@@ -419,7 +418,7 @@ hiding it — so the class always wins regardless of how the other side toggled 
 `everyDialogIsRenderedByTheWrapper`), `ModalWrapperRenderTest`, `DialogA11yE2eTest`
 (`everyDialogFollowsTheContract`), `AdminMissionDataCrudE2eTest`
 (`cancelButtonClosesEachCreateDialog`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
-`AdminPersonalBlueprintsPageControllerMvcTest`, `OrgChartKeyboardA11yE2eTest`,
+`AdminPersonalBlueprintsPageControllerMvcTest`,
 `TouchClassLayoutE2eTest`
 
 **Three sanctioned widths, and no fourth.** `.krt-modal` is 440 px (confirms and single-field
@@ -451,7 +450,7 @@ wrapper carries `.krt-modal-flow`.
 **One shape means one busy probe.** `krt-live-sync.js` asks "is any dialog open?" by querying
 `.krt-modal-overlay`, and that guard is what stops a peer's change from swapping the DOM out from
 under an open form and 409-ing the next submit. While three shapes existed the probe saw only one of
-them, so 54 dialogs had no such protection and org-chart hand-rolled a `busyTest` to compensate. A
+them, so 54 dialogs had no such protection and one page hand-rolled a `busyTest` to compensate. A
 dialog in a new shape would silently lose this again — which is the second reason the shape is
 singular.
 
@@ -624,8 +623,7 @@ The mechanism is `position: static` inside the `width <= 768px` block, and one c
 optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
 the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because every
 reader of that property — `main`'s reserve, the shared `--krt-panel-viewport-rest` that caps the
-Materialbörse / Preis-Übersicht / Beförderung panels, the org-chart proxy
-scrollbar's `bottom`, the `bottom` of the sticky form actions (`.form-actions--sticky`) and of the
+Materialbörse / Preis-Übersicht / Beförderung panels, the `bottom` of the sticky form actions (`.form-actions--sticky`) and of the
 operation payout table's pinned sum row, and the mission-detail padding — would otherwise reserve
 space for a footer that is not there.
 
@@ -658,7 +656,7 @@ rows — put 118 findings on surfaces that had never been measured.
   legitimately through a transparent positioned `::after` overlay ("small glyph, fat-finger target")
   or through the `<label>` that activates it, and both are real targets to a finger. This is not a
   relaxation: it is what "hit area" meant all along, and measuring the border box instead reported
-  15 org-chart chevrons as defects when `org-chart.css` had stretched each one to
+  15 chevrons as defects when a page stylesheet had stretched each one to
   `var(--touch-target)` with exactly that overlay. A pseudo-element is only counted on a
   non-replaced element, because `<input>`, `<select>` and `<textarea>` render none.
 - **Three more in-row controls ARE exempt**, at 32px, on the same reading as `.master-row`:
@@ -948,7 +946,7 @@ dialogs** they render as **icon + text** (the glyph prepended before the label, 
 `<span th:text>`). Decorative button glyphs set `pointer-events: none` (via `.btn .krt-icon`) so a
 click always lands on the host `<button>` / `<a>`, never the inner `<svg>`. Danger styling
 (`btn-quiet-danger` / `btn-outline-danger`) and existing `data-*` hooks are preserved. Mode toggles
-whose label flips with state (e.g. the org-chart edit toggle) keep their text label.
+whose label flips with state keep their text label.
 
 **Acceptance**
 
@@ -1034,8 +1032,8 @@ Wherever the tool renders a person's identity to a user, it shows that user's **
 the **display name** when one is set (non-blank), otherwise the **username** as the fallback. The raw
 username is never the visible label when a display name exists. This is the project-wide
 identity-presentation rule and holds on **every** surface that names a user — table and list rows,
-badges and avatars, detail and profile pages, dropdown / picker option labels, the org chart and
-Leitung views, mission / order / bank / inventory / refinery rows, the audit viewer's actor column,
+badges and avatars, detail and profile pages, dropdown / picker option labels, the Leitung view,
+mission / order / bank / inventory / refinery rows, the audit viewer's actor column,
 notifications, and the generated PDF exports — across all four device classes.
 
 The single source of truth is the backend: `User.getEffectiveName()` returns the display name when
@@ -1563,7 +1561,7 @@ now wins over a page rule that had out-specified it:
 | Where | Element | Before → after |
 | --- | --- | --- |
 | Bank, Bank-Anträge, Berechtigungen, Kontenverwaltung, Staffelbank, Admin-Bank, Bank- und Audit-Log | sub-line under the page greeting | 17.6 px → 12.8 px, top margin 0.25 rem |
-| Spezialkommandos (admin), Organigramm | sub-line under the page greeting | grey 1 → grey 2 (text), top margin 0.5 rem |
+| Spezialkommandos (admin) | sub-line under the page greeting | grey 1 → grey 2 (text), top margin 0.5 rem |
 | Missionsdaten (admin), Lager-Eingabe, Auftrag anlegen | checkbox labels | block → flex row, gap 0.5 rem, weight 400 |
 | Raffinerieauftrag anlegen | read-only inputs | surface and border of the migrated read-only style |
 | Persönliches Inventar | one field group | margin-bottom of its migrated class |
@@ -1780,7 +1778,7 @@ its former sibling pages become tabs of it.
 | Einsatz & Flotte | wedge | Missionen (Missionen · Operationen), Hangar (Hangar · Schiffskatalog) |
 | Logistik | crate | Lager (Lager · Mindestbestände), Raffinerie, Aufträge (Aufträge · Materialbedarf · Blueprint-Verfügbarkeit) |
 | Handel | swap arrows | Material (Liste · Übersicht · Profitberechnung), Materialbörse, Beschaffung (Bedarf · Meine Spenden · Ankauf) |
-| Staffel | users | Organisation (Organigramm · Staffel-Bank · *Leitung*), Beförderung (Übersicht · Meine Bewertungen · *Verwaltung*) |
+| Staffel | users | Org-Einheits-Bank (Staffel-Bank · *Leitung*), Beförderung (Übersicht · Meine Bewertungen · *Verwaltung*) |
 | Kartellbank (bank staff only) | bank | Kartellbank (Dashboard · Verwaltung · Berechtigungen · Anträge) |
 
 - *Shipped:* the groups, links and tabs are the entries of the registry (`NavigationRegistry`),
@@ -2486,10 +2484,10 @@ Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and right
 each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
 backend read that backs the page its hits open (missions and operations over every period,
 materials from the visible catalogue, blueprints from the availability overview, ship types from
-the unit hangar overview, job orders from the scoped number lookup of REQ-ORDERS-048, org units and
-members from the org chart), so a hit is exactly an entity that page would show the caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
+the unit hangar overview, job orders from the scoped number lookup of REQ-ORDERS-048), so a hit is
+exactly an entity that page would show the caller. A type that fails or takes longer than 2 s yields no hits; a lost session still sends the
 caller to the login. An optional repeatable `kind` parameter (the type keys `mission`,
-`operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`) narrows the
+`operation`, `material`, `blueprint`, `ship`, `job_order`) narrows the
 search; an unknown key asks no type. Each hit is `{kind, href, label, crumb, icon, status, date}`,
 with `crumb` the type's name and `status` localized.
 
@@ -2500,23 +2498,14 @@ with `crumb` the type's name and `status` localized.
 | Material | name | material detail |
 | Blueprint | name | blueprint detail |
 | Ship | ship type | hangar filtered to that type |
-| Org unit | name | org chart with the unit highlighted |
 | Job order | number (`displayId`, exact or prefix), through a scoped number lookup | job order detail |
-| Member | name | org chart with the person highlighted; in admin mode the member edit page |
 
-- A hit carries a slim projection (id, name, status, date). A member finds exactly the people the
-  org chart shows them, by the name it shows (display name, the username only when none is set),
-  with the rank they hold there as status; no search reveals more than the page it opens. A job
-  order hit shows the number only (`#12`) with its status and creation date.
+- A hit carries a slim projection (id, name, status, date); no search reveals more than the page it
+  opens. A job order hit shows the number only (`#12`) with its status and creation date.
 - **Limits:** debounced (250 ms), at least 2 characters (1 digit for a job-order number), at most
   100 characters, 5 hits per type, aborted when the user types on. Each type carries its own
   minimum (`QuickAccessSearchKind.minTermLength`); a type is asked only when the term reaches it.
-- **Admin mode:** a member hit with an account carries `adminHref` (`/members/{id}`); the browser
-  opens it instead of the org chart while the drawer is in administration mode
-  (`krtSearchHitHref`). A holder without an account always opens the chart.
-- **Highlight:** the org chart marks and scrolls to the unit or person named by its `highlight`
-  query parameter (an org unit id, a user id, or the seat id of a holder without an account).
-  Blueprint and ship hits open the overview or unit hangar filtered by the name (`search`).
+- Blueprint and ship hits open the overview or unit hangar filtered by the name (`search`).
 - **The term stays a query parameter;** it never reaches a path, an MDC field or a metric label.
 
 **Prefixes.** Symbol and word are equivalent; both languages' words are accepted in either UI
@@ -2529,13 +2518,11 @@ backend nothing; an entity prefix asks only that type.
 | Actions | `>` | `aktion:` / `action:` |
 | Pages and tabs | `/` | `seite:` / `page:` |
 | Job orders | `#` | `auftrag:` / `order:` |
-| Members | `@` | `mitglied:` / `member:` |
 | Missions | — | `mission:` / `mission:` |
 | Operations | — | `operation:` / `operation:` |
 | Materials | — | `material:` / `material:` |
 | Blueprints | — | `blueprint:` / `blueprint:` |
 | Ships | — | `schiff:` / `ship:` |
-| Org units | — | `einheit:` / `unit:` |
 
 **Ranking.** One mixed list („Treffer"), scored by match quality plus the „Häufig" weight (pages
 and tabs only): a label that starts with the term, then one that contains it, then a breadcrumb
@@ -2556,7 +2543,7 @@ is wrapped in a try/catch.
 **Empty state.** Favoriten, then Häufig (at most 5), then Zuletzt (`krt.recent`, at most 4),
 without duplicates: an entry shown in a higher section is left out of the lower ones. Entries are
 identified by their stable entry key, a page without an entry by its path. Entity hits never
-enter Zuletzt or Häufig, so no entity or member name reaches `localStorage`.
+enter Zuletzt or Häufig, so no entity name reaches `localStorage`.
 
 **Filtering.** A hidden page and its tabs, and every entry unavailable in the active context
 (REQ-UI-026), are left out; entity hits and actions of a hidden page stay.
@@ -2585,13 +2572,12 @@ a star and says the result in a polite status line.
 limits, term not in the path, the MDC or a label) · `QuickAccessSearchMetricsTest` ·
 `MissionQuickAccessSearchContributorTest`, `OperationQuickAccessSearchContributorTest`,
 `MaterialQuickAccessSearchContributorTest`, `BlueprintQuickAccessSearchContributorTest`,
-`ShipQuickAccessSearchContributorTest`, `OrgUnitQuickAccessSearchContributorTest`,
-`MemberQuickAccessSearchContributorTest` (exactly the chart's people),
+`ShipQuickAccessSearchContributorTest`,
 `JobOrderQuickAccessSearchContributorTest` (the read the page uses) · `QuickAccessFoldTest` · `:frontend:testSearchJs`
-(prefix parsing, ranking, the admin-mode target, the decay and the empty-state de-duplication) ·
+(prefix parsing, ranking, the decay and the empty-state de-duplication) ·
 `NavigationCurrentEntryTest`, `NavigationRenderMvcTest` (which links can be favourites) ·
 `NavigationE2eTest` (Ctrl+Enter, Tab, Ctrl+D, the empty state without duplicates, hidden pages
-filtered while their hits and actions stay, a page-contributed action) · `QuickAccessSearchE2eTest` (every type found, a job order by number, org unit and member highlight on the chart, entity names kept out of
+filtered while their hits and actions stay, a page-contributed action) · `QuickAccessSearchE2eTest` (every type found, a job order by number, entity names kept out of
 `krt.recent`, late hits keep the highlight, `?` help, prefixes narrow) ·
 `monitoring/prometheus/tests/quick_access_search_slow_test.yml` · **Code:** `shell/web/QuickAccessSearchController.java`,
 `shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,

@@ -531,11 +531,6 @@
 /orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{jobOrderId}/item-collection GET -> ItemCollectionPageController#viewItemCollection gate=method:isAuthenticated() layout=yes
 /orders/{jobOrderId}/material-collection GET -> MaterialCollectionPageController#viewMaterialCollection gate=method:isAuthenticated() layout=yes
-/org-chart GET -> OrgChartPageController#orgChart gate=method:isAuthenticated() layout=yes
-/org-chart/positions/ajax POST -> OrgChartPageController#createPosition gate=method:hasRole('ADMIN') layout=yes
-/org-chart/positions/{id}/ajax DELETE -> OrgChartPageController#deletePosition gate=method:hasRole('ADMIN') layout=yes
-/org-chart/positions/{id}/ajax PUT -> OrgChartPageController#updatePosition gate=method:hasRole('ADMIN') layout=yes
-/org-chart/positions/{id}/leader/ajax DELETE -> OrgChartPageController#vacateLeader gate=method:hasRole('ADMIN') layout=yes
 /org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
 /org-unit-bank/accounts/{id} GET -> OrgUnitBankPageController#orgUnitBankAccount gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
 /organisation/leitung GET -> LeitungPageController#leitung gate=method:@officerSurfaceGate.canOpenLeitung() layout=yes

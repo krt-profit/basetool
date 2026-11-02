@@ -248,6 +248,14 @@ Rules:
     backward one. **This is the shape of exception the rule admits: a column whose *content* is
     the risk, approved by the repository owner in the plan, with the rollback written down.** It
     is not a precedent for dropping ordinary data a release early.
+  - **Owner-approved single-phase exception: V331 / V332** (`drop_grand_admiral_display_name`,
+    `drop_org_chart_position`, 2026-11-02, #2987, ADR-0329). The org chart was removed with every
+    reader and writer of `org_chart_position` and `org_unit.grand_admiral_display_name`; the owner
+    approved dropping both in the same change rather than keeping dormant personal data, and its
+    privacy registrations, for a release. The data was descriptive only and granted nothing. A
+    rollback to an application version with the org chart finds an empty chart and no free-text
+    Grand Admiral; the forward fix is a migration that re-creates the table empty and the column
+    nullable.
 * **Drop-then-add in one file is allowed only on tables that did not yet ship
   to production**, i.e. for migrations younger than the most recently
   deployed version. Use sparingly and only during the very first iteration of

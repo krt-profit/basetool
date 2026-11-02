@@ -362,7 +362,7 @@ abweichen:
   `<p>` innerhalb eines `<li>`, ein Gedanke pro `<li>`.
 - **Punkt-Aufbau:** Jedes `<li>` beginnt mit dem **Schlagwort samt Doppelpunkt in
   `<strong>`**, dann folgen ein bis zwei ganze Sätze, z. B.
-  `<li><strong>Organigramm:</strong> Eine neue Seite zeigt …</li>`. Der Doppelpunkt
+  `<li><strong>Leitung:</strong> Eine neue Seite zeigt …</li>`. Der Doppelpunkt
   steht **innerhalb** der Auszeichnung; das Schlagwort ist ein Substantiv oder
   Bereichsname, kein Verb. Höchstens zwei Sätze pro Punkt — was länger wird, kürzen
   oder bündeln.

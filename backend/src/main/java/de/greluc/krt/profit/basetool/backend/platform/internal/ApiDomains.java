@@ -126,7 +126,6 @@ public final class ApiDomains {
           Map.entry("NotificationController", "notification"),
           Map.entry("NotificationRuleController", "notification"),
           Map.entry("OperationController", "operation"),
-          Map.entry("OrgChartController", "orgchart"),
           Map.entry("OrgHierarchyController", "orgunit"),
           Map.entry("OrgUnitBankController", "bank"),
           Map.entry("OrgUnitController", "orgunit"),

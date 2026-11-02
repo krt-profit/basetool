@@ -41,8 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * (REQ-ROLE-003).
  *
  * <p>Enforces at most four groups per Staffel and a {@code SQUADRON} parent, and refuses to delete
- * a group that still has members. Every mutation is audit-logged (REQ-AUDIT-001) and mirrored onto
- * the org chart's Kommando node (REQ-ROLE-006) in the same transaction.
+ * a group that still has members. Every mutation is audit-logged (REQ-AUDIT-001).
  */
 @Service
 @RequiredArgsConstructor
@@ -57,7 +56,6 @@ public class KommandoGroupService {
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
   private final AuditRecorder auditRecorder;
-  private final MembershipChangeObserver membershipChangeObserver;
   private final KommandoGroupMapper kommandoGroupMapper;
 
   /**
@@ -102,7 +100,6 @@ public class KommandoGroupService {
             .sortIndex((int) existing)
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    membershipChangeObserver.onKommandoGroupCreated(saved);
     auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
         saved.getId(),
@@ -147,7 +144,6 @@ public class KommandoGroupService {
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    membershipChangeObserver.onKommandoGroupUpdated(saved);
     auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
     return kommandoGroupMapper.toDto(saved);
@@ -169,7 +165,6 @@ public class KommandoGroupService {
           "Kommandogruppe still has assigned members — reassign them before deleting it");
     }
     String name = group.getName();
-    membershipChangeObserver.onKommandoGroupDeleted(groupId);
     kommandoGroupRepository.delete(group);
     auditRecorder.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
   }

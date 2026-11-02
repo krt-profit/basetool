@@ -39,7 +39,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li>a Bereichsleiter may not appoint another Bereichsleiter;
  *   <li>plain members appoint nothing on the Bereich or the squadron-rank endpoint;
  *   <li>even an admin cannot give a Staffel member a silo-leadership rank (REQ-ORG-017);
- *   <li>a successful appointment is mirrored onto the org chart (REQ-ROLE-006).
+ *   <li>a successful appointment shows in the Leitung view (REQ-ROLE-004).
  * </ul>
  *
  * <p>The dedicated users {@code test-appoint-bl} and {@code test-appoint-tgt} own the mutated
@@ -160,16 +160,15 @@ class RoleAppointmentMatrixE2eTest {
   }
 
   /**
-   * Mirror (REQ-ROLE-006): the Bereichsleiter appointment seeded in {@link #setUp()} projects
-   * {@code test-appoint-bl}'s account-linked seat onto the descriptive org chart, so the chart read
-   * carries that user id.
+   * The Bereichsleiter appointment seeded in {@link #setUp()} shows in the Leitung view
+   * (REQ-ROLE-004): the admin's read of the roster carries {@code test-appoint-bl}'s user id.
    */
   @Test
-  void bereichAppointmentMirrorsAccountSeatOntoOrgChart() {
-    String chart = seeder.getBody(ADMIN_USER, ADMIN_PASSWORD, "/api/v1/org-chart");
+  void bereichAppointmentShowsInTheLeitungView() {
+    String view = seeder.getBody(ADMIN_USER, ADMIN_PASSWORD, "/api/v1/leadership");
     assertTrue(
-        chart.contains(blUserId),
-        "the org chart must mirror the appointed Bereichsleiter's account seat (REQ-ROLE-006)");
+        view.contains(blUserId),
+        "the Leitung view must list the appointed Bereichsleiter (REQ-ROLE-004)");
   }
 
   /**

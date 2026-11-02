@@ -1114,7 +1114,6 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
-| `orgchart` | 1 | `org_chart_position` |
 | `promotion` | 5 | `member_evaluation`, `promotion_category`, `promotion_level_content`, `promotion_topic`, `rank_requirement` |
 | `personalinventory` | 1 | `personal_inventory_item` |
 | `navigation` | 8 | `navigation_appearance`, `navigation_dashboard_layout`, `navigation_dashboard_widget`, `navigation_favourite`, `navigation_hidden`, `navigation_order`, `navigation_preferences`, `navigation_tab_bar` |

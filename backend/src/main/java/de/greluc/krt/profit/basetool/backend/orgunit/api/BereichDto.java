@@ -36,7 +36,7 @@ import org.jetbrains.annotations.Nullable;
  * @param active soft-delete flag; server-populated, {@code null} on requests means "no change".
  * @param parentOrgUnitId the owning {@code Organisationsleitung}'s id, or {@code null} when not yet
  *     wired; the parent kind is validated server-side.
- * @param department the Bereichsfarbe tinting the org chart (REQ-ORG-026), or {@code null} when
+ * @param department the Bereichsfarbe tinting the Leitung tree (REQ-ROLE-004), or {@code null} when
  *     unassigned.
  * @param version optimistic-lock counter; required on update.
  */

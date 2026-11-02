@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.leadership.model.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungViewDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.OlMemberResponse;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.UpdateKommandoGroupRequest;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
 import java.util.List;
@@ -42,9 +41,9 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
 /**
- * Typed backend client of the Leitung page (REQ-ROLE-004): the delegated view, the org chart that
- * places its units, the Spezialkommando role flags and the rank, Kommandogruppe, Bereich and
- * Organisationsleitung writes, over {@link BackendApiClient} (plan §5.9, ADR-0032).
+ * Typed backend client of the Leitung page (REQ-ROLE-004): the delegated view, the Spezialkommando
+ * role flags and the rank, Kommandogruppe, Bereich and Organisationsleitung writes, over {@link
+ * BackendApiClient} (plan §5.9, ADR-0032).
  */
 @Service
 @RequiredArgsConstructor
@@ -66,17 +65,7 @@ public class LeadershipBackendClient {
    */
   @Nullable
   public LeitungViewDto leitungView() {
-    return backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class);
-  }
-
-  /**
-   * Reads the org chart, which places each unit under its Bereich and department.
-   *
-   * @return the chart, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public OrgChartDto orgChart() {
-    return backendApiClient.get("/api/v1/org-chart", OrgChartDto.class);
+    return backendApiClient.get("/api/v1/leadership", LeitungViewDto.class);
   }
 
   /**

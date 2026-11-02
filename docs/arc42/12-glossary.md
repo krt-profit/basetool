@@ -17,7 +17,6 @@ worth reading even if you know the domain.
 | **Leitung** | Leadership, both as a role and as the delegated administration page. |
 | **Logistiker (einer Einheit)** | A member whose membership in that unit carries `is_logistician` **or** any leadership rank. Not the same as the flag alone: an officer of a unit is its Logistician without the flag being set. The web also grants it to a leadership rank's cascaded reach; the exchange does not (ADR-0257). |
 | **Beförderung** | Promotion — the evaluation matrix (**Bewertungen** per category against rank requirements). Only a Staffel carries it, never an SK, Bereich or OL; one of the audited areas. |
-| **Organigramm** | The organisation's org chart of functional positions (Funktionsränge), separate from the tenancy tree. |
 
 > **`owning_org_unit_id` vs `responsible_org_unit_id` / `requesting_org_unit_id`** — not synonyms.
 > Staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry

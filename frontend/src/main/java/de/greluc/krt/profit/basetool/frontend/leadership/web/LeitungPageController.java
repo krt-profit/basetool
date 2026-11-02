@@ -34,10 +34,6 @@ import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitContex
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungViewDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.UpdateKommandoGroupRequest;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.BereichChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.SpecialCommandChartDto;
-import de.greluc.krt.profit.basetool.frontend.orgchart.model.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
@@ -100,9 +96,8 @@ public class LeitungPageController {
    *
    * <p>Besides {@code leitung} the model carries {@code selectedUnitId} (the requested unit when
    * the view lists it, else the first listed unit), {@code selectedTab}, {@code unitContext}
-   * (Bereich and department per unit, read from the org chart; empty when that read fails), {@code
-   * selfUserId} and, per Spezialkommando, {@code skRosters} plus {@code skFlagsKnown} for the units
-   * whose role flags the caller may read.
+   * (Bereich and department per unit that has them), {@code selfUserId} and, per Spezialkommando,
+   * {@code skRosters} plus {@code skFlagsKnown} for the units whose role flags the caller may read.
    *
    * @param fragment {@code "leitungSections"} for the fragment only; otherwise the full page.
    * @param unit the id of the unit to show, from the {@code ?unit=} deep link; may be absent.
@@ -126,7 +121,7 @@ public class LeitungPageController {
     model.addAttribute("selectedTab", TAB_GROUPS.equals(tab) ? TAB_GROUPS : TAB_MEMBERS);
     if (view != null) {
       model.addAttribute("selectedUnitId", selectedUnitId(view, unit));
-      model.addAttribute("unitContext", unitContext());
+      model.addAttribute("unitContext", unitContext(view));
       model.addAttribute("selfUserId", selfUserId(view));
       Map<UUID, List<OrgUnitMembershipDto>> rosters = new HashMap<>();
       Set<UUID> flagsKnown = new HashSet<>();
@@ -226,38 +221,17 @@ public class LeitungPageController {
   }
 
   /**
-   * Reads the org chart to place each unit under its Bereich and department colour. The read is
-   * best effort: the tree renders without colour and Bereich when it fails.
+   * Places each unit under its Bereich and department colour, as the view reports them.
    *
-   * @return the context per unit id; empty when the chart is unavailable.
+   * @param view the delegated view.
+   * @return the context per unit id, for the units that sit in a Bereich or are one.
    */
   @NotNull
-  private Map<UUID, LeitungUnitContext> unitContext() {
+  private static Map<UUID, LeitungUnitContext> unitContext(@NotNull LeitungViewDto view) {
     Map<UUID, LeitungUnitContext> context = new HashMap<>();
-    OrgChartDto chart =
-        SectionFallback.load(log, "leitung-org-chart", leadershipClient::orgChart, null);
-    if (chart == null || chart.bereiche() == null) {
-      return context;
-    }
-    for (BereichChartDto b : chart.bereiche()) {
-      if (b == null || b.orgUnitId() == null) {
-        continue;
-      }
-      context.put(b.orgUnitId(), new LeitungUnitContext(null, b.department()));
-      LeitungUnitContext child = new LeitungUnitContext(b.name(), b.department());
-      if (b.squadrons() != null) {
-        for (SquadronChartDto s : b.squadrons()) {
-          if (s != null && s.orgUnitId() != null) {
-            context.put(s.orgUnitId(), child);
-          }
-        }
-      }
-      if (b.specialCommands() != null) {
-        for (SpecialCommandChartDto sc : b.specialCommands()) {
-          if (sc != null && sc.orgUnitId() != null) {
-            context.put(sc.orgUnitId(), child);
-          }
-        }
+    for (LeitungUnitDto u : allUnits(view)) {
+      if (u.id() != null && (u.bereichName() != null || u.department() != null)) {
+        context.put(u.id(), new LeitungUnitContext(u.bereichName(), u.department()));
       }
     }
     return context;

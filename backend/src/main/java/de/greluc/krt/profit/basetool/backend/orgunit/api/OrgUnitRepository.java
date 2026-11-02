@@ -47,7 +47,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron Squadron}
    * and {@link de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand SpecialCommand},
-   * regardless of {@code is_profit_eligible}, for the org chart (REQ-ORG-026).
+   * regardless of {@code is_profit_eligible}, for the Leitung view (REQ-ROLE-004).
    *
    * @return the active Staffeln + SKs in arbitrary order; never {@code null}, possibly empty.
    */
@@ -133,7 +133,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich} for the
-   * org chart's Bereich tiers (REQ-ORG-026).
+   * Leitung view (REQ-ROLE-004).
    *
    * @return the active Bereiche in arbitrary order; never {@code null}, possibly empty.
    */
@@ -143,7 +143,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   /**
    * Loads the active {@link
    * de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung}, normally a singleton,
-   * for the org chart's root tier (REQ-ORG-026).
+   * for the Leitung view (REQ-ROLE-004).
    *
    * @return the active OL row(s) in arbitrary order; never {@code null}, normally one or zero.
    */

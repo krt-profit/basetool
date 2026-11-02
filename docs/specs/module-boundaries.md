@@ -37,7 +37,8 @@ A nested, local or anonymous class belongs to its top-level class, and a generat
 `XMapperImpl` to the `@Mapper` type `XMapper` it implements. The rules are a faithful port of the
 audit's classification (`docs/archive/domain-modularisation-audit-2026-09/scripts/10-backend-domains-classify.py`)
 with the behaviour-free re-homings of plan §7.3 applied (the leadership writes into `orgunit` and
-the Leitung view into `orgchart` — corrected 2026-10-04, the view was first mapped to `orgunit` —,
+the Leitung view into `leadership` — the module was named `orgchart` until the org chart was removed
+(ADR-0329) —,
 the access core into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
 `HandleAnonymisation` into `kernel`, `PayoutPreference` into `identity`, the composition root into
 `app`). Changing a class's target module is a reviewed edit of this file. Once a module's package
@@ -124,7 +125,7 @@ exception contract (ADR-0235): **136 edges**.
 
 Shrunk the same day to **127 class edges in 37 module pairs** by the Phase 1 re-homings of plan
 §7.3: the exchange row records nested in the repositories that produce them (−5), the catalogue
-`ShipTypeMapper` (−1), the org chart behind the org-unit module's `MembershipChangeObserver` (−2)
+`ShipTypeMapper` (−1), the leadership mirror behind an org-unit observer (−2, removed by ADR-0329)
 and `AuthHelperService` without its delegations to `OwnerScopeService` (−1).
 
 After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **112 class edges in 30 module pairs**.
@@ -204,8 +205,8 @@ declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13
 A module without an `api` package keeps all its types in its base package, which is its unnamed
 interface: `kernel` today. A module that publishes nothing keeps every type below its base
 package and outside an `api` package, so it exposes no type at all; no declaration allows it,
-and Spring Modulith reports any module that reaches into it: `dashboard`, `navigation`,
-`orgchart`, `personalinventory` and `promotion` today, which no other module uses. Such a leaf
+and Spring Modulith reports any module that reaches into it: `dashboard`, `leadership`,
+`navigation`, `personalinventory` and `promotion` today, which no other module uses. Such a leaf
 module is laid out in `internal` and `web` only and consumes the `api` of other modules alone;
 `navigation` is leaf by design, since the frontend reaches it over REST. For a module that
 keeps its types in the base package, its dependents allow it by bare name (`"kernel"`, not
@@ -214,16 +215,17 @@ module that may depend on no declared module says so with `allowedDependencies =
 annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
 
 Declared on `main`: `admin`, `app`, `audit`, `bank`, `blueprint`, `catalogue`, `dashboard`,
-`exchange`, `hangar`, `identity`, `inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`,
-`mission`, `navigation`, `notification`, `operation`, `orgchart`, `orgunit`, `personalinventory`,
-`platform`, `privacy`, `promotion`, `purchasing`, `refinery`, `scope`, `supply` (floor 29). `mission` publishes `mission.api.MissionCommands`, its first
+`exchange`, `hangar`, `identity`, `inventory`, `joborder`, `kernel`, `leadership`, `livesync`,
+`materialexchange`, `mission`, `navigation`, `notification`, `operation`, `orgunit`,
+`personalinventory`, `platform`, `privacy`, `promotion`, `purchasing`, `refinery`, `scope`, `supply`
+(floor 29). `mission` publishes `mission.api.MissionCommands`, its first
 command (`detachFromOperation`, plan §5.3). `bank.api` carries `BankAmounts` and `BankBookingRequestType`, which its
 events and its conflict exception expose.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay
-acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `orgchart`, `admin`,
+acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `leadership`, `admin`,
 `personalinventory`, `promotion`, `exchange`, `materialexchange`, `refinery`, `joborder`, `mission` and `inventory` are laid out this way (the inventory publishes the DTOs the job order returns, `InventoryItemDto` and its allocation DTOs, in `inventory.api`); the exchange's frozen relay
 wire records sit in `exchange.internal.dto`.
 

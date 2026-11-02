@@ -389,9 +389,6 @@ declare const KRT_DEMAND_LIVESYNC_UPDATES: string;
 /** Injected by the page bootstrap (declared in orders-material-demand.html). */
 declare const KRT_DEMAND_SECTION_REFRESH_ERROR: string;
 
-/** Injected by the page bootstrap (declared in org-chart.html). */
-declare const OC_I18N: KrtI18nDict;
-
 /** Injected by the page bootstrap (declared in promotion-admin-rank-requirements.html). */
 declare const AR_CATEGORIES_BY_TOPIC: Record<
     string,

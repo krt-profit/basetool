@@ -19,15 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.web;
 
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Payload for designating an Organisationsleitung's Grand Admiral (REQ-ORG-021): exactly one of an
- * account or a free-text name.
+ * Payload for designating an Organisationsleitung's Grand Admiral (REQ-ORG-021).
  *
- * @param userId the account to designate, or {@code null} for a free-text holder
- * @param displayName the free-text holder name, or {@code null} when designating an account; at
- *     most 120 chars
+ * @param userId the account to designate; required
  */
-public record GrandAdmiralRequest(UUID userId, @Size(max = 120) String displayName) {}
+public record GrandAdmiralRequest(@NotNull UUID userId) {}

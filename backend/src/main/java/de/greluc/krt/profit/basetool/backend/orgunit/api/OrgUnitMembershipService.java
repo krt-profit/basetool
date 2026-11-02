@@ -73,7 +73,6 @@ public class OrgUnitMembershipService {
   private final KommandoGroupRepository kommandoGroupRepository;
   private final FirstMembershipObserver firstMembershipObserver;
   private final AuditRecorder auditRecorder;
-  private final MembershipChangeObserver membershipChangeObserver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
   private final OrgUnitSeatNotifier seatNotifier;
   private final OrgUnitSeatEligibility seatEligibility;
@@ -141,7 +140,6 @@ public class OrgUnitMembershipService {
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
-    membershipChangeObserver.onUnitMembershipRemoved(sc.getId(), userId);
 
     if (membershipRepository.countByIdUserId(userId) == 0) {
       firstMembershipObserver.onUserLostLastOrgUnit(userId);
@@ -203,7 +201,6 @@ public class OrgUnitMembershipService {
           case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
         });
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    membershipChangeObserver.onBereichRoleGranted(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
     auditRecorder.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
@@ -233,7 +230,6 @@ public class OrgUnitMembershipService {
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
-    membershipChangeObserver.onUnitMembershipRemoved(bereichId, userId);
     auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         bereichId,
@@ -287,7 +283,6 @@ public class OrgUnitMembershipService {
             .snapshotResponsibleHolders(organisationsleitungId);
     m.setRole(MembershipRole.OL_MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    membershipChangeObserver.onOlMemberAdded(ol.getId(), userId);
     auditRecorder.record(
         AuditEventType.ROLE_GRANTED,
         ol.getId(),
@@ -319,7 +314,6 @@ public class OrgUnitMembershipService {
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
     membershipRepository.delete(m);
-    membershipChangeObserver.onUnitMembershipRemoved(organisationsleitungId, userId);
     orgUnitRepository
         .findById(organisationsleitungId)
         .map(u -> Hibernate.unproxy(u, OrgUnit.class))
@@ -365,7 +359,6 @@ public class OrgUnitMembershipService {
       return;
     }
     ol.setGrandAdmiralUserId(userId);
-    ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previous != null) {
       auditRecorder.record(
@@ -396,42 +389,17 @@ public class OrgUnitMembershipService {
   public void removeGrandAdmiral(@NotNull UUID organisationsleitungId) {
     Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
     final UUID previousUser = ol.getGrandAdmiralUserId();
-    if (previousUser == null && ol.getGrandAdmiralDisplayName() == null) {
+    if (previousUser == null) {
       return;
     }
     ol.setGrandAdmiralUserId(null);
-    ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
-    if (previousUser != null) {
-      auditRecorder.record(
-          AuditEventType.ROLE_CHANGED,
-          ol.getId(),
-          OrgUnitLabels.shorthandOrName(ol),
-          previousUser,
-          AuditDetails.of("grandAdmiral", false));
-    }
-  }
-
-  /**
-   * Sets a free-text Grand Admiral (REQ-ORG-021) for an OL member without a Basetool account,
-   * replacing any existing holder. Grants nothing, changes no membership and is not audited.
-   *
-   * @param organisationsleitungId the OL org unit; never {@code null}.
-   * @param displayName the typed holder name; must not be blank.
-   * @throws NotFoundException if the OL does not exist.
-   * @throws BadRequestException if the id is not the Organisationsleitung, or the name is blank.
-   */
-  @Transactional
-  public void setGrandAdmiralFreeText(
-      @NotNull UUID organisationsleitungId, @NotNull String displayName) {
-    final String trimmed = displayName.trim();
-    if (trimmed.isEmpty()) {
-      throw new BadRequestException("Grand Admiral name must not be blank");
-    }
-    Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
-    ol.setGrandAdmiralDisplayName(trimmed);
-    ol.setGrandAdmiralUserId(null);
-    orgUnitRepository.saveAndFlush(ol);
+    auditRecorder.record(
+        AuditEventType.ROLE_CHANGED,
+        ol.getId(),
+        OrgUnitLabels.shorthandOrName(ol),
+        previousUser,
+        AuditDetails.of("grandAdmiral", false));
   }
 
   /**
@@ -619,8 +587,6 @@ public class OrgUnitMembershipService {
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-        membershipChangeObserver.onSquadronRankCleared(
-            removed.getId().getOrgUnitId(), user.getId());
       }
       responsibleHolderTrackerProvider
           .getObject()
@@ -703,7 +669,6 @@ public class OrgUnitMembershipService {
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(specialCommandId);
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    membershipChangeObserver.onSkLeadChanged(specialCommandId, userId, request.isLead());
     auditRecorder.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
         specialCommandId,
@@ -775,7 +740,6 @@ public class OrgUnitMembershipService {
     m.setRole(rank);
     m.setKommandoGroup(group);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    membershipChangeObserver.onSquadronRankAssigned(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
     auditRecorder.record(
@@ -818,7 +782,6 @@ public class OrgUnitMembershipService {
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    membershipChangeObserver.onSquadronRankCleared(squadronId, userId);
     auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         squadronId,

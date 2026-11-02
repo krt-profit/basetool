@@ -273,9 +273,9 @@ public class OrgHierarchyController {
   }
 
   /**
-   * Designates the Grand Admiral of the Organisationsleitung (REQ-ORG-021): the single OL member
-   * rendered at the top of the OL in the org chart. Auto-adds the user as an OL member when needed;
-   * their rights stay exactly those of an OL member.
+   * Designates the Grand Admiral of the Organisationsleitung (REQ-ORG-021), a title held by one OL
+   * member. Auto-adds the user as an OL member when needed; their rights stay exactly those of an
+   * OL member.
    *
    * @param id the Organisationsleitung id.
    * @param request the user to designate.
@@ -285,18 +285,11 @@ public class OrgHierarchyController {
   @Operation(
       summary = "Designate the Grand Admiral",
       description =
-          "Designates the single Grand Admiral rendered at the top of the Organisationsleitung"
-              + " (REQ-ORG-021). Supply either a userId (an account holder, kept with OL-member"
-              + " rights, auto-adds OL membership) or a displayName (a free-text holder for a"
-              + " member without an account, grants nothing) — mutually exclusive. ADMIN-only.")
+          "Designates the single Grand Admiral of the Organisationsleitung (REQ-ORG-021). The"
+              + " account keeps OL-member rights and is added to the OL when needed. ADMIN-only.")
   public void setGrandAdmiral(
       @PathVariable @NotNull UUID id, @RequestBody @Valid GrandAdmiralRequest request) {
-    if (request.userId() != null) {
-      orgUnitMembershipService.setGrandAdmiral(id, request.userId());
-    } else {
-      orgUnitMembershipService.setGrandAdmiralFreeText(
-          id, request.displayName() == null ? "" : request.displayName());
-    }
+    orgUnitMembershipService.setGrandAdmiral(id, request.userId());
   }
 
   /**

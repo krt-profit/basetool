@@ -39,7 +39,6 @@ export const CRUMB_SEPARATOR = ' · ';
  * @property {number} [frequency] how often the member opens the page, for the ranking
  * @property {string} [href] the page it opens; absent for an action
  * @property {string} [tabHref] the page a link action opens in a new browser tab
- * @property {string} [adminHref] the page it opens in administration mode instead
  * @property {() => void} [run] what an action does
  * @property {string} [fill] the query a prefix-help row puts into the input
  * @property {boolean} [fromServer] whether it is an entity hit of the backend search, which
@@ -59,7 +58,7 @@ export function textOf(el) {
 /**
  * A palette row with its folded search text.
  *
- * @param {{ label: string, crumb: string, icon: string, keywords: string, key?: string, starrable?: boolean, href?: string, tabHref?: string, adminHref?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
+ * @param {{ label: string, crumb: string, icon: string, keywords: string, key?: string, starrable?: boolean, href?: string, tabHref?: string, run?: () => void, fill?: string, fromServer?: boolean }} spec
  *     what the row shows and does
  * @returns {PaletteItem} the row
  */
@@ -76,7 +75,6 @@ export function makeItem(spec) {
     if (spec.starrable) item.starrable = true;
     if (spec.tabHref) item.tabHref = spec.tabHref;
     if (spec.href) item.href = spec.href;
-    if (spec.adminHref) item.adminHref = spec.adminHref;
     if (spec.run) item.run = spec.run;
     if (spec.fill) item.fill = spec.fill;
     if (spec.fromServer) item.fromServer = true;

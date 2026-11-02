@@ -43,24 +43,14 @@ public class Organisationsleitung extends OrgUnit {
 
   /**
    * The account id of the OL member holding the Grand Admiral post (REQ-ORG-021), or {@code null}
-   * when vacant. Records only who the org chart renders at the top; grants no extra rights, and
-   * deleting the account vacates the post.
+   * when vacant. A title only: it grants no extra rights, and deleting the account vacates the
+   * post.
    */
   @Getter
   @Setter
   @Column(name = "grand_admiral_user_id")
   @Nullable
   private UUID grandAdmiralUserId;
-
-  /**
-   * Free-text name of a Grand Admiral without a Basetool account (REQ-ORG-021), or {@code null}.
-   * Mutually exclusive with {@link #grandAdmiralUserId}; grants nothing.
-   */
-  @Getter
-  @Setter
-  @Column(name = "grand_admiral_display_name", columnDefinition = "TEXT")
-  @Nullable
-  private String grandAdmiralDisplayName;
 
   /**
    * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}

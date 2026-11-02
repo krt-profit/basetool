@@ -256,18 +256,12 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
-   * Global org-structure room shared by {@code /admin/org-structure} and {@code /org-chart}, with
-   * sections {@code units}, {@code forms} and {@code chart}; authorized by the socket's
-   * authentication alone, the admin sections staying protected per fragment.
+   * Global org-structure room of {@code /admin/org-structure}, with sections {@code units} and
+   * {@code forms}; authorized by the socket's authentication alone, the admin sections staying
+   * protected per fragment.
    */
   ORG_STRUCTURE(
-      "org-structure",
-      false,
-      Set.of("units", "forms", "chart"),
-      false,
-      "org_structure",
-      null,
-      null),
+      "org-structure", false, Set.of("units", "forms"), false, "org_structure", null, null),
 
   /**
    * Global admin room for {@code /admin/exchange-clients} with sections {@code registry} (the

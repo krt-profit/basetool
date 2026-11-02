@@ -95,13 +95,11 @@ export const KRT_SEARCH_PREFIXES = Object.freeze([
     { kind: 'action', symbol: '>', words: ['aktion', 'action'] },
     { kind: 'page', symbol: '/', words: ['seite', 'page'] },
     { kind: 'job_order', symbol: '#', words: ['auftrag', 'order'] },
-    { kind: 'member', symbol: '@', words: ['mitglied', 'member'] },
     { kind: 'mission', symbol: '', words: ['mission'] },
     { kind: 'operation', symbol: '', words: ['operation'] },
     { kind: 'material', symbol: '', words: ['material'] },
     { kind: 'blueprint', symbol: '', words: ['blueprint'] },
     { kind: 'ship', symbol: '', words: ['schiff', 'ship'] },
-    { kind: 'org_unit', symbol: '', words: ['einheit', 'unit'] },
 ]);
 
 const PREFIX_WORD = /^([a-z]+):\s*/i;
@@ -131,19 +129,6 @@ export function krtSearchParse(raw) {
             return { kind: byWord.kind, term: text.slice(word[0].length).trim(), help: false };
     }
     return { kind: null, term: text, help: false };
-}
-
-/**
- * The page a server hit opens: its administration page in administration mode when it has one.
- *
- * @param {{ href: string, adminHref?: string | null }} hit the hit as the search answered it
- * @param {boolean} adminMode whether the navigation is in administration mode
- * @returns {string} the path to open
- */
-export function krtSearchHitHref(hit, adminMode) {
-    return adminMode && typeof hit.adminHref === 'string' && hit.adminHref.charAt(0) === '/'
-        ? hit.adminHref
-        : hit.href;
 }
 
 /**

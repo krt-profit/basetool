@@ -76,7 +76,6 @@ class OrgUnitMembershipServiceTest {
   @Mock private KommandoGroupRepository kommandoGroupRepository;
   @Mock private FirstMembershipObserver firstMembershipObserver;
   @Mock private AuditService auditService;
-  @Mock private MembershipChangeObserver membershipChangeObserver;
   @Mock private OrgUnitSeatNotifier seatNotifier;
 
   @Mock private ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
@@ -107,7 +106,6 @@ class OrgUnitMembershipServiceTest {
             kommandoGroupRepository,
             firstMembershipObserver,
             auditService,
-            membershipChangeObserver,
             orgUnitMembershipMapper,
             seatNotifier,
             new OrgUnitSeatEligibility(membershipRepository, userRepository),
@@ -316,7 +314,6 @@ class OrgUnitMembershipServiceTest {
     membershipService.removeMember(scId, userId);
 
     verify(membershipRepository).deleteById(id);
-    verify(membershipChangeObserver).onUnitMembershipRemoved(scId, userId);
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(scId), any(), eq(userId), any());
   }
@@ -424,7 +421,6 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
     assertEquals(MembershipRole.SK_LEAD, updated.getRole());
-    verify(membershipChangeObserver).onSkLeadChanged(scId, userId, true);
     verify(seatNotifier)
         .seatChanged(eq(userId), any(), eq(MembershipRole.SK_LEAD), eq(true), isNull());
     verify(auditService)
@@ -444,7 +440,6 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
     assertEquals(MembershipRole.MEMBER, updated.getRole());
-    verify(membershipChangeObserver).onSkLeadChanged(scId, userId, false);
     verify(seatNotifier)
         .seatChanged(eq(userId), any(), eq(MembershipRole.SK_LEAD), eq(false), isNull());
     verify(auditService)
@@ -585,7 +580,6 @@ class OrgUnitMembershipServiceTest {
     verify(membershipRepository).deleteAll(List.of(rowA));
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(squadronA), any(), eq(userId), any());
-    verify(membershipChangeObserver).onSquadronRankCleared(squadronA, userId);
     verify(firstMembershipObserver).onUserLostLastOrgUnit(userId);
   }
 
@@ -634,8 +628,6 @@ class OrgUnitMembershipServiceTest {
         membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
     assertEquals(MembershipRole.BEREICHSKOORDINATOR, m.getRole());
-    verify(membershipChangeObserver)
-        .onBereichRoleGranted(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(bereichId), any(), eq(userId), any());
     verify(seatNotifier)
@@ -713,7 +705,6 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m = membershipService.addOlMember(olId, userId);
 
     assertEquals(MembershipRole.OL_MEMBER, m.getRole());
-    verify(membershipChangeObserver).onOlMemberAdded(olId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(olId), any(), eq(userId), any());
     verify(seatNotifier)
@@ -767,21 +758,6 @@ class OrgUnitMembershipServiceTest {
         .record(eq(AuditEventType.ROLE_CHANGED), eq(olId), any(), eq(userId), any());
   }
 
-  @Test
-  void setGrandAdmiralFreeText_setsTrimmedNameAndSupersedesAccount() {
-    UUID olId = UUID.randomUUID();
-    Organisationsleitung ol = new Organisationsleitung();
-    ol.setId(olId);
-    ol.setGrandAdmiralUserId(userId);
-    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
-
-    membershipService.setGrandAdmiralFreeText(olId, "  Admiral ohne Account  ");
-
-    assertEquals("Admiral ohne Account", ol.getGrandAdmiralDisplayName());
-    assertNull(ol.getGrandAdmiralUserId());
-    verify(membershipRepository, never()).saveAndFlush(any());
-  }
-
   /** A Staffel membership row for {@link #userId} on the given squadron with the given rank. */
   private OrgUnitMembership squadronMember(UUID squadronId, MembershipRole role) {
     OrgUnitMembership m = new OrgUnitMembership();
@@ -806,9 +782,6 @@ class OrgUnitMembershipServiceTest {
             squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L);
 
     assertEquals(MembershipRole.STAFFELLEITER, saved.getRole());
-    verify(membershipChangeObserver)
-        .onSquadronRankAssigned(
-            eq(squadronId), eq(userId), eq(MembershipRole.STAFFELLEITER), isNull());
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
     verify(seatNotifier)
@@ -855,7 +828,6 @@ class OrgUnitMembershipServiceTest {
 
     assertEquals(rank, saved.getRole());
     assertNull(saved.getKommandoGroup());
-    verify(membershipChangeObserver).onSquadronRankAssigned(squadronId, userId, rank, null);
   }
 
   @ParameterizedTest
@@ -919,8 +891,6 @@ class OrgUnitMembershipServiceTest {
 
     assertEquals(MembershipRole.KOMMANDOLEITER, saved.getRole());
     assertSame(group, saved.getKommandoGroup());
-    verify(membershipChangeObserver)
-        .onSquadronRankAssigned(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
   }
@@ -957,7 +927,6 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership saved = membershipService.removeSquadronRank(squadronId, userId, 0L);
 
     assertEquals(MembershipRole.MEMBER, saved.getRole());
-    verify(membershipChangeObserver).onSquadronRankCleared(squadronId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_REVOKED), eq(squadronId), any(), eq(userId), any());
     verify(seatNotifier)

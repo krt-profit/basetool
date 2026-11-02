@@ -113,10 +113,10 @@ notification contract rather than the kernel, because it carries the org-unit mo
 `OrgUnitKind`.
 
 The Phase 1 re-homings (plan §7.3) added three more: `kernel` (handle anonymisation, the handle
-scrubber and the generic `FuzzyNameMatcher`), `orgunit.api` (`BereichLeadershipRole` and the observer SPI `MembershipChangeObserver`) and
-`orgunit.web` (the Bereich-leader and Grand-Admiral request bodies). The org chart mirrors the
-leadership ranks as that observer, inside the transaction of the rank change, so the org-unit
-services no longer know `OrgChartService`. The exchange's row records are nested in the
+scrubber and the generic `FuzzyNameMatcher`), `orgunit.api` (`BereichLeadershipRole`) and
+`orgunit.web` (the Bereich-leader and Grand-Admiral request bodies). The org-unit services report
+no leadership change to another module: the rank is the only record of a seat (REQ-ROLE-006). The
+exchange's row records are nested in the
 repositories that produce them, the catalogue's `ShipTypeMapper` maps ship types, and
 `AuthHelperService` no longer delegates to `OwnerScopeService`: callers ask the scope API
 directly.
@@ -155,12 +155,11 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (create, update and cancel), `RefineryOrderQueryService` (the reads, also the blueprint craftability's `CraftabilityYieldSource`), `RefineryOrderStoreService` (completion), `RefineryImportService`, `RefineryAccessPolicy`, the import settings and the store requests, `RefineryMissionFinance` (the mission's `MissionFinanceContributor`), `MissionRefineryOrderRelease` (the mission's `MissionDeletionObserver`) and `RefineryOrderMissionCache` (the per-transaction memo behind `mapper.RefineryOrderMissionLookup`) | `RefineryOrderController`, `RefineryImportController` |
 | `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderEditor` (the edit module every order edit runs through, ADR-0287), `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the integrity task, its own repositories and the request DTOs | `JobOrderController`, `JobOrderHandoverController`, `JobOrderMaterialController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
 | `mission` | `MissionCommands` (`detachFromOperation`), the read SPI `OperationSummaryProvider` (the operation module implements it), `MissionFinanceContributor` and `MissionDeletionObserver` (the refinery module implements them), `MissionReferences` (the refinery reads a mission's reference through it) | the mission, structure, participant, timeline and finance services, `MissionEditor` (the edit module every timeline, roster and structure edit runs through, ADR-0287), `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, `MissionOperationSummaryCache` (the per-transaction memo behind `mapper.MissionOperationLookup`), its own repositories and the request DTOs | `MissionController` (calls the mission, timeline, participant and structure services for their sections, ADR-0286), `MissionFinanceEntryController` |
-| `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
+| `leadership` | — (publishes nothing) | `LeitungViewService` and the Leitung DTOs (ADR-0329) | `LeitungController` (`/api/v1/leadership`) |
 | `promotion` | — (publishes nothing; the account deletion reaches the module through its `UserErasureParticipant`) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 
-`OrgChartService` mirrors the leadership ranks inside the transaction of the rank change. The org
-chart's DTOs stay in `internal`, because its services return them: a moved domain's `web` depends on
-its `internal`, never the reverse ([`module-boundaries.md`](../specs/module-boundaries.md),
+The Leitung DTOs stay in `internal`, because its service returns them: a moved domain's `web`
+depends on its `internal`, never the reverse ([`module-boundaries.md`](../specs/module-boundaries.md),
 REQ-MOD-006).
 
 The exchange is the first module whose lower neighbours had to stop naming it: the security

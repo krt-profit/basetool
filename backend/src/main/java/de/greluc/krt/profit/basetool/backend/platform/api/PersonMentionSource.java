@@ -59,7 +59,7 @@ public interface PersonMentionSource {
     /** The material exchange. */
     MARKET,
 
-    /** The org chart. */
+    /** The org-structure administration. */
     ORG,
 
     /** The audit viewer. */

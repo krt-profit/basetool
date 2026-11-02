@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import java.util.List;
@@ -39,6 +40,10 @@ import java.util.UUID;
  * @param groups the unit's Kommandogruppen (Staffel only; empty otherwise).
  * @param grandAdmiralUserId the Grand Admiral's account id (REQ-ORG-021), set only on the
  *     Organisationsleitung, or {@code null}.
+ * @param bereichName the name of the Bereich a Staffel or Spezialkommando sits under, or {@code
+ *     null} for a Bereich, the Organisationsleitung and a unit without a Bereich.
+ * @param department the department enum name of the unit's Bereich (its own for a Bereich), or
+ *     {@code null} when none is assigned.
  */
 @DtoMirror
 public record LeitungUnitDto(
@@ -50,4 +55,6 @@ public record LeitungUnitDto(
     boolean canManageRoster,
     List<LeitungMemberDto> members,
     List<KommandoGroupDto> groups,
-    UUID grandAdmiralUserId) {}
+    UUID grandAdmiralUserId,
+    String bereichName,
+    @BackendEnumAsString String department) {}

@@ -27,7 +27,7 @@ admin is judged like everyone else; the `OFFICER` role plays no part.
   usual trigger: `UserReconciliationService` tells the identity-owned `RolesChangedObserver`
   (implemented by `OrgUnitSeatNotifier#onRolesChanged`) whenever it replaces a member's roles, and a
   seat holder whose new roles lack `KRT Member` is reported with one of their seats (`seatCode`
-  `ROLES_RECONCILED`, no actor). The seat stays in the org chart.
+  `ROLES_RECONCILED`, no actor). The seat itself stays.
 - **What it says.** `ORG_LEADERSHIP_ROLE_MISMATCH`; the default rule notifies every admin (`ROLE`
   `ADMIN`, the actor included) with the member, the unit, the coded seat change (`seatCode`), the
   seat (`rankCode`) and the only `mismatchCode`, `MISSING_KRT_MEMBER`. A second notice of the same
