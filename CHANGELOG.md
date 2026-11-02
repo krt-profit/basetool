@@ -2,6 +2,318 @@
 
 ## [Unreleased]
 
+## [v1.21.0](https://github.com/krt-profit/basetool/releases/tag/v1.21.0) - 2026-11-02
+
+### Added
+
+- **Kartellbank (API).** Neuer Lesezugriff `GET /api/v1/bank/org-units/accounts/visible` liefert
+  seitenweise alle Einheitenkonten, die du auf der Einheiten-Bankseite sehen darfst, mit Saldo,
+  Sparziel und 30-Tage-Verlauf – KRT-Konto zuerst, dann die Konten deines aktiven Kontexts. Grundlage
+  für das kommende „Bank“-Widget der Startseite.
+
+- **Schnellzugriff findet Missionen, Operationen und Material.** Ab zwei Zeichen zeigt `Strg K`
+  neben den Seiten auch passende Missionen, Operationen und Materialien – nur die, die du auf der
+  jeweiligen Seite auch sehen darfst. Präfixe wie `>` (Aktionen), `/` (Seiten) oder `mission:`
+  grenzen die Suche ein, `?` zeigt alle Präfixe.
+
+- **Aufträge: externe Bearbeiter.** Ein Logistiker des Auftrags kann jedes aktive Konto als
+  Bearbeiter eintragen; die Auswahl zeigt die Mitglieder der bearbeitenden Einheit zuerst und
+  markiert alle anderen mit ihrer Einheit. Der Eintrag öffnet dem Bearbeiter diesen einen Auftrag
+  vollständig, auch außerhalb seiner Einheit; er darf nur seine eigene Notiz pflegen und sich
+  selbst austragen. Das Ein- und Austragen externer Bearbeiter wird im Aktivitätsprotokoll eigens
+  erfasst.
+
+- **Lager: Mindestbestände.** Logistiker und Leitung einer Einheit legen im neuen Tab
+  „Mindestbestände“ für ein Material und eine Qualitätsstufe einen Mindest- und einen Zielbestand
+  fest. Der Tab zeigt, wie viel freier Bestand der Einheit jedem Mindestbestand zugeteilt ist –
+  höchste Stufe zuerst, ohne persönliche, gestohlene oder reservierte Mengen – und markiert zu
+  niedrige Bestände; Änderungen erscheinen bei allen ohne Neuladen.
+
+- **Lager: Mindestbestände für Gegenstände.** Neben Materialien lassen sich jetzt auch Items mit
+  einem Mindest- und Zielbestand überwachen (nur ganze Stück, ohne Qualitätsstufe). Jede Zeile zeigt
+  zusätzlich, wie viel die Einheit bereits angefordert hat – offene Bedarfe und offene oder laufende
+  Aufträge ab der Qualitätsstufe der Zeile; die Menge zählt nie als Bestand.
+
+- **Lager: niedrige Bestände.** Ein Material mit unterschrittenem Mindestbestand trägt im globalen
+  Lager die Markierung „Niedrig“. In der Zeile des Mindestbestands legen Logistiker per „Auftrag
+  anlegen“ und „Bedarf anlegen“ einen Auftrag oder Bedarf mit Material, Stufe und Fehlmenge
+  vorausgefüllt an.
+
+- **Aufträge: „Ich bearbeite".** Die Auftragsübersicht hat ein viertes Segment (Meine · Ich bearbeite ·
+  Zu bearbeiten · Alle) mit allen Aufträgen, in denen du als Bearbeiter eingetragen bist. Wer als
+  Bearbeiter eingetragen ist, aber keinen Zugriff auf die Auftragsbearbeitung hat, sieht „Aufträge"
+  in der Navigation und darin nur dieses Segment.
+
+- **Mindestbestand unterschritten.** Fällt ein Mindestbestand unter sein Minimum, erhalten die direkten Logistiker und Leitungsposten der Einheit genau eine Benachrichtigung; erst wenn der Zielbestand wieder erreicht ist, meldet er sich erneut. Die Meldung lässt sich im Profil unter Lager abschalten.
+
+- **Niedrig-Markierung und Kurzbefehle für Items.** Auch Items mit unterschrittenem Mindestbestand tragen im globalen Lager die Markierung „Niedrig“, und „Auftrag anlegen“ / „Bedarf anlegen“ öffnen sich mit dem Item vorbelegt.
+
+- **Schnellzugriff findet Blueprints, Schiffe, Org-Einheiten, Aufträge und Mitglieder.** `Strg K`
+  zeigt jetzt auch Blueprints, Schiffstypen der Einheit, Org-Einheiten und Mitglieder aus dem
+  Organigramm sowie Aufträge nach Nummer (`#12`, ab einer Ziffer) – nur, was du auf der jeweiligen
+  Seite auch sehen darfst. Das Organigramm hebt die gefundene Einheit oder Person hervor.
+
+- **Navigation.** Mit dem Stern im Seitenkopf legst du eine Seite oder einen Reiter als Favorit ab
+  (bis zu 12). Ganz oben im Menü steht dann die Gruppe „Favoriten“, auf jedem Gerät gleich; ein
+  Favorit, den der aktive Bereich nicht anbietet, erscheint ausgegraut mit „In … nicht verfügbar“.
+  Ändert sich dieselbe Liste in einem anderen Fenster, lädt nur die Favoritenliste neu und weist
+  darauf hin.
+
+- **Datenschutz.** Deine Favoriten sind Teil des Datenexports (Abschnitt „Navigationseinstellungen“)
+  und werden beim Zusammenführen zweier Konten vereinigt.
+
+- **Navigation.** Auf großen Bildschirmen wählst du unter „Darstellung“ (Profil und Seitenleiste): die Schublade wie bisher, eine Leiste mit einem Symbol je Gruppe und aufklappbaren Untermenüs (ab 1025 px) oder eine angeheftete Seitenleiste (ab 1280 px). Die Wahl wird für alle Geräte gespeichert; auf schmaleren Bildschirmen gilt weiter die Schublade.
+
+- **Navigation.** Unter „Anpassen“ im Menü blendest du Seiten aus: Sie wandern in den eingeklappten
+  Bereich „Mehr“ und fehlen im Schnellzugriff (Strg+K), samt ihren Reitern. Jeder Eintrag hat dort
+  einen Stern und ein Auge, 44 Pixel groß bis 1024 Pixel Breite; Persönliches lässt sich nur
+  favorisieren. Ein Favorit und eine ausgeblendete Seite schließen sich aus. „Alle wieder
+  einblenden“ und „Alle Favoriten entfernen“ setzen zurück. Das Ausblenden gilt auch im
+  Admin-Modus.
+
+- **Datenschutz.** Deine ausgeblendeten Seiten sind Teil des Datenexports und werden beim
+  Zusammenführen zweier Konten vereinigt, ohne die Favoriten.
+
+- **Dashboard.** Die Startseite ist jetzt ein Dashboard aus Widgets in zwei Spalten: Nächste Tage und Information links, Favoriten und Benachrichtigungen rechts. Über „Anpassen“ ordnest du die Widgets, wechselst die Spalte, entfernst sie, fügst sie hinzu (höchstens 12), stellst ihre Optionen ein oder stellst den Standard wieder her.
+
+- **Information.** Administratoren bearbeiten die Information direkt im Dashboard.
+
+- **Schnellzugriff mit „Häufig“, Favoriten und Tastenkürzeln.** `Strg K` zeigt ohne Eingabe
+  Favoriten, häufig besuchte Seiten und zuletzt besuchte Seiten, jede Seite nur einmal; getippte
+  Treffer werden nach deiner Nutzung geordnet. Neue Aktionen setzen die aktuelle Seite als Favorit,
+  blenden sie aus oder öffnen „Anpassen“. `Strg Enter` öffnet einen Treffer in einem neuen Tab,
+  `Tab` übernimmt einen Präfix-Vorschlag und `Strg D` setzt die markierte Seite als Favorit.
+
+- **Navigation.** Die Tab-Leiste am Handy hat drei frei wählbare Plätze, dazu fest „Meldungen“ und
+  „Menü“. Bis zur ersten Änderung füllen deine Favoriten sie, dann Missionen, Lager und Aufträge;
+  die erste Änderung legt alle drei Plätze fest. Unter „Anpassen“ wählst du pro Platz eine Seite
+  oder tauschst Nachbarn, ein langer Druck auf einen Tab öffnet dieselbe Auswahl. Eine bereits
+  belegte Seite tauscht die Plätze; ist ein Platz hier nicht verfügbar, springt der nächste Favorit
+  oder Standard ein. „Tab-Leiste zurücksetzen“ macht sie wieder automatisch. Im Admin-Modus gibt es
+  eine eigene Leiste (Admin-Dashboard, Mitgliederverwaltung, Audit-Logs).
+
+- **Datenschutz.** Deine Tab-Leisten sind Teil des Datenexports.
+
+- **Navigation.** Unter „Anpassen“ verschiebst du Gruppen und Links im Menü mit Pfeil-Buttons oder
+  Alt+Pfeil hoch/runter; der Fokus bleibt auf dem verschobenen Eintrag und eine Ansage nennt die
+  neue Position. Die Reihenfolge gilt je Modus (Mitglied und Administration), ein Link bleibt in
+  seiner Gruppe, neue Einträge reihen sich hinter ihrem bisherigen Vorgänger ein.
+  „Standardreihenfolge“ setzt zurück.
+
+- **Datenschutz.** Deine Menü-Reihenfolge ist Teil des Datenexports; beim Zusammenführen zweier
+  Konten gilt die des Zielkontos.
+
+- **Tastenkürzel.** Alt+1 bis Alt+9 öffnen die ersten neun Favoriten, Alt+0 die Startseite. Ein leerer oder ausgegrauter Platz zeigt einen Hinweis. Die Tasten ruhen in Dialogen und im Admin-Modus und lassen sich im Profil unter „Darstellung" abschalten.
+
+- **Dialog „Tastenkürzel".** Er listet die Tasten und öffnet sich über das Profilmenü und den Schnellzugriff.
+
+- **Dashboard-Widgets.** Neu im Katalog: „Nächster Einsatz“ zeigt die nächsten Einsätze deiner Einheiten und die, für die du angemeldet bist (Zeilenzahl einstellbar), „Hangar-Bereitschaft“ zeigt, wie viele deiner Schiffe einsatzbereit sind. Beide aktualisieren sich live.
+
+- **Dashboard-Widgets.** Neu im Katalog: „Ich bearbeite“ zeigt die Aufträge, bei denen du als Bearbeiter eingetragen bist, „Bestand niedrig“ die unterschrittenen Mindestbestände (leerste zuerst) und „Bank“ Kontostand, Ziel und 30-Tage-Trend der Konten, die du einsehen darfst. Alle drei haben Optionen für Zeilen (und Status bzw. Einheit) und aktualisieren sich live.
+
+- **Startseite.** Mit „Als Startseite festlegen“ neben dem Stern im Seitenkopf oder unter „Darstellung“ im Profil wählst du je Modus eine Seite, die nach der Anmeldung, beim Start der installierten App und beim Wechsel in den Administrationsmodus öffnet. Ein Link, der dich zur Anmeldung geschickt hat, hat Vorrang; ist die Seite nicht erreichbar, öffnet das Dashboard. Das Logo führt weiterhin immer zum Dashboard.
+
+- **Alles zurücksetzen.** Im Profil setzt eine bestätigte Aktion Favoriten, ausgeblendete Seiten, Reihenfolge, Tab-Leiste und Darstellung beider Modi, beide Dashboards und beide Startseiten auf den Standard zurück; die Navigation erscheint wieder als Schublade.
+
+- **Dashboard-Widgets.** Neue Widgets „Materialbörse“, „Bedarf & Spenden“ und „Meine Bankanträge“ für das Dashboard; Anzahl und Status sind einstellbar, „Alle anzeigen“ führt zur jeweiligen Seite.
+
+- **Bedarf.** Die Bedarfsliste der Versorgung lässt sich nach „ungedeckt“ und „teilweise gedeckt“ filtern.
+
+- **Dashboard-Widgets.** Neu im Katalog: „Aufträge zu bearbeiten“ (Aufträge, die eine deiner Einheiten bearbeitet), „Materialbedarf“ (offener Materialbedarf) und „Raffinerie: fertig“ (abholbereite Raffinerie-Aufträge). Sie haben Optionen für Zeilen (sowie Einheit bzw. Status) und aktualisieren sich live.
+
+- **Favoriten umsortieren.** Favoriten lassen sich wie Gruppen und Links mit Pfeil-Tasten, Alt+Pfeil hoch/runter oder den Schaltflächen verschieben; Alt+1…9 und die Icon-Leiste folgen der gewählten Reihenfolge.
+
+### Changed
+
+- **Benachrichtigungen (Admins).** Der Hinweis zu Leitungswechseln meldet jetzt ein Leitungsmitglied
+  ohne die Rolle KRT Member, auch wenn ihm die Rolle beim Rollenabgleich entzogen wurde; die
+  OFFICER-Rolle wird nicht mehr mit den Leitungssitzen verglichen. Ein neuer schreibgeschützter
+  Bericht (`scripts/officer-cut-report.sql`) listet vor dem Wegfall von OFFICER alle betroffenen
+  Sitze, Freigaben und Regeln.
+
+- **Leitungsposten nur mit KRT-Mitgliedschaft.** Ein Leitungsposten (Staffelrang, SK-Leitung,
+  Bereichsleitung, Organisationsleitung, Grand Admiral) kann nur noch an ein Mitglied mit der
+  Keycloak-Rolle „KRT Member“ vergeben werden; ein bestehender Posten bleibt erhalten, wenn die Rolle
+  später fehlt.
+
+- **Administration.** Der Admin-Modus zeigt einen Admin-Dashboard-Einstieg und 13 Links in den drei
+  einklappbaren Gruppen Mitglieder & Organisation, Stammdaten und Betrieb; zusammengehörige Seiten
+  sind über Tab-Leisten verbunden.
+
+- **Organisationsstruktur.** Die Staffeln werden im Tab „Staffeln“ verwaltet, samt der Schalter
+  „Beförderung aktiv“ und „Auftragsbearbeitung“; der Schalter für Spezialkommandos sitzt in deren
+  Liste. Die Systemeinstellungen enthalten diese Schalter nicht mehr.
+
+- **Mitglieder.** Die Mitgliedsseite hat die Tabs Stammdaten, Hangar, Inventar, Blueprints und
+  Export; die Mitgliederauswahl der Admin-Seiten für Inventar und Blueprints entfällt.
+
+- **Gefahrenzone.** Bank-Zurücksetzung und „Alle Blueprints löschen“ liegen im neuen Tab
+  „Gefahrenzone“ der Systemeinstellungen; `/admin/bank` leitet dorthin weiter.
+
+- **Benachrichtigungsregeln für Offiziere.** Regeln mit dem Ziel „Offizier“ erreichen jetzt die
+  Inhaber eines Leitungspostens direkt in der betroffenen Einheit; eine globale Regel für die Rolle
+  „OFFICER“ erreicht alle Posteninhaber. Neues, frei wählbares Regelziel „Sitzinhaber“.
+
+- **Einkauf: Leitung einer Einheit.** Die Leitung einer Einheit im Einkauf (Pausieren, Fortsetzen) wird
+  über die Offiziersreichweite in genau dieser Einheit erkannt, nicht mehr über eine globale Rolle.
+
+- **Aufträge und Lager ohne Offiziersrolle.** Die Schaltflächen und Schnittstellen für Aufträge,
+  Übergaben und das Lager hängen nur noch an Logistiker, Mitglied und Admin; Leitungsposten erhalten
+  die Logistiker-Rechte weiterhin über ihren Posten.
+
+- **Offiziers-Menüeinträge nach Reichweite.** Leitung und Beförderungsverwaltung erscheinen in der
+  Seitenleiste nach der Offiziers-Reichweite im aktiven Kontext, nicht mehr nach der Rolle „Offizier“;
+  die Rollenanzeige folgt ebenfalls der Reichweite.
+
+- **Weniger Sonderfall „Offizier“.** Profitberechnung, Bank-Mitgliedersuche und Blaupausen-Übersicht
+  stehen Offizieren nicht mehr allein aufgrund der Rolle offen; Mitglieder und Leitungsposten sind
+  unverändert zugelassen.
+
+- **Offiziersrechte nur in der eigenen Einheit (Missionen, Operationen, Hangar).** Finanzbuchungen
+  bearbeiten, den Missionseigner ändern und „Bezahlt“ einer Operation zurücknehmen darf, wer
+  Offiziersreichweite in der besitzenden Einheit hat. Die Besitzer-Details der Hangar-Übersicht und das
+  Zurücksetzen der Ausrüstung zeigen und betreffen nur noch Schiffe aus Einheiten mit Reichweite.
+
+- **Beförderung und Leitung nach Offiziersreichweite.** Beförderungsverwaltung, Mitgliederbewertung
+  und Leitungsseite stehen Mitgliedern mit Leitungssitz nur noch für die eigene Einheit offen; Admins
+  behalten Zugriff auf alles.
+
+- **Rangbereich nach Leitungssitz.** Mitglieder mit Leitungssitz erhalten die Ränge 1–12, andere
+  KRT-Mitglieder 13–20, Admins 1–20; die Officer-Rolle in Keycloak spielt dafür keine Rolle mehr.
+
+- **Offiziersseiten zeigen nur die eigene Reichweite.** Mitgliederliste, Bewertungen, Themen, Kategorien, Rangvoraussetzungen und Eignung der Beförderungsverwaltung beschränken sich auf die Einheiten mit Leitungssitz; wer in Staffel B nur Mitglied ist, sieht dort nichts davon.
+
+- **Lager: Mindestbestände bei Löschung und Deaktivierung.** Wird ein Material gelöscht, entfallen
+  seine Mindestbestände und werden je Eintrag im Audit-Log festgehalten. Bei einer deaktivierten
+  Einheit oder einem nicht mehr gelisteten Katalogeintrag bleiben sie gespeichert, werden aber
+  ausgeblendet und kehren mit der Reaktivierung zurück.
+
+- **Persönliche Daten nur für Admins.** Rollen, Berechtigungen, Logistiker-/Einsatzmanager-Flags, Beitrittsdatum und Discord-Verknüpfung anderer Mitglieder sieht nur noch die Administration, auch als Logistiker oder Leitung. Die Beschreibung sehen alle Mitglieder; den Benutzernamen nur, wenn kein Anzeigename gesetzt ist.
+
+- **Einsatzleitung sichtbar.** Eigentümer und Einsatzmanager einer Mission sehen alle, die die Mission sehen, nur mit Namen.
+
+- **Einsatzmanager pro Einheit.** Wer in einer Einheit Einsatzmanager ist, verwaltet nur deren Missionen
+  und Operationen, nicht die einer anderen Einheit. Missionen und Operationen ohne Einheit verwalten nur
+  Einsatzmanager der Organisationsleitung oder eines Bereichs. Die Schaltflächen folgen der angepinnten
+  Einheit.
+
+- **Logistiker und Einsatz-Manager.** Eine Logistiker- oder Einsatz-Manager-Berechtigung in einem Bereich gilt jetzt auch für die Staffeln und Spezialkommandos darunter, in der Organisationsleitung für alle Einheiten; das gilt auch für direkt vergebene Rechte und bei gewählter Einheit.
+
+- **Logistiker-Schaltflächen folgen der angepinnten Einheit.** Lager, Aufträge und Raffinerie zeigen Logistiker-Bedienelemente nur, wenn du in der angepinnten Einheit Logistiker bist (ohne Pin: in irgendeiner deiner Einheiten).
+
+- **Offizier-Rechte nur mit Leitungsposten.** Von Hand vergebene Officer ohne Leitungsposten verlieren ihre Offizier-Rechte; sie gelten künftig nur in der Einheit, die der eigene Posten erreicht, auch in der ungepinnten Ansicht.
+
+- **Navigation.** Mitglieder sehen rund 10 Links in den vier Aufgabengruppen Einsatz & Flotte,
+  Logistik, Handel und Staffel (Bankmitarbeitende zusätzlich Kartellbank), alle Gruppen offen.
+  Zusammengehörige Seiten sind Tabs einer Seite, zum Beispiel Missionen · Operationen oder
+  Lager · Mindestbestände; Leitung und Beförderungsverwaltung erscheinen als Tabs nur mit
+  Berechtigung.
+
+- **Kopfzeile und Fußzeile.** Das Logo führt zur Startseite und die Glocke zu den
+  Benachrichtigungen; beide haben keinen Menülink mehr. Die Star-Citizen-Links stehen in der
+  Fußzeile.
+
+- **Lager.** „Mein Lager“ und „Globales Lager“ sind Optionen des Lager-Tabs (`/inventory?storage=my`
+  bzw. `storage=all`); die alten Adressen leiten mit den Filtern dorthin um.
+
+- **Leitung: Kommandoleiter ohne Kommandogruppe.** Kommandoleiter und stellv. Kommandoleiter lassen
+  sich jetzt wie Ensigns ohne Kommandogruppe ernennen („— allgemein —"); je Staffel sind bis zu vier
+  von jedem Rang möglich. Im Organigramm erhält ein Kommandoleiter ohne Gruppe ein eigenes Kommando,
+  ein Stellvertreter ohne Gruppe steht direkt unter der Staffelleitung.
+
+- **Admin-Dashboard.** Der Admin-Modus hat ein eigenes, anpassbares Dashboard: der Hub mit allen Verwaltungsseiten sowie die Widgets Offene Löschanträge, Discord-Registrierungen, Sync- & Importstatus und Offene Nutzungsbedingungen. Die Information wird direkt im Widget bearbeitet oder entfernt; die frühere Seite leitet auf das Dashboard um.
+
+- **Dashboard „Meine Bankanträge".** Das Widget lädt nur noch die angezeigten Anträge samt Gesamtzahl vom Server, und seine Einträge sowie „Alle anzeigen" öffnen direkt den Tab „Meine Anträge" der Org-Einheit-Bank.
+
+- **Startseite wählen.** Die Auswahl der Startseite im Profil gruppiert die Seiten nach ihrer
+  Navigationsgruppe; gleich benannte Seiten (z. B. mehrere „Aufträge“) sind dadurch unterscheidbar.
+
+- **Raffinerie-Liste.** Die Aktion „Einlagern“ erscheint nur noch bei Aufträgen, die du bearbeiten darfst – als Besitzer oder als Logistiker der zugehörigen Einheit, auch über eine Bereichs-Zuweisung.
+
+- **Beförderung nur in Einheiten mit aktivierter Beförderung.** Bewertungen, Beförderungsverwaltung
+  und die zugehörigen Menüeinträge zählen nur noch Einheiten, in denen die Beförderung eingeschaltet
+  ist. Ein Offiziersposten in einer Einheit ohne Beförderung öffnet dort nichts mehr; ohne
+  Beförderungs-Einheit in Reichweite verschwinden die Einträge samt Favoriten und Startseiten.
+
+- **Admin-Dashboard.** Offene Löschanträge, Discord-Registrierungen und offene Nutzungsbedingungen aktualisieren sich live, sobald sich etwas ändert; der Sync- & Importstatus folgt dem Ende eines Laufs ebenso.
+
+- **Sync- & Importstatus.** Das Widget zählt die Läufe im gewählten Zeitraum genau (nicht mehr nur den letzten Lauf).
+
+### Removed
+
+- **Betrieb.** Die einmaligen Skripte für die Host-Layout-Migration und die Realm-Umbenennung sind entfernt, beide Hosts sind migriert; Tag `v1.20.2` enthält sie samt Runbook noch.
+
+- **Rolle „Officer“.** Die Keycloak-Rolle OFFICER entfällt: Offizier-Rechte ergeben sich nur noch aus dem Leitungsposten und gelten nur in der Einheit, die der Posten erreicht. Von Hand vergebene Officer ohne Posten verlieren ihre Offizier-Rechte; Mitgliederlisten setzen die Rolle „KRT Member“ voraus.
+
+- **Sonderkonten.** Die Sichtbarkeits- und Freigabegrenzen für „Alle Offiziere“ werden entfernt und im Bank-Audit-Log als Systemereignis festgehalten. Benachrichtigungsregeln für die Rolle OFFICER gehen an die Inhaber von Leitungsposten.
+
+- **Sonderkonten.** Die Freigaben „Alle Logistiker“ und „Alle Mission-Manager“ entfallen, weil ein Sonderkonto keine eigene Einheit hat und die Rolle so in jeder Einheit galt. Bestehende Freigaben und Limits werden entfernt und im Bank-Audit-Log als Systemereignis festgehalten; Sichtbarkeit kommt nur noch aus Bankrollen, „Alle Mitglieder“ und Einzelfreigaben.
+
+### Fixed
+
+- **Logistiker pro Einheit.** Logistiker-Rechte in Lager, Aufträgen, Eintragungen und Raffinerie gelten
+  nur noch für die Einheit, in der du Logistiker bist. Eine bloße Mitgliedschaft in einer anderen
+  Einheit gibt dort keine Logistiker-Rechte; ist eine Einheit angepinnt, zählt nur diese.
+
+- **Benachrichtigungs-Glocke.** Der Zähler an der Glocke wird von Screenreadern nicht mehr doppelt vorgelesen; der zugängliche Name bleibt „Benachrichtigungen öffnen“.
+
+- **Dashboard-Widgets.** Schlägt das Laden eines Widgets fehl oder wird es verweigert, zeigt nur dieses Widget einen Fehlerhinweis mit „Erneut versuchen“; die anderen laden weiter.
+
+- **Auftragsliste.** Die Materialanzahl am „Materialien“-Knopf hat jetzt genug Kontrast (WCAG AA).
+
+- **Rechte-Kaskade.** Logistiker- und Missionsmanager-Rechte auf einem Bereich gelten jetzt auch für interne Missionen, Lagerzeilen und Raffinerieaufträge der Einheiten darunter.
+
+- **Aufträge.** Die Liste „Alle“ zeigt auch Mitgliedern ohne Profit-Zugang die Aufträge, denen sie zugewiesen sind.
+
+- **Mindestbestände.** Beim Bearbeiten eines Mindestbestands mit inzwischen deaktivierter Qualitätsstufe bleibt die Stufe erhalten, statt still entfernt zu werden.
+
+- **Navigation.** Favoriten, ausgeblendete Seiten und Startseiten für Leitung, Beförderungsverwaltung oder Aufträge verschwinden, sobald das Recht in keiner Einheit mehr besteht; Startseiten werden dabei ebenfalls bereinigt.
+
+- **Listen.** Logistiker- und Missionsmanager-Rechte auf einem Bereich gelten nun auch in den Listen für Lager, Raffinerie, Aufträge, Missionen und Operationen der Einheiten darunter; Dashboard-Widgets ohne das nötige Recht werden entfernt.
+
+- **Navigation und Startseite.** Eine Seite kann auch bei gleichzeitigen Änderungen nicht mehr zugleich Favorit und ausgeblendet sein, und das Verschieben von Widgets setzt deren Optionen nicht mehr zurück.
+
+- **Startseiten-Widgets.** „Bestand niedrig“ und „Raffinerie: fertig“ aktualisieren sich von selbst, „Benachrichtigungen“ zeigt ungelesene Einträge auch hinter vielen gelesenen, und ein Ladefehler zeigt den Fehlerzustand mit Neu-laden-Schaltfläche.
+
+- **Icon-Leiste.** Die Leiste folgt Änderungen an Favoriten, ausgeblendeten Seiten und Reihenfolge sofort, und der Admin-Schalter nutzt die eingestellte Admin-Startseite.
+
+- **Dashboard.** Ein offenes Dashboard übernimmt Widgets und Einstellungen, die du in einem anderen Fenster gespeichert hast, spätestens nach zehn Minuten; im Anpassen-Modus bleibt die Seite unverändert.
+
+- **Nächster Einsatz.** Die Übersicht „Nächster Einsatz“ zeigt keine öffentliche Mission mehr, deren
+  übergeordnete interne Mission du nicht sehen darfst; eine Mission-Manager-Berechtigung auf der
+  übergeordneten Einheit zählt für eingetragene Einsätze mit.
+
+- **Raffinerie.** Der Name und der geplante Start einer Mission, die du nicht sehen darfst, erscheinen
+  nicht mehr an einem verknüpften Raffinerieauftrag.
+
+- **Raffinerie und Lager im Namen anderer.** Wer Logistiker über eine Bereichs- oder
+  Organisationsleitungs-Zuweisung ist, kann jetzt auch die Raffinerieaufträge von Mitgliedern darunterliegender
+  Einheiten auflisten und im Namen dieser Mitglieder anlegen oder einlagern; zuvor lieferte die Liste 403.
+
+- **Lager lädt schneller.** Die „niedrig"-Markierung im Lager liest nur noch den Lagerbestand und nicht mehr die offenen Aufträge und Bedarfe.
+
+- **Navigation.** Das Aufräumen von Startseiten setzt keine zuvor gespeicherte Darstellung mehr zurück. Das Menü der Icon-Leiste lässt sich nach einer Aktualisierung weiter über den Avatar öffnen. Die Mitgliedersuche findet auch direkte Stellvertreter von Kommandoleitern im Organigramm.
+
+- **Ankauf und Beschaffung.** „Ankauf“ bleibt neben „Bedarf & Spenden“ als Favorit, Start- und Tab-Seite wählbar. Die Tabs „Eingehende Spenden“, „Statistik“, „Partner“, „Handelsbeauftragte“ und „Bericht“ lassen sich ebenfalls als Favorit, Start- und Tab-Seite wählen.
+
+- **Discord-Anmeldung.** Nach einer abgelehnten Discord-Anmeldung startet ein neuer Versuch im selben
+  Browser wieder sauber, statt immer zur Anmeldeseite zurückzuspringen. Wer die Rolle KRT-Mitglied
+  gerade erst bekommen hat, kommt so ohne Warten oder Browserwechsel hinein. Die Ablehnungsseite
+  erklärt jetzt auch, dass das Verbinden einer anderen Anwendung (z. B. VerseKit) nur Mitgliedern
+  offensteht.
+
+### Security
+
+- **Interne Missionen.** „Nächster Einsatz“ und die Einsatz-Zusammenfassung der Startseite zeigen Mitgliedern ohne Einheit nur noch öffentliche Missionen; interne Missionen sehen nur Mitglieder der jeweiligen Einheit.
+
+- **Missionen ohne Einheit.** Eine Mission ohne verantwortliche Einheit kann nicht mehr „intern“ sein; bestehende Fälle sind öffentlich gestellt, das Formular sperrt den Schalter ohne Einheit.
+
+- **Einsatz-Finanzen.** Die Finanzansicht einer Operation zeigt eine interne Mission einer anderen Einheit ohne Namen als „Interne Mission einer anderen Einheit“; der Betrag bleibt in der Summe.
+
+- **Aufträge.** Wer einem Auftrag nur zugewiesen ist, sieht in den verknüpften Lagerbeständen keine Namen und Startzeiten interner Missionen mehr, die er nicht lesen darf; die Menge bleibt sichtbar.
+
+- **Leitungssitz ohne KRT Member.** Ein behaltener Leitungssitz, dessen Inhaber die Rolle KRT Member verloren hat, verleiht keine Logistiker- oder Einsatzmanager-Rechte mehr. Ausdrücklich gesetzte Logistiker- und Einsatzmanager-Markierungen bleiben bestehen.
+
 ## [v1.20.2](https://github.com/krt-profit/basetool/releases/tag/v1.20.2) - 2026-10-31
 
 ### Added
