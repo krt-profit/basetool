@@ -801,7 +801,8 @@ org-unit-blind.
 > dense account list) and **Meine Anträge** (the requester's own requests) — with both panels and
 > their counts living inside the `orgUnitBank` swap fragment, so a request create/cancel updates the
 > list and the request tab-count in place (REQ-FE-005); the active tab is carried in a `#tab=` deeplink
-> that is re-applied after each swap. A booking request is raised from a **single page-level CTA**
+> that is re-applied after each swap; `/org-unit-bank#tab=antraege` opens „Meine Anträge" and is
+> the target of the dashboard widget „Meine Bankanträge". A booking request is raised from a **single page-level CTA**
 > whose modal carries an **account selector** filled only with the caller's requestable accounts
 > (`canRequest`); the CTA + modal are shown only when at least one such account is visible, replacing
 > the former per-card request button + "view only" label. Accounts render with a linked name, 30-day
@@ -870,10 +871,16 @@ is still `PENDING` (`BOOKING_REQUEST_CANCELLED`) or **correct** it while it is s
 *and* unapproved (REQ-BANK-056). The requester endpoints live under
 `/api/v1/bank/org-units/requests/**`, scope-checked by the same seam (create requires the
 caller to oversee the org unit; cancel requires owning the request). A request cannot be
-raised against a `CLOSED` account.
+raised against a `CLOSED` account. `GET /api/v1/bank/org-units/requests/page` reads the same
+own requests as one page, filtered by lifecycle state (`status`, repeatable; every state when
+omitted), newest first, with the total over all pages — a read-only call that is not audited. The
+dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
 
 **Acceptance**
 
+- [x] The own-requests page filters by state, reads strictly the caller's own requests, removes the
+  staff note and reports the total (`BankBookingRequestServiceTest`,
+  `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`).
 - [x] Create stamps `PENDING`, the requester + requester-handle snapshot, audits
   `BOOKING_REQUEST_CREATED`, and books nothing (`BankBookingRequestServiceTest`).
 - [x] Create outside the caller's oversight scope is denied **before** the account is

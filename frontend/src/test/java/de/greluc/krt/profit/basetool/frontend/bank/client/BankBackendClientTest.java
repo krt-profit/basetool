@@ -348,6 +348,19 @@ class BankBackendClientTest {
   }
 
   @Test
+  void ownOrgUnitRequestPageSendsTheSizeAndEachState() {
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
+
+    assertThat(client.ownOrgUnitRequestPage(List.of("CONFIRMED", "REJECTED"), 3)).isNotNull();
+    assertThat(client.ownOrgUnitRequestPage(List.of(), 5)).isNotNull();
+
+    backend.expect(
+        "GET", "/api/v1/bank/org-units/requests/page?size=3&status=CONFIRMED&status=REJECTED");
+    backend.expect("GET", "/api/v1/bank/org-units/requests/page?size=5");
+  }
+
+  @Test
   void orgUnitWritesSendTheBackendRecordsAndDecodeTheAnswers() {
     for (int i = 0; i < 20; i++) {
       backend.answerJson(VERSIONED);
