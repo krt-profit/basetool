@@ -83,7 +83,9 @@ reach stays own-squadron: the two previously-unscoped per-user refinery endpoint
 there.
 
 The `canView/canManageUserRefineryOrders` gate is a **coarse user-level pre-check**: it passes when
-the caller shares *any one* of the target user's org units (`anyMatch`). Because a member may belong
+the caller shares *any one* of the target user's org units (`anyMatch`) or holds a Logistician grant
+that covers one, cascade included (decision 18; `UserAccessPolicy#canActOnTargetUserAsGrantee`, also
+used by `InventoryAccessPolicy#canManageUserInventory`). Because a member may belong
 to up to two Staffeln (REQ-ORG-017), the gate alone does **not** bound which of the target's rows the
 caller sees — so it must be paired with per-row org-unit filtering. **Read path (finding SEC-01):**
 `GET /users/{userId}` lists through the strict-staffel scoped query `findByOwnerIdScoped`
@@ -107,7 +109,7 @@ stamped outside the caller's scope is one the caller cannot read back).
   the target's orders stamped to the other unit (finding SEC-01) — the coarse `anyMatch` gate is not
   relied on for per-row isolation.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderServiceLifecycleTest` (`getUserRefineryOrdersScoped_*`), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderQueryServiceTest` (`getUserRefineryOrdersScoped_*`), `GrantCascadeAggregateAccessIntegrationTest` (on-behalf gates, `/users/{userId}` list), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderQueryService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
 
 #### Officer reach is derived from the seats (ADR-0300)
 

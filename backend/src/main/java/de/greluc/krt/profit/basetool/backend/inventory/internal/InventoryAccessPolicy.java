@@ -114,13 +114,14 @@ public class InventoryAccessPolicy implements BookInPolicy {
 
   /**
    * Coarse pre-check for creating Lager rows in another member's name: admin, self, or a shared
-   * editable org unit (REQ-SEC-005). The per-row bound is the stamp validation.
+   * editable or Logistician-granted org unit (REQ-SEC-005). The per-row bound is the stamp
+   * validation.
    *
    * @param targetUserId the member whose Lager would receive the row; never {@code null}
    * @return {@code true} iff the caller may create Lager rows in that member's name
    */
   public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return userAccessPolicy.canActOnTargetUser(targetUserId, true);
+    return userAccessPolicy.canActOnTargetUserAsGrantee(targetUserId, Roles.LOGISTICIAN);
   }
 
   @Override

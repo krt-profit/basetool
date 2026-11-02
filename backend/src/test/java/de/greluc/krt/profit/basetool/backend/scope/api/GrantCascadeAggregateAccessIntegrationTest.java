@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
@@ -50,10 +51,12 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +68,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -87,6 +91,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
   @Autowired private MissionAccessPolicy missionAccessPolicy;
   @Autowired private InventoryAccessPolicy inventoryAccessPolicy;
   @Autowired private RefineryAccessPolicy refineryAccessPolicy;
+  @Autowired private RefineryOrderController refineryOrderController;
   @Autowired private BereichRepository bereichRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
@@ -105,6 +110,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
   private UUID childId;
   private UUID siblingId;
   private UUID callerId;
+  private UUID childMemberId;
   private UUID internalMissionId;
   private UUID inventoryRowId;
   private UUID refineryOrderId;
@@ -132,6 +138,13 @@ class GrantCascadeAggregateAccessIntegrationTest {
       orgUnitMembershipRepository.save(membership);
 
       User childMember = newUser("cascade-member-" + tag);
+      childMemberId = childMember.getId();
+      OrgUnitMembership childMembership = new OrgUnitMembership();
+      childMembership.setId(new OrgUnitMembershipId(childMemberId, childId));
+      childMembership.setUser(childMember);
+      childMembership.setKind(OrgUnitKind.SQUADRON);
+      childMembership.setJoinedAt(Instant.now());
+      orgUnitMembershipRepository.save(childMembership);
       Mission mission = new Mission();
       mission.setOwningOrgUnit(child);
       mission.setName("Cascade-Mission-" + tag);
@@ -224,6 +237,64 @@ class GrantCascadeAggregateAccessIntegrationTest {
                 logisticianGrant(siblingId),
                 () -> refineryAccessPolicy.canSeeRefineryOrder(refineryOrderId)))
         .isFalse();
+  }
+
+  @Test
+  void aLogisticianGrantOnTheBereichPassesTheOnBehalfGatesForAMemberOfAStaffelBelow() {
+    assertThat(
+            asCaller(
+                logisticianGrant(bereichId),
+                () -> refineryAccessPolicy.canViewUserRefineryOrders(childMemberId)))
+        .isTrue();
+    assertThat(
+            asCaller(
+                logisticianGrant(bereichId),
+                () -> refineryAccessPolicy.canManageUserRefineryOrders(childMemberId)))
+        .isTrue();
+    assertThat(
+            asCaller(
+                logisticianGrant(bereichId),
+                () -> inventoryAccessPolicy.canManageUserInventory(childMemberId)))
+        .isTrue();
+  }
+
+  @Test
+  void aSiblingGrantNoGrantOrAPinOutsideTheGrantFailsTheOnBehalfGates() {
+    assertThat(
+            asCaller(
+                logisticianGrant(siblingId),
+                () -> refineryAccessPolicy.canViewUserRefineryOrders(childMemberId)))
+        .isFalse();
+    assertThat(
+            asCaller(null, () -> refineryAccessPolicy.canManageUserRefineryOrders(childMemberId)))
+        .isFalse();
+    assertThat(
+            asCaller(
+                logisticianGrant(bereichId),
+                siblingId,
+                () -> refineryAccessPolicy.canViewUserRefineryOrders(childMemberId)))
+        .isFalse();
+    assertThat(
+            asCaller(
+                missionGrant(bereichId),
+                () -> inventoryAccessPolicy.canManageUserInventory(childMemberId)))
+        .isFalse();
+  }
+
+  @Test
+  void theUserOrdersEndpointListsAChildMembersOrdersForABereichLogisticianAndRefusesASibling() {
+    assertThat(
+            asCaller(
+                    logisticianGrant(bereichId),
+                    () -> refineryOrderController.getUserRefineryOrders(childMemberId, 0, 50, null))
+                .content())
+        .extracting(RefineryOrderListDto::id)
+        .contains(refineryOrderId);
+    assertThatThrownBy(() ->
+            asCaller(
+                logisticianGrant(siblingId),
+                () -> refineryOrderController.getUserRefineryOrders(childMemberId, 0, 50, null)))
+        .isInstanceOf(AccessDeniedException.class);
   }
 
   @Test

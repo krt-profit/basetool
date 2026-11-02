@@ -90,7 +90,7 @@ params), the `onlyMine` toggle and the search `q` — and the pagination control
 `RefineryOrderServiceLifecycleTest` · **Code:** `RefineryOrderPageController.viewOrders` /
 `segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery/refinery-orders-index.html`,
 `templates/kernel/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),
-`RefineryOrderService.getAllRefineryOrders` / `getMyRefineryOrders`,
+`RefineryOrderQueryService.getAllRefineryOrders` / `getMyRefineryOrders`,
 `RefineryOrderRepository.findFilteredScoped` / `findOwnedFiltered` / `LIST_FILTER` · **Issues:** #2
 (performance audit)
 
@@ -230,7 +230,7 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
   are already `COMPLETED`.
 
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
-`RefineryOrderServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
+`RefineryOrderStoreServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
 `storeRefineryOrder`
 
 ### Write requests and settings (wave 6 of the API cut)

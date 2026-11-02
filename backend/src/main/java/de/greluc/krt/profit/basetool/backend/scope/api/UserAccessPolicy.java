@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.UUID;
@@ -56,6 +57,22 @@ public class UserAccessPolicy {
     return canActOnTargetUserScoped(
         targetUserId,
         edit ? accessGateService::canEditSquadron : accessGateService::canSeeSquadron);
+  }
+
+  /**
+   * {@link #canActOnTargetUser} for a surface governed by a contextual role: the same checks, with
+   * a unit also accepted when the caller's grant of {@code roleName} covers it, cascade included
+   * (decision 18, REQ-SEC-005). It stays a coarse pre-check; the rows are bounded by the grant
+   * scope of the query or the stamp validation.
+   *
+   * @param targetUserId the member being acted upon; never {@code null}
+   * @param roleName the contextual role, {@link Roles#LOGISTICIAN} or {@link Roles#MISSION_MANAGER}
+   * @return {@code true} iff the caller shares at least one in-scope or granted org unit with the
+   *     member
+   */
+  public boolean canActOnTargetUserAsGrantee(@NotNull UUID targetUserId, @NotNull String roleName) {
+    return canActOnTargetUserScoped(
+        targetUserId, unit -> accessGateService.canSeeSquadronAsGrantee(unit, roleName));
   }
 
   /**

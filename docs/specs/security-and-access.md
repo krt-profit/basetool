@@ -3445,7 +3445,7 @@ the caller.
 - [x] The receiver picker is absent for a non-logistician, including on a split row and on the
   flash-attribute re-render after a validation error.
 
-**Enforced by:** `RefineryOrderServiceTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
+**Enforced by:** `RefineryOrderStoreServiceTest` · **Code:** `RefineryOrderStoreService#storeRefineryOrder`,
 `RefineryOrderPageController#viewOrderDetail`, `refinery/refinery-orders-details.html` · **Mirrors:**
 `InventoryItemService#createInventoryItem`
 
