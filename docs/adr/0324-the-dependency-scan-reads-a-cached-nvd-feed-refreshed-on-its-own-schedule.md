@@ -31,7 +31,11 @@ We will separate keeping the NVD dataset current from scanning with it.
 1. **A refresh workflow owns the dataset.** `nvd-feed-refresh.yml` runs daily, on demand, and on a
    `main` push that touches the root build script or the version catalog (a plugin bump may need a
    new database). It restores the newest feed, runs `dependencyCheckUpdate` with up to three
-   time-limited attempts, stamps `refreshed-at`, and saves under a key unique to the run. A daily
+   time-limited attempts, stamps `refreshed-at`, and saves under a key unique to the run. The
+   attempts share the data directory, so a retry resumes where a stalled one stopped; between them
+   the refresh stops the Gradle daemon and clears the dataset's lock files, because `timeout` kills
+   only the client. The task runs without the configuration cache, which the plugin's `Update`
+   task does not support. A daily
    save keeps a recently created, recently used entry, so neither the seven-day expiry nor LRU
    eviction removes the feed between refreshes.
 2. **One feed on `main`.** After the save a separate job — the only one holding `actions: write`,

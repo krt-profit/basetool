@@ -77,3 +77,7 @@ dependencyCheck {
     nvd.delay = 16000
   }
 }
+
+tasks.named("dependencyCheckUpdate") {
+  notCompatibleWithConfigurationCache("The OWASP Update task holds a reference to the Project.")
+}

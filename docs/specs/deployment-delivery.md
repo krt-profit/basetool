@@ -3402,12 +3402,18 @@ refresh and never a pull request's scan (ADR-0324).
 
 - **The refresh.** Daily, on `workflow_dispatch`, and on a push to `main` that touches the root
   `build.gradle.kts` or `gradle/libs.versions.toml`, it restores the newest feed, runs
-  `dependencyCheckUpdate` up to three times with a time limit per attempt, writes the update time
+  `dependencyCheckUpdate` up to three times with a 25-minute limit per attempt, writes the update time
   as epoch seconds to `refreshed-at` in the data directory, and saves the directory under a key
   unique to the run (`nvd-feed-v2-<os>-<run id>-<attempt>`). A failed update saves nothing. On
   `main` it then deletes every other `nvd-feed-` cache, and deletes none when the one it saved is
   not listed. A failed scheduled refresh opens or comments on the issue *Daily NVD feed refresh
   failed*.
+- **Attempts build on each other.** The data directory stays on the runner between attempts, so a
+  retry continues from the years an earlier attempt already stored. After a failed or timed-out
+  attempt the refresh stops the Gradle daemon, which `timeout` does not kill and which would keep
+  the dataset locked, and deletes the dataset's lock files before the next attempt. The build
+  declares `dependencyCheckUpdate` incompatible with the configuration cache, since the plugin's
+  task holds the `Project`; Gradle runs it without the cache instead of failing the build.
 - **The scan.** It restores the newest `nvd-feed-v2-<os>-` cache and runs `dependencyCheckAggregate`
   with `-PdependencyCheckAutoUpdate=false`. Before that it fails, with an error that names the
   refresh, when no cache was restored or `refreshed-at` is missing or 168 hours old, and warns from
@@ -3422,6 +3428,7 @@ refresh and never a pull request's scan (ADR-0324).
 - [x] No step of `dependency-check.yml` passes an NVD API key or runs with auto-update on.
 - [x] The refresh saves only after a successful update, and its prune job runs only on `main`
   with `actions: write`, as the only job of either workflow that holds it.
+- [x] `./gradlew dependencyCheckUpdate -m` succeeds with the configuration cache switched on.
 - [ ] A manual refresh on `main` saves a feed and a following scan restores it.
 
 **Enforced by:** `.github/workflows/nvd-feed-refresh.yml` · `.github/workflows/dependency-check.yml`
