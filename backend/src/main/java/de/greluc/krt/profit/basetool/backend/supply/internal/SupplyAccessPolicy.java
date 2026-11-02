@@ -114,6 +114,16 @@ public class SupplyAccessPolicy {
   }
 
   /**
+   * Whether the caller reads the donation statistics: the governing leadership and the lead or a
+   * Logistician of at least one unit.
+   *
+   * @return {@code true} when the statistics answer the caller
+   */
+  public boolean canReadStats() {
+    return isGoverningLeadership() || !managedUnitIds().isEmpty();
+  }
+
+  /**
    * Whether the caller may read the maximum price and the purchase progress of the needs of a unit:
    * the unit's lead or Logistician, the governing leadership and a trade delegate.
    *

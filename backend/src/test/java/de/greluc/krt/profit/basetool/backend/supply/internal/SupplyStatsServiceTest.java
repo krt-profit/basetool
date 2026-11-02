@@ -87,8 +87,7 @@ class SupplyStatsServiceTest {
 
   @Test
   void aMemberWithoutAnyManagedUnitSeesNoStatistics() {
-    when(accessPolicy.isGoverningLeadership()).thenReturn(false);
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
+    when(accessPolicy.canReadStats()).thenReturn(false);
 
     assertThatThrownBy(() -> service.stats(6)).isInstanceOf(AccessDeniedException.class);
 
@@ -97,6 +96,7 @@ class SupplyStatsServiceTest {
 
   @Test
   void aManagerSeesOnlyTheirOwnUnitsAndNoDonorList() {
+    when(accessPolicy.canReadStats()).thenReturn(true);
     when(accessPolicy.isGoverningLeadership()).thenReturn(false);
     when(accessPolicy.managedUnitIds()).thenReturn(Set.of(mine.getId()));
     when(orgUnitRepository.findAll()).thenReturn(List.of(mine, other));
@@ -124,6 +124,7 @@ class SupplyStatsServiceTest {
 
   @Test
   void theGoverningLeadershipSeesEveryUnitAndThePerDonorList() {
+    when(accessPolicy.canReadStats()).thenReturn(true);
     User donor = new User();
     donor.setId(UUID.randomUUID());
     donor.setDisplayName("Zed");
@@ -147,6 +148,7 @@ class SupplyStatsServiceTest {
 
   @Test
   void theSpanIsClampedToAtLeastOneAndAtMostThirtySixMonths() {
+    when(accessPolicy.canReadStats()).thenReturn(true);
     when(accessPolicy.isGoverningLeadership()).thenReturn(true);
     when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
     when(orgUnitRepository.findAll()).thenReturn(List.of());

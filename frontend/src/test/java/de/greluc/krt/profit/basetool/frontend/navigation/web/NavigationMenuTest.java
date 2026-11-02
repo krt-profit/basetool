@@ -161,10 +161,43 @@ class NavigationMenuTest {
     assertThat(keys(menu, "trade")).doesNotContain("purchasing.deals");
     assertThat(menu.palettePages())
         .extracting(NavigationEntry::key)
-        .contains("purchasing.deals", "supply.incoming", "supply.stats", "purchasing.partners")
+        .contains("purchasing.deals")
         .doesNotContain("supply.needs");
     assertThat(keys(resolve(Set.of(), Set.of(NavigationFlag.PURCHASING)), "trade"))
         .contains("purchasing.deals");
+  }
+
+  /** A supply or purchasing tab is a page only with its surface switch and its own flag. */
+  @Test
+  void theDataTabsNeedTheirOwnFlag() {
+    NavigationMenu switchesOnly =
+        resolve(Set.of(), Set.of(NavigationFlag.SUPPLY, NavigationFlag.PURCHASING));
+    NavigationMenu granted =
+        resolve(
+            Set.of(),
+            Set.of(
+                NavigationFlag.SUPPLY,
+                NavigationFlag.PURCHASING,
+                NavigationFlag.SUPPLY_STATS,
+                NavigationFlag.PURCHASING_PARTNERS));
+    NavigationMenu flagsWithoutSwitches =
+        resolve(Set.of(), Set.of(NavigationFlag.SUPPLY_STATS, NavigationFlag.PURCHASING_PARTNERS));
+
+    assertThat(switchesOnly.palettePages())
+        .extracting(NavigationEntry::key)
+        .doesNotContain(
+            "supply.incoming",
+            "supply.stats",
+            "purchasing.partners",
+            "purchasing.delegates",
+            "purchasing.report");
+    assertThat(granted.palettePages())
+        .extracting(NavigationEntry::key)
+        .contains("supply.stats", "purchasing.partners")
+        .doesNotContain("supply.incoming", "purchasing.delegates", "purchasing.report");
+    assertThat(flagsWithoutSwitches.palettePages())
+        .extracting(NavigationEntry::key)
+        .doesNotContain("supply.stats", "purchasing.partners");
   }
 
   /** The Leitung tab follows the capability flag, not a role. */

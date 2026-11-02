@@ -23,45 +23,55 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessEntry;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationRegistry;
-import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
-import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
-import java.util.List;
-import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** Unit tests for {@link SupplyQuickAccessContributor}: the same tabs the supply pages show. */
+/**
+ * Unit tests for {@link SupplyQuickAccessContributor}: the tabs the layout read's flags grant, the
+ * same the supply pages show.
+ */
 @ExtendWith(MockitoExtension.class)
 class SupplyQuickAccessContributorTest {
 
-  @Mock private SupplyBackendClient supplyClient;
   @Mock private SupplyFeatureState featureState;
-  @Mock private FrontendAuthHelperService authHelper;
+  @Mock private LayoutContextLoader layoutContextLoader;
+  @Mock private HttpServletRequest request;
 
-  @InjectMocks private SupplyQuickAccessContributor contributor;
+  private SupplyQuickAccessContributor contributor;
 
-  /** While the supply surface is off, nothing is offered and the backend is not asked. */
+  @BeforeEach
+  void setUp() {
+    contributor = new SupplyQuickAccessContributor(featureState, layoutContextLoader, request);
+  }
+
+  private void grant(CapabilitiesResponse capabilities) {
+    when(featureState.enabled()).thenReturn(true);
+    when(layoutContextLoader.capabilities(request)).thenReturn(capabilities);
+  }
+
+  /** While the supply surface is off, nothing is offered and no flags are read. */
   @Test
   void offersNothingWhileTheSurfaceIsOff() {
     when(featureState.enabled()).thenReturn(false);
 
     assertThat(contributor.entries()).isEmpty();
-    verifyNoInteractions(supplyClient);
+    verifyNoInteractions(layoutContextLoader);
   }
 
-  /** A manager of a receiving unit gets the incoming donations and the statistics. */
+  /** A caller with both flags gets the incoming donations and the statistics. */
   @Test
-  void managerOfAReceivingUnitGetsBothTabs() {
-    when(featureState.enabled()).thenReturn(true);
-    when(supplyClient.units()).thenReturn(List.of(unit(true, true)));
+  void bothFlagsOfferBothTabs() {
+    grant(LayoutResponses.tabs(true, true, false, false, false));
 
     assertThat(contributor.entries())
         .extracting(QuickAccessEntry::href)
@@ -71,8 +81,7 @@ class SupplyQuickAccessContributorTest {
   /** Every tab carries the key and the path of the registered tab, so it can be starred. */
   @Test
   void everyTabCarriesTheKeyOfItsRegisteredEntry() {
-    when(featureState.enabled()).thenReturn(true);
-    when(supplyClient.units()).thenReturn(List.of(unit(true, true)));
+    grant(LayoutResponses.tabs(true, true, false, false, false));
     NavigationRegistry registry = new NavigationRegistry();
 
     assertThat(contributor.entries())
@@ -84,38 +93,21 @@ class SupplyQuickAccessContributorTest {
                 .contains(entry.href()));
   }
 
-  /** An administrator who manages no unit gets the statistics only. */
+  /** The statistics flag alone offers the statistics only. */
   @Test
-  void administratorGetsTheStatisticsOnly() {
-    when(featureState.enabled()).thenReturn(true);
-    when(supplyClient.units()).thenReturn(List.of(unit(false, true)));
-    when(authHelper.isAdmin()).thenReturn(true);
+  void theStatisticsFlagAloneOffersTheStatistics() {
+    grant(LayoutResponses.tabs(false, true, true, true, true));
 
     assertThat(contributor.entries())
         .extracting(QuickAccessEntry::href)
         .containsExactly("/supply/stats");
   }
 
-  /** A plain member gets neither tab. */
+  /** A plain member, or a failed layout read, gets neither tab. */
   @Test
-  void memberGetsNoTab() {
-    when(featureState.enabled()).thenReturn(true);
-    when(supplyClient.units()).thenReturn(null);
+  void noFlagOffersNothing() {
+    grant(CapabilitiesResponse.NONE);
 
     assertThat(contributor.entries()).isEmpty();
-  }
-
-  /** A failed read fails closed. */
-  @Test
-  void failedReadOffersNothing() {
-    when(featureState.enabled()).thenReturn(true);
-    when(supplyClient.units()).thenThrow(new IllegalStateException("backend down"));
-
-    assertThat(contributor.entries()).isEmpty();
-  }
-
-  private static @NotNull SupplyUnitDto unit(boolean canManage, boolean acceptsDonations) {
-    return new SupplyUnitDto(
-        UUID.randomUUID(), "Unit", "U", "SQUADRON", true, acceptsDonations, canManage, 0L);
   }
 }

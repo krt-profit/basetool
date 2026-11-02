@@ -3820,6 +3820,21 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 **Enforced by:** `MeControllerTest` (`getCapabilities_assignedJobOrdersFlag*`),
 `JobOrderAssigneeGrantIntegrationTest`, `CapabilityFlagsAdviceTest`
 
+#### The supply and purchasing tab capabilities (ADR-0282)
+
+`GET /api/v1/me/capabilities` and the `capabilities` object of `GET /api/v1/me/layout` carry
+`canViewSupplyIncoming`, `canViewSupplyStats`, `canViewPurchasingPartners`,
+`canViewPurchasingDelegates` and `canViewPurchasingReport`: whether the caller may open that tab of
+„Bedarf & Spenden" or „Ankauf". Each is `false` while its surface is off; otherwise the owning
+module decides it through its `api` seam (`SupplyTabAccess`, `PurchasingTabAccess`) with the access
+policy the read behind the tab enforces — the rules are tabulated in REQ-UI-026. None depends on
+the pinned unit. An admin reads the backend's answer, not `true`, because each also needs its
+surface on (and the incoming tab an active unit that accepts donations). The flags steer the
+navigation, the tab bars and the quick access only; every read behind a tab re-checks.
+
+**Enforced by:** `MeControllerTest` (`getCapabilities_*TabFlags*`, `getLayout_carriesTheSameTabFlags`),
+`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeLayoutSingleTransactionTest`
+
 #### Officer reach in the capabilities (ADR-0300)
 
 - **The capabilities are pin-aware.** `GET /api/v1/me/capabilities` and the `capabilities` object of

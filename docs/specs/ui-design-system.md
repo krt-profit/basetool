@@ -1691,7 +1691,19 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   whose tab bar shows them; those five tabs are registry entries (`supply.incoming`,
   `supply.stats`, `purchasing.partners`, `purchasing.delegates`, `purchasing.report`) and the
   on-demand answer carries each tab's entry key, so they can be starred, chosen as phone slots and
-  start pages like every other tab. Empty, it offers up to four recently visited pages (`localStorage`
+  start pages like every other tab — but only by a member who may open them. Each entry requires
+  its surface switch and its own capability flag of the layout read (ADR-0282, Amendment 1):
+
+  | Entry | Capability flag | True when the surface is on and the caller |
+  |---|---|---|
+  | `supply.incoming` | `canViewSupplyIncoming` | manages (lead or Logistician), or as an admin reaches, an active unit that accepts donations |
+  | `supply.stats` | `canViewSupplyStats` | belongs to the governing leadership or manages at least one unit (the gate of the statistics read, REQ-SUP-013) |
+  | `purchasing.partners` | `canViewPurchasingPartners` | is an active trade delegate or the governing leadership |
+  | `purchasing.delegates` | `canViewPurchasingDelegates` | is the governing leadership |
+  | `purchasing.report` | `canViewPurchasingReport` | is a delegate, the governing leadership, bank staff or a unit manager (REQ-PUR-023) |
+
+  The tab bars of „Bedarf & Spenden" and „Ankauf" and the on-demand quick-access answer read the
+  same flags, so the navigation, the tab bars and the quick access offer the same tabs. Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
   anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
@@ -1750,6 +1762,13 @@ their filter query; in-place requests and sub-paths are not redirected) ·
 `NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
 `PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
+`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeControllerTest` (each tab flag
+positive and negative, none while its surface is off) · `MeLayoutSingleTransactionTest` (the tab
+flags add no statement per unit) · `NavigationAdvicePromotionFlagsTest`, `NavigationFlagTest` (the
+flags and their user-wide rule) · `NavigationDataTabGateMvcTest` (the start-page select and the
+favourites offer a tab only with its flag; a lost one is deleted while its surface is on) ·
+`NavigationDataTabGateE2eTest` (a plain member is not offered „Bericht" as a start page, a trade
+delegate is) ·
 `:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
 `Ctrl+K`, tolerant and search-term matching, the create-mission and administration actions, admin
 mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
@@ -2427,6 +2446,8 @@ optimistic-lock version, so an edit in one never 409s another:
   promotion pages for a member when none is among their units or reach (`canUsePromotionAnywhere`,
   REQ-PROMO-004); a right that
   does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
+  five supply and purchasing tabs of REQ-UI-026 are lost when their flag is off while their
+  surface is on; the
   switches of the installation and the page, and a capability read that failed, delete nothing.
   The stored start pages of both modes are checked like every other stored key. Dashboard widgets
   follow the same classification: an instance whose gate (roles and flags) the member lost user-wide

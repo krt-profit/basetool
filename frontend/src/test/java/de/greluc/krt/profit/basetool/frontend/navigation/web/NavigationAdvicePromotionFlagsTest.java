@@ -26,13 +26,17 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvic
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 
-/** Unit tests of the promotion flags {@link NavigationAdvice#access} derives from capabilities. */
+/**
+ * Unit tests of the promotion and data-tab flags {@link NavigationAdvice#access} derives from
+ * capabilities.
+ */
 class NavigationAdvicePromotionFlagsTest {
 
   private NavigationAdvice advice;
@@ -59,7 +63,7 @@ class NavigationAdvicePromotionFlagsTest {
     CapabilitiesResponse officerOfDisabledUnitsOnly =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, true, true, false, true, true, true,
-            true, false, false);
+            true, false, false, false, false, false, false, false);
 
     assertThat(accessFor(officerOfDisabledUnitsOnly).flags())
         .contains(NavigationFlag.OFFICER_ANYWHERE, NavigationFlag.OPEN_LEITUNG)
@@ -75,11 +79,39 @@ class NavigationAdvicePromotionFlagsTest {
     CapabilitiesResponse pinnedToDisabled =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, false, false, false, false, false,
-            false, true, true, true);
+            false, true, true, true, false, false, false, false, false);
 
     assertThat(accessFor(pinnedToDisabled).flags())
         .contains(NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE, NavigationFlag.PROMOTION_ANYWHERE)
         .doesNotContain(NavigationFlag.MANAGE_PROMOTIONS);
+  }
+
+  @Test
+  @DisplayName("each supply and purchasing tab flag follows its own capability")
+  void eachDataTabFlagFollowsItsOwnCapability() {
+    assertThat(accessFor(LayoutResponses.tabs(true, false, false, false, false)).flags())
+        .contains(NavigationFlag.SUPPLY_INCOMING)
+        .doesNotContain(
+            NavigationFlag.SUPPLY_STATS,
+            NavigationFlag.PURCHASING_PARTNERS,
+            NavigationFlag.PURCHASING_DELEGATES,
+            NavigationFlag.PURCHASING_REPORT);
+    assertThat(accessFor(LayoutResponses.tabs(false, true, false, true, false)).flags())
+        .contains(NavigationFlag.SUPPLY_STATS, NavigationFlag.PURCHASING_DELEGATES)
+        .doesNotContain(
+            NavigationFlag.SUPPLY_INCOMING,
+            NavigationFlag.PURCHASING_PARTNERS,
+            NavigationFlag.PURCHASING_REPORT);
+    assertThat(accessFor(LayoutResponses.tabs(false, false, true, false, true)).flags())
+        .contains(NavigationFlag.PURCHASING_PARTNERS, NavigationFlag.PURCHASING_REPORT)
+        .doesNotContain(NavigationFlag.SUPPLY_INCOMING, NavigationFlag.SUPPLY_STATS);
+    assertThat(accessFor(CapabilitiesResponse.NONE).flags())
+        .doesNotContain(
+            NavigationFlag.SUPPLY_INCOMING,
+            NavigationFlag.SUPPLY_STATS,
+            NavigationFlag.PURCHASING_PARTNERS,
+            NavigationFlag.PURCHASING_DELEGATES,
+            NavigationFlag.PURCHASING_REPORT);
   }
 
   @Test

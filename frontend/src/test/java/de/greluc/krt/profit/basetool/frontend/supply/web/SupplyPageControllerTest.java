@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyStatsDto;
 import java.util.List;
@@ -48,14 +48,15 @@ class SupplyPageControllerTest {
   @Mock private SupplyBackendClient supplyClient;
   @Mock private SupplyFeatureState featureState;
   @Mock private QualityTierCatalog qualityTierCatalog;
-  @Mock private FrontendAuthHelperService authHelper;
+  @Mock private LayoutContextLoader layoutContextLoader;
 
   private SupplyPageController controller;
 
   @BeforeEach
   void setUp() {
     controller =
-        new SupplyPageController(supplyClient, featureState, qualityTierCatalog, authHelper);
+        new SupplyPageController(
+            supplyClient, featureState, qualityTierCatalog, layoutContextLoader);
   }
 
   @Test
