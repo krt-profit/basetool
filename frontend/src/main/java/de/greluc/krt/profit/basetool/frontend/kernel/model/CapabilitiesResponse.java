@@ -83,7 +83,9 @@ public record CapabilitiesResponse(
 
   /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
   public static final CapabilitiesResponse NONE =
-      new CapabilitiesResponse(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false);
+      new CapabilitiesResponse(
+          false, false, false, false, false, false, false, false, false, false, false, false, false,
+          false, false, false, false, false, false, false, false);
 
   /**
    * Every role-derived capability on, as an admin passes each gate; the server switch, the tab
@@ -93,6 +95,27 @@ public record CapabilitiesResponse(
    * @return the admin's capability flags
    */
   public static CapabilitiesResponse admin(CapabilitiesResponse backend) {
-    return new CapabilitiesResponse(true, true, true, true, true, true, backend.canMarkStolen(), true, true, true, true, true, true, backend.canViewSupplyIncoming(), backend.canViewSupplyStats(), backend.canViewPurchasingPartners(), backend.canViewPurchasingDelegates(), backend.canViewPurchasingReport(), backend.canViewBankStaff(), backend.canManageBank(), true);
+    return new CapabilitiesResponse(
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        backend.canMarkStolen(),
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        backend.canViewSupplyIncoming(),
+        backend.canViewSupplyStats(),
+        backend.canViewPurchasingPartners(),
+        backend.canViewPurchasingDelegates(),
+        backend.canViewPurchasingReport(),
+        backend.canViewBankStaff(),
+        backend.canManageBank(),
+        true);
   }
 }

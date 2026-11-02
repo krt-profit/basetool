@@ -26,8 +26,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests of {@link NavigationFlag#holdsUserWide}: when a context-bound or data-tab right is lost
- * for good.
+ * Unit tests of {@link NavigationFlag#holdsUserWide}: when a context-bound or data-tab right is
+ * lost for good.
  */
 class NavigationFlagTest {
 

@@ -66,7 +66,28 @@ public final class LayoutResponses {
     return new MeLayoutResponse(
         null,
         List.of(),
-        new CapabilitiesResponse(false, canViewJobOrders, canViewOwnJobOrders, canViewAssignedJobOrders, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
+        new CapabilitiesResponse(
+            false,
+            canViewJobOrders,
+            canViewOwnJobOrders,
+            canViewAssignedJobOrders,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false),
         0L);
   }
 
@@ -84,7 +105,28 @@ public final class LayoutResponses {
       boolean canViewJobOrders,
       boolean canViewOwnJobOrders,
       boolean canMarkStolen) {
-    return new CapabilitiesResponse(canSeeBlueprintOverview, canViewJobOrders, canViewOwnJobOrders, false, false, false, canMarkStolen, false, false, false, false, false, false, false, false, false, false, false, false, false, false);
+    return new CapabilitiesResponse(
+        canSeeBlueprintOverview,
+        canViewJobOrders,
+        canViewOwnJobOrders,
+        false,
+        false,
+        false,
+        canMarkStolen,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
   }
 
   /**
@@ -94,7 +136,9 @@ public final class LayoutResponses {
    * @return the capability flags
    */
   public static CapabilitiesResponse missionManager() {
-    return new CapabilitiesResponse(false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false);
+    return new CapabilitiesResponse(
+        false, false, false, false, false, true, false, false, false, false, false, false, false,
+        false, false, false, false, false, false, false, false);
   }
 
   /**
@@ -114,7 +158,28 @@ public final class LayoutResponses {
    * @return the capability flags
    */
   public static CapabilitiesResponse logistician(boolean canMarkStolen) {
-    return new CapabilitiesResponse(false, false, false, false, true, false, canMarkStolen, false, false, false, false, false, false, false, false, false, false, false, false, false, false);
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        canMarkStolen,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
   }
 
   /**
@@ -133,7 +198,28 @@ public final class LayoutResponses {
       boolean purchasingPartners,
       boolean purchasingDelegates,
       boolean purchasingReport) {
-    return new CapabilitiesResponse(false, false, false, false, false, false, false, false, false, false, false, false, false, supplyIncoming, supplyStats, purchasingPartners, purchasingDelegates, purchasingReport, false, false, false);
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        supplyIncoming,
+        supplyStats,
+        purchasingPartners,
+        purchasingDelegates,
+        purchasingReport,
+        false,
+        false,
+        false);
   }
 
   /**
@@ -169,7 +255,28 @@ public final class LayoutResponses {
   }
 
   private static CapabilitiesResponse officerCaps(boolean officerHere) {
-    return new CapabilitiesResponse(false, false, false, false, false, false, false, officerHere, officerHere, officerHere, officerHere, officerHere, officerHere, false, false, false, false, false, false, false, false);
+    return new CapabilitiesResponse(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        officerHere,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false);
   }
 
   /**
