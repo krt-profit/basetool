@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
-
 import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankAccountsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankVisibleAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.web.BankSparkline;
@@ -31,8 +29,9 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.StockLevelDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentController;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentGetMapping;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,8 +42,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -54,8 +51,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * central error mapping and shows that widget's error state.
  */
 @Controller
-@UsesLayoutModel
-@RequestMapping("/dashboard/widgets")
+@FragmentController("/dashboard/widgets")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class DashboardWorkWidgetController {
@@ -79,7 +75,7 @@ public class DashboardWorkWidgetController {
    * @return the {@code assignedOrders} fragment
    */
   @NotNull
-  @GetMapping(value = "/assigned-orders", headers = AJAX)
+  @FragmentGetMapping("/assigned-orders")
   public String assignedOrders(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
@@ -106,7 +102,7 @@ public class DashboardWorkWidgetController {
    * @return the {@code lowStock} fragment
    */
   @NotNull
-  @GetMapping(value = "/low-stock", headers = AJAX)
+  @FragmentGetMapping("/low-stock")
   public String lowStock(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -129,7 +125,7 @@ public class DashboardWorkWidgetController {
    * @return the {@code bank} fragment
    */
   @NotNull
-  @GetMapping(value = "/bank", headers = AJAX)
+  @FragmentGetMapping("/bank")
   public String bank(@NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<OrgUnitBankVisibleAccountDto> page =
         bankClient.firstPage(options.rows(DashboardWidgetType.BANK, rows));

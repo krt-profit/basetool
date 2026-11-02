@@ -19,15 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
-
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentController;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentGetMapping;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.web.RefineryProgress;
@@ -39,8 +38,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -50,8 +47,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * by the central error mapping and shows that widget's error state.
  */
 @Controller
-@UsesLayoutModel
-@RequestMapping("/dashboard/widgets")
+@FragmentController("/dashboard/widgets")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class DashboardOrderWidgetController {
@@ -77,7 +73,7 @@ public class DashboardOrderWidgetController {
    * @return the {@code ordersToProcess} fragment
    */
   @NotNull
-  @GetMapping(value = "/orders-to-process", headers = AJAX)
+  @FragmentGetMapping("/orders-to-process")
   public String ordersToProcess(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -103,7 +99,7 @@ public class DashboardOrderWidgetController {
    * @return the {@code materialDemand} fragment
    */
   @NotNull
-  @GetMapping(value = "/material-demand", headers = AJAX)
+  @FragmentGetMapping("/material-demand")
   public String materialDemand(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -125,7 +121,7 @@ public class DashboardOrderWidgetController {
    * @return the {@code refineryReady} fragment
    */
   @NotNull
-  @GetMapping(value = "/refinery-ready", headers = AJAX)
+  @FragmentGetMapping("/refinery-ready")
   public String refineryReady(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<RefineryOrderListDto> page =

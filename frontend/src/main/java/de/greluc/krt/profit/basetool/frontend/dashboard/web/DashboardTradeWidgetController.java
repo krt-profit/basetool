@@ -19,14 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
-
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentController;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.FragmentGetMapping;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
@@ -44,8 +43,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -55,8 +52,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * state.
  */
 @Controller
-@UsesLayoutModel
-@RequestMapping("/dashboard/widgets")
+@FragmentController("/dashboard/widgets")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class DashboardTradeWidgetController {
@@ -90,7 +86,7 @@ public class DashboardTradeWidgetController {
    * @return the {@code market} fragment
    */
   @NotNull
-  @GetMapping(value = "/market", headers = AJAX)
+  @FragmentGetMapping("/market")
   public String market(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
@@ -131,7 +127,7 @@ public class DashboardTradeWidgetController {
    * @return the {@code supplyNeeds} fragment
    */
   @NotNull
-  @GetMapping(value = "/supply-needs", headers = AJAX)
+  @FragmentGetMapping("/supply-needs")
   public String supplyNeeds(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -171,7 +167,7 @@ public class DashboardTradeWidgetController {
    * @return the {@code bankRequests} fragment
    */
   @NotNull
-  @GetMapping(value = "/bank-requests", headers = AJAX)
+  @FragmentGetMapping("/bank-requests")
   public String bankRequests(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
