@@ -38365,6 +38365,121 @@
         "x-domain" : "mission"
       }
     },
+    "/api/v1/navigation/dashboard-widgets" : {
+      "get" : {
+        "operationId" : "readDashboardCatalogue",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DashboardCatalogueResponse"
+                }
+              }
+            },
+            "description" : "The catalogue.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Read the dashboard widget catalogue.",
+        "tags" : [ "navigation" ],
+        "x-domain" : "navigation"
+      }
+    },
     "/api/v1/navigation/dashboards/{mode}" : {
       "delete" : {
         "operationId" : "resetDashboard",
@@ -84815,6 +84930,45 @@
         },
         "required" : [ "channel", "contactVia", "kind", "name" ]
       },
+      "DashboardCatalogueResponse" : {
+        "type" : "object",
+        "properties" : {
+          "dayChoices" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          "rangeChoices" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          "rowChoices" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          "statusChoices" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "BOTH", "OFFERS", "REQUESTS", "ALL_OPEN", "UNCOVERED", "PARTIAL", "DECIDED" ]
+            }
+          },
+          "widgets" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DashboardWidgetDescriptor"
+            }
+          }
+        }
+      },
       "DashboardLayoutItem" : {
         "type" : "object",
         "properties" : {
@@ -84913,6 +85067,52 @@
             "items" : {
               "$ref" : "#/components/schemas/DashboardWidgetResponse"
             }
+          }
+        }
+      },
+      "DashboardWidgetDescriptor" : {
+        "type" : "object",
+        "properties" : {
+          "defaultColumn" : {
+            "type" : "string",
+            "enum" : [ "WIDE", "NARROW" ]
+          },
+          "defaultDays" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "defaultRows" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "defaultStatus" : {
+            "type" : "string",
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "BOTH", "OFFERS", "REQUESTS", "ALL_OPEN", "UNCOVERED", "PARTIAL", "DECIDED" ]
+          },
+          "inDefault" : {
+            "type" : "boolean"
+          },
+          "mode" : {
+            "type" : "string",
+            "enum" : [ "MEMBER", "ADMIN" ]
+          },
+          "options" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "UNIT", "DAYS", "RANGE", "ROWS", "STATUS" ]
+            }
+          },
+          "statuses" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "BOTH", "OFFERS", "REQUESTS", "ALL_OPEN", "UNCOVERED", "PARTIAL", "DECIDED" ]
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MATERIAL_DEMAND", "REFINERY_READY", "MARKET", "SUPPLY_NEEDS", "BANK_REQUESTS" ]
           }
         }
       },

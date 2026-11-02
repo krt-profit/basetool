@@ -23,8 +23,10 @@ import static de.greluc.krt.profit.basetool.backend.navigation.internal.Dashboar
 import static de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptions.DEFAULT_DAYS;
 import static de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptions.DEFAULT_ROWS;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -34,8 +36,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The widget types the store accepts, with the mode each belongs to, its place in the mode's
- * default, the options it offers and their defaults (REQ-UI-034). A new type or option is a change
- * to the spec's catalogue table.
+ * default, the options it offers and their defaults (REQ-UI-034). This enum is the one catalogue:
+ * the frontend reads it through {@link DashboardCatalogueResponse}. A new type or option is a
+ * change to the spec's catalogue table.
  */
 @Getter
 public enum DashboardWidgetType {
@@ -71,7 +74,7 @@ public enum DashboardWidgetType {
       true,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
       DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.UNREAD),
-      EnumSet.of(DashboardStatus.UNREAD, DashboardStatus.ALL)),
+      ordered(DashboardStatus.UNREAD, DashboardStatus.ALL)),
 
   /** The member's next missions: those of the own units and those the member is signed up for. */
   NEXT_MISSION(
@@ -136,7 +139,7 @@ public enum DashboardWidgetType {
       false,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
       DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.OPEN_ACTIVE),
-      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+      ordered(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
   /** The minimum stock levels that are low, emptiest first. */
   LOW_STOCK(
@@ -161,7 +164,7 @@ public enum DashboardWidgetType {
       false,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
       DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.OPEN_ACTIVE),
-      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+      ordered(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
   /** The open material demand across the visible orders, the largest gap first. */
   MATERIAL_DEMAND(
@@ -186,7 +189,7 @@ public enum DashboardWidgetType {
       false,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
       DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.BOTH),
-      EnumSet.of(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
+      ordered(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
 
   /** The open supply needs, optionally the uncovered or partly covered ones. */
   SUPPLY_NEEDS(
@@ -195,7 +198,7 @@ public enum DashboardWidgetType {
       false,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
       DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.ALL_OPEN),
-      EnumSet.of(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
+      ordered(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
 
   /** The member's own bank requests: pending, decided or all. */
   BANK_REQUESTS(
@@ -204,16 +207,16 @@ public enum DashboardWidgetType {
       false,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
       DashboardOptions.ofRowsAndStatus(DEFAULT_BANK_ROWS, DashboardStatus.OPEN),
-      EnumSet.of(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
+      ordered(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */
-  public static final Set<Integer> DAY_CHOICES = Set.of(3, 7, 14);
+  public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);
 
   /** The day counts a widget with the {@link DashboardOption#RANGE} option accepts. */
-  public static final Set<Integer> RANGE_CHOICES = Set.of(1, 7, 30);
+  public static final List<Integer> RANGE_CHOICES = List.of(1, 7, 30);
 
   /** The row counts a widget with the {@link DashboardOption#ROWS} option accepts. */
-  public static final Set<Integer> ROW_CHOICES = Set.of(3, 5, 10);
+  public static final List<Integer> ROW_CHOICES = List.of(3, 5, 10);
 
   private final DashboardMode mode;
   private final DashboardColumn defaultColumn;
@@ -244,6 +247,16 @@ public enum DashboardWidgetType {
     this.options = options;
     this.defaults = defaults;
     this.statuses = statuses;
+  }
+
+  /**
+   * The status choices of a widget in the order its options dialog lists them.
+   *
+   * @param choices the statuses in display order
+   * @return an immutable set that iterates in that order
+   */
+  private static @NotNull Set<DashboardStatus> ordered(@NotNull DashboardStatus... choices) {
+    return Collections.unmodifiableSet(new LinkedHashSet<>(List.of(choices)));
   }
 
   /**

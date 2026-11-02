@@ -1,0 +1,207 @@
+{
+  "dayChoices" : [ 3, 7, 14 ],
+  "rangeChoices" : [ 1, 7, 30 ],
+  "rowChoices" : [ 3, 5, 10 ],
+  "statusChoices" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "BOTH", "OFFERS", "REQUESTS", "ALL_OPEN", "UNCOVERED", "PARTIAL", "DECIDED" ],
+  "widgets" : [ {
+    "type" : "UPCOMING_DAYS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "WIDE",
+    "inDefault" : true,
+    "options" : [ "UNIT", "DAYS", "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : 7,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "INFORMATION",
+    "mode" : "MEMBER",
+    "defaultColumn" : "WIDE",
+    "inDefault" : true,
+    "options" : [ ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : null,
+    "defaultStatus" : null
+  }, {
+    "type" : "FAVOURITES",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : true,
+    "options" : [ ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : null,
+    "defaultStatus" : null
+  }, {
+    "type" : "NOTIFICATIONS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : true,
+    "options" : [ "ROWS", "STATUS" ],
+    "statuses" : [ "UNREAD", "ALL" ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : "UNREAD"
+  }, {
+    "type" : "NEXT_MISSION",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "HANGAR_READINESS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : null,
+    "defaultStatus" : null
+  }, {
+    "type" : "ADMIN_HUB",
+    "mode" : "ADMIN",
+    "defaultColumn" : "WIDE",
+    "inDefault" : true,
+    "options" : [ ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : null,
+    "defaultStatus" : null
+  }, {
+    "type" : "DELETION_REQUESTS",
+    "mode" : "ADMIN",
+    "defaultColumn" : "NARROW",
+    "inDefault" : true,
+    "options" : [ "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "DISCORD_REGISTRATIONS",
+    "mode" : "ADMIN",
+    "defaultColumn" : "NARROW",
+    "inDefault" : true,
+    "options" : [ "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "SYNC_STATUS",
+    "mode" : "ADMIN",
+    "defaultColumn" : "NARROW",
+    "inDefault" : true,
+    "options" : [ "RANGE" ],
+    "statuses" : [ ],
+    "defaultDays" : 7,
+    "defaultRows" : null,
+    "defaultStatus" : null
+  }, {
+    "type" : "OPEN_TERMS",
+    "mode" : "ADMIN",
+    "defaultColumn" : "NARROW",
+    "inDefault" : true,
+    "options" : [ "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "ASSIGNED_ORDERS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "ROWS", "STATUS" ],
+    "statuses" : [ "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : "OPEN_ACTIVE"
+  }, {
+    "type" : "LOW_STOCK",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "UNIT", "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "BANK",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 3,
+    "defaultStatus" : null
+  }, {
+    "type" : "ORDERS_TO_PROCESS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "UNIT", "ROWS", "STATUS" ],
+    "statuses" : [ "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : "OPEN_ACTIVE"
+  }, {
+    "type" : "MATERIAL_DEMAND",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "UNIT", "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "REFINERY_READY",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "ROWS" ],
+    "statuses" : [ ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : null
+  }, {
+    "type" : "MARKET",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "ROWS", "STATUS" ],
+    "statuses" : [ "BOTH", "OFFERS", "REQUESTS" ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : "BOTH"
+  }, {
+    "type" : "SUPPLY_NEEDS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "UNIT", "ROWS", "STATUS" ],
+    "statuses" : [ "ALL_OPEN", "UNCOVERED", "PARTIAL" ],
+    "defaultDays" : null,
+    "defaultRows" : 5,
+    "defaultStatus" : "ALL_OPEN"
+  }, {
+    "type" : "BANK_REQUESTS",
+    "mode" : "MEMBER",
+    "defaultColumn" : "NARROW",
+    "inDefault" : false,
+    "options" : [ "ROWS", "STATUS" ],
+    "statuses" : [ "OPEN", "DECIDED", "ALL" ],
+    "defaultDays" : null,
+    "defaultRows" : 3,
+    "defaultStatus" : "OPEN"
+  } ]
+}
