@@ -198,7 +198,9 @@ import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.privacy.api.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
@@ -608,6 +610,8 @@ class ArchitectureTest {
           InventoryAggregationService.class,
           InventoryCheckoutService.class,
           RefineryOrderService.class,
+          RefineryOrderQueryService.class,
+          RefineryOrderStoreService.class,
           HangarService.class,
           OperationService.class,
           JobOrderService.class,

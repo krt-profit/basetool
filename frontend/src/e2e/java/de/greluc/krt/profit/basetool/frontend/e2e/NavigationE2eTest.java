@@ -808,6 +808,36 @@ class NavigationE2eTest {
         });
   }
 
+  /** After a menu refresh the preserved avatar still opens its flyout on Enter and on click. */
+  @Test
+  void theAvatarFlyoutOpensAfterTheMenuRefreshed() {
+    run(
+        1440,
+        900,
+        "nav-rail-avatar-refresh",
+        page -> {
+          try {
+            chooseMode(page, "rail");
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            page.evaluate("() => document.dispatchEvent(new CustomEvent('krt:nav-rendered'))");
+            Locator avatar = page.getByTestId("nav-rail-avatar");
+            Locator flyout = page.locator("#nav-rail-flyout-avatar");
+
+            avatar.focus();
+            page.keyboard().press("Enter");
+            assertThat(flyout).isVisible();
+            assertThat(avatar).hasAttribute("aria-expanded", "true");
+            page.keyboard().press("Escape");
+            assertThat(flyout).isHidden();
+
+            avatar.click();
+            assertThat(flyout).isVisible();
+          } finally {
+            chooseMode(page, "drawer");
+          }
+        });
+  }
+
   /**
    * Runs one scenario in a fresh authenticated context of the given viewport, dumping the page when
    * it fails.

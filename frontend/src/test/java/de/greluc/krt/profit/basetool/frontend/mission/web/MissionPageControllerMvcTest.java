@@ -825,7 +825,8 @@ class MissionPageControllerMvcTest {
             null,
             Collections.emptyList(),
             null,
-            1L);
+            1L,
+            null);
     long expectedEndsAtMillis = order.getEndsAt().toEpochMilli();
 
     MissionDto mission =

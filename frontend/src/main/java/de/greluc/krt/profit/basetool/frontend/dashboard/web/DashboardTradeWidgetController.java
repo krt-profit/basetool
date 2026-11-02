@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
-import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
@@ -72,13 +72,18 @@ public class DashboardTradeWidgetController {
 
   private static final String NEED_OPEN = "OPEN";
 
-  private static final String REQUEST_PENDING = "PENDING";
+  /** The request states "Offen" asks the backend for. */
+  private static final List<String> REQUESTS_OPEN = List.of("PENDING");
+
+  /** The request states "Entschieden" asks for: decided, rejected and withdrawn. */
+  private static final List<String> REQUESTS_DECIDED =
+      List.of("CONFIRMED", "REJECTED", "CANCELLED");
 
   private final MaterialExchangeBackendClient marketClient;
 
   private final SupplyBackendClient supplyClient;
 
-  private final BankBackendClient bankClient;
+  private final OrgUnitBankRequestsBackendClient bankRequestsClient;
 
   private final OwnOrgUnits ownOrgUnits;
 
@@ -183,25 +188,18 @@ public class DashboardTradeWidgetController {
     DashboardStatus resolved =
         DashboardWidgetOptions.statusOf(
             DashboardWidgetType.BANK_REQUESTS, status, DashboardStatus.OPEN);
-    List<BankBookingRequestDto> own = bankClient.ownOrgUnitRequests();
-    List<BankBookingRequestDto> matching =
-        (own == null ? List.<BankBookingRequestDto>of() : own)
-            .stream().filter(request -> matches(resolved, request)).toList();
-    model.addAttribute(
-        "bankRequestRows",
-        matching.stream()
-            .limit(DashboardWidgetOptions.rows(rows, BANK_REQUESTS_DEFAULT_ROWS))
-            .toList());
-    model.addAttribute("bankRequestTotal", matching.size());
+    PageResponse<BankBookingRequestDto> own =
+        bankRequestsClient.ownPage(
+            requestStates(resolved), DashboardWidgetOptions.rows(rows, BANK_REQUESTS_DEFAULT_ROWS));
+    model.addAttribute("bankRequestRows", own == null ? List.of() : own.content());
+    model.addAttribute("bankRequestTotal", own == null ? 0 : own.totalElements());
     return FRAGMENTS + "bankRequests";
   }
 
-  private static boolean matches(
-      @NotNull DashboardStatus status, @NotNull BankBookingRequestDto request) {
-    boolean pending = REQUEST_PENDING.equals(request.status());
+  private static List<String> requestStates(@NotNull DashboardStatus status) {
     if (status == DashboardStatus.OPEN) {
-      return pending;
+      return REQUESTS_OPEN;
     }
-    return status != DashboardStatus.DECIDED || !pending;
+    return status == DashboardStatus.DECIDED ? REQUESTS_DECIDED : List.of();
   }
 }

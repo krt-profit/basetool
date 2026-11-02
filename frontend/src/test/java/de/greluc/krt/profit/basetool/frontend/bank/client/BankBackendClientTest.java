@@ -320,16 +320,12 @@ class BankBackendClientTest {
   void orgUnitReads() {
     backend.answerJson("[]");
     backend.answerJson("[]");
-    backend.answerJson("[]");
-    backend.answerJson("[]");
     backend.answerJson("{}");
     backend.answerJson("{}");
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson("{}");
 
     assertThat(client.orgUnitBalances()).isEmpty();
-    assertThat(client.ownOrgUnitRequests()).isEmpty();
-    assertThat(client.foreignOrgUnitRequests()).isEmpty();
     assertThat(client.orgUnitTransferTargets()).isEmpty();
     client.orgUnitAccount(ID);
     client.orgUnitAccountSettings(ID);
@@ -338,8 +334,6 @@ class BankBackendClientTest {
 
     String account = "/api/v1/bank/org-units/accounts/" + ID;
     backend.expect("GET", "/api/v1/bank/org-units/balances");
-    backend.expect("GET", "/api/v1/bank/org-units/requests");
-    backend.expect("GET", "/api/v1/bank/org-units/requests/foreign");
     backend.expect("GET", "/api/v1/bank/org-units/transfer-targets");
     backend.expect("GET", account);
     backend.expect("GET", account + "/settings");

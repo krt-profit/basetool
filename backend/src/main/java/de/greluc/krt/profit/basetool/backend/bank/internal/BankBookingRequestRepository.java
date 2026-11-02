@@ -74,11 +74,14 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   Optional<BankBookingRequest> findByIdForUpdate(@Param("id") UUID id);
 
   /**
-   * The requester's own requests, most-recent first — the officer/lead "my requests" list
-   * (REQ-BANK-022). Per-user isolation: callers only ever pass their own {@code sub}.
+   * Returns one page of the requester's own requests in any of the given states, the "my requests"
+   * list (REQ-BANK-022). Per-user isolation: callers only ever pass their own {@code sub}. An empty
+   * status collection yields an empty page.
    *
    * @param requestedBy the requesting user's id
-   * @return the requester's requests, newest first
+   * @param statuses the lifecycle states to include (any-of)
+   * @param pageable page, size and whitelisted sort
+   * @return one page of the requester's requests in any of those states
    */
   @EntityGraph(
       attributePaths = {
@@ -89,7 +92,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "holder.user",
         "resultingTransaction"
       })
-  List<BankBookingRequest> findByRequestedByOrderByCreatedAtDesc(UUID requestedBy);
+  Page<BankBookingRequest> findByRequestedByAndStatusIn(
+      UUID requestedBy, Collection<BankBookingRequestStatus> statuses, Pageable pageable);
 
   /**
    * Returns one page of requests in the given state across all accounts, the management/admin

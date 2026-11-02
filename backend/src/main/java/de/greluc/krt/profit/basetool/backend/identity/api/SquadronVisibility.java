@@ -42,20 +42,10 @@ public interface SquadronVisibility {
   boolean canSeeSquadron(@NotNull UUID squadronId);
 
   /**
-   * The Staffel ids the admin user list, the search and the promotion queries filter on.
+   * The Staffel ids the admin user list and the search filter on.
    *
    * @return the id set, or {@code null} for the unfiltered all-scope of admins and leadership
    */
   @Nullable
   Set<UUID> currentUserListScopeSquadronIds();
-
-  /**
-   * The Staffel ids whose members the caller may evaluate and manage as an officer, narrowed to the
-   * pinned unit and never wider than the caller's officer reach.
-   *
-   * @return the id set, empty without officer reach, or {@code null} for the unrestricted admin
-   *     scope
-   */
-  @Nullable
-  Set<UUID> currentOfficerReadScope();
 }

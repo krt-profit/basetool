@@ -41,8 +41,10 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPol
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapper;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
 import java.time.Instant;
 import java.util.List;
@@ -70,6 +72,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class RefineryOrderControllerTest {
 
   @Mock private RefineryOrderService service;
+  @Mock private RefineryOrderQueryService queryService;
+  @Mock private RefineryOrderStoreService storeService;
   @Mock private UserService userService;
   @Mock private RefineryOrderMapper mapper;
   @Mock private RefineryAccessPolicy refineryAccessPolicy;
@@ -92,7 +96,7 @@ class RefineryOrderControllerTest {
     @Test
     void logistician_routesToTheExistingOwner() {
       RefineryOrder existing = newOrder(OTHER_USER_ID);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -120,7 +124,7 @@ class RefineryOrderControllerTest {
     void logisticianWithNoOwnerAnywhere_fallsBackToCaller() {
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -143,7 +147,7 @@ class RefineryOrderControllerTest {
     @Test
     void nonLogistician_andCallerIsOwner_passesThrough() {
       RefineryOrder existing = newOrder(CALLER_ID);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -163,7 +167,7 @@ class RefineryOrderControllerTest {
     @Test
     void nonLogistician_andCallerIsNotOwner_throwsAccessDenied() {
       RefineryOrder existing = newOrder(OTHER_USER_ID);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -179,7 +183,7 @@ class RefineryOrderControllerTest {
     void nonLogistician_andExistingOwnerIsNull_throwsAccessDenied() {
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -263,9 +267,10 @@ class RefineryOrderControllerTest {
     void anyCaller_getsTheMissionOrdersOfTheirOwnAndOfTheirLogisticianUnits() {
       RefineryOrder order = new RefineryOrder();
       RefineryOrderListDto dto = mock(RefineryOrderListDto.class);
-      when(service.getMissionRefineryOrdersForCaller(missionId, CALLER_ID))
+      when(queryService.getMissionRefineryOrdersForCaller(missionId, CALLER_ID))
           .thenReturn(List.of(order));
-      when(mapper.toListDto(order)).thenReturn(dto);
+      when(refineryAccessPolicy.canEditRefineryOrder(order)).thenReturn(true);
+      when(mapper.toListDto(order, true)).thenReturn(dto);
 
       assertEquals(List.of(dto), controller.getMissionRefineryOrders(jwt, missionId));
     }
@@ -328,13 +333,13 @@ class RefineryOrderControllerTest {
 
       controller.storeMyRefineryOrder(jwt, ORDER_ID, dto);
 
-      verify(service).storeRefineryOrder(CALLER_ID, ORDER_ID, dto, false);
+      verify(storeService).storeRefineryOrder(CALLER_ID, ORDER_ID, dto, false);
     }
 
     @Test
     void getRefineryOrder_returnsMappedDto() {
       RefineryOrder order = newOrder(CALLER_ID);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(order);
+      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(order);
       RefineryOrderDto out = dto();
       when(mapper.toDto(eq(order), any())).thenReturn(out);
 
@@ -351,14 +356,14 @@ class RefineryOrderControllerTest {
     void getAllRefineryOrders_passesStatusesReadyQueryAndEndsAtSortToTheService() {
       List<RefineryOrderStatus> statuses =
           List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS);
-      when(service.getAllRefineryOrders(eq(statuses), eq(true), eq("laranite"), any()))
+      when(queryService.getAllRefineryOrders(eq(statuses), eq(true), eq("laranite"), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       PageResponse<RefineryOrderListDto> result =
           controller.getAllRefineryOrders(statuses, true, "laranite", 2, 10, "endsAt,asc");
 
       ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-      verify(service)
+      verify(queryService)
           .getAllRefineryOrders(eq(statuses), eq(true), eq("laranite"), pageable.capture());
       assertEquals(2, pageable.getValue().getPageNumber());
       assertEquals(10, pageable.getValue().getPageSize());
@@ -369,13 +374,13 @@ class RefineryOrderControllerTest {
 
     @Test
     void getAllRefineryOrders_absentReady_isFalseAndTheDefaultSortStaysStartedAt() {
-      when(service.getAllRefineryOrders(any(), eq(false), any(), any()))
+      when(queryService.getAllRefineryOrders(any(), eq(false), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       controller.getAllRefineryOrders(null, null, null, null, null, null);
 
       ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-      verify(service).getAllRefineryOrders(isNull(), eq(false), isNull(), pageable.capture());
+      verify(queryService).getAllRefineryOrders(isNull(), eq(false), isNull(), pageable.capture());
       assertEquals(
           Sort.by(Sort.Order.asc("startedAt"), Sort.Order.asc("id")),
           pageable.getValue().getSort());
@@ -383,12 +388,12 @@ class RefineryOrderControllerTest {
 
     @Test
     void getMyRefineryOrders_passesTheCallerReadyAndQueryToTheService() {
-      when(service.getMyRefineryOrders(eq(CALLER_ID), any(), eq(true), eq("ARC"), any()))
+      when(queryService.getMyRefineryOrders(eq(CALLER_ID), any(), eq(true), eq("ARC"), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       controller.getMyRefineryOrders(jwt, null, true, "ARC", 0, 50, "endsAt,asc");
 
-      verify(service).getMyRefineryOrders(eq(CALLER_ID), isNull(), eq(true), eq("ARC"), any());
+      verify(queryService).getMyRefineryOrders(eq(CALLER_ID), isNull(), eq(true), eq("ARC"), any());
     }
 
     @Test
@@ -396,7 +401,7 @@ class RefineryOrderControllerTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> controller.getMyRefineryOrders(jwt, null, null, null, 0, 50, "owner,asc"));
-      verify(service, never()).getMyRefineryOrders(any(), any(), anyBoolean(), any(), any());
+      verify(queryService, never()).getMyRefineryOrders(any(), any(), anyBoolean(), any(), any());
     }
   }
 

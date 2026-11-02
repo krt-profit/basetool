@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +44,7 @@ public class PromotionAccessPolicy {
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+  private final PromotionReach promotionReach;
 
   /**
    * Whether the per-squadron promotion feature flag is on for the caller's scope: the flag of the
@@ -66,31 +68,34 @@ public class PromotionAccessPolicy {
 
   /**
    * Resolves the squadrons a promotion read may touch, or nothing when the read shows nothing: the
-   * feature flag is off, a member has no read access, or an officer view has no officer reach.
-   * {@link PromotionReadView#MANAGEMENT} never reaches beyond the caller's officer reach, narrowed
-   * to the pinned unit (REQ-ROLE-007).
+   * feature flag is off, a member has no read access, or an officer view has no officer reach in a
+   * promotion-enabled unit. {@link PromotionReadView#MANAGEMENT} never reaches beyond the caller's
+   * officer reach in units with promotion enabled, narrowed to the pinned unit (REQ-ROLE-007); only
+   * an admin's management read depends on the active squadron's flag.
    *
    * @param view whose data the read shows
    * @return the readable squadrons, or empty when the read answers empty
    */
   public @NotNull Optional<PromotionReadScope> readScope(@NotNull PromotionReadView view) {
-    if (!isFeatureEnabledForCurrentScope()) {
-      return Optional.empty();
-    }
     return switch (view) {
       case MEMBER ->
-          hasReadAccess()
+          isFeatureEnabledForCurrentScope() && hasReadAccess()
               ? Optional.of(
                   new PromotionReadScope(
                       ownerScopeService.currentSquadronId().<Set<UUID>>map(Set::of).orElse(null)))
               : Optional.empty();
-      case MANAGEMENT -> {
-        Set<UUID> reach = ownerScopeService.currentOfficerReadScope();
-        yield reach != null && reach.isEmpty()
-            ? Optional.empty()
-            : Optional.of(new PromotionReadScope(reach));
-      }
+      case MANAGEMENT -> managementScope();
     };
+  }
+
+  private @NotNull Optional<PromotionReadScope> managementScope() {
+    if (authHelper.isAdmin() && !isFeatureEnabledForCurrentScope()) {
+      return Optional.empty();
+    }
+    Set<UUID> reach = promotionReach.currentManagementScope();
+    return reach != null && reach.isEmpty()
+        ? Optional.empty()
+        : Optional.of(new PromotionReadScope(reach));
   }
 
   /**
@@ -109,24 +114,29 @@ public class PromotionAccessPolicy {
 
   /**
    * Refuses the call unless the caller holds officer reach in the squadron that owns the promotion
-   * data being written; admins pass.
+   * data being written and the squadron has promotion enabled; admins pass.
    *
    * @param squadronId the owning squadron of the topic, category, level content or requirement
-   * @throws AccessDeniedException if the caller holds no officer reach in {@code squadronId}
+   * @throws AccessDeniedException if the caller holds no officer reach in {@code squadronId}, or
+   *     the squadron has promotion disabled
    */
   public void assertOfficerIn(@NotNull UUID squadronId) {
     if (!ownerScopeService.canActAsOfficerIn(squadronId)) {
       throw new AccessDeniedException("Caller holds no officer reach in the owning squadron");
     }
+    if (!authHelper.isAdmin() && !promotionReach.isEnabled(squadronId)) {
+      throw new AccessDeniedException("Promotion is disabled in the owning squadron");
+    }
   }
 
   /**
    * Refuses the call unless the caller may act on the member as an officer: admins pass, others
-   * need officer reach in at least one of the member's Staffeln (REQ-ORG-017).
+   * need officer reach in at least one of the member's Staffeln that has promotion enabled
+   * (REQ-ORG-017).
    *
    * @param userId the {@code app_user.id} of the member being evaluated; never {@code null}
    * @throws AccessDeniedException if the caller holds officer reach in none of the member's
-   *     Staffeln
+   *     promotion-enabled Staffeln
    */
   public void assertOfficerOverMember(@NotNull UUID userId) {
     if (authHelper.isAdmin()) {
@@ -134,7 +144,8 @@ public class PromotionAccessPolicy {
     }
     boolean reaches =
         orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId).stream()
-            .anyMatch(ownerScopeService::canActAsOfficerIn);
+            .anyMatch(
+                id -> ownerScopeService.canActAsOfficerIn(id) && promotionReach.isEnabled(id));
     if (!reaches) {
       throw new AccessDeniedException("Caller holds no officer reach over this member");
     }

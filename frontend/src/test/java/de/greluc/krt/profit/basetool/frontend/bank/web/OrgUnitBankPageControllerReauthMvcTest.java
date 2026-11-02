@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
@@ -48,7 +49,10 @@ class OrgUnitBankPageControllerReauthMvcTest {
   void setUp() {
     mockMvc =
         ReauthPageMvc.standalone(
-            new OrgUnitBankPageController(bankClient, new ParallelPageLoader()));
+            new OrgUnitBankPageController(
+                bankClient,
+                mock(OrgUnitBankRequestsBackendClient.class),
+                new ParallelPageLoader()));
     ReauthPageMvc.signInMember("KRT_MEMBER");
   }
 

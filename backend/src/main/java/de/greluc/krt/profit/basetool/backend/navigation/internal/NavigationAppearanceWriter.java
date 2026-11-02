@@ -118,7 +118,7 @@ public class NavigationAppearanceWriter {
 
   /**
    * Clears every start page that names one of the given keys, bumping the appearance version when
-   * one went.
+   * one went; the root lock is taken before the row is read, like every other write.
    *
    * @param userId the owner's {@code app_user.id}
    * @param keys the entry keys the member may no longer see
@@ -126,6 +126,9 @@ public class NavigationAppearanceWriter {
    */
   @Transactional
   public boolean prune(@NotNull UUID userId, @NotNull Collection<String> keys) {
+    if (preferences.lockByUserId(userId).isEmpty()) {
+      return false;
+    }
     Optional<NavigationAppearance> stored = appearances.findById(userId);
     if (stored.isEmpty() || !stored.get().clearStartPages(keys)) {
       return false;

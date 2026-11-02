@@ -74,23 +74,25 @@ public class SupplyQuickAccessContributor implements QuickAccessContributor {
     List<QuickAccessEntry> out = new ArrayList<>(2);
     if (tabs.incoming()) {
       out.add(
-          new QuickAccessEntry(
+          QuickAccessEntry.tab(
               "/supply/donations/incoming",
               "palette.page.supplyIncoming",
               CRUMB,
               ICON,
               "palette.keywords.supplyIncoming",
-              PAGE));
+              PAGE,
+              "supply.incoming"));
     }
     if (tabs.stats()) {
       out.add(
-          new QuickAccessEntry(
+          QuickAccessEntry.tab(
               "/supply/stats",
               "palette.page.supplyStats",
               CRUMB,
               ICON,
               "palette.keywords.supplyStats",
-              PAGE));
+              PAGE,
+              "supply.stats"));
     }
     return List.copyOf(out);
   }

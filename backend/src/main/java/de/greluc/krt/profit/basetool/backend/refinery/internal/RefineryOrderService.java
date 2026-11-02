@@ -22,65 +22,39 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilitySlice;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilityYieldSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYield;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD and completion (store) for refinery orders.
+ * Create, update and cancel for refinery orders; reads live in {@link RefineryOrderQueryService},
+ * completion (store) in {@link RefineryOrderStoreService}.
  *
  * <p>Only the owner or a logistician may edit an order, checked per resource. Orders may only
  * target locations that host a refinery.
@@ -88,7 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class RefineryOrderService implements CraftabilityYieldSource {
+public class RefineryOrderService {
 
   private final RefineryOrderRepository refineryOrderRepository;
   private final UserRepository userRepository;
@@ -97,219 +71,13 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   private final MissionParticipantRepository missionParticipantRepository;
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
-  private final JobOrderRepository jobOrderRepository;
-  private final JobOrderItemService jobOrderItemService;
-  private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
-  private final StockCommands stockCommands;
   private final AuditRecorder auditRecorder;
 
   /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
   private final ApplicationEventPublisher eventPublisher;
 
   private final UserService userService;
-
-  /**
-   * Owner-scoped paged list under the list filters (REQ-REFINERY-019).
-   *
-   * @param userId owner id
-   * @param statuses optional status filter; {@code null} or empty means every status
-   * @param readyOnly {@code true} to keep only orders whose end is unknown or has passed
-   * @param query optional free-text search; {@code null} or blank means no search
-   * @param pageable page request
-   * @return one page of the user's matching orders
-   */
-  public Page<RefineryOrder> getMyRefineryOrders(
-      @NotNull UUID userId,
-      @Nullable List<RefineryOrderStatus> statuses,
-      boolean readyOnly,
-      @Nullable String query,
-      @NotNull Pageable pageable) {
-    return refineryOrderRepository.findOwnedFiltered(
-        userId, statusesOrAll(statuses), readyOnly, Instant.now(), searchPattern(query), pageable);
-  }
-
-  /**
-   * The statuses a list filters on: the given ones, or every status when none is given.
-   *
-   * @param statuses the requested statuses, or {@code null}
-   * @return a non-empty status set
-   */
-  @NotNull
-  private static Set<RefineryOrderStatus> statusesOrAll(
-      @Nullable List<RefineryOrderStatus> statuses) {
-    if (statuses == null || statuses.isEmpty()) {
-      return EnumSet.allOf(RefineryOrderStatus.class);
-    }
-    return EnumSet.copyOf(statuses);
-  }
-
-  /**
-   * The LIKE pattern of a list search: the stripped, lower-cased text with its wildcards escaped,
-   * wrapped in {@code %…%}.
-   *
-   * @param query the search text, or {@code null}
-   * @return the pattern, or {@code null} for a {@code null} or blank query
-   */
-  @Nullable
-  static String searchPattern(@Nullable String query) {
-    String trimmed = StringNormalization.trimToNull(query);
-    return trimmed == null ? null : LikePatterns.contains(trimmed.toLowerCase(Locale.ROOT));
-  }
-
-  /**
-   * Lists a target user's refinery orders for the cross-user oversight endpoint, limited to the
-   * units in which the caller is Logistician.
-   *
-   * <p>The {@code @PreAuthorize} gate only checks a shared org unit; the per-row scope filter here
-   * hides orders stamped to units in which the caller is no Logistician.
-   *
-   * @param targetUserId the user whose orders to list; never {@code null}
-   * @param pageable page request
-   * @return the in-scope page of the target user's orders
-   */
-  public Page<RefineryOrder> getUserRefineryOrdersScoped(
-      @NotNull UUID targetUserId, @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentLogisticianScope();
-    return refineryOrderRepository.findByOwnerIdScoped(
-        targetUserId,
-        scope.adminAllScope(),
-        scope.activeOrgUnitId(),
-        scope.memberOrgUnitIds(),
-        pageable);
-  }
-
-  /**
-   * Sums the yield of the user's {@code OPEN} and {@code IN_PROGRESS} refinery orders into one SCU
-   * total per (output material, quality), for the craftability calculation.
-   *
-   * @param userId the owning user; never {@code null}
-   * @return one slice per (output material, quality), with the summed SCU yield; never {@code null}
-   */
-  @Override
-  @NotNull
-  public List<CraftabilitySlice> pendingYieldSlices(@NotNull UUID userId) {
-    List<RefineryOrder> orders =
-        refineryOrderRepository.findOwnedWithGoodsByStatusIn(
-            userId, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS));
-    Map<UUID, Map<Integer, Double>> pooled = new HashMap<>();
-    for (RefineryOrder order : orders) {
-      if (order.getGoods() == null) {
-        continue;
-      }
-      for (RefineryGood good : order.getGoods()) {
-        Material material = good.getOutputMaterial();
-        if (material == null
-            || material.getId() == null
-            || good.getOutputQuantity() == null
-            || good.getQuality() == null) {
-          continue;
-        }
-        double scu = toScu(good.getOutputQuantity(), material.getQuantityType());
-        if (scu <= 0.0d) {
-          continue;
-        }
-        pooled
-            .computeIfAbsent(material.getId(), _ -> new HashMap<>())
-            .merge(good.getQuality(), scu, Double::sum);
-      }
-    }
-    List<CraftabilitySlice> slices = new ArrayList<>();
-    pooled.forEach((materialId, byQuality) ->
-        byQuality.forEach(
-            (quality, scu) -> slices.add(new CraftabilitySlice(materialId, quality, scu))));
-    return slices;
-  }
-
-  /**
-   * Converts a refinery good's output quantity from units to SCU (100 units per SCU for SCU
-   * commodities; others unchanged).
-   *
-   * @param outputQuantityUnits the good's output quantity in units
-   * @param quantityType the output material's quantity type (may be {@code null})
-   * @return the equivalent amount in SCU
-   */
-  private static double toScu(int outputQuantityUnits, QuantityType quantityType) {
-    if (quantityType == QuantityType.SCU) {
-      return outputQuantityUnits / 100.0d;
-    }
-    return outputQuantityUnits;
-  }
-
-  /**
-   * Lists the refinery orders linked to a mission that the caller may see on the mission: their
-   * own, plus every order of the units in which they are Logistician (REQ-SEC-005).
-   *
-   * @param missionId mission id
-   * @param userId the caller's user id
-   * @return the caller's own orders and the orders of their Logistician units, each once
-   */
-  public List<RefineryOrder> getMissionRefineryOrdersForCaller(
-      @NotNull UUID missionId, @NotNull UUID userId) {
-    Map<UUID, RefineryOrder> byId = new LinkedHashMap<>();
-    ScopePredicate scope = ownerScopeService.currentLogisticianScope();
-    if (scope.adminAllScope()
-        || scope.activeOrgUnitId() != null
-        || !scope.memberOrgUnitIds().isEmpty()) {
-      refineryOrderRepository
-          .findByMissionIdScoped(
-              missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
-          .forEach(o -> byId.put(o.getId(), o));
-    }
-    refineryOrderRepository
-        .findByMissionIdAndOwnerId(missionId, userId)
-        .forEach(o -> byId.putIfAbsent(o.getId(), o));
-    return List.copyOf(byId.values());
-  }
-
-  /**
-   * Paged list of the in-scope orders under the list filters (REQ-REFINERY-019).
-   *
-   * @param statuses optional status filter; {@code null} or empty means every status
-   * @param readyOnly {@code true} to keep only orders whose end is unknown or has passed
-   * @param query optional free-text search; {@code null} or blank means no search
-   * @param pageable page request
-   * @return one page of the matching in-scope orders
-   */
-  public Page<RefineryOrder> getAllRefineryOrders(
-      @Nullable List<RefineryOrderStatus> statuses,
-      boolean readyOnly,
-      @Nullable String query,
-      @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return refineryOrderRepository.findFilteredScoped(
-        statusesOrAll(statuses),
-        readyOnly,
-        Instant.now(),
-        searchPattern(query),
-        scope.adminAllScope(),
-        scope.activeOrgUnitId(),
-        scope.memberOrgUnitIds(),
-        pageable);
-  }
-
-  /**
-   * Convenience overload without status filter.
-   *
-   * @param pageable page request
-   * @return paged orders across all users
-   */
-  public Page<RefineryOrder> getAllRefineryOrders(@NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return refineryOrderRepository.findAllScoped(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
-  }
-
-  /**
-   * Returns the order.
-   *
-   * @param id refinery order primary key
-   * @return the order
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
-   */
-  public RefineryOrder getRefineryOrder(@NotNull UUID id) {
-    return Entities.require(refineryOrderRepository.findById(id), "error.refinery_order.not_found");
-  }
 
   /**
    * Persists a new refinery order owned by the given user, validating every referenced id and that
@@ -405,10 +173,10 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_CREATED,
         saved.getId(),
-        refineryLabel(saved),
+        RefineryOrders.label(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", locationName(saved))
-            .with("method", methodName(saved))
+        AuditDetails.of("location", RefineryOrders.locationName(saved))
+            .with("method", RefineryOrders.methodName(saved))
             .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
             .with("status", saved.getStatus()));
     return saved;
@@ -463,7 +231,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       @NotNull UUID orderId,
       @NotNull RefineryOrder details,
       boolean isLogistician) {
-    RefineryOrder order = getRefineryOrder(orderId);
+    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
 
     OptimisticLock.checkOptionalClient(
         order.getVersion(), details.getVersion(), RefineryOrder.class, orderId);
@@ -546,10 +314,10 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_UPDATED,
         saved.getId(),
-        refineryLabel(saved),
+        RefineryOrders.label(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", locationName(saved))
-            .with("method", methodName(saved))
+        AuditDetails.of("location", RefineryOrders.locationName(saved))
+            .with("method", RefineryOrders.methodName(saved))
             .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
             .with("status", previousStatus + "->" + saved.getStatus()));
     return saved;
@@ -616,7 +384,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   @Transactional
   public void deleteRefineryOrder(
       @NotNull UUID userId, @NotNull UUID orderId, boolean isLogistician) {
-    RefineryOrder order = getRefineryOrder(orderId);
+    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
 
     if (!isLogistician
         && (order.getOwner() == null
@@ -633,150 +401,9 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_CANCELED,
         order.getId(),
-        refineryLabel(order),
+        RefineryOrders.label(order),
         order.getOwner() != null ? order.getOwner().getId() : null,
         AuditDetails.of("previousStatus", previousStatus));
-  }
-
-  /**
-   * Completes a refinery order by booking each output material as an inventory row.
-   *
-   * <p>Rows marked {@code personal} get no earmark (REQ-INV-035); a non-logistician may only book
-   * onto themselves (REQ-SEC-039).
-   *
-   * @throws AccessDeniedException when the caller is neither owner nor logistician, or when a
-   *     non-logistician names another user as an item's receiving stock owner
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order or any
-   *     referenced id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is
-   *     already stored, has no output goods, an item combines {@code personal} with a job order, or
-   *     an item names a job order that does not require its material
-   */
-  @Transactional
-  public void storeRefineryOrder(
-      @NotNull UUID userId,
-      @NotNull UUID orderId,
-      @NotNull RefineryOrderStoreDto dto,
-      boolean isLogistician) {
-    RefineryOrder order = getRefineryOrder(orderId);
-
-    if (order.getStoredAt() != null || order.getStatus() == RefineryOrderStatus.COMPLETED) {
-      throw new BadRequestException("error.refinery_order.already_stored");
-    }
-
-    if (!isLogistician
-        && (order.getOwner() == null
-            || order.getOwner().getId() == null
-            || !order.getOwner().getId().equals(userId))) {
-      throw new AccessDeniedException("Access denied: You do not own this refinery order");
-    }
-
-    final RefineryOrderStatus previousStatus = order.getStatus();
-    final Set<UUID> bookedOnto = new LinkedHashSet<>();
-
-    for (RefineryOrderStoreItemDto itemDto : dto.items()) {
-      final Material mat =
-          Entities.require(
-              materialRepository.findById(itemDto.materialId()),
-              () -> "Material not found: " + itemDto.materialId());
-
-      final Location loc =
-          Entities.require(
-              locationRepository.findById(itemDto.locationId()),
-              () -> "Location not found: " + itemDto.locationId());
-
-      final UUID targetUserId =
-          itemDto.userId() != null
-              ? itemDto.userId()
-              : (order.getOwner() != null ? order.getOwner().getId() : null);
-      stockCommands.requireBookIn(
-          targetUserId,
-          userId,
-          isLogistician,
-          Boolean.TRUE.equals(itemDto.personal()),
-          BookInRule.refineryStore());
-
-      User assignee;
-      if (itemDto.userId() != null) {
-        assignee =
-            Entities.require(
-                userRepository.findById(itemDto.userId()),
-                () -> "User not found: " + itemDto.userId());
-      } else {
-        assignee = order.getOwner();
-      }
-
-      final boolean personal = Boolean.TRUE.equals(itemDto.personal());
-      if (personal && itemDto.jobOrderId() != null) {
-        throw new BadRequestException(
-            "Personal items cannot be assigned to a mission or job order");
-      }
-
-      JobOrder jobOrder = null;
-      if (itemDto.jobOrderId() != null) {
-        jobOrder =
-            Entities.require(
-                jobOrderRepository.findById(itemDto.jobOrderId()),
-                () -> "JobOrder not found: " + itemDto.jobOrderId());
-        assertMaterialRequiredByJobOrder(mat, jobOrder);
-      }
-
-      final OrgUnit owningOrgUnit =
-          ownerScopeService.resolveOrgUnitForPickerOutputNullable(
-              assignee, itemDto.owningOrgUnitId());
-
-      String incomingNote = StringNormalization.trimToNull(itemDto.note());
-
-      stockCommands.bookInFromRefinery(
-          orderId,
-          assignee,
-          owningOrgUnit,
-          mat,
-          loc,
-          itemDto.quality(),
-          itemDto.amount(),
-          incomingNote,
-          personal,
-          jobOrder != null ? jobOrder.getId() : null,
-          jobOrder != null ? jobOrder.getDisplayId() : null,
-          order.getMissionId());
-      bookedOnto.add(assignee.getId());
-
-      updateGoodOutputQuantity(order, itemDto);
-    }
-
-    order.setStatus(RefineryOrderStatus.COMPLETED);
-    order.setStoredAt(Instant.now());
-    refineryOrderRepository.save(order);
-    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
-    announceStored(order, userId, bookedOnto);
-    auditRecorder.record(
-        AuditEventType.REFINERY_ORDER_STORED,
-        order.getId(),
-        refineryLabel(order),
-        order.getOwner() != null ? order.getOwner().getId() : null,
-        AuditDetails.of("items", dto.items().size())
-            .with("status", previousStatus + "->COMPLETED"));
-  }
-
-  /**
-   * Rejects earmarking refinery output for a job order that does not require its material, as the
-   * inventory create path does (REQ-ORDERS-018).
-   *
-   * @param material the output material being booked
-   * @param jobOrder the order the new inventory row is earmarked for
-   * @throws BadRequestException when the order does not require the material
-   */
-  private void assertMaterialRequiredByJobOrder(
-      @NotNull Material material, @NotNull JobOrder jobOrder) {
-    if (!jobOrderItemService.requiredMaterialIds(jobOrder).contains(material.getId())) {
-      throw new BadRequestException(
-          "Material "
-              + material.getId()
-              + " is not required by job order "
-              + jobOrder.getId()
-              + "; an inventory item can only be linked to an order that needs its material.");
-    }
   }
 
   /**
@@ -799,179 +426,6 @@ public class RefineryOrderService implements CraftabilityYieldSource {
             order.getLocation() == null ? null : order.getLocation().getName(),
             changeCode,
             userService.currentActor()));
-  }
-
-  /**
-   * Tells the owner that somebody else stored their order, and every other member whose stock
-   * received a yield the acting member booked onto them (REQ-REFINERY-024).
-   *
-   * @param order the stored order
-   * @param actorId the acting member
-   * @param bookedOnto the members whose stock received a row
-   */
-  private void announceStored(
-      @NotNull RefineryOrder order, @NotNull UUID actorId, @NotNull Set<UUID> bookedOnto) {
-    UUID ownerId = order.getOwner() == null ? null : order.getOwner().getId();
-    String location = order.getLocation() == null ? null : order.getLocation().getName();
-    ActorRef actor = null;
-    if (ownerId != null && !actorId.equals(ownerId)) {
-      actor = userService.currentActor();
-      eventPublisher.publishEvent(
-          RefineryNotices.changedByOther(
-              order.getId(),
-              ownerId,
-              location,
-              bookedOnto.contains(ownerId) ? "STORED_TO_YOU" : "STORED",
-              actor));
-    }
-    for (UUID memberId : bookedOnto) {
-      if (memberId.equals(actorId) || memberId.equals(ownerId)) {
-        continue;
-      }
-      if (actor == null) {
-        actor = userService.currentActor();
-      }
-      eventPublisher.publishEvent(
-          RefineryNotices.changedByOther(
-              order.getId(), memberId, location, "STORED_TO_YOU", actor));
-    }
-  }
-
-  /**
-   * Builds the non-personal audit subject label {@code <method> · <location>} for a refinery order
-   * (REQ-AUDIT-001).
-   *
-   * @param order the refinery order
-   * @return the {@code <method> · <location>} label
-   */
-  @NotNull
-  private static String refineryLabel(RefineryOrder order) {
-    return methodName(order) + " · " + locationName(order);
-  }
-
-  /**
-   * The order's location name for an audit payload, or {@code -} when unset.
-   *
-   * @param order the refinery order
-   * @return the location name or {@code -}
-   */
-  private static String locationName(@NotNull RefineryOrder order) {
-    return order.getLocation() != null ? order.getLocation().getName() : "-";
-  }
-
-  /**
-   * The order's refining-method name for an audit payload, or {@code none} when unset.
-   *
-   * @param order the refinery order
-   * @return the method name or {@code none}
-   */
-  private static String methodName(@NotNull RefineryOrder order) {
-    return order.getRefiningMethod() != null ? order.getRefiningMethod().getName() : "none";
-  }
-
-  /**
-   * Writes the user's final stored amount back into the matching {@link
-   * de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood}, converting SCU back to
-   * units (×100).
-   */
-  private void updateGoodOutputQuantity(RefineryOrder order, RefineryOrderStoreItemDto itemDto) {
-    if (order.getGoods() == null
-        || itemDto == null
-        || itemDto.materialId() == null
-        || itemDto.amount() == null) {
-      return;
-    }
-    RefineryGood target = findGood(order, itemDto.materialId(), itemDto.quality());
-    if (target == null) {
-      target = findGood(order, itemDto.materialId(), null);
-    }
-    if (target != null) {
-      RefineryGood good = target;
-      double amount = itemDto.amount();
-      String quantityTypeName =
-          good.getOutputMaterial().getQuantityType() != null
-              ? good.getOutputMaterial().getQuantityType().name()
-              : null;
-      long rawNew;
-      if ("SCU".equals(quantityTypeName)) {
-        rawNew = Math.round(amount * 100.0d);
-      } else {
-        rawNew = Math.round(amount);
-      }
-      int clamped = Math.clamp(rawNew, 1, Integer.MAX_VALUE);
-      good.setOutputQuantity(clamped);
-    }
-  }
-
-  /**
-   * Finds the good a store item belongs to.
-   *
-   * @param order the order whose goods to search
-   * @param materialId the output material the item books
-   * @param quality the grade the item carries, or {@code null} to match on the material alone
-   * @return the good, or {@code null} when none matches
-   */
-  @Nullable
-  private RefineryGood findGood(RefineryOrder order, UUID materialId, @Nullable Integer quality) {
-    for (RefineryGood good : order.getGoods()) {
-      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
-        continue;
-      }
-      if (!good.getOutputMaterial().getId().equals(materialId)) {
-        continue;
-      }
-      if (quality != null && !quality.equals(good.getQuality())) {
-        continue;
-      }
-      return good;
-    }
-    return null;
-  }
-
-  /**
-   * Returns the UEX yield bonus in percent per material for the refinery at {@code location};
-   * negative values are a malus, and an empty map means no known yield data.
-   *
-   * @param location the order's chosen location, may be {@code null}
-   * @return map keyed by material UUID, never {@code null}
-   */
-  @NotNull
-  public Map<UUID, Integer> getYieldBonusByMaterialForLocation(Location location) {
-    if (location == null) {
-      return Map.of();
-    }
-    String cityName = location.getCity() != null ? location.getCity().getName() : null;
-    String stationName =
-        location.getSpaceStation() != null ? location.getSpaceStation().getName() : null;
-    if (cityName == null && stationName == null) {
-      return Map.of();
-    }
-    Map<UUID, Integer> result = new HashMap<>();
-    for (RefineryYield yield : refineryYieldRepository.findAllForLocation(cityName, stationName)) {
-      if (yield.getMaterial() == null || yield.getMaterial().getId() == null) {
-        continue;
-      }
-      result.putIfAbsent(yield.getMaterial().getId(), yield.getYieldBonus());
-    }
-    return result;
-  }
-
-  /**
-   * Resolves {@code locationId} and delegates to {@link
-   * #getYieldBonusByMaterialForLocation(Location)}; a {@code null} or unknown id yields an empty
-   * map.
-   *
-   * @param locationId target location id; may be {@code null}
-   * @return per-material yield bonus map for the location, never {@code null}
-   */
-  public Map<UUID, Integer> getYieldBonusByMaterialForLocationId(UUID locationId) {
-    if (locationId == null) {
-      return Map.of();
-    }
-    return locationRepository
-        .findById(locationId)
-        .map(this::getYieldBonusByMaterialForLocation)
-        .orElseGet(Map::of);
   }
 
   /**

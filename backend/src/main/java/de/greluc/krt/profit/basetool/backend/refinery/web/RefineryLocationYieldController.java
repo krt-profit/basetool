@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
-import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.Map;
 import java.util.UUID;
@@ -38,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class RefineryLocationYieldController {
 
-  private final RefineryOrderService refineryOrderService;
+  private final RefineryOrderQueryService refineryOrderQueryService;
 
   /**
    * Returns the UEX-derived refinery yield bonus/malus per input material for a refinery location,
@@ -57,6 +57,6 @@ public class RefineryLocationYieldController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public Map<UUID, Integer> getYieldsForLocation(@PathVariable @NotNull UUID locationId) {
-    return refineryOrderService.getYieldBonusByMaterialForLocationId(locationId);
+    return refineryOrderQueryService.getYieldBonusByMaterialForLocationId(locationId);
   }
 }

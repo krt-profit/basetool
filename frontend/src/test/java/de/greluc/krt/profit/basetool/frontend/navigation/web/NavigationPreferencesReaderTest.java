@@ -55,6 +55,11 @@ class NavigationPreferencesReaderTest {
   private static final NavigationAccess MEMBER =
       new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
 
+  private static final NavigationAccess MEMBER_OF_AN_ENABLED_UNIT =
+      new NavigationAccess(
+          Set.of("KRT_MEMBER"),
+          Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.PROMOTION_ANYWHERE));
+
   private NavigationBackendClient client;
   private NavigationPreferencesReader reader;
 
@@ -160,7 +165,7 @@ class NavigationPreferencesReaderTest {
         .thenReturn(
             storedOrder(new OrderModeResponse(Map.of("unit", List.of("promotion.overview")), 1)));
 
-    assertThat(reader.read(MEMBER).order().member().links("unit"))
+    assertThat(reader.read(MEMBER_OF_AN_ENABLED_UNIT).order().member().links("unit"))
         .containsExactly("promotion.overview");
     verify(client, never()).prune(org.mockito.ArgumentMatchers.anyList());
   }
@@ -184,7 +189,7 @@ class NavigationPreferencesReaderTest {
   void keepsAContextOnlyGapGreyedAndStored() {
     when(client.preferences()).thenReturn(stored(1, "promotion.overview"));
 
-    NavigationFavourites favourites = reader.read(MEMBER).favourites();
+    NavigationFavourites favourites = reader.read(MEMBER_OF_AN_ENABLED_UNIT).favourites();
 
     assertThat(favourites.member())
         .singleElement()
@@ -206,8 +211,8 @@ class NavigationPreferencesReaderTest {
             Set.of("KRT_MEMBER"),
             Set.of(
                 NavigationFlag.LANGUAGE_DE,
-                NavigationFlag.PROMOTION,
-                NavigationFlag.OFFICER_ANYWHERE));
+                NavigationFlag.PROMOTION_ANYWHERE,
+                NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE));
 
     NavigationFavourites kept = reader.read(seatElsewhere).favourites();
 
@@ -219,6 +224,36 @@ class NavigationPreferencesReaderTest {
 
     verify(client).prune(List.of("promotion.manage"));
     assertThat(pruned.keys()).containsExactly("missions.list");
+  }
+
+  @Test
+  @DisplayName("promotion entries are deleted once no unit with promotion enabled is in reach")
+  void deletesPromotionEntriesWhenNoEnabledUnitIsInReach() {
+    when(client.preferences())
+        .thenReturn(stored(2, "promotion.overview", "promotion.manage", "missions.list"));
+    when(client.prune(List.of("promotion.overview", "promotion.manage")))
+        .thenReturn(stored(3, "missions.list"));
+    NavigationAccess officerOfDisabledUnitsOnly =
+        new NavigationAccess(
+            Set.of("KRT_MEMBER"),
+            Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.OFFICER_ANYWHERE));
+
+    NavigationFavourites favourites = reader.read(officerOfDisabledUnitsOnly).favourites();
+
+    verify(client).prune(List.of("promotion.overview", "promotion.manage"));
+    assertThat(favourites.keys()).containsExactly("missions.list");
+  }
+
+  @Test
+  @DisplayName("management entries are deleted while the overview stays for a plain member")
+  void deletesOnlyTheManagementEntryWhenNoManagingUnitIsInReach() {
+    when(client.preferences()).thenReturn(stored(2, "promotion.overview", "promotion.manage"));
+    when(client.prune(List.of("promotion.manage"))).thenReturn(stored(3, "promotion.overview"));
+
+    NavigationFavourites favourites = reader.read(MEMBER_OF_AN_ENABLED_UNIT).favourites();
+
+    verify(client).prune(List.of("promotion.manage"));
+    assertThat(favourites.keys()).containsExactly("promotion.overview");
   }
 
   @Test
@@ -346,7 +381,7 @@ class NavigationPreferencesReaderTest {
   void keepsAHiddenContextGapStored() {
     when(client.preferences()).thenReturn(storedHidden(1, "promotion.overview"));
 
-    NavigationHidden hidden = reader.read(MEMBER).hidden();
+    NavigationHidden hidden = reader.read(MEMBER_OF_AN_ENABLED_UNIT).hidden();
 
     assertThat(hidden.keys()).containsExactly("promotion.overview");
     assertThat(hidden.member())

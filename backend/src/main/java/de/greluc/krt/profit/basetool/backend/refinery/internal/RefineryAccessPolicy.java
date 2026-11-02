@@ -90,12 +90,19 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may edit the order
    */
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
-    return refineryOrderRepository
-        .findById(orderId)
-        .map(o ->
-            ownerScopeService.permitsOwnedRow(
-                o.getOwner(), o.getOwningOrgUnit(), true, Roles.LOGISTICIAN))
-        .orElse(false);
+    return refineryOrderRepository.findById(orderId).map(this::canEditRefineryOrder).orElse(false);
+  }
+
+  /**
+   * Entity overload of {@link #canEditRefineryOrder(UUID)} for callers that already hold the order,
+   * such as the list rows.
+   *
+   * @param order the refinery order to inspect; never {@code null}
+   * @return {@code true} iff the caller may edit the order
+   */
+  public boolean canEditRefineryOrder(@NotNull RefineryOrder order) {
+    return ownerScopeService.permitsOwnedRow(
+        order.getOwner(), order.getOwningOrgUnit(), true, Roles.LOGISTICIAN);
   }
 
   /**
@@ -118,23 +125,23 @@ public class RefineryAccessPolicy {
 
   /**
    * Coarse pre-check for reading a member's refinery orders: admin, the member themselves, or a
-   * caller whose read scope covers any of the member's memberships.
+   * caller whose read scope or Logistician grant covers any of the member's memberships.
    *
    * @param targetUserId the member whose orders the caller wants to read; never {@code null}
    * @return {@code true} iff the caller may read the member's in-scope refinery orders
    */
   public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
-    return userAccessPolicy.canActOnTargetUser(targetUserId, false);
+    return userAccessPolicy.canActOnTargetUserAsGrantee(targetUserId, Roles.LOGISTICIAN);
   }
 
   /**
    * Coarse pre-check for creating a refinery order on a member's behalf, like {@link
-   * #canViewUserRefineryOrders(UUID)} with the edit scope.
+   * #canViewUserRefineryOrders(UUID)}.
    *
    * @param targetUserId the member the caller wants to create an order for; never {@code null}
    * @return {@code true} iff the caller may create a refinery order on the member's behalf
    */
   public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
-    return userAccessPolicy.canActOnTargetUser(targetUserId, true);
+    return userAccessPolicy.canActOnTargetUserAsGrantee(targetUserId, Roles.LOGISTICIAN);
   }
 }

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,6 +34,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -49,6 +53,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class OrgUnitBankRequestService {
+
+  private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt");
 
   private final OrgUnitBankAccessService accessService;
   private final AuthHelperService authHelperService;
@@ -343,9 +349,26 @@ public class OrgUnitBankRequestService {
    */
   @NotNull
   public List<BankBookingRequestDto> listOwnBookingRequests() {
-    return bankBookingRequestService.listForCurrentRequester().stream()
-        .map(BankBookingRequestDto::withoutStaffNote)
-        .toList();
+    return pageOwnBookingRequests(Set.of(), Pageable.unpaged(NEWEST_FIRST)).getContent();
+  }
+
+  /**
+   * Pages the caller's own booking requests in the given states with the staff note removed
+   * (REQ-BANK-022, REQ-BANK-054); the dashboard's "Meine Bankanträge" widget reads its rows and
+   * total from it.
+   *
+   * @param statuses the lifecycle states to include; empty means every state
+   * @param pageable page, size and sort
+   * @return the caller's requests of that page, with the total over all pages
+   */
+  @NotNull
+  public Page<BankBookingRequestDto> pageOwnBookingRequests(
+      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
+    Set<BankBookingRequestStatus> effective =
+        statuses.isEmpty() ? EnumSet.allOf(BankBookingRequestStatus.class) : statuses;
+    return bankBookingRequestService
+        .pageForCurrentRequester(effective, pageable)
+        .map(BankBookingRequestDto::withoutStaffNote);
   }
 
   /**
