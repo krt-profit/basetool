@@ -167,7 +167,9 @@ public class JobOrderQueryService {
       @Nullable UUID processingOrgUnitId,
       Pageable pageable) {
     if (!ownerScopeService.canViewJobOrders()) {
-      return Page.empty(pageable);
+      return toProcess
+          ? Page.empty(pageable)
+          : assignedOnly(statusesOrAll(statuses), squadronIds, pageable);
     }
     List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
@@ -203,6 +205,31 @@ public class JobOrderQueryService {
             pageable);
 
     return jobOrderStockProjectionService.mapPageWithStock(page);
+  }
+
+  /**
+   * The "Alle" list of a caller outside the order workflow: only the orders they hold an assignee
+   * entry on (REQ-ORDERS-047), narrowed by the display filter.
+   *
+   * @param statuses the status filter, never empty
+   * @param squadronIds optional display filter; null/empty means no restriction
+   * @param pageable page request
+   * @return the caller's assigned orders, an empty page for an unidentified caller
+   */
+  private Page<JobOrderDto> assignedOnly(
+      List<JobOrderStatus> statuses, @Nullable Collection<UUID> squadronIds, Pageable pageable) {
+    UUID callerId = authHelper.currentUserId().orElse(null);
+    if (callerId == null) {
+      return Page.empty(pageable);
+    }
+    boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
+    return jobOrderStockProjectionService.mapPageWithStock(
+        jobOrderRepository.findAssignedJobOrdersFiltered(
+            statuses,
+            noSquadronFilter,
+            noSquadronFilter ? Set.of(NIL_ID) : squadronIds,
+            callerId,
+            pageable));
   }
 
   /**

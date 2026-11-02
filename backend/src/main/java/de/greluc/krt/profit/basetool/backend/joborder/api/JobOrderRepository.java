@@ -289,6 +289,34 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
+   * The orders on which {@code callerId} holds an assignee entry, narrowed by the status and the
+   * optional squadron display filter: the part of the "Alle" list a caller outside the profit gate
+   * keeps (REQ-ORDERS-047). The entry is the visibility grant, so no tenancy predicate applies.
+   *
+   * @param statuses status values to keep; never empty.
+   * @param noSquadronFilter {@code true} to disable the squadron display filter.
+   * @param squadronIds the squadron ids to match on either side; never empty, pass a placeholder
+   *     when {@code noSquadronFilter} is {@code true}.
+   * @param callerId the caller's user id.
+   * @param pageable page request (carries the sort).
+   * @return paged job orders the caller is an assignee of, matching the filters.
+   */
+  @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
+  @Query(
+      """
+      SELECT o FROM JobOrder o WHERE o.status IN :statuses
+      AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN :squadronIds
+           OR o.requestingOrgUnit.id IN :squadronIds)
+      AND EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id = :callerId)
+      """)
+  Page<JobOrder> findAssignedJobOrdersFiltered(
+      @Param("statuses") List<JobOrderStatus> statuses,
+      @Param("noSquadronFilter") boolean noSquadronFilter,
+      @Param("squadronIds") @Nullable Collection<UUID> squadronIds,
+      @Param("callerId") UUID callerId,
+      Pageable pageable);
+
+  /**
    * Paged list of the orders on which {@code callerId} holds an assignee entry, behind {@code GET
    * /api/v1/orders?assignedToMe=true} (REQ-ORDERS-040). The entry is the visibility grant itself
    * (REQ-ORDERS-047), so no tenancy predicate applies.
