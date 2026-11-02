@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
@@ -152,7 +154,7 @@ public class QuickAccessSearchController {
    * @throws ReauthenticationRequiredException when the session can no longer reach the backend
    */
   @NotNull
-  @GetMapping(value = PATH, headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = PATH, headers = AJAX)
   public List<QuickAccessSearchItem> search(
       @RequestParam(name = "q", required = false) @Nullable String q,
       @RequestParam(name = "kind", required = false) @Nullable List<String> kind) {

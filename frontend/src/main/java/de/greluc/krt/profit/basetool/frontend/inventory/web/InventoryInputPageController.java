@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
@@ -140,7 +142,7 @@ public class InventoryInputPageController {
    */
   @NotNull
   @ResponseBody
-  @GetMapping(value = "/order-needs", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/order-needs", headers = AJAX)
   public Map<String, Object> orderNeedsAjax() {
     return orderNeeds(catalogs.activeJobOrders(true));
   }

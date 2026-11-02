@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesAndHiddenUpdateRequest;
@@ -59,8 +60,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class NavigationPreferencesController {
-
-  private static final String AJAX = "X-Requested-With=XMLHttpRequest";
 
   /** The key format a mode or scope segment must have before it joins a backend path. */
   private static final Pattern SEGMENT = Pattern.compile("^[a-z][a-z0-9]*([.-][a-z0-9]+)*$");

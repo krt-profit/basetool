@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.PAGE_ONLY;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import org.jetbrains.annotations.NotNull;
@@ -38,10 +40,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class LegacyAdminRedirectController {
 
-  private static final String PAGE_ONLY = "!X-Requested-With";
-
   /**
-   * The former bank page, now the Gefahrenzone tab of the system settings.
+   * Sends the bank page path to the Gefahrenzone tab of the system settings.
    *
    * @return a redirect to the danger-zone tab
    */
@@ -52,7 +52,7 @@ public class LegacyAdminRedirectController {
   }
 
   /**
-   * The Staffeln list of the mission data, now the Staffeln tab of the organisation structure.
+   * Sends the mission-data Staffeln path to the Staffeln tab of the organisation structure.
    *
    * @return a redirect to the Staffeln tab
    */
@@ -63,8 +63,8 @@ public class LegacyAdminRedirectController {
   }
 
   /**
-   * The former announcement editor, now the inline editor of the Information widget on the
-   * dashboard.
+   * Sends the announcement editor path to the dashboard, where the Information widget edits the
+   * announcement inline.
    *
    * @return a redirect to the dashboard
    */
