@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -106,7 +107,7 @@ class LayoutMiscAdviceTest {
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(
             new LayoutContextLoader.MeLayoutResponse(
-                null, List.of(), CapabilityFlagsAdvice.CapabilitiesResponse.NONE, 7L));
+                null, List.of(), CapabilitiesResponse.NONE, 7L));
 
     assertEquals(7L, advice().unreadNotificationCount(new MockHttpServletRequest()));
     verify(backendApiClient, never())
