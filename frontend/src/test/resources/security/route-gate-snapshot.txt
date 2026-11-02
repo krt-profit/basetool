@@ -292,7 +292,6 @@
 /dashboard/widgets/information GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#information gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/low-stock GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWorkWidgetController#lowStock gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/material-demand GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardOrderWidgetController#materialDemand gate=class:isAuthenticated() layout=yes
-/dashboard/widgets/my-orders GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardOrderWidgetController#myOrders gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/next-mission GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#nextMission gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/notifications GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardWidgetController#notifications gate=class:isAuthenticated() layout=yes
 /dashboard/widgets/open-terms GET headers=[X-Requested-With=XMLHttpRequest] -> DashboardAdminWidgetController#openTerms gate=class:hasRole('ADMIN') layout=yes

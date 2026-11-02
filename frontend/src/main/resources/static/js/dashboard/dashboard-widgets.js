@@ -40,7 +40,7 @@ const POLL_STAGGER_SLOTS = 8;
  */
 const LIVE_ROOMS = {
     orders: {
-        queue: ['ASSIGNED_ORDERS', 'ORDERS_TO_PROCESS', 'MY_ORDERS'],
+        queue: ['ASSIGNED_ORDERS', 'ORDERS_TO_PROCESS'],
         demand: ['MATERIAL_DEMAND'],
     },
     inventory: { 'stock-levels': ['LOW_STOCK'] },

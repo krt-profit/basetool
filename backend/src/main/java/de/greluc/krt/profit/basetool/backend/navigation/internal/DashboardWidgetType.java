@@ -159,15 +159,6 @@ public enum DashboardWidgetType {
       new DashboardOptions(null, null, 5, DashboardStatus.OPEN_ACTIVE),
       EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
-  /** The orders the member's units requested, by priority. */
-  MY_ORDERS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      false,
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.RUNNING),
-      EnumSet.of(DashboardStatus.RUNNING, DashboardStatus.COMPLETED, DashboardStatus.ALL)),
-
   /** The open material demand across the visible orders, the largest gap first. */
   MATERIAL_DEMAND(
       DashboardMode.MEMBER,

@@ -501,7 +501,6 @@ class DashboardServiceTest {
             new DashboardLayoutRequest(
                 List.of(
                     item(DashboardWidgetType.ORDERS_TO_PROCESS),
-                    item(DashboardWidgetType.MY_ORDERS),
                     item(DashboardWidgetType.MATERIAL_DEMAND),
                     item(DashboardWidgetType.REFINERY_READY)),
                 0L));
@@ -510,13 +509,10 @@ class DashboardServiceTest {
     assertThat(toProcess.rows()).isEqualTo(5);
     assertThat(toProcess.status()).isEqualTo(DashboardStatus.OPEN_ACTIVE);
     assertThat(toProcess.orgUnitId()).isNull();
-    DashboardWidgetResponse mine = written.widgets().get(1);
-    assertThat(mine.rows()).isEqualTo(5);
-    assertThat(mine.status()).isEqualTo(DashboardStatus.RUNNING);
-    DashboardWidgetResponse demand = written.widgets().get(2);
+    DashboardWidgetResponse demand = written.widgets().get(1);
     assertThat(demand.rows()).isEqualTo(5);
     assertThat(demand.status()).isNull();
-    DashboardWidgetResponse refinery = written.widgets().get(3);
+    DashboardWidgetResponse refinery = written.widgets().get(2);
     assertThat(refinery.rows()).isEqualTo(5);
     assertThat(refinery.status()).isNull();
   }
@@ -528,7 +524,6 @@ class DashboardServiceTest {
         .extracting(DashboardWidgetResponse::type)
         .doesNotContain(
             DashboardWidgetType.ORDERS_TO_PROCESS,
-            DashboardWidgetType.MY_ORDERS,
             DashboardWidgetType.MATERIAL_DEMAND,
             DashboardWidgetType.REFINERY_READY);
   }
@@ -544,14 +539,12 @@ class DashboardServiceTest {
             new DashboardLayoutRequest(
                 List.of(
                     item(DashboardWidgetType.ORDERS_TO_PROCESS),
-                    item(DashboardWidgetType.MY_ORDERS),
                     item(DashboardWidgetType.MATERIAL_DEMAND),
                     item(DashboardWidgetType.REFINERY_READY)),
                 0L));
     DashboardWidgetResponse toProcess = written.widgets().get(0);
-    DashboardWidgetResponse mine = written.widgets().get(1);
-    DashboardWidgetResponse demand = written.widgets().get(2);
-    DashboardWidgetResponse refinery = written.widgets().get(3);
+    DashboardWidgetResponse demand = written.widgets().get(1);
+    DashboardWidgetResponse refinery = written.widgets().get(2);
     UUID unit = UUID.randomUUID();
 
     DashboardOptions pinned = new DashboardOptions(unit, null, 3, DashboardStatus.IN_PROGRESS);
@@ -575,16 +568,6 @@ class DashboardServiceTest {
                 .replaceOptions(
                     owner,
                     MEMBER,
-                    mine.id(),
-                    new DashboardOptionsRequest(
-                        null, null, 10, DashboardStatus.COMPLETED, mine.optionsVersion()))
-                .status())
-        .isEqualTo(DashboardStatus.COMPLETED);
-    assertThat(
-            service
-                .replaceOptions(
-                    owner,
-                    MEMBER,
                     demand.id(),
                     new DashboardOptionsRequest(null, null, 3, null, demand.optionsVersion()))
                 .rows())
@@ -593,16 +576,8 @@ class DashboardServiceTest {
             service.replaceOptions(
                 owner,
                 MEMBER,
-                mine.id(),
-                new DashboardOptionsRequest(unit, null, 5, null, mine.optionsVersion())))
-        .isInstanceOf(BadRequestException.class);
-    assertThatThrownBy(() ->
-            service.replaceOptions(
-                owner,
-                MEMBER,
-                mine.id(),
-                new DashboardOptionsRequest(
-                    null, null, 5, DashboardStatus.OPEN, mine.optionsVersion())))
+                refinery.id(),
+                new DashboardOptionsRequest(unit, null, 5, null, refinery.optionsVersion())))
         .isInstanceOf(BadRequestException.class);
     assertThatThrownBy(() ->
             service.replaceOptions(

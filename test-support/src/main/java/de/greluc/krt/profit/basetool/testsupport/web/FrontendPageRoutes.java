@@ -179,7 +179,6 @@ public final class FrontendPageRoutes {
           "/dashboard/widgets/information",
           "/dashboard/widgets/low-stock",
           "/dashboard/widgets/material-demand",
-          "/dashboard/widgets/my-orders",
           "/dashboard/widgets/next-mission",
           "/dashboard/widgets/notifications",
           "/dashboard/widgets/open-terms",

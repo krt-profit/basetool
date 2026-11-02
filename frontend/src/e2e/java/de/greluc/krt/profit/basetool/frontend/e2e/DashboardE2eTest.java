@@ -407,7 +407,6 @@ class DashboardE2eTest {
           for (String slug :
               new String[] {
                 "orders-to-process",
-                "my-orders",
                 "material-demand",
                 "refinery-ready",
                 "assigned-orders",
@@ -421,8 +420,7 @@ class DashboardE2eTest {
           assertThat(page.getByTestId("dashboard-refinery-ready-error")).isVisible();
           assertThat(page.getByTestId("dashboard-assigned-orders-error")).isVisible();
           assertThat(page.getByTestId("dashboard-refinery-ready-retry")).isVisible();
-          for (String loaded :
-              new String[] {"orders-to-process", "my-orders", "material-demand", "low-stock"}) {
+          for (String loaded : new String[] {"orders-to-process", "material-demand", "low-stock"}) {
             assertThat(
                     page.getByTestId("dashboard-widget-" + loaded).locator("[data-widget-content]"))
                 .isVisible();
@@ -432,12 +430,14 @@ class DashboardE2eTest {
                       .locator("[data-testid='dashboard-orders-to-process-count']"))
               .isVisible();
 
-          page.getByTestId("dashboard-widget-my-orders").getByTestId("dashboard-options").click();
+          page.getByTestId("dashboard-widget-orders-to-process")
+              .getByTestId("dashboard-options")
+              .click();
           assertThat(page.locator("#dashboard-option-status option:not([hidden])")).hasCount(3);
-          page.locator("#dashboard-option-status").selectOption("COMPLETED");
+          page.locator("#dashboard-option-status").selectOption("IN_PROGRESS");
           page.getByTestId("dashboard-options-save").click();
-          assertThat(page.getByTestId("dashboard-widget-my-orders"))
-              .hasAttribute("data-status", "COMPLETED");
+          assertThat(page.getByTestId("dashboard-widget-orders-to-process"))
+              .hasAttribute("data-status", "IN_PROGRESS");
 
           page.evaluate(RESET_DASHBOARD);
         });

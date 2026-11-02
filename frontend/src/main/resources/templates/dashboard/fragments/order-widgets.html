@@ -35,15 +35,6 @@
     <div th:replace="~{:: foot('dashboard-orders-to-process-count', ${toProcessTotal}, @{/orders(scope='TO_PROCESS')})}"></div>
 </div>
 
-<div th:fragment="myOrders" data-widget-content data-testid="dashboard-my-orders">
-    <th:block th:if="${not #lists.isEmpty(myOrders)}">
-        <th:block th:replace="~{:: orderRows(${myOrders}, 'dashboard-my-orders-row', 'dashboard-my-orders-unit', true)}"></th:block>
-    </th:block>
-    <p th:if="${#lists.isEmpty(myOrders)}" class="home-notifs__empty" data-testid="dashboard-my-orders-empty"
-       th:text="#{dashboard.myOrders.empty}">Deine Einheiten haben keinen Auftrag in dieser Auswahl.</p>
-    <div th:replace="~{:: foot('dashboard-my-orders-count', ${myOrdersTotal}, @{/orders(scope='MINE')})}"></div>
-</div>
-
 <div th:fragment="materialDemand" data-widget-content data-testid="dashboard-material-demand">
     <ul th:if="${not #lists.isEmpty(demandRows)}" class="dash-links">
         <li th:each="row : ${demandRows}">

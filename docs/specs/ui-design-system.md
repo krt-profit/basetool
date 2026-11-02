@@ -2587,7 +2587,7 @@ ADR-0282, ADR-0297
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
 > one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Aufträge zu
-> bearbeiten, Meine Aufträge, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig,
+> bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig,
 > Bank, Information (with the inline editor for administrators), Favoriten and
 > Benachrichtigungen, with the options of the matrix below, the admin dashboard with its five
 > widgets and the start page per mode. Not built yet (planned): the catalogue widgets
@@ -2625,7 +2625,6 @@ unit.
 | Member | Nächster Einsatz | the next missions of the user's units and the ones the user is signed up for, merged, soonest first (REQ-MISSION-031) | rows |
 | Member | Hangar-Bereitschaft | readiness of the user's hangar | — |
 | Member | Aufträge zu bearbeiten | orders the user's unit processes | unit; status **Offen + In Bearbeitung** / Offen / In Bearbeitung; rows |
-| Member | Meine Aufträge | orders the user requested | status **Laufend** / Abgeschlossen / Alle; rows |
 | Member | Ich bearbeite | orders the user is an assignee of, by priority (REQ-ORDERS-047) | status as „Aufträge zu bearbeiten"; rows |
 | Member | Materialbedarf | open material demand | unit; rows |
 | Member | Raffinerie: fertig | finished refinery jobs | rows |
@@ -2645,11 +2644,10 @@ unit.
 
 A widget with a list links „Alle anzeigen" to its page or tab („Ich bearbeite" to that segment,
 „Bestand niedrig" to „Mindestbestände", „Bank" to `/org-unit-bank`). Widgets carry no action
-buttons. „Aufträge zu bearbeiten" links to the „Zu bearbeiten" segment of the orders, „Meine
-Aufträge" to „Meine", „Materialbedarf" to the material demand and „Raffinerie: fertig" to the
-„Abholbereit" segment of the refinery. „Laufend" is open and in progress, „Abgeschlossen" completed and
-rejected. „Aufträge zu bearbeiten" and „Materialbedarf" appear in the catalogue for a caller with
-access to the order area, „Meine Aufträge" for a requester of one of their units. „Bank" has no unit option — its set ignores the context, only its order uses it — and is
+buttons. „Aufträge zu bearbeiten" links to the „Zu bearbeiten" segment of the orders,
+„Materialbedarf" to the material demand and „Raffinerie: fertig" to the „Abholbereit" segment of
+the refinery. „Aufträge zu bearbeiten" and „Materialbedarf" appear in the catalogue for a caller
+with access to the order area. „Bank" has no unit option — its set ignores the context, only its order uses it — and is
 not part of the default. A new option is a change to this table.
 
 **Availability.**
@@ -2665,14 +2663,12 @@ fails on its own, never blocking the page: a refused (`403`) or failed read repl
 an error state and a retry button, carrying the test ids `dashboard-<widget>-error` and
 `dashboard-<widget>-retry`. „Aufträge zu bearbeiten" reads `GET /orders?toProcess=true` (with
 `orgUnitId` for a unit pinned in the widget, which only narrows the caller's processing units),
-„Meine Aufträge" `GET /orders/requested`, „Raffinerie: fertig" the ready segment of
+„Raffinerie: fertig" the ready segment of
 `GET /refinery-orders/all` (REQ-REFINERY-019), each with the row count as page size and the page
 total as count; „Materialbedarf" reads the new summary `GET /orders/material-demand/summary`
 (`orgUnitId`, `limit`; the count of open buckets and the first rows, REQ-ORDERS-034) instead of the
-whole overview. The order room updates „Aufträge zu bearbeiten", „Meine Aufträge" and „Ich
-bearbeite" (section `queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie:
-fertig"; the order room admits a requester (`canViewOwnJobOrders`) besides the queue and assignee
-callers. A widget whose area has a live-sync topic updates live
+whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich bearbeite" (section
+`queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig". A widget whose area has a live-sync topic updates live
 (REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
 reload at once when the tab becomes visible again.
 
@@ -2728,7 +2724,7 @@ instances, the empty and error states, deletion on role loss, the hint, the cata
 Hangar-Bereitschaft: the rows and their rows option, the counts, the empty states, the member's hangar room),
 `DashboardWorkWidgetsMvcTest` (Ich bearbeite, Bestand niedrig and Bank: the read per option, the
 page total as count, the rows, the unit label, the target bar and trend, the empty states),
-`DashboardOrderWidgetsMvcTest` (Aufträge zu bearbeiten, Meine Aufträge, Materialbedarf and
+`DashboardOrderWidgetsMvcTest` (Aufträge zu bearbeiten, Materialbedarf and
 Raffinerie: fertig: the read per option, the count, the rows, the unit label, the empty states, the
 refused read), `JobOrderBackendClientTest` (the processing-unit and summary reads),
 `DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin

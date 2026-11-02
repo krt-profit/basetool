@@ -84809,7 +84809,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MY_ORDERS", "MATERIAL_DEMAND", "REFINERY_READY" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MATERIAL_DEMAND", "REFINERY_READY" ]
           }
         },
         "required" : [ "column", "type" ]
@@ -84850,7 +84850,7 @@
           },
           "status" : {
             "type" : "string",
-            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "RUNNING", "COMPLETED" ]
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ]
           },
           "version" : {
             "type" : "integer",
@@ -84867,7 +84867,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MY_ORDERS", "MATERIAL_DEMAND", "REFINERY_READY" ]
+              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MATERIAL_DEMAND", "REFINERY_READY" ]
             },
             "maxItems" : 32,
             "minItems" : 0
@@ -84926,11 +84926,11 @@
           },
           "status" : {
             "type" : "string",
-            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "RUNNING", "COMPLETED" ]
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ]
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MY_ORDERS", "MATERIAL_DEMAND", "REFINERY_READY" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "ORDERS_TO_PROCESS", "MATERIAL_DEMAND", "REFINERY_READY" ]
           }
         }
       },

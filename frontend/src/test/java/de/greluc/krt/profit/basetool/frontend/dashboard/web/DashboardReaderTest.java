@@ -228,19 +228,15 @@ class DashboardReaderTest {
   }
 
   @Test
-  @DisplayName("the order widgets are offered only to a caller who may read their orders")
+  @DisplayName("the order widgets are offered only to a caller with access to the order area")
   void offersTheOrderWidgetsByTheOrderFlags() {
     when(client.dashboard(DashboardMode.MEMBER)).thenReturn(stored(false));
     NavigationAccess queue =
         new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.JOB_ORDERS));
-    NavigationAccess requester =
-        new NavigationAccess(Set.of(), Set.of(NavigationFlag.OWN_JOB_ORDERS));
 
     assertThat(read(queue, null, List.of()).catalogue())
-        .contains(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND)
-        .doesNotContain(DashboardWidgetType.MY_ORDERS);
-    assertThat(read(requester, null, List.of()).catalogue())
-        .contains(DashboardWidgetType.MY_ORDERS)
+        .contains(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
+    assertThat(read(MEMBER, null, List.of()).catalogue())
         .doesNotContain(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
   }
 

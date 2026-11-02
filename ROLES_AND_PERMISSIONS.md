@@ -1307,8 +1307,8 @@ export for somebody who cannot sign in included (REQ-SEC-058) — and of the adm
 where the surviving account's choices win (REQ-SEC-046). A dashboard widget renders only for a
 user who may read its data: „Nächste Tage“, „Nächster Einsatz“, „Bestand niedrig“ and „Bank“
 need the member role (the mission list, the Lager and the org-unit bank are for members and above),
-„Aufträge zu bearbeiten“ and „Materialbedarf“ the access to the order area, „Meine Aufträge“ the
-requester view of the caller's own units (REQ-ORDERS-023), the others every signed-in user („Ich
+„Aufträge zu bearbeiten“ and „Materialbedarf“ the access to the order area, the others every
+signed-in user („Ich
 bearbeite“ lists only the orders the caller is an assignee of, REQ-ORDERS-047; „Raffinerie: fertig“
 lists the ready refinery orders in the caller's unit scope). The order widgets read per unit:
 „Aufträge zu bearbeiten“ shows the orders of the units the caller belongs to, narrowed to one of

@@ -56,16 +56,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the bodies of the "Aufträge zu bearbeiten", "Meine Aufträge", "Materialbedarf" and
- * "Raffinerie: fertig" widgets through MockMvc (REQ-UI-034): each widget reads its own endpoint
- * with its options, shows the read's total as the count and its first rows, says so when nothing
- * qualifies, and answers a backend refusal with an error status instead of a body.
+ * Renders the bodies of the "Aufträge zu bearbeiten", "Materialbedarf" and "Raffinerie: fertig"
+ * widgets through MockMvc (REQ-UI-034): each widget reads its own endpoint with its options, shows
+ * the read's total as the count and its first rows, says so when nothing qualifies, and answers a
+ * backend refusal with an error status instead of a body.
  */
 @SpringBootTest
 class DashboardOrderWidgetsMvcTest {
 
   private static final String TO_PROCESS = "/dashboard/widgets/orders-to-process";
-  private static final String MY_ORDERS = "/dashboard/widgets/my-orders";
   private static final String DEMAND = "/dashboard/widgets/material-demand";
   private static final String REFINERY = "/dashboard/widgets/refinery-ready";
   private static final String ORDERS_URL =
@@ -73,10 +72,6 @@ class DashboardOrderWidgetsMvcTest {
   private static final String TO_PROCESS_TWO_URL = ORDERS_URL + ",{status}&toProcess=true";
   private static final String TO_PROCESS_ONE_URL = ORDERS_URL + "&toProcess=true";
   private static final String TO_PROCESS_UNIT_URL = TO_PROCESS_TWO_URL + "&orgUnitId={orgUnitId}";
-  private static final String REQUESTED_URL =
-      "/api/v1/orders/requested?page={page}&size={size}&sort=priority,asc&status={status}";
-  private static final String REQUESTED_TWO_URL = REQUESTED_URL + ",{status}";
-  private static final String REQUESTED_FOUR_URL = REQUESTED_URL + ",{status},{status},{status}";
   private static final String SUMMARY_URL = "/api/v1/orders/material-demand/summary?limit={limit}";
   private static final String SUMMARY_UNIT_URL = SUMMARY_URL + "&orgUnitId={orgUnitId}";
   private static final String READY_URL =
@@ -255,7 +250,7 @@ class DashboardOrderWidgetsMvcTest {
             eq(TO_PROCESS_TWO_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN"), eq("IN_PROGRESS")))
         .thenReturn(orders(0));
 
-    render(TO_PROCESS, Map.of("status", "COMPLETED"));
+    render(TO_PROCESS, Map.of("status", "UNREAD"));
 
     verify(backendApiClient)
         .get(eq(TO_PROCESS_TWO_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN"), eq("IN_PROGRESS"));
@@ -271,53 +266,6 @@ class DashboardOrderWidgetsMvcTest {
     assertThat(render(TO_PROCESS))
         .contains("data-testid=\"dashboard-orders-to-process-empty\"")
         .contains("Kein Auftrag zu bearbeiten.");
-  }
-
-  /** The default status is "Laufend": open and in-progress orders the caller's units requested. */
-  @Test
-  void myOrders_listTheRunningRequestedOrders() throws Exception {
-    when(backendApiClient.get(
-            eq(REQUESTED_TWO_URL), anyTypeRef(), eq(0), eq(5), eq("OPEN"), eq("IN_PROGRESS")))
-        .thenReturn(orders(4, order(51, "IN_PROGRESS", 3)));
-
-    String html = render(MY_ORDERS);
-
-    assertThat(html)
-        .containsPattern("data-testid=\"dashboard-my-orders-count\"[^>]*>4<")
-        .contains("data-testid=\"dashboard-my-orders-row\"")
-        .contains("#51")
-        .containsPattern("href=\"/orders\\?scope=MINE\"");
-  }
-
-  /** "Abgeschlossen" reads the completed and rejected orders. */
-  @Test
-  void myOrders_completedReadsTheClosedOrders() throws Exception {
-    when(backendApiClient.get(
-            eq(REQUESTED_TWO_URL), anyTypeRef(), eq(0), eq(10), eq("COMPLETED"), eq("REJECTED")))
-        .thenReturn(orders(1, order(52, "COMPLETED", 3)));
-
-    String html = render(MY_ORDERS, Map.of("status", "COMPLETED", "rows", "10"));
-
-    assertThat(html).contains("#52").contains(">Abgeschlossen<");
-  }
-
-  /** "Alle" reads every status. */
-  @Test
-  void myOrders_allReadsEveryStatus() throws Exception {
-    when(backendApiClient.get(
-            eq(REQUESTED_FOUR_URL),
-            anyTypeRef(),
-            eq(0),
-            eq(5),
-            eq("OPEN"),
-            eq("IN_PROGRESS"),
-            eq("COMPLETED"),
-            eq("REJECTED")))
-        .thenReturn(orders(0));
-
-    assertThat(render(MY_ORDERS, Map.of("status", "ALL")))
-        .contains("data-testid=\"dashboard-my-orders-empty\"")
-        .contains("Deine Einheiten haben keinen Auftrag in dieser Auswahl.");
   }
 
   /** The summary read carries the rows, its count is the open buckets and the rows are cut. */

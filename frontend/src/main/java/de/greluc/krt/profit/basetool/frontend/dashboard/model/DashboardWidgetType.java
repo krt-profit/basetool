@@ -153,14 +153,6 @@ public enum DashboardWidgetType {
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
       EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
-  /** The orders the member's units requested; the requester view is open to a requester. */
-  MY_ORDERS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.requires(NavigationFlag.OWN_JOB_ORDERS),
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      EnumSet.of(DashboardStatus.RUNNING, DashboardStatus.COMPLETED, DashboardStatus.ALL)),
-
   /** The open material demand; the overview is part of the order area. */
   MATERIAL_DEMAND(
       DashboardMode.MEMBER,

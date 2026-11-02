@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetTyp
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
@@ -90,33 +89,6 @@ public class DashboardOrderWidgetController {
     addOrders(model, page, "toProcessOrders", "toProcessTotal");
     model.addAttribute("toProcessShowsUnit", unit == null);
     return FRAGMENTS + "ordersToProcess";
-  }
-
-  /**
-   * Renders the orders the member's units requested, by priority.
-   *
-   * @param model the Thymeleaf model
-   * @param rows the rows shown
-   * @param status the status filter
-   * @return the {@code myOrders} fragment
-   */
-  @NotNull
-  @GetMapping(value = "/my-orders", headers = "X-Requested-With=XMLHttpRequest")
-  public String myOrders(
-      @NotNull Model model,
-      @RequestParam(required = false) @Nullable Integer rows,
-      @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.orderStatus(DashboardWidgetType.MY_ORDERS, status);
-    PageResponse<JobOrderDto> page =
-        orderClient.orders(
-            OrderListScope.MINE,
-            0,
-            DashboardWidgetOptions.rows(rows),
-            DashboardWidgetOptions.orderStatuses(resolved),
-            List.of());
-    addOrders(model, page, "myOrders", "myOrdersTotal");
-    return FRAGMENTS + "myOrders";
   }
 
   /**
