@@ -18,9 +18,12 @@
                 th:disabled="${!navigationAppearance.loaded()}">
             <option value="" th:selected="${navigationStartPages.selected(mode).isEmpty()}"
                     th:text="#{profile.startPage.dashboard}">Dashboard (Standard)</option>
-            <option th:each="option : ${navigationStartPages.options(mode)}" th:value="${option.key()}"
-                    th:selected="${option.key() == navigationStartPages.selected(mode)}"
-                    th:text="#{__${option.labelKey()}__}">Seite</option>
+            <optgroup th:each="group : ${navigationStartPages.groups(mode)}"
+                      th:label="#{__${group.labelKey()}__}">
+                <option th:each="option : ${group.options()}" th:value="${option.key()}"
+                        th:selected="${option.key() == navigationStartPages.selected(mode)}"
+                        th:text="#{__${option.labelKey()}__}">Seite</option>
+            </optgroup>
         </select>
     </div>
 </th:block>

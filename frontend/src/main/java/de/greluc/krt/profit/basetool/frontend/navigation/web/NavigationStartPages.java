@@ -23,8 +23,12 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAppearance;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAvailability;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGroup;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationMode;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -45,8 +49,18 @@ public record NavigationStartPages(
    *
    * @param key the entry key
    * @param labelKey the message key of the label
+   * @param groupLabelKey the message key of the navigation group the page belongs to
    */
-  public record Option(@NotNull String key, @NotNull String labelKey) {}
+  public record Option(
+      @NotNull String key, @NotNull String labelKey, @NotNull String groupLabelKey) {}
+
+  /**
+   * The pages of one navigation group, which tells apart pages that share a label.
+   *
+   * @param labelKey the message key of the group heading
+   * @param options the pages of the group, in registry order
+   */
+  public record OptionGroup(@NotNull String labelKey, @NotNull List<Option> options) {}
 
   /**
    * Resolves the choices of a caller.
@@ -66,15 +80,20 @@ public record NavigationStartPages(
             .filter(entry -> registry.starrable(entry.key()).isPresent())
             .filter(entry -> registry.availability(entry, access) != NavigationAvailability.GONE)
             .toList();
+    Map<String, Long> sharedLabels =
+        offered.stream()
+            .collect(
+                Collectors.groupingBy(
+                    entry -> groupedLabel(registry, entry), Collectors.counting()));
     return new NavigationStartPages(
         appearance,
         offered.stream()
             .filter(entry -> !registry.isAdminEntry(entry.key()))
-            .map(NavigationStartPages::option)
+            .map(entry -> option(registry, entry, sharedLabels))
             .toList(),
         offered.stream()
             .filter(entry -> registry.isAdminEntry(entry.key()))
-            .map(NavigationStartPages::option)
+            .map(entry -> option(registry, entry, sharedLabels))
             .toList());
   }
 
@@ -87,6 +106,23 @@ public record NavigationStartPages(
   @NotNull
   public List<Option> options(@NotNull String modeSegment) {
     return NavigationMode.ADMIN.getSegment().equals(modeSegment) ? admin : member;
+  }
+
+  /**
+   * The choices of a mode grouped by navigation group, in registry order.
+   *
+   * @param modeSegment {@code member} or {@code admin}
+   * @return the groups that hold at least one choice
+   */
+  @NotNull
+  public List<OptionGroup> groups(@NotNull String modeSegment) {
+    return options(modeSegment).stream()
+        .collect(
+            Collectors.groupingBy(Option::groupLabelKey, LinkedHashMap::new, Collectors.toList()))
+        .entrySet()
+        .stream()
+        .map(group -> new OptionGroup(group.getKey(), group.getValue()))
+        .toList();
   }
 
   /**
@@ -125,7 +161,25 @@ public record NavigationStartPages(
   }
 
   @NotNull
-  private static Option option(@NotNull NavigationEntry entry) {
-    return new Option(entry.key(), entry.labelKey());
+  private static String groupLabel(
+      @NotNull NavigationRegistry registry, @NotNull NavigationEntry entry) {
+    return registry.groupOf(entry.key()).map(NavigationGroup::labelKey).orElse(entry.labelKey());
+  }
+
+  @NotNull
+  private static String groupedLabel(
+      @NotNull NavigationRegistry registry, @NotNull NavigationEntry entry) {
+    return groupLabel(registry, entry) + '/' + entry.labelKey();
+  }
+
+  /** An entry whose label another entry of its group shares shows its tab label instead. */
+  @NotNull
+  private static Option option(
+      @NotNull NavigationRegistry registry,
+      @NotNull NavigationEntry entry,
+      @NotNull Map<String, Long> sharedLabels) {
+    boolean shared = sharedLabels.get(groupedLabel(registry, entry)) > 1;
+    return new Option(
+        entry.key(), shared ? entry.tabLabel() : entry.labelKey(), groupLabel(registry, entry));
   }
 }

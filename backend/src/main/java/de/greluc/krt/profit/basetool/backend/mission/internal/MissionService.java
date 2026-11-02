@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -53,6 +54,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +109,9 @@ public class MissionService implements MissionCommands {
 
   /** Publishes the mission notifications (REQ-MISSION-021…029). */
   private final MissionNotificationPublisher notificationPublisher;
+
+  /** The mission-detail rule, ancestors and the Mission Manager cascade included. */
+  private final MissionVisibility missionVisibility;
 
   /**
    * Always throws; listing missions must go through {@link #searchMissions(String, Instant,
@@ -238,6 +243,9 @@ public class MissionService implements MissionCommands {
    */
   private static final List<String> NEXT_MISSION_STATUSES = List.of("PLANNED", "ACTIVE");
 
+  /** The candidates read per page while the upcoming missions are filtered by visibility. */
+  private static final int UPCOMING_BATCH_SIZE = 50;
+
   /**
    * Returns the next {@code PLANNED} or {@code ACTIVE} mission by planned start for the home-page
    * banner. With an org-unit scope only that scope's missions count (REQ-MISSION-008); an admin in
@@ -265,22 +273,39 @@ public class MissionService implements MissionCommands {
    * (REQ-MISSION-008 scope and pin) merged with those the caller is signed up for, each mission
    * once, soonest planned start first (REQ-MISSION-031).
    *
+   * <p>A mission counts only when the caller may read it and every ancestor (REQ-MISSION-008); the
+   * candidates are read page by page and filtered before the limit applies, so a hidden row never
+   * crowds out a later visible one.
+   *
    * @param limit the most missions to return
    * @return the missions with their owning org unit loaded, empty when none is upcoming
    */
   public List<Mission> getUpcomingOwnAndSignedUp(int limit) {
     ScopePredicate scope = requestScopeResolver.currentScopePredicate();
-    return missionRepository.findUpcomingOwnOrSignedUp(
-        Instant.now(),
-        NEXT_MISSION_STATUSES,
-        scope.adminAllScope(),
-        !scope.adminAllScope() && hasNoUnitScope(scope),
-        scope.adminAllScope(),
-        scope.activeOrgUnitId(),
-        scope.memberOrgUnitIds(),
-        authHelperService.currentUserId().orElse(null),
-        authHelperService.isMemberOrAbove(),
-        PageRequest.of(0, limit));
+    Instant now = Instant.now();
+    UUID userId = authHelperService.currentUserId().orElse(null);
+    List<Mission> visible = new ArrayList<>();
+    for (int page = 0; visible.size() < limit; page++) {
+      List<Mission> candidates =
+          missionRepository.findUpcomingOwnOrSignedUp(
+              now,
+              NEXT_MISSION_STATUSES,
+              scope.adminAllScope(),
+              !scope.adminAllScope() && hasNoUnitScope(scope),
+              scope.activeOrgUnitId(),
+              scope.memberOrgUnitIds(),
+              userId,
+              PageRequest.of(page, UPCOMING_BATCH_SIZE));
+      for (Mission candidate : candidates) {
+        if (visible.size() < limit && missionVisibility.canSeeMission(candidate)) {
+          visible.add(candidate);
+        }
+      }
+      if (candidates.size() < UPCOMING_BATCH_SIZE) {
+        break;
+      }
+    }
+    return visible;
   }
 
   /**

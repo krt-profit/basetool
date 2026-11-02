@@ -236,6 +236,17 @@ public class NavigationRegistry {
   }
 
   /**
+   * Looks up the group an entry belongs to.
+   *
+   * @param key the entry key
+   * @return the group, or empty for an unknown key
+   */
+  @NotNull
+  public Optional<NavigationGroup> groupOf(@NotNull String key) {
+    return Optional.ofNullable(groupByKey.get(key));
+  }
+
+  /**
    * Whether a caller passes both an entry's own gate and its group's.
    *
    * @param entry a registered entry
@@ -477,10 +488,12 @@ public class NavigationRegistry {
             .gate(NavigationGate.requires(JOB_ORDERS))
             .testId("nav-orders"),
         of("orders.own", "/orders", "nav.page.orders")
+            .tab("nav.orders.own")
             .keywords("palette.keywords.orders")
             .gate(NavigationGate.requires(OWN_JOB_ORDERS).andExcludes(JOB_ORDERS))
             .testId("nav-orders-own"),
         of("orders.assigned", "/orders", "nav.page.orders")
+            .tab("nav.orders.assigned")
             .keywords("palette.keywords.orders")
             .gate(
                 NavigationGate.requires(ASSIGNED_JOB_ORDERS)

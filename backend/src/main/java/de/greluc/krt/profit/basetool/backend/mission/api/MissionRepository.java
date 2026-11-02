@@ -83,19 +83,6 @@ public interface MissionRepository
       @Param("cutoff") Instant cutoff);
 
   /**
-   * Projects the given missions to their reference DTOs in one read, whatever the caller's scope.
-   *
-   * @param ids the mission ids
-   * @return the existing missions' references, in no particular order
-   */
-  @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto(m.id, m.name,
-      m.status, m.plannedStartTime) FROM Mission m WHERE m.id IN :ids
-      """)
-  List<MissionReferenceDto> findReferencesByIdIn(@Param("ids") Collection<UUID> ids);
-
-  /**
    * Loads a mission by id with its {@code participants}, their to-one associations and their {@code
    * orgUnits} fetched.
    *
@@ -204,8 +191,9 @@ public interface MissionRepository
    *
    * <p>The own-unit part follows {@link #findNextScopedMission}: the pin when set, else the member
    * units, every mission when {@code ownOrgWide}, or the public missions when {@code
-   * ownPublicOnly}. A signed-up mission counts only inside the caller's mission visibility. Fetches
-   * only {@code owningOrgUnit}, so the limit stays in SQL.
+   * ownPublicOnly}. The rows are candidates: the caller applies the mission-detail visibility
+   * (ancestors included) page by page. Fetches only {@code owningOrgUnit}, so the limit stays in
+   * SQL.
    *
    * @param now exclusive lower bound on {@code plannedStartTime}
    * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
@@ -213,11 +201,9 @@ public interface MissionRepository
    *     the whole organisation (admin in all-squadrons mode)
    * @param ownPublicOnly {@code true} when the caller has no unit scope and is not an admin, so the
    *     own-unit part holds the public missions only
-   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
    * @param activeOrgUnitId the single pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the caller's effective org-unit reach; consulted only without a pin
    * @param userId the caller whose sign-ups count, or {@code null} for none
-   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member or above
    * @param pageable the limit ({@code PageRequest.of(0, limit)})
    * @return the matching missions, soonest first, at most {@code pageable} size
    */
@@ -229,19 +215,16 @@ public interface MissionRepository
           + " OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
           + " OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
           + " OR (EXISTS (SELECT 1 FROM MissionParticipant p"
-          + " WHERE p.mission = m AND p.user.id = :userId) AND "
-          + MissionScope.PREDICATE
-          + ")) ORDER BY m.plannedStartTime ASC, m.id ASC")
+          + " WHERE p.mission = m AND p.user.id = :userId))) ORDER BY m.plannedStartTime ASC,"
+          + " m.id ASC")
   List<Mission> findUpcomingOwnOrSignedUp(
       @Param("now") Instant now,
       @Param("statuses") Collection<String> statuses,
       @Param("ownOrgWide") boolean ownOrgWide,
       @Param("ownPublicOnly") boolean ownPublicOnly,
-      @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("userId") @Nullable UUID userId,
-      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       Pageable pageable);
 
   /**

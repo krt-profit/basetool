@@ -88,6 +88,9 @@ the viewer has any:
   cascade above (REQ-ORG-015), to the Mission Manager cascade and to admins. No other viewer sees a
   foreign internal mission through this lookup, any fallback of it, the lists, the search, the
   calendar, the dashboard widgets or the operation finance views.
+- **A mission reference read for another module** (`mission.api.MissionReferences`) returns a
+  mission the viewer may not see (the mission and every ancestor) without its name and planned
+  start; its id and status stay.
 - **A mission without an owning org unit cannot be internal.** Create, the flags patch and the
   owning-unit reassignment answer `400 Bad Request` when the result would be an internal mission
   without a unit, and the check constraint `ck_mission_internal_has_owning_org_unit` enforces it in
@@ -248,12 +251,18 @@ the read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
   (REQ-MISSION-008); a caller without a unit scope gets the public missions only, an admin in
   all-squadrons mode every mission.
 - **Sign-ups.** A mission the caller holds a participant row on (`PLANNED` / `ACTIVE`, planned start
-  in the future) is included even when another unit owns it, but only inside the caller's mission
-  visibility (the scope predicate of the mission list, REQ-MISSION-012): a signed-up internal
-  mission of a unit the caller cannot see stays out. A mission in both sets appears once.
+  in the future) is included even when another unit owns it, but only when the caller may read the
+  mission **and every ancestor** (the mission detail rule, REQ-MISSION-008, including the Mission
+  Manager grant cascade): a signed-up internal mission of a unit the caller cannot see stays out. A
+  mission in both sets appears once.
+- **Visibility of every row.** The rule of the sign-ups applies to the own-unit and the public
+  rows as well: a public child of an internal parent the caller may not read is never returned,
+  whichever branch selected it. The candidates are filtered before the limit applies, so a hidden
+  row never takes the place of a later visible one.
 - **Order and bound.** Sorted by `plannedStartTime` ascending, ties by id. `limit` is the most rows
   returned, 1 to 10, **5** when absent; a value outside 1 to 10 is `400 Bad Request`. The union,
-  the order and the limit are one query, so a page of ten holds the ten soonest of both sets.
+  the order is one query, read page by page until the limit of visible rows is reached, so a page of
+  ten holds the ten soonest visible missions of both sets.
 - **No upcoming mission.** The answer is `200` with an empty list, never `204`.
 - **Row content.** Each row carries the per-caller `signedUp` flag and the registered count from the
   same batched reads as the list (REQ-MISSION-012, REQ-DATA-003) and its owning org unit from the
@@ -266,6 +275,8 @@ the read of the dashboard's „Nächster Einsatz" widget (REQ-UI-034).
 - [x] The result holds the upcoming own-unit missions and the upcoming signed-up missions of another visible unit, each once, soonest first.
 - [x] A mission of a foreign unit the caller is not signed up for is not in the result.
 - [x] A signed-up internal mission of a unit the caller cannot see is not in the result.
+- [x] A public child of an unreadable internal parent is not in the result for a signed-up member of another unit nor for a caller without a unit.
+- [x] A signed-up internal mission below a unit the caller holds a Mission Manager grant on is in the result.
 - [x] A caller without a unit gets the public upcoming missions and no foreign internal one.
 - [x] The pin narrows the own-unit part to the pinned unit and leaves the sign-ups.
 - [x] `limit` bounds the result and keeps the soonest entries; 1 and 10 are accepted, 0 and 11 answer 400, an absent `limit` means 5.

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
@@ -49,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -82,6 +85,8 @@ class MissionServiceTest {
 
   @Mock private AuditService auditService;
 
+  @Mock private MissionVisibility missionVisibility;
+
   private MissionService missionService;
 
   @BeforeEach
@@ -102,7 +107,8 @@ class MissionServiceTest {
             authHelperService,
             auditService,
             null,
-            mock(MissionNotificationPublisher.class));
+            mock(MissionNotificationPublisher.class),
+            missionVisibility);
   }
 
   @Test
@@ -228,30 +234,80 @@ class MissionServiceTest {
   }
 
   @Test
-  void getUpcomingOwnAndSignedUp_scopedMember_passesScopeCallerAndLimit() {
+  void getUpcomingOwnAndSignedUp_scopedMember_passesScopeAndCallerAndKeepsVisibleRows() {
     UUID orgA = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     Mission upcoming = new Mission();
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
     when(missionRepository.findUpcomingOwnOrSignedUp(
             any(),
             eq(List.of("PLANNED", "ACTIVE")),
             eq(false),
             eq(false),
-            eq(false),
             isNull(),
             eq(Set.of(orgA)),
             eq(userId),
-            eq(true),
-            eq(PageRequest.of(0, 4))))
+            eq(PageRequest.of(0, 50))))
         .thenReturn(List.of(upcoming));
+    when(missionVisibility.canSeeMission(upcoming)).thenReturn(true);
 
-    List<Mission> result = missionService.getUpcomingOwnAndSignedUp(4);
+    assertEquals(List.of(upcoming), missionService.getUpcomingOwnAndSignedUp(4));
+  }
 
-    assertEquals(List.of(upcoming), result);
+  @Test
+  void getUpcomingOwnAndSignedUp_dropsInvisibleRowsBeforeTheLimit() {
+    Mission hidden = new Mission();
+    Mission first = new Mission();
+    Mission second = new Mission();
+    when(requestScopeResolver.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(UUID.randomUUID())));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(), any(), anyBoolean(), anyBoolean(), any(), any(), any(), any()))
+        .thenReturn(List.of(hidden, first, second));
+    when(missionVisibility.canSeeMission(hidden)).thenReturn(false);
+    when(missionVisibility.canSeeMission(first)).thenReturn(true);
+    when(missionVisibility.canSeeMission(second)).thenReturn(true);
+
+    assertEquals(List.of(first, second), missionService.getUpcomingOwnAndSignedUp(2));
+  }
+
+  @Test
+  void getUpcomingOwnAndSignedUp_readsFurtherPagesWhenTheFirstIsFilteredAway() {
+    List<Mission> fullPage = new ArrayList<>();
+    for (int i = 0; i < 50; i++) {
+      fullPage.add(new Mission());
+    }
+    Mission later = new Mission();
+    when(requestScopeResolver.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(UUID.randomUUID())));
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            any(),
+            anyBoolean(),
+            anyBoolean(),
+            any(),
+            any(),
+            any(),
+            eq(PageRequest.of(0, 50))))
+        .thenReturn(fullPage);
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            any(),
+            anyBoolean(),
+            anyBoolean(),
+            any(),
+            any(),
+            any(),
+            eq(PageRequest.of(1, 50))))
+        .thenReturn(List.of(later));
+    when(missionVisibility.canSeeMission(any(Mission.class))).thenReturn(false);
+    when(missionVisibility.canSeeMission(later)).thenReturn(true);
+
+    assertEquals(List.of(later), missionService.getUpcomingOwnAndSignedUp(1));
   }
 
   @Test
@@ -260,18 +316,8 @@ class MissionServiceTest {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pin, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
     when(missionRepository.findUpcomingOwnOrSignedUp(
-            any(),
-            any(),
-            eq(false),
-            eq(false),
-            eq(false),
-            eq(pin),
-            eq(Set.of()),
-            isNull(),
-            eq(true),
-            eq(PageRequest.of(0, 5))))
+            any(), any(), eq(false), eq(false), eq(pin), eq(Set.of()), isNull(), any()))
         .thenReturn(List.of());
 
     assertEquals(List.of(), missionService.getUpcomingOwnAndSignedUp(5));
@@ -282,33 +328,29 @@ class MissionServiceTest {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
     when(missionRepository.findUpcomingOwnOrSignedUp(
-            any(), any(), eq(true), eq(false), eq(true), any(), any(), any(), eq(true), any()))
+            any(), any(), eq(true), eq(false), any(), any(), any(), any()))
         .thenReturn(List.of());
 
     missionService.getUpcomingOwnAndSignedUp(5);
 
     verify(missionRepository)
-        .findUpcomingOwnOrSignedUp(
-            any(), any(), eq(true), eq(false), eq(true), any(), any(), any(), eq(true), any());
+        .findUpcomingOwnOrSignedUp(any(), any(), eq(true), eq(false), any(), any(), any(), any());
   }
 
   @Test
-  void getUpcomingOwnAndSignedUp_unitlessMember_isLimitedToPublicMissions() {
+  void getUpcomingOwnAndSignedUp_unitlessMember_isLimitedToPublicCandidates() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
     when(missionRepository.findUpcomingOwnOrSignedUp(
-            any(), any(), eq(false), eq(true), eq(false), any(), any(), any(), eq(true), any()))
+            any(), any(), eq(false), eq(true), any(), any(), any(), any()))
         .thenReturn(List.of());
 
     missionService.getUpcomingOwnAndSignedUp(5);
 
     verify(missionRepository)
-        .findUpcomingOwnOrSignedUp(
-            any(), any(), eq(false), eq(true), eq(false), any(), any(), any(), eq(true), any());
+        .findUpcomingOwnOrSignedUp(any(), any(), eq(false), eq(true), any(), any(), any(), any());
   }
 
   @Test
