@@ -265,6 +265,8 @@ public class CapabilityFlagsAdvice {
    *     context
    * @param canManageMissionFinance whether mission finance and owner change are offered in the
    *     active context
+   * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
+   *     whatever unit is pinned
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -279,13 +281,14 @@ public class CapabilityFlagsAdvice {
       boolean canManagePromotions,
       boolean canSeeHangarOwnerDetails,
       boolean canManageJobOrders,
-      boolean canManageMissionFinance) {
+      boolean canManageMissionFinance,
+      boolean canActAsOfficerAnywhere) {
 
     /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
     public static final CapabilitiesResponse NONE =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, false, false, false, false, false,
-            false);
+            false, false);
 
     /**
      * Every role-derived capability on, as an admin passes each gate; the server switch stays the
@@ -296,7 +299,20 @@ public class CapabilityFlagsAdvice {
      */
     public static CapabilitiesResponse admin(boolean canMarkStolen) {
       return new CapabilitiesResponse(
-          true, true, true, true, true, true, canMarkStolen, true, true, true, true, true, true);
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          canMarkStolen,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true);
     }
   }
 }

@@ -141,7 +141,8 @@ public class MeController {
         officerHere,
         officerHere,
         officerHere,
-        officerHere);
+        officerHere,
+        ownerScopeService.canActAsOfficerAnywhere());
   }
 
   /**
@@ -269,6 +270,8 @@ public class MeController {
    *     context
    * @param canManageMissionFinance whether mission finance and owner change are offered in the
    *     active context
+   * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
+   *     whatever unit is pinned; {@code true} for an admin
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -286,7 +289,8 @@ public class MeController {
       boolean canManagePromotions,
       boolean canSeeHangarOwnerDetails,
       boolean canManageJobOrders,
-      boolean canManageMissionFinance) {}
+      boolean canManageMissionFinance,
+      boolean canActAsOfficerAnywhere) {}
 
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.

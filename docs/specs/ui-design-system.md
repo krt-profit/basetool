@@ -2410,7 +2410,12 @@ optimistic-lock version, so an edit in one never 409s another:
 - **Deletion on next load:** an entry the user may no longer see user-wide, and a stored key the
   entry registry no longer knows, is detected by the frontend while it builds the navigation and
   deleted from every section through the backend, which holds no key-to-permission knowledge.
-  Unavailability in the active context deletes nothing. Regaining a role restores nothing.
+  Unavailability in the active context deletes nothing. Regaining a role restores nothing. A right
+  tied to the pinned unit (the Leitung and promotion-management entries) counts as lost user-wide
+  only when the caller holds officer reach in no unit (`canActAsOfficerAnywhere`); a right that
+  does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
+  switches of the installation and the page, and a capability read that failed, delete nothing.
+  The stored start pages of both modes are checked like every other stored key.
 
 **Browser-side state stays in the browser** (REQ-UI-017, ADR-0120): group collapse
 (`krt.sidebar.*`), the recent pages (`krt.recent`) and the „Häufig" ranking (REQ-UI-033).

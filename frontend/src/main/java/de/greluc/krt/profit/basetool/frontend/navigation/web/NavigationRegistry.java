@@ -352,7 +352,7 @@ public class NavigationRegistry {
     if (group.permits(entry, access)) {
       return NavigationAvailability.AVAILABLE;
     }
-    return group.gate().permitsRoles(access) && entry.gate().permitsRoles(access)
+    return group.gate().permitsUserWide(access) && entry.gate().permitsUserWide(access)
         ? NavigationAvailability.CONTEXT
         : NavigationAvailability.GONE;
   }

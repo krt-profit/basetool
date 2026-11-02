@@ -83877,6 +83877,9 @@
       "CapabilitiesResponse" : {
         "type" : "object",
         "properties" : {
+          "canActAsOfficerAnywhere" : {
+            "type" : "boolean"
+          },
           "canManageBank" : {
             "type" : "boolean"
           },

@@ -28,6 +28,6 @@ public enum NavigationAvailability {
   /** The caller holds the entry's roles, but the active context does not offer it. */
   CONTEXT,
 
-  /** The caller no longer holds a role the entry needs, in any context. */
+  /** The caller no longer holds a role or right the entry needs, in any context. */
   GONE
 }

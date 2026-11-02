@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
@@ -41,9 +42,11 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -119,9 +122,17 @@ public class NavigationPreferencesReader {
     for (NavigationMode mode : NavigationMode.values()) {
       gone.addAll(tabBarResolver.gone(mode, stored.tabBars().of(mode), access));
     }
+    gone.addAll(goneStartPages(stored.appearance(), access));
     return new Resolution(
         new NavigationPersonalisation(favourites, hidden, order, stored.tabBars()),
         gone.stream().distinct().toList());
+  }
+
+  private List<String> goneStartPages(AppearanceResponse stored, NavigationAccess access) {
+    return Stream.of(stored.startPageMember(), stored.startPageAdmin())
+        .filter(Objects::nonNull)
+        .filter(key -> availability(registry.starrable(key), access) == NavigationAvailability.GONE)
+        .toList();
   }
 
   private NavigationOrder resolveOrder(

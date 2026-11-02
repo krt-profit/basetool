@@ -3824,7 +3824,8 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
   seat holder reads `true` through the authorities their seat mints (REQ-ROLE-002), not through an
   officer role.
 
-**The officer flags:** `hasOfficerReach`, `canOpenLeitung`,
+**The officer flags:** `canActAsOfficerAnywhere` (reach in at least one unit whatever the pin, which
+tells a lost seat from a pin outside it), `hasOfficerReach`, `canOpenLeitung`,
 `canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`
 (and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);

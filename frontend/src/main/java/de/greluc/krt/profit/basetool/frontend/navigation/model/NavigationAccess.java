@@ -27,17 +27,31 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param roles the bare role codes the caller reaches through the role hierarchy
  * @param flags the per-request flags that are set
+ * @param rightsKnown whether the flags come from a capability answer; {@code false} after a failed
+ *     read, when an unset flag says nothing about a lost right
  */
-public record NavigationAccess(@NotNull Set<String> roles, @NotNull Set<NavigationFlag> flags) {
+public record NavigationAccess(
+    @NotNull Set<String> roles, @NotNull Set<NavigationFlag> flags, boolean rightsKnown) {
 
   /**
    * Copies the sets so the access stays immutable.
    *
    * @param roles the reachable bare role codes
    * @param flags the set flags
+   * @param rightsKnown whether the flags come from a capability answer
    */
   public NavigationAccess {
     roles = Set.copyOf(roles);
     flags = Set.copyOf(flags);
+  }
+
+  /**
+   * An access whose flags come from a capability answer.
+   *
+   * @param roles the reachable bare role codes
+   * @param flags the set flags
+   */
+  public NavigationAccess(@NotNull Set<String> roles, @NotNull Set<NavigationFlag> flags) {
+    this(roles, flags, true);
   }
 }
