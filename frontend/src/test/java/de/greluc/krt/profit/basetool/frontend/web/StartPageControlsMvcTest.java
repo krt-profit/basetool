@@ -43,7 +43,10 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPrefere
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.StartPageUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -169,6 +172,39 @@ class StartPageControlsMvcTest {
         .contains("data-testid=\"start-page-select-admin\"")
         .containsPattern("<option value=\"missions.list\"\\s+selected")
         .containsPattern("<option value=\"admin.members\"\\s+selected");
+  }
+
+  @Test
+  @DisplayName("the select groups its pages by navigation group, with no equal labels in a group")
+  void theSelectGroupsEqualLabelsApart() throws Exception {
+    stored(null, null);
+
+    String html = page("/profile", admin());
+
+    for (String mode : List.of("member", "admin")) {
+      String select =
+          html.substring(
+              html.indexOf("data-testid=\"start-page-select-" + mode + "\""),
+              html.indexOf("</select>", html.indexOf("data-testid=\"start-page-select-" + mode)));
+      String afterDashboard = select.substring(select.indexOf("</option>") + "</option>".length());
+      assertThat(afterDashboard.replaceAll("(?s)<optgroup.*?</optgroup>", "").trim())
+          .as("%s options outside an optgroup", mode)
+          .isEmpty();
+      Matcher groups =
+          Pattern.compile("(?s)<optgroup label=\"([^\"]+)\">(.*?)</optgroup>").matcher(select);
+      int found = 0;
+      while (groups.find()) {
+        found++;
+        List<String> labels = new ArrayList<>();
+        Matcher options =
+            Pattern.compile("(?s)<option[^>]*>([^<]+)</option>").matcher(groups.group(2));
+        while (options.find()) {
+          labels.add(options.group(1).trim());
+        }
+        assertThat(labels).as("%s group %s", mode, groups.group(1)).doesNotHaveDuplicates();
+      }
+      assertThat(found).as("%s optgroups", mode).isPositive();
+    }
   }
 
   @Test

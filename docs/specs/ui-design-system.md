@@ -2730,6 +2730,9 @@ default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI
   can be a favourite; it turns into „Startseite entfernen" on the chosen page. A write is
   `PUT /api/v1/navigation/preferences/appearance/start-page/{mode}` with the appearance version,
   which it bumps, so it conflicts with „Darstellung" writes and with nothing else.
+- **Profile select.** The select per mode lists the pages in `optgroup`s headed by their navigation
+  group, so equal labels in different groups stay apart; two pages of one group that share a label
+  show their tab label instead (e.g. „Meine Aufträge", „Zugewiesene Aufträge" beside „Aufträge").
 - A start page whose key the member may no longer see user-wide is deleted on the next load
   (REQ-UI-032).
 
