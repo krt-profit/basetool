@@ -9,13 +9,19 @@ Do not run destructive Git commands without explicit user instruction: `git rese
 
 ## Worktrees and temporary files
 
-**Worktrees and temporary files live outside the checkout.** On the owner's workstation that is
-`D:\Coding\claude-worktrees` — a worktree of this repository goes to
-`D:\Coding\claude-worktrees\basetool\<name>` and nowhere else: never inside the checkout (no
-`.claude/worktrees`, no `.worktrees`, which also slow `spotlessApply`), never next to it. Temporary
-folders and files (scratch scripts, intermediate output, a throwaway `GRADLE_USER_HOME`, a
-`git archive` extract) land there as well, not in `%TEMP%`, `/tmp` or the repository. A tool default
-that points elsewhere does not change this; pass the path explicitly and clean up afterwards.
+**Worktrees and temporary files live outside the checkout**, and on the owner's workstation every
+agent keeps them in a folder of its own (`<agent>` = `claude`, `codex`, …):
+
+- **Worktrees:** `D:\Coding\Agents\Worktrees\<agent>\basetool\<name>` and nowhere else — never
+  inside the checkout (no `.claude/worktrees`, no `.worktrees`, which also slow `spotlessApply`),
+  never next to it.
+- **Temporary files:** `D:\Coding\Agents\Temp\<agent>\<task>`, one folder per piece of work, for
+  scratch scripts, intermediate output, a throwaway `GRADLE_USER_HOME`, a `git archive` extract,
+  commit-message and PR-body files. Not `%TEMP%`, `/tmp` or the repository.
+- **Clean up:** remove the task folder when the work is done, and a worktree once its branch is
+  merged or abandoned. Never touch another agent's folder.
+
+A tool default that points elsewhere does not change this; pass the path explicitly.
 
 ## Before every push
 
