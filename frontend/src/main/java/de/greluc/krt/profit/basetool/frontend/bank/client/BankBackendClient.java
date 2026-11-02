@@ -110,9 +110,6 @@ public class BankBackendClient {
   private static final ParameterizedTypeReference<List<OrgUnitBankBalanceDto>> BALANCE_LIST =
       new ParameterizedTypeReference<>() {};
 
-  private static final ParameterizedTypeReference<List<BankBookingRequestDto>>
-      BOOKING_REQUEST_LIST = new ParameterizedTypeReference<>() {};
-
   private static final ParameterizedTypeReference<List<BankAccountRefDto>> ACCOUNT_REF_LIST =
       new ParameterizedTypeReference<>() {};
 
@@ -619,45 +616,6 @@ public class BankBackendClient {
   @Nullable
   public List<OrgUnitBankBalanceDto> orgUnitBalances() {
     return backendApiClient.get("/api/v1/bank/org-units/balances", BALANCE_LIST);
-  }
-
-  /**
-   * Reads the caller's own org-unit booking requests (REQ-BANK-022).
-   *
-   * @return the requests, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public List<BankBookingRequestDto> ownOrgUnitRequests() {
-    return backendApiClient.get("/api/v1/bank/org-units/requests", BOOKING_REQUEST_LIST);
-  }
-
-  /**
-   * Reads one page of the caller's own org-unit booking requests in the given states, newest first
-   * (REQ-BANK-022).
-   *
-   * @param statuses the lifecycle states to include, each sent as its own {@code status} value;
-   *     empty for every state
-   * @param size the page size
-   * @return the page with the total over all pages, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public PageResponse<BankBookingRequestDto> ownOrgUnitRequestPage(
-      @NotNull List<String> statuses, int size) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/bank/org-units/requests/page")
-            .queryParam("size", size);
-    statuses.forEach(s -> uri.queryParam("status", s));
-    return backendApiClient.get(uri.toUriString(), BOOKING_REQUEST_PAGE);
-  }
-
-  /**
-   * Reads the booking requests on the accounts the caller is responsible for.
-   *
-   * @return the requests, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public List<BankBookingRequestDto> foreignOrgUnitRequests() {
-    return backendApiClient.get("/api/v1/bank/org-units/requests/foreign", BOOKING_REQUEST_LIST);
   }
 
   /**

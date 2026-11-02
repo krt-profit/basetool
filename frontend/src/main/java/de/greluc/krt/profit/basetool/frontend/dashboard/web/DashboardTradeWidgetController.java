@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
-import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
@@ -83,7 +83,7 @@ public class DashboardTradeWidgetController {
 
   private final SupplyBackendClient supplyClient;
 
-  private final BankBackendClient bankClient;
+  private final OrgUnitBankRequestsBackendClient bankRequestsClient;
 
   private final OwnOrgUnits ownOrgUnits;
 
@@ -189,7 +189,7 @@ public class DashboardTradeWidgetController {
         DashboardWidgetOptions.statusOf(
             DashboardWidgetType.BANK_REQUESTS, status, DashboardStatus.OPEN);
     PageResponse<BankBookingRequestDto> own =
-        bankClient.ownOrgUnitRequestPage(
+        bankRequestsClient.ownPage(
             requestStates(resolved), DashboardWidgetOptions.rows(rows, BANK_REQUESTS_DEFAULT_ROWS));
     model.addAttribute("bankRequestRows", own == null ? List.of() : own.content());
     model.addAttribute("bankRequestTotal", own == null ? 0 : own.totalElements());
