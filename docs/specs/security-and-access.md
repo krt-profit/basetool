@@ -1268,7 +1268,14 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
 - **A seat confers reach only while its holder holds `KRT Member`.** An appointment of a member
   without it is refused with `409 LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER` — every seat-writing path of
   `OrgUnitMembershipService`: Bereich rank, OL seat, Grand Admiral, SK lead, squadron rank. A seat
-  whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029).
+  whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029): the
+  authority converter then mints no rank-derived `LOGISTICIAN` / `MISSION_MANAGER` authority, flat
+  or contextual, and no cascaded one; only the explicit `is_logistician` / `is_mission_manager`
+  flags stay in force. The same holds wherever else a rank is read: the exchange's Logistician
+  units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`), the oversight scope of the
+  blueprint overview and the org-unit bank balances, and the Leitung page.
+  **Enforced by:** `RetainedSeatWithoutKrtMemberIntegrationTest`,
+  `CustomJwtGrantedAuthoritiesConverterTest`.
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
 **Where it is read.** The scope kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too, narrowed to the units with promotion enabled (REQ-PROMO-004). A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.

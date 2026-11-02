@@ -142,6 +142,7 @@ class OwnerScopeServiceTest {
   @BeforeEach
   void setUp() {
     lenient().when(authHelper.isAuthenticated()).thenReturn(true);
+    lenient().when(authHelper.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
 
     squadronA = new Squadron();
     squadronA.setId(SQUADRON_A_ID);

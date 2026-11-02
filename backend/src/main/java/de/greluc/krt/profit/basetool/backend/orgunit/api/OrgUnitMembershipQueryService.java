@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -60,6 +62,7 @@ public class OrgUnitMembershipQueryService {
   private final SpecialCommandService specialCommandService;
   private final StaffelMembershipResolver staffelMembershipResolver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
+  private final UserRepository userRepository;
 
   /**
    * Lists every active Staffel and Spezialkommando as picker options, independent of memberships;
@@ -218,16 +221,19 @@ public class OrgUnitMembershipQueryService {
 
   /**
    * Returns the org-unit ids in which the user is a Logistician: the units whose membership makes
-   * them one by {@link OrgUnitMembership#isLogisticianOfOwnUnit()}, plus the units below a Bereich
-   * or Organisationsleitung they are one of (REQ-SEC-005, REQ-XCH-043).
+   * them one by {@link OrgUnitMembership#isLogisticianOfOwnUnit(boolean)}, plus the units below a
+   * Bereich or Organisationsleitung they are one of (REQ-SEC-005, REQ-XCH-043). A rank counts only
+   * while the user holds {@code KRT Member}; the explicit flag always does (REQ-SEC-015).
    *
    * @param userId the user whose memberships to read; never {@code null}.
    * @return the org-unit ids; never {@code null}, possibly empty.
    */
   @NotNull
   public Set<UUID> findLogisticianOrgUnitIds(@NotNull UUID userId) {
+    boolean seatsConfer = userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER));
     return orgUnitCascadeService.grantedUnits(
-        membershipRepository.findAllByIdUserId(userId), OrgUnitMembership::isLogisticianOfOwnUnit);
+        membershipRepository.findAllByIdUserId(userId),
+        membership -> membership.isLogisticianOfOwnUnit(seatsConfer));
   }
 
   /**
