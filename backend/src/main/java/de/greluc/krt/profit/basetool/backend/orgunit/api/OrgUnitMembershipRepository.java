@@ -228,6 +228,18 @@ public interface OrgUnitMembershipRepository
   Set<UUID> findLeadershipUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
+   * Returns every member who holds a leadership seat in any org unit. Backs {@code SEAT_HOLDERS}.
+   *
+   * @return the distinct seat holders' user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      """
+      SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.role <>
+      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER
+      """)
+  Set<UUID> findAllLeadershipUserIds();
+
+  /**
    * Whether a member holds any leadership seat: a squadron rank, a Bereich rank, an
    * Organisationsleitung seat or an SK lead (REQ-ORG-029).
    *

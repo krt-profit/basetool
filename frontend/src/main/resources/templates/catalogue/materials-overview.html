@@ -14,12 +14,16 @@
             <span class="page-eyebrow" data-testid="page-eyebrow" th:text="#{nav.materials}">Handel</span>
             <div class="page-title">
                 <h1 th:text="#{nav.materials.overview}">Preis-Übersicht</h1>
+                <th:block th:if="${navigationCurrent != null and navigationFavourites != null}">
+                    <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${navigationCurrent}, false)}" />
+                </th:block>
                 <span th:if="${uexAge != null}" class="chip chip--muted" data-testid="uex-age"
                       th:title="${uexAge.syncedAt}"
                       th:text="#{${'materials.uexAge.' + uexAge.unit}(${uexAge.amount})}">UEX · vor 14 min</span>
             </div>
         </div>
     </div>
+    <th:block th:replace="~{kernel/fragments/nav-entries :: pageTabs('materials.overview')}"></th:block>
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 

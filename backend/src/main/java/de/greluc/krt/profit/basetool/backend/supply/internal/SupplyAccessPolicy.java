@@ -21,17 +21,15 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriceAudience;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,7 +51,8 @@ public class SupplyAccessPolicy {
   /** The contextual role that stands for the lead or a Logistician of a unit. */
   static final String UNIT_MANAGER_ROLE = "LOGISTICIAN";
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelperService;
   private final SupplySettingsService settingsService;
   private final ObjectProvider<NeedPriceAudience> priceAudiences;
@@ -74,7 +73,7 @@ public class SupplyAccessPolicy {
    * @return {@code true} when the caller manages the unit's needs and donations
    */
   public boolean canManageUnit(@NotNull UUID orgUnitId) {
-    return ownerScopeService.hasRoleInOrgUnit(orgUnitId, UNIT_MANAGER_ROLE);
+    return accessGateService.hasRoleInOrgUnit(orgUnitId, UNIT_MANAGER_ROLE);
   }
 
   /**
@@ -95,18 +94,7 @@ public class SupplyAccessPolicy {
    * @return the ids of the units the caller leads or is a Logistician of
    */
   public @NotNull Set<UUID> managedUnitIds() {
-    Set<UUID> ids = new HashSet<>();
-    authHelperService
-        .currentAuthentication()
-        .ifPresent(authentication -> {
-          for (GrantedAuthority authority : authentication.getAuthorities()) {
-            if (authority instanceof OrgUnitContextualAuthority contextual
-                && UNIT_MANAGER_ROLE.equals(contextual.roleName())) {
-              ids.add(contextual.orgUnitId());
-            }
-          }
-        });
-    return ids;
+    return requestScopeResolver.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE);
   }
 
   /**
@@ -116,12 +104,12 @@ public class SupplyAccessPolicy {
    * @return {@code true} for the governing leadership
    */
   public boolean isGoverningLeadership() {
-    if (authHelperService.isAdmin() || ownerScopeService.currentUserIsOlMember()) {
+    if (authHelperService.isAdmin() || requestScopeResolver.currentUserIsOlMember()) {
       return true;
     }
     Optional<UUID> area = settingsService.governingAreaId();
     return area.isPresent()
-        && ownerScopeService.currentUserHoldsRoleOnOrgUnit(
+        && requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
             area.get(), MembershipRole.BEREICHSLEITER);
   }
 

@@ -26,12 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPriceOverviewDto;
@@ -56,6 +58,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -74,7 +77,23 @@ class MaterialServiceTest {
 
   @Mock private MaterialMapper materialMapper;
 
+  @Mock private MaterialDeletionObserver materialDeletionObserver;
+
   @InjectMocks private MaterialService materialService;
+
+  @Test
+  void deleteMaterial_releasesTheMaterialsDependantsBeforeTheDelete() {
+    UUID id = UUID.randomUUID();
+    Material material = new Material();
+    material.setId(id);
+    when(materialRepository.findById(id)).thenReturn(Optional.of(material));
+
+    materialService.deleteMaterial(id);
+
+    InOrder inOrder = inOrder(materialDeletionObserver, materialRepository);
+    inOrder.verify(materialDeletionObserver).beforeMaterialDelete(id);
+    inOrder.verify(materialRepository).delete(material);
+  }
 
   @Test
   void findAllReference_returnsTheCompleteUnboundedProjection() {

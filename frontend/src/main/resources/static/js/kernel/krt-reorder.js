@@ -38,6 +38,9 @@
  * @property {(move: KrtReorderMove) => Promise<boolean>} persist saves the move and re-renders
  *     the list; resolves true when the server accepted it
  * @property {() => boolean} [dragAllowed] whether a drag may start; defaults to a fine pointer
+ * @property {(target: Element) => boolean} [owns] whether a control or key target inside the
+ *     container belongs to this list; defaults to every target. Lists nested in one another
+ *     use it so that an inner control moves only the inner list.
  */
 
 /**
@@ -133,6 +136,7 @@ export const krtReorder = {
             (() =>
                 typeof window.matchMedia !== 'function' ||
                 window.matchMedia('(pointer: fine)').matches);
+        const owns = options.owns ?? (() => true);
         let busy = false;
 
         /** @returns {HTMLElement[]} the items in their current order */
@@ -149,6 +153,7 @@ export const krtReorder = {
             const rows = items();
             rows.forEach((row, i) => {
                 row.querySelectorAll(`[${MOVE_ATTR}]`).forEach((btn) => {
+                    if (!owns(btn)) return;
                     const dir = btn.getAttribute(MOVE_ATTR);
                     const blocked =
                         (dir === 'up' && i === 0) || (dir === 'down' && i === rows.length - 1);
@@ -229,7 +234,7 @@ export const krtReorder = {
 
         container.addEventListener('click', (e) => {
             const btn = /** @type {Element | null} */ (e.target)?.closest?.(`[${MOVE_ATTR}]`);
-            if (!btn || !container.contains(btn)) return;
+            if (!btn || !container.contains(btn) || !owns(btn)) return;
             e.preventDefault();
             if (btn.getAttribute('aria-disabled') === 'true') return;
             const row = /** @type {HTMLElement | null} */ (btn.closest(itemSelector));
@@ -240,9 +245,9 @@ export const krtReorder = {
         container.addEventListener('keydown', (e) => {
             const direction = reorderKeyDirection(e);
             if (!direction) return;
-            const row = /** @type {HTMLElement | null} */ (
-                /** @type {Element | null} */ (e.target)?.closest?.(itemSelector) ?? null
-            );
+            const target = /** @type {Element | null} */ (e.target);
+            if (!target || !owns(target)) return;
+            const row = /** @type {HTMLElement | null} */ (target.closest?.(itemSelector) ?? null);
             if (!row || !container.contains(row)) return;
             e.preventDefault();
             move(row, direction);

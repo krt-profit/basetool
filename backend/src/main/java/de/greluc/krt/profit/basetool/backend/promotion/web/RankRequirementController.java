@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.web;
 import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementWriteRequest;
@@ -69,6 +70,8 @@ public class RankRequirementController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of rank requirements
    */
   @GetMapping
@@ -80,7 +83,8 @@ public class RankRequirementController {
   public PageResponse<RankRequirementResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -88,7 +92,7 @@ public class RankRequirementController {
             sort,
             RankRequirementService.SORTABLE_FIELDS,
             RankRequirementService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.list(pageable));
+    return PageResponse.of(service.list(pageable, view));
   }
 
   /**
@@ -98,6 +102,8 @@ public class RankRequirementController {
    *
    * @param fromRank ordinal of the current rank
    * @param toRank ordinal of the rank being promoted to
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return the rank requirements applicable to that transition
    */
   @GetMapping("/by-ranks")
@@ -106,8 +112,10 @@ public class RankRequirementController {
     @ApiResponse(responseCode = "200", description = "Requirements for the rank transition.")
   })
   public List<RankRequirementResponse> listByRanks(
-      @RequestParam int fromRank, @RequestParam int toRank) {
-    return service.listByRanks(fromRank, toRank);
+      @RequestParam int fromRank,
+      @RequestParam int toRank,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
+    return service.listByRanks(fromRank, toRank, view);
   }
 
   /**
@@ -129,15 +137,17 @@ public class RankRequirementController {
 
   /**
    * Persists a new {@link de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement}
-   * describing the minimum score and conditions for a rank transition. Restricted to ADMIN or
-   * OFFICER callers.
+   * describing the minimum score and conditions for a rank transition. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param request validated payload describing the new rank requirement
    * @return the persisted rank requirement in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new rank requirement. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new rank requirement. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Rank requirement created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -157,7 +167,9 @@ public class RankRequirementController {
    * @return the updated rank requirement in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a rank requirement. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Update a rank requirement. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Rank requirement updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -172,14 +184,16 @@ public class RankRequirementController {
   }
 
   /**
-   * Permanently removes the rank requirement identified by {@code id}. Restricted to ADMIN or
-   * OFFICER callers.
+   * Permanently removes the rank requirement identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the rank requirement to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a rank requirement. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Delete a rank requirement. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")

@@ -158,12 +158,14 @@ class WebAppManifestControllerTest {
   }
 
   @Test
-  @DisplayName("declares a standalone app scoped to the whole origin, starting at /")
+  @DisplayName(
+      "declares a standalone app scoped to the whole origin, starting at the start page entry"
+          + " point")
   void declaresStandaloneApp() throws Exception {
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(jsonPath("$.display").value("standalone"))
-        .andExpect(jsonPath("$.start_url").value("/"))
+        .andExpect(jsonPath("$.start_url").value("/start"))
         .andExpect(jsonPath("$.scope").value("/"))
         .andExpect(jsonPath("$.id").value("/"));
   }

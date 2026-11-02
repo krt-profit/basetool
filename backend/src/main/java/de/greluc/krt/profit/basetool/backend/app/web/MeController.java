@@ -21,13 +21,16 @@ package de.greluc.krt.profit.basetool.backend.app.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -57,7 +60,11 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class MeController {
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
+
+  /** Narrows the promotion capabilities to the units that have promotion enabled. */
+  private final PromotionReach promotionReach;
 
   /** Answers role questions through the configured hierarchy rather than by literal match. */
   private final AuthHelperService authHelperService;
@@ -71,6 +78,9 @@ public class MeController {
 
   /** Supplies the server switch of the „gestohlen" marker. */
   private final InventoryProperties inventoryProperties;
+
+  /** Answers whether the caller holds a job-order assignee entry. */
+  private final JobOrderAssigneeLookup jobOrderAssigneeLookup;
 
   /**
    * Returns the org-unit context applied to staffel-scoped queries for this request.
@@ -93,7 +103,7 @@ public class MeController {
    * @return current effective org-unit context
    */
   private @NotNull ActiveOrgUnitResponse activeOrgUnit() {
-    return new ActiveOrgUnitResponse(ownerScopeService.currentOrgUnitId().orElse(null));
+    return new ActiveOrgUnitResponse(requestScopeResolver.currentOrgUnitId().orElse(null));
   }
 
   /**
@@ -120,16 +130,39 @@ public class MeController {
    * @return the caller's UI capability flags
    */
   private @NotNull CapabilitiesResponse capabilities() {
+    boolean officerHere = requestScopeResolver.canActAsOfficerInActiveContext();
     return new CapabilitiesResponse(
-        ownerScopeService.canAccessBlueprintOverview(),
-        ownerScopeService.canViewJobOrders(),
-        ownerScopeService.canViewOwnJobOrders(),
+        requestScopeResolver.canAccessBlueprintOverview(),
+        requestScopeResolver.canViewJobOrders(),
+        requestScopeResolver.canViewOwnJobOrders(),
+        holdsAssigneeEntry(),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)),
-        authHelperService.isLogisticianOrAbove(),
-        authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)),
+        accessGateService.canActAsLogisticianInActiveContext(),
+        requestScopeResolver.canActAsMissionManagerInActiveContext(),
         authHelperService.isAdmin(),
-        inventoryProperties.stolenMarkingEnabled());
+        inventoryProperties.stolenMarkingEnabled(),
+        officerHere,
+        officerHere,
+        promotionReach.canManageInActiveContext(),
+        officerHere,
+        officerHere,
+        officerHere,
+        accessGateService.canActAsOfficerAnywhere(),
+        promotionReach.canManageAnywhere(),
+        promotionReach.canUseAnywhere());
+  }
+
+  /**
+   * Whether the caller holds an assignee entry on any job order; independent of the pinned unit.
+   *
+   * @return {@code true} iff the caller is an assignee of at least one order
+   */
+  private boolean holdsAssigneeEntry() {
+    return authHelperService
+        .currentUserId()
+        .map(jobOrderAssigneeLookup::holdsAnyEntry)
+        .orElse(false);
   }
 
   /**
@@ -222,26 +255,58 @@ public class MeController {
    *     profit-eligible org unit)
    * @param canViewOwnJobOrders whether the caller may view orders their own org unit requested
    *     (admin or any org-unit member; REQ-ORDERS-023)
+   * @param canViewAssignedJobOrders whether the caller holds an assignee entry on at least one
+   *     order, which opens the order list to them without profit access (REQ-ORDERS-040); not
+   *     affected by the pinned unit
    * @param canViewBankStaff whether the caller holds {@code BANK_EMPLOYEE} or above
    * @param canManageBank whether the caller holds {@code BANK_MANAGEMENT}
-   * @param isLogisticianOrAbove whether the caller reaches {@code LOGISTICIAN} through the role
-   *     hierarchy; gates the Lager and Auftrag write paths
-   * @param isMissionManagerOrAbove whether the caller reaches {@code MISSION_MANAGER} through the
-   *     role hierarchy; gates the payout confirmation
+   * @param isLogisticianOrAbove whether the caller holds a Logistician grant in the active context:
+   *     in the pinned unit, or in any unit when none is pinned; {@code true} for an admin; gates
+   *     the Lager, refinery and Auftrag write controls
+   * @param isMissionManagerOrAbove whether the caller holds a Mission Manager grant in the active
+   *     context: in the pinned unit, or in any unit when none is pinned; {@code true} for an admin;
+   *     gates the mission and operation management
    * @param isAdmin whether the caller holds {@code ADMIN}
    * @param canMarkStolen whether stock may be booked in as, marked or unmarked „gestohlen" now
    *     (REQ-INV-053); a server switch, the same for every caller
+   * @param hasOfficerReach whether the caller holds officer reach in the active context: in the
+   *     pinned unit, or in any unit when none is pinned; {@code true} for an admin (REQ-SEC-047)
+   * @param canOpenLeitung whether the Leitung page is offered in the active context
+   * @param canManagePromotions whether promotion management is offered in the active context:
+   *     officer reach in the pinned unit, or in any unit when none is pinned, counting only units
+   *     with promotion enabled
+   * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
+   * @param canManageJobOrders whether the officer job-order writes are offered in the active
+   *     context
+   * @param canManageMissionFinance whether mission finance and owner change are offered in the
+   *     active context
+   * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
+   *     whatever unit is pinned; {@code true} for an admin
+   * @param canManagePromotionsAnywhere whether the caller manages promotions in at least one unit
+   *     with promotion enabled, whatever unit is pinned; {@code true} for an admin
+   * @param canUsePromotionAnywhere whether the caller belongs to or reaches at least one unit with
+   *     promotion enabled, whatever unit is pinned; {@code true} for an admin
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
       boolean canViewJobOrders,
       boolean canViewOwnJobOrders,
+      boolean canViewAssignedJobOrders,
       boolean canViewBankStaff,
       boolean canManageBank,
       boolean isLogisticianOrAbove,
       boolean isMissionManagerOrAbove,
       boolean isAdmin,
-      boolean canMarkStolen) {}
+      boolean canMarkStolen,
+      boolean hasOfficerReach,
+      boolean canOpenLeitung,
+      boolean canManagePromotions,
+      boolean canSeeHangarOwnerDetails,
+      boolean canManageJobOrders,
+      boolean canManageMissionFinance,
+      boolean canActAsOfficerAnywhere,
+      boolean canManagePromotionsAnywhere,
+      boolean canUsePromotionAnywhere) {}
 
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.

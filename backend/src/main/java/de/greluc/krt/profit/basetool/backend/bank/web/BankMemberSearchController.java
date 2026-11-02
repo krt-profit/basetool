@@ -58,8 +58,6 @@ public class BankMemberSearchController {
       "hasAnyRole('"
           + Roles.ADMIN
           + "', '"
-          + Roles.OFFICER
-          + "', '"
           + Roles.KRT_MEMBER
           + "', '"
           + Roles.BANK_EMPLOYEE
@@ -89,8 +87,6 @@ public class BankMemberSearchController {
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
           + "', '"
           + Roles.KRT_MEMBER
           + "', '"

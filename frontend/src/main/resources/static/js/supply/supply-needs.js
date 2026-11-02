@@ -156,6 +156,47 @@ document.addEventListener('DOMContentLoaded', () => {
     krtEvents.on('click', 'supply-open-need', openCreate);
     krtEvents.on('click', 'supply-edit-need', openEdit);
 
+    const SHORTCUT_PARAMS = ['needUnit', 'needMaterial', 'needItem', 'needTier', 'needAmount'];
+
+    /**
+     * Selects an option by value when the select offers it; any other value leaves it unchanged.
+     *
+     * @param {HTMLSelectElement} target the select
+     * @param {string | null} value the wanted option value
+     */
+    function selectIfOffered(target, value) {
+        if (value && Array.from(target.options).some((option) => option.value === value)) {
+            target.value = value;
+            target.dispatchEvent(new Event('change'));
+        }
+    }
+
+    /**
+     * Opens the need form prefilled from the shortcut link of a low minimum stock level and drops
+     * the shortcut parameters from the address.
+     */
+    function openFromShortcut() {
+        const params = new URLSearchParams(window.location.search);
+        const materialId = params.get('needMaterial');
+        const itemId = params.get('needItem');
+        if (!materialId && !itemId) return;
+        openCreate();
+        selectIfOffered(select('supply-need-unit'), params.get('needUnit'));
+        if (itemId) {
+            select('supply-need-kind').value = 'item';
+            select('supply-need-kind').dispatchEvent(new Event('change'));
+            selectIfOffered(select('supply-need-item'), itemId);
+        } else {
+            selectIfOffered(select('supply-need-material'), materialId);
+            selectIfOffered(select('supply-need-tier'), params.get('needTier'));
+        }
+        const amount = params.get('needAmount');
+        if (amount) field('supply-need-amount').value = amount;
+        SHORTCUT_PARAMS.forEach((name) => params.delete(name));
+        const rest = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+    openFromShortcut();
     form.addEventListener('submit', (event) => {
         event.preventDefault();
         const id = textOrNull(field('supply-need-id').value);

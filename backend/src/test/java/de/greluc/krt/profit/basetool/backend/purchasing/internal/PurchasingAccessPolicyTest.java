@@ -30,22 +30,19 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * Who trades, governs, manages a raising unit's side or reads the report (REQ-PUR-003, REQ-PUR-021,
@@ -58,7 +55,8 @@ class PurchasingAccessPolicyTest {
   private static final UUID UNIT = UUID.randomUUID();
   private static final UUID AREA = UUID.randomUUID();
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private AccessGateService accessGateService;
   @Mock private AuthHelperService authHelperService;
   @Mock private PurchasingSettingsService settingsService;
   @Mock private PurchasingDelegateRepository delegateRepository;
@@ -69,7 +67,11 @@ class PurchasingAccessPolicyTest {
   void setUp() {
     policy =
         new PurchasingAccessPolicy(
-            ownerScopeService, authHelperService, settingsService, delegateRepository);
+            requestScopeResolver,
+            accessGateService,
+            authHelperService,
+            settingsService,
+            delegateRepository);
   }
 
   private PurchasingDeal dealOf(UUID delegate) {
@@ -82,7 +84,7 @@ class PurchasingAccessPolicyTest {
 
   private void noLeadership() {
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
     when(settingsService.governingAreaIds()).thenReturn(List.of());
   }
 
@@ -93,23 +95,19 @@ class PurchasingAccessPolicyTest {
         .thenReturn(false);
   }
 
-  private Authentication authenticationWith(GrantedAuthority... authorities) {
-    return new UsernamePasswordAuthenticationToken("caller", "n/a", List.of(authorities));
-  }
-
   @Test
   void anAdminGovernsWithoutAnyScopeLookup() {
     when(authHelperService.isAdmin()).thenReturn(true);
 
     assertThat(policy.isGoverningLeadership()).isTrue();
 
-    verifyNoInteractions(ownerScopeService, settingsService);
+    verifyNoInteractions(requestScopeResolver, accessGateService, settingsService);
   }
 
   @Test
   void anOrganisationsleitungMemberGoverns() {
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentUserIsOlMember()).thenReturn(true);
+    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(true);
 
     assertThat(policy.isGoverningLeadership()).isTrue();
   }
@@ -117,9 +115,9 @@ class PurchasingAccessPolicyTest {
   @Test
   void theLeaderOfAGoverningBereichGoverns() {
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
     when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
         .thenReturn(true);
 
     assertThat(policy.isGoverningLeadership()).isTrue();
@@ -129,13 +127,16 @@ class PurchasingAccessPolicyTest {
   void aCoordinatorOfAnyGoverningBereichGoverns() {
     UUID other = UUID.randomUUID();
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
     when(settingsService.governingAreaIds()).thenReturn(List.of(AREA, other));
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(any(), eq(MembershipRole.BEREICHSLEITER)))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
+            any(), eq(MembershipRole.BEREICHSLEITER)))
         .thenReturn(false);
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSKOORDINATOR))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
+            AREA, MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(false);
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(other, MembershipRole.BEREICHSKOORDINATOR))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
+            other, MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(true);
 
     assertThat(policy.isGoverningLeadership()).isTrue();
@@ -144,15 +145,16 @@ class PurchasingAccessPolicyTest {
   @Test
   void anOperatorOfAGoverningBereichDoesNotGovern() {
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
     when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
         .thenReturn(false);
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSKOORDINATOR))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
+            AREA, MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(false);
 
     assertThat(policy.isGoverningLeadership()).isFalse();
-    verify(ownerScopeService, never())
+    verify(requestScopeResolver, never())
         .currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSOPERATOR);
   }
 
@@ -166,11 +168,12 @@ class PurchasingAccessPolicyTest {
   @Test
   void aCallerWhoLeadsOtherUnitsOnlyDoesNotGovern() {
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
+    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
     when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSLEITER))
         .thenReturn(false);
-    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(AREA, MembershipRole.BEREICHSKOORDINATOR))
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
+            AREA, MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(false);
 
     assertThat(policy.isGoverningLeadership()).isFalse();
@@ -233,7 +236,7 @@ class PurchasingAccessPolicyTest {
 
     assertThat(policy.canReadDeal(dealOf(CALLER))).isTrue();
 
-    verifyNoInteractions(ownerScopeService, settingsService);
+    verifyNoInteractions(requestScopeResolver, accessGateService, settingsService);
   }
 
   @Test
@@ -241,7 +244,7 @@ class PurchasingAccessPolicyTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
     noLeadership();
     noBankRole();
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
 
     assertThat(policy.canReadDeal(dealOf(UUID.randomUUID()))).isTrue();
   }
@@ -260,7 +263,7 @@ class PurchasingAccessPolicyTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
     noLeadership();
     noBankRole();
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(false);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(false);
 
     assertThat(policy.canReadDeal(dealOf(UUID.randomUUID()))).isFalse();
   }
@@ -318,10 +321,10 @@ class PurchasingAccessPolicyTest {
 
   @Test
   void deliveriesAreAcceptedByTheUnitManagerOfTheRaisingUnitOnly() {
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
     assertThat(policy.canAcceptDeliveries(dealOf(UUID.randomUUID()))).isTrue();
 
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(false);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(false);
     assertThat(policy.canAcceptDeliveries(dealOf(UUID.randomUUID()))).isFalse();
   }
 
@@ -336,8 +339,8 @@ class PurchasingAccessPolicyTest {
   @Test
   void theLeadOfAUnitPausesOnlyThatUnitAndNotTheWholeOrganisation() {
     noLeadership();
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "OFFICER")).thenReturn(false);
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(false);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(true);
 
     assertThat(policy.canPause(UNIT)).isTrue();
     assertThat(policy.canPause(null)).isFalse();
@@ -346,36 +349,40 @@ class PurchasingAccessPolicyTest {
   @Test
   void aMemberWhoLeadsNothingPausesNothing() {
     noLeadership();
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "OFFICER")).thenReturn(false);
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(false);
+    when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(false);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(false);
 
     assertThat(policy.canPause(UNIT)).isFalse();
   }
 
   @Test
   void aStaffelleiterLeadsHisUnit() {
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "OFFICER")).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(true);
 
     assertThat(policy.leadsUnit(UNIT)).isTrue();
   }
 
   @Test
-  void managedUnitsAreTheLogisticianGrantsOfTheCallerOnly() {
+  void aSeatInOneUnitDoesNotLeadAnotherUnit() {
     UUID other = UUID.randomUUID();
-    when(authHelperService.currentAuthentication())
-        .thenReturn(
-            Optional.of(
-                authenticationWith(
-                    new OrgUnitContextualAuthority("LOGISTICIAN", UNIT),
-                    new OrgUnitContextualAuthority("OFFICER", other),
-                    new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))));
+    when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(other)).thenReturn(false);
+    when(accessGateService.hasRoleInOrgUnit(other, "LEAD")).thenReturn(false);
+
+    assertThat(policy.leadsUnit(UNIT)).isTrue();
+    assertThat(policy.leadsUnit(other)).isFalse();
+  }
+
+  @Test
+  void managedUnitsAreTheLogisticianGrantsOfTheCaller() {
+    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of(UNIT));
 
     assertThat(policy.managedUnitIds()).containsExactly(UNIT);
   }
 
   @Test
-  void noAuthenticationManagesNoUnit() {
-    when(authHelperService.currentAuthentication()).thenReturn(Optional.empty());
+  void noGrantManagesNoUnit() {
+    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of());
 
     assertThat(policy.managedUnitIds()).isEmpty();
   }
@@ -398,9 +405,7 @@ class PurchasingAccessPolicyTest {
         .thenReturn(Optional.empty());
     noLeadership();
     noBankRole();
-    when(authHelperService.currentAuthentication())
-        .thenReturn(
-            Optional.of(authenticationWith(new OrgUnitContextualAuthority("LOGISTICIAN", UNIT))));
+    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of(UNIT));
 
     assertThat(policy.canReadReport()).isTrue();
     assertThat(policy.canReadPartnerNotes()).isFalse();
@@ -413,7 +418,7 @@ class PurchasingAccessPolicyTest {
         .thenReturn(Optional.empty());
     noLeadership();
     noBankRole();
-    when(authHelperService.currentAuthentication()).thenReturn(Optional.of(authenticationWith()));
+    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of());
 
     assertThat(policy.canReadReport()).isFalse();
   }

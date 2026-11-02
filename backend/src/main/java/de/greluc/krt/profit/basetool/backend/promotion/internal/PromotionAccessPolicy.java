@@ -19,23 +19,34 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 /**
  * The promotion module's access policy (plan §5.4, ADR-0236): the per-Staffel feature flag and the
- * read gate every Beförderung read and write consults, built on the scope kernel.
+ * read gate every Beförderung read and write consults, and the officer-reach checks of its writes
+ * (REQ-SEC-015), built on the scope kernel.
  */
 @Component("promotionAccessPolicy")
 @RequiredArgsConstructor
 public class PromotionAccessPolicy {
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+  private final PromotionReach promotionReach;
 
   /**
    * Whether the per-squadron promotion feature flag is on for the caller's scope: the flag of the
@@ -44,7 +55,7 @@ public class PromotionAccessPolicy {
    * @return {@code true} when the promotion menu may be exposed for the caller
    */
   public boolean isFeatureEnabledForCurrentScope() {
-    return ownerScopeService.currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
+    return requestScopeResolver.currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
   }
 
   /**
@@ -54,7 +65,42 @@ public class PromotionAccessPolicy {
    * @return {@code true} for admins and for non-admins with an effective squadron
    */
   public boolean hasReadAccess() {
-    return authHelper.isAdmin() || ownerScopeService.currentSquadronId().isPresent();
+    return authHelper.isAdmin() || requestScopeResolver.currentSquadronId().isPresent();
+  }
+
+  /**
+   * Resolves the squadrons a promotion read may touch, or nothing when the read shows nothing: the
+   * feature flag is off, a member has no read access, or an officer view has no officer reach in a
+   * promotion-enabled unit. {@link PromotionReadView#MANAGEMENT} never reaches beyond the caller's
+   * officer reach in units with promotion enabled, narrowed to the pinned unit (REQ-ROLE-007); only
+   * an admin's management read depends on the active squadron's flag.
+   *
+   * @param view whose data the read shows
+   * @return the readable squadrons, or empty when the read answers empty
+   */
+  public @NotNull Optional<PromotionReadScope> readScope(@NotNull PromotionReadView view) {
+    return switch (view) {
+      case MEMBER ->
+          isFeatureEnabledForCurrentScope() && hasReadAccess()
+              ? Optional.of(
+                  new PromotionReadScope(
+                      requestScopeResolver
+                          .currentSquadronId()
+                          .<Set<UUID>>map(Set::of)
+                          .orElse(null)))
+              : Optional.empty();
+      case MANAGEMENT -> managementScope();
+    };
+  }
+
+  private @NotNull Optional<PromotionReadScope> managementScope() {
+    if (authHelper.isAdmin() && !isFeatureEnabledForCurrentScope()) {
+      return Optional.empty();
+    }
+    Set<UUID> reach = promotionReach.currentManagementScope();
+    return reach != null && reach.isEmpty()
+        ? Optional.empty()
+        : Optional.of(new PromotionReadScope(reach));
   }
 
   /**
@@ -68,6 +114,45 @@ public class PromotionAccessPolicy {
       throw new AccessDeniedException(
           "Promotion feature is disabled for the caller's squadron; ask an administrator to"
               + " re-enable it.");
+    }
+  }
+
+  /**
+   * Refuses the call unless the caller holds officer reach in the squadron that owns the promotion
+   * data being written and the squadron has promotion enabled; admins pass.
+   *
+   * @param squadronId the owning squadron of the topic, category, level content or requirement
+   * @throws AccessDeniedException if the caller holds no officer reach in {@code squadronId}, or
+   *     the squadron has promotion disabled
+   */
+  public void assertOfficerIn(@NotNull UUID squadronId) {
+    if (!accessGateService.canActAsOfficerIn(squadronId)) {
+      throw new AccessDeniedException("Caller holds no officer reach in the owning squadron");
+    }
+    if (!authHelper.isAdmin() && !promotionReach.isEnabled(squadronId)) {
+      throw new AccessDeniedException("Promotion is disabled in the owning squadron");
+    }
+  }
+
+  /**
+   * Refuses the call unless the caller may act on the member as an officer: admins pass, others
+   * need officer reach in at least one of the member's Staffeln that has promotion enabled
+   * (REQ-ORG-017).
+   *
+   * @param userId the {@code app_user.id} of the member being evaluated; never {@code null}
+   * @throws AccessDeniedException if the caller holds officer reach in none of the member's
+   *     promotion-enabled Staffeln
+   */
+  public void assertOfficerOverMember(@NotNull UUID userId) {
+    if (authHelper.isAdmin()) {
+      return;
+    }
+    boolean reaches =
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId).stream()
+            .anyMatch(
+                id -> accessGateService.canActAsOfficerIn(id) && promotionReach.isEnabled(id));
+    if (!reaches) {
+      throw new AccessDeniedException("Caller holds no officer reach over this member");
     }
   }
 }

@@ -44,7 +44,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 /**
  * Functional flows for game-item stock in the Lager (REQ-INV-029/030/031): einbuchen in item mode,
  * umbuchen and ausbuchen of an item row, the ITEM-order allocation gate, and live peer sync on
- * {@code /inventory/all?view=items}.
+ * {@code /inventory?storage=all&view=items}.
  *
  * <p>Each scenario seeds its own game item via {@link BackendSeeder#seedOrderableItem}; mutations
  * are driven through the UI and verified via the grouped {@code catalog=ITEM} endpoint.
@@ -149,7 +149,7 @@ class ItemInventoryOperationsE2eTest {
 
   /**
    * Einbuchen in item mode: books in the seeded widget and asserts the stock grew by the entered
-   * amount and the row is reachable in the {@code /inventory/my?view=items} tree.
+   * amount and the row is reachable in the {@code /inventory?storage=my&view=items} tree.
    */
   @Test
   void einbuchenCreatesItemStock() {
@@ -181,7 +181,7 @@ class ItemInventoryOperationsE2eTest {
               AMOUNT_DELTA,
               "the booked-in whole amount must add to the widget's item stock");
 
-          page.waitForURL(url -> url.contains("/inventory/my"));
+          page.waitForURL(url -> url.contains("storage=my"));
 
           JsonObject row = findMyItemRow(einbuchenGameItemId);
           openMyItemViewToEntry(
@@ -412,9 +412,9 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/my?view=items} and expands the game item's group and the stack
-   * at the given location until the entry leaf row appears (REQ-INV-030). Already-open containers
-   * are left open.
+   * Navigates to {@code /inventory?storage=my&view=items} and expands the game item's group and the
+   * stack at the given location until the entry leaf row appears (REQ-INV-030). Already-open
+   * containers are left open.
    *
    * @param page the authenticated page
    * @param gameItemId the scenario-unique game item whose group to expand
@@ -423,7 +423,7 @@ class ItemInventoryOperationsE2eTest {
    */
   private static void openMyItemViewToEntry(
       Page page, String gameItemId, String locationId, String rowId) {
-    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my?view=items");
+    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory?storage=my&view=items");
     page.waitForLoadState();
     Locator groupRow = page.locator("div.tree-row--group[data-game-item-id='" + gameItemId + "']");
     assertThat(groupRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -448,13 +448,13 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/all?view=items} and expands the sync widget's group and stack
-   * until the entry leaf row loads.
+   * Navigates to {@code /inventory?storage=all&view=items} and expands the sync widget's group and
+   * stack until the entry leaf row loads.
    *
    * @param page the authenticated page
    */
   private static void expandAllItemViewToLeaf(Page page) {
-    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/all?view=items");
+    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory?storage=all&view=items");
     page.waitForLoadState();
     page.locator("div.tree-row--group[data-game-item-id='" + syncGameItemId + "']")
         .click(new Locator.ClickOptions().setTimeout(20_000));

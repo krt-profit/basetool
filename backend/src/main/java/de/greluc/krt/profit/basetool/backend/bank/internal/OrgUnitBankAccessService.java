@@ -30,12 +30,11 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,8 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The single org-unit-aware seam between the bank and the org-unit oversight scope (ADR-0020): it
- * authorizes against {@link OwnerScopeService} and then reuses the org-unit-blind bank code ({@link
- * BankAccountService}, {@link BankStatementReportService}).
+ * authorizes against {@link RequestScopeResolver} and then reuses the org-unit-blind bank code
+ * ({@link BankAccountService}, {@link BankStatementReportService}).
  *
  * <p>Owns every org-unit bank access decision — who views, holds, configures or is exempt — and
  * serves the read side of the org-unit bank page: the account cards and the read-only drill-in.
@@ -76,7 +75,7 @@ public class OrgUnitBankAccessService {
   private static final BankCapabilitiesDto READ_ONLY_CAPABILITIES =
       new BankCapabilitiesDto(false, false, false, false);
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelperService;
   private final BankAccountRepository bankAccountRepository;
   private final BankPostingRepository bankPostingRepository;
@@ -96,34 +95,11 @@ public class OrgUnitBankAccessService {
   @NotNull
   @Transactional(readOnly = true)
   public List<OrgUnitBankBalanceDto> listOverseenOrgUnitBalances() {
-    boolean admin = authHelperService.isAdmin();
-    ScopePredicate viewScope = ownerScopeService.currentOversightScope();
-    List<BankAccount> active =
-        bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
-            .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
-            .toList();
-    if (active.isEmpty()) {
-      return List.of();
-    }
-    Map<UUID, List<BankAccountViewGrant>> grantsByAccount =
-        viewGrantRepository
-            .findByAccountIdIn(active.stream().map(BankAccount::getId).toList())
-            .stream()
-            .collect(Collectors.groupingBy(grant -> grant.getAccount().getId()));
-    List<BankAccount> visible =
-        active.stream()
-            .filter(account ->
-                admin
-                    || canViewInternal(
-                        account,
-                        viewScope,
-                        grantsByAccount.getOrDefault(account.getId(), List.of())))
-            .toList();
+    List<BankAccount> visible = visibleActiveAccounts(requestScopeResolver.currentOversightScope());
     if (visible.isEmpty()) {
       return List.of();
     }
-    Map<UUID, BigDecimal> balances = balancesByAccountId(visible);
-    Map<UUID, List<BankPostingSlice>> slicesByAccount = slicesByAccountId(visible);
+    BankAccountFigures figures = BankAccountFigures.load(bankPostingRepository, visible);
     Map<UUID, List<BankAccountApprovalLimit>> limitsByAccount =
         approvalLimitRepository
             .findByAccountIdIn(visible.stream().map(BankAccount::getId).toList())
@@ -131,8 +107,8 @@ public class OrgUnitBankAccessService {
             .collect(Collectors.groupingBy(limit -> limit.getAccount().getId()));
     return visible.stream()
         .map(account -> {
-          BigDecimal balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
-          List<BankPostingSlice> slices = slicesByAccount.getOrDefault(account.getId(), List.of());
+          BigDecimal balance = figures.balanceOf(account.getId());
+          List<BankPostingSlice> slices = figures.slicesOf(account.getId());
           BigDecimal delta = BankTrendCalculator.windowDelta(slices);
           boolean canRequest = isRequestCapable(account);
           boolean approvalExempt = canRequest && isApprovalExempt(account);
@@ -151,6 +127,60 @@ public class OrgUnitBankAccessService {
               approvalLimit,
               approvalExempt);
         })
+        .toList();
+  }
+
+  /**
+   * Lists every active account the caller may view on the org-unit bank page over their whole
+   * reach, ignoring the active-org-unit pin (REQ-BANK-064).
+   *
+   * @return the visible active accounts ordered by account number; empty when none
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public List<BankAccount> listViewableActiveAccounts() {
+    return visibleActiveAccounts(requestScopeResolver.currentOversightScopeIgnoringPin());
+  }
+
+  /**
+   * The org units of the caller's active context (REQ-BANK-064): the pinned unit, or every unit the
+   * caller is a direct member of when none is pinned.
+   *
+   * @return the active-context org-unit ids; empty for a caller without memberships and pin
+   */
+  @NotNull
+  public Set<UUID> activeContextOrgUnitIds() {
+    UUID pinned = requestScopeResolver.currentScopePredicate().activeOrgUnitId();
+    return pinned != null
+        ? Set.of(pinned)
+        : requestScopeResolver.currentDirectMembershipOrgUnitIds();
+  }
+
+  /**
+   * The active accounts the caller may view under the given oversight scope; an admin views all.
+   *
+   * @param viewScope the caller's cascading oversight scope
+   * @return the visible active accounts ordered by account number; empty when none
+   */
+  @NotNull
+  private List<BankAccount> visibleActiveAccounts(@NotNull ScopePredicate viewScope) {
+    boolean admin = authHelperService.isAdmin();
+    List<BankAccount> active =
+        bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
+            .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
+            .toList();
+    if (active.isEmpty() || admin) {
+      return active;
+    }
+    Map<UUID, List<BankAccountViewGrant>> grantsByAccount =
+        viewGrantRepository
+            .findByAccountIdIn(active.stream().map(BankAccount::getId).toList())
+            .stream()
+            .collect(Collectors.groupingBy(grant -> grant.getAccount().getId()));
+    return active.stream()
+        .filter(account ->
+            canViewInternal(
+                account, viewScope, grantsByAccount.getOrDefault(account.getId(), List.of())))
         .toList();
   }
 
@@ -267,7 +297,7 @@ public class OrgUnitBankAccessService {
    * @return whether the caller is an OL member
    */
   public boolean callerIsOlMember() {
-    return ownerScopeService.currentUserIsOlMember();
+    return requestScopeResolver.currentUserIsOlMember();
   }
 
   /**
@@ -283,7 +313,7 @@ public class OrgUnitBankAccessService {
     }
     return canViewInternal(
         account,
-        ownerScopeService.currentOversightScope(),
+        requestScopeResolver.currentOversightScope(),
         viewGrantRepository.findByAccountId(account.getId()));
   }
 
@@ -328,12 +358,11 @@ public class OrgUnitBankAccessService {
             case MEMBERSHIP_ROLE -> {
               MembershipRole role = parseMembershipRole(grant.getRoleCode());
               yield role != null
-                  && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owningOrgUnitId, role);
+                  && requestScopeResolver.currentUserHoldsRoleOnOrgUnit(owningOrgUnitId, role);
             }
-            case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
+            case ALL_MEMBERS -> requestScopeResolver.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
             case AREA_MEMBERS -> callerIsMemberOfAreaCascade(owningOrgUnitId);
             case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
-            case GLOBAL_ROLE -> false;
           };
       if (match) {
         return true;
@@ -343,8 +372,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Whether a view grant of a {@code SPECIAL} account admits the caller: a reachable global role,
-   * all-members, or an individual grant.
+   * Whether a view grant of a {@code SPECIAL} account admits the caller: all-members or an
+   * individual grant.
    *
    * @param grants the account's view grants
    * @return {@code true} iff a grant admits the caller
@@ -354,9 +383,6 @@ public class OrgUnitBankAccessService {
     for (BankAccountViewGrant grant : grants) {
       boolean match =
           switch (grant.getGranteeKind()) {
-            case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(
-                    Roles.authority(Objects.requireNonNull(grant.getRoleCode())));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
             case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
@@ -375,8 +401,8 @@ public class OrgUnitBankAccessService {
    * @return {@code true} iff the caller is an OL member or a Bereichsleiter
    */
   private boolean currentUserCanAutoViewSpecial() {
-    return ownerScopeService.currentUserIsOlMember()
-        || ownerScopeService.currentUserIsBereichsleiter();
+    return requestScopeResolver.currentUserIsOlMember()
+        || requestScopeResolver.currentUserIsBereichsleiter();
   }
 
   /**
@@ -392,7 +418,7 @@ public class OrgUnitBankAccessService {
             .collect(Collectors.toSet());
     return profitBereichIds.stream()
         .anyMatch(id ->
-            ownerScopeService.currentUserHoldsRoleOnOrgUnit(id, MembershipRole.BEREICHSLEITER));
+            requestScopeResolver.currentUserHoldsRoleOnOrgUnit(id, MembershipRole.BEREICHSLEITER));
   }
 
   /**
@@ -413,13 +439,13 @@ public class OrgUnitBankAccessService {
             Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
                 ? MembershipRole.SK_LEAD
                 : MembershipRole.STAFFELLEITER;
-        yield ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, holderRole);
+        yield requestScopeResolver.currentUserHoldsRoleOnOrgUnit(owner, holderRole);
       }
       case AREA ->
           owner != null
-              && ownerScopeService.currentUserHoldsRoleOnOrgUnit(
+              && requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
                   owner, MembershipRole.BEREICHSLEITER);
-      case CARTEL -> ownerScopeService.currentUserIsOlMember();
+      case CARTEL -> requestScopeResolver.currentUserIsOlMember();
       case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL -> false;
     };
@@ -450,7 +476,7 @@ public class OrgUnitBankAccessService {
     return switch (account.getType()) {
       case ORG_UNIT, AREA -> isResponsibleHolder(account);
       case SPECIAL ->
-          ownerScopeService.currentUserIsOlMember()
+          requestScopeResolver.currentUserIsOlMember()
               || authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT));
       case CARTEL, CARTEL_BANK -> false;
     };
@@ -574,14 +600,11 @@ public class OrgUnitBankAccessService {
               MembershipRole role = parseMembershipRole(limit.getRoleCode());
               yield owner != null
                   && role != null
-                  && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, role);
+                  && requestScopeResolver.currentUserHoldsRoleOnOrgUnit(owner, role);
             }
-            case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(
-                    Roles.authority(Objects.requireNonNull(limit.getRoleCode())));
             case AREA_MEMBERS -> owner != null && callerIsMemberOfAreaCascade(owner);
             case ALL_MEMBERS ->
-                owner != null && ownerScopeService.currentUserIsMemberOfOrgUnit(owner);
+                owner != null && requestScopeResolver.currentUserIsMemberOfOrgUnit(owner);
             case USER -> false;
           };
       if (matches) {
@@ -717,38 +740,6 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Batch-computes the balances of the given accounts in one grouped query (REQ-DATA-003).
-   *
-   * @param accounts the accounts to sum
-   * @return a map of account id to balance for accounts that have at least one posting
-   */
-  @NotNull
-  private Map<UUID, BigDecimal> balancesByAccountId(@NotNull List<BankAccount> accounts) {
-    List<UUID> ids = accounts.stream().map(BankAccount::getId).toList();
-    Map<UUID, BigDecimal> byAccount = new HashMap<>();
-    for (BankAccountBalance row : bankPostingRepository.accountBalances(ids)) {
-      byAccount.put(row.accountId(), row.balance());
-    }
-    return byAccount;
-  }
-
-  /**
-   * Fetches the last 30 days of posting slices for the given accounts in one windowed query
-   * (REQ-DATA-003) and groups them by account id, for the per-card 30-day trend (REQ-BANK-016).
-   *
-   * @param accounts the visible accounts
-   * @return a map of account id to its in-window posting slices (only accounts with slices appear)
-   */
-  @NotNull
-  private Map<UUID, List<BankPostingSlice>> slicesByAccountId(@NotNull List<BankAccount> accounts) {
-    List<UUID> ids = accounts.stream().map(BankAccount::getId).toList();
-    return bankPostingRepository
-        .postingSlicesSince(ids, BankTrendCalculator.windowCutoff())
-        .stream()
-        .collect(Collectors.groupingBy(BankPostingSlice::accountId));
-  }
-
-  /**
    * Projects a visible account and its resolved figures into the balance-card DTO.
    *
    * @param account the visible account
@@ -803,7 +794,7 @@ public class OrgUnitBankAccessService {
   boolean callerIsMemberOfAreaCascade(@NotNull UUID bereichId) {
     List<UUID> childIds = orgUnitRepository.findChildOrgUnitIds(bereichId);
     return isMemberOfAreaCascade(
-        bereichId, ownerScopeService.currentDirectMembershipOrgUnitIds(), childIds);
+        bereichId, requestScopeResolver.currentDirectMembershipOrgUnitIds(), childIds);
   }
 
   /**

@@ -97,7 +97,7 @@ class BankAdminResetE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/admin/bank");
+        E2eSupport.navigate(page, baseUrl + "/admin/settings/danger-zone");
         page.waitForLoadState();
         page.evaluate("window.__krtNoReload = true;");
         page.locator("[data-testid='bank-wipe-open']")

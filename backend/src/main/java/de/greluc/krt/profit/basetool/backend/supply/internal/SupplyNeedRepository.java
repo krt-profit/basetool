@@ -75,6 +75,27 @@ public interface SupplyNeedRepository
       @Param("gameItemId") @Nullable UUID gameItemId);
 
   /**
+   * Loads the needs of the given units in a state for the given materials and game items, with
+   * their tier, for the requested amount of the minimum stock levels (REQ-INV-067).
+   *
+   * @param status the state
+   * @param units the raising units; never empty
+   * @param subjects the materials and game items; never empty
+   * @return the matching needs
+   */
+  @Query(
+      """
+      SELECT n FROM SupplyNeed n
+      LEFT JOIN n.material m LEFT JOIN n.gameItem g LEFT JOIN FETCH n.qualityTier
+      WHERE n.status = :status AND n.orgUnitId IN :units
+        AND (m.id IN :subjects OR g.id IN :subjects)
+      """)
+  List<SupplyNeed> findByStatusAndUnitsAndSubjects(
+      @Param("status") NeedStatus status,
+      @Param("units") Collection<UUID> units,
+      @Param("subjects") Collection<UUID> subjects);
+
+  /**
    * Loads the open material needs linked to a job order whose unit was not yet told that the order
    * covers them, with their material and tier, for the covered-order notice (REQ-SUP-024).
    *

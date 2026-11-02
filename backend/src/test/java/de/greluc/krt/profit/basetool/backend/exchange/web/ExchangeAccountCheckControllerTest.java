@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -226,7 +227,7 @@ class ExchangeAccountCheckControllerTest {
    */
   private double count(@NotNull String outcome) {
     return meterRegistry
-        .get(MetricNames.EXCHANGE_ACCOUNT_CHECKS)
+        .get(ExchangeMetricNames.EXCHANGE_ACCOUNT_CHECKS)
         .tag(MetricNames.TAG_OUTCOME, outcome)
         .counter()
         .count();

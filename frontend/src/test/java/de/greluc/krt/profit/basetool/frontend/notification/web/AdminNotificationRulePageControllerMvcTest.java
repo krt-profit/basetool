@@ -247,7 +247,7 @@ class AdminNotificationRulePageControllerMvcTest {
 
     assertThat(html)
         .contains("data-testid=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Betrieb<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
         .contains("data-list-count-for=\"rules-host\"")
         .doesNotContain("class=\"greeting")

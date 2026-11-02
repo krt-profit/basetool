@@ -30,13 +30,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -53,7 +53,7 @@ class RefineryOrderPageControllerReauthMvcTest {
         ReauthPageMvc.standalone(
             new RefineryOrderPageController(
                 client,
-                mock(RoleHierarchy.class),
+                mock(LogisticianGate.class),
                 mock(IngestHandoffService.class),
                 new ParallelPageLoader()));
     ReauthPageMvc.signInMember();

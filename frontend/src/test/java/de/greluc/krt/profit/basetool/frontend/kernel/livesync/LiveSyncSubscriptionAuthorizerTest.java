@@ -116,6 +116,22 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
+  void theAdminDashboardRoomAdmitsOnlyAnAdminWithoutAskingTheBackend() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("admin-dashboard");
+
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_ADMIN"), null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(
+            authorizer.authorize(
+                topic, TOKEN, PIN, Set.of("ROLE_OFFICER", "ROLE_KRT_MEMBER"), null))
+        .isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of(), null)).isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, null, null))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
   void aUnitHangarRoomAsksTheUnitOverviewGate() throws Exception {
     UUID unit = UUID.randomUUID();
     LiveSyncTopic topic = LiveSyncTopic.parse("hangar-unit:" + unit);
@@ -264,6 +280,22 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + TOKEN);
     assertThat(request.getHeader(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER))
         .isEqualTo(PIN.toString());
+  }
+
+  @Test
+  void authorize_ordersQueue_allowsAnAssigneeWithoutProfitAccess() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(jsonResponse("{\"canViewJobOrders\":false,\"canViewAssignedJobOrders\":true}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+  }
+
+  @Test
+  void authorize_ordersQueue_deniesWhenNeitherCapabilityIsGranted() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(jsonResponse("{\"canViewJobOrders\":false,\"canViewAssignedJobOrders\":false}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
   }
 
   @Test

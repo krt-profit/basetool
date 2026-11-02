@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicWriteRequest;
@@ -67,9 +68,10 @@ class PromotionTopicControllerTest {
     Page<PromotionTopicResponse> page =
         new PageImpl<>(
             List.of(t), PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "sortOrder")), 1);
-    when(service.list(any(Pageable.class))).thenReturn(page);
+    when(service.list(any(Pageable.class), eq(PromotionReadView.MEMBER))).thenReturn(page);
 
-    PageResponse<PromotionTopicResponse> result = controller.list(0, 20, "sortOrder,asc");
+    PageResponse<PromotionTopicResponse> result =
+        controller.list(0, 20, "sortOrder,asc", PromotionReadView.MEMBER);
 
     assertThat(result.content()).containsExactly(t);
     assertThat(result.page()).isZero();
@@ -79,33 +81,34 @@ class PromotionTopicControllerTest {
     assertThat(result.sort()).containsExactly("sortOrder,asc");
 
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-    verify(service).list(captor.capture());
+    verify(service).list(captor.capture(), eq(PromotionReadView.MEMBER));
     assertThat(captor.getValue().getPageNumber()).isZero();
     assertThat(captor.getValue().getPageSize()).isEqualTo(20);
   }
 
   @Test
   void list_withNullParams_appliesPaginationDefaults() {
-    when(service.list(any(Pageable.class)))
+    when(service.list(any(Pageable.class), eq(PromotionReadView.MEMBER)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-    PageResponse<PromotionTopicResponse> result = controller.list(null, null, null);
+    PageResponse<PromotionTopicResponse> result =
+        controller.list(null, null, null, PromotionReadView.MEMBER);
 
     assertThat(result).isNotNull();
     assertThat(result.content()).isEmpty();
-    verify(service).list(any(Pageable.class));
+    verify(service).list(any(Pageable.class), eq(PromotionReadView.MEMBER));
   }
 
   @Test
   void listAll_returnsServiceListVerbatim() {
     PromotionTopicResponse a = topic("Combat");
     PromotionTopicResponse b = topic("Logistics");
-    when(service.listAll()).thenReturn(List.of(a, b));
+    when(service.listAll(PromotionReadView.MEMBER)).thenReturn(List.of(a, b));
 
-    List<PromotionTopicResponse> result = controller.listAll();
+    List<PromotionTopicResponse> result = controller.listAll(PromotionReadView.MEMBER);
 
     assertThat(result).containsExactly(a, b);
-    verify(service).listAll();
+    verify(service).listAll(PromotionReadView.MEMBER);
   }
 
   @Test

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -101,17 +102,17 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * every squadron (admin "all squadrons" mode); a non-null id restricts the result to evaluations
    * whose category's topic is owned by that squadron.
    *
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data pagination/sort instructions
    * @return a page of evaluations visible to the caller
    */
   @Query(
       """
-      SELECT e FROM MemberEvaluation e WHERE :owningSquadronId IS NULL OR
-      e.category.topic.owningSquadron.id = :owningSquadronId
+      SELECT e FROM MemberEvaluation e WHERE :scopeSquadronIds IS NULL OR
+      e.category.topic.owningSquadron.id IN :scopeSquadronIds
       """)
   Page<MemberEvaluation> findAllScoped(
-      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
    * Looks up a single evaluation by its primary key components.
@@ -156,7 +157,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * squadron's catalog. {@code null} scope spans every squadron (admin "all squadrons" mode).
    *
    * @param userId the {@code app_user.id} of the member
-   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param scopeSquadronIds the squadron scope, or {@code null} for all squadrons
    * @return the member's evaluations (category+topic fetched) within the scope, possibly empty
    */
   @Query(
@@ -165,10 +166,11 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       JOIN FETCH e.category c
       JOIN FETCH c.topic t
       WHERE e.userId = :userId
-      AND (:owningSquadronId IS NULL OR t.owningSquadron.id = :owningSquadronId)
+      AND (:scopeSquadronIds IS NULL OR t.owningSquadron.id IN :scopeSquadronIds)
       """)
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopicScoped(
-      @Param("userId") UUID userId, @Param("owningSquadronId") @Nullable UUID owningSquadronId);
+      @Param("userId") UUID userId,
+      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
 
   /**
    * Deletes every promotion grade of the given member during hard account deletion (REQ-DATA-008).

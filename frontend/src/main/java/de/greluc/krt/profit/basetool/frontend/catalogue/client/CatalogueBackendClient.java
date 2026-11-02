@@ -41,8 +41,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierWriteDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SpaceStationDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
@@ -62,13 +60,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Typed backend client of the catalogue domain: materials and their prices, matrix, categories and
  * external aliases, locations, the UEX-mirrored universe, ship data, the mission reference data,
- * quality tiers, sync reports and the P4K import, over {@link BackendApiClient} (plan §5.9,
- * ADR-0032). Evicting the catalogue caches after a write stays with the caller.
+ * quality tiers and the P4K import, over {@link BackendApiClient} (plan §5.9, ADR-0032). Evicting
+ * the catalogue caches after a write stays with the caller.
  */
 @Service
 @RequiredArgsConstructor
@@ -84,8 +81,6 @@ public class CatalogueBackendClient {
   private static final String JOBS_URI = "/api/v1/catalog/admin/import/p4k/jobs";
 
   /** The page size of the sync-report listing. */
-  private static final int SYNC_REPORT_PAGE_SIZE = 100;
-
   private static final ParameterizedTypeReference<PageResponse<MaterialPriceOverviewDto>>
       MATERIAL_PRICE_OVERVIEW_PAGE = new ParameterizedTypeReference<>() {};
 
@@ -134,7 +129,7 @@ public class CatalogueBackendClient {
   private static final ParameterizedTypeReference<PageResponse<TerminalDto>> TERMINAL_PAGE =
       new ParameterizedTypeReference<>() {};
 
-  private static final ParameterizedTypeReference<PageResponse<SyncReportDto>> SYNC_REPORT_PAGE =
+  private static final ParameterizedTypeReference<List<P4kImportJobDto>> P4K_JOB_LIST =
       new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<JobTypeDto>> JOB_TYPE_PAGE =
@@ -689,11 +684,7 @@ public class CatalogueBackendClient {
    */
   @Nullable
   public List<P4kImportJobDto> p4kImportJobs() {
-    return backendApiClient.execute(
-        HttpMethod.GET,
-        JOBS_URI,
-        webClient -> webClient.get().uri(JOBS_URI),
-        spec -> spec.bodyToFlux(P4kImportJobDto.class).collectList());
+    return backendApiClient.get(JOBS_URI, P4K_JOB_LIST);
   }
 
   /**
@@ -733,44 +724,6 @@ public class CatalogueBackendClient {
                         .queryParam("seedNew", seedNew)
                         .build(id)),
         spec -> spec.bodyToMono(P4kImportJobDto.class));
-  }
-
-  /**
-   * Reads one page of sync-report events.
-   *
-   * @param page zero-based page index, never negative
-   * @param source {@code SCWIKI} or {@code UEX}, or {@code null} for both catalogues
-   * @return the page, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public PageResponse<SyncReportDto> syncReportPage(int page, @Nullable String source) {
-    UriComponentsBuilder uriBuilder =
-        UriComponentsBuilder.fromPath("/api/v1/catalog/admin/sync-reports")
-            .queryParam("page", page)
-            .queryParam("size", SYNC_REPORT_PAGE_SIZE);
-    if (source != null) {
-      uriBuilder.queryParam("source", source);
-    }
-    String uri = uriBuilder.toUriString();
-    return backendApiClient.get(uri, SYNC_REPORT_PAGE);
-  }
-
-  /**
-   * Deletes the sync-report events older than a number of days.
-   *
-   * @param source {@code SCWIKI} or {@code UEX}, or {@code null} for both catalogues
-   * @param days the minimum age in days of a deleted event
-   * @return the deleted count, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public SyncReportPurgeResultDto purgeSyncReports(@Nullable String source, int days) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/catalog/admin/sync-reports")
-            .queryParam("olderThanDays", days);
-    if (source != null) {
-      uri.queryParam("source", source);
-    }
-    return backendApiClient.delete(uri.toUriString(), SyncReportPurgeResultDto.class);
   }
 
   /**

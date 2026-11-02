@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.Optional;
@@ -57,9 +58,9 @@ class PurchasingBusinessGaugesTest {
     for (DealStatus status : DealStatus.values()) {
       assertThat(dealsIn(status)).isZero();
     }
-    assertThat(value(MetricNames.PURCHASING_SETTLEMENTS_OVERDUE)).isZero();
-    assertThat(value(MetricNames.PURCHASING_PAUSED)).isZero();
-    assertThat(value(MetricNames.PURCHASING_DELEGATES_ACTIVE)).isZero();
+    assertThat(value(PurchasingMetricNames.PURCHASING_SETTLEMENTS_OVERDUE)).isZero();
+    assertThat(value(PurchasingMetricNames.PURCHASING_PAUSED)).isZero();
+    assertThat(value(PurchasingMetricNames.PURCHASING_DELEGATES_ACTIVE)).isZero();
   }
 
   @Test
@@ -76,9 +77,9 @@ class PurchasingBusinessGaugesTest {
     for (DealStatus status : DealStatus.values()) {
       assertThat(dealsIn(status)).isEqualTo(status.ordinal() + 1.0);
     }
-    assertThat(value(MetricNames.PURCHASING_SETTLEMENTS_OVERDUE)).isEqualTo(3.0);
-    assertThat(value(MetricNames.PURCHASING_DELEGATES_ACTIVE)).isEqualTo(2.0);
-    assertThat(value(MetricNames.PURCHASING_PAUSED)).isEqualTo(1.0);
+    assertThat(value(PurchasingMetricNames.PURCHASING_SETTLEMENTS_OVERDUE)).isEqualTo(3.0);
+    assertThat(value(PurchasingMetricNames.PURCHASING_DELEGATES_ACTIVE)).isEqualTo(2.0);
+    assertThat(value(PurchasingMetricNames.PURCHASING_PAUSED)).isEqualTo(1.0);
   }
 
   @Test
@@ -86,21 +87,21 @@ class PurchasingBusinessGaugesTest {
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
         .thenReturn(Optional.of(setting(true)));
     gauges.sample();
-    assertThat(value(MetricNames.PURCHASING_PAUSED)).isEqualTo(1.0);
+    assertThat(value(PurchasingMetricNames.PURCHASING_PAUSED)).isEqualTo(1.0);
 
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
         .thenReturn(Optional.of(setting(false)));
     gauges.sample();
-    assertThat(value(MetricNames.PURCHASING_PAUSED)).isZero();
+    assertThat(value(PurchasingMetricNames.PURCHASING_PAUSED)).isZero();
 
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID)).thenReturn(Optional.empty());
     gauges.sample();
-    assertThat(value(MetricNames.PURCHASING_PAUSED)).isZero();
+    assertThat(value(PurchasingMetricNames.PURCHASING_PAUSED)).isZero();
   }
 
   private double dealsIn(DealStatus status) {
     return registry
-        .get(MetricNames.PURCHASING_DEALS_BY_STATUS)
+        .get(PurchasingMetricNames.PURCHASING_DEALS_BY_STATUS)
         .tag(MetricNames.TAG_STATUS, status.name())
         .gauge()
         .value();

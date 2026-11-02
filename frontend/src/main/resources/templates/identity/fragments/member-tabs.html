@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="tabs(memberId, active)" class="tab-nav member-tabs" th:aria-label="#{members.tabs.aria}" data-testid="member-tabs">
+    <a th:href="@{/members/{id}/edit(id=${memberId})}" class="tab" th:classappend="${active == 'profile'} ? 'active'"
+       th:attr="aria-current=${active == 'profile'} ? 'page' : null" data-testid="member-tab-link-profile"
+       th:text="#{members.edit.tab.profile}">Stammdaten</a>
+    <a th:href="@{/admin/members/{id}/hangar(id=${memberId})}" class="tab" th:classappend="${active == 'hangar'} ? 'active'"
+       th:attr="aria-current=${active == 'hangar'} ? 'page' : null" data-testid="member-tab-link-hangar"
+       th:text="#{members.edit.hangar}">Hangar</a>
+    <a th:href="@{/admin/personal-inventory(userSub=${memberId})}" class="tab" th:classappend="${active == 'inventory'} ? 'active'"
+       th:attr="aria-current=${active == 'inventory'} ? 'page' : null" data-testid="member-tab-link-inventory"
+       th:text="#{members.tab.inventory}">Inventar</a>
+    <a th:href="@{/admin/personal-blueprints(userSub=${memberId})}" class="tab" th:classappend="${active == 'blueprints'} ? 'active'"
+       th:attr="aria-current=${active == 'blueprints'} ? 'page' : null" data-testid="member-tab-link-blueprints"
+       th:text="#{members.tab.blueprints}">Blueprints</a>
+    <a th:href="@{/members/{id}/export(id=${memberId})}" class="tab" th:classappend="${active == 'export'} ? 'active'"
+       th:attr="aria-current=${active == 'export'} ? 'page' : null" data-testid="member-tab-link-export"
+       th:text="#{members.export.title}">Datenauskunft</a>
+</nav>
+</body>
+</html>

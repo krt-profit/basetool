@@ -104,6 +104,32 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
+   * The public next-mission lookup of a caller without a unit skips an earlier foreign internal
+   * mission and a terminal public one (REQ-MISSION-008).
+   */
+  @Test
+  void findNextPublicMission_skipsInternalAndTerminalMissions() {
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    OrgUnit foreign = newSquadron("Public-Foreign-" + tag, "PF" + tag);
+
+    Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
+    saveMission(
+        foreign, "Internal-Earliest", Instant.parse("2099-01-01T00:00:00Z"), "PLANNED", true);
+    saveMission(
+        foreign, "Public-Terminal", Instant.parse("2099-01-15T00:00:00Z"), "COMPLETED", false);
+    UUID publicId =
+        saveMission(
+            foreign, "Public-Soon", Instant.parse("2099-02-01T00:00:00Z"), "PLANNED", false);
+
+    Mission next =
+        missionRepository
+            .findNextPublicMission(lowerBound, List.of("PLANNED", "ACTIVE"))
+            .orElseThrow();
+
+    assertThat(next.getId()).isEqualTo(publicId);
+  }
+
+  /**
    * The scoped next-mission lookup returns the own unit's soonest {@code PLANNED}/{@code ACTIVE}
    * mission, ignoring terminal and foreign missions (REQ-MISSION-008).
    */

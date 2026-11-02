@@ -35,7 +35,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Verifies that a non-personal stock row linked to neither a job order nor a mission appears as a
- * group row in {@code /inventory/all} (ADR-0003, REQ-INV-002).
+ * group row in {@code /inventory?storage=all} (ADR-0003, REQ-INV-002).
  */
 @Tag("e2e")
 class InventoryStackViewE2eTest {
@@ -80,8 +80,9 @@ class InventoryStackViewE2eTest {
   }
 
   /**
-   * Loads {@code /inventory/all} and asserts the seeded, unlinked stock surfaces as a material
-   * group row — i.e. the grouped view is not empty for stock that carries no job order / mission.
+   * Loads {@code /inventory?storage=all} and asserts the seeded, unlinked stock surfaces as a
+   * material group row — i.e. the grouped view is not empty for stock that carries no job order /
+   * mission.
    */
   @Test
   void groupedGlobalInventoryShowsStockWithoutJobOrderOrMission() {
@@ -94,7 +95,7 @@ class InventoryStackViewE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=all");
         page.waitForLoadState();
         assertThat(page.locator("div.tree-row--group[data-material-id='" + materialId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

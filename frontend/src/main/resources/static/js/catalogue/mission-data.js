@@ -27,7 +27,7 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtReorder } from '/js/kernel/krt-reorder.js';
 
-const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
+const MISSION_KINDS = ['jobtypes', 'freqtypes'];
 
 /**
  * Returns the data kind whose list the detail pane shows.
@@ -41,7 +41,7 @@ function selectedMissionKind() {
 }
 
 /**
- * Builds the query string that carries the three inactive-toggles and the selected kind.
+ * Builds the query string that carries the two inactive-toggles and the selected kind.
  *
  * @returns {string} the query string without a leading question mark
  */
@@ -56,9 +56,7 @@ function missionFilterParams() {
         const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         return el ? el.checked : false;
     }
-    return `includeInactiveSquadrons=${checked(
-        'includeInactiveSquadrons',
-    )}&includeInactiveJobTypes=${checked(
+    return `includeInactiveJobTypes=${checked(
         'includeInactiveJobTypes',
     )}&includeInactiveFrequencyTypes=${checked(
         'includeInactiveFrequencyTypes',
@@ -123,7 +121,6 @@ function onMissionKindKeydown(e) {
 
 const missionData = krtPageSections.create({
     sections: {
-        squadrons: { container: '#squadrons-results', fragmentValue: 'squadrons-results' },
         jobtypes: { container: '#jobtypes-results', fragmentValue: 'jobtypes-results' },
         freqtypes: { container: '#freqtypes-results', fragmentValue: 'freqtypes-results' },
     },
@@ -139,7 +136,6 @@ const missionData = krtPageSections.create({
  * @returns {string | null} the section key, or null for an unknown action
  */
 function missionSectionForAction(action) {
-    if (action.indexOf('/squadrons') !== -1) return 'squadrons';
     if (action.indexOf('/job-types') !== -1) return 'jobtypes';
     if (action.indexOf('/frequency-types') !== -1) return 'freqtypes';
     return null;
@@ -178,45 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function dialogField(id) {
         return /** @type {HTMLInputElement} */ (document.getElementById(id));
     }
-
-    const sqModal = document.getElementById('squadron-modal');
-    const sqForm = /** @type {HTMLFormElement} */ (document.getElementById('squadron-form'));
-    const sqTitle = /** @type {HTMLElement} */ (document.getElementById('squadron-modal-title'));
-    const sqAddBtn = document.getElementById('add-squadron-btn');
-    const sqClose = /** @type {NodeListOf<HTMLElement>} */ (
-        document.querySelectorAll('.close-squadron-modal')
-    );
-
-    if (sqAddBtn) {
-        sqAddBtn.onclick = () => {
-            assignFormAction(
-                sqForm,
-                safeSameOriginUrl(sqAddBtn.getAttribute('data-action'), sqForm.action),
-            );
-            sqTitle.innerText = MISSION_TITLES.squadronCreate;
-            dialogField('sq-name').value = '';
-            dialogField('sq-shorthand').value = '';
-            dialogField('sq-desc').value = '';
-            dialogField('edit-squadron-version').value = '0';
-            krtModal.open(sqModal);
-        };
-    }
-
-    document.addEventListener('click', (e) => {
-        const btn = /** @type {Element} */ (e.target).closest('.edit-squadron-btn');
-        if (!btn) return;
-        assignFormAction(sqForm, safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action));
-        sqTitle.innerText = MISSION_TITLES.edit;
-        dialogField('sq-name').value = btn.getAttribute('data-name') ?? '';
-        dialogField('sq-shorthand').value = btn.getAttribute('data-shorthand') ?? '';
-        dialogField('sq-desc').value = btn.getAttribute('data-desc') ?? '';
-        dialogField('edit-squadron-version').value = btn.getAttribute('data-version') ?? '';
-        krtModal.open(sqModal);
-    });
-
-    sqClose.forEach((btn) => {
-        btn.onclick = () => krtModal.close(sqModal);
-    });
 
     const jtModal = document.getElementById('jobtype-modal');
     const jtForm = /** @type {HTMLFormElement} */ (document.getElementById('jobtype-form'));
@@ -348,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.onclick = function (event) {
-        if (event.target === sqModal) krtModal.close(sqModal);
         if (event.target === jtModal) krtModal.close(jtModal);
         if (event.target === ftModal) krtModal.close(ftModal);
     };
@@ -406,7 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-    wireModalSave(sqForm, sqModal);
     wireModalSave(jtForm, jtModal);
     wireModalSave(ftForm, ftModal);
 
@@ -547,7 +502,7 @@ function readMissionFilterPref() {
     }
 }
 
-/** Stores the three inactive-toggles and the selected kind as the page's preference. */
+/** Stores the two inactive-toggles and the selected kind as the page's preference. */
 function persistMissionFilters() {
     /**
      * Reads a filter checkbox.
@@ -563,7 +518,6 @@ function persistMissionFilters() {
         localStorage.setItem(
             MISSION_FILTER_PREF_KEY,
             JSON.stringify({
-                squadrons: checked('includeInactiveSquadrons'),
                 jobTypes: checked('includeInactiveJobTypes'),
                 frequencyTypes: checked('includeInactiveFrequencyTypes'),
                 kind: selectedMissionKind(),
@@ -592,13 +546,11 @@ function persistMissionFilters() {
             });
         });
     };
-    wireFilter('includeInactiveSquadrons', 'squadrons-results');
     wireFilter('includeInactiveJobTypes', 'jobtypes-results');
     wireFilter('includeInactiveFrequencyTypes', 'freqtypes-results');
 
     (function () {
         const toggles = [
-            { id: 'includeInactiveSquadrons', pref: 'squadrons' },
             { id: 'includeInactiveJobTypes', pref: 'jobTypes' },
             { id: 'includeInactiveFrequencyTypes', pref: 'frequencyTypes' },
         ];
@@ -614,9 +566,7 @@ function persistMissionFilters() {
         ) {
             selectMissionKind(saved.kind, false);
         }
-        if (
-            /[?&]includeInactive(Squadrons|JobTypes|FrequencyTypes)=/.test(window.location.search)
-        ) {
+        if (/[?&]includeInactive(JobTypes|FrequencyTypes)=/.test(window.location.search)) {
             persistMissionFilters();
             return;
         }

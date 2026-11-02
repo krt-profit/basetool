@@ -91,6 +91,14 @@ public class BackendServiceException extends RuntimeException {
    */
   public static final String CODE_RANK_OUTSIDE_ROLE_RANGE = "RANK_OUTSIDE_ROLE_RANGE";
 
+  /**
+   * Problem code of the {@code 409} the backend answers when a leadership seat is given to a user
+   * without {@code KRT Member} (REQ-SEC-015). Form handlers branch on it so the refusal is not
+   * shown as a concurrency conflict.
+   */
+  public static final String CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER =
+      "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER";
+
   private final int statusCode;
   private final @NotNull String problemCode;
   private final @Nullable String correlationId;

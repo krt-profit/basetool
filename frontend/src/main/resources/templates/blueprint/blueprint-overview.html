@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{blueprintOverview.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='blueprints.availability', eyebrowKey='nav.group.logistics', titleText=#{blueprintOverview.title},
         count=${overviewPage != null ? overviewPage.totalElements() : null}, countId='bp-overview-count', countFor='bp-overview-results')}"></th:block>
 
     <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Error</div>

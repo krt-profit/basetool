@@ -29,10 +29,13 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -47,6 +50,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,7 +76,9 @@ public class OperationService {
   private final MissionRepository missionRepository;
   private final MissionCommands missionCommands;
   private final UserService userService;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
   private final OperationPayoutService operationPayoutService;
@@ -84,7 +90,8 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope =
+        requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     return operationRepository.findAllScoped(
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
@@ -119,7 +126,8 @@ public class OperationService {
         (status == null || status.isEmpty())
             ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
             : status;
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope =
+        requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     return operationRepository.searchOperations(
         LikePatterns.escapeNullable(query),
         start,
@@ -143,7 +151,8 @@ public class OperationService {
    */
   @NotNull
   public List<OperationReferenceDto> findAllReference() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope =
+        requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     Instant terminalCutoff =
         OffsetDateTime.now(ZoneOffset.UTC)
             .minusMonths(REFERENCE_TERMINAL_CUTOFF_MONTHS)
@@ -186,12 +195,14 @@ public class OperationService {
    * <p>With an authenticated caller, a picked org unit is validated against the caller's
    * memberships; without a pick the caller's single membership is used, and a caller without any
    * membership creates an ownerless operation (REQ-ORG-009). Without an authenticated caller the
-   * pick is ignored and {@code OwnerScopeService.currentOrgUnit()} is stamped.
+   * pick is ignored and {@code RequestScopeResolver.currentOrgUnit()} is stamped.
    *
    * @param operation transient entity
    * @param owningOrgUnitId optional picker output from {@link OperationCreateDto#owningOrgUnitId},
    *     or {@code null}
    * @return the persisted operation
+   * @throws AccessDeniedException when the caller holds no Mission Manager grant in the stamped
+   *     unit, or for an ownerless operation none in an Organisationsleitung or Bereich unit
    */
   @Transactional
   public Operation createOperation(@NotNull Operation operation, @Nullable UUID owningOrgUnitId) {
@@ -199,10 +210,15 @@ public class OperationService {
       User caller = userService.getCurrentUser().orElse(null);
       if (caller != null) {
         operation.setOwningOrgUnit(
-            ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, owningOrgUnitId));
+            orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, owningOrgUnitId));
       } else {
-        ownerScopeService.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
+        requestScopeResolver.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }
+    }
+    UUID stampedOrgUnitId =
+        operation.getOwningOrgUnit() == null ? null : operation.getOwningOrgUnit().getId();
+    if (!accessGateService.canManageMissionsOf(stampedOrgUnitId)) {
+      throw new AccessDeniedException("Mission Manager grant required in the owning org unit");
     }
     Operation saved = operationRepository.save(operation);
     auditRecorder.record(

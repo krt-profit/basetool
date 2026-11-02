@@ -29,9 +29,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ class PromotionCategoryServiceTest {
 
   @Mock private PromotionCategoryMapper mapper;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AccessGateService accessGateService;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private AuditService auditService;
@@ -81,15 +82,18 @@ class PromotionCategoryServiceTest {
     PromotionCategoryResponse response =
         new PromotionCategoryResponse(
             UUID.randomUUID(), 0L, topicId, "Grundlagen", "Flug Kenntnisse", null, 0, null, null);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
-    when(repository.findAllByTopicIdScopedOrdered(topicId, scopeId)).thenReturn(List.of(category));
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(Set.of(scopeId))));
+    when(repository.findAllByTopicIdScopedOrdered(topicId, Set.of(scopeId)))
+        .thenReturn(List.of(category));
     when(mapper.toResponse(category)).thenReturn(response);
 
-    List<PromotionCategoryResponse> result = service.listAllByTopic(topicId);
+    List<PromotionCategoryResponse> result =
+        service.listAllByTopic(topicId, PromotionReadView.MEMBER);
 
     assertEquals(1, result.size());
     assertEquals("Flug Kenntnisse", result.get(0).name());
-    verify(repository).findAllByTopicIdScopedOrdered(topicId, scopeId);
+    verify(repository).findAllByTopicIdScopedOrdered(topicId, Set.of(scopeId));
   }
 
   @Test
@@ -111,7 +115,7 @@ class PromotionCategoryServiceTest {
     PromotionCategory entity =
         PromotionCategory.builder().topic(topic).name("Flug Kenntnisse").sortOrder(0).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
+    when(accessGateService.canSeeSquadron(squadronId)).thenReturn(false);
 
     assertThrows(AccessDeniedException.class, () -> service.get(id));
   }

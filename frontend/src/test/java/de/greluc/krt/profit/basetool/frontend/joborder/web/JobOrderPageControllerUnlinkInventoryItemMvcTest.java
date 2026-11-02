@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +70,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItem_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
       throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 
@@ -109,6 +111,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItem_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 

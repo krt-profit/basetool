@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="customise" class="home-top__actions" th:if="${dashboard.loaded()}">
+    <button type="button" class="btn btn-secondary" data-trigger="dashboard-customise" aria-pressed="false"
+            aria-controls="dashboard-board" data-testid="dashboard-customise"
+            th:attr="data-label-customise=#{dashboard.customise},data-label-done=#{dashboard.customise.done}"
+            th:text="#{dashboard.customise}">Anpassen</button>
+</div>
+
+<div th:fragment="toolbar" class="dash-toolbar is-hidden" data-dashboard-toolbar data-testid="dashboard-toolbar" th:if="${dashboard.loaded()}">
+    <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-add" data-testid="dashboard-add"
+            th:text="#{dashboard.add}">Widget hinzufügen</button>
+    <button type="button" class="btn btn-ghost btn-xs" data-trigger="dashboard-reset" data-testid="dashboard-reset"
+            th:text="#{dashboard.reset}">Standard wiederherstellen</button>
+</div>
+
+</body>
+</html>

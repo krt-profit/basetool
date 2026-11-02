@@ -37,9 +37,11 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipPledgeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -318,7 +320,7 @@ class HangarPagePatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Einsatz &amp; Flotte<")
         .contains("data-testid=\"hangar-import\"")
         .contains("data-testid=\"hangar-add-ship\"")
         .contains("data-testid=\"overflow-menu-toggle\"")
@@ -395,8 +397,10 @@ class HangarPagePatternRenderTest {
 
   /** The org-unit tab renders the tree rows and, for an officer, the hidden owner rows. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void rendersTheOrgUnitTreeWithOwnerRowsForOfficers() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
     SquadronShipOverviewDto cutlass =
         new SquadronShipOverviewDto(
             type("Cutlass Black", "Drake"),

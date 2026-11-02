@@ -277,7 +277,7 @@ class SeededNotificationRulesIntegrationTest {
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
-            SelectorKind.ROLE),
+            SelectorKind.SEAT_HOLDERS),
         rule(
             NotificationEventType.SUPPLY_DONATION_PLEDGED,
             NotificationType.SUPPLY_DONATION_PLEDGED,
@@ -294,6 +294,12 @@ class SeededNotificationRulesIntegrationTest {
             NotificationType.SUPPLY_DONATION_DECLINED,
             true,
             SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.INVENTORY_STOCK_LEVEL_LOW,
+            NotificationType.INVENTORY_STOCK_LEVEL_LOW,
+            false,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
         rule(
             NotificationEventType.SUPPLY_NEED_ORDER_COVERED,
             NotificationType.SUPPLY_NEED_ORDER_COVERED,

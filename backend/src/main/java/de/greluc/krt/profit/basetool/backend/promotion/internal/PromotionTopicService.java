@@ -27,7 +27,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -44,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Domain service for {@link PromotionTopic} CRUD. A topic's {@code owningSquadron} scopes its whole
- * promotion subtree; officers act on their own squadron's topics, admins on any.
+ * promotion subtree; admins and callers with officer reach in that squadron write it.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,40 +62,42 @@ public class PromotionTopicService {
 
   private final PromotionTopicRepository repository;
   private final PromotionTopicMapper mapper;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
+  private final RequestScopeResolver requestScopeResolver;
   private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
   /**
-   * Pages the promotion topics in the caller's squadron scope; admins in "all squadrons" mode see
-   * every squadron.
+   * Pages the promotion topics of the requested view; admins in "all squadrons" mode see every
+   * squadron.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of promotion topics
    */
-  public Page<PromotionTopicResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<PromotionTopicResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
    * Returns every {@link PromotionTopicResponse} ordered by {@code sortOrder}, scoped exactly as
-   * {@link #list(Pageable)}. Used by the promotion UI to render the full topic list without
-   * pagination.
+   * {@link #list(Pageable, PromotionReadView)}. Used by the promotion UI to render the full topic
+   * list without pagination.
    *
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return visible topics in display order
    */
-  public List<PromotionTopicResponse> listAll() {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope).stream().map(mapper::toResponse).toList();
+  public List<PromotionTopicResponse> listAll(@NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds()).stream().map(mapper::toResponse).toList())
+        .orElseGet(List::of);
   }
 
   /**
@@ -114,29 +117,30 @@ public class PromotionTopicService {
 
   /**
    * Persists a new {@link PromotionTopic} stamped with the caller's active squadron ({@link
-   * OwnerScopeService#currentSquadron()}).
+   * RequestScopeResolver#currentSquadron()}).
    *
    * @param request validated payload describing the new topic
    * @return the persisted topic in response form
    * @throws BadRequestException when the caller has no active squadron context
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public PromotionTopicResponse create(@NotNull PromotionTopicWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
-    if (ownerScopeService.hasAmbiguousStaffelContext()) {
+    if (requestScopeResolver.hasAmbiguousStaffelContext()) {
       throw new BadRequestException(
           "You belong to two Staffeln — pin the Staffel this promotion topic belongs to via the"
               + " sidebar switcher before creating it.");
     }
     Squadron squadron =
-        ownerScopeService
+        requestScopeResolver
             .currentSquadron()
             .orElseThrow(() ->
                 new BadRequestException(
                     "No active squadron context — admins in 'all squadrons' mode must focus a"
                         + " squadron via the sidebar switcher before creating a promotion"
                         + " topic."));
+    promotionAccessPolicy.assertOfficerIn(squadron.getId());
     PromotionTopic entity = mapper.toEntity(request);
     entity.setOwningSquadron(squadron);
     PromotionTopic saved = repository.save(entity);
@@ -161,7 +165,7 @@ public class PromotionTopicService {
    * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
@@ -184,7 +188,7 @@ public class PromotionTopicService {
    * @throws AccessDeniedException if the caller's squadron does not match
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public void delete(@NotNull UUID id) {
     promotionAccessPolicy.assertFeatureEnabled();
     PromotionTopic entity = load(id);
@@ -204,7 +208,7 @@ public class PromotionTopicService {
     if (topic.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canSeeSquadron(topic.getOwningSquadron().getId())) {
+    if (!accessGateService.canSeeSquadron(topic.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not match the topic's owning squadron");
     }
@@ -214,9 +218,6 @@ public class PromotionTopicService {
     if (topic.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
-      throw new AccessDeniedException(
-          "Caller's squadron context does not allow editing the topic's owning squadron");
-    }
+    promotionAccessPolicy.assertOfficerIn(topic.getOwningSquadron().getId());
   }
 }

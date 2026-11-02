@@ -55,7 +55,7 @@ class AssetAwareAuthenticationSuccessHandlerTest {
   }
 
   @Test
-  void onAuthenticationSuccess_assetSavedRequest_dropsSavedRequestAndRedirectsToContextRoot()
+  void onAuthenticationSuccess_assetSavedRequest_dropsSavedRequestAndRedirectsToStartPage()
       throws Exception {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -66,12 +66,12 @@ class AssetAwareAuthenticationSuccessHandlerTest {
     handler.onAuthenticationSuccess(request, response, authentication);
 
     verify(requestCache).removeRequest(request, response);
-    assertEquals("/", response.getRedirectedUrl());
+    assertEquals("/start", response.getRedirectedUrl());
     verify(delegate, never()).onAuthenticationSuccess(any(), any(), any());
   }
 
   @Test
-  void onAuthenticationSuccess_assetSavedRequestWithContextPath_redirectsToContextRootHome()
+  void onAuthenticationSuccess_assetSavedRequestWithContextPath_redirectsToStartPage()
       throws Exception {
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setContextPath("/app");
@@ -82,7 +82,7 @@ class AssetAwareAuthenticationSuccessHandlerTest {
 
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    assertEquals("/app/", response.getRedirectedUrl());
+    assertEquals("/app/start", response.getRedirectedUrl());
   }
 
   @Test
@@ -99,6 +99,50 @@ class AssetAwareAuthenticationSuccessHandlerTest {
     verify(delegate).onAuthenticationSuccess(request, response, authentication);
     verify(requestCache, never()).removeRequest(any(), any());
     assertEquals(null, response.getRedirectedUrl(), "Wrapper must not write its own redirect");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"/", "https://profit-base.online/", "/?continue", ""})
+  void onAuthenticationSuccess_rootSavedRequest_countsAsAPlainLogin(String saved) throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    SavedRequest savedRequest = mock(SavedRequest.class);
+    when(savedRequest.getRedirectUrl()).thenReturn(saved);
+    when(requestCache.getRequest(request, response)).thenReturn(savedRequest);
+
+    handler.onAuthenticationSuccess(request, response, authentication);
+
+    verify(requestCache).removeRequest(request, response);
+    assertEquals("/start", response.getRedirectedUrl());
+    verify(delegate, never()).onAuthenticationSuccess(any(), any(), any());
+  }
+
+  @Test
+  void onAuthenticationSuccess_plainLoginWithTheDefaultDelegate_goesToTheStartPage()
+      throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    when(requestCache.getRequest(request, response)).thenReturn(null);
+
+    new AssetAwareAuthenticationSuccessHandler(requestCache)
+        .onAuthenticationSuccess(request, response, authentication);
+
+    assertEquals("/start", response.getRedirectedUrl());
+  }
+
+  @Test
+  void onAuthenticationSuccess_deepLinkWithTheDefaultDelegate_winsOverTheStartPage()
+      throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    SavedRequest saved = mock(SavedRequest.class);
+    when(saved.getRedirectUrl()).thenReturn("http://localhost/missions/abc-123");
+    when(requestCache.getRequest(request, response)).thenReturn(saved);
+
+    new AssetAwareAuthenticationSuccessHandler(requestCache)
+        .onAuthenticationSuccess(request, response, authentication);
+
+    assertEquals("http://localhost/missions/abc-123", response.getRedirectedUrl());
   }
 
   @Test

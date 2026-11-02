@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,11 +40,14 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.util.HashSet;
@@ -71,7 +75,9 @@ class OperationServiceTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionCommands missionCommands;
   @Mock private UserService userService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private AccessGateService accessGateService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private AuthHelperService authHelperService;
 
   @Mock private AuditService auditService;
@@ -85,9 +91,10 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
+    when(accessGateService.canManageMissionsOf(null)).thenReturn(true);
     when(userService.getCurrentUser()).thenReturn(java.util.Optional.empty());
     org.mockito.Mockito.lenient()
-        .when(ownerScopeService.currentOrgUnit())
+        .when(requestScopeResolver.currentOrgUnit())
         .thenReturn(java.util.Optional.empty());
 
     Operation result = operationService.createOperation(operation, null);
@@ -119,8 +126,9 @@ class OperationServiceTest {
     UUID pickedOrgUnitId = picked.getId();
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, pickedOrgUnitId))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, pickedOrgUnitId))
         .thenReturn(picked);
+    when(accessGateService.canManageMissionsOf(pickedOrgUnitId)).thenReturn(true);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Operation saved = operationService.createOperation(operation, pickedOrgUnitId);
@@ -138,13 +146,38 @@ class OperationServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(null);
+    when(accessGateService.canManageMissionsOf(null)).thenReturn(true);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Operation saved = operationService.createOperation(operation, null);
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership caller → ownerless operation");
     verify(operationRepository, times(1)).save(operation);
+  }
+
+  @Test
+  void createOperation_withoutAGrantInTheStampedUnit_isRefusedAndNothingIsSaved() {
+    Operation operation = new Operation();
+    operation.setName("Foreign Op");
+    operation.setStatus(OperationStatus.PLANNED);
+
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stamped =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+    stamped.setId(UUID.randomUUID());
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(stamped);
+    when(accessGateService.canManageMissionsOf(stamped.getId())).thenReturn(false);
+
+    assertThrows(
+        org.springframework.security.access.AccessDeniedException.class,
+        () -> operationService.createOperation(operation, null));
+    verify(operationRepository, never()).save(any(Operation.class));
   }
 
   @Test
@@ -172,7 +205,7 @@ class OperationServiceTest {
   void shouldGetAllOperations() {
     PageRequest pageable = PageRequest.of(0, 10);
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(operationRepository.findAllScoped(true, null, Set.of(), false, null, pageable))
         .thenReturn(page);
@@ -192,7 +225,7 @@ class OperationServiceTest {
       UUID squadronId = UUID.randomUUID();
       List<String> requestedStatus = List.of("PLANNED", "ACTIVE");
 
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
       when(operationRepository.searchOperations(
               "alpha",
@@ -228,7 +261,7 @@ class OperationServiceTest {
     @Test
     void nullStatusList_fallsBackToFullEnumSet() {
       PageRequest pageable = PageRequest.of(0, 20);
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.captor();
       when(operationRepository.searchOperations(
@@ -257,7 +290,7 @@ class OperationServiceTest {
     @Test
     void emptyStatusList_alsoFallsBackToFullEnumSet() {
       PageRequest pageable = PageRequest.of(0, 20);
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.captor();
       when(operationRepository.searchOperations(
@@ -281,7 +314,7 @@ class OperationServiceTest {
     @Test
     void adminAllSquadronsMode_passesNullScopeToRepository() {
       PageRequest pageable = PageRequest.of(0, 20);
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
               any(),
@@ -308,7 +341,7 @@ class OperationServiceTest {
       PageRequest pageable = PageRequest.of(0, 20);
       Instant start = Instant.parse("2026-06-01T00:00:00Z");
       Instant end = Instant.parse("2026-06-30T23:59:00Z");
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
               any(),

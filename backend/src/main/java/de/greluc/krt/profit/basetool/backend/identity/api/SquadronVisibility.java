@@ -42,7 +42,7 @@ public interface SquadronVisibility {
   boolean canSeeSquadron(@NotNull UUID squadronId);
 
   /**
-   * The Staffel ids the admin user list, the search and the promotion queries filter on.
+   * The Staffel ids the admin user list and the search filter on.
    *
    * @return the id set, or {@code null} for the unfiltered all-scope of admins and leadership
    */

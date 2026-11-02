@@ -50,6 +50,17 @@ class LiveSyncSectionMapParityTest {
   private static final Pattern SEAM_ENTRY =
       Pattern.compile("(?:'([\\w-]+)'|\"([\\w-]+)\"|([\\w-]+))\\s*:\\s*\\{\\s*container");
 
+  /** One room of the dashboard's {@code LIVE_ROOMS}: its name and the body of its sections. */
+  private static final Pattern DASHBOARD_ROOM =
+      Pattern.compile("(?:'([\\w-]+)'|([\\w-]+))\\s*:\\s*\\{([^{}]*)\\}");
+
+  /** One section of a dashboard room: its key, followed by the array of widget types. */
+  private static final Pattern DASHBOARD_SECTION =
+      Pattern.compile("(?:'([\\w-]+)'|([\\w-]+))\\s*:\\s*\\[");
+
+  /** The one {@code inventory_all} section the Lager pages render; the levels tab adds its own. */
+  private static final String LAGER_STOCK_SECTION = "stock";
+
   @Test
   void missionSeamMap_matchesTheMissionTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/mission/mission-detail.js", "sections");
@@ -294,13 +305,21 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void stockLevelSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory/stock-levels.js", "sections");
+    assertThat(jsKeys)
+        .as("sections keys in stock-levels.js vs LiveSyncTopicClass.INVENTORY_ALL")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-admin.js", "sections", 0);
     assertThat(jsKeys)
         .as(
             "sections keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
                 + " whitelist")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -308,7 +327,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-my.js", "sections", 0);
     assertThat(jsKeys)
         .as("sections keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -316,7 +335,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-index.js", "sections");
     assertThat(jsKeys)
         .as("sections keys in inventory-index.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -324,7 +343,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-material.js", "sections");
     assertThat(jsKeys)
         .as("sections keys in inventory-material.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -332,7 +351,7 @@ class LiveSyncSectionMapParityTest {
     Set<String> jsKeys = seamMapKeys("/static/js/inventory/inventory-game-item.js", "sections");
     assertThat(jsKeys)
         .as("sections keys in inventory-game-item.js vs" + " LiveSyncTopicClass.INVENTORY_ALL")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+        .containsExactly(LAGER_STOCK_SECTION);
   }
 
   @Test
@@ -357,6 +376,39 @@ class LiveSyncSectionMapParityTest {
     assertThat(jsKeys)
         .as("sections keys in members.js vs LiveSyncTopicClass.MEMBERS whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBERS.allowedSections());
+  }
+
+  @Test
+  void dashboardLiveRooms_nameOnlyWhitelistedSectionsOfExistingGlobalRooms() throws IOException {
+    String js = readResource("/static/js/dashboard/dashboard-widgets.js");
+    String block = js.substring(js.indexOf("const LIVE_ROOMS = {"));
+    block = block.substring(0, block.indexOf("};"));
+    Matcher rooms = DASHBOARD_ROOM.matcher(block);
+    int found = 0;
+    while (rooms.find()) {
+      found++;
+      String prefix = rooms.group(1) != null ? rooms.group(1) : rooms.group(2);
+      LiveSyncTopicClass topicClass =
+          Stream.of(LiveSyncTopicClass.values())
+              .filter(candidate -> candidate.prefix().equals(prefix) && !candidate.scoped())
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("no global room '" + prefix + "'"));
+      Set<String> sections = new LinkedHashSet<>();
+      Matcher keys = DASHBOARD_SECTION.matcher(rooms.group(3));
+      while (keys.find()) {
+        sections.add(keys.group(1) != null ? keys.group(1) : keys.group(2));
+      }
+      assertThat(sections)
+          .as("sections of the dashboard room '%s' vs %s whitelist", prefix, topicClass)
+          .isNotEmpty()
+          .isSubsetOf(topicClass.allowedSections());
+      if (topicClass == LiveSyncTopicClass.ADMIN_DASHBOARD) {
+        assertThat(sections)
+            .as("every admin dashboard section drives a widget")
+            .containsExactlyInAnyOrderElementsOf(topicClass.allowedSections());
+      }
+    }
+    assertThat(found).as("rooms read from LIVE_ROOMS").isGreaterThanOrEqualTo(7);
   }
 
   @Test

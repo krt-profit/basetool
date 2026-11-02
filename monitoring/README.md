@@ -308,6 +308,8 @@ section above.
 | **OptimisticLockConflictSpike** | A likely locking regression. Check recent deploys; look for a coarse lock or a missed `data-version` propagation on the affected surface. |
 | **IdentityProviderUnavailable** | The app is re-mapping unreachable-Keycloak-JWKS failures to 503. Check Keycloak reachability / DNS before 5xx surfaces to users. The ingest gateway's 503 for a full DPoP replay store is subtracted (its auth-failure reason `dpop_store_full`); `IngestDpopReplayCacheFull` covers that. |
 | **Http5xxRateHigh / HttpLatencyP95High / LogbackErrorSpike** | One application returns more than 1 % 5xx, answers its p95 slower than 2 s, or logs ERRORs above 0.2/s, for 10 minutes. Check the last deploy first, then the application's ERROR lines in Loki (the `level` label) and dashboard `03`; a matching `CircuitBreakerOpen` or `HikariPoolPending` names the dependency. |
+| **QuickAccessSearchSlow** | The quick access's entity search (`/quick-access/search`) answered slower than 1 s at p95 for 10 minutes. Each entity type is asked in parallel and capped at 2 s, so one slow backend list read drags the answer: `sum by (kind, outcome) (rate(basetool_quick_access_search_total[10m]))` names the type that times out or fails; check that type's list endpoint on dashboard `03`. |
+| **NavigationEndpointsErroring** | More than 5 % of the navigation preference and dashboard requests (`/api/v1/navigation/*` on the backend, `/navigation/*` and `/dashboard/*` on the frontend) failed with a 5xx for 10 minutes. Pages keep rendering with the defaults and the stars off, but favourites, hidden pages and the dashboard layout cannot be saved, and a failing widget shows its own error. `sum by (application, uri, status) (rate(http_server_requests_seconds_count{uri=~"/api/v1/navigation/.*\|/navigation/favourites\|/dashboard/.*", status=~"5.."}[10m]))` names the failing route; look in the backend log for the correlation id, then at the connection pool on dashboard `03`. The meters `basetool_navigation_preference_writes_total` (outcome `error`) and `basetool_navigation_personalised_accounts` are on dashboard `07`. |
 | **JvmHeapHigh / JvmGcOverheadHigh** | The heap has been above 90 % of its max, or GC pauses have taken more than 20 % of wall time, for 10 minutes — the collector is thrashing and latency degrades. Read the heap and allocation panels on `03`; a steady climb after a deploy is a leak, not a sizing problem. |
 | **JvmThreadsHigh** | More than 1638 live threads — 80 % of the JVM containers' `PidsLimit=2048`. At the cap the JVM cannot create native threads (`JvmNativeThreadExhaustion`). A steady climb is a thread leak: take a thread dump (`jcmd <pid> Thread.print` through `podman exec` — a gated write on production) or compare the thread-state panels on `03`. |
 | **JvmNativeThreadExhaustion** | **CRITICAL.** A JVM logged `pthread_create failed` / `unable to create native thread`: its container hit the pids cap and the app is failing. Restart the service to recover, then find the leak — `ContainerPidsHigh` and `JvmThreadsHigh` are the leading signals. |
@@ -425,6 +427,20 @@ internet and that the `/actuator` denies answer 404 (REQ-OBS-012). The internal 
 cannot carry that signal — its traffic never arrives from a public address, and the admin allow-list
 names exactly the container-network gateways. A failing run notifies via GitHub's workflow-failure
 e-mail, not Alertmanager.
+
+## Dashboard 07: navigation and quick access
+
+Panels 92 to 96 of `07-basetool-operations.json` watch the navigation and the quick access
+(REQ-UI-032, REQ-UI-033, REQ-OBS-011); `NavigationEndpointsErroring` and `QuickAccessSearchSlow`
+alert on them.
+
+| Panel | Query | Reads as |
+| --- | --- | --- |
+| 92 Navigation preference writes/hour | `basetool_navigation_preference_writes_total` by `section`, `outcome` | Writes of favourites, hidden pages, order, appearance and tab bars; a `conflict` is a stale section version, an `error` a failed write. |
+| 93 Personalised navigation accounts | `basetool_navigation_personalised_accounts` by `section` | Accounts holding an entry in a section. |
+| 94 Navigation endpoints 5xx rate | `http_server_requests_seconds_count` on `/api/v1/navigation/*`, `/navigation/*`, `/dashboard/*` | Server errors of the preference and dashboard routes. |
+| 95 Quick-access searches/hour | `basetool_quick_access_search_total` by `kind`, `outcome` | Entity searches per type; `error` failed closed, `timeout` missed the 2 s cap. |
+| 96 Quick-access search p95 | `http_server_requests_seconds_bucket` on `/quick-access/search` | 95th percentile of the entity search. |
 
 ## Operating procedures
 

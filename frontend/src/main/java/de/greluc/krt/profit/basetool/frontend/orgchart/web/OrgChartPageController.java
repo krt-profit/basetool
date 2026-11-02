@@ -53,10 +53,26 @@ import org.springframework.web.bind.annotation.ResponseBody;
  */
 @Controller
 @UsesLayoutModel
-@RequestMapping("/org-chart")
+@RequestMapping(OrgChartPageController.PATH)
 @RequiredArgsConstructor
 @Slf4j
 public class OrgChartPageController {
+
+  /** The page path. */
+  public static final String PATH = "/org-chart";
+
+  /** The query parameter naming the unit or person the page highlights. */
+  static final String HIGHLIGHT_PARAM = "highlight";
+
+  /**
+   * The link to the page with one unit or person highlighted.
+   *
+   * @param key the org unit id, the user id or the position id of a holder without an account
+   * @return the page path with the highlight parameter
+   */
+  public static @NotNull String highlightHref(@NotNull UUID key) {
+    return PATH + "?" + HIGHLIGHT_PARAM + "=" + key;
+  }
 
   /** Reads the chart and sends the editor's writes. */
   private final OrgChartBackendClient orgChartClient;

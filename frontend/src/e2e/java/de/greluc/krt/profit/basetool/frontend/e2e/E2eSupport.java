@@ -474,6 +474,18 @@ final class E2eSupport {
   }
 
   /**
+   * Waits until every request and navigation the page started before the call has been issued, by a
+   * round trip to the server: the page cannot answer it before the handlers that ran earlier have
+   * acted, so an effect that did not show up by now is not coming. It replaces a fixed sleep in a
+   * check that something did not happen.
+   *
+   * @param page the page whose earlier actions are to have taken effect
+   */
+  static void settle(Page page) {
+    page.evaluate("() => fetch('/impressum', { cache: 'no-store' }).then((r) => r.status)");
+  }
+
+  /**
    * Navigates to {@code url}, retrying up to {@link #NAVIGATE_MAX_ATTEMPTS} times on a transient
    * abort ({@link #isTransientNavigationAbort}) or a timeout, with the context's cookie jar put
    * back when the failed attempt wiped it ({@link #restoreLostCookieJar}).

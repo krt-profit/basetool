@@ -108,7 +108,7 @@ class AdminDeletionRequestsListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"deletionRequestsHost\"")
         .doesNotContain("class=\"greeting")

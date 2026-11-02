@@ -45,7 +45,7 @@ Ein Officer beantragt eine Buchung für seine Einheit; Bankmitarbeiter entscheid
 
 ### Sichtbarkeitsmatrix der Konten-Verantwortung (`OrgUnitBankVisibilityMatrixE2eTest`)
 
-10. Per API als jeweiliger Nutzer: Sonderkonto-Auto-Sicht, Drill-in-Endpunkte (`/api/v1/bank/org-units/…`), Freigaben der Arten `USER`, `GLOBAL_ROLE` und `ALL_MEMBERS` (vom Admin gesetzt), Saldo-Ziel und Sichtbarkeits-Konfiguration.
+10. Per API als jeweiliger Nutzer: Sonderkonto-Auto-Sicht, Drill-in-Endpunkte (`/api/v1/bank/org-units/…`), Freigaben der Arten `USER` und `ALL_MEMBERS` sowie die abgewiesenen Rollen-Buckets (von der Bankleitung gesetzt), Saldo-Ziel und Sichtbarkeits-Konfiguration.
 11. In der UI: der Bereichsleiter öffnet den Drill-in eines gebuchten Sonderkontos.
 
 ## Erwartetes Ergebnis
@@ -53,7 +53,7 @@ Ein Officer beantragt eine Buchung für seine Einheit; Bankmitarbeiter entscheid
 - **Anträge:** Der bestätigte Antrag steht auf `CONFIRMED`, und der Saldo des Einheitenkontos ist um den beantragten Betrag gestiegen; der zurückgezogene und der abgelehnte Antrag bewegen kein Geld; der bearbeitete Antrag trägt den korrigierten Betrag. Der Officer erreicht die Mitarbeiter-Warteschlange nicht, der reine Mitarbeiter die Officer-Seite nicht — geprüft wird die **Seite**, nicht der Navigationslink.
 - **Berechtigungen:** Die Leitung sieht alle Konten, der Mitarbeiter nur das freigegebene; das einfache Mitglied ohne Bankrolle sieht nichts (Dashboard verboten, keine Dashboard-Inhalte in der UI). Die Auditspur ist ADMIN-only, die Freigabe-Matrix Leitungs-only. Die Leitung sieht Dashboard, Direktbuchung und Berichte; das Detail-JSON trägt die Capability-Flags, die die K1-Buttons nutzen.
 - **Live-Sync:** Kontext B entfernt den entschiedenen Antrag **in place** aus seiner Nur-offen-Warteschlange. Das Entscheidungsmodal öffnet sich für den nächsten Antrag erneut, ohne Reload.
-- **Sichtbarkeit:** Ein Bereichsleiter sieht das Sonderkonto automatisch; ein Inhaber der `OFFICER`-Rolle ohne Bereichs-/OL-Sitz sieht es **nicht**, ein einfaches Mitglied auch nicht. Ein Mitglied ohne Aufsicht, Freigabe oder Sitz wird an den Drill-in-Endpunkten abgewiesen. Eine `USER`-Freigabe macht ein Einheitenkonto genau für diesen Nutzer sichtbar; `GLOBAL_ROLE`- und `ALL_MEMBERS`-Freigaben wirken auf dem Sonderkonto. Das Saldo-Ziel darf der Admin setzen, ein Mitglied nicht; die Sichtbarkeit eines Sonderkontos konfigurieren nur OL oder Bankleitung — nicht der Bereichsleiter, der es sieht. Die Drill-in-Historie zeigt fünf Spalten und **keine** Halter-Spalte (REQ-BANK-038).
+- **Sichtbarkeit:** Ein Bereichsleiter sieht das Sonderkonto automatisch; ein einfaches Mitglied sieht es **nicht**. Ein Mitglied ohne Aufsicht, Freigabe oder Sitz wird an den Drill-in-Endpunkten abgewiesen. Eine `USER`-Freigabe macht ein Einheitenkonto genau für diesen Nutzer sichtbar; `USER`- und `ALL_MEMBERS`-Freigaben wirken auf dem Sonderkonto, Rollen-Buckets (Logistiker, Mission-Manager) lehnt es mit 400 ab. Das Saldo-Ziel darf der Admin setzen, ein Mitglied nicht; die Sichtbarkeit eines Sonderkontos konfigurieren nur OL oder Bankleitung — nicht der Bereichsleiter, der es sieht. Die Drill-in-Historie zeigt fünf Spalten und **keine** Halter-Spalte (REQ-BANK-038).
 
 ## Sonderfälle & Lehren
 

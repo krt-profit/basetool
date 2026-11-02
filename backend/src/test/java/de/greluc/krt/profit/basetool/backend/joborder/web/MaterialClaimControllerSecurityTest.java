@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies that the material-claim write endpoints forbid a LOGISTICIAN outside a profit-eligible
- * org unit and admit a profit-eligible one ({@code @ownerScopeService.canViewJobOrders()}).
+ * org unit and admit a profit-eligible one ({@code @requestScopeResolver.canViewJobOrders()}).
  */
 @SpringBootTest
 class MaterialClaimControllerSecurityTest {
@@ -55,7 +55,7 @@ class MaterialClaimControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MaterialClaimService materialClaimService;
-  @MockitoBean private OwnerScopeService ownerScopeService;
+  @MockitoBean private RequestScopeResolver requestScopeResolver;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
   private static final UUID CLAIM_ID = UUID.randomUUID();
@@ -84,7 +84,7 @@ class MaterialClaimControllerSecurityTest {
 
   @Test
   void upsertClaim_nonProfitLogistician_isForbidden() throws Exception {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     mockMvc
         .perform(
@@ -99,7 +99,7 @@ class MaterialClaimControllerSecurityTest {
 
   @Test
   void upsertClaim_profitEligibleLogistician_reachesService() throws Exception {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
 
     mockMvc
         .perform(
@@ -114,7 +114,7 @@ class MaterialClaimControllerSecurityTest {
 
   @Test
   void withdrawClaim_nonProfitLogistician_isForbidden() throws Exception {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     mockMvc
         .perform(
@@ -127,7 +127,7 @@ class MaterialClaimControllerSecurityTest {
 
   @Test
   void withdrawClaim_profitEligibleLogistician_reachesService() throws Exception {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
 
     mockMvc
         .perform(

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookResult
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkStolenMarkRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCatalog;
@@ -50,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredR
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -100,20 +100,9 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class InventoryItemController {
 
-  /**
-   * Role gate of the squadron-wide inventory endpoints: ADMIN, OFFICER, LOGISTICIAN (implied by the
-   * first two) or KRT_MEMBER, the same set as the {@code /api/v1/inventory/**} URL rule.
-   */
+  /** Role gate of the squadron-wide inventory endpoints: ADMIN, LOGISTICIAN or KRT_MEMBER. */
   public static final String INVENTORY_ACCESS =
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "','"
-          + Roles.OFFICER
-          + "','"
-          + Roles.LOGISTICIAN
-          + "','"
-          + Roles.KRT_MEMBER
-          + "')";
+      "hasAnyRole('" + Roles.ADMIN + "','" + Roles.LOGISTICIAN + "','" + Roles.KRT_MEMBER + "')";
 
   /** Default page size for a stack-entries drill-down when the caller does not specify one. */
   private static final int STACK_ENTRIES_DEFAULT_SIZE = 20;
@@ -147,7 +136,7 @@ public class InventoryItemController {
   private final InventoryStolenMarkService inventoryStolenMarkService;
   private final InventoryAggregationService inventoryAggregationService;
   private final UserService userService;
-  private final AuthHelperService authHelperService;
+  private final InventoryAccessPolicy inventoryAccessPolicy;
 
   /**
    * Aggregated per-catalog-entry inventory view. For {@code catalog=MATERIAL} (the default) the
@@ -583,7 +572,7 @@ public class InventoryItemController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemBookOutDto dto) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    boolean isLogistician = inventoryAccessPolicy.isLogisticianOfItem(id);
     InventoryItemDto result =
         inventoryItemService.bookOutInventoryItem(
             id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
@@ -620,7 +609,7 @@ public class InventoryItemController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemPersonalRebookDto dto) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    boolean isLogistician = inventoryAccessPolicy.isLogisticianOfItem(id);
     return inventoryItemService.rebookPersonal(
         id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
   }
@@ -636,7 +625,7 @@ public class InventoryItemController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemNoteUpdateRequest request) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    boolean isLogistician = inventoryAccessPolicy.isLogisticianOfItem(id);
     return inventoryItemService.updateNote(
         id, request, userService.getUserIdFromJwt(jwt), isLogistician);
   }
@@ -828,7 +817,7 @@ public class InventoryItemController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemStolenMarkDto dto) {
     return inventoryStolenMarkService.mark(
-        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
+        id, dto, userService.getUserIdFromJwt(jwt), inventoryAccessPolicy.isLogisticianOfItem(id));
   }
 
   /**
@@ -912,7 +901,7 @@ public class InventoryItemController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid UpdateDeliveredRequest request) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    boolean isLogistician = inventoryAccessPolicy.isLogisticianOfItem(id);
     return inventoryItemService.updateDelivered(
         id, request, userService.getUserIdFromJwt(jwt), isLogistician);
   }
@@ -955,7 +944,7 @@ public class InventoryItemController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryAllocationWriteDto dto) {
     return inventoryItemService.addAllocation(
-        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
+        id, dto, userService.getUserIdFromJwt(jwt), inventoryAccessPolicy.isLogisticianOfItem(id));
   }
 
   /**
@@ -991,7 +980,7 @@ public class InventoryItemController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryAllocationWriteDto dto) {
     return inventoryItemService.changeAllocation(
-        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
+        id, dto, userService.getUserIdFromJwt(jwt), inventoryAccessPolicy.isLogisticianOfItem(id));
   }
 
   /**
@@ -1024,13 +1013,13 @@ public class InventoryItemController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryAllocationWriteDto dto) {
     return inventoryItemService.removeAllocation(
-        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
+        id, dto, userService.getUserIdFromJwt(jwt), inventoryAccessPolicy.isLogisticianOfItem(id));
   }
 
   /**
    * Admin-only: removes every non-personal inventory item ("globales Lager leeren"). Personal
-   * entries are deliberately left untouched. Gated by {@code hasRole('ADMIN')} so neither {@code
-   * OFFICER} nor {@code LOGISTICIAN} can trigger the squadron-wide wipe.
+   * entries are deliberately left untouched. Gated by {@code hasRole('ADMIN')} so neither an
+   * officer nor a {@code LOGISTICIAN} can trigger the squadron-wide wipe.
    *
    * @return 204 No Content
    */

@@ -226,6 +226,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
             false);
 
     stubDetail(orderId, userId, order);
@@ -341,6 +342,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -418,6 +420,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -500,6 +503,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -599,6 +603,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
             false);
 
     stubDetail(orderId, userId, order);
@@ -688,6 +693,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -743,6 +749,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -808,6 +815,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -887,6 +895,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         List.of(),
         Instant.now(),
         1L,
+        null,
         null,
         false);
   }
@@ -1313,6 +1322,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -1381,6 +1391,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             Instant.now(),
             1L,
+            null,
             null,
             false);
     stubDetail(orderId, userId, order);

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.materialexchange.api.MaterialExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -43,12 +43,12 @@ public class MaterialExchangeBusinessGauges implements BusinessGaugeSource {
   public void register(@NotNull MeterRegistry registry) {
     BusinessGauges.countGauge(
         registry,
-        MetricNames.MATERIAL_EXCHANGE_ACTIVE,
+        MaterialExchangeMetricNames.MATERIAL_EXCHANGE_ACTIVE,
         materialExchangeActive,
         MaterialExchangeOfferStatus.ACTIVE.name());
     BusinessGauges.countGauge(
         registry,
-        MetricNames.MATERIAL_REQUEST_OPEN,
+        MaterialExchangeMetricNames.MATERIAL_REQUEST_OPEN,
         materialRequestOpen,
         MaterialExchangeRequestStatus.ACTIVE.name());
   }

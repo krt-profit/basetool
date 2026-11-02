@@ -34,11 +34,13 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
@@ -133,7 +135,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
             .getContentAsString();
 
     assertThat(html)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .containsPattern("id=\"add-sc-btn\" class=\"btn btn--cta\"")
         .contains("class=\"krt-switch\" for=\"includeInactive\"")
@@ -143,6 +145,39 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
     assertThat(html.split("btn--cta", -1)).hasSize(3);
+  }
+
+  /** Each active special command carries one profit switch in its row, sorted by name. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_rendersOneProfitTogglePerSpecialCommandSortedByName() throws Exception {
+    UUID zuluId = UUID.randomUUID();
+    UUID alphaId = UUID.randomUUID();
+    SpecialCommandDto zulu =
+        new SpecialCommandDto(zuluId, "Zulu-Kommando", "ZK", "", true, true, 3L);
+    SpecialCommandDto alpha =
+        new SpecialCommandDto(alphaId, "Alpha-Kommando", "AK", "", true, false, 1L);
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(alpha, zulu), 0, 1000, 2, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/special-commands"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    java.util.regex.Matcher toggles =
+        java.util.regex.Pattern.compile("<input[^>]*sk-profit-toggle[^>]*>").matcher(html);
+    assertThat(toggles.find()).as("first SK toggle").isTrue();
+    String first = toggles.group();
+    assertThat(toggles.find()).as("second SK toggle").isTrue();
+    String second = toggles.group();
+    assertThat(toggles.find()).as("exactly one toggle per SK").isFalse();
+    assertThat(first).contains("data-sk-id=\"" + alphaId + "\"").doesNotContain("checked");
+    assertThat(second).contains("data-sk-id=\"" + zuluId + "\"").contains("checked");
   }
 
   /** An empty catalogue renders the empty state, not a bare text block. */
@@ -257,7 +292,34 @@ class AdminSpecialCommandsPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = "ADMIN")
+  void toggleMemberLead_classic_withoutKrtMember_namesTheRefusal() throws Exception {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.patch(contains("/lead"), any(), eq(Void.class), eq(skId), eq(userId)))
+        .thenThrow(
+            new BackendServiceException(
+                "seat refused",
+                null,
+                409,
+                BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
+                null,
+                List.of(),
+                null));
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + skId + "/members/" + userId + "/lead")
+                .with(csrf())
+                .param("isLead", "true")
+                .param("version", "0"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/organisation/special-commands/" + skId))
+        .andExpect(flash().attribute("errorToast", "error.orgUnit.seatRequiresKrtMember"));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void toggleMemberLeadAjax_officer_returns403() throws Exception {
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

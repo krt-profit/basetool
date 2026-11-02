@@ -31,8 +31,9 @@ import java.util.UUID;
  * fill {@code materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
  * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty.
  *
- * <p>{@code redacted} is {@code true} when the caller sees the order only as a member of the
- * requesting org unit (REQ-ORDERS-023).
+ * <p>{@code canManageAssignees} is resolved on the detail and assignee reads only; {@code redacted}
+ * is {@code true} when the caller sees the order only as a member of the requesting org unit
+ * (REQ-ORDERS-023).
  */
 @DtoMirror
 public record JobOrderDto(
@@ -55,4 +56,26 @@ public record JobOrderDto(
     Instant createdAt,
     Long version,
     Boolean canEdit,
-    boolean redacted) {}
+    Boolean canManageAssignees,
+    boolean redacted) {
+
+  /**
+   * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is
+   * {@code false} for a caller who reads the order only through an assignee entry (REQ-ORDERS-047).
+   *
+   * @return {@code true} iff {@code canEdit} is {@code true}
+   */
+  public boolean callerMayEdit() {
+    return Boolean.TRUE.equals(canEdit);
+  }
+
+  /**
+   * Whether the backend lets the caller change other users' assignee entries: its {@code
+   * canManageAssignees} flag, held only by a Logistician of the order's unit (REQ-ORDERS-014).
+   *
+   * @return {@code true} iff {@code canManageAssignees} is {@code true}
+   */
+  public boolean callerMayManageAssignees() {
+    return Boolean.TRUE.equals(canManageAssignees);
+  }
+}

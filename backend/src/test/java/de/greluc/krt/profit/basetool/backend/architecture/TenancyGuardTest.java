@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderMaterialController;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -49,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationDashboardWidget;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
@@ -76,7 +79,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPol
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyDonation;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeed;
@@ -110,13 +113,14 @@ class TenancyGuardTest {
   /** The scope services whose SpEL bean names and {@code can*} methods count as a scope gate. */
   private static final Set<Class<?>> SCOPE_GATE_TYPES =
       Set.of(
-          OwnerScopeService.class,
+          RequestScopeResolver.class,
           AccessGateService.class,
           OperationAccessPolicy.class,
           RefineryAccessPolicy.class,
           JobOrderAccessPolicy.class,
           MissionAccessPolicy.class,
           InventoryAccessPolicy.class,
+          StockLevelAccessPolicy.class,
           HangarAccessPolicy.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class,
@@ -126,6 +130,10 @@ class TenancyGuardTest {
   /** Org-unit references that are no tenancy boundary, each with the reason. */
   private static final Map<String, String> NOT_TENANT_SCOPE =
       Map.ofEntries(
+          Map.entry(
+              key(NavigationDashboardWidget.class, "orgUnitId"),
+              "the unit a member pins a widget to, read only by its owner; the widget's data reads"
+                  + " apply the unit's own scope"),
           Map.entry(
               key(JobOrder.class, "requestingOrgUnit"),
               "the customer unit; it grants no queue visibility, the responsible unit scopes the"
@@ -354,10 +362,10 @@ class TenancyGuardTest {
               new HandlerKey(JobOrderController.class, "updateItemJobOrderAsRequester"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
-              new HandlerKey(JobOrderController.class, "unlinkMaterial"),
+              new HandlerKey(JobOrderMaterialController.class, "unlinkMaterial"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
-              new HandlerKey(JobOrderController.class, "unlinkInventoryItem"),
+              new HandlerKey(JobOrderMaterialController.class, "unlinkInventoryItem"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
               new HandlerKey(MissionFinanceEntryController.class, "updateFinanceEntry"),
@@ -501,7 +509,7 @@ class TenancyGuardTest {
     SpelScopeGate gate = new SpelScopeGate(SCOPE_GATE_TYPES);
 
     assertThat(gate.isScopeGated("hasRole('ADMIN')")).isTrue();
-    assertThat(gate.isScopeGated("hasRole('OFFICER') and @ownerScopeService.canEditShip(#id)"))
+    assertThat(gate.isScopeGated("hasRole('OFFICER') and @accessGateService.canEditShip(#id)"))
         .isTrue();
     assertThat(
             gate.isScopeGated(
@@ -511,7 +519,7 @@ class TenancyGuardTest {
         .isTrue();
     assertThat(gate.isScopeGated("isAuthenticated()")).isFalse();
     assertThat(gate.isScopeGated("hasRole('ADMIN') or isAuthenticated()")).isFalse();
-    assertThat(gate.isScopeGated("isAuthenticated() or @ownerScopeService.canEditShip(#id)"))
+    assertThat(gate.isScopeGated("isAuthenticated() or @accessGateService.canEditShip(#id)"))
         .isFalse();
     assertThat(gate.isScopeGated("@bankSecurityService.canSee(#id, authentication)")).isFalse();
     assertThat(gate.isScopeGated("hasAnyRole('ADMIN', 'OFFICER')")).isFalse();

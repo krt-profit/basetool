@@ -131,28 +131,11 @@ public interface UserRepository
    * Returns the ids ({@code sub}s) of every user holding the global role with the given stable
    * {@code code} (e.g. {@code ADMIN}). Backs the notification rule engine's {@code ROLE} selector.
    *
-   * @param roleCode the stable role code to match (e.g. {@code ADMIN}, {@code OFFICER})
+   * @param roleCode the stable role code to match (e.g. {@code ADMIN})
    * @return the matching user ids; never {@code null}, possibly empty
    */
   @Query("SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode")
   Set<UUID> findUserIdsByRoleCode(@Param("roleCode") String roleCode);
-
-  /**
-   * Returns the ids of users who hold the global role {@code roleCode} and are members of the given
-   * org unit, for the notification rule engine's {@code ORG_RELATIVE_ROLE} resolution.
-   *
-   * @param roleCode the stable role code to match (e.g. {@code OFFICER})
-   * @param orgUnitId the org unit the user must be a member of
-   * @return the matching user ids; never {@code null}, possibly empty
-   */
-  @Query(
-      """
-      SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode AND EXISTS
-      (SELECT 1 FROM OrgUnitMembership m WHERE m.id.userId = u.id AND m.id.orgUnitId =
-      :orgUnitId)
-      """)
-  Set<UUID> findUserIdsByRoleCodeAndOrgUnitMembership(
-      @Param("roleCode") String roleCode, @Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Paged squadron-scoped user listing (REQ-ORG-017); users without a Staffel membership are always
@@ -189,8 +172,8 @@ public interface UserRepository
 
   /**
    * Paged squadron-scoped listing of the ordinary members the promotion system evaluates; users
-   * holding {@code ADMIN} or {@code OFFICER} and users without a squadron membership are excluded.
-   * Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
+   * holding {@code ADMIN} or a leadership seat and users without a squadron membership are
+   * excluded. Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
    *
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
    * @param pageable paging and sorting
@@ -201,7 +184,9 @@ public interface UserRepository
       SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id =
       u.id AND ms.kind = de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON
       AND (:scopeSquadronIds IS NULL OR ms.id.orgUnitId IN :scopeSquadronIds)) AND NOT
-      EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))
+      EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) = 'ADMIN') AND NOT EXISTS (SELECT 1 FROM
+      OrgUnitMembership seat WHERE seat.user.id = u.id AND seat.role <>
+      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER)
       """)
   Page<User> findEvaluatableMembers(
       @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
@@ -283,6 +268,31 @@ public interface UserRepository
   Page<UserReferenceDto> searchScopedReferences(
       @Param("query") String query,
       @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds,
+      Pageable pageable);
+
+  /**
+   * Unscoped substring search over the active accounts (approved, present and enabled in Keycloak),
+   * projected to {@link UserReferenceDto}: the {@code preferredIds} first, then by username.
+   *
+   * @param query the LIKE-escaped substring to match against username or display name
+   * @param preferredIds the users to list first; never empty, pass a placeholder for none
+   * @param pageable the result window; its sort is ignored
+   * @return the matching active accounts, preferred users first
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto(u.id,
+      u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+      '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
+      (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
+      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND
+      u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+      AND u.inKeycloak = true AND u.enabledInKeycloak = true
+      ORDER BY CASE WHEN u.id IN :preferredIds THEN 0 ELSE 1 END, LOWER(u.username)
+      """)
+  List<UserReferenceDto> searchActiveReferences(
+      @Param("query") String query,
+      @Param("preferredIds") Collection<UUID> preferredIds,
       Pageable pageable);
 
   /**

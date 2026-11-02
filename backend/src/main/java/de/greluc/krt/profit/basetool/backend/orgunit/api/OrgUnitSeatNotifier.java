@@ -25,7 +25,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.events.OrgNotices;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -37,21 +39,27 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tells the admins when a leadership change leaves a member's OFFICER role out of step with their
- * seats, and clears that notice once the roles fit again (REQ-ORG-029). The OFFICER role is granted
- * by hand next to a seat, so the two can drift.
+ * Tells the admins when a leadership seat holder lacks the {@code KRT Member} role, and clears that
+ * notice once the member holds the role again or no seat any more (REQ-ORG-029).
  */
 @Service
 @RequiredArgsConstructor
 public class OrgUnitSeatNotifier implements RolesChangedObserver {
 
+  private static final String MISSING_KRT_MEMBER = "MISSING_KRT_MEMBER";
+  private static final String APPOINTED = "APPOINTED";
+  private static final String REMOVED = "REMOVED";
+  private static final String ROLES_RECONCILED = "ROLES_RECONCILED";
+  private static final String UNKNOWN_LABEL = "—";
+
   private final OrgUnitMembershipRepository membershipRepository;
+  private final OrgUnitRepository orgUnitRepository;
   private final UserRepository userRepository;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
-   * Checks a member after a seat was filled or vacated and publishes the mismatch, if any; when the
-   * roles fit, the member's earlier mismatch notice goes.
+   * Checks a member after a seat was filled or vacated and reports a seat holder without {@code KRT
+   * Member}; otherwise the member's earlier notice goes.
    *
    * @param userId the member
    * @param unitName the unit's shorthand or name
@@ -66,30 +74,17 @@ public class OrgUnitSeatNotifier implements RolesChangedObserver {
       @NotNull MembershipRole rank,
       boolean appointed,
       @Nullable UUID actorSub) {
-    String mismatch =
-        mismatch(
-            membershipRepository.existsLeadershipSeat(userId),
-            userRepository.hasAnyRoleCode(userId, List.of(Roles.OFFICER)),
-            userRepository.hasAnyRoleCode(userId, List.of(Roles.ADMIN)));
-    if (mismatch == null) {
+    if (!membershipRepository.existsLeadershipSeat(userId)
+        || userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER))) {
       eventPublisher.publishEvent(OrgNotices.leadershipRolesAgree(userId));
       return;
     }
-    String member = userRepository.findPlainById(userId).map(User::getEffectiveName).orElse("—");
-    eventPublisher.publishEvent(
-        OrgNotices.leadershipRoleMismatch(
-            userId,
-            member,
-            unitName,
-            appointed ? "APPOINTED" : "REMOVED",
-            rank.name(),
-            mismatch,
-            actorSub));
+    publishMissingKrtMember(userId, unitName, appointed ? APPOINTED : REMOVED, rank, actorSub);
   }
 
   /**
-   * Clears the member's mismatch notice when their freshly reconciled roles fit their seats; a
-   * member whose roles still disagree keeps it.
+   * Reports a seat holder whose freshly reconciled roles lack {@code KRT Member}, naming one of
+   * their seats; a member who holds the role or no seat has their notice cleared.
    *
    * @param userId the member
    * @param roles the member's roles after the reconciliation
@@ -97,25 +92,33 @@ public class OrgUnitSeatNotifier implements RolesChangedObserver {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void onRolesChanged(@NotNull UUID userId, @NotNull Set<Role> roles) {
-    boolean officer =
-        roles.stream().anyMatch(role -> Roles.OFFICER.equalsIgnoreCase(role.getCode()));
-    boolean admin = roles.stream().anyMatch(role -> Roles.ADMIN.equalsIgnoreCase(role.getCode()));
-    if (mismatch(membershipRepository.existsLeadershipSeat(userId), officer, admin) == null) {
+    boolean krtMember =
+        roles.stream().anyMatch(role -> Roles.KRT_MEMBER.equalsIgnoreCase(role.getCode()));
+    Optional<OrgUnitMembership> seat = krtMember ? Optional.empty() : firstSeat(userId);
+    if (seat.isEmpty()) {
       eventPublisher.publishEvent(OrgNotices.leadershipRolesAgree(userId));
+      return;
     }
+    String unitName =
+        orgUnitRepository
+            .findById(seat.get().getId().getOrgUnitId())
+            .map(OrgUnitLabels::shorthandOrName)
+            .orElse(UNKNOWN_LABEL);
+    publishMissingKrtMember(userId, unitName, ROLES_RECONCILED, seat.get().getRole(), null);
   }
 
-  @Nullable
-  private static String mismatch(boolean holdsSeat, boolean officer, boolean admin) {
-    if (admin) {
-      return null;
-    }
-    if (holdsSeat && !officer) {
-      return "MISSING_OFFICER";
-    }
-    if (!holdsSeat && officer) {
-      return "SURPLUS_OFFICER";
-    }
-    return null;
+  private Optional<OrgUnitMembership> firstSeat(UUID userId) {
+    return membershipRepository.findAllByIdUserId(userId).stream()
+        .filter(membership -> membership.getRole() != MembershipRole.MEMBER)
+        .min(Comparator.comparing(OrgUnitMembership::getRole));
+  }
+
+  private void publishMissingKrtMember(
+      UUID userId, String unitName, String seatCode, MembershipRole rank, @Nullable UUID actorSub) {
+    String member =
+        userRepository.findPlainById(userId).map(User::getEffectiveName).orElse(UNKNOWN_LABEL);
+    eventPublisher.publishEvent(
+        OrgNotices.leadershipRoleMismatch(
+            userId, member, unitName, seatCode, rank.name(), MISSING_KRT_MEMBER, actorSub));
   }
 }

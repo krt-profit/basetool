@@ -21,12 +21,16 @@ package de.greluc.krt.profit.basetool.frontend.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.shell.web.CsrfTokenController;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -144,6 +148,41 @@ class LayoutModelScopeMvcTest {
             "/api/v1/notifications/unread-count",
             "/api/v1/org-units/me/active",
             "/api/v1/org-units/me/switchable");
+  }
+
+  /**
+   * A rendered page exposes the backend's officer flags of the active context as model attributes
+   * (REQ-SEC-047).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void renderedPage_exposesTheOfficerFlagsOfTheActiveContext() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+
+    mockMvc
+        .perform(get("/"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("hasOfficerReach", true))
+        .andExpect(model().attribute("canOpenLeitung", true))
+        .andExpect(model().attribute("canManagePromotions", true))
+        .andExpect(model().attribute("canSeeHangarOwnerDetails", true))
+        .andExpect(model().attribute("canManageJobOrders", true))
+        .andExpect(model().attribute("canManageMissionFinance", true));
+  }
+
+  /** Without reach in the active context every officer flag of a rendered page is off. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void renderedPage_withoutReach_officerFlagsOff() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(false));
+
+    mockMvc
+        .perform(get("/"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("hasOfficerReach", false))
+        .andExpect(model().attribute("canOpenLeitung", false));
   }
 
   /**

@@ -1,0 +1,13 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .member-export {
+        max-width: var(--content-max-form);
+    }
+    .member-export__title {
+        margin: 0;
+        font-size: var(--fs-sm);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+}

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.RetentionParticipant;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -103,7 +104,7 @@ public class BankAuditService implements RetentionParticipant {
             .build();
     BankAuditEvent saved = auditEventRepository.save(event);
     meterRegistry
-        .counter(MetricNames.BANK_AUDIT_EVENTS, MetricNames.TAG_EVENT_TYPE, eventType.name())
+        .counter(BankMetricNames.BANK_AUDIT_EVENTS, MetricNames.TAG_EVENT_TYPE, eventType.name())
         .increment();
     return saved;
   }

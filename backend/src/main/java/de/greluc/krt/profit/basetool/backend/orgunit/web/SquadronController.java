@@ -49,8 +49,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the squadron reference table. Mutations are OFFICER/ADMIN; activate is
- * ADMIN-only.
+ * REST surface for the squadron reference table. Mutations and activate are ADMIN-only.
  *
  * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
  * gate still wins (REQ-SEC-052).

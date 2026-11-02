@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -71,6 +72,8 @@ public class PromotionLevelContentController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of level contents
    */
   @GetMapping
@@ -82,7 +85,8 @@ public class PromotionLevelContentController {
   public PageResponse<PromotionLevelContentResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -90,7 +94,7 @@ public class PromotionLevelContentController {
             sort,
             PromotionLevelContentService.SORTABLE_FIELDS,
             PromotionLevelContentService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.list(pageable));
+    return PageResponse.of(service.list(pageable, view));
   }
 
   /**
@@ -99,6 +103,8 @@ public class PromotionLevelContentController {
    *
    * @param categoryId identifier of the parent {@link
    *     de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategory}
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return the level contents bound to that category
    */
   @GetMapping("/by-category/{categoryId}")
@@ -106,8 +112,10 @@ public class PromotionLevelContentController {
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Level contents for the category.")
   })
-  public List<PromotionLevelContentResponse> listByCategory(@PathVariable UUID categoryId) {
-    return service.listByCategory(categoryId);
+  public List<PromotionLevelContentResponse> listByCategory(
+      @PathVariable UUID categoryId,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
+    return service.listByCategory(categoryId, view);
   }
 
   /**
@@ -130,15 +138,17 @@ public class PromotionLevelContentController {
   /**
    * Persists a new {@link
    * de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContent}, binding the
-   * expectations of a single rank level to the referenced category. Restricted to ADMIN or OFFICER
-   * callers.
+   * expectations of a single rank level to the referenced category. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param request validated payload describing the new level content
    * @return the persisted level content in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new level content. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new level content. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Level content created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -160,7 +170,8 @@ public class PromotionLevelContentController {
    * @return the updated level content in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a level content. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Update a level content. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Level content updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -175,14 +186,15 @@ public class PromotionLevelContentController {
   }
 
   /**
-   * Permanently removes the level content identified by {@code id}. Restricted to ADMIN or OFFICER
-   * callers.
+   * Permanently removes the level content identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the level content to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a level content. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary = "Delete a level content. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")

@@ -208,6 +208,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
             List.of("PLANNED"),
             null,
             null,
+            null,
             true,
             null,
             Set.of(),

@@ -43,8 +43,10 @@ import org.springframework.security.web.savedrequest.SavedRequest;
  * asset.
  *
  * <p>When the saved URL's path starts with {@code /sm/} or ends in one of {@link
- * #ASSET_EXTENSIONS}, the saved request is removed and the response redirects to {@code /}, so a
- * background asset request never becomes the post-login target.
+ * #ASSET_EXTENSIONS}, or is the bare application root, the saved request is removed and the
+ * response redirects to {@link #PLAIN_LOGIN_TARGET}, so a background asset request never becomes
+ * the post-login target. A plain login, one without a saved deep link, lands there too, and the
+ * start page of the member decides where it goes on (REQ-UI-034).
  */
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -65,6 +67,9 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
    * an asset request regardless of extension.
    */
   static final String SOURCEMAP_PREFIX = "/sm/";
+
+  /** Where a login without a deep link goes: the entry point of the start page (REQ-UI-034). */
+  static final String PLAIN_LOGIN_TARGET = "/start";
 
   /** The request cache used to look up and remove the saved request; never {@code null}. */
   private final @NotNull RequestCache requestCache;
@@ -91,7 +96,7 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
    * the chain saved.
    *
    * @param requestCache the shared cache; never {@code null}
-   * @return the delegate whose default target URL is {@code /}
+   * @return the delegate whose default target URL is {@link #PLAIN_LOGIN_TARGET}
    */
   @NotNull
   private static SavedRequestAwareAuthenticationSuccessHandler defaultDelegate(
@@ -99,14 +104,14 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
     SavedRequestAwareAuthenticationSuccessHandler handler =
         new SavedRequestAwareAuthenticationSuccessHandler();
     handler.setRequestCache(requestCache);
-    handler.setDefaultTargetUrl("/");
+    handler.setDefaultTargetUrl(PLAIN_LOGIN_TARGET);
     handler.setAlwaysUseDefaultTargetUrl(false);
     return handler;
   }
 
   /**
-   * Removes an asset-like saved request and redirects to the context root, or otherwise delegates
-   * to the wrapped {@link SavedRequestAwareAuthenticationSuccessHandler}.
+   * Removes an asset-like or root saved request and redirects to the plain-login target, or
+   * otherwise delegates to the wrapped {@link SavedRequestAwareAuthenticationSuccessHandler}.
    *
    * @param request the current request, for the saved request and the context path
    * @param response the response the redirect is written to
@@ -121,15 +126,44 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
       @NotNull Authentication authentication)
       throws IOException, ServletException {
     SavedRequest saved = requestCache.getRequest(request, response);
-    if (saved != null && isAssetLikePath(saved.getRedirectUrl())) {
+    if (saved != null && isNoDeepLink(saved.getRedirectUrl())) {
       log.debug(
-          "[oauth2-success] dropping asset-like saved request and redirecting to /: savedUrl={}",
+          "[oauth2-success] dropping saved request that is no deep link: savedUrl={}",
           saved.getRedirectUrl());
       requestCache.removeRequest(request, response);
-      response.sendRedirect(request.getContextPath() + "/");
+      response.sendRedirect(request.getContextPath() + PLAIN_LOGIN_TARGET);
       return;
     }
     delegate.onAuthenticationSuccess(request, response, authentication);
+  }
+
+  /**
+   * Whether a saved URL is no deep link: an asset, or the bare application root a visitor opens
+   * before signing in.
+   *
+   * @param url the saved URL; may be {@code null}
+   * @return {@code true} when the login is a plain one
+   */
+  private static boolean isNoDeepLink(@Nullable String url) {
+    return isAssetLikePath(url) || isRootPath(url);
+  }
+
+  /**
+   * Checks whether a URL's path is the application root, ignoring the query string.
+   *
+   * @param url the saved URL; may be {@code null}
+   * @return {@code true} for {@code /} and for the root of an absolute URL
+   */
+  static boolean isRootPath(@Nullable String url) {
+    if (url == null) {
+      return false;
+    }
+    try {
+      String path = URI.create(url).getPath();
+      return path != null && (path.isEmpty() || "/".equals(path));
+    } catch (IllegalArgumentException _) {
+      return false;
+    }
   }
 
   /**

@@ -143,7 +143,7 @@ public class NotificationRuleService {
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
       String resolvedRoleCode = validateSelector(selectorRequest);
-      if (selectorRequest.kind().readsOnlyTheEvent()) {
+      if (selectorRequest.kind().readsNoSelectorColumns()) {
         rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
         continue;
       }
@@ -198,7 +198,8 @@ public class NotificationRuleService {
           MISSION_PARTICIPANTS,
           MISSION_LEADERSHIP,
           EXCHANGE_CLIENT_HOLDERS,
-          EVENT_RECIPIENTS -> {}
+          EVENT_RECIPIENTS,
+          SEAT_HOLDERS -> {}
       case null -> throw new NullPointerException("selector kind");
     }
     return null;

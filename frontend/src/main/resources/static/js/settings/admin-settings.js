@@ -17,9 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
+/* global SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
-import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 const settings = krtPageSections.create({
@@ -39,103 +38,6 @@ const settings = krtPageSections.create({
         dismissLabelKey: 'conflict.dismiss',
         reloadQuestionKey: 'conflict.question',
     },
-});
-
-/**
- * Wires one family of optimistic boolean toggles: each change flips the label at once and PATCHes
- * through krtFetch.write (REQ-FE-002). On failure the checkbox and label are reverted and an error
- * toast is shown; a 409 is left to krtFetch's conflict handling.
- *
- * @param {string} selector the checkbox selector (e.g. '.squadron-promotion-toggle')
- * @param {string} idAttribute the attribute carrying the target id
- * @param {(id: string) => string} urlFor builds the PATCH URL for an id
- * @param {(checked: boolean) => object} bodyFor builds the JSON payload for the new state
- * @param {{ on: string, off: string, saved: string, error: string }} labels localized strings
- */
-function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
-    /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll(selector)).forEach(
-        (checkbox) => {
-            checkbox.addEventListener('change', () => {
-                const id = checkbox.getAttribute(idAttribute) || '';
-                const checked = checkbox.checked;
-                const labelSpan = checkbox.parentElement
-                    ? checkbox.parentElement.querySelector('.toggle-state-text')
-                    : null;
-                if (labelSpan) {
-                    labelSpan.textContent = checked ? labels.on : labels.off;
-                }
-                function revert() {
-                    checkbox.checked = !checked;
-                    if (labelSpan) {
-                        labelSpan.textContent = !checked ? labels.on : labels.off;
-                    }
-                }
-                settings.write({
-                    method: 'PATCH',
-                    url: urlFor(id),
-                    payload: bodyFor(checked),
-                    submitter: checkbox,
-                    successMessage: labels.saved,
-                    errorMessage: labels.error,
-                    onConflict() {
-                        revert();
-                        return false;
-                    },
-                    onError() {
-                        revert();
-                        showFrontendErrorToast(labels.error);
-                        return true;
-                    },
-                    onNetworkError() {
-                        revert();
-                        return false;
-                    },
-                });
-            });
-        },
-    );
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    wireToggle(
-        '.squadron-promotion-toggle',
-        'data-squadron-id',
-        (id) => {
-            return `/api/proxy/squadrons/${encodeURIComponent(id)}/promotion-enabled`;
-        },
-        (checked) => {
-            return { enabled: checked };
-        },
-        { on: MSG_ENABLED, off: MSG_DISABLED, saved: MSG_SAVED, error: MSG_ERROR },
-    );
-    const profitLabels = {
-        on: MSG_PROFIT_ENABLED,
-        off: MSG_PROFIT_DISABLED,
-        saved: MSG_PROFIT_SAVED,
-        error: MSG_PROFIT_ERROR,
-    };
-    wireToggle(
-        '.squadron-profit-toggle',
-        'data-squadron-id',
-        (id) => {
-            return `/api/proxy/squadrons/${encodeURIComponent(id)}/profit-eligible`;
-        },
-        (checked) => {
-            return { eligible: checked };
-        },
-        profitLabels,
-    );
-    wireToggle(
-        '.sk-profit-toggle',
-        'data-sk-id',
-        (id) => {
-            return `/api/proxy/special-commands/${encodeURIComponent(id)}/profit-eligible`;
-        },
-        (checked) => {
-            return { eligible: checked };
-        },
-        profitLabels,
-    );
 });
 
 document.addEventListener('DOMContentLoaded', () => {

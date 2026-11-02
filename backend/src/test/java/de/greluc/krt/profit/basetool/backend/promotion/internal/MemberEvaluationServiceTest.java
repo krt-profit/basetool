@@ -26,12 +26,13 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -56,14 +61,12 @@ class MemberEvaluationServiceTest {
 
   @Mock private MemberEvaluationMapper mapper;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
-  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
-
-  @Mock private AuthHelperService authHelperService;
-
   @Mock private AuditService auditService;
+
+  @Mock private UserService userService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -97,7 +100,7 @@ class MemberEvaluationServiceTest {
             PromotionLevel.LEVEL_A,
             null,
             null);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(requestScopeResolver.currentSquadronId()).thenReturn(Optional.of(scopeId));
     when(repository.findAllByUserIdScoped(userA, scopeId)).thenReturn(List.of(evalA));
     when(mapper.toResponse(evalA)).thenReturn(responseA);
 
@@ -139,7 +142,6 @@ class MemberEvaluationServiceTest {
     when(repository.findByUserIdAndCategoryId(userId, categoryId)).thenReturn(Optional.empty());
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
-    when(authHelperService.isAdmin()).thenReturn(true);
 
     MemberEvaluationResponse result = service.upsert(userId, categoryId, request);
 
@@ -186,7 +188,6 @@ class MemberEvaluationServiceTest {
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(repository.findByUserIdAndCategoryId(userId, categoryId))
         .thenReturn(Optional.of(existing));
-    when(authHelperService.isAdmin()).thenReturn(true);
     when(repository.save(existing)).thenReturn(existing);
     when(mapper.toResponse(existing)).thenReturn(response);
 
@@ -221,7 +222,6 @@ class MemberEvaluationServiceTest {
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(repository.findByUserIdAndCategoryId(userId, categoryId))
         .thenReturn(Optional.of(existing));
-    when(authHelperService.isAdmin()).thenReturn(true);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -243,20 +243,18 @@ class MemberEvaluationServiceTest {
   }
 
   @Test
-  void upsert_shouldDenyOfficer_evaluatingForeignSquadronMember() {
+  void upsert_shouldDeny_whenPolicyRefusesReachOverTheMember() {
     UUID foreignMemberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
-    UUID foreignStaffelId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     MemberEvaluationUpdateRequest request =
         new MemberEvaluationUpdateRequest(null, PromotionLevel.LEVEL_B);
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(foreignMemberId))
-        .thenReturn(java.util.List.of(foreignStaffelId));
-    when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
+    doThrow(new AccessDeniedException("no reach"))
+        .when(promotionAccessPolicy)
+        .assertOfficerOverMember(foreignMemberId);
 
     assertThrows(
         AccessDeniedException.class, () -> service.upsert(foreignMemberId, categoryId, request));
@@ -264,10 +262,9 @@ class MemberEvaluationServiceTest {
   }
 
   @Test
-  void upsert_shouldAllowOfficer_evaluatingOwnSquadronMember() {
+  void upsert_shouldAllow_whenPolicyAcceptsReachOverTheMember() {
     UUID memberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
-    UUID ownStaffelId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     MemberEvaluationUpdateRequest request =
@@ -292,10 +289,6 @@ class MemberEvaluationServiceTest {
             null);
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(memberId))
-        .thenReturn(java.util.List.of(ownStaffelId));
-    when(ownerScopeService.canEditSquadron(ownStaffelId)).thenReturn(true);
     when(repository.findByUserIdAndCategoryId(memberId, categoryId)).thenReturn(Optional.empty());
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
@@ -312,12 +305,33 @@ class MemberEvaluationServiceTest {
     MemberEvaluation entity =
         MemberEvaluation.builder().userId(USER_A).assignedLevel(PromotionLevel.LEVEL_A).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(authHelperService.isAdmin()).thenReturn(true);
 
     service.delete(id);
 
     verify(repository).delete(entity);
     verify(auditService)
         .record(eq(AuditEventType.PROMOTION_EVALUATION_DELETED), any(), any(), any(), isNull());
+  }
+
+  @Test
+  void listEvaluatableMembers_queriesOnlyTheManagementScope() {
+    Pageable pageable = PageRequest.of(0, 20);
+    UUID enabledUnit = UUID.randomUUID();
+    Page<User> members = new PageImpl<>(List.of(new User()));
+    when(promotionAccessPolicy.readScope(PromotionReadView.MANAGEMENT))
+        .thenReturn(Optional.of(new PromotionReadScope(Set.of(enabledUnit))));
+    when(userService.findEvaluatableMembers(Set.of(enabledUnit), pageable)).thenReturn(members);
+
+    assertSame(members, service.listEvaluatableMembers(pageable));
+  }
+
+  @Test
+  void listEvaluatableMembers_isEmptyWithoutAManagementScope() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(promotionAccessPolicy.readScope(PromotionReadView.MANAGEMENT))
+        .thenReturn(Optional.empty());
+
+    assertTrue(service.listEvaluatableMembers(pageable).isEmpty());
+    verify(userService, never()).findEvaluatableMembers(any(), any());
   }
 }

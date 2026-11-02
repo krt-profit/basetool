@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,7 +130,10 @@ class MissionAccessControlTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                            new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -272,7 +276,10 @@ class MissionAccessControlTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"),
+                            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                            new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),

@@ -321,7 +321,7 @@ class BankAccountDetailPatternRenderTest {
 
   /** The overview shows account cards, the renamed tab and the running requests' approval path. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBankOverviewRendersCardsAndTheApprovalPath() throws Exception {
     UUID orgUnitId = UUID.randomUUID();
     OrgUnitBankBalanceDto balance =

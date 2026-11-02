@@ -33,7 +33,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -81,7 +81,7 @@ public class HangarImportService {
   private final ShipTypeRepository shipTypeRepository;
   private final UserRepository userRepository;
   private final ObjectMapper objectMapper;
-  private final OwnerScopeService ownerScopeService;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
   private final HangarUnitLiveSync unitLiveSync;
 
@@ -248,7 +248,7 @@ public class HangarImportService {
       @NotNull FleetExportParser.FleetImportEntry entry,
       @NotNull ImportTally tally) {
     if (!tally.owningOrgUnitResolved) {
-      tally.owningOrgUnit = ownerScopeService.resolveOrgUnitForImport(user);
+      tally.owningOrgUnit = orgUnitStampingService.resolveOrgUnitForImport(user);
       tally.owningOrgUnitResolved = true;
     }
     Ship ship = new Ship();

@@ -58,7 +58,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -88,7 +88,7 @@ class JobOrderServiceTest {
 
   @Mock private OrgUnitRepository orgUnitRepository;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private OrgUnitAccessPolicy orgUnitAccessPolicy;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
@@ -172,13 +172,15 @@ class JobOrderServiceTest {
             jobOrderRepository,
             materialRepository,
             new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
-            ownerScopeService,
+            requestScopeResolver,
             jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null);
+            null,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
@@ -270,6 +272,7 @@ class JobOrderServiceTest {
             Instant.now(),
             1L,
             null,
+            null,
             false);
   }
 
@@ -359,7 +362,7 @@ class JobOrderServiceTest {
 
   @Test
   void getAllJobOrders_nonViewer_returnsEmptyPageWithoutQuerying() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     org.springframework.data.domain.Page<JobOrderDto> result =
         jobOrderQueryService.getAllJobOrders(
@@ -368,8 +371,17 @@ class JobOrderServiceTest {
     assertTrue(result.isEmpty());
     verify(jobOrderRepository, never())
         .findScopedJobOrders(
-            any(), anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(), any());
-    verify(ownerScopeService, never()).currentScopePredicate();
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            anyBoolean(),
+            any(),
+            any(),
+            any(),
+            any());
+    verify(requestScopeResolver, never()).currentScopePredicate();
   }
 
   @Test
@@ -873,7 +885,7 @@ class JobOrderServiceTest {
 
   @Test
   void getRequestedJobOrders_emptyMembership_returnsEmptyPageWithoutHittingRepo() {
-    when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
+    when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
 
     org.springframework.data.domain.Page<JobOrderDto> page =
         jobOrderQueryService.getRequestedJobOrders(
@@ -886,7 +898,7 @@ class JobOrderServiceTest {
   @Test
   void getRequestedJobOrders_nullStatuses_defaultsToAllStatuses_scopedToDirectMembership() {
     UUID requestingUnitId = UUID.randomUUID();
-    when(ownerScopeService.currentDirectMembershipOrgUnitIds())
+    when(requestScopeResolver.currentDirectMembershipOrgUnitIds())
         .thenReturn(java.util.Set.of(requestingUnitId));
     when(jobOrderRepository.findRequestedOrders(
             any(), eq(java.util.Set.of(requestingUnitId)), any()))
@@ -1900,6 +1912,7 @@ class JobOrderServiceTest {
               Instant.now(),
               1L,
               null,
+              null,
               false);
       when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
@@ -1971,6 +1984,7 @@ class JobOrderServiceTest {
                 List.of(),
                 Instant.now(),
                 o.getVersion(),
+                null,
                 null,
                 false);
           });

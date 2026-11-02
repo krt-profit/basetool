@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<th:block th:fragment="dialog">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='nav-shortcuts', titleId='nav-shortcuts-title', titleKey='shortcuts.title',
+        variant='shortcuts-modal', body=~{kernel/fragments/nav-shortcuts :: shortcuts-body})}">
+    </th:block>
+</th:block>
+<th:block th:fragment="shortcuts-body">
+    <div class="krt-modal-body shortcuts" data-testid="nav-shortcuts-body">
+        <h3 class="shortcuts-heading" th:text="#{shortcuts.group.general}">Allgemein</h3>
+        <dl class="shortcuts-list">
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd" data-palette-kbd th:text="#{palette.kbd}">STRG K</kbd></dt>
+                <dd th:text="#{shortcuts.palette}">Schnellzugriff öffnen</dd>
+            </div>
+        </dl>
+        <h3 class="shortcuts-heading" th:text="#{shortcuts.group.navigation}">Navigation</h3>
+        <dl class="shortcuts-list">
+            <div class="shortcuts-row" data-testid="shortcuts-favourites">
+                <dt>
+                    <span data-shortcuts-status="on"><kbd class="nav-kbd" data-shortcut-slot="1">Alt+1</kbd> &hellip; <kbd class="nav-kbd" data-shortcut-slot="9">Alt+9</kbd></span>
+                    <th:block th:replace="~{kernel/fragments/nav-shortcuts :: status}" />
+                </dt>
+                <dd th:text="#{shortcuts.favourites}">Favorit 1 bis 9 öffnen</dd>
+            </div>
+            <div class="shortcuts-row" data-testid="shortcuts-dashboard">
+                <dt>
+                    <span data-shortcuts-status="on"><kbd class="nav-kbd" data-shortcut-slot="0">Alt+0</kbd></span>
+                    <th:block th:replace="~{kernel/fragments/nav-shortcuts :: status}" />
+                </dt>
+                <dd th:text="#{shortcuts.dashboard}">Startseite öffnen</dd>
+            </div>
+        </dl>
+        <h3 class="shortcuts-heading" th:text="#{shortcuts.group.palette}">Im Schnellzugriff</h3>
+        <dl class="shortcuts-list">
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd">&uarr; &darr;</kbd></dt>
+                <dd th:text="#{palette.hint.navigate}">Navigieren</dd>
+            </div>
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd">&crarr;</kbd></dt>
+                <dd th:text="#{palette.hint.open}">Öffnen</dd>
+            </div>
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd" th:text="#{palette.kbd.newTab}">Strg &crarr;</kbd></dt>
+                <dd th:text="#{palette.hint.newTab}">Neuer Tab</dd>
+            </div>
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd">Tab</kbd></dt>
+                <dd th:text="#{shortcuts.palette.prefix}">Vorgeschlagenes Präfix übernehmen</dd>
+            </div>
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd" th:text="#{palette.kbd.favourite}">Strg D</kbd></dt>
+                <dd th:text="#{palette.hint.favourite}">Favorit</dd>
+            </div>
+            <div class="shortcuts-row">
+                <dt><kbd class="nav-kbd">ESC</kbd></dt>
+                <dd th:text="#{palette.hint.close}">Schließen</dd>
+            </div>
+        </dl>
+    </div>
+</th:block>
+<th:block th:fragment="status">
+    <span data-shortcuts-status="off" hidden>
+        <span th:text="#{shortcuts.off}">ausgeschaltet</span>
+        <a th:href="@{/profile#profile-appearance-card}" data-testid="shortcuts-appearance-link" th:text="#{profile.appearance.title}">Darstellung</a>
+    </span>
+    <span data-shortcuts-status="member" hidden th:text="#{shortcuts.memberOnly}">nur im Mitgliedermodus</span>
+</th:block>
+</body>
+</html>

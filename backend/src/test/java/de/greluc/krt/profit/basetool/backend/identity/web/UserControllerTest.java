@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RankRange;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -117,6 +119,30 @@ class UserControllerTest {
         1L,
         null,
         false);
+  }
+
+  @Test
+  void getUserRankRange_returnsTheBasisAndBoundsOfTheServiceRange() {
+    UUID id = UUID.randomUUID();
+    when(userService.findRankRange(id)).thenReturn(Optional.of(RankRange.leadershipSeat()));
+
+    UserController.UserRankRangeResponse response = controller.getUserRankRange(id);
+
+    assertEquals(RankRange.Basis.LEADERSHIP_SEAT, response.basis());
+    assertEquals(1, response.minRank());
+    assertEquals(12, response.maxRank());
+  }
+
+  @Test
+  void getUserRankRange_withoutARange_hasNoBasisAndTheFullBounds() {
+    UUID id = UUID.randomUUID();
+    when(userService.findRankRange(id)).thenReturn(Optional.empty());
+
+    UserController.UserRankRangeResponse response = controller.getUserRankRange(id);
+
+    assertNull(response.basis());
+    assertEquals(1, response.minRank());
+    assertEquals(20, response.maxRank());
   }
 
   @Test

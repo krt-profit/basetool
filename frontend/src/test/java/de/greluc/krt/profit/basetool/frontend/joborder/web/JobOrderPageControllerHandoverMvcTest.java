@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCre
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,7 @@ class JobOrderPageControllerHandoverMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandover_WithValidItems_ShouldMapDtoAndRedirectWithSuccessToast() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 
@@ -115,6 +117,7 @@ class JobOrderPageControllerHandoverMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandover_WhenBackendReturns409_ShouldRedirectWithErrorToast() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 
@@ -139,6 +142,7 @@ class JobOrderPageControllerHandoverMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandover_WithNoItems_ShouldShortCircuit_NotCallBackend_AndShowErrorToast()
       throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
 
     mockMvc

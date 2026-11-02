@@ -107,11 +107,12 @@ class LiftedRoleGatesTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("inventoryGates")
-  void inventoryGateAdmitsExactlyTheFourRolesTheUrlRuleAdmitted(Method method) {
-    for (String role : List.of(Roles.ADMIN, Roles.OFFICER, Roles.LOGISTICIAN, Roles.KRT_MEMBER)) {
+  void inventoryGateAdmitsExactlyTheThreeRolesTheUrlRuleAdmitted(Method method) {
+    for (String role : List.of(Roles.ADMIN, Roles.LOGISTICIAN, Roles.KRT_MEMBER)) {
       assertThat(granted(method, Roles.authority(role))).as(role).isTrue();
     }
-    for (String role : List.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.MISSION_MANAGER)) {
+    for (String role :
+        List.of("OFFICER", Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.MISSION_MANAGER)) {
       assertThat(granted(method, Roles.authority(role))).as(role).isFalse();
     }
     assertThat(granted(method, Roles.NO_ROLE_MARKER)).as("NO_ROLE").isFalse();
@@ -125,7 +126,7 @@ class LiftedRoleGatesTest {
     assertThat(granted(method, Permissions.HANGAR_WRITE)).as("HANGAR_WRITE").isTrue();
     assertThat(granted(method, Roles.authority(Roles.ADMIN))).as("ADMIN").isTrue();
     for (String role :
-        List.of(Roles.KRT_MEMBER, Roles.OFFICER, Roles.LOGISTICIAN, Roles.BANK_MANAGEMENT)) {
+        List.of(Roles.KRT_MEMBER, "OFFICER", Roles.LOGISTICIAN, Roles.BANK_MANAGEMENT)) {
       assertThat(granted(method, Roles.authority(role))).as(role).isFalse();
     }
     assertThat(granted(method, Roles.NO_ROLE_MARKER)).as("NO_ROLE").isFalse();

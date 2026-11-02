@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * Refinery order payload.
  *
  * <p>{@code owningOrgUnitId} is the picker output on create, resolved by {@code
- * OwnerScopeService.resolveOrgUnitForPickerOutputNullable} for all four org-unit kinds; an
+ * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable} for all four org-unit kinds; an
  * inadmissible pick is rejected with 400 (REQ-ORG-016).
  */
 public record RefineryOrderDto(

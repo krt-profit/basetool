@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,31 +45,29 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
- * The leadership role-mismatch notice (REQ-ORG-029): a seat without OFFICER and OFFICER without a
- * seat are reported to the admins, a fitting role set or an admin is not, and a reconciliation that
- * makes the roles fit clears the notice.
+ * The "seat holder without {@code KRT Member}" notice (REQ-ORG-029): a seat holder without the role
+ * is reported to the admins, whether a seat changed or a role reconciliation took the role away,
+ * and the notice clears once the member holds the role again or no seat any more.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitSeatNotifierTest {
 
   private static final UUID USER = UUID.randomUUID();
+  private static final UUID UNIT = UUID.randomUUID();
 
   @Mock private OrgUnitMembershipRepository membershipRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private UserRepository userRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private OrgUnitSeatNotifier notifier;
 
-  private User member;
-
   @BeforeEach
   void setUp() {
-    member = new User();
+    User member = new User();
     member.setId(USER);
     member.setUsername("ada");
-    org.mockito.Mockito.lenient()
-        .when(userRepository.findPlainById(USER))
-        .thenReturn(Optional.of(member));
+    lenient().when(userRepository.findPlainById(USER)).thenReturn(Optional.of(member));
   }
 
   private NoticeEvent published() {
@@ -76,9 +76,21 @@ class OrgUnitSeatNotifierTest {
     return (NoticeEvent) captured.getValue();
   }
 
-  private void roles(boolean officer, boolean admin) {
-    when(userRepository.hasAnyRoleCode(USER, List.of("OFFICER"))).thenReturn(officer);
-    when(userRepository.hasAnyRoleCode(USER, List.of("ADMIN"))).thenReturn(admin);
+  private void krtMember(boolean holdsRole) {
+    when(userRepository.hasAnyRoleCode(USER, List.of("KRT_MEMBER"))).thenReturn(holdsRole);
+  }
+
+  private void holdsSeatIn(String shorthand, MembershipRole rank) {
+    OrgUnitMembership plain = new OrgUnitMembership();
+    plain.setId(new OrgUnitMembershipId(USER, UUID.randomUUID()));
+    plain.setRole(MembershipRole.MEMBER);
+    OrgUnitMembership seat = new OrgUnitMembership();
+    seat.setId(new OrgUnitMembershipId(USER, UNIT));
+    seat.setRole(rank);
+    when(membershipRepository.findAllByIdUserId(USER)).thenReturn(List.of(plain, seat));
+    OrgUnit unit = new Squadron();
+    unit.setShorthand(shorthand);
+    when(orgUnitRepository.findById(UNIT)).thenReturn(Optional.of(unit));
   }
 
   private static Role role(String code) {
@@ -88,9 +100,9 @@ class OrgUnitSeatNotifierTest {
   }
 
   @Test
-  void aNewSeatWithoutTheOfficerRoleIsReportedAsMissing() {
+  void aSeatHolderWithoutKrtMemberIsReportedAfterASeatChange() {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
-    roles(false, false);
+    krtMember(false);
 
     notifier.seatChanged(USER, "ALP", MembershipRole.STAFFELLEITER, true, null);
 
@@ -102,26 +114,25 @@ class OrgUnitSeatNotifierTest {
         .containsEntry("unit", "ALP")
         .containsEntry("seatCode", "APPOINTED")
         .containsEntry("rankCode", "STAFFELLEITER")
-        .containsEntry("mismatchCode", "MISSING_OFFICER");
+        .containsEntry("mismatchCode", "MISSING_KRT_MEMBER");
   }
 
   @Test
-  void aVacatedLastSeatWithTheOfficerRoleLeftIsReportedAsSurplus() {
-    when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(false);
-    roles(true, false);
-
-    notifier.seatChanged(USER, "ALP", MembershipRole.STAFFELLEITER, false, null);
-
-    NoticeEvent notice = published();
-    assertThat(notice.renderParams())
-        .containsEntry("seatCode", "REMOVED")
-        .containsEntry("mismatchCode", "SURPLUS_OFFICER");
-  }
-
-  @Test
-  void aSeatWithTheOfficerRoleClearsAnEarlierMismatch() {
+  void aRemovedSeatWithAnotherSeatLeftAndNoKrtMemberIsStillReported() {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
-    roles(true, false);
+    krtMember(false);
+
+    notifier.seatChanged(USER, "ALP", MembershipRole.ENSIGN, false, null);
+
+    assertThat(published().renderParams())
+        .containsEntry("seatCode", "REMOVED")
+        .containsEntry("mismatchCode", "MISSING_KRT_MEMBER");
+  }
+
+  @Test
+  void aSeatHolderWithKrtMemberClearsAnEarlierNotice() {
+    when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
+    krtMember(true);
 
     notifier.seatChanged(USER, "ALP", MembershipRole.ENSIGN, true, null);
 
@@ -130,43 +141,62 @@ class OrgUnitSeatNotifierTest {
   }
 
   @Test
-  void anAdminNeverMismatches() {
-    when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
-    roles(false, true);
-
-    notifier.seatChanged(USER, "ALP", MembershipRole.OL_MEMBER, true, null);
-
-    assertThat(published().eventType())
-        .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
-  }
-
-  @Test
-  void aMemberWithoutSeatAndWithoutOfficerNeverMismatches() {
+  void aRemovedLastSeatClearsTheNoticeEvenWithoutKrtMember() {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(false);
-    roles(false, false);
 
-    notifier.seatChanged(USER, "ALP", MembershipRole.ENSIGN, false, null);
-
-    assertThat(published().eventType())
-        .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
-  }
-
-  @Test
-  void aReconciliationThatMakesTheRolesFitClearsTheNotice() {
-    when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
-
-    notifier.onRolesChanged(USER, Set.of(role("OFFICER")));
+    notifier.seatChanged(USER, "ALP", MembershipRole.STAFFELLEITER, false, null);
 
     assertThat(published().eventType())
         .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
   }
 
   @Test
-  void aReconciliationThatLeavesTheRolesOutOfStepKeepsTheNotice() {
+  void anAdminSeatHolderWithoutKrtMemberIsReportedToo() {
     when(membershipRepository.existsLeadershipSeat(USER)).thenReturn(true);
+    krtMember(false);
 
+    notifier.seatChanged(USER, "OL", MembershipRole.OL_MEMBER, true, null);
+
+    assertThat(published().eventType())
+        .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH);
+  }
+
+  @Test
+  void aSeatHolderWhoLosesKrtMemberInAReconciliationIsReported() {
+    holdsSeatIn("ALP", MembershipRole.STAFFELLEITER);
+
+    notifier.onRolesChanged(USER, Set.of(role("BANK_STAFF")));
+
+    NoticeEvent notice = published();
+    assertThat(notice.eventType()).isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH);
+    assertThat(notice.actorSub()).isNull();
+    assertThat(notice.renderParams())
+        .containsEntry("member", "ada")
+        .containsEntry("unit", "ALP")
+        .containsEntry("seatCode", "ROLES_RECONCILED")
+        .containsEntry("rankCode", "STAFFELLEITER")
+        .containsEntry("mismatchCode", "MISSING_KRT_MEMBER");
+  }
+
+  @Test
+  void aReconciliationThatRestoresKrtMemberClearsTheNotice() {
     notifier.onRolesChanged(USER, Set.of(role("KRT_MEMBER")));
 
-    verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any(Object.class));
+    assertThat(published().eventType())
+        .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
+  }
+
+  @Test
+  void aReconciliationOfAMemberWithoutSeatAndWithoutKrtMemberClearsTheNotice() {
+    OrgUnitMembership plain = new OrgUnitMembership();
+    plain.setId(new OrgUnitMembershipId(USER, UNIT));
+    plain.setRole(MembershipRole.MEMBER);
+    when(membershipRepository.findAllByIdUserId(USER)).thenReturn(List.of(plain));
+
+    notifier.onRolesChanged(USER, Set.of());
+
+    assertThat(published().eventType())
+        .isEqualTo(NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED);
+    verify(orgUnitRepository, never()).findById(any());
   }
 }

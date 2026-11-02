@@ -17,396 +17,109 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ * The quick access (REQ-UI-026, REQ-UI-033): the dialog behind the search field and Ctrl+K. This
+ * script wires the dialog's events to the modules that hold the pages, the actions, the groups,
+ * the backend entity search and the rows on screen.
+ */
+
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtSearchFind, krtSearchFold } from '/js/kernel/krt-search.js';
+import { NAV_RENDERED_EVENT } from '/js/kernel/nav-preferences.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { createActions } from '/js/kernel/krt-palette-actions.js';
+import { createEntitySearch } from '/js/kernel/krt-palette-entity-search.js';
+import { createGroups } from '/js/kernel/krt-palette-groups.js';
+import { remember } from '/js/kernel/krt-palette-history.js';
+import { createPageIndex } from '/js/kernel/krt-palette-index.js';
+import { toggleFavourite } from '/js/kernel/krt-palette-personalise.js';
+import { createView } from '/js/kernel/krt-palette-view.js';
+import { krtSearchHitHref, krtSearchParse } from '/js/kernel/krt-search.js';
+
+/** @import { PaletteItem } from '/js/kernel/krt-palette-items.js' */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const RECENT_KEY = 'krt.recent';
-    const RECENT_MAX = 4;
-    const PAGE_MAX = 8;
-    const SVG_NS = 'http://www.w3.org/2000/svg';
-
     const dialog = document.getElementById('nav-palette');
     const root = dialog ? dialog.querySelector('.palette') : null;
     const input = /** @type {HTMLInputElement | null} */ (document.getElementById('palette-input'));
     const results = document.getElementById('palette-results');
     const emptyEl = dialog ? dialog.querySelector('.palette-empty') : null;
+    const liveEl = dialog ? dialog.querySelector('[data-palette-live]') : null;
     if (!dialog || !(root instanceof HTMLElement) || !input || !results) return;
     const paletteRoot = root;
     const paletteInput = input;
-    const resultsEl = results;
     const data = paletteRoot.dataset;
 
     /**
-     * @typedef {object} PaletteItem
-     * @property {string} label the visible name
-     * @property {string} crumb the group it belongs to, shown as a breadcrumb
-     * @property {string} icon the sprite symbol without its `krt-icon-` prefix
-     * @property {string} foldLabel the folded label the search matches first
-     * @property {string} foldRest the folded breadcrumb and search terms the search matches second
-     * @property {string} [href] the page it opens; absent for an action
-     * @property {() => void} [run] what an action does
-     */
-
-    /**
-     * The visible text of an element with its whitespace collapsed.
+     * Says that a page became or stopped being a favourite: in the dialog's status line while it
+     * is open, otherwise as a toast.
      *
-     * @param {Element | null} el the element
-     * @returns {string} its text, or an empty string
+     * @param {string} name the page's name
+     * @param {boolean} favourite the page's new state
      */
-    const textOf = function (el) {
-        return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
-    };
-
-    /**
-     * A palette row with its folded search text.
-     *
-     * @param {{ label: string, crumb: string, icon: string, keywords: string, href?: string, run?: () => void }} spec
-     *     what the row shows and does
-     * @returns {PaletteItem} the row
-     */
-    const makeItem = function (spec) {
-        /** @type {PaletteItem} */
-        const item = {
-            label: spec.label,
-            crumb: spec.crumb,
-            icon: spec.icon,
-            foldLabel: krtSearchFold(spec.label),
-            foldRest: krtSearchFold(`${spec.crumb} ${spec.keywords}`),
-        };
-        if (spec.href) item.href = spec.href;
-        if (spec.run) item.run = spec.run;
-        return item;
-    };
-
-    /** @type {PaletteItem[]} */
-    const index = [];
-    const seen = new Set();
-
-    /**
-     * Adds a page unless its target is already offered.
-     *
-     * @param {string} href the page's path
-     * @param {string} label its name
-     * @param {string} crumb its group
-     * @param {string} icon its sprite symbol
-     * @param {string} keywords its additional search terms
-     * @returns {boolean} whether the page was added
-     */
-    const addPage = function (href, label, crumb, icon, keywords) {
-        if (!label || href.charAt(0) !== '/' || href.indexOf('/oauth2/') === 0 || seen.has(href)) {
-            return false;
-        }
-        seen.add(href);
-        index.push(makeItem({ href, label, crumb, icon, keywords }));
-        return true;
-    };
-
-    /**
-     * Collects every page the member may open from the rendered menu and the palette's own page
-     * list, so the palette offers exactly the links the server rendered for this member.
-     */
-    const buildIndex = function () {
-        const sidebar = document.getElementById('sidebar');
-        const menuLinks = sidebar
-            ? ['.nav-mode-main', '.nav-personal', '.nav-mode-admin', '.nav-legal'].flatMap(
-                  (zone) => {
-                      return Array.from(sidebar.querySelectorAll(`${zone} a[href]`));
-                  },
-              )
-            : [];
-        const ownLinks = Array.from(paletteRoot.querySelectorAll('.palette-source-pages a[href]'));
-        menuLinks.concat(ownLinks).forEach((a) => {
-            if (a.hasAttribute('data-nav-skip') || a.closest('.nav-lang-menu')) return;
-            const groupHolder = a.closest('[data-nav-group]');
-            const iconHolder = a.closest('[data-nav-icon]');
-            addPage(
-                a.getAttribute('href') || '',
-                textOf(a.querySelector('.nav-top-label') || a),
-                groupHolder ? groupHolder.getAttribute('data-nav-group') || '' : '',
-                iconHolder ? iconHolder.getAttribute('data-nav-icon') || 'list' : 'list',
-                a.getAttribute('data-nav-keywords') || '',
-            );
-        });
-    };
-
-    buildIndex();
-
-    /**
-     * The actions behind the server-rendered links of one source list.
-     *
-     * @param {string} selector the source list
-     * @returns {PaletteItem[]} one action per link, in document order
-     */
-    const linkActions = function (selector) {
-        const crumb = data.actionCrumb || '';
-        return Array.from(paletteRoot.querySelectorAll(`${selector} a[href]`)).map((a) => {
-            return makeItem({
-                label: textOf(a),
-                crumb,
-                icon: a.getAttribute('data-nav-icon') || 'list',
-                keywords: a.getAttribute('data-nav-keywords') || '',
-                run() {
-                    if (a instanceof HTMLElement) a.click();
-                },
-            });
-        });
-    };
-
-    /**
-     * The actions the palette offers besides pages.
-     *
-     * @returns {PaletteItem[]} the actions this member can take on this page
-     */
-    const buildActions = function () {
-        const crumb = data.actionCrumb || '';
-        /** @type {PaletteItem[]} */
-        const out = linkActions('.palette-source-actions');
-        const select = document.getElementById('squadron-switcher-select');
-        if (select) {
-            out.push(
-                makeItem({
-                    label: krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
-                    crumb,
-                    icon: 'swap',
-                    keywords: '',
-                    run() {
-                        if (krtChrome.nav) krtChrome.nav.open(select);
-                    },
-                }),
-            );
-        }
-        if (document.querySelector('#sidebar .nav-admin-entry')) {
-            out.push(
-                makeItem({
-                    label: krtI18nText(data.actionAdmin, 'data-action-admin'),
-                    crumb,
-                    icon: 'gear',
-                    keywords: '',
-                    run() {
-                        if (krtChrome.nav) krtChrome.nav.openAdmin();
-                    },
-                }),
-            );
-        }
-        linkActions('.palette-source-tail').forEach((item) => {
-            out.push(item);
-        });
-        const logoutForm = document.getElementById('nav-logout-form');
-        if (logoutForm instanceof HTMLFormElement) {
-            out.push(
-                makeItem({
-                    label: krtI18nText(data.actionLogout, 'data-action-logout'),
-                    crumb,
-                    icon: 'logout',
-                    keywords: '',
-                    run() {
-                        logoutForm.requestSubmit();
-                    },
-                }),
-            );
-        }
-        return out;
-    };
-
-    const actions = buildActions();
-
-    /**
-     * Reads the recently visited pages, tolerating blocked storage and foreign content.
-     *
-     * @returns {{ href: string, label: string, group: string }[]} newest first
-     */
-    const readRecent = function () {
-        try {
-            const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
-            return Array.isArray(raw)
-                ? raw.filter((e) => {
-                      return e && typeof e.href === 'string' && e.href.charAt(0) === '/';
-                  })
-                : [];
-        } catch (_e) {
-            return [];
+    const announceFavourite = function (name, favourite) {
+        const pattern = favourite
+            ? krtI18nText(data.liveFavouriteAdded, 'data-live-favourite-added')
+            : krtI18nText(data.liveFavouriteRemoved, 'data-live-favourite-removed');
+        const message = pattern.replace('{name}', name);
+        if (krtModal.isOpen(dialog) && liveEl) {
+            liveEl.textContent = '';
+            liveEl.textContent = message;
+        } else {
+            showFrontendSuccessToast(message);
         }
     };
 
+    const pageIndex = createPageIndex(paletteRoot);
+    const search = createEntitySearch(data.entitySearchUrl, () => {
+        if (krtModal.isOpen(dialog)) view.render(true);
+    });
+    const groupsFor = createGroups({
+        paletteRoot,
+        pages: pageIndex.items,
+        emptyStatePages: pageIndex.emptyStatePages,
+        currentActions: createActions(paletteRoot, announceFavourite),
+        entityHitsFor: search.hitsFor,
+    });
+    const view = createView({
+        input: paletteInput,
+        results,
+        empty: emptyEl,
+        groupsFor,
+        searching: search.pending,
+        onChoose: (item) => {
+            choose(item);
+        },
+    });
+
     /**
-     * Puts a page at the top of the recently visited pages.
+     * The path a row opens in a new browser tab.
      *
-     * @param {PaletteItem} entry the page
+     * @param {PaletteItem} item the row's item
+     * @returns {string | null} the path, or null for a row that opens nothing
      */
-    const remember = function (entry) {
-        const href = entry.href;
-        if (!href) return;
-        const list = readRecent().filter((e) => {
-            return e.href !== href;
-        });
-        list.unshift({ href, label: entry.label, group: entry.crumb });
-        try {
-            localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
-        } catch (_e) {}
+    const newTabTarget = function (item) {
+        if (item.fill) return null;
+        if (item.fromServer) {
+            const adminMode = !!krtChrome.nav && krtChrome.nav.isAdminMode();
+            return krtSearchHitHref(/** @type {any} */ (item), adminMode);
+        }
+        return item.href || item.tabHref || null;
     };
 
     /**
-     * Records the current page: the offered page with exactly this path, otherwise the menu link
-     * the drawer marks as current.
-     */
-    const recordVisit = function () {
-        const here = window.location.pathname;
-        let entry = index.find((e) => {
-            return e.href === here;
-        });
-        if (!entry) {
-            const sidebar = document.getElementById('sidebar');
-            const active = sidebar ? sidebar.querySelector('a.is-active[href]') : null;
-            const href = active ? active.getAttribute('href') : null;
-            entry = href
-                ? index.find((e) => {
-                      return e.href === href;
-                  })
-                : undefined;
-        }
-        if (entry) remember(entry);
-    };
-    recordVisit();
-
-    /**
-     * Whether an item matches the folded query, and how well.
+     * Opens a row in a new browser tab, closing the palette.
      *
-     * @param {PaletteItem} item the row
-     * @param {string} q the folded query
-     * @returns {number} 0 for a label hit, 1 for a breadcrumb or search-term hit, -1 for none
+     * @param {PaletteItem} item the highlighted row's item
      */
-    const rankOf = function (item, q) {
-        if (item.foldLabel.includes(q)) return 0;
-        return item.foldRest.includes(q) ? 1 : -1;
-    };
-
-    /**
-     * The groups shown for a query: recent pages and actions when it is empty, matching pages and
-     * actions otherwise.
-     *
-     * @param {string} q the folded, trimmed query
-     * @returns {{ label: string, items: PaletteItem[] }[]} the non-empty groups in display order
-     */
-    const groupsFor = function (q) {
-        /** @type {{ label: string, items: PaletteItem[] }[]} */
-        const groups = [];
-        if (!q) {
-            /** @type {PaletteItem[]} */
-            const recent = [];
-            readRecent().forEach((e) => {
-                const known = index.find((i) => {
-                    return i.href === e.href;
-                });
-                if (known && recent.length < RECENT_MAX) recent.push(known);
-            });
-            if (recent.length) {
-                groups.push({
-                    label: krtI18nText(data.recent, 'data-recent'),
-                    items: recent,
-                });
-            }
-            if (actions.length) {
-                groups.push({
-                    label: krtI18nText(data.actions, 'data-actions'),
-                    items: actions,
-                });
-            }
-            return groups;
-        }
-        const pages = index
-            .map((e, i) => {
-                return { e, rank: rankOf(e, q), i };
-            })
-            .filter((x) => {
-                return x.rank >= 0;
-            })
-            .sort((a, b) => {
-                return a.rank - b.rank || a.i - b.i;
-            })
-            .slice(0, PAGE_MAX)
-            .map((x) => {
-                return x.e;
-            });
-        const acts = actions.filter((a) => {
-            return rankOf(a, q) >= 0;
-        });
-        if (pages.length) {
-            groups.push({ label: krtI18nText(data.pages, 'data-pages'), items: pages });
-        }
-        if (acts.length) {
-            groups.push({ label: krtI18nText(data.actions, 'data-actions'), items: acts });
-        }
-        return groups;
-    };
-
-    /**
-     * A sprite icon element.
-     *
-     * @param {string} name the symbol without its `krt-icon-` prefix
-     * @param {string} className the class to give the svg
-     * @returns {SVGSVGElement} the icon
-     */
-    const icon = function (name, className) {
-        const svg = document.createElementNS(SVG_NS, 'svg');
-        svg.setAttribute('class', `krt-icon ${className}`);
-        svg.setAttribute('aria-hidden', 'true');
-        const use = document.createElementNS(SVG_NS, 'use');
-        use.setAttribute('href', `#krt-icon-${name}`);
-        svg.appendChild(use);
-        return svg;
-    };
-
-    /**
-     * The label with the first occurrence of the query marked.
-     *
-     * @param {string} label the visible name
-     * @param {string} q the folded query
-     * @returns {HTMLSpanElement} the label element
-     */
-    const labelWithHit = function (label, q) {
-        const span = document.createElement('span');
-        span.className = 'palette-row-label';
-        const hit = krtSearchFind(label, q);
-        if (!hit) {
-            span.textContent = label;
-            return span;
-        }
-        span.appendChild(document.createTextNode(label.slice(0, hit.start)));
-        const mark = document.createElement('mark');
-        mark.textContent = label.slice(hit.start, hit.end);
-        span.appendChild(mark);
-        span.appendChild(document.createTextNode(label.slice(hit.end)));
-        return span;
-    };
-
-    /** @type {{ row: HTMLElement, item: PaletteItem }[]} */
-    let rows = [];
-    let selected = 0;
-
-    /**
-     * Moves the selection, clamped to the rows shown.
-     *
-     * @param {number} next the row index to select
-     */
-    const select = function (next) {
-        if (!rows.length) {
-            selected = 0;
-            paletteInput.removeAttribute('aria-activedescendant');
-            return;
-        }
-        selected = Math.max(0, Math.min(rows.length - 1, next));
-        rows.forEach((r, i) => {
-            const on = i === selected;
-            r.row.classList.toggle('is-selected', on);
-            r.row.setAttribute('aria-selected', String(on));
-        });
-        const current = rows[selected].row;
-        paletteInput.setAttribute('aria-activedescendant', current.id);
-        current.scrollIntoView({ block: 'nearest' });
+    const chooseInNewTab = function (item) {
+        const target = newTabTarget(item);
+        if (!target) return;
+        krtModal.close(dialog);
+        if (item.href && !item.fromServer) remember(item);
+        window.open(target, '_blank', 'noopener');
     };
 
     /**
@@ -415,69 +128,30 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {PaletteItem} item the chosen row
      */
     const choose = function (item) {
+        if (item.fill) {
+            paletteInput.value = item.fill;
+            paletteInput.focus();
+            update();
+            return;
+        }
         krtModal.close(dialog);
         if (item.run) {
             item.run();
         } else if (item.href) {
-            remember(item);
-            window.location.assign(item.href);
+            if (!item.fromServer) remember(item);
+            const adminMode = !!krtChrome.nav && krtChrome.nav.isAdminMode();
+            window.location.assign(
+                item.fromServer
+                    ? krtSearchHitHref(/** @type {any} */ (item), adminMode)
+                    : item.href,
+            );
         }
     };
 
-    /**
-     * Shows the rows for the current query.
-     *
-     * @param {number} [keep] the row index to select instead of the first
-     */
-    const render = function (keep) {
-        const q = krtSearchFold(paletteInput.value.trim());
-        resultsEl.textContent = '';
-        rows = [];
-        groupsFor(q).forEach((group) => {
-            const wrap = document.createElement('div');
-            wrap.setAttribute('role', 'group');
-            wrap.setAttribute('aria-label', group.label);
-            const heading = document.createElement('span');
-            heading.className = 'palette-group-label';
-            heading.setAttribute('aria-hidden', 'true');
-            heading.textContent = group.label;
-            wrap.appendChild(heading);
-            group.items.forEach((item) => {
-                const n = rows.length;
-                const row = document.createElement('div');
-                row.className = 'palette-row';
-                row.id = `palette-opt-${n}`;
-                row.setAttribute('role', 'option');
-                row.setAttribute('aria-selected', 'false');
-                if (item.href) row.setAttribute('data-href', item.href);
-                row.appendChild(icon(item.icon, 'palette-row-icon'));
-                const text = document.createElement('span');
-                text.className = 'palette-row-text';
-                text.appendChild(labelWithHit(item.label, q));
-                const crumb = document.createElement('span');
-                crumb.className = 'palette-row-crumb';
-                crumb.textContent = item.crumb;
-                text.appendChild(crumb);
-                row.appendChild(text);
-                const enter = document.createElement('span');
-                enter.className = 'palette-row-enter';
-                enter.setAttribute('aria-hidden', 'true');
-                enter.textContent = '↵';
-                row.appendChild(enter);
-                row.appendChild(icon('chevron-right', 'palette-row-chevron'));
-                row.addEventListener('mousemove', () => {
-                    if (selected !== n) select(n);
-                });
-                row.addEventListener('click', () => {
-                    choose(item);
-                });
-                wrap.appendChild(row);
-                rows.push({ row, item });
-            });
-            resultsEl.appendChild(wrap);
-        });
-        if (emptyEl instanceof HTMLElement) emptyEl.hidden = rows.length > 0;
-        select(keep || 0);
+    /** Shows the rows for the edited query and searches the backend for it. */
+    const update = function () {
+        search.schedule(krtSearchParse(paletteInput.value));
+        view.render();
     };
 
     let extraRequested = false;
@@ -500,12 +174,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     const iconName = typeof e.icon === 'string' && e.icon ? e.icon : 'list';
                     const crumb = typeof e.crumb === 'string' ? e.crumb : '';
                     const keywords = typeof e.keywords === 'string' ? e.keywords : '';
-                    if (addPage(e.href, e.label, crumb, iconName, keywords)) added = true;
+                    const entryKey = typeof e.key === 'string' && e.key ? e.key : undefined;
+                    if (
+                        pageIndex.addPage({
+                            href: e.href,
+                            label: e.label,
+                            crumb,
+                            icon: iconName,
+                            keywords,
+                            entryKey,
+                            starrable: entryKey !== undefined,
+                        })
+                    ) {
+                        added = true;
+                    }
                 });
-                if (added && krtModal.isOpen(dialog)) render(selected);
+                if (added && krtModal.isOpen(dialog)) view.render(true);
             })
             .catch(() => {});
     };
+
+    document.addEventListener(NAV_RENDERED_EVENT, () => {
+        pageIndex.rebuild();
+        extraRequested = false;
+        if (krtModal.isOpen(dialog)) {
+            view.render(true);
+            loadExtraPages();
+        }
+    });
 
     /**
      * Opens the palette.
@@ -514,7 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const open = function (prefill) {
         paletteInput.value = prefill || '';
-        render();
+        pageIndex.refreshFrequencies();
+        update();
         krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
         paletteInput.setSelectionRange(end, end);
@@ -524,19 +221,43 @@ document.addEventListener('DOMContentLoaded', () => {
     krtChrome.palette = { open };
 
     paletteInput.addEventListener('input', () => {
-        render();
+        update();
     });
     paletteInput.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            select(selected + 1);
+            view.select(view.selectedIndex() + 1);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            select(selected - 1);
-        } else if (e.key === 'Enter') {
+            view.select(view.selectedIndex() - 1);
+        } else if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
-            const current = rows[selected];
-            if (current) choose(current.item);
+            const current = view.current();
+            if (current) choose(current);
+        } else if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const current = view.current();
+            if (current && current.fill) {
+                e.preventDefault();
+                choose(current);
+            }
+        }
+    });
+
+    dialog.addEventListener('keydown', (e) => {
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+        const current = view.current();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (current) chooseInNewTab(current);
+        } else if ((e.key === 'd' || e.key === 'D') && !e.shiftKey) {
+            e.preventDefault();
+            const key = current && current.starrable ? current.key : undefined;
+            if (current && key) {
+                const name = current.label;
+                toggleFavourite(key, (favourite) => {
+                    announceFavourite(name, favourite);
+                });
+            }
         }
     });
 
@@ -549,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dialog.addEventListener('close', () => {
         paletteInput.value = '';
+        search.cancel();
     });
 
     document.querySelectorAll('[data-palette-open]').forEach((trigger) => {

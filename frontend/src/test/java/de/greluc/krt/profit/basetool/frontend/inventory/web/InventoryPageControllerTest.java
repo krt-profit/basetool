@@ -74,29 +74,21 @@ class InventoryPageControllerTest {
 
   private BackendApiClient backendApiClient;
   private InventoryPageController controller;
+  private InventoryListPageController listController;
+  private InventoryInputPageController inputController;
   private InventoryWriteController writeController;
-
-  /** Mirrors {@code SecurityConfig#roleHierarchy}, which mirrors the backend's. */
-  private static final org.springframework.security.access.hierarchicalroles.RoleHierarchy
-      ROLE_HIERARCHY =
-          org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl.fromHierarchy(
-              """
-              ROLE_ADMIN > ROLE_LOGISTICIAN
-              ROLE_OFFICER > ROLE_LOGISTICIAN
-              ROLE_ADMIN > ROLE_MISSION_MANAGER
-              ROLE_OFFICER > ROLE_MISSION_MANAGER
-              ROLE_ADMIN > ROLE_BANK_MANAGEMENT
-              ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
-              """);
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
+    InventoryCatalogs catalogs = new InventoryCatalogs(inventoryClient);
     controller =
-        new InventoryPageController(
-            inventoryClient, PARALLEL, ROLE_HIERARCHY, mock(ItemPickerLabels.class));
-    writeController = new InventoryWriteController(inventoryClient, controller);
+        new InventoryPageController(inventoryClient, catalogs, mock(ItemPickerLabels.class));
+    listController = new InventoryListPageController(inventoryClient, catalogs);
+    inputController = new InventoryInputPageController(inventoryClient, PARALLEL, catalogs);
+    writeController =
+        new InventoryWriteController(inventoryClient, inputController, listController);
   }
 
   @Test
@@ -335,7 +327,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view =
-        controller.viewMyInventory(
+        listController.viewMyInventory(
             new LagerQuery(
                 null, null, null, null, null, null, null, false, false, false, false, null, null,
                 null, null, null),
@@ -357,7 +349,7 @@ class InventoryPageControllerTest {
     UUID jobOrderId = UUID.randomUUID();
 
     String view =
-        controller.viewMyInventory(
+        listController.viewMyInventory(
             new LagerQuery(
                 null,
                 List.of(materialId),
@@ -404,7 +396,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     String view =
-        controller.viewMyInventory(
+        listController.viewMyInventory(
             new LagerQuery(
                 null, null, null, null, null, null, null, true, false, false, false, null, null,
                 null, null, null),
@@ -432,7 +424,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     String view =
-        controller.viewMyInventory(
+        listController.viewMyInventory(
             new LagerQuery(
                 null, null, null, null, null, null, null, false, true, false, false, null, null,
                 null, null, null),
@@ -463,7 +455,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view =
-        controller.viewMyInventory(
+        listController.viewMyInventory(
             new LagerQuery(
                 null, null, null, null, null, null, null, false, false, false, false, null, null,
                 null, null, null),
@@ -482,7 +474,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(entryA, entryB));
 
     List<UUID> ids =
-        controller.myEntryIds(
+        listController.myEntryIds(
             new LagerQuery(
                 null,
                 List.of(materialId),
@@ -522,7 +514,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(entry));
 
     List<UUID> ids =
-        controller.myEntryIds(
+        listController.myEntryIds(
             new LagerQuery(
                 "items",
                 null,
@@ -557,7 +549,7 @@ class InventoryPageControllerTest {
 
     assertEquals(
         List.of(),
-        controller.myEntryIds(
+        listController.myEntryIds(
             new LagerQuery(
                 null, null, null, null, null, null, null, false, false, false, false, null, null,
                 null, null, null)));
@@ -571,7 +563,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view =
-        controller.viewAllInventory(
+        listController.viewAllInventory(
             new LagerQuery(
                 null,
                 List.of(UUID.randomUUID()),
@@ -599,7 +591,7 @@ class InventoryPageControllerTest {
   @Test
   void viewInputPage_shouldReturnInputPage() {
     Model model = new ConcurrentModel();
-    String view = controller.viewInputPage(null, model);
+    String view = inputController.viewInputPage(null, model);
     assertEquals("inventory/inventory-input", view);
   }
 
@@ -694,9 +686,14 @@ class InventoryPageControllerTest {
 
     String view =
         writeController.bookOutInventoryItem(
-            id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
+            id,
+            form,
+            bindingResult,
+            new ConcurrentModel(),
+            redirectAttributes,
+            "/inventory?storage=all");
 
-    assertEquals("redirect:/inventory/all", view);
+    assertEquals("redirect:/inventory?storage=all", view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
   }
 
@@ -714,9 +711,14 @@ class InventoryPageControllerTest {
 
     String view =
         writeController.bookOutInventoryItem(
-            id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
+            id,
+            form,
+            bindingResult,
+            new ConcurrentModel(),
+            redirectAttributes,
+            "/inventory?storage=all");
 
-    assertEquals("redirect:/inventory/all", view);
+    assertEquals("redirect:/inventory?storage=all", view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
   }
 
@@ -735,13 +737,13 @@ class InventoryPageControllerTest {
         .thenReturn(null);
 
     String referer =
-        "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
+        "https://example.org/inventory?storage=my&materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
     String view =
         writeController.bookOutInventoryItem(
             id, form, bindingResult, new ConcurrentModel(), redirectAttributes, referer);
 
     assertEquals(
-        "redirect:/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222",
+        "redirect:/inventory?storage=my&materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222",
         view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
   }
@@ -758,7 +760,7 @@ class InventoryPageControllerTest {
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
     String referer =
-        "https://example.org/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2";
+        "https://example.org/inventory?storage=all&missionIds=33333333-3333-3333-3333-333333333333&page=2";
     ConcurrentModel renderModel = new ConcurrentModel();
     String view =
         writeController.bookOutInventoryItem(
@@ -772,23 +774,19 @@ class InventoryPageControllerTest {
   @Test
   void buildInventoryRedirectFromReferer_shouldHandleNullAndEmptyReferer() {
     assertEquals(
-        "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer("/inventory/my", null));
+        "/inventory?storage=my",
+        InventoryWriteController.buildInventoryRedirectFromReferer("/inventory?storage=my", null));
     assertEquals(
-        "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer("/inventory/my", ""));
+        "/inventory?storage=my",
+        InventoryWriteController.buildInventoryRedirectFromReferer("/inventory?storage=my", ""));
     assertEquals(
-        "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer(
-                "/inventory/my", "https://example.org/inventory/my"));
+        "/inventory?storage=my",
+        InventoryWriteController.buildInventoryRedirectFromReferer(
+            "/inventory?storage=my", "https://example.org/inventory?storage=my"));
     assertEquals(
-        "/inventory/all",
-        de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController
-            .buildInventoryRedirectFromReferer(
-                "/inventory/all", "https://example.org/inventory/all?fragment=true"));
+        "/inventory?storage=all",
+        InventoryWriteController.buildInventoryRedirectFromReferer(
+            "/inventory?storage=all", "https://example.org/inventory?storage=all&fragment=true"));
   }
 
   @Test
@@ -1157,7 +1155,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(group));
 
     String view =
-        controller.viewMyInventory(
+        listController.viewMyInventory(
             new LagerQuery(
                 null,
                 null,
@@ -1233,7 +1231,7 @@ class InventoryPageControllerTest {
           return List.of();
         });
 
-    controller.viewMyInventory(
+    listController.viewMyInventory(
         new LagerQuery(
             null,
             null,
@@ -1289,7 +1287,7 @@ class InventoryPageControllerTest {
           return List.of();
         });
 
-    controller.viewMyInventory(
+    listController.viewMyInventory(
         new LagerQuery(
             "items",
             null,
@@ -1343,7 +1341,7 @@ class InventoryPageControllerTest {
   void myEntryIds_itemAttributeFilters_forwarded() {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
-    controller.myEntryIds(
+    listController.myEntryIds(
         new LagerQuery(
             "items",
             null,
@@ -1378,7 +1376,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     String view =
-        controller.viewAllInventory(
+        listController.viewAllInventory(
             new LagerQuery(
                 null,
                 null,
@@ -1423,7 +1421,7 @@ class InventoryPageControllerTest {
     UUID locationId = UUID.randomUUID();
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
-    controller.myEntryIds(
+    listController.myEntryIds(
         new LagerQuery(
             null,
             null,
@@ -1441,7 +1439,7 @@ class InventoryPageControllerTest {
             null,
             null,
             null));
-    controller.myEntryIds(
+    listController.myEntryIds(
         new LagerQuery(
             "items",
             null,

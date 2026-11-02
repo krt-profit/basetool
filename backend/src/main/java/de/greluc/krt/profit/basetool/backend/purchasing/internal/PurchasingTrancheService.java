@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PaymentModel;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.TrancheKind;
@@ -347,7 +348,7 @@ public class PurchasingTrancheService {
   private void count(@NotNull TrancheKind kind, @NotNull String outcome) {
     meterRegistry
         .counter(
-            MetricNames.PURCHASING_TRANCHES,
+            PurchasingMetricNames.PURCHASING_TRANCHES,
             MetricNames.TAG_KIND,
             kind.name(),
             MetricNames.TAG_OUTCOME,

@@ -87,30 +87,6 @@ public class SettingsBackendClient {
   }
 
   /**
-   * Reads one page of the active squadrons for the promotion toggle.
-   *
-   * @param page the zero-based page index
-   * @return the page, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public PageResponse<SquadronDto> squadronPage(int page) {
-    return backendApiClient.get(
-        "/api/v1/squadrons?size=1000&sort=name,asc&page={page}", SQUADRON_PAGE, page);
-  }
-
-  /**
-   * Reads one page of the active Spezialkommandos for the profit toggle.
-   *
-   * @param page the zero-based page index
-   * @return the page, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public PageResponse<SpecialCommandDto> specialCommandPage(int page) {
-    return backendApiClient.get(
-        "/api/v1/special-commands?size=1000&sort=name,asc&page={page}", SPECIAL_COMMAND_PAGE, page);
-  }
-
-  /**
    * Names the backend resource of a setting.
    *
    * @param setting the setting

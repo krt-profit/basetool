@@ -24,10 +24,11 @@ package de.greluc.krt.profit.basetool.backend.mission.api;
  * {@code @Query} values of the repositories that list the aggregate.
  *
  * <p>The fragment lives beside the aggregate's repository and is the list-side half of the rule
- * that {@code MissionAccessPolicy} enforces row by row: both widen together (plan section 5.4). It
- * is a compile-time constant, which an annotation value needs, so the class is {@code public} and
- * has no behaviour. A query that needs more than the fragment starts with a text block, appends the
- * constant and continues only with plain string literals.
+ * that {@code MissionAccessPolicy} enforces row by row: both apply one visibility rule, so a row
+ * the list returns is a row the policy lets the caller see. It is a compile-time constant, which an
+ * annotation value needs, so the class is {@code public} and has no behaviour. A query that needs
+ * more than the fragment starts with a text block, appends the constant and continues only with
+ * plain string literals.
  */
 public final class MissionScope {
 

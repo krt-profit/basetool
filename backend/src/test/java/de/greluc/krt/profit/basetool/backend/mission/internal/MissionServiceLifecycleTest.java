@@ -39,14 +39,17 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.HashSet;
 import java.util.Optional;
@@ -76,7 +79,8 @@ class MissionServiceLifecycleTest {
   @Mock private OperationSummaryProvider operationSummaryProvider;
   @Mock private MissionDeletionObserver missionDeletionObserver;
   @Mock private UserService userService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private AuthHelperService authHelperService;
 
   @Mock private AuditService auditService;
@@ -96,11 +100,13 @@ class MissionServiceLifecycleTest {
             operationSummaryProvider,
             missionDeletionObserver,
             userService,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             authHelperService,
             auditService,
             null,
-            mock(MissionNotificationPublisher.class));
+            mock(MissionNotificationPublisher.class),
+            mock(MissionVisibility.class));
   }
 
   private static final UUID MISSION_ID = UUID.randomUUID();
@@ -333,7 +339,7 @@ class MissionServiceLifecycleTest {
 
   @Test
   void findAllActiveReference_delegatesToRepository() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
             eq(true),
@@ -364,7 +370,7 @@ class MissionServiceLifecycleTest {
   @Test
   void findAllActiveReference_passesCurrentSquadronIdToRepository() {
     java.util.UUID squadronId = java.util.UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, squadronId, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
             eq(false),

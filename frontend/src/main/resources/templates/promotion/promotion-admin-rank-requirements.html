@@ -10,10 +10,11 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.admin.ranks.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='promotion.ranks', eyebrowKey='nav.promotion', titleText=#{promotion.admin.ranks.title},
         count=${isAllSquadronsMode ? null : #lists.size(requirements)}, countId='ar-count', countFor='ar-results',
         actions=~{::ar-actions})}">
         <th:block th:ref="ar-actions">
+            <th:block th:replace="~{promotion/fragments/promotion-management-switch :: switch(active='ranks')}"></th:block>
             <button th:unless="${isAllSquadronsMode}" type="button" class="btn btn--cta"
                     data-trigger="ar-open-create" data-testid="page-head-primary">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>

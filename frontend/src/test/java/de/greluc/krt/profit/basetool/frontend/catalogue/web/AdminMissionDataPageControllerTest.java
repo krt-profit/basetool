@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ConcurrentModel;
@@ -56,15 +55,8 @@ class AdminMissionDataPageControllerTest {
     jobTypes.add(jobType("Charlie"));
     jobTypes.add(jobType("Bravo"));
 
-    List<SquadronDto> squadrons = new ArrayList<>();
-    squadrons.add(squadron("X-Ray"));
-    squadrons.add(squadron("Zulu"));
-    squadrons.add(squadron("Yankee"));
-
     PageResponse<JobTypeDto> jobTypesPage =
         new PageResponse<>(jobTypes, 0, 1000, jobTypes.size(), 1, List.of("name,asc"));
-    PageResponse<SquadronDto> squadronsPage =
-        new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
             eq(
@@ -75,16 +67,7 @@ class AdminMissionDataPageControllerTest {
             eq(0)))
         .thenReturn(jobTypesPage);
 
-    when(backendApiClient.get(
-            eq(
-                "/api/v1/squadrons?size=1000&sort=name,asc"
-                    + "&includeInactive={includeInactive}&page={page}"),
-            anyTypeRef(),
-            eq(false),
-            eq(0)))
-        .thenReturn(squadronsPage);
-
-    controller.listData(false, false, false, null, model);
+    controller.listData(false, false, null, model);
 
     @SuppressWarnings("unchecked")
     List<JobTypeDto> sortedJobTypes = (List<JobTypeDto>) model.getAttribute("jobTypes");
@@ -92,13 +75,7 @@ class AdminMissionDataPageControllerTest {
     assertEquals("Bravo", sortedJobTypes.get(1).name());
     assertEquals("Charlie", sortedJobTypes.get(2).name());
 
-    @SuppressWarnings("unchecked")
-    List<SquadronDto> sortedSquadrons = (List<SquadronDto>) model.getAttribute("squadrons");
-    assertEquals("X-Ray", sortedSquadrons.get(0).name());
-    assertEquals("Yankee", sortedSquadrons.get(1).name());
-    assertEquals("Zulu", sortedSquadrons.get(2).name());
     assertEquals(Boolean.FALSE, model.getAttribute("jobTypesTruncated"));
-    assertEquals(Boolean.FALSE, model.getAttribute("squadronsTruncated"));
     assertEquals(Boolean.FALSE, model.getAttribute("frequencyTypesTruncated"));
   }
 
@@ -127,7 +104,7 @@ class AdminMissionDataPageControllerTest {
     when(backendApiClient.get(eq(template), anyTypeRef(), eq(false), eq(0))).thenReturn(firstPage);
     when(backendApiClient.get(eq(template), anyTypeRef(), eq(false), eq(1))).thenReturn(secondPage);
 
-    controller.listData(false, false, false, null, model);
+    controller.listData(false, false, null, model);
 
     @SuppressWarnings("unchecked")
     List<JobTypeDto> jobTypes = (List<JobTypeDto>) model.getAttribute("jobTypes");
@@ -153,9 +130,6 @@ class AdminMissionDataPageControllerTest {
     PageResponse<Object> endlessPage =
         new PageResponse<>(
             List.of(jobType("Row")), 0, 1000, reportedPages, reportedPages, List.of());
-    PageResponse<Object> endlessSquadrons =
-        new PageResponse<>(
-            List.of(squadron("Row")), 0, 1000, reportedPages, reportedPages, List.of());
     PageResponse<Object> endlessFrequencyTypes =
         new PageResponse<>(
             List.of(new FrequencyTypeDto(UUID.randomUUID(), "Row", null, true, 0, 0L)),
@@ -170,28 +144,18 @@ class AdminMissionDataPageControllerTest {
             org.mockito.ArgumentMatchers.any(Object[].class)))
         .thenReturn(endlessPage);
     when(backendApiClient.get(
-            org.mockito.ArgumentMatchers.startsWith("/api/v1/squadrons"),
-            anyTypeRef(),
-            org.mockito.ArgumentMatchers.any(Object[].class)))
-        .thenReturn(endlessSquadrons);
-    when(backendApiClient.get(
             org.mockito.ArgumentMatchers.startsWith("/api/v1/frequency-types"),
             anyTypeRef(),
             org.mockito.ArgumentMatchers.any(Object[].class)))
         .thenReturn(endlessFrequencyTypes);
 
-    controller.listData(false, false, false, null, model);
+    controller.listData(false, false, null, model);
 
     assertEquals(Boolean.TRUE, model.getAttribute("jobTypesTruncated"));
-    assertEquals(Boolean.TRUE, model.getAttribute("squadronsTruncated"));
     assertEquals(Boolean.TRUE, model.getAttribute("frequencyTypesTruncated"));
   }
 
   private static JobTypeDto jobType(String name) {
     return new JobTypeDto(UUID.randomUUID(), name, null, "MISSION", null, true, false, false, 0L);
-  }
-
-  private static SquadronDto squadron(String name) {
-    return new SquadronDto(UUID.randomUUID(), name, null, null, true, false, false, 0L);
   }
 }

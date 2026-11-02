@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface for the material-category reference table. Reads need authentication; mutations are
- * ADMIN/OFFICER.
+ * ADMIN-only.
  *
  * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
  * gate takes precedence (REQ-SEC-052).

@@ -61,6 +61,8 @@ class NotificationPreferenceGroupsTest {
         .isEqualTo("market");
     assertThat(NotificationPreferenceGroups.groupOf("INVENTORY_TRANSFERRED_TO_USER"))
         .isEqualTo("inventory");
+    assertThat(NotificationPreferenceGroups.groupOf("INVENTORY_STOCK_LEVEL_LOW"))
+        .isEqualTo("inventory");
     assertThat(NotificationPreferenceGroups.groupOf("EXCHANGE_BULK_UNDO_APPLIED"))
         .isEqualTo("connectedApps");
     assertThat(NotificationPreferenceGroups.groupOf("ACCOUNT_DELETION_REQUESTED"))

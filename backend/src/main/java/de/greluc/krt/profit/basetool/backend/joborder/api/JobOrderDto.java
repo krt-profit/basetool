@@ -49,6 +49,9 @@ import org.jetbrains.annotations.NotNull;
  * @param itemHandovers item-handover events ({@code ITEM} orders)
  * @param createdAt creation instant (UTC)
  * @param version optimistic-lock version
+ * @param canEdit whether the caller may edit the order, role and scope (REQ-SEC-047)
+ * @param canManageAssignees whether the caller may change other users' assignee entries, a
+ *     Logistician of the order's unit (REQ-ORDERS-014); {@code null} where it is not resolved
  * @param redacted {@code true} when this is the requesting-owner view with processing-side data
  *     stripped (REQ-ORDERS-023)
  */
@@ -72,6 +75,7 @@ public record JobOrderDto(
     Instant createdAt,
     Long version,
     Boolean canEdit,
+    Boolean canManageAssignees,
     boolean redacted) {
 
   /**
@@ -102,6 +106,7 @@ public record JobOrderDto(
         createdAt,
         version,
         canEdit,
+        canManageAssignees,
         redacted);
   }
 
@@ -133,6 +138,39 @@ public record JobOrderDto(
         createdAt,
         version,
         canEdit,
+        canManageAssignees,
         value);
+  }
+
+  /**
+   * Returns a copy of this DTO with the {@link #canManageAssignees()} flag replaced.
+   *
+   * @param value the caller's assignee-management flag
+   * @return a copy differing only in {@code canManageAssignees}
+   */
+  @NotNull
+  public JobOrderDto withCanManageAssignees(Boolean value) {
+    return new JobOrderDto(
+        id,
+        displayId,
+        responsibleOrgUnit,
+        requestingOrgUnit,
+        handle,
+        comment,
+        priority,
+        status,
+        type,
+        countBlueprintsWithVariants,
+        materials,
+        items,
+        aggregatedMaterials,
+        assignees,
+        handovers,
+        itemHandovers,
+        createdAt,
+        version,
+        canEdit,
+        value,
+        redacted);
   }
 }

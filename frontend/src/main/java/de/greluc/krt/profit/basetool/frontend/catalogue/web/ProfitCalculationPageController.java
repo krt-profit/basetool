@@ -62,8 +62,7 @@ public class ProfitCalculationPageController {
    */
   @NotNull
   @GetMapping
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.KRT_MEMBER + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("hasAnyRole('" + Roles.KRT_MEMBER + "', '" + Roles.ADMIN + "')")
   public String showProfitCalculationPage(Model model) {
     log.debug("Showing profit calculation page");
     if (!SectionFallback.run(log, "profit-calculation", () -> addCalculationSources(model))) {

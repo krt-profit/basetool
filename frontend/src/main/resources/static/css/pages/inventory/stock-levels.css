@@ -1,0 +1,33 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .stock-level-unit {
+        margin-bottom: var(--space-6);
+    }
+    .stock-level-unit__title {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        font-size: var(--fs-h3);
+    }
+    .stock-level-meter {
+        width: 100%;
+        min-width: 6rem;
+        margin-bottom: var(--space-2);
+    }
+    .stock-level-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-2);
+    }
+    .stock-level-entry {
+        margin: 0 0 var(--space-3);
+        color: var(--color-gray-1);
+    }
+    @media (width <= 768px) {
+        .stock-level-meter {
+            display: none;
+        }
+    }
+}

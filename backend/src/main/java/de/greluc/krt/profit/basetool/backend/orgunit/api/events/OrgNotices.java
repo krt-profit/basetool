@@ -43,15 +43,15 @@ public final class OrgNotices {
   private OrgNotices() {}
 
   /**
-   * A leadership seat was filled or vacated and the member's OFFICER role does not fit; replaces
-   * the member's earlier mismatch notice.
+   * A leadership seat holder lacks the {@code KRT Member} role; replaces the member's earlier
+   * mismatch notice.
    *
    * @param userId the member
    * @param member the member's name
    * @param unit the unit's shorthand or name
-   * @param seatCode {@code APPOINTED} or {@code REMOVED}
+   * @param seatCode {@code APPOINTED}, {@code REMOVED} or {@code ROLES_RECONCILED}
    * @param rankCode the seat's {@code MembershipRole} name
-   * @param mismatchCode {@code MISSING_OFFICER} or {@code SURPLUS_OFFICER}
+   * @param mismatchCode {@code MISSING_KRT_MEMBER}
    * @param actorSub the member who changed the seat, or {@code null}
    * @return the event
    */
@@ -81,7 +81,7 @@ public final class OrgNotices {
   }
 
   /**
-   * The member's roles fit their seats; the mismatch notice goes.
+   * The member holds {@code KRT Member} or no seat; the mismatch notice goes.
    *
    * @param userId the member
    * @return the event

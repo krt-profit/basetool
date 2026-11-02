@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.operation.client.OperationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
@@ -49,7 +50,10 @@ class OperationPageControllerReauthMvcTest {
     mockMvc =
         ReauthPageMvc.standalone(
             new OperationPageController(
-                operationClient, mock(MarkdownRenderer.class), new ParallelPageLoader()));
+                operationClient,
+                mock(MissionManagerGate.class),
+                mock(MarkdownRenderer.class),
+                new ParallelPageLoader()));
     ReauthPageMvc.signInMember();
   }
 

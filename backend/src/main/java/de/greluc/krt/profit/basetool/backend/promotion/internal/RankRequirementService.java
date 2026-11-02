@@ -27,7 +27,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -59,7 +60,8 @@ public class RankRequirementService {
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryRepository categoryRepository;
   private final RankRequirementMapper mapper;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
+  private final RequestScopeResolver requestScopeResolver;
   private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
@@ -68,15 +70,16 @@ public class RankRequirementService {
    * #SORTABLE_FIELDS} by the controller.
    *
    * @param pageable Spring Data paging and sorting parameters
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return a page of rank requirements
    */
-  public Page<RankRequirementResponse> list(@NotNull Pageable pageable) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return Page.empty(pageable);
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
+  public Page<RankRequirementResponse> list(
+      @NotNull Pageable pageable, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findAllScoped(scope.squadronIds(), pageable).map(mapper::toResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
@@ -84,17 +87,18 @@ public class RankRequirementService {
    *
    * @param fromRank ordinal of the current rank
    * @param toRank ordinal of the rank being promoted to
+   * @param view whose data to list: the caller's own squadron or the squadrons they manage
    * @return the rank requirements applicable to that transition
    */
-  public List<RankRequirementResponse> listByRanks(int fromRank, int toRank) {
-    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
-        || !promotionAccessPolicy.hasReadAccess()) {
-      return List.of();
-    }
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    return repository.findScopedByFromRankAndToRank(fromRank, toRank, scope).stream()
-        .map(mapper::toResponse)
-        .toList();
+  public List<RankRequirementResponse> listByRanks(
+      int fromRank, int toRank, @NotNull PromotionReadView view) {
+    return promotionAccessPolicy
+        .readScope(view)
+        .map(scope ->
+            repository.findScopedByFromRankAndToRank(fromRank, toRank, scope.squadronIds()).stream()
+                .map(mapper::toResponse)
+                .toList())
+        .orElseGet(List::of);
   }
 
   /**
@@ -124,23 +128,24 @@ public class RankRequirementService {
    *     topic/category belongs to a different squadron
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public RankRequirementResponse create(@NotNull RankRequirementWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
-    if (ownerScopeService.hasAmbiguousStaffelContext()) {
+    if (requestScopeResolver.hasAmbiguousStaffelContext()) {
       throw new BadRequestException(
           "You belong to two Staffeln — pin the Staffel this rank requirement belongs to via the"
               + " sidebar switcher before creating it.");
     }
     Squadron squadron =
-        ownerScopeService
+        requestScopeResolver
             .currentSquadron()
             .orElseThrow(() ->
                 new BadRequestException(
                     "No active squadron context — admins in 'all squadrons' mode must focus a"
                         + " squadron via the sidebar switcher before creating a rank"
                         + " requirement."));
+    promotionAccessPolicy.assertOfficerIn(squadron.getId());
     RankRequirement entity = mapper.toEntity(request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
@@ -174,7 +179,7 @@ public class RankRequirementService {
    * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementWriteRequest request) {
     promotionAccessPolicy.assertFeatureEnabled();
@@ -200,14 +205,14 @@ public class RankRequirementService {
   }
 
   /**
-   * Permanently removes the rank requirement identified by {@code id}. Restricted to ADMIN or
-   * OFFICER callers.
+   * Permanently removes the rank requirement identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the rank requirement to delete
    * @throws NotFoundException if no rank requirement exists for that id
    */
   @Transactional
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
   public void delete(@NotNull UUID id) {
     promotionAccessPolicy.assertFeatureEnabled();
     RankRequirement entity = load(id);
@@ -244,7 +249,7 @@ public class RankRequirementService {
     if (entity.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canSeeSquadron(entity.getOwningSquadron().getId())) {
+    if (!accessGateService.canSeeSquadron(entity.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not match the rank requirement's owning squadron");
     }
@@ -254,10 +259,7 @@ public class RankRequirementService {
     if (entity.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canEditSquadron(entity.getOwningSquadron().getId())) {
-      throw new AccessDeniedException(
-          "Caller's squadron context does not allow editing this rank requirement");
-    }
+    promotionAccessPolicy.assertOfficerIn(entity.getOwningSquadron().getId());
   }
 
   /**

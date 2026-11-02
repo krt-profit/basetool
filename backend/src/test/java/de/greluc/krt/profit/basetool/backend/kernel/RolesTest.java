@@ -32,7 +32,6 @@ class RolesTest {
   @Test
   void bareRoleCodesAreByteIdenticalToThePriorLiterals() {
     assertEquals("ADMIN", Roles.ADMIN);
-    assertEquals("OFFICER", Roles.OFFICER);
     assertEquals("KRT_MEMBER", Roles.KRT_MEMBER);
     assertEquals("BANK_EMPLOYEE", Roles.BANK_EMPLOYEE);
     assertEquals("BANK_MANAGEMENT", Roles.BANK_MANAGEMENT);
@@ -44,10 +43,5 @@ class RolesTest {
   void authorityPrependsTheRolePrefix() {
     assertEquals("ROLE_ADMIN", Roles.authority(Roles.ADMIN));
     assertEquals("ROLE_BANK_MANAGEMENT", Roles.authority(Roles.BANK_MANAGEMENT));
-  }
-
-  @Test
-  void adminOrOfficerIsTheExpectedSpelExpression() {
-    assertEquals("hasAnyRole('ADMIN','OFFICER')", Roles.ADMIN_OR_OFFICER);
   }
 }

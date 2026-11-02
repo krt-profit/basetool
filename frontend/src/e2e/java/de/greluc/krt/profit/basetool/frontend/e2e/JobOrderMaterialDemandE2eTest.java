@@ -195,10 +195,9 @@ class JobOrderMaterialDemandE2eTest {
   }
 
   /**
-   * The page is advertised in the navigation, not only reachable by typing the URL. The link is
-   * asserted by presence and target rather than by clicking it: the nav entries live inside
-   * collapsed {@code <details>} groups, so a click would be testing the sidebar's disclosure
-   * behaviour instead of this feature.
+   * The page is advertised in the navigation, not only reachable by typing the URL. The tab is
+   * asserted by presence and target rather than by clicking it: the tab bar of the Aufträge page
+   * carries it, and a click would be testing the navigation's behaviour instead of this feature.
    */
   @Test
   void navigationCarriesTheMaterialDemandEntry() {
@@ -206,7 +205,7 @@ class JobOrderMaterialDemandE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders");
-        Locator navLink = page.locator("[data-testid='nav-orders-material-demand']");
+        Locator navLink = page.locator("[data-testid='page-tab-orders.demand']");
         assertThat(navLink).hasCount(1);
         assertThat(navLink).hasAttribute("href", "/orders/material-demand");
       } catch (RuntimeException | AssertionError failure) {

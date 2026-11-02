@@ -105,7 +105,8 @@ class UserReassignmentOrderTest {
               + "purchasing_partner.created_by,purchasing_deal.delegate_user_id,"
               + "purchasing_deal_delivery.recorded_by,purchasing_deal_delivery.accepted_by,"
               + "purchasing_deal_settlement.recorded_by,purchasing_setting.paused_by,"
-              + "purchasing_unit_pause.paused_by|");
+              + "purchasing_unit_pause.paused_by|",
+          "210:NavigationUserReassignment|navigation_preferences.user_id|");
 
   @Autowired private UserAccountMergeService mergeService;
 
@@ -131,7 +132,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(72);
+    assertThat(all).doesNotHaveDuplicates().hasSize(73);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

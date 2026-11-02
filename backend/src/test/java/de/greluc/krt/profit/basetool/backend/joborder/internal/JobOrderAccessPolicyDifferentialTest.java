@@ -39,8 +39,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -58,7 +56,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the job-order access policy (plan §5.4, ADR-0236): over one
  * fixture matrix of callers and orders, {@link JobOrderAccessPolicy} returns exactly the verdict of
- * the scope hub's former job-order gates.
+ * the scope hub's former job-order read gates; the edit gates moved to the per-unit Logistician
+ * rule ({@code LogisticianPerUnitSurfacesTest}).
  *
  * <p>{@link ScopeHubJobOrderGates} restates those gates as {@link AccessGateService} decided them
  * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
@@ -189,14 +188,6 @@ class JobOrderAccessPolicyDifferentialTest {
             ScopeHubJobOrderGates::canSeeJobOrderInventoryOwners,
             JobOrderAccessPolicy::canSeeJobOrderInventoryOwners),
         new Gate(
-            "canEditJobOrder",
-            ScopeHubJobOrderGates::canEditJobOrder,
-            JobOrderAccessPolicy::canEditJobOrder),
-        new Gate(
-            "mayEditJobOrder",
-            ScopeHubJobOrderGates::mayEditJobOrder,
-            JobOrderAccessPolicy::mayEditJobOrderEarmarks),
-        new Gate(
             "canSeeJobOrderAsRequester",
             ScopeHubJobOrderGates::canSeeJobOrderAsRequester,
             JobOrderAccessPolicy::canSeeJobOrderAsRequester),
@@ -295,18 +286,12 @@ class JobOrderAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      OwnerScopeService ownerScopeService =
-          new OwnerScopeService(
-              resolver,
-              accessGateService,
-              new OrgUnitStampingService(
-                  resolver, accessGateService, authHelper, memberships, orgUnits));
       scopeHub =
           new ScopeHubJobOrderGates(
-              accessGateService, authHelper, resolver, repository, handovers, itemHandovers);
+              accessGateService, resolver, repository, handovers, itemHandovers);
       policy =
           new JobOrderAccessPolicy(
-              ownerScopeService, authHelper, repository, handovers, itemHandovers);
+              resolver, accessGateService, authHelper, repository, handovers, itemHandovers);
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {
@@ -334,7 +319,6 @@ class JobOrderAccessPolicyDifferentialTest {
    * The job-order gates as the scope hub decided them, restated on the kernel's primitives.
    *
    * @param accessGateService the scope hub, for its org-unit gates
-   * @param authHelper the caller's roles
    * @param resolver the request scope, for the queue capability and the caller's memberships
    * @param orders the job orders
    * @param handovers the material handovers
@@ -342,22 +326,13 @@ class JobOrderAccessPolicyDifferentialTest {
    */
   private record ScopeHubJobOrderGates(
       AccessGateService accessGateService,
-      AuthHelperService authHelper,
       RequestScopeResolver resolver,
       JobOrderRepository orders,
       JobOrderHandoverRepository handovers,
       JobOrderItemHandoverRepository itemHandovers) {
 
     boolean canSeeJobOrder(UUID id) {
-      return orders.findById(id).map(o -> row(o, false)).orElse(false);
-    }
-
-    boolean canEditJobOrder(UUID id) {
-      return orders.findById(id).map(o -> row(o, true)).orElse(false);
-    }
-
-    boolean mayEditJobOrder(UUID id) {
-      return authHelper.isLogisticianOrAbove() && canEditJobOrder(id);
+      return orders.findById(id).map(this::row).orElse(false);
     }
 
     boolean canSeeJobOrderBlueprintOwners(UUID id) {
@@ -382,7 +357,7 @@ class JobOrderAccessPolicyDifferentialTest {
           .orElse(false);
     }
 
-    private boolean row(JobOrder order, boolean edit) {
+    private boolean row(JobOrder order) {
       if (!resolver.canViewJobOrders()) {
         return false;
       }
@@ -390,9 +365,7 @@ class JobOrderAccessPolicyDifferentialTest {
       if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
         return true;
       }
-      return edit
-          ? accessGateService.canEditSquadron(responsible.getId())
-          : accessGateService.canSeeSquadron(responsible.getId());
+      return accessGateService.canSeeSquadron(responsible.getId());
     }
 
     private boolean responsibleVisible(UUID id) {

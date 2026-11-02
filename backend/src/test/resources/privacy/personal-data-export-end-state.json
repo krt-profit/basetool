@@ -571,5 +571,87 @@
       "revoked_at" : null
     } ],
     "truncated" : false
+  }, {
+    "key" : "navigationPreferences",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "preference_section" : "dashboard",
+      "position" : 0,
+      "entry_key" : null,
+      "dashboard_mode" : "MEMBER",
+      "widget_type" : "UPCOMING_DAYS",
+      "column_side" : "WIDE",
+      "org_unit_id" : null,
+      "range_days" : 7,
+      "row_count" : 5,
+      "status_filter" : null
+    }, {
+      "preference_section" : "desktopMode",
+      "position" : 0,
+      "entry_key" : "RAIL",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
+      "preference_section" : "favourites",
+      "position" : 0,
+      "entry_key" : "missions.list",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
+      "preference_section" : "hidden",
+      "position" : 0,
+      "entry_key" : "bank.dashboard",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
+      "preference_section" : "order.member.groups",
+      "position" : 0,
+      "entry_key" : "logistics",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
+      "preference_section" : "shortcutsEnabled",
+      "position" : 0,
+      "entry_key" : "true",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    }, {
+      "preference_section" : "tabbar-member",
+      "position" : 1,
+      "entry_key" : "storage.overview",
+      "dashboard_mode" : null,
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
+      "status_filter" : null
+    } ],
+    "truncated" : false
   } ]
 }

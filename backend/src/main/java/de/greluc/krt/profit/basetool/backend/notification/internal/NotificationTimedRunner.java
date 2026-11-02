@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -116,7 +117,10 @@ public class NotificationTimedRunner {
         Integer count = producerTransaction.execute(_ -> producer.produce(now, budget));
         int produced = count == null ? 0 : count;
         meterRegistry
-            .counter(MetricNames.NOTIFICATION_TIMED_PRODUCED, MetricNames.TAG_KIND, producer.kind())
+            .counter(
+                NotificationMetricNames.NOTIFICATION_TIMED_PRODUCED,
+                MetricNames.TAG_KIND,
+                producer.kind())
             .increment(produced);
         total += produced;
       } catch (RuntimeException e) {

@@ -54,19 +54,6 @@ public class UserRoleRecipientDirectory implements RoleRecipientDirectory {
   }
 
   /**
-   * The holders of a global role who are members of one org unit.
-   *
-   * @param roleCode the stable role code
-   * @param orgUnitId the org unit the holders must belong to
-   * @return the matching user subs; never {@code null}, possibly empty
-   */
-  @Override
-  @NotNull
-  public Set<UUID> holdersOfRoleInOrgUnit(@NotNull String roleCode, @NotNull UUID orgUnitId) {
-    return userRepository.findUserIdsByRoleCodeAndOrgUnitMembership(roleCode, orgUnitId);
-  }
-
-  /**
    * Looks a role code up in the role catalogue, ignoring case.
    *
    * @param roleCode the code as submitted

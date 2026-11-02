@@ -92,7 +92,7 @@ class InventoryFilterPanelCollapseE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/inventory/my");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=my");
         page.waitForLoadState();
 
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
@@ -139,7 +139,7 @@ class InventoryFilterPanelCollapseE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/inventory/my");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=my");
         page.waitForLoadState();
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
@@ -147,7 +147,7 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
         page.waitForResponse(
-            r -> r.url().contains("/inventory/my?") && r.url().contains("personalOnly=true"),
+            r -> r.url().contains("storage=my") && r.url().contains("personalOnly=true"),
             () -> page.locator("[data-testid='segment-personalScope-personal']").click());
         assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
@@ -185,7 +185,7 @@ class InventoryFilterPanelCollapseE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=all");
         page.waitForLoadState();
 
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))

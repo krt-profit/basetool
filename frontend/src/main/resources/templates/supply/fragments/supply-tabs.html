@@ -16,6 +16,8 @@
        th:classappend="${active == 'stats'} ? 'active'"
        th:attr="aria-current=${active == 'stats'} ? 'page' : null" data-testid="supply-tab-stats"
        th:text="#{supply.tab.stats}">Statistik</a>
+    <a th:if="${purchasingEnabled}" th:href="@{/purchasing/deals}" class="tab"
+       data-testid="supply-tab-purchasing" th:text="#{nav.purchasing.deals}">Ankauf</a>
 </nav>
 </body>
 </html>

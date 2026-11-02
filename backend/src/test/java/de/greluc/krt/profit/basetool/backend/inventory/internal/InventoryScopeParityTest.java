@@ -92,9 +92,7 @@ class InventoryScopeParityTest {
                 .collect(Collectors.toSet()),
         (wired, id) ->
             new InventoryAccessPolicy(
-                    wired.ownerScopeService(),
-                    inventoryItemRepository,
-                    mock(UserAccessPolicy.class))
+                    wired.gate(), inventoryItemRepository, mock(UserAccessPolicy.class))
                 .canSeeInventoryItem(id));
   }
 

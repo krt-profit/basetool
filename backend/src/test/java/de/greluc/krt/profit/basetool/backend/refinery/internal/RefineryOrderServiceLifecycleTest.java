@@ -20,16 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,14 +35,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilitySlice;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
@@ -62,11 +58,11 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -81,10 +77,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -106,6 +98,7 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
 
   @Mock private AuditService auditService;
 
@@ -144,233 +137,6 @@ class RefineryOrderServiceLifecycleTest {
     rawInput.setId(INPUT_MATERIAL_ID);
     rawInput.setName("Quantanium");
     rawInput.setType(MaterialType.RAW);
-  }
-
-  @Nested
-  class GetRefineryOrderTests {
-
-    @Test
-    void returnsOrder_whenPresent() {
-      RefineryOrder order = new RefineryOrder();
-      order.setId(ORDER_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-
-      assertSame(order, service.getRefineryOrder(ORDER_ID));
-    }
-
-    @Test
-    void throwsNotFound_whenAbsent() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
-
-      assertThrows(NotFoundException.class, () -> service.getRefineryOrder(ORDER_ID));
-    }
-  }
-
-  @Nested
-  class ListAndPageTests {
-
-    private final Pageable pageable = PageRequest.of(0, 10);
-
-    @Test
-    void getMyRefineryOrders_withEmptyStatusList_filtersOnEveryStatus() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findOwnedFiltered(
-              eq(OWNER_ID),
-              eq(EnumSet.allOf(RefineryOrderStatus.class)),
-              eq(false),
-              any(Instant.class),
-              isNull(),
-              eq(pageable)))
-          .thenReturn(page);
-
-      assertEquals(
-          1,
-          service
-              .getMyRefineryOrders(OWNER_ID, List.of(), false, null, pageable)
-              .getTotalElements());
-    }
-
-    @Test
-    void getMyRefineryOrders_withNullStatusListAndBlankQuery_filtersOnEveryStatusWithoutSearch() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findOwnedFiltered(
-              eq(OWNER_ID),
-              eq(EnumSet.allOf(RefineryOrderStatus.class)),
-              eq(false),
-              any(Instant.class),
-              isNull(),
-              eq(pageable)))
-          .thenReturn(page);
-
-      assertEquals(
-          1,
-          service.getMyRefineryOrders(OWNER_ID, null, false, "   ", pageable).getTotalElements());
-    }
-
-    @Test
-    void getMyRefineryOrders_withStatusesReadyAndQuery_passesThemAsOneFilteredQuery() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      Instant before = Instant.now();
-      when(refineryOrderRepository.findOwnedFiltered(
-              eq(OWNER_ID),
-              eq(EnumSet.of(RefineryOrderStatus.OPEN)),
-              eq(true),
-              any(Instant.class),
-              eq("%laranite%"),
-              eq(pageable)))
-          .thenReturn(page);
-
-      assertEquals(
-          1,
-          service
-              .getMyRefineryOrders(
-                  OWNER_ID, List.of(RefineryOrderStatus.OPEN), true, " Laranite ", pageable)
-              .getTotalElements());
-      ArgumentCaptor<Instant> now = ArgumentCaptor.forClass(Instant.class);
-      verify(refineryOrderRepository)
-          .findOwnedFiltered(any(), any(), anyBoolean(), now.capture(), any(), any());
-      assertFalse(now.getValue().isBefore(before));
-    }
-
-    @Test
-    void searchPattern_escapesLikeWildcardsAndLowerCases() {
-      assertEquals("%50\\%\\_a%", RefineryOrderService.searchPattern("50%_A"));
-      assertNull(RefineryOrderService.searchPattern(null));
-      assertNull(RefineryOrderService.searchPattern(" "));
-    }
-
-    @Test
-    void getUserRefineryOrdersScoped_adminAllScope_forwardsAdminAllScopeToScopedQuery() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(true, null, Set.of()));
-      when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, true, null, Set.of(), pageable))
-          .thenReturn(page);
-
-      assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
-      verify(refineryOrderRepository, never())
-          .findOwnedFiltered(any(), any(), anyBoolean(), any(), any(), any());
-    }
-
-    @Test
-    void getUserRefineryOrdersScoped_nonAdminMemberUnion_forwardsOnlyTheCallersOrgUnits() {
-      UUID callerStaffelA = UUID.randomUUID();
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffelA)));
-      when(refineryOrderRepository.findByOwnerIdScoped(
-              OWNER_ID, false, null, Set.of(callerStaffelA), pageable))
-          .thenReturn(page);
-
-      assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
-      verify(refineryOrderRepository, never())
-          .findOwnedFiltered(any(), any(), anyBoolean(), any(), any(), any());
-    }
-
-    @Test
-    void getUserRefineryOrdersScoped_pinnedCaller_forwardsActiveOrgUnitId() {
-      UUID pinned = UUID.randomUUID();
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(false, pinned, Set.of()));
-      when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, false, pinned, Set.of(), pageable))
-          .thenReturn(page);
-
-      assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
-      verify(refineryOrderRepository, never())
-          .findOwnedFiltered(any(), any(), anyBoolean(), any(), any(), any());
-    }
-
-    @Test
-    void getAllRefineryOrders_emptyStatusList_filtersOnEveryStatusInTheCallersScope() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-      when(refineryOrderRepository.findFilteredScoped(
-              eq(EnumSet.allOf(RefineryOrderStatus.class)),
-              eq(false),
-              any(Instant.class),
-              isNull(),
-              eq(true),
-              isNull(),
-              eq(Set.of()),
-              eq(pageable)))
-          .thenReturn(page);
-
-      assertEquals(
-          1, service.getAllRefineryOrders(List.of(), false, null, pageable).getTotalElements());
-      verify(refineryOrderRepository, never())
-          .findAllScoped(anyBoolean(), any(), any(), any(Pageable.class));
-    }
-
-    @Test
-    void getAllRefineryOrders_withStatusesReadyAndQuery_forwardsThemWithTheCallersScope() {
-      UUID callerStaffel = UUID.randomUUID();
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffel)));
-      when(refineryOrderRepository.findFilteredScoped(
-              eq(EnumSet.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)),
-              eq(true),
-              any(Instant.class),
-              eq("%arc-l1%"),
-              eq(false),
-              isNull(),
-              eq(Set.of(callerStaffel)),
-              eq(pageable)))
-          .thenReturn(page);
-
-      assertEquals(
-          1,
-          service
-              .getAllRefineryOrders(
-                  List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS),
-                  true,
-                  "ARC-L1",
-                  pageable)
-              .getTotalElements());
-    }
-
-    @Test
-    void getAllRefineryOrders_secondOverload_callsFindAll() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-      when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
-          .thenReturn(page);
-
-      assertEquals(1, service.getAllRefineryOrders(pageable).getTotalElements());
-    }
-
-    @Test
-    void getMissionRefineryOrdersScoped_passesCallerScope_soForeignSquadronOrdersAreUnreachable() {
-      UUID squadronA = UUID.randomUUID();
-      UUID squadronB = UUID.randomUUID();
-      ScopePredicate squadronAscope = new ScopePredicate(false, null, Set.of(squadronA));
-      when(ownerScopeService.currentScopePredicate()).thenReturn(squadronAscope);
-      RefineryOrder squadronAorder = new RefineryOrder();
-      when(refineryOrderRepository.findByMissionIdScoped(
-              MISSION_ID, false, null, Set.of(squadronA)))
-          .thenReturn(List.of(squadronAorder));
-
-      List<RefineryOrder> result = service.getMissionRefineryOrdersScoped(MISSION_ID);
-
-      assertEquals(List.of(squadronAorder), result);
-      verify(refineryOrderRepository)
-          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronA));
-      verify(refineryOrderRepository, never())
-          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronB));
-      verify(refineryOrderRepository, never()).findByMissionId(any(UUID.class));
-    }
-
-    @Test
-    void getMissionRefineryOrders_filteredByOwner_delegatesToCombinedQuery() {
-      RefineryOrder o = new RefineryOrder();
-      when(refineryOrderRepository.findByMissionIdAndOwnerId(MISSION_ID, OWNER_ID))
-          .thenReturn(List.of(o));
-
-      assertEquals(List.of(o), service.getMissionRefineryOrders(MISSION_ID, OWNER_ID));
-    }
   }
 
   @Nested
@@ -432,6 +198,60 @@ class RefineryOrderServiceLifecycleTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
+    }
+
+    @Test
+    void onBehalf_stampedUnitWithoutALogisticianGrant_isRefused() {
+      Squadron unitB = new Squadron();
+      unitB.setId(UUID.randomUUID());
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
+          .thenReturn(unitB);
+      doThrow(new AccessDeniedException("no"))
+          .when(ownerScopeService)
+          .requireLogisticianInOwner(unitB);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () ->
+              service.createRefineryOrderOnBehalf(
+                  OWNER_ID, freshOrderWithLocation(), unitB.getId()));
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void onBehalf_ownerlessStampForANonAdmin_isRefused() {
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, null))
+          .thenReturn(null);
+      doThrow(new AccessDeniedException("no"))
+          .when(ownerScopeService)
+          .requireLogisticianInOwner(null);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () -> service.createRefineryOrderOnBehalf(OWNER_ID, freshOrderWithLocation(), null));
+    }
+
+    @Test
+    void onBehalf_stampedUnitWithALogisticianGrant_isCreated() {
+      Squadron unitA = new Squadron();
+      unitA.setId(UUID.randomUUID());
+      Location cityLoc = new Location();
+      cityLoc.setId(LOCATION_ID);
+      City city = new City();
+      city.setHasRefineryTerminal(true);
+      cityLoc.setCity(city);
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, unitA.getId()))
+          .thenReturn(unitA);
+      when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
+      when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      RefineryOrder result =
+          service.createRefineryOrderOnBehalf(OWNER_ID, freshOrderWithLocation(), unitA.getId());
+
+      assertSame(unitA, result.getOwningOrgUnit());
     }
 
     @Test
@@ -1197,94 +1017,87 @@ class RefineryOrderServiceLifecycleTest {
   }
 
   @Nested
-  class OwnedOpenRefineryYieldSlicesTests {
-
-    private final UUID scuMaterialId = UUID.randomUUID();
-    private final UUID pieceMaterialId = UUID.randomUUID();
+  class CreateOrderPickerDelegationTests {
 
     @Test
-    void poolsConvertsScuAndMergesAcrossOrders() {
-      Material scuMat = materialWithType(scuMaterialId, QuantityType.SCU);
-      Material pieceMat = materialWithType(pieceMaterialId, QuantityType.PIECE);
+    void createRefineryOrder_delegatesPickerResolutionToOwnerScopeService() {
+      UUID userId = UUID.randomUUID();
+      UUID pickedOrgUnitId = UUID.randomUUID();
 
-      RefineryOrder order1 = new RefineryOrder();
-      order1.setGoods(new HashSet<>(Set.of(good(scuMat, 100, 250), good(pieceMat, 50, 7))));
+      User user = new User();
+      user.setId(userId);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-      RefineryOrder order2 = new RefineryOrder();
-      order2.setGoods(new HashSet<>(Set.of(good(scuMat, 100, 150))));
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
+      resolved.setId(pickedOrgUnitId);
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
+          .thenReturn(resolved);
 
-      when(refineryOrderRepository.findOwnedWithGoodsByStatusIn(
-              OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
-          .thenReturn(List.of(order1, order2));
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      SpaceStation station = new SpaceStation();
+      station.setHasRefineryTerminal(true);
+      loc.setSpaceStation(station);
+      RefineryOrder transientOrder = new RefineryOrder();
+      transientOrder.setLocation(loc);
+      when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
+      when(refineryOrderRepository.save(any(RefineryOrder.class)))
+          .thenAnswer(i -> i.getArgument(0));
 
-      List<CraftabilitySlice> slices = service.pendingYieldSlices(OWNER_ID);
+      RefineryOrder saved = service.createRefineryOrder(userId, transientOrder, pickedOrgUnitId);
 
-      assertEquals(2, slices.size(), "one slice per (material, quality) pair");
-      assertEquals(
-          4.0d,
-          totalScuFor(slices, scuMaterialId, 100),
-          1e-9,
-          "250+150 units at 100 units/SCU pool to 2.5+1.5 = 4.0 SCU");
-      assertEquals(
-          7.0d,
-          totalScuFor(slices, pieceMaterialId, 50),
-          1e-9,
-          "non-SCU output passes through unconverted");
+      assertSame(
+          resolved,
+          saved.getOwningOrgUnit(),
+          "the picker output must be honoured verbatim, not user.getSquadron()");
     }
 
     @Test
-    void skipsNullMaterialNullQualityNullQuantityNonPositiveScuAndNullGoods() {
-      Material scuMat = materialWithType(scuMaterialId, QuantityType.SCU);
+    void createRefineryOrder_stripsClientSuppliedIdAndVersion() {
+      UUID userId = UUID.randomUUID();
+      User user = new User();
+      user.setId(userId);
+      user.setDisplayName("PII Owner Name");
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-      RefineryGood valid = good(scuMat, 100, 300);
-      RefineryGood nullMaterial = good(null, 100, 200);
-      RefineryGood nullQuality = good(scuMat, null, 200);
-      RefineryGood nullQuantity = good(scuMat, 100, null);
-      RefineryGood zeroScu = good(scuMat, 100, 0);
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      SpaceStation station = new SpaceStation();
+      station.setHasRefineryTerminal(true);
+      loc.setSpaceStation(station);
+      when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
+      when(refineryOrderRepository.save(any(RefineryOrder.class)))
+          .thenAnswer(i -> i.getArgument(0));
 
-      RefineryOrder order = new RefineryOrder();
-      order.setGoods(
-          new HashSet<>(Set.of(valid, nullMaterial, nullQuality, nullQuantity, zeroScu)));
+      RefineryOrder transientOrder = new RefineryOrder();
+      transientOrder.setLocation(loc);
+      transientOrder.setId(UUID.randomUUID());
+      transientOrder.setVersion(7L);
 
-      RefineryOrder nullGoodsOrder = new RefineryOrder();
-      nullGoodsOrder.setGoods(null);
+      service.createRefineryOrder(userId, transientOrder, null);
 
-      when(refineryOrderRepository.findOwnedWithGoodsByStatusIn(
-              OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
-          .thenReturn(List.of(order, nullGoodsOrder));
+      ArgumentCaptor<RefineryOrder> captor = ArgumentCaptor.forClass(RefineryOrder.class);
+      verify(refineryOrderRepository).save(captor.capture());
+      assertNull(
+          captor.getValue().getId(),
+          "client-supplied id must be nulled so save() does an INSERT, not a merge UPSERT");
+      assertNull(
+          captor.getValue().getVersion(), "client-supplied version must be nulled on create");
 
-      List<CraftabilitySlice> slices = service.pendingYieldSlices(OWNER_ID);
-
-      assertEquals(1, slices.size(), "only the fully-populated positive-SCU good yields a slice");
-      CraftabilitySlice only = slices.get(0);
-      assertEquals(scuMaterialId, only.materialId());
-      assertEquals(Integer.valueOf(100), only.quality());
-      assertEquals(3.0d, only.totalScu(), 1e-9);
-    }
-
-    private Material materialWithType(UUID id, QuantityType type) {
-      Material m = new Material();
-      m.setId(id);
-      m.setQuantityType(type);
-      return m;
-    }
-
-    private RefineryGood good(Material outputMaterial, Integer quality, Integer outputQuantity) {
-      RefineryGood g = new RefineryGood();
-      g.setOutputMaterial(outputMaterial);
-      g.setQuality(quality);
-      g.setOutputQuantity(outputQuantity);
-      return g;
-    }
-
-    private Double totalScuFor(List<CraftabilitySlice> slices, UUID materialId, int quality) {
-      for (CraftabilitySlice slice : slices) {
-        if (materialId.equals(slice.materialId())
-            && Integer.valueOf(quality).equals(slice.quality())) {
-          return slice.totalScu();
-        }
-      }
-      return null;
+      ArgumentCaptor<String> labelCaptor = ArgumentCaptor.forClass(String.class);
+      verify(auditService)
+          .record(
+              eq(
+                  de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
+                      .REFINERY_ORDER_CREATED),
+              any(),
+              labelCaptor.capture(),
+              any(),
+              any());
+      org.junit.jupiter.api.Assertions.assertFalse(
+          labelCaptor.getValue().contains("PII Owner Name"),
+          "refinery audit subjectLabel must not contain the owner's personal name");
     }
   }
 

@@ -107,7 +107,7 @@ class LagerLocationFilterE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/inventory/my");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=my");
         page.waitForLoadState();
 
         assertThat(page.locator("div.tree-row--group[data-material-id='" + materialId + "']"))

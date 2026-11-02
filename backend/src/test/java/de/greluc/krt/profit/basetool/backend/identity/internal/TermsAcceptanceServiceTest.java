@@ -28,6 +28,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.UUID;
@@ -56,6 +57,7 @@ class TermsAcceptanceServiceTest {
 
   @Mock private TermsAcceptanceRepository termsAcceptanceRepository;
   @Mock private TermsVersionProvider termsVersionProvider;
+  @Mock private AdminDashboardLiveSync adminDashboardLiveSync;
 
   private MeterRegistry meterRegistry;
   private TermsAcceptanceService service;
@@ -65,7 +67,8 @@ class TermsAcceptanceServiceTest {
   void setUp() {
     meterRegistry = new SimpleMeterRegistry();
     service =
-        new TermsAcceptanceService(termsAcceptanceRepository, termsVersionProvider, meterRegistry);
+        new TermsAcceptanceService(
+            termsAcceptanceRepository, termsVersionProvider, meterRegistry, adminDashboardLiveSync);
     userId = UUID.randomUUID();
   }
 
@@ -163,6 +166,18 @@ class TermsAcceptanceServiceTest {
     assertThat(captor.getValue().getTermsVersion()).isEqualTo(VERSION);
     assertThat(captor.getValue().getAcceptedAt()).isNotNull();
     assertThat(meterRegistry.counter("basetool.terms.acceptances").count()).isEqualTo(1.0);
+    verify(adminDashboardLiveSync).termsChanged();
+  }
+
+  /** A repeat writes nothing, so it announces nothing. */
+  @Test
+  void aRepeatedConsentAnnouncesNothing() {
+    when(termsVersionProvider.getCurrentVersion()).thenReturn(VERSION);
+    when(termsAcceptanceRepository.existsByUserIdAndTermsVersion(userId, VERSION)).thenReturn(true);
+
+    assertThat(service.acceptCurrentTerms(userId)).isFalse();
+
+    verify(adminDashboardLiveSync, never()).termsChanged();
   }
 
   /** Accepting twice in one process writes once — no second history row, no second count. */

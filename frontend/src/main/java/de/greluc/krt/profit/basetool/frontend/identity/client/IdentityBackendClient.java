@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRankRangeResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -339,6 +340,17 @@ public class IdentityBackendClient {
   @Nullable
   public UserRsiHandleResponse userRsiHandle(@NotNull UUID id) {
     return backendApiClient.get("/api/v1/users/{id}/rsi-handle", UserRsiHandleResponse.class, id);
+  }
+
+  /**
+   * Reads another member's rank range, for an admin (REQ-ROLE-007).
+   *
+   * @param id the member
+   * @return the range, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public UserRankRangeResponse userRankRange(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/users/{id}/rank-range", UserRankRangeResponse.class, id);
   }
 
   /**

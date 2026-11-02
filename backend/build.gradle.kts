@@ -225,9 +225,23 @@ tasks.named<Test>("test") {
     .withPropertyName("backendQuadletEnvTemplate")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
+  inputs
+    .file(layout.settingsDirectory.file("scripts/officer-cut-report.sql"))
+    .withPropertyName("officerCutReport")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
   val authzMatrixUpdate = providers.systemProperty("authz.matrix.update").orElse("false")
   inputs.property("authzMatrixUpdate", authzMatrixUpdate)
   jvmArgumentProviders.add(
     CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) },
+  )
+
+  val dashboardCatalogueUpdate =
+    providers.systemProperty("dashboard.catalogue.update").orElse("false")
+  inputs.property("dashboardCatalogueUpdate", dashboardCatalogueUpdate)
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider {
+      listOf("-Ddashboard.catalogue.update=" + dashboardCatalogueUpdate.get())
+    },
   )
 }

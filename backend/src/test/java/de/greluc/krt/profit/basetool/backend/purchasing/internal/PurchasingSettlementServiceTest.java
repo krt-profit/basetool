@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.LossReason;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.TrancheKind;
@@ -160,7 +161,7 @@ class PurchasingSettlementServiceTest {
         .contains("remainder=3000")
         .contains("loss=0")
         .doesNotContain("name");
-    assertThat(meterRegistry.find(MetricNames.PURCHASING_DEALS).counter()).isNull();
+    assertThat(meterRegistry.find(PurchasingMetricNames.PURCHASING_DEALS).counter()).isNull();
   }
 
   @Test
@@ -195,7 +196,7 @@ class PurchasingSettlementServiceTest {
         .contains("loss=0");
     assertThat(
             meterRegistry
-                .get(MetricNames.PURCHASING_DEALS)
+                .get(PurchasingMetricNames.PURCHASING_DEALS)
                 .tag(MetricNames.TAG_EVENT, "settled")
                 .counter()
                 .count())
@@ -412,7 +413,7 @@ class PurchasingSettlementServiceTest {
     assertThat(details.getValue().toString()).contains("paid=7000").contains("loss=0");
     assertThat(
             meterRegistry
-                .get(MetricNames.PURCHASING_DEALS)
+                .get(PurchasingMetricNames.PURCHASING_DEALS)
                 .tag(MetricNames.TAG_EVENT, "settled")
                 .counter()
                 .count())

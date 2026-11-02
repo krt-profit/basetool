@@ -220,7 +220,7 @@ public class ShipDataPageController {
 
   /**
    * Resets the {@code fitted} flag on every ship of the squadron; irreversible, restricted to
-   * ADMIN/OFFICER.
+   * ADMIN.
    *
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /ship-data}

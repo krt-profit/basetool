@@ -34,7 +34,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -113,15 +113,38 @@ class JobOrderToProcessMvcTest {
         .doesNotContain(orderRespA.toString(), orderRespB.toString(), orderRespSk.toString());
   }
 
+  @Test
+  void pinnedToSquadronA_toProcessWithTheSameOrgUnitId_keepsTheQueue() throws Exception {
+    List<String> ids = listIds(squadronAId, true, squadronAId);
+
+    assertThat(ids).contains(orderRespA.toString());
+  }
+
+  @Test
+  void pinnedToSquadronA_toProcessWithAnotherOrgUnitId_listsNothingOfTheSeededOrders()
+      throws Exception {
+    List<String> ids = listIds(squadronAId, true, UUID.randomUUID());
+
+    assertThat(ids)
+        .doesNotContain(orderRespA.toString(), orderRespB.toString(), orderRespSk.toString());
+  }
+
+  private @NotNull List<String> listIds(@Nullable UUID pinnedOrgUnitId, boolean toProcess)
+      throws Exception {
+    return listIds(pinnedOrgUnitId, toProcess, null);
+  }
+
   /**
    * Reads the newest order ids an admin sees, optionally pinned to one org unit.
    *
    * @param pinnedOrgUnitId the org unit sent as the active-unit pin, or {@code null} for none
    * @param toProcess the value of the {@code toProcess} query parameter
+   * @param orgUnitId the value of the {@code orgUnitId} query parameter, or {@code null} for none
    * @return the ids of the listed orders
    * @throws Exception if the request fails
    */
-  private @NotNull List<String> listIds(@Nullable UUID pinnedOrgUnitId, boolean toProcess)
+  private @NotNull List<String> listIds(
+      @Nullable UUID pinnedOrgUnitId, boolean toProcess, @Nullable UUID orgUnitId)
       throws Exception {
     MockHttpServletRequestBuilder request =
         get("/api/v1/orders")
@@ -133,9 +156,12 @@ class JobOrderToProcessMvcTest {
                     .jwt(token -> token.subject(UUID.randomUUID().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
             .accept(MediaType.APPLICATION_JSON);
+    if (orgUnitId != null) {
+      request = request.param("orgUnitId", orgUnitId.toString());
+    }
     if (pinnedOrgUnitId != null) {
       request =
-          request.header(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER, pinnedOrgUnitId.toString());
+          request.header(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, pinnedOrgUnitId.toString());
     }
     String body =
         mockMvc

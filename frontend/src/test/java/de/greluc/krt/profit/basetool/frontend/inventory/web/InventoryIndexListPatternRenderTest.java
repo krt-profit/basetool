@@ -116,6 +116,16 @@ class InventoryIndexListPatternRenderTest {
    * @return the row
    */
   private static @NotNull AggregatedInventoryDto materialRow() {
+    return materialRow(false);
+  }
+
+  /**
+   * A material row in SCU.
+   *
+   * @param lowStock whether a level of the material is low
+   * @return the row
+   */
+  private static @NotNull AggregatedInventoryDto materialRow(boolean lowStock) {
     MaterialDto material =
         new MaterialDto(
             MATERIAL_ID,
@@ -133,7 +143,7 @@ class InventoryIndexListPatternRenderTest {
             false,
             true,
             0L);
-    return new AggregatedInventoryDto(material, null, 512.0, 700.0, 12.5);
+    return new AggregatedInventoryDto(material, null, 512.0, 700.0, 12.5, lowStock);
   }
 
   /** The material view renders on the pattern: head, tabs, row link, numeric cells, foot. */
@@ -144,7 +154,7 @@ class InventoryIndexListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Logistik<")
         .containsPattern("<h1>Lagerverwaltung</h1>")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"inventory-results\"")
@@ -161,12 +171,22 @@ class InventoryIndexListPatternRenderTest {
         .contains("data-testid=\"lager-view-items\"")
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern(
-            "class=\"row-link\"[^>]*href=\"/inventory/all\\?materialIds=" + MATERIAL_ID)
+            "class=\"row-link\"[^>]*href=\"/inventory\\?storage=all&amp;materialIds=" + MATERIAL_ID)
         .contains(">Laranite<")
         .contains("data-label=\"Ø Qualität\"")
         .contains(">12,500 SCU<")
         .contains("data-list-total=\"1\"")
         .doesNotContain("data-testid=\"empty-state\"");
+  }
+
+  /** A material with a low minimum stock level carries the „Niedrig" badge (REQ-INV-068). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aMaterialWithALowLevelIsMarked() throws Exception {
+    assertThat(render(pageOf(materialRow(true)), ""))
+        .containsPattern("data-testid=\"inventory-low-stock\"[^>]*>Niedrig<");
+    assertThat(render(pageOf(materialRow(false)), ""))
+        .doesNotContain("data-testid=\"inventory-low-stock\"");
   }
 
   /** An empty material view renders the empty state with its action and no table. */
@@ -201,10 +221,38 @@ class InventoryIndexListPatternRenderTest {
     assertThat(html)
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern(
-            "class=\"row-link\"[^>]*href=\"/inventory/all\\?view=items&amp;gameItemIds="
+            "class=\"row-link\"[^>]*href=\"/inventory\\?storage=all&amp;view=items&amp;gameItemIds="
                 + GAME_ITEM_ID)
         .containsPattern("class=\"cell-sub\">RSI<")
         .doesNotContain("Max. Qualit");
+  }
+
+  /** A game item with a low level carries the „niedrig" marker in the items view (REQ-INV-068). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemsViewMarksAnItemWithALowLevel() throws Exception {
+    AggregatedInventoryDto low =
+        new AggregatedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(GAME_ITEM_ID, "Quantum Drive XL-1", "RSI", null),
+            null,
+            null,
+            7.0,
+            true);
+
+    assertThat(render(pageOf(low), "view=items")).contains("data-testid=\"inventory-low-stock\"");
+    assertThat(
+            render(
+                pageOf(
+                    new AggregatedInventoryDto(
+                        null,
+                        new InventoryGameItemReferenceDto(
+                            GAME_ITEM_ID, "Quantum Drive XL-1", "RSI", null),
+                        null,
+                        null,
+                        7.0)),
+                "view=items"))
+        .doesNotContain("data-testid=\"inventory-low-stock\"");
   }
 
   /**

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
@@ -124,8 +125,8 @@ public class ScWikiItemSyncService {
               + " skipping.");
       return 0;
     }
-    meterRegistry.counter(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN);
-    meterRegistry.gauge(MetricNames.CATALOGUE_ITEMS_WITH_STATS, itemsWithStats);
+    meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN);
+    meterRegistry.gauge(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS, itemsWithStats);
     int written =
         Boolean.TRUE.equals(properties.syncAllItems()) ? syncItemsBackfill() : syncItemsClosure();
     itemsWithStats.set(gameItemStatRepository.countItemsWithStats());
@@ -296,9 +297,9 @@ public class ScWikiItemSyncService {
       String reason = sweepSkipReason(ctx);
       meterRegistry
           .counter(
-              MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED,
-              MetricNames.TAG_SWEEP,
-              MetricNames.SWEEP_ITEM,
+              CatalogueMetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED,
+              CatalogueMetricNames.TAG_SWEEP,
+              CatalogueMetricNames.SWEEP_ITEM,
               MetricNames.TAG_REASON,
               reason)
           .increment();
@@ -714,7 +715,7 @@ public class ScWikiItemSyncService {
   private ShipComponentClass resolveItemClass(@NotNull String wikiClass) {
     ShipComponentClass resolved = ShipComponentClass.fromWikiClass(wikiClass);
     if (resolved == null) {
-      meterRegistry.counter(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).increment();
+      meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).increment();
       String value = LogSafe.text(wikiClass.strip(), MAX_ITEM_CLASS_LOG_LENGTH);
       if (unknownItemClassesLogged.size() < MAX_LOGGED_UNKNOWN_ITEM_CLASSES
           && unknownItemClassesLogged.add(value.toLowerCase(Locale.ROOT))) {
@@ -970,18 +971,18 @@ public class ScWikiItemSyncService {
 
   /**
    * Names why the cross-kind orphan sweep stood down; only {@link
-   * MetricNames#SWEEP_SKIP_INCOMPLETE} indicates a fault.
+   * CatalogueMetricNames#SWEEP_SKIP_INCOMPLETE} indicates a fault.
    *
    * @param ctx the finished run's context
    * @return one of the three bounded reason values; never {@code null}
    */
   private static String sweepSkipReason(BackfillContext ctx) {
     if (ctx.notModifiedPasses > 0 && ctx.failedPasses == ctx.notModifiedPasses) {
-      return MetricNames.SWEEP_SKIP_NOT_MODIFIED;
+      return CatalogueMetricNames.SWEEP_SKIP_NOT_MODIFIED;
     }
     if (ctx.seen.isEmpty()) {
-      return MetricNames.SWEEP_SKIP_NO_ROWS;
+      return CatalogueMetricNames.SWEEP_SKIP_NO_ROWS;
     }
-    return MetricNames.SWEEP_SKIP_INCOMPLETE;
+    return CatalogueMetricNames.SWEEP_SKIP_INCOMPLETE;
   }
 }

@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
@@ -223,6 +224,7 @@ class ListSearchRelayParamsTest {
     return standalone(
         new OperationPageController(
             new OperationBackendClient(backend),
+            mock(MissionManagerGate.class),
             mock(MarkdownRenderer.class),
             mock(ParallelPageLoader.class)));
   }

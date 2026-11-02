@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mapstruct.factory.Mappers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -87,7 +87,7 @@ class OrgUnitMembershipServiceTest {
   private OrgUnitMembershipMapper orgUnitMembershipMapper =
       Mappers.getMapper(OrgUnitMembershipMapper.class);
 
-  @InjectMocks private OrgUnitMembershipService membershipService;
+  private OrgUnitMembershipService membershipService;
 
   private SpecialCommand sc;
   private UUID scId;
@@ -97,6 +97,21 @@ class OrgUnitMembershipServiceTest {
 
   @BeforeEach
   void setUp() {
+    membershipService =
+        new OrgUnitMembershipService(
+            membershipRepository,
+            specialCommandService,
+            userRepository,
+            squadronRepository,
+            orgUnitRepository,
+            kommandoGroupRepository,
+            firstMembershipObserver,
+            auditService,
+            membershipChangeObserver,
+            orgUnitMembershipMapper,
+            seatNotifier,
+            new OrgUnitSeatEligibility(membershipRepository, userRepository),
+            responsibleHolderTrackerProvider);
     scId = UUID.randomUUID();
     sc = new SpecialCommand();
     sc.setId(scId);
@@ -115,6 +130,105 @@ class OrgUnitMembershipServiceTest {
         .when(responsibleHolderTrackerProvider.getObject())
         .thenReturn(responsibleHolderTracker);
     lenient().when(responsibleHolderTracker.snapshotResponsibleHolders(any())).thenReturn(Map.of());
+    lenient()
+        .when(userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER)))
+        .thenReturn(true);
+  }
+
+  private void stubWithoutKrtMember() {
+    when(userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER))).thenReturn(false);
+  }
+
+  @Test
+  void addBereichLeader_withoutKrtMember_isRefused() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    stubWithoutKrtMember();
+
+    assertThrows(
+        LeadershipSeatRequiresKrtMemberException.class,
+        () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
+    verify(membershipRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void addOlMember_withoutKrtMember_isRefused() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    stubWithoutKrtMember();
+
+    assertThrows(
+        LeadershipSeatRequiresKrtMemberException.class,
+        () -> membershipService.addOlMember(olId, userId));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void setGrandAdmiral_withoutKrtMember_isRefused() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    stubWithoutKrtMember();
+
+    assertThrows(
+        LeadershipSeatRequiresKrtMemberException.class,
+        () -> membershipService.setGrandAdmiral(olId, userId));
+    assertNull(ol.getGrandAdmiralUserId());
+  }
+
+  @Test
+  void toggleLead_promoteWithoutKrtMember_isRefused() {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setVersion(0L);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
+    stubWithoutKrtMember();
+
+    assertThrows(
+        LeadershipSeatRequiresKrtMemberException.class,
+        () ->
+            membershipService.toggleLead(scId, userId, new MembershipLeadToggleRequest(true, 0L)));
+    assertEquals(MembershipRole.MEMBER, m.getRole());
+  }
+
+  @Test
+  void toggleLead_demoteWithoutKrtMember_keepsWorking() {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setVersion(1L);
+    m.setRole(MembershipRole.SK_LEAD);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
+    when(membershipRepository.saveAndFlush(m)).thenReturn(m);
+
+    membershipService.toggleLead(scId, userId, new MembershipLeadToggleRequest(false, 1L));
+
+    assertEquals(MembershipRole.MEMBER, m.getRole());
+    verify(userRepository, never()).hasAnyRoleCode(any(), any());
+  }
+
+  @Test
+  void assignSquadronRank_withoutKrtMember_isRefused() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    stubWithoutKrtMember();
+
+    assertThrows(
+        LeadershipSeatRequiresKrtMemberException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.ENSIGN, null, 0L));
+    assertEquals(MembershipRole.MEMBER, m.getRole());
+    verify(membershipRepository, never()).saveAndFlush(any());
   }
 
   @Test

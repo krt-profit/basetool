@@ -162,9 +162,9 @@ class AdminOrgStructurePageControllerMvcTest {
   }
 
   /**
-   * The page renders on the list pattern: page head under the "Benutzer &amp; Inhalte" group with
-   * the unit count, the units as a stacked data table with the kind translated, the create forms as
-   * cards, no HUD box.
+   * The page renders on the list pattern: page head under the "Mitglieder &amp; Organisation" group
+   * with the unit count, the units as a stacked data table with the kind translated, the create
+   * forms as cards, no HUD box.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
@@ -194,7 +194,7 @@ class AdminOrgStructurePageControllerMvcTest {
 
     assertThat(html)
         .contains("data-testid=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");

@@ -52,8 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface for the location reference table, including a {@code /lookup} projection for
- * typeaheads and a {@code /refineries} list for the refinery-order form. Mutations are
- * OFFICER/ADMIN.
+ * typeaheads and a {@code /refineries} list for the refinery-order form. Mutations are ADMIN-only.
  *
  * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
  * gate takes precedence (REQ-SEC-052).

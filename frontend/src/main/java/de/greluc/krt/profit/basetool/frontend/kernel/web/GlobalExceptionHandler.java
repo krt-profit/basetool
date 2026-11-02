@@ -45,6 +45,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -373,8 +374,8 @@ public class GlobalExceptionHandler {
 
   /**
    * Answers a request whose parameters Tomcat refused to parse (an empty parameter name, a
-   * percent-escape that fails to decode, too many parameters, or a malformed {@code POST} body)
-   * with a {@code 400}.
+   * percent-escape that fails to decode, too many parameters, or a malformed {@code POST} body) or
+   * a {@code @Valid} body that fails its constraints with a {@code 400}.
    *
    * <p>Logged at DEBUG without the exception message, because the input is client-controlled
    * (REQ-OBS-001, REQ-OBS-004).
@@ -383,7 +384,7 @@ public class GlobalExceptionHandler {
    * @param model the model populated for the HTML error page
    * @return a {@code 400} JSON body for XHR callers, or the {@code error/error} view name otherwise
    */
-  @ExceptionHandler(InvalidParameterException.class)
+  @ExceptionHandler({InvalidParameterException.class, MethodArgumentNotValidException.class})
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Object handleInvalidParameter(@NotNull HttpServletRequest request, @NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
@@ -646,6 +647,9 @@ public class GlobalExceptionHandler {
     m.put("BANK_OWNER_APPROVAL_REQUIRED", "error.bank.ownerApprovalRequired");
     m.put("BANK_FOUR_EYES_REQUIRED", "error.bank.fourEyesRequired");
     m.put("RANK_OUTSIDE_ROLE_RANGE", "error.member.rank.outsideRoleRange");
+    m.put(
+        BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
+        "error.orgUnit.seatRequiresKrtMember");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");
     m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");
     m.put("SUPPLY_UNIT_CANNOT_RECEIVE", "error.supply.unitCannotReceive");

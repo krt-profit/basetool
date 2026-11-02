@@ -12,7 +12,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{materialboerse.title}, actions=~{::mb-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.materials', titleText=#{materialboerse.title}, actions=~{::mb-actions})}">
         <th:block th:ref="mb-actions">
             <div class="overflow-menu mb-create" data-overflow-menu data-mb-cta-group="offers"
                  th:hidden="${activeMode == 'requests'}">

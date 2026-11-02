@@ -79,15 +79,6 @@
     .form-layout.card > .form-actions--sticky {
         margin: 0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6));
     }
-    .member-export {
-        max-width: var(--content-max-form);
-    }
-    .member-export__title {
-        margin: 0;
-        font-size: var(--fs-sm);
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-    }
     @media (width <= 768px) {
         .staffel-slot {
             grid-template-columns: minmax(0, 1fr);

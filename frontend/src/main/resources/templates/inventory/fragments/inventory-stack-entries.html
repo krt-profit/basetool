@@ -460,7 +460,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block th:if="${isLogisticianOrAbove}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
                                       role="button" tabindex="0"
@@ -508,7 +508,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block th:unless="${isLogisticianOrAbove}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -529,7 +529,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block th:if="${isLogisticianOrAbove}">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission"
                                       role="button" tabindex="0"
@@ -577,7 +577,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block th:unless="${isLogisticianOrAbove}">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission">
                                     <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
@@ -596,7 +596,7 @@
                 <span th:case="'PIECE'"><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
                 <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
-            <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
+            <div class="tree-cell tree-cell--actions" th:if="${isLogisticianOrAbove}">
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
@@ -683,7 +683,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              data-piece="true">
-                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block th:if="${isLogisticianOrAbove}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
                                       role="button" tabindex="0"
@@ -731,7 +731,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+                            <th:block th:unless="${isLogisticianOrAbove}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -749,7 +749,7 @@
             <div class="tree-cell tree-cell--num tree-amount">
                 <span><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
             </div>
-            <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
+            <div class="tree-cell tree-cell--actions" th:if="${isLogisticianOrAbove}">
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"

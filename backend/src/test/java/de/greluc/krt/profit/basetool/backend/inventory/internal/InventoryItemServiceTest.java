@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -45,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -54,7 +56,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.model.dto.*;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.List;
 import java.util.Optional;
@@ -90,11 +93,13 @@ class InventoryItemServiceTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
 
   @Mock private MaterialMapper materialMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private InventoryAccessPolicy inventoryAccessPolicy;
 
   @Mock private JobOrderItemService jobOrderItemService;
 
+  @Mock private StockLevelService stockLevelService;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
@@ -104,6 +109,9 @@ class InventoryItemServiceTest {
 
   @BeforeEach
   void wireDelegates() {
+    lenient()
+        .when(stockLevelService.lowSubjects())
+        .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
     realAggregationService =
         new InventoryAggregationService(
             inventoryItemRepository,
@@ -112,8 +120,9 @@ class InventoryItemServiceTest {
             gameItemRepository,
             inventoryItemMapper,
             materialMapper,
-            ownerScopeService,
-            null);
+            requestScopeResolver,
+            null,
+            stockLevelService);
     realCheckoutService =
         new InventoryCheckoutService(
             inventoryItemRepository,
@@ -125,7 +134,8 @@ class InventoryItemServiceTest {
             new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             auditService,
             eventPublisher);
     inventoryItemService =
@@ -137,7 +147,8 @@ class InventoryItemServiceTest {
             locationRepository,
             earmarkTargets,
             inventoryItemMapper,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             inventoryAccessPolicy,
             new InventoryStockCommands(
                 null, null, null, null, null, inventoryAccessPolicy, null, null),
@@ -155,7 +166,7 @@ class InventoryItemServiceTest {
     InventoryItem b = new InventoryItem();
     InventoryItemDto da = mock(InventoryItemDto.class);
     InventoryItemDto db = mock(InventoryItemDto.class);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMissionIdScoped(missionId, true, null, java.util.Set.of()))
         .thenReturn(List.of(a, b));
@@ -174,7 +185,7 @@ class InventoryItemServiceTest {
   void getAggregatedInventory_shouldReturnPage() {
     Object[] obj = new Object[] {new Material(), 10.0, 900, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.getAggregatedInventory(
             anyBoolean(), any(), any(), any(Pageable.class)))
@@ -195,7 +206,7 @@ class InventoryItemServiceTest {
   void getInventoryByMaterial_shouldReturnPage() {
     UUID materialId = UUID.randomUUID();
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMaterialAndPersonalFalseScoped(
             any(), anyBoolean(), any(), any(), any()))
@@ -226,7 +237,7 @@ class InventoryItemServiceTest {
 
   @Test
   void getAllInventory_shouldReturnAll_whenMaterialIdIsNull() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
@@ -259,7 +270,7 @@ class InventoryItemServiceTest {
     List<UUID> jobOrderIds = List.of(jobOrderId);
     List<UUID> missionIds = List.of(missionId);
 
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
@@ -654,7 +665,8 @@ class InventoryItemServiceTest {
             locationRepository,
             earmarkTargets,
             inventoryItemMapper,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             inventoryAccessPolicy,
             new InventoryStockCommands(
                 null, null, null, null, null, inventoryAccessPolicy, null, null),
@@ -2041,7 +2053,7 @@ class InventoryItemServiceTest {
 
   @Test
   void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
         .thenReturn(42);
@@ -2054,7 +2066,7 @@ class InventoryItemServiceTest {
 
   @Test
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
         .thenReturn(0);
@@ -2068,7 +2080,7 @@ class InventoryItemServiceTest {
   @Test
   void deleteAllGlobalInventory_inFocusedMode_shouldScopeToActiveSquadron() {
     UUID scope = UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, scope, java.util.Set.of()));
     when(inventoryItemRepository.deleteAllNonPersonal(false, scope, java.util.Set.of()))
         .thenReturn(7);
@@ -2108,7 +2120,7 @@ class InventoryItemServiceTest {
 
     Squadron resolved = new Squadron();
     resolved.setId(pickedOrgUnitId);
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(resolved);
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
@@ -2150,7 +2162,7 @@ class InventoryItemServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, foreignOrgUnitId))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, foreignOrgUnitId))
         .thenThrow(new BadRequestException("not a membership"));
 
     assertThrows(
@@ -2195,7 +2207,7 @@ class InventoryItemServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(orgB);
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);

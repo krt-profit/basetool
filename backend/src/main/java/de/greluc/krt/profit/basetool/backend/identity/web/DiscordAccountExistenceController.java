@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.web;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceRequest;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceResponse;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceService;
@@ -81,18 +82,18 @@ public class DiscordAccountExistenceController {
     String configuredSecret = properties.sharedSecret();
     if (configuredSecret == null || configuredSecret.isBlank()) {
       log.debug("Discord account-existence precheck called but no shared secret is configured.");
-      recordPrecheck(MetricNames.DISCORD_PRECHECK_DISABLED);
+      recordPrecheck(IdentityMetricNames.DISCORD_PRECHECK_DISABLED);
       return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
     }
     if (!constantTimeEquals(configuredSecret, providedSecret)) {
       log.warn("Discord account-existence precheck rejected: missing or invalid shared secret.");
-      recordPrecheck(MetricNames.DISCORD_PRECHECK_UNAUTHORIZED);
+      recordPrecheck(IdentityMetricNames.DISCORD_PRECHECK_UNAUTHORIZED);
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
     boolean exists =
         accountExistenceService.accountExistsForDiscordIdentity(
             request.username(), request.email(), request.serverNickname());
-    recordPrecheck(MetricNames.DISCORD_PRECHECK_OK);
+    recordPrecheck(IdentityMetricNames.DISCORD_PRECHECK_OK);
     return ResponseEntity.ok(new DiscordAccountExistenceResponse(exists));
   }
 
@@ -100,12 +101,13 @@ public class DiscordAccountExistenceController {
    * Increments {@code basetool_discord_precheck_total} for one bounded {@code outcome}; never
    * records the candidate names or e-mail.
    *
-   * @param outcome one of {@link MetricNames#DISCORD_PRECHECK_OK} / {@link
-   *     MetricNames#DISCORD_PRECHECK_UNAUTHORIZED} / {@link MetricNames#DISCORD_PRECHECK_DISABLED}
+   * @param outcome one of {@link IdentityMetricNames#DISCORD_PRECHECK_OK} / {@link
+   *     IdentityMetricNames#DISCORD_PRECHECK_UNAUTHORIZED} / {@link
+   *     IdentityMetricNames#DISCORD_PRECHECK_DISABLED}
    */
   private void recordPrecheck(@NotNull String outcome) {
     meterRegistry
-        .counter(MetricNames.DISCORD_PRECHECK, MetricNames.TAG_OUTCOME, outcome)
+        .counter(IdentityMetricNames.DISCORD_PRECHECK, MetricNames.TAG_OUTCOME, outcome)
         .increment();
   }
 

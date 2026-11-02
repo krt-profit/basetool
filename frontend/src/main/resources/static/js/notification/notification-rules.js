@@ -90,6 +90,7 @@ function initNotificationRules() {
             'MISSION_LEADERSHIP',
             'EXCHANGE_CLIENT_HOLDERS',
             'EVENT_RECIPIENTS',
+            'SEAT_HOLDERS',
         ];
 
         /** The kind a new, empty selector row starts with. */

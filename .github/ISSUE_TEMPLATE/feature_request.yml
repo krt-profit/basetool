@@ -11,7 +11,7 @@ body:
       label: Problem / Use Case
       description: >-
         Which problem does this feature solve? Who benefits from it?
-        Which role (ADMIN / OFFICER / LOGISTICIAN / MISSION_MANAGER /
+        Which role (ADMIN / LOGISTICIAN / MISSION_MANAGER /
         KRT_MEMBER)?
     validations:
       required: true

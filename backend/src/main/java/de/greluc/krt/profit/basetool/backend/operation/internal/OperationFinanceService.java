@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceGroupAggregate;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderLine;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -65,6 +67,7 @@ public class OperationFinanceService {
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final MissionMapper missionMapper;
   private final RefineryOrderFinanceReader refineryOrderFinanceReader;
+  private final MissionVisibility missionVisibility;
 
   /**
    * Builds the full aggregated finance DTO for the operation with a fixed number of queries.
@@ -122,13 +125,16 @@ public class OperationFinanceService {
 
       operationTotalSum = operationTotalSum.add(missionTotalSum);
 
-      List<MissionFinanceEntryDto> entryDtos = entries.stream().map(missionMapper::toDto).toList();
-
-      List<RefineryOrderDto> orderDtos = orders.stream().map(RefineryOrderLine::order).toList();
-
-      missionSummaries.add(
-          new MissionFinanceSummaryDto(
-              mission.getId(), mission.getName(), missionTotalSum, entryDtos, orderDtos));
+      if (missionVisibility.canSeeMission(mission)) {
+        List<MissionFinanceEntryDto> entryDtos =
+            entries.stream().map(missionMapper::toDto).toList();
+        List<RefineryOrderDto> orderDtos = orders.stream().map(RefineryOrderLine::order).toList();
+        missionSummaries.add(
+            new MissionFinanceSummaryDto(
+                mission.getId(), mission.getName(), missionTotalSum, entryDtos, orderDtos, false));
+      } else {
+        missionSummaries.add(anonymisedSummary(mission.getId(), missionTotalSum));
+      }
     }
 
     return new OperationFinanceDto(operationId, operationTotalSum, missionSummaries);
@@ -150,11 +156,17 @@ public class OperationFinanceService {
     Operation operation =
         Entities.require(operationRepository.findById(operationId), "Operation not found");
 
+    Set<UUID> anonymisedIds =
+        operation.getMissions().stream()
+            .filter(mission -> !missionVisibility.canSeeMission(mission))
+            .map(Mission::getId)
+            .collect(Collectors.toSet());
     List<Mission> orderedMissions =
         operation.getMissions().stream()
             .sorted(
-                Comparator.comparing(
-                    Mission::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                Comparator.comparing((Mission mission) -> anonymisedIds.contains(mission.getId()))
+                    .thenComparing(
+                        Mission::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
             .toList();
     boolean truncated = orderedMissions.size() > MAX_FINANCE_SUMMARY_MISSIONS;
     List<Mission> missions =
@@ -182,7 +194,10 @@ public class OperationFinanceService {
               agg != null ? agg.expenseSum() : null,
               refineryProfitByMission.get(mission.getId()));
       operationTotalSum = operationTotalSum.add(missionTotal);
-      lines.add(new OperationMissionFinanceDto(mission.getId(), mission.getName(), missionTotal));
+      boolean anonymised = anonymisedIds.contains(mission.getId());
+      lines.add(
+          new OperationMissionFinanceDto(
+              mission.getId(), anonymised ? null : mission.getName(), missionTotal, anonymised));
     }
 
     return new OperationFinanceSummaryDto(operationId, operationTotalSum, lines, truncated);
@@ -226,11 +241,28 @@ public class OperationFinanceService {
     }
     BigDecimal missionTotal = missionTotal(incomeSum, expenseSum, refineryProfit);
 
+    if (!missionVisibility.canSeeMission(mission)) {
+      return anonymisedSummary(missionId, missionTotal);
+    }
     List<MissionFinanceEntryDto> entryDtos = entries.stream().map(missionMapper::toDto).toList();
     List<RefineryOrderDto> orderDtos = orders.stream().map(RefineryOrderLine::order).toList();
 
     return new MissionFinanceSummaryDto(
-        mission.getId(), mission.getName(), missionTotal, entryDtos, orderDtos);
+        mission.getId(), mission.getName(), missionTotal, entryDtos, orderDtos, false);
+  }
+
+  /**
+   * Builds the line of a mission the caller may not see: the total stays so the operation sum
+   * remains traceable, the name, entries and orders are dropped.
+   *
+   * @param missionId the mission's id
+   * @param total the mission's signed total
+   * @return the anonymised finance line
+   */
+  @NotNull
+  private static MissionFinanceSummaryDto anonymisedSummary(
+      @NotNull UUID missionId, @NotNull BigDecimal total) {
+    return new MissionFinanceSummaryDto(missionId, null, total, List.of(), List.of(), true);
   }
 
   /**

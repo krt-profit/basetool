@@ -87,6 +87,10 @@ declare const supplyI18n: KrtI18nDict;
 declare const purchasingConflict: KrtI18nDict;
 /** Injected by the page bootstrap (declared in the purchasing fragment purchasing-script.html). */
 declare const purchasingI18n: KrtI18nDict;
+/** Injected by the page bootstrap (declared in stock-levels.html). */
+declare const stockLevelConflict: KrtI18nDict;
+/** Injected by the page bootstrap (declared in stock-levels.html). */
+declare const stockLevelI18n: KrtI18nDict;
 /** Injected by the page bootstrap (declared in hangar.html). */
 declare const hangarConflict: KrtI18nDict;
 /** Injected by the page bootstrap (declared in hangar.html). */
@@ -147,6 +151,10 @@ declare const MISSION_CONFLICT: KrtI18nDict;
 declare const MISSION_MSG: KrtI18nDict;
 /** Injected by the page bootstrap (declared in mission-data.html). */
 declare const MISSION_TITLES: KrtI18nDict;
+/** Injected by the page bootstrap (declared in squadrons.html). */
+declare const SQUADRON_CONFLICT: KrtI18nDict;
+/** Injected by the page bootstrap (declared in squadrons.html). */
+declare const SQUADRON_MSG: KrtI18nDict;
 
 /** Injected by the page bootstrap (declared in mission-detail.html). */
 declare const MSG_CONFIRM_MANAGER_REMOVE: string;

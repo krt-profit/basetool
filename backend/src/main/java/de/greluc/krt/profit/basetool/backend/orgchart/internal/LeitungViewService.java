@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupMapper;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -53,8 +55,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Visibility follows the caller's leadership ranks — a Staffel or SK rank shows its own unit, an
  * area rank its Bereich with the Bereich's Staffeln and SKs, an OL membership every unit — so a
- * plain member receives empty lists. The capability flags alone decide what may be changed;
- * appointments are written through separate, individually authorized endpoints.
+ * plain member receives empty lists. A pin narrows the view to the pinned unit and the units its
+ * seat reaches, and to nothing when the pin is outside the caller's units. The capability flags
+ * alone decide what may be changed; appointments are written through separate, individually
+ * authorized endpoints.
  */
 @Service
 @RequiredArgsConstructor
@@ -69,6 +73,7 @@ public class LeitungViewService {
   private final KommandoGroupRepository kommandoGroupRepository;
   private final KommandoGroupMapper kommandoGroupMapper;
   private final OrgUnitCascadeService cascadeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /**
    * Builds the caller's Leitung view: the OL(s), Bereiche, Staffeln and Spezialkommandos they lead
@@ -83,7 +88,8 @@ public class LeitungViewService {
   public LeitungViewDto buildView(@NotNull Authentication authentication) {
     boolean admin = authHelperService.isAdmin();
     UUID callerId = authHelperService.currentUserId().orElse(null);
-    Set<UUID> visible = admin ? Set.of() : visibleOrgUnitIds(callerId);
+    Set<UUID> visible =
+        admin ? Set.of() : requestScopeResolver.narrowToPin(visibleOrgUnitIds(callerId));
 
     List<LeitungUnitDto> ols = new ArrayList<>();
     for (OrgUnit ol : sortedByName(orgUnitRepository.findActiveOrganisationsleitung())) {
@@ -136,14 +142,16 @@ public class LeitungViewService {
 
   /**
    * The org units a non-admin caller leads: every unit they hold a leadership rank on, plus the
-   * cascade of an area rank (the Bereich's Staffeln and SKs) or an OL membership (every unit).
+   * cascade of an area rank (the Bereich's Staffeln and SKs) or an OL membership (every unit); none
+   * unless the caller holds {@code KRT Member} (REQ-SEC-015).
    *
    * @param callerId the caller's account id, or {@code null} for an unidentifiable caller.
    * @return the visible org-unit ids; empty for a caller without a leadership rank.
    */
   @NotNull
   private Set<UUID> visibleOrgUnitIds(@Nullable UUID callerId) {
-    if (callerId == null) {
+    if (callerId == null
+        || !authHelperService.hasReachableRole(Roles.authority(Roles.KRT_MEMBER))) {
       return Set.of();
     }
     List<OrgUnitMembership> leaderships =

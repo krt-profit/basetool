@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.supply.api.DeclineReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyMetricNames;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import de.greluc.krt.profit.basetool.backend.supply.api.events.SupplyNotices;
@@ -712,7 +713,9 @@ public class SupplyDonationService {
   }
 
   private void count(@NotNull String status) {
-    meterRegistry.counter(MetricNames.SUPPLY_DONATIONS, MetricNames.TAG_STATUS, status).increment();
+    meterRegistry
+        .counter(SupplyMetricNames.SUPPLY_DONATIONS, MetricNames.TAG_STATUS, status)
+        .increment();
   }
 
   private static @NotNull Specification<SupplyDonation> fetchCatalogue() {

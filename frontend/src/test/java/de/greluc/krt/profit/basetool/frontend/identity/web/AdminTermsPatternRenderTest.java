@@ -99,7 +99,7 @@ class AdminTermsPatternRenderTest {
 
     assertThat(filterForm).doesNotContain("type=\"submit\"").doesNotContain("<select");
     assertThat(html)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"admin-terms-results\"")
         .contains("data-testid=\"segment-filter-pending\"")

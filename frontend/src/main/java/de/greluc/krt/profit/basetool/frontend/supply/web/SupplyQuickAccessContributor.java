@@ -46,6 +46,7 @@ public class SupplyQuickAccessContributor implements QuickAccessContributor {
 
   private static final String CRUMB = "nav.section.supply";
   private static final String ICON = "download";
+  private static final String PAGE = "supply.needs";
 
   private final SupplyBackendClient supplyClient;
   private final SupplyFeatureState featureState;
@@ -73,21 +74,25 @@ public class SupplyQuickAccessContributor implements QuickAccessContributor {
     List<QuickAccessEntry> out = new ArrayList<>(2);
     if (tabs.incoming()) {
       out.add(
-          new QuickAccessEntry(
+          QuickAccessEntry.tab(
               "/supply/donations/incoming",
               "palette.page.supplyIncoming",
               CRUMB,
               ICON,
-              "palette.keywords.supplyIncoming"));
+              "palette.keywords.supplyIncoming",
+              PAGE,
+              "supply.incoming"));
     }
     if (tabs.stats()) {
       out.add(
-          new QuickAccessEntry(
+          QuickAccessEntry.tab(
               "/supply/stats",
               "palette.page.supplyStats",
               CRUMB,
               ICON,
-              "palette.keywords.supplyStats"));
+              "palette.keywords.supplyStats",
+              PAGE,
+              "supply.stats"));
     }
     return List.copyOf(out);
   }

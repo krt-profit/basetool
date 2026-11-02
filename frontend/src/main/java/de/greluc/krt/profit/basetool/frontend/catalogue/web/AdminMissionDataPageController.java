@@ -33,8 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronForm;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,8 +62,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Controller for the admin mission-data page ({@code /admin/mission-data}), managing the job-type,
- * squadron and frequency-type catalogs with create, update, soft delete and re-activate; the {@code
+ * Controller for the admin mission-data page ({@code /admin/mission-data}), managing the job-type
+ * and frequency-type catalogs with create, update, soft delete and re-activate; the {@code
  * includeInactive*} flags list soft-deleted entries.
  */
 @Controller
@@ -76,26 +74,24 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMissionDataPageController {
 
-  /** Reads and writes the job-type, squadron and frequency-type catalogues. */
+  /** Reads and writes the job-type and frequency-type catalogues. */
   private final CatalogueBackendClient catalogueClient;
 
-  /** Loads the three catalogues in parallel. */
+  /** Loads the two catalogues in parallel. */
   private final ParallelPageLoader parallelPageLoader;
 
   /** Clears the catalogue caches after a write. */
   private final CatalogueCacheEviction cacheEviction;
 
   /**
-   * Renders all three complete catalogs, fetched in parallel via {@link ParallelPageLoader}
+   * Renders both complete catalogs, fetched in parallel via {@link ParallelPageLoader}
    * (REQ-ADMIN-001). A failed catalog renders empty with {@code error.admin.mission.data.load}; a
    * catalog hitting the page-walk cap sets its {@code *Truncated} flag (REQ-ADMIN-002).
    *
    * @param includeInactiveJobTypes show soft-deleted job types
-   * @param includeInactiveSquadrons show soft-deleted squadrons
    * @param includeInactiveFrequencyTypes show soft-deleted frequency types
-   * @param fragment {@code "squadrons-results"}, {@code "jobtypes-results"} or {@code
-   *     "freqtypes-results"} to render only that section's table (REQ-FE-002); otherwise the full
-   *     page
+   * @param fragment {@code "jobtypes-results"} or {@code "freqtypes-results"} to render only that
+   *     section's table (REQ-FE-002); otherwise the full page
    * @param model Thymeleaf model populated with the lists, forms and toggles
    * @return the {@code admin/mission-data} view name, or one section's fragment
    */
@@ -103,21 +99,16 @@ public class AdminMissionDataPageController {
   @GetMapping
   public String listData(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveJobTypes,
-      @RequestParam(required = false, defaultValue = "false") boolean includeInactiveSquadrons,
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveFrequencyTypes,
       @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("jobTypeForm")) {
       model.addAttribute("jobTypeForm", new JobTypeForm("", "", "", false, false, 0L));
     }
-    if (!model.containsAttribute("squadronForm")) {
-      model.addAttribute("squadronForm", new SquadronForm("", "", "", 0L));
-    }
     if (!model.containsAttribute("frequencyTypeForm")) {
       model.addAttribute("frequencyTypeForm", new FrequencyTypeForm("", "", 0L));
     }
     model.addAttribute("includeInactiveJobTypes", includeInactiveJobTypes);
-    model.addAttribute("includeInactiveSquadrons", includeInactiveSquadrons);
     model.addAttribute("includeInactiveFrequencyTypes", includeInactiveFrequencyTypes);
 
     AtomicBoolean anyFailure = new AtomicBoolean(false);
@@ -131,15 +122,6 @@ public class AdminMissionDataPageController {
               return null;
             });
 
-    CompletableFuture<CompleteCatalog<SquadronDto>> squadronsFuture =
-        parallelPageLoader
-            .loadAsync(() -> fetchSquadrons(includeInactiveSquadrons))
-            .exceptionally(e -> {
-              logFragmentLoadFailure("squadrons", e);
-              anyFailure.set(true);
-              return null;
-            });
-
     CompletableFuture<CompleteCatalog<FrequencyTypeDto>> freqsFuture =
         parallelPageLoader
             .loadAsync(() -> fetchFrequencyTypes(includeInactiveFrequencyTypes))
@@ -149,25 +131,20 @@ public class AdminMissionDataPageController {
               return null;
             });
 
-    CompletableFuture.allOf(jobTypesFuture, squadronsFuture, freqsFuture).join();
+    CompletableFuture.allOf(jobTypesFuture, freqsFuture).join();
 
     CompleteCatalog<JobTypeDto> jobTypesCatalog = jobTypesFuture.join();
-    CompleteCatalog<SquadronDto> squadronsCatalog = squadronsFuture.join();
     CompleteCatalog<FrequencyTypeDto> freqsCatalog = freqsFuture.join();
     model.addAttribute("jobTypes", jobTypesCatalog == null ? null : jobTypesCatalog.items());
-    model.addAttribute("squadrons", squadronsCatalog == null ? null : squadronsCatalog.items());
     if (freqsCatalog != null) {
       model.addAttribute("frequencyTypes", freqsCatalog.items());
     }
     model.addAttribute("jobTypesTruncated", jobTypesCatalog != null && jobTypesCatalog.truncated());
-    model.addAttribute(
-        "squadronsTruncated", squadronsCatalog != null && squadronsCatalog.truncated());
     model.addAttribute("frequencyTypesTruncated", freqsCatalog != null && freqsCatalog.truncated());
     if (anyFailure.get()) {
       model.addAttribute("error", "error.admin.mission.data.load");
     }
     return switch (fragment == null ? "" : fragment) {
-      case "squadrons-results" -> "catalogue/admin/mission-data :: squadrons-results";
       case "jobtypes-results" -> "catalogue/admin/mission-data :: jobtypes-results";
       case "freqtypes-results" -> "catalogue/admin/mission-data :: freqtypes-results";
       default -> "catalogue/admin/mission-data";
@@ -219,32 +196,6 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Fetches the complete squadron catalog (REQ-ADMIN-001) as {@link SquadronDto}s sorted by name,
-   * with the truncation flag (REQ-ADMIN-002).
-   */
-  @NotNull
-  private CompleteCatalog<SquadronDto> fetchSquadrons(boolean includeInactive) {
-    CompleteCatalog<SquadronDto> catalog =
-        CatalogPages.fetchAll(page -> catalogueClient.squadronPage(includeInactive, page));
-    List<SquadronDto> squadrons =
-        catalog.items().stream()
-            .map(s ->
-                new SquadronDto(
-                    s.id(),
-                    s.name(),
-                    s.shorthand(),
-                    s.description(),
-                    Boolean.TRUE.equals(s.active()),
-                    Boolean.TRUE.equals(s.isPromotionEnabled()),
-                    Boolean.TRUE.equals(s.isProfitEligible()),
-                    versionOrZero(s.version())))
-            .collect(Collectors.toCollection(ArrayList::new));
-    squadrons.sort(
-        Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
-    return new CompleteCatalog<>(squadrons, catalog.totalElements(), catalog.truncated());
-  }
-
-  /**
    * Fetches the complete frequency-type catalog in its admin order (REQ-ADMIN-001), with the
    * truncation flag (REQ-ADMIN-002).
    */
@@ -283,7 +234,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "jobtype-modal");
       model.addAttribute("modalAction", "/admin/mission-data/job-types");
-      return listData(false, false, false, null, model);
+      return listData(false, false, null, model);
     }
     try {
       JobTypeDto body =
@@ -336,7 +287,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "jobtype-modal");
       model.addAttribute("modalAction", "/admin/mission-data/job-types/" + id + "/update");
-      return listData(false, false, false, null, model);
+      return listData(false, false, null, model);
     }
     try {
       JobTypeDto body =
@@ -427,155 +378,6 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Creates a squadron, handling validation and 409 like {@link #createJobType}.
-   *
-   * @param form squadron form
-   * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model for inline re-rendering
-   * @param redirectAttributes flash attributes carrier
-   * @return the list page on validation failure, otherwise redirect
-   */
-  @NotNull
-  @PostMapping("/squadrons")
-  public String createSquadron(
-      @Valid @ModelAttribute("squadronForm") SquadronForm form,
-      BindingResult bindingResult,
-      Model model,
-      RedirectAttributes redirectAttributes) {
-    if (bindingResult.hasErrors()) {
-      model.addAttribute("openModal", "squadron-modal");
-      model.addAttribute("modalAction", "/admin/mission-data/squadrons");
-      return listData(false, false, false, null, model);
-    }
-    try {
-      SquadronDto body =
-          new SquadronDto(
-              null, form.name(), form.shorthand(), form.description(), true, true, false, 0L);
-      catalogueClient.createSquadron(body);
-      cacheEviction.clearStaticDataCache();
-      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (BackendServiceException e) {
-      log.debug("Create Squadron failed", e);
-      if (e.getStatusCode() == 409) {
-        redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.squadron");
-        return "redirect:/admin/mission-data";
-      }
-      return "redirect:/admin/mission-data?error=CreateSquadronFailed";
-    } catch (Exception e) {
-      log.error("Create Squadron failed", e);
-      return "redirect:/admin/mission-data?error=CreateSquadronFailed";
-    }
-    return "redirect:/admin/mission-data";
-  }
-
-  /**
-   * Updates a squadron, handling conflicts like {@link #updateJobType}.
-   *
-   * @param id squadron id
-   * @param form squadron form
-   * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model for inline re-rendering
-   * @param redirectAttributes flash attributes carrier
-   * @return the list page on validation failure, otherwise redirect
-   */
-  @NotNull
-  @PostMapping("/squadrons/{id}/update")
-  public String updateSquadron(
-      @PathVariable @NotNull UUID id,
-      @Valid @ModelAttribute("squadronForm") SquadronForm form,
-      BindingResult bindingResult,
-      Model model,
-      RedirectAttributes redirectAttributes) {
-    if (bindingResult.hasErrors()) {
-      model.addAttribute("openModal", "squadron-modal");
-      model.addAttribute("modalAction", "/admin/mission-data/squadrons/" + id + "/update");
-      return listData(false, false, false, null, model);
-    }
-    try {
-      SquadronDto body =
-          new SquadronDto(
-              id,
-              form.name(),
-              form.shorthand(),
-              form.description(),
-              true,
-              true,
-              false,
-              form.version());
-      catalogueClient.updateSquadron(id, body);
-      cacheEviction.clearStaticDataCache();
-      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (BackendServiceException e) {
-      log.debug("Update Squadron failed", e);
-      if (e.getStatusCode() == 409) {
-        if ("concurrency-conflict".equals(e.getProblemType())) {
-          redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
-        } else {
-          redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.squadron");
-        }
-        return "redirect:/admin/mission-data";
-      }
-      return "redirect:/admin/mission-data?error=UpdateSquadronFailed";
-    } catch (Exception e) {
-      log.error("Update Squadron failed", e);
-      return "redirect:/admin/mission-data?error=UpdateSquadronFailed";
-    }
-    return "redirect:/admin/mission-data";
-  }
-
-  /**
-   * Soft-deletes a squadron. Mirrors {@link #deleteJobType}'s in-use handling for 409.
-   *
-   * @param id squadron id
-   * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /admin/mission-data}
-   */
-  @NotNull
-  @PostMapping("/squadrons/{id}/delete")
-  public String deleteSquadron(
-      @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
-    try {
-      catalogueClient.deleteSquadron(id);
-      cacheEviction.clearStaticDataCache();
-      redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
-    } catch (BackendServiceException e) {
-      log.debug("Delete Squadron failed", e);
-      if (e.getStatusCode() == 409) {
-        redirectAttributes.addFlashAttribute("errorToast", "error.delete.squadron.in_use");
-        return "redirect:/admin/mission-data";
-      }
-      return "redirect:/admin/mission-data?error=DeleteSquadronFailed";
-    } catch (Exception e) {
-      log.error("Delete Squadron failed", e);
-      return "redirect:/admin/mission-data?error=DeleteSquadronFailed";
-    }
-    return "redirect:/admin/mission-data";
-  }
-
-  /**
-   * Re-activates a soft-deleted squadron. ADMIN-only, mirrors {@link #activateJobType}.
-   *
-   * @param id squadron id
-   * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /admin/mission-data}
-   */
-  @NotNull
-  @PostMapping("/squadrons/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public String activateSquadron(
-      @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
-    try {
-      catalogueClient.activateSquadron(id);
-      cacheEviction.clearStaticDataCache();
-      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (Exception e) {
-      log.error("Activate Squadron failed", e);
-      return "redirect:/admin/mission-data?error=ActivateSquadronFailed";
-    }
-    return "redirect:/admin/mission-data";
-  }
-
-  /**
    * Creates a frequency type like {@link #createJobType}; the backend appends it to the order.
    *
    * @param form frequency-type form
@@ -594,7 +396,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "frequency-type-modal");
       model.addAttribute("modalAction", "/admin/mission-data/frequency-types");
-      return listData(false, false, false, null, model);
+      return listData(false, false, null, model);
     }
     try {
       catalogueClient.createFrequencyType(
@@ -632,7 +434,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "frequency-type-modal");
       model.addAttribute("modalAction", "/admin/mission-data/frequency-types/" + id + "/update");
-      return listData(false, false, false, null, model);
+      return listData(false, false, null, model);
     }
     try {
       catalogueClient.updateFrequencyType(
@@ -812,84 +614,6 @@ public class AdminMissionDataPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateJobTypeAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(() -> catalogueClient.activateJobType(id));
-  }
-
-  /**
-   * In-place twin of {@link #createSquadron}.
-   *
-   * @param form squadron form
-   * @param bindingResult validation errors carrier
-   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
-   *     on a conflict / failure
-   */
-  @ResponseBody
-  @PostMapping(value = "/squadrons", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> createSquadronAjax(
-      @Valid @ModelAttribute("squadronForm") SquadronForm form, BindingResult bindingResult) {
-    if (bindingResult.hasErrors()) {
-      return ResponseEntity.status(422).build();
-    }
-    return okOrRelay(() ->
-        catalogueClient.createSquadron(
-            new SquadronDto(
-                null, form.name(), form.shorthand(), form.description(), true, true, false, 0L)));
-  }
-
-  /**
-   * In-place twin of {@link #updateSquadron}.
-   *
-   * @param id squadron id
-   * @param form squadron form
-   * @param bindingResult validation errors carrier
-   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
-   *     on a conflict / failure
-   */
-  @ResponseBody
-  @PostMapping(value = "/squadrons/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> updateSquadronAjax(
-      @PathVariable @NotNull UUID id,
-      @Valid @ModelAttribute("squadronForm") SquadronForm form,
-      BindingResult bindingResult) {
-    if (bindingResult.hasErrors()) {
-      return ResponseEntity.status(422).build();
-    }
-    return okOrRelay(() ->
-        catalogueClient.updateSquadron(
-            id,
-            new SquadronDto(
-                id,
-                form.name(),
-                form.shorthand(),
-                form.description(),
-                true,
-                true,
-                false,
-                form.version())));
-  }
-
-  /**
-   * In-place twin of {@link #deleteSquadron}.
-   *
-   * @param id squadron id
-   * @return {@code 200} on success, the relayed backend status on a conflict / failure
-   */
-  @ResponseBody
-  @PostMapping(value = "/squadrons/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> deleteSquadronAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> catalogueClient.deleteSquadron(id));
-  }
-
-  /**
-   * In-place twin of {@link #activateSquadron}.
-   *
-   * @param id squadron id
-   * @return {@code 200} on success, the relayed backend status on failure
-   */
-  @ResponseBody
-  @PostMapping(value = "/squadrons/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public ResponseEntity<Object> activateSquadronAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> catalogueClient.activateSquadron(id));
   }
 
   /**

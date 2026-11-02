@@ -140,7 +140,10 @@ class MemberEditPageRenderTest {
         .contains("data-error-for=\"description\"");
   }
 
-  /** The page renders on the form pattern with three tabs and one sticky primary action. */
+  /**
+   * The page renders on the form pattern with the member tab bar, two inner tabs and one sticky
+   * primary action.
+   */
   @Test
   @WithMockUser(roles = "ADMIN")
   void editPage_rendersTheFormPatternWithTabs() throws Exception {
@@ -159,11 +162,12 @@ class MemberEditPageRenderTest {
         .containsPattern("class=\"page-eyebrow\" href=\"/members\"")
         .contains("<span>Mitgliederverwaltung</span>")
         .contains("<h1>Pilot</h1>")
-        .containsPattern(
-            "href=\"/admin/members/"
-                + id
-                + "/hangar\" class=\"btn btn-ghost\"\\s+"
-                + "data-testid=\"member-edit-hangar\"")
+        .contains("data-testid=\"member-tabs\"")
+        .containsPattern("class=\"tab active\"[^>]*data-testid=\"member-tab-link-profile\"")
+        .contains("href=\"/admin/members/" + id + "/hangar\"")
+        .contains("href=\"/admin/personal-inventory?userSub=" + id + "\"")
+        .contains("href=\"/admin/personal-blueprints?userSub=" + id + "\"")
+        .contains("href=\"/members/" + id + "/export\"")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box")
         .doesNotContain("krtm-");
@@ -171,10 +175,9 @@ class MemberEditPageRenderTest {
         .contains("class=\"tab-nav member-edit-tabs\" role=\"tablist\"")
         .contains("data-testid=\"member-tab-profile\"")
         .contains("data-testid=\"member-tab-memberships\"")
-        .contains("data-testid=\"member-tab-export\"")
         .contains("id=\"member-panel-profile\" class=\"member-edit-panel\" role=\"tabpanel\"")
         .containsPattern("id=\"member-panel-memberships\"[^>]*hidden")
-        .containsPattern("id=\"member-panel-export\"[^>]*hidden");
+        .doesNotContain("member-panel-export");
     assertThat(html)
         .contains("id=\"member-edit-form\" data-member-edit=\"true\" class=\"form-layout card\"")
         .contains("class=\"form-section__head\"")
@@ -188,9 +191,7 @@ class MemberEditPageRenderTest {
         .contains("class=\"data-table data-table--stack\" data-testid=\"member-memberships-table\"")
         .containsPattern("class=\"chip chip--muted\"\\s*>SK</span>")
         .doesNotContain(">SPECIAL_COMMAND<")
-        .contains("href=\"/organisation/special-commands/" + SK_ID + "\"")
-        .contains("data-testid=\"member-export-pdf\"")
-        .contains("data-testid=\"member-export-json\"");
+        .contains("href=\"/organisation/special-commands/" + SK_ID + "\"");
   }
 
   /** Without memberships the Mitgliedschaften tab shows the empty state instead of a table. */

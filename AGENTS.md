@@ -120,7 +120,7 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 Canonical homes: security and access control —
 [`security-and-access.md`](docs/specs/security-and-access.md) (`REQ-SEC-*`, `ArchitectureTest`);
 **multi-org-unit tenancy (CRITICAL)** — [`org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md)
-(`REQ-ORG-*`, `OwnerScopeService`); database and Flyway —
+(`REQ-ORG-*`, `RequestScopeResolver`, `AccessGateService`); database and Flyway —
 [`data-persistence.md`](docs/specs/data-persistence.md) (`REQ-DATA-*`, `ddl-auto = validate`, no
 N+1); API conventions — [`api-conventions.md`](docs/specs/api-conventions.md) (`REQ-API-*`);
 logging — [`observability.md`](docs/specs/observability.md) (**never log names, emails or tokens**).

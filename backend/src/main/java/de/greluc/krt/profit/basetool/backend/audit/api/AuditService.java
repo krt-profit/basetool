@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.audit.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Optional;
@@ -95,7 +94,8 @@ public class AuditService implements AuditRecorder {
             .build();
     auditEventRepository.save(event);
     meterRegistry
-        .counter(MetricNames.AUDIT_EVENTS, MetricNames.TAG_DOMAIN, eventType.domain().name())
+        .counter(
+            AuditMetricNames.AUDIT_EVENTS, AuditMetricNames.TAG_DOMAIN, eventType.domain().name())
         .increment();
   }
 

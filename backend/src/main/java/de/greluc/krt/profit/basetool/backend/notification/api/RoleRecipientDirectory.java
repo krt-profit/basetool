@@ -42,16 +42,6 @@ public interface RoleRecipientDirectory {
   Set<UUID> holdersOfRole(@NotNull String roleCode);
 
   /**
-   * The holders of a global role who are members of one org unit.
-   *
-   * @param roleCode the stable role code
-   * @param orgUnitId the org unit the holders must belong to
-   * @return the matching user subs; never {@code null}, possibly empty
-   */
-  @NotNull
-  Set<UUID> holdersOfRoleInOrgUnit(@NotNull String roleCode, @NotNull UUID orgUnitId);
-
-  /**
    * Looks a role code up in the role catalogue, ignoring case.
    *
    * @param roleCode the code as submitted

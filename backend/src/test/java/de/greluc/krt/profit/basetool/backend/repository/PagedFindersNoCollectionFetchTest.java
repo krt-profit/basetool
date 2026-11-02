@@ -141,6 +141,7 @@ class PagedFindersNoCollectionFetchTest {
                   List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
                   null,
                   null,
+                  null,
                   true,
                   null,
                   Set.of(),
@@ -160,6 +161,7 @@ class PagedFindersNoCollectionFetchTest {
                   true,
                   null,
                   Set.of(),
+                  new UUID(0L, 0L),
                   PAGE)
               .getContent();
       assertUnfetched(scoped, JobOrder::getMaterials);

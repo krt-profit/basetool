@@ -82,7 +82,7 @@ class PromotionAreaPagePatternRenderTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(topicA, "Alpha", 0), topic(topicB, "Bravo", 1)));
     when(backendApiClient.get(
             contains("/categories/by-topic/{topicId}"), anyTypeRef(), eq(topicA.toString())))

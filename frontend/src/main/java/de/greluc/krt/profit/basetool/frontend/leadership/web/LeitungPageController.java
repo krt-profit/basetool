@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.leadership.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.OfficerSurfaceGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.leadership.client.LeadershipBackendClient;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddBereichLeaderRequest;
@@ -72,8 +72,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * appoint, change and remove the ranks their tier delegates to them in the org units the backend
  * returns as manageable, shown as a unit tree with the selected unit's detail.
  *
- * <p>Gated to {@link Roles#ADMIN_OR_OFFICER}; per-unit authorisation is enforced by the backend.
- * Write proxies relay backend failures as status plus {@code {code, detail}}.
+ * <p>Gated to {@link OfficerSurfaceGate#canOpenLeitung()}; per-unit authorisation is enforced by
+ * the backend. Write proxies relay backend failures as status plus {@code {code, detail}}.
  */
 @Controller
 @UsesLayoutModel
@@ -112,7 +112,7 @@ public class LeitungPageController {
    */
   @NotNull
   @GetMapping
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public String leitung(
       @RequestParam(required = false) String fragment,
       @RequestParam(required = false) String unit,
@@ -341,7 +341,7 @@ public class LeitungPageController {
    */
   @PutMapping("/squadrons/{squadronId}/ranks/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> assignSquadronRank(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
@@ -361,7 +361,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/squadrons/{squadronId}/ranks/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> removeSquadronRank(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
@@ -380,7 +380,7 @@ public class LeitungPageController {
    */
   @PostMapping("/squadrons/{squadronId}/kommando-groups/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> createKommandoGroup(
       @PathVariable @NotNull UUID squadronId, @RequestBody CreateKommandoGroupRequest body) {
     return proxy(
@@ -398,7 +398,7 @@ public class LeitungPageController {
    */
   @PutMapping("/squadrons/{squadronId}/kommando-groups/{groupId}/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> updateKommandoGroup(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID groupId,
@@ -417,7 +417,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/squadrons/{squadronId}/kommando-groups/{groupId}/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> deleteKommandoGroup(
       @PathVariable @NotNull UUID squadronId, @PathVariable @NotNull UUID groupId) {
     return proxy(
@@ -437,7 +437,7 @@ public class LeitungPageController {
    */
   @PostMapping("/bereiche/{bereichId}/members/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> addBereichLeader(
       @PathVariable @NotNull UUID bereichId, @RequestBody AddBereichLeaderRequest body) {
     return proxy(
@@ -453,7 +453,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/bereiche/{bereichId}/members/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> removeBereichLeader(
       @PathVariable @NotNull UUID bereichId, @PathVariable @NotNull UUID userId) {
     return proxy(
@@ -473,7 +473,7 @@ public class LeitungPageController {
    */
   @PostMapping("/organisationsleitung/{olId}/members/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> addOlMember(
       @PathVariable @NotNull UUID olId, @RequestBody AddOlMemberRequest body) {
     return proxy("Add OL member failed", () -> leadershipClient.addOlMember(olId, body));
@@ -488,7 +488,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/organisationsleitung/{olId}/members/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> removeOlMember(
       @PathVariable @NotNull UUID olId, @PathVariable @NotNull UUID userId) {
     return proxy(
@@ -509,7 +509,7 @@ public class LeitungPageController {
    */
   @PutMapping("/organisationsleitung/{olId}/grand-admiral/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> setGrandAdmiral(
       @PathVariable @NotNull UUID olId, @RequestBody GrandAdmiralRequest body) {
     return proxy(
@@ -528,7 +528,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/organisationsleitung/{olId}/grand-admiral/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> removeGrandAdmiral(@PathVariable @NotNull UUID olId) {
     return proxy(
         "Remove Grand Admiral failed",
@@ -548,7 +548,7 @@ public class LeitungPageController {
    */
   @PatchMapping("/special-commands/{skId}/members/{userId}/lead/ajax")
   @ResponseBody
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  @PreAuthorize(OfficerSurfaceGate.CAN_OPEN_LEITUNG)
   public ResponseEntity<Object> toggleSkLead(
       @PathVariable @NotNull UUID skId,
       @PathVariable @NotNull UUID userId,

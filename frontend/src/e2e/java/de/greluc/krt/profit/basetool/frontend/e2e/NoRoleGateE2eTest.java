@@ -105,7 +105,7 @@ class NoRoleGateE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, NO_ROLE_USER, NO_ROLE_PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=all");
         page.waitForLoadState();
 
         assertEquals(0, page.locator("#inventoryTable").count(), "no page of the tool may render");

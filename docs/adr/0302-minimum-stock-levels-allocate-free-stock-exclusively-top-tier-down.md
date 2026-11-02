@@ -1,7 +1,6 @@
 # ADR-0302 — Minimum stock levels allocate free stock exclusively, top tier down
 
-- **Status:** Accepted — implementation pending (the table, its migration and the requirements it
-  drives are not built yet).
+- **Status:** Accepted — implemented (map #2800): the table, material and game-item levels, the allocation, the requested amount, the lifecycle, the API, the „Mindestbestände“ tab, the badge, the shortcuts, the notification, the gauge and the dashboard widget.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** REQ-INV-067 · REQ-INV-068 · REQ-NOTIF-030 · spec [`supply.md`](../specs/supply.md)
@@ -35,8 +34,11 @@ donations, and open supply needs and job orders ask for more that has not arrive
 6. **A low-stock notification fires once** when a level drops below its minimum and re-arms only
    after it has reached its target again; it goes to the unit's direct Logisticians and direct
    leadership seats, without cascade, and can be switched off.
-7. **Lifecycle:** a level is deleted with its catalogue entry or its unit, with an audit event; a
-   deactivated tier leaves the level in place, flagged „Stufe inaktiv". None of these notifies.
+7. **Lifecycle:** a level is deleted with its material, with an audit event per level. Units are
+   only ever deactivated and catalogue entries only soft-deleted, so the levels of an inactive unit
+   or a delisted entry stay stored and hidden, raise no notice and do not count in the gauge; they
+   return with the unit or the entry. A deactivated tier leaves the level in place, flagged „Stufe
+   inaktiv". None of these notifies.
 
 ## Consequences
 
@@ -47,7 +49,7 @@ donations, and open supply needs and job orders ask for more that has not arrive
 - REQ-INV-067 (concept, counting, allocation, low and requested) and REQ-INV-068 (maintenance,
   access, API, the „Mindestbestände" tab, the „Bestand niedrig" widget, lifecycle, audit) are
   added, REQ-NOTIF-030 adds the notification, REQ-SUP-003 is reworded to "a Logistician of the unit,
-  the lead included"; all planned.
+  the lead included".
 - `AuditDomain.INVENTORY` gains `MIN_STOCK_LEVEL_SET`, `…_CHANGED`, `…_REMOVED` and
   `…_REMOVED_BY_CASCADE`; `basetool_inventory_minimum_levels_below` counts low levels without a unit
   label. Low stock is a notification, not an alert.

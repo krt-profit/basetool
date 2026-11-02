@@ -97,7 +97,7 @@ Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC
 
 ## 8.2 Multi-org-unit tenancy
 
-The tenant is the **OrgUnit**. Scoping happens in the service layer through `OwnerScopeService`,
+The tenant is the **OrgUnit**. Scoping happens in the service layer through the scope kernel (`RequestScopeResolver`, `AccessGateService`),
 and the aggregates genuinely differ: strict-Staffel scoping for most, a public escape for
 non-internal Missions, and a separate responsible/requesting pair for Job Orders. Creation stamps
 ownership according to a documented matrix, the admin area and promotion are explicit carve-outs,
@@ -284,8 +284,21 @@ Two binding rules shape every UI change:
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it and into the
   palette's own source lists, so the server alone decides which pages a member is offered; tabs
   whose visibility needs a backend read come from domain `QuickAccessContributor`s through
-  `GET /quick-access/entries` on the first opening (REQ-UI-026, ADR-0240, ADR-0282,
-  `NavigationRenderMvcTest`, `NavigationE2eTest`).
+  `GET /quick-access/entries` on the first opening, and entities from domain
+  `QuickAccessSearchContributor`s through `GET /quick-access/search`, asked in parallel, each scoped
+  by the backend list its page uses and failing closed on its own; the term stays a query parameter,
+  never a log line, MDC field or label (REQ-UI-026, REQ-UI-033, ADR-0240, ADR-0282, ADR-0297,
+  `NavigationRenderMvcTest`, `NavigationE2eTest`, `QuickAccessSearchE2eTest`). The drawer, the phone tab bar and the quick
+  access's own pages and actions are rendered from one entry registry (`navigation.web
+  .NavigationRegistry`), every link under its stable entry key (`data-entry-key`), so a change of
+  the navigation edits the registry, not the fragments (`NavigationEntryKeyRenderMvcTest`).
+- **Navigation personalisation is a per-user store, not a shared surface.** Favourites, hidden
+  pages, order, tab bar, appearance and the dashboards live server-side in the `navigation` module,
+  one version counter per section and one per widget instance, so an edit in one never 409s another;
+  a stale write is dropped and only that section reloads. Entries are keyed by stable entry keys,
+  never URLs, and the frontend, which knows each key's permission, asks for the deletion of keys the
+  user may no longer see. Nothing is pushed live to other tabs, and nothing is audited (REQ-UI-032,
+  REQ-UI-034, ADR-0298, ADR-0299, `NavigationPreferencesServiceTest`).
 - **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
   overview of the home page (B) or a form (C): one page head with at most one primary action and an
   overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on

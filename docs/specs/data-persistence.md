@@ -55,7 +55,7 @@ Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load f
 memoise a request-constant lookup or verdict on the `HttpServletRequest` — or derive both projections
 from a single load — so repeated per-row / per-resolver reads collapse to one (e.g. the
 `PromotionEligibilityService` evaluation set is loaded once per user across all rank transitions, and
-`OwnerScopeService.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
+`RequestScopeResolver.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
 and own-level oversight scopes from one membership read). Dead unbounded eager finders
 (`SELECT i FROM InventoryItem i` with no caller) are deleted, not kept as a foot-gun.
 
@@ -76,7 +76,9 @@ statement. The mission's operation is the case: `Mission.operationId` is resolve
 costs one statement for its operations whatever its size (`MissionOperationReadNoNPlusOneTest`).
 The refinery order's mission is the second case: `RefineryOrder.missionId` is resolved by
 `RefineryOrderMissionCache` over `mission.api.MissionReferences`, so a page of orders costs one
-statement for its missions whatever its size (`RefineryOrderReadNoNPlusOneTest`). Deleting a mission
+statement for its missions whatever its size (`RefineryOrderReadNoNPlusOneTest`). A mission the
+caller may not read (`mission.api.MissionVisibility`, REQ-MISSION-008) is returned by
+`MissionReferences` without name and planned start. Deleting a mission
 clears the link through `mission.api.MissionDeletionObserver`, which updates each order as an
 entity, so its row version moves.
 
@@ -92,7 +94,7 @@ embedded key, and the V95 kind trigger then refused memberships inserted ahead o
 created in the same flush (`HangarIntegrationTest`).
 
 A **request-constant verdict or lookup** consulted more than once per request (e.g. per row) must be
-memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.canViewJobOrders()` and
+memoised on the `HttpServletRequest` so it resolves once: `RequestScopeResolver.canViewJobOrders()` and
 `currentMemberOrgUnitIds()` cache on a request attribute, and `UserMapper` memoises the per-user
 Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
 direct query outside an HTTP request). The delegated appointment verdicts
@@ -189,7 +191,7 @@ rather than loading the parent aggregate to stream it (`MissionParticipantServic
 material `SUM` on the list path, plus the in-memory sum reproducing the native per-bucket semantics
 at each quality floor), `JobOrderMaterialStockRowQueryDataTest` (the batched projection runs on the
 real Postgres schema, returns only order-linked rows, and its floor sum equals the native
-`sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `OwnerScopeServiceTest` (profit-eligibility
+`sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `ScopeKernelTest` (profit-eligibility
 count runs once across repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per
 user within a request, direct-query fallback without one), `MissionServicePayoutTest` (check-in/out/
 payout resolve the participant without an aggregate load), `UserMappingNoNPlusOneTest` (a
@@ -731,7 +733,7 @@ checks. The six scope fragments are pinned byte for byte by `ScopeFragmentsGolde
 (`ShipScopeParityTest`, `InventoryScopeParityTest`, `RefineryScopeParityTest`, `OperationScopeParityTest`, `MissionScopeParityTest`,
 `JobOrderScopeParityTest`) runs the list query against the real schema and the row gate over the nine callers of the access-policy
 differential tests (`ScopeParityCallers`): the list never shows a row the gate refuses, and the two agree on every row another member
-owns in a unit (for Mission, Operation and JobOrder on every row). `RefineryOrderRepositoryScopedTest` and `OwnerScopeServiceTest` still cover the scoped queries.
+owns in a unit (for Mission, Operation and JobOrder on every row). `RefineryOrderRepositoryScopedTest` and `ScopeKernelTest` still cover the scoped queries.
 
 **Code:** `backend/src/main/java/.../backend/catalogue/internal/LookupTableRepository.java`,
 `mission/api/MissionScope.java`, `hangar/api/ShipScope.java`, `joborder/api/JobOrderScope.java`, `inventory/api/InventoryScope.java`
@@ -804,6 +806,8 @@ materialize an operation's whole finance / refinery ledger under a held Hikari c
 - **Per-mission entry detail loads lazily.** Each finance-tab `<details>` fetches its own mission's
   entry / refinery breakdown on first expand via `GET /api/v1/operations/{id}/finances/{missionId}`
   (operation-scoped `canSeeOperation` authz), so the initial render never materializes every entry.
+  A child mission the caller may not see (REQ-MISSION-008) is returned anonymised: amount kept, no
+  name, entries or orders.
 - **Parallel + fragment-gated operation reads.** The four independent operation-detail reads
   (operation, missions page, finance-summary, payouts) run concurrently via `ParallelPageLoader`; the
   `fragment=missions` pager swap fetches neither finance-summary nor payouts (the regression fence is a
@@ -817,10 +821,9 @@ materialize an operation's whole finance / refinery ledger under a held Hikari c
   only within the last 3 months (by `createdAt`), and the mission-detail controller fetches it only on
   a full render (not on fragment refetches) — the operation analogue of the mission
   `findAllActiveReference` bound.
-- **Job-order detail gates its uncached users read.** `JobOrderPageController.viewOrderDetail` fetches
-  `/api/v1/users?size=1000` only on the full page (the assignee picker lives in the full-page-only
-  `assigneesSection`), not on any in-place section swap — pre-empting the same read-amplification once
-  order live-sync lands.
+- **Job-order detail reads no user list.** The assignee picker searches its candidates on demand
+  (`GET /api/v1/orders/{id}/assignee-candidates`, at most 20 hits, REQ-ORDERS-047), so neither the
+  full page nor an in-place section swap loads the members.
 
 **Acceptance**: `OperationFinanceServiceTest` (grouped per-mission totals; lazy per-mission detail;
 404 for a foreign mission); `MissionFinanceEntryRepositoryIntegrationTest` (the grouped finance /
@@ -863,7 +866,7 @@ fine.
 `OrgUnitMembershipQueryService.listOptionsForUser` / `findAllMembershipsForUser` (batched, also
 de-N+1-ing the sort comparator), `JobOrderHandoverService` / `JobOrderItemHandoverService`
 (executing-Staffel stamp), with `JobOrderOrgUnitResolver` as the pre-existing canonical pattern.
-Covered by `StaffelMembershipResolverTest`, `OwnerScopeServiceTest`,
+Covered by `StaffelMembershipResolverTest`, `ScopeKernelTest`,
 `OrgUnitMembershipQueryServiceTest`, `PromotionFeatureFlagServiceGateTest`.
 
 ### REQ-DATA-014 — an external-catalogue tombstone sweep runs only on an identity-verified census (ADR-0147, ADR-0195)
@@ -1097,7 +1100,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 118 tables. Its machine-readable copy is
+The ownership map, 120 tables. Its machine-readable copy is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1114,6 +1117,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `orgchart` | 1 | `org_chart_position` |
 | `promotion` | 5 | `member_evaluation`, `promotion_category`, `promotion_level_content`, `promotion_topic`, `rank_requirement` |
 | `personalinventory` | 1 | `personal_inventory_item` |
+| `navigation` | 8 | `navigation_appearance`, `navigation_dashboard_layout`, `navigation_dashboard_widget`, `navigation_favourite`, `navigation_hidden`, `navigation_order`, `navigation_preferences`, `navigation_tab_bar` |
 | `hangar` | 1 | `ship` |
 | `blueprint` | 3 | `blueprint_external_alias`, `default_blueprint`, `personal_blueprint` |
 | `inventory` | 4 | `inventory_item`, `inventory_item_donation_allocation`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
@@ -1203,20 +1207,29 @@ listed with its reason:
 implementations, the `PersonalDataExportSection`
 implementations, `UserAccountMergeService`, the `UserReassignmentParticipant` implementations
 
-#### Planned amendment (ADR-0298)
+#### The navigation module (ADR-0298)
 
-> **Status: planned** (ADR-0298, ADR-0299, map #2800). Until it ships, the current text above / the
-> current code stays authoritative.
+> **Status: shipped** (ADR-0298, ADR-0299, map #2800). The root table, the favourites, the hidden
+> pages, the order, the appearance (desktop mode, shortcut switch, start pages), the phone tab bars
+> and the dashboards (`navigation_dashboard_layout` per mode with its version, and
+> `navigation_dashboard_widget` per instance with its option version) are stored.
 
-The `navigation` module's tables (REQ-UI-032, REQ-UI-034) reference the member through
-`app_user (id)` with `ON DELETE CASCADE` and take a disposition in all three registries:
-**erasure** by the cascade; **export** in the section `navigationPreferences` (REQ-SEC-058);
-**merge** as columns that follow the member, with the navigation-specific overlap rule of
-REQ-SEC-046. None is listed as not exported or not merged. The column counts and selection floors
-above grow with them.
+The `navigation` module keeps one root row per member, `navigation_preferences`, which references
+`app_user (id)` with `ON DELETE CASCADE` and carries the version counter of every section. Every
+further preference table (today `navigation_favourite`, `navigation_hidden`, `navigation_order`, `navigation_appearance`, `navigation_tab_bar` and `navigation_dashboard_layout`,
+whose instances `navigation_dashboard_widget` reference the layout) references that root, never `app_user`,
+with `ON DELETE CASCADE`, in a column that is not named like a member column. The root takes a
+disposition in all three registries: **erasure** by the cascade; **export** in the one section
+`navigationPreferences` (REQ-SEC-058); **merge** as the column
+`navigation_preferences.user_id`, which follows the member, with the navigation-specific overlap
+rule of REQ-SEC-046. None is listed as not exported or not merged. Every write, a prune included,
+takes the member's root lock (a version bump or a pessimistic read of the root, or of the dashboard
+layout) before it reads the values it decides on, so a write never acts on a snapshot older than a
+committed change, and root-before-child is the one lock order.
 
-**Enforced by (to be added):** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`
-(the navigation columns classified) · **Related:** REQ-SEC-046, REQ-SEC-058, ADR-0298
+**Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
+`UserIdentityColumnForeignKeyTest`, `NavigationUserReassignmentTest` · **Related:** REQ-SEC-046,
+REQ-SEC-058, ADR-0298
 
 ### REQ-DATA-022 — a cached instance is never edited; caches move to read models
 

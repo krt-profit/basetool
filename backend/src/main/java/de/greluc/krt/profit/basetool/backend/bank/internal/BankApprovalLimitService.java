@@ -159,8 +159,7 @@ public class BankApprovalLimitService {
     List<BankApprovalLimitUserDto> userLimits = new ArrayList<>();
     for (BankAccountApprovalLimit limit : limits) {
       switch (limit.getGranteeKind()) {
-        case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
-            roleLimits.put(limit.getRoleCode(), limit.getLimitAmount());
+        case MEMBERSHIP_ROLE -> roleLimits.put(limit.getRoleCode(), limit.getLimitAmount());
         case ALL_MEMBERS -> allMembersLimit = limit.getLimitAmount();
         case AREA_MEMBERS -> areaMembersLimit = limit.getLimitAmount();
         case USER -> {

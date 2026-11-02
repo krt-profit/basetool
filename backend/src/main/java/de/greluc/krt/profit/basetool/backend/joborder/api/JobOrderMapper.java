@@ -105,6 +105,8 @@ public abstract class JobOrderMapper {
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
   @Mapping(target = "withAssignees", ignore = true)
   @Mapping(target = "withRedacted", ignore = true)
+  @Mapping(target = "canManageAssignees", ignore = true)
+  @Mapping(target = "withCanManageAssignees", ignore = true)
   public abstract JobOrderDto toDto(JobOrder jobOrder);
 
   /**

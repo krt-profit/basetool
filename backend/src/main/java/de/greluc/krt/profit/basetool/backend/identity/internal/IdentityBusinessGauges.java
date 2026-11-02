@@ -20,10 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -47,12 +47,16 @@ public class IdentityBusinessGauges implements BusinessGaugeSource {
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
-    BusinessGauges.countGauge(registry, MetricNames.REGISTRATION_PENDING, registrationPending);
+    BusinessGauges.countGauge(
+        registry, IdentityMetricNames.REGISTRATION_PENDING, registrationPending);
     BusinessGauges.ageGauge(
-        registry, MetricNames.REGISTRATION_PENDING_OLDEST_AGE, registrationOldestAge);
-    BusinessGauges.countGauge(registry, MetricNames.USERS_PENDING_DELETION, usersPendingDeletion);
+        registry, IdentityMetricNames.REGISTRATION_PENDING_OLDEST_AGE, registrationOldestAge);
+    BusinessGauges.countGauge(
+        registry, IdentityMetricNames.USERS_PENDING_DELETION, usersPendingDeletion);
     BusinessGauges.ageGauge(
-        registry, MetricNames.USERS_PENDING_DELETION_OLDEST_AGE, usersPendingDeletionOldestAge);
+        registry,
+        IdentityMetricNames.USERS_PENDING_DELETION_OLDEST_AGE,
+        usersPendingDeletionOldestAge);
   }
 
   @Override

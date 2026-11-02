@@ -47,7 +47,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -81,7 +81,7 @@ class InventoryItemServicePersonalRebookTest {
   @Mock private StockOfferLookup stockOfferLookup;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
 
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -223,7 +223,7 @@ class InventoryItemServicePersonalRebookTest {
       picked.setId(UUID.randomUUID());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID pickedId = UUID.randomUUID();
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
           .thenReturn(picked);
 
       InventoryItemDto result =
@@ -261,7 +261,7 @@ class InventoryItemServicePersonalRebookTest {
       item.setOwningOrgUnit(sourceOrgUnit);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID pickedId = UUID.randomUUID();
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
           .thenReturn(sourceOrgUnit);
 
       service.rebookPersonal(ITEM_ID, dto(4.0, 1L, pickedId), OWNER_ID, false);
@@ -282,7 +282,7 @@ class InventoryItemServicePersonalRebookTest {
       picked.setId(UUID.randomUUID());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID pickedId = UUID.randomUUID();
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
           .thenReturn(picked);
 
       service.rebookPersonal(ITEM_ID, dto(5.0, 1L, pickedId), OWNER_ID, false);
@@ -329,7 +329,7 @@ class InventoryItemServicePersonalRebookTest {
       assertTrue(newRow.getMissionAllocations().isEmpty(), "personal row never carries a mission");
       assertSame(owner, newRow.getUser());
 
-      verify(ownerScopeService, never()).resolveOrgUnitForPickerOutputNullable(any(), any());
+      verify(orgUnitStampingService, never()).resolveOrgUnitForPickerOutputNullable(any(), any());
 
       assertEquals(6.0, item.getAmount(), "source keeps the remainder");
       verify(inventoryItemRepository).saveAndFlush(item);

@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.DomainProblem;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.util.Map;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
@@ -28,61 +27,54 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 
 /**
- * Thrown when an admin sets a member rank that the member's stored Keycloak role does not permit:
- * {@code OFFICER} holds ranks 1–12, {@code KRT_MEMBER} ranks 13–20 (REQ-ROLE-007).
+ * Thrown when an admin sets a member rank outside the range the account's standing permits: officer
+ * reach (a leadership seat held with {@code KRT Member}) holds ranks 1–12, {@code KRT Member}
+ * without reach ranks 13–20 (REQ-ROLE-007).
  *
  * <p>Answers {@code 400} with code {@code RANK_OUTSIDE_ROLE_RANGE}. The message is the i18n key of
- * a role-specific detail, so every client shows the reason and the way out in the caller's
- * language; the extension properties carry the role and its permitted range.
+ * a basis-specific detail, so every client shows the reason and the way out in the caller's
+ * language; the extension properties carry the basis and its permitted range.
  */
 @Getter
 public final class RankOutsideRoleRangeException extends DomainProblem {
 
-  /** The stored role whose range the rank left, {@code OFFICER} or {@code KRT_MEMBER}. */
+  /** The basis whose range the rank left, a {@link RankRange.Basis} name. */
   @NotNull private final String role;
 
-  /** The lowest rank the role permits. */
+  /** The lowest rank the range permits. */
   private final int minRank;
 
-  /** The highest rank the role permits. */
+  /** The highest rank the range permits. */
   private final int maxRank;
 
   /**
    * Creates the exception.
    *
-   * @param detailKey the i18n key of the role-specific detail
-   * @param role the stored role whose range the rank left
-   * @param minRank the lowest rank the role permits
-   * @param maxRank the highest rank the role permits
+   * @param detailKey the i18n key of the basis-specific detail
+   * @param range the range the rank left
    */
-  private RankOutsideRoleRangeException(
-      @NotNull String detailKey, @NotNull String role, int minRank, int maxRank) {
+  private RankOutsideRoleRangeException(@NotNull String detailKey, @NotNull RankRange range) {
     super(detailKey);
-    this.role = role;
-    this.minRank = minRank;
-    this.maxRank = maxRank;
+    this.role = range.basis().name();
+    this.minRank = range.minRank();
+    this.maxRank = range.maxRank();
   }
 
   /**
-   * The refusal for a member who still holds the {@code OFFICER} role.
+   * The refusal for a rank outside the given range.
    *
-   * @return the exception naming the officer range 1–12
+   * @param range the range the rank left; an admin's range cannot be left within 1–20
+   * @return the exception naming the basis and its range
    */
   @NotNull
-  public static RankOutsideRoleRangeException officer() {
-    return new RankOutsideRoleRangeException(
-        "problem.rank_outside_role_range.officer.detail", Roles.OFFICER, 1, 12);
-  }
-
-  /**
-   * The refusal for a member who holds {@code KRT_MEMBER} without {@code OFFICER}.
-   *
-   * @return the exception naming the member range 13–20
-   */
-  @NotNull
-  public static RankOutsideRoleRangeException member() {
-    return new RankOutsideRoleRangeException(
-        "problem.rank_outside_role_range.member.detail", Roles.KRT_MEMBER, 13, 20);
+  public static RankOutsideRoleRangeException outside(@NotNull RankRange range) {
+    String detailKey =
+        switch (range.basis()) {
+          case ADMIN -> "problem.rank_outside_role_range.detail";
+          case LEADERSHIP_SEAT -> "problem.rank_outside_role_range.leadership_seat.detail";
+          case KRT_MEMBER -> "problem.rank_outside_role_range.krt_member.detail";
+        };
+    return new RankOutsideRoleRangeException(detailKey, range);
   }
 
   /**
@@ -119,9 +111,9 @@ public final class RankOutsideRoleRangeException extends DomainProblem {
   }
 
   /**
-   * The role and its permitted range, copied onto the problem response.
+   * The basis and its permitted range, copied onto the problem response.
    *
-   * @return {@code role}, {@code minRank} and {@code maxRank}
+   * @return {@code role} (the basis), {@code minRank} and {@code maxRank}
    */
   @NotNull
   @Unmodifiable
@@ -131,7 +123,7 @@ public final class RankOutsideRoleRangeException extends DomainProblem {
   }
 
   /**
-   * The role the handler's log line records.
+   * The basis the handler's log line records.
    *
    * @return {@code role}
    */

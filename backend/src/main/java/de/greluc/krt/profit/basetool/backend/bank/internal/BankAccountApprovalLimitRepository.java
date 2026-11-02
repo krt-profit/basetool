@@ -57,7 +57,7 @@ public interface BankAccountApprovalLimitRepository
    * Looks up an account's role-tier limit (used by the set-limit upsert to update in place).
    *
    * @param accountId the account; never {@code null}
-   * @param granteeKind {@code MEMBERSHIP_ROLE} or {@code GLOBAL_ROLE}; never {@code null}
+   * @param granteeKind {@code MEMBERSHIP_ROLE}; never {@code null}
    * @param roleCode the role code; never {@code null}
    * @return the existing limit, or empty
    */
@@ -88,7 +88,7 @@ public interface BankAccountApprovalLimitRepository
    * Removes the account's role limit of the given kind and role code.
    *
    * @param accountId the account; never {@code null}
-   * @param granteeKind {@code MEMBERSHIP_ROLE} or {@code GLOBAL_ROLE}; never {@code null}
+   * @param granteeKind {@code MEMBERSHIP_ROLE}; never {@code null}
    * @param roleCode the role code to remove; never {@code null}
    * @return the number of rows removed (0 or 1)
    */

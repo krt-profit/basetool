@@ -34,10 +34,32 @@ import org.jetbrains.annotations.Nullable;
  * @param maxQuality highest single-entry quality; {@code 0.0} without stock, {@code null} for a
  *     game-item row
  * @param amount total quantity in stock
+ * @param lowStock whether a minimum stock level of the material or game item is low in the caller's
+ *     scope (REQ-INV-068)
  */
 public record AggregatedInventoryDto(
     @Nullable MaterialDto material,
     @Nullable InventoryGameItemReferenceDto gameItem,
     @Nullable Double quality,
     @Nullable Double maxQuality,
-    Double amount) {}
+    Double amount,
+    boolean lowStock) {
+
+  /**
+   * Creates a row that no low level marks.
+   *
+   * @param material the aggregated material, or {@code null} for a game-item row
+   * @param gameItem the aggregated game item, or {@code null} for a material row
+   * @param quality amount-weighted average quality, or {@code null}
+   * @param maxQuality highest single-entry quality, or {@code null}
+   * @param amount total quantity in stock
+   */
+  public AggregatedInventoryDto(
+      @Nullable MaterialDto material,
+      @Nullable InventoryGameItemReferenceDto gameItem,
+      @Nullable Double quality,
+      @Nullable Double maxQuality,
+      Double amount) {
+    this(material, gameItem, quality, maxQuality, amount, false);
+  }
+}

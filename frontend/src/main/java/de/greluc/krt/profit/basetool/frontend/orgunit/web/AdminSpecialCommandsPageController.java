@@ -336,6 +336,11 @@ public class AdminSpecialCommandsPageController {
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle SpecialCommand member lead failed", e);
+      if (BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER.equals(
+          e.getProblemCode())) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.orgUnit.seatRequiresKrtMember");
+        return "redirect:" + MEMBER_PAGE_BASE + id;
+      }
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
         return "redirect:" + MEMBER_PAGE_BASE + id;

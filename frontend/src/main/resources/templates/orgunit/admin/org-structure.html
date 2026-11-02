@@ -12,7 +12,7 @@
     <span id="os-i18n" hidden
           th:attr="data-saved=#{admin.orgStructure.success.saved},data-error=#{admin.orgStructure.error.action},data-refresh-error=#{admin.orgStructure.refresh.error}"></span>
 
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.orgStructure.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.orgstructure.structure', eyebrowKey='nav.admin.group.members', titleText=#{admin.orgStructure.title},
         count=${nodes != null ? nodes.size() : null}, countId='org-units-count', countFor='org-structure-units', actions=~{::org-structure-actions})}">
         <th:block th:ref="org-structure-actions">
             <a th:href="@{/org-chart}" class="btn btn-ghost" th:text="#{admin.orgStructure.toChart}">Zum Organigramm</a>

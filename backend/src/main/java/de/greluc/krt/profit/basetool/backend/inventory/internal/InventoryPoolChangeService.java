@@ -41,7 +41,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -79,7 +79,7 @@ public class InventoryPoolChangeService {
   private final InventoryItemRepository inventoryItemRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
   private final InventoryCheckoutService inventoryCheckoutService;
@@ -118,8 +118,8 @@ public class InventoryPoolChangeService {
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     OrgUnit source = requireSharedRow(item);
-    if (!ownerScopeService.hasRoleInOrgUnit(source.getId(), LOGISTICIAN)
-        || !ownerScopeService.hasRoleInOrgUnit(dto.targetOwningOrgUnitId(), LOGISTICIAN)) {
+    if (!accessGateService.hasRoleInOrgUnit(source.getId(), LOGISTICIAN)
+        || !accessGateService.hasRoleInOrgUnit(dto.targetOwningOrgUnitId(), LOGISTICIAN)) {
       throw new AccessDeniedException(
           "Only a Logistician of both units may move stock between them");
     }
@@ -146,14 +146,14 @@ public class InventoryPoolChangeService {
             inventoryItemRepository.findById(itemId), () -> "Inventory item not found: " + itemId);
     if (Boolean.TRUE.equals(item.getPersonal())
         || item.getOwningOrgUnit() == null
-        || !ownerScopeService.hasRoleInOrgUnit(item.getOwningOrgUnit().getId(), LOGISTICIAN)) {
+        || !accessGateService.hasRoleInOrgUnit(item.getOwningOrgUnit().getId(), LOGISTICIAN)) {
       return List.of();
     }
     UUID source = item.getOwningOrgUnit().getId();
     List<UUID> candidates =
         membershipQueryService.findDirectMembershipOrgUnitIds(item.getUser().getId()).stream()
             .filter(id -> !id.equals(source))
-            .filter(id -> ownerScopeService.hasRoleInOrgUnit(id, LOGISTICIAN))
+            .filter(id -> accessGateService.hasRoleInOrgUnit(id, LOGISTICIAN))
             .toList();
     return orgUnitRepository.findAllById(candidates).stream()
         .map(unit ->
@@ -201,7 +201,7 @@ public class InventoryPoolChangeService {
     }
     OrgUnit target = Entities.require(orgUnitRepository.findById(targetId), "Org unit not found");
     double moved = amount == null ? amountOf(item) : amount;
-    InventoryItem result = moveInto(item, orgUnitRef(source), target, moved);
+    InventoryItem result = moveInto(item, InventoryAuditLabels.orgUnitRef(source), target, moved);
     if (!holderId.equals(actorId)) {
       eventPublisher.publishEvent(
           InventoryNotices.poolChangedByOther(
@@ -265,7 +265,7 @@ public class InventoryPoolChangeService {
         InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("fromOrgUnit", from)
-            .with("toOrgUnit", orgUnitRef(target))
+            .with("toOrgUnit", InventoryAuditLabels.orgUnitRef(target))
             .with("amount", amount)
             .with("split", !whole)
             .with("newRow", whole ? "-" : result.getId()));
@@ -386,16 +386,6 @@ public class InventoryPoolChangeService {
    */
   private static @NotNull String unitName(@NotNull OrgUnit unit) {
     return Objects.requireNonNullElse(StringNormalization.trimToNull(unit.getName()), UNKNOWN_NAME);
-  }
-
-  /**
-   * Formats an org unit for an audit payload as {@code kind:id}.
-   *
-   * @param unit the unit
-   * @return the bounded reference
-   */
-  private static @NotNull String orgUnitRef(@NotNull OrgUnit unit) {
-    return unit.getKind() + ":" + unit.getId();
   }
 
   /**

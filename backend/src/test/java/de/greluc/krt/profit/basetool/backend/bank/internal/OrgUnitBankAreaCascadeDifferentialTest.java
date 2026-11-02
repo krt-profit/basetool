@@ -32,9 +32,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
@@ -98,7 +95,7 @@ class OrgUnitBankAreaCascadeDifferentialTest {
               boolean actual =
                   OrgUnitBankAccessService.isMemberOfAreaCascade(
                       target,
-                      fixture.ownerScope().currentDirectMembershipOrgUnitIds(),
+                      fixture.resolver().currentDirectMembershipOrgUnitIds(),
                       fixture.orgUnits().findChildOrgUnitIds(target));
               assertThat(actual)
                   .as(
@@ -134,15 +131,14 @@ class OrgUnitBankAreaCascadeDifferentialTest {
   }
 
   /**
-   * One caller situation wired into a real {@link RequestScopeResolver} and {@link
-   * OwnerScopeService}.
+   * One caller situation wired into a real {@link RequestScopeResolver}.
    *
-   * @param ownerScope the scope facade over the real resolver
+   * @param resolver the real resolver
    * @param orgUnits the org-unit repository answering the child queries
    * @param callerMemberships the caller's membership rows
    */
   private record Fixture(
-      OwnerScopeService ownerScope,
+      RequestScopeResolver resolver,
       OrgUnitRepository orgUnits,
       List<OrgUnitMembership> callerMemberships) {
 
@@ -182,10 +178,7 @@ class OrgUnitBankAreaCascadeDifferentialTest {
               mock(OrgUnitCascadeService.class),
               mock(StaffelMembershipResolver.class),
               request);
-      OwnerScopeService ownerScope =
-          new OwnerScopeService(
-              resolver, mock(AccessGateService.class), mock(OrgUnitStampingService.class));
-      return new Fixture(ownerScope, orgUnits, rows);
+      return new Fixture(resolver, orgUnits, rows);
     }
   }
 }

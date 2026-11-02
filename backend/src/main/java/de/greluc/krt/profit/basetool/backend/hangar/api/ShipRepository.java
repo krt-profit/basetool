@@ -123,6 +123,18 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   long countOwnedBy(@Param("owner") UUID owner);
 
   /**
+   * Counts a member's ships and the fitted ones among them in one statement (REQ-HANGAR-016).
+   *
+   * @param owner the member
+   * @return the totals; zero for a member without ships
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto(COUNT(s),"
+          + " COALESCE(SUM(CASE WHEN s.fitted = true THEN 1L ELSE 0L END), 0L))"
+          + " FROM Ship s WHERE s.owner.id = :owner")
+  ShipReadinessDto readinessOf(@Param("owner") UUID owner);
+
+  /**
    * Flips the {@code fitted} flag back to {@code false} on every ship; used by the fleet-import
    * flow as the first step before re-applying the freshly imported fitted set. {@code
    * clearAutomatically = true} flushes the persistence context so subsequent saves in the same

@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipant
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
 import de.greluc.krt.profit.basetool.backend.model.*;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,10 @@ class MissionUnitManagementTest {
 
   @Autowired private UserRepository userRepository;
   @Autowired private MissionRepository missionRepository;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository squadronRepository;
+
   @Autowired private ShipRepository shipRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private MissionService missionService;
@@ -114,6 +119,12 @@ class MissionUnitManagementTest {
                 null,
                 null));
 
+    mission.setOwningOrgUnit(
+        squadronRepository
+            .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
+            .orElseThrow());
+    mission = missionRepository.save(mission);
+
     missionParticipantService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
 
@@ -139,6 +150,10 @@ class MissionUnitManagementTest {
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
                             new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority(
+                                "MISSION_MANAGER",
+                                de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron
+                                    .IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -165,6 +180,10 @@ class MissionUnitManagementTest {
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(
                             new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new OrgUnitContextualAuthority(
+                                "MISSION_MANAGER",
+                                de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron
+                                    .IRIDIUM_ID),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),

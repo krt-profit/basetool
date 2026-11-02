@@ -45,7 +45,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -166,7 +166,7 @@ class MissionEditorTest {
   void aCallerWithoutAnHttpRequestMeetsTheSameGate() {
     MissionAccessPolicy realPolicy =
         new MissionAccessPolicy(
-            mock(OwnerScopeService.class),
+            mock(AccessGateService.class),
             authHelperService,
             missionRepository,
             mock(UserService.class),

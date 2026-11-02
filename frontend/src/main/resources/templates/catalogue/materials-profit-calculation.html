@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.materials', titleText=#{nav.materials.profit_calculation}, count=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='materials.profit', eyebrowKey='nav.materials', titleText=#{nav.materials.profit_calculation}, count=null)}"></th:block>
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 

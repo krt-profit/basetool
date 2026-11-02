@@ -80,8 +80,8 @@ class BankOrgUnitRequestsE2eTest {
     seeder = new BackendSeeder();
 
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
-    seeder.assignStaffelMembership(
-        ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
+    seeder.assignStaffelleiterSeat(
+        ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false);
 
     accountId =
         seeder.ensureOrgUnitBankAccount(
@@ -121,7 +121,7 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         assertThat(page.locator("[data-testid='org-unit-bank-card']").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
+        assertThat(page.locator("[data-testid='page-tab-orgunitbank.overview']")).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-officer");
         throw failure;
@@ -134,7 +134,7 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
-        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
+        assertThat(page.locator("[data-testid='page-tab-orgunitbank.overview']")).isVisible();
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-member");
@@ -246,6 +246,32 @@ class BankOrgUnitRequestsE2eTest {
         "CANCELLED",
         seeder.bookingRequestStatus(OFFICER_USER, OFFICER_PASSWORD, requestId),
         "cancelling withdrew the pending request");
+  }
+
+  /** The {@code #tab=antraege} deep link the dashboard widget uses opens the requests tab. */
+  @Test
+  void deepLinkOpensTheMyRequestsTab() {
+    String baseUrl = STACK.baseUrl();
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        createRequest(page, "DEPOSIT", "7003");
+
+        Page deepLinked = context.newPage();
+        E2eSupport.navigate(deepLinked, baseUrl + "/org-unit-bank#tab=antraege");
+
+        assertThat(deepLinked.locator("[data-testid='org-unit-bank-tab-requests']"))
+            .hasAttribute("aria-selected", "true");
+        assertThat(deepLinked.locator("[data-testid='org-unit-bank-requests']")).isVisible();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-deep-link");
+        throw failure;
+      }
+    }
   }
 
   /** F2: a bank employee rejects a pending request with a reason — no money moves. */

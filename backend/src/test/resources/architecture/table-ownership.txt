@@ -44,6 +44,7 @@ inventory_item inventory
 inventory_item_donation_allocation inventory
 inventory_item_job_order_allocation inventory
 inventory_item_mission_allocation inventory
+inventory_stock_level inventory
 job_order joborder
 job_order_assignees joborder
 job_order_handover joborder
@@ -137,3 +138,11 @@ terms_acceptance identity
 uex_category catalogue
 user_approval_event identity
 user_roles identity
+navigation_preferences navigation
+navigation_favourite navigation
+navigation_appearance navigation
+navigation_dashboard_layout navigation
+navigation_dashboard_widget navigation
+navigation_hidden navigation
+navigation_order navigation
+navigation_tab_bar navigation

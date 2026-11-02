@@ -8,6 +8,7 @@
               noAcc=#{orgChart.noAccount}"
      th:classappend="|${(node.positionType() == 'AREA_LEAD' or node.positionType() == 'BEREICHSLEITER') ? 'oc-node--hero' : ''} ${freeText ? 'oc-node--freetext' : ''}|"
      role="treeitem" tabindex="-1" th:aria-level="${level}"
+     th:data-oc-key="${node.userId() != null ? node.userId() : node.positionId()}"
      th:aria-label="#{${rk}} + ', ' + ${nm} + (${freeText} ? ' (' + ${noAcc} + ')' : '')">
     <span class="oc-node-rank" th:text="#{${rk}}">Rank</span>
     <span class="oc-node-name" th:text="${nm}">Name</span>
@@ -45,7 +46,7 @@
               th:classappend="${'oc-dept--' + b.department().toLowerCase().replace('_', '-')}"></span>
         <span class="oc-caption-title" th:text="${b.name()}">Bereich</span>
     </div>
-    <div class="oc-tree oc-bereich-tier" role="tree"
+    <div class="oc-tree oc-bereich-tier" role="tree" th:data-oc-key="${b.orgUnitId()}"
          th:classappend="${b.department() != null ? 'oc-dept--' + b.department().toLowerCase().replace('_', '-') : ''}"
          th:aria-label="#{orgChart.a11y.bereich(${b.name()})}">
         <div class="oc-col">
@@ -111,6 +112,7 @@
     <li th:each="sq : ${squadrons}">
         <div class="oc-col">
             <div class="oc-unit-box" role="treeitem" tabindex="-1" aria-level="2"
+                 th:data-oc-key="${sq.orgUnitId()}"
                  th:aria-label="#{orgChart.a11y.squadron(${sq.name()})}">
                 <span class="sh" th:text="${sq.shorthand()}">ALP</span>
                 <span class="nm" th:text="${sq.name()}">ALPHA</span>
@@ -176,6 +178,7 @@
                                            cmdNm=${cmd.leaderUserName() != null ? cmd.leaderUserName() : cmd.leaderDisplayName()},
                                            cmdNoAcc=#{orgChart.noAccount}">
                             <div class="oc-node" role="treeitem" tabindex="-1" aria-level="5"
+                                 th:data-oc-key="${cmd.leaderUserId() != null ? cmd.leaderUserId() : cmd.positionId()}"
                                  th:classappend="${cmdFreeText ? 'oc-node--freetext' : ''}"
                                  th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + ${cmdNm} + (${cmdFreeText} ? ' (' + ${cmdNoAcc} + ')' : '')">
                                 <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
@@ -279,6 +282,7 @@
     <li th:each="sk : ${specialCommands}">
         <div class="oc-col">
             <div class="oc-unit-box oc-unit-box--sk" role="treeitem" tabindex="-1" aria-level="2"
+                 th:data-oc-key="${sk.orgUnitId()}"
                  th:aria-label="#{orgChart.a11y.sk(${sk.name()})}">
                 <span class="sh" th:text="${sk.shorthand()}">BRV</span>
                 <span class="nm" th:text="${sk.name()}">Bravo</span>

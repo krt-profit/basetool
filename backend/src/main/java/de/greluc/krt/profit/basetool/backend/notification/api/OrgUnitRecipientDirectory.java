@@ -65,4 +65,12 @@ public interface OrgUnitRecipientDirectory {
    */
   @NotNull
   Set<UUID> leadershipOf(@NotNull UUID orgUnitId);
+
+  /**
+   * The members who hold a leadership seat in any org unit.
+   *
+   * @return their user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  Set<UUID> allSeatHolders();
 }

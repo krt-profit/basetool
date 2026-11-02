@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategoryResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategoryService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategoryWriteRequest;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -69,6 +70,8 @@ public class PromotionCategoryController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of categories
    */
   @GetMapping
@@ -80,7 +83,8 @@ public class PromotionCategoryController {
   public PageResponse<PromotionCategoryResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -88,7 +92,7 @@ public class PromotionCategoryController {
             sort,
             PromotionCategoryService.SORTABLE_FIELDS,
             PromotionCategoryService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.list(pageable));
+    return PageResponse.of(service.list(pageable, view));
   }
 
   /**
@@ -100,6 +104,8 @@ public class PromotionCategoryController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return a {@link PageResponse} of categories scoped to the topic
    */
   @GetMapping("/by-topic/{topicId}")
@@ -111,7 +117,8 @@ public class PromotionCategoryController {
       @PathVariable UUID topicId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -119,7 +126,7 @@ public class PromotionCategoryController {
             sort,
             PromotionCategoryService.SORTABLE_FIELDS,
             PromotionCategoryService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.listByTopic(topicId, pageable));
+    return PageResponse.of(service.listByTopic(topicId, pageable, view));
   }
 
   /**
@@ -127,14 +134,17 @@ public class PromotionCategoryController {
    * sortOrder}, used by the promotion UI to render the full evaluation table without pagination.
    *
    * @param topicId identifier of the parent promotion topic
+   * @param view {@code MEMBER} for the caller's own squadron, {@code MANAGEMENT} for the squadrons
+   *     the caller manages as an officer
    * @return the topic's categories in display order
    */
   @GetMapping("/by-topic/{topicId}/all")
   @Operation(
       summary = "List all categories for a specific topic ordered by sortOrder (no pagination).")
   @ApiResponses({@ApiResponse(responseCode = "200", description = "All categories for the topic.")})
-  public List<PromotionCategoryResponse> listAllByTopic(@PathVariable UUID topicId) {
-    return service.listAllByTopic(topicId);
+  public List<PromotionCategoryResponse> listAllByTopic(
+      @PathVariable UUID topicId, @RequestParam(defaultValue = "MEMBER") PromotionReadView view) {
+    return service.listAllByTopic(topicId, view);
   }
 
   /**
@@ -157,14 +167,18 @@ public class PromotionCategoryController {
   /**
    * Persists a new {@link
    * de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionCategory} attached to the
-   * topic referenced by the request. Restricted to ADMIN or OFFICER callers.
+   * topic referenced by the request. Restricted to admins and callers with officer reach in the
+   * owning squadron.
    *
    * @param request validated payload describing the new category
    * @return the persisted category in its response form
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a new promotion category. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Create a new promotion category. Requires ADMIN or officer reach in the owning"
+              + " squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Category created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -187,7 +201,9 @@ public class PromotionCategoryController {
    * @return the updated category in its response form
    */
   @PutMapping("/{id}")
-  @Operation(summary = "Update a promotion category. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Update a promotion category. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Category updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -202,14 +218,16 @@ public class PromotionCategoryController {
   }
 
   /**
-   * Permanently removes the promotion category identified by {@code id}. Restricted to ADMIN or
-   * OFFICER callers.
+   * Permanently removes the promotion category identified by {@code id}. Restricted to admins and
+   * callers with officer reach in the owning squadron.
    *
    * @param id identifier of the category to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a promotion category. Requires ADMIN or OFFICER role.")
+  @Operation(
+      summary =
+          "Delete a promotion category. Requires ADMIN or officer reach in the owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Category deleted."),
     @ApiResponse(responseCode = "404", description = "Category not found.")

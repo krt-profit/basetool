@@ -47,7 +47,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -55,6 +56,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -86,8 +88,16 @@ class InventoryAggregationServiceTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private InventoryItemViewRepository inventoryItemViewRepository;
+  @Mock private StockLevelService stockLevelService;
+
+  @BeforeEach
+  void noLowLevels() {
+    lenient()
+        .when(stockLevelService.lowSubjects())
+        .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
+  }
 
   @InjectMocks private InventoryAggregationService service;
 
@@ -245,7 +255,7 @@ class InventoryAggregationServiceTest {
 
     @Test
     void allItemStacks_gradeAlone_narrowsToEveryComponentWikiType() {
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(inventoryItemViewRepository.findGlobalItemStacks(
               anyBoolean(),
@@ -317,7 +327,7 @@ class InventoryAggregationServiceTest {
     void allItemStacks_forwardScopeTriple() {
       UUID activeOrgUnitId = UUID.randomUUID();
       UUID memberOrgUnitId = UUID.randomUUID();
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, activeOrgUnitId, Set.of(memberOrgUnitId)));
       when(inventoryItemViewRepository.findGlobalItemStacks(
               anyBoolean(),
@@ -678,7 +688,7 @@ class InventoryAggregationServiceTest {
       GameItem coupling = gameItem("Coupling");
       InventoryGameItemReferenceDto ref =
           new InventoryGameItemReferenceDto(coupling.getId(), "Coupling", null, null);
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(inventoryItemRepository.getAggregatedItemInventory(
               anyBoolean(), any(), any(), any(Pageable.class)))
@@ -698,7 +708,7 @@ class InventoryAggregationServiceTest {
     @Test
     void nullSum_coalescesToZero() {
       GameItem coupling = gameItem("Coupling");
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(inventoryItemRepository.getAggregatedItemInventory(
               anyBoolean(), any(), any(), any(Pageable.class)))
@@ -714,7 +724,7 @@ class InventoryAggregationServiceTest {
     @Test
     void forwardsScopeTripleAndPageable() {
       UUID activeOrgUnitId = UUID.randomUUID();
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, activeOrgUnitId, Set.of()));
       when(inventoryItemRepository.getAggregatedItemInventory(
               anyBoolean(), any(), any(), any(Pageable.class)))
@@ -756,7 +766,7 @@ class InventoryAggregationServiceTest {
               1L,
               null,
               null);
-      when(ownerScopeService.currentScopePredicate())
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, Set.of(memberOrgUnitId)));
       when(inventoryItemRepository.findGlobalItemsByFilters(
               anyBoolean(),
@@ -840,7 +850,7 @@ class InventoryAggregationServiceTest {
    */
   private void stubGlobalItemStacks(InventoryItemStackAggregate... aggregates) {
     lenient()
-        .when(ownerScopeService.currentScopePredicate())
+        .when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(inventoryItemViewRepository.findGlobalItemStacks(
             anyBoolean(),

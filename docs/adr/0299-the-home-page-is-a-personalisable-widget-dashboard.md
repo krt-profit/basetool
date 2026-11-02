@@ -1,6 +1,6 @@
 # ADR-0299 — The home page is a personalisable widget dashboard
 
-- **Status:** Accepted — implementation pending (the requirements it drives are marked planned).
+- **Status:** Accepted — shipped: the member and the admin dashboard with their framework, the start page, and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Aufträge zu bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig, Bank, Materialbörse, Bedarf & Spenden, Meine Bankanträge, Information, Favoriten and Benachrichtigungen.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-034, REQ-UI-032) ·
@@ -58,7 +58,7 @@ sync topic while others do not.
 
 ## Consequences
 
-- REQ-UI-034 is added (planned), with the option matrix and the catalogue as tables.
+- REQ-UI-034 is added, with the option matrix and the catalogue as tables.
 - Widgets build on the existing read endpoints, a page total serving as a count; summary endpoints
   are added only where a widget would otherwise load a whole list, and for the new data sources
   (REQ-BANK-064, REQ-ORDERS-047, REQ-INV-068).

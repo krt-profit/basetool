@@ -32,10 +32,6 @@
         "description": "E2E test role"
       },
       {
-        "name": "Officer",
-        "description": "E2E test role"
-      },
-      {
         "name": "Logistician",
         "description": "E2E test role"
       },
@@ -179,7 +175,6 @@
       ],
       "realmRoles": [
         "Admin",
-        "Officer",
         "KRT Member"
       ]
     },
@@ -196,7 +191,6 @@
         }
       ],
       "realmRoles": [
-        "Officer",
         "KRT Member"
       ]
     },

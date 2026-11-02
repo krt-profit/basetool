@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.orgunit.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.OfficerSurfaceGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.leadership.web.LeitungPageController;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipFlagsForm;
@@ -61,7 +61,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * /organisation/special-commands/{id}}): the roster, adding and removing members and setting their
  * Logistiker / Einsatzmanager flags, each with an AJAX twin.
  *
- * <p>Gated to {@link Roles#ADMIN_OR_OFFICER}; the backend's per-SK {@code
+ * <p>Gated to {@link OfficerSurfaceGate#hasOfficerReach()}; the backend's per-SK {@code
  * SpecialCommandSecurityService#canManageMembers} admits only admins and the SK's lead. The SK-lead
  * toggle lives on {@link AdminSpecialCommandsPageController}. Also compare {@link
  * LeitungPageController}.
@@ -71,7 +71,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/organisation/special-commands")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize(Roles.ADMIN_OR_OFFICER)
+@PreAuthorize(OfficerSurfaceGate.HAS_OFFICER_REACH)
 public class SpecialCommandMembersPageController {
 
   /** Base path of this page; every redirect of this controller lands on a child of it. */

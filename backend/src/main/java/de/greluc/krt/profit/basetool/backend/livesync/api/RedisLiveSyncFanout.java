@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RedisJsonFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
@@ -63,7 +62,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout {
             meterRegistry,
             channel,
             instanceId,
-            MetricNames.LIVESYNC_REDIS_ERRORS,
+            LivesyncMetricNames.LIVESYNC_REDIS_ERRORS,
             "Live-sync");
   }
 
@@ -93,8 +92,8 @@ public class RedisLiveSyncFanout implements LiveSyncFanout {
         () ->
             meterRegistry
                 .counter(
-                    MetricNames.LIVESYNC_REDIS_PUBLISHED,
-                    MetricNames.TAG_TOPIC_CLASS,
+                    LivesyncMetricNames.LIVESYNC_REDIS_PUBLISHED,
+                    LivesyncMetricNames.TAG_TOPIC_CLASS,
                     topic.topicClass().metricLabel())
                 .increment());
   }

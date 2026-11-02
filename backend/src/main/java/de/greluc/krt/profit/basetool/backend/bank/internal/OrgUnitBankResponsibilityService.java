@@ -51,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
  * membership ranks, and audits changes to them around leadership mutations (REQ-BANK-034,
  * ADR-0070).
  *
- * <p>It carries no caller context and depends on no {@code OwnerScopeService}, so the interactive
+ * <p>It carries no caller context and depends on no scope-kernel bean, so the interactive
  * org-unit/bank authorization stays in {@link OrgUnitBankAccessService} (ADR-0020) and the bank
  * classes stay org-unit-blind (REQ-BANK-008).
  */

@@ -56,19 +56,19 @@ class MissionPeerRedactorTest {
     UserDto redacted = redactor.cleanupUserForPeer(full);
 
     assertThat(redacted.id()).isEqualTo(full.id());
-    assertThat(redacted.username()).isEqualTo("bob.callsign");
+    assertThat(redacted.username()).isNull();
     assertThat(redacted.displayName()).isEqualTo("Bob");
     assertThat(redacted.effectiveName()).isEqualTo("Bob");
     assertThat(redacted.rank()).isEqualTo(5);
     assertThat(redacted.inKeycloak()).isTrue();
     assertThat(redacted.version()).isEqualTo(1L);
     assertThat(redacted.email()).isNull();
-    assertThat(redacted.description()).isNull();
+    assertThat(redacted.description()).isEqualTo(full.description());
     assertThat(redacted.roles()).isNull();
     assertThat(redacted.permissions()).isNull();
     assertThat(redacted.lastReadAnnouncementId()).isNull();
-    assertThat(redacted.squadron()).isNull();
-    assertThat(redacted.squadrons()).isNull();
+    assertThat(redacted.squadron()).isEqualTo(full.squadron());
+    assertThat(redacted.squadrons()).isEqualTo(full.squadrons());
     assertThat(redacted.joinDate()).isNull();
     assertThat(redacted.discordLinked()).isNull();
     assertThat(redacted.isLogistician()).isFalse();
@@ -83,7 +83,7 @@ class MissionPeerRedactorTest {
     MissionParticipantDto redacted = redactor.cleanupParticipantForPeer(participant);
 
     assertThat(redacted.user().email()).isNull();
-    assertThat(redacted.user().username()).isEqualTo("bob.callsign");
+    assertThat(redacted.user().username()).isNull();
     assertThat(redacted.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(redacted.comment()).isEqualTo("my comment");
   }
@@ -99,7 +99,7 @@ class MissionPeerRedactorTest {
   }
 
   @Test
-  void cleanupMissionForPeer_forAReadingPeer_clearsOwnerAndManagers() {
+  void cleanupMissionForPeer_forAReadingPeer_keepsOwnerAndManagersAsPeerReferences() {
     List<MissionStepDto> steps = List.of();
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
@@ -107,8 +107,12 @@ class MissionPeerRedactorTest {
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
-    assertThat(redacted.owner()).isNull();
-    assertThat(redacted.managers()).isNull();
+    assertThat(redacted.owner()).isNotNull();
+    assertThat(redacted.owner().id()).isEqualTo(full.owner().id());
+    assertThat(redacted.owner().displayName()).isEqualTo(full.owner().displayName());
+    assertThat(redacted.owner().username()).isNull();
+    assertThat(redacted.managers()).hasSize(full.managers().size());
+    assertThat(redacted.managers()).allSatisfy(m -> assertThat(m.username()).isNull());
     assertThat(redacted.canEdit()).isFalse();
     assertThat(redacted.canManageManagers()).isFalse();
     assertThat(redacted.description()).isEqualTo("secret plan");
@@ -121,10 +125,10 @@ class MissionPeerRedactorTest {
   }
 
   /**
-   * A peer who may manage the mission keeps the managers list the same response says they may edit.
+   * A peer who may manage the mission keeps its capability flag and sees the same peer-shaped list.
    */
   @Test
-  void cleanupMissionForPeer_forAManagingPeer_keepsTheListItSaysTheyMayEdit() {
+  void cleanupMissionForPeer_forAManagingPeer_keepsTheCapabilityFlag() {
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
     MissionDto full = mission("secret plan", squadron, participant, List.of(), List.of(), true);
@@ -132,8 +136,7 @@ class MissionPeerRedactorTest {
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
     assertThat(redacted.canManageManagers()).isTrue();
-    assertThat(redacted.owner()).isEqualTo(full.owner());
-    assertThat(redacted.managers()).isEqualTo(full.managers());
+    assertThat(redacted.owner().id()).isEqualTo(full.owner().id());
     assertThat(redacted.participants().iterator().next().user().email()).isNull();
   }
 
@@ -151,15 +154,12 @@ class MissionPeerRedactorTest {
     UserDto owner = redacted.assignedUnits().getFirst().ship().owner();
     assertThat(owner.roles()).isNull();
     assertThat(owner.permissions()).isNull();
-    assertThat(owner.description()).isNull();
     assertThat(owner.email()).isNull();
-    assertThat(owner.squadron()).isNull();
-    assertThat(owner.squadrons()).isNull();
     assertThat(owner.joinDate()).isNull();
     assertThat(owner.discordLinked()).isNull();
     assertThat(owner.isLogistician()).isFalse();
     assertThat(owner.isMissionManager()).isFalse();
-    assertThat(owner.username()).isEqualTo("bob.callsign");
+    assertThat(owner.username()).isNull();
     assertThat(owner.rank()).isEqualTo(5);
     assertThat(redacted.assignedUnits().getFirst().name()).isEqualTo("Alpha");
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");

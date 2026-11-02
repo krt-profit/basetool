@@ -34,7 +34,8 @@ public interface MissionReferences {
    * Looks the missions up in one read.
    *
    * @param ids the missions
-   * @return each existing mission's reference by id; an unknown id is absent
+   * @return each existing mission's reference by id, with {@code null} name and start for a mission
+   *     the caller may not read (REQ-MISSION-008); an unknown id is absent
    */
   @NotNull
   Map<UUID, MissionReferenceDto> references(@NotNull Collection<UUID> ids);

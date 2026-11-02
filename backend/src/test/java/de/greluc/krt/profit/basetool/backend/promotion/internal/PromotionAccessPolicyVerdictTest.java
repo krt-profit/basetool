@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
@@ -39,8 +40,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -220,10 +221,13 @@ class PromotionAccessPolicyVerdictTest {
             mock(OrgUnitCascadeService.class),
             staffelResolver,
             request);
-    OwnerScopeService ownerScopeService =
-        new OwnerScopeService(
-            resolver, mock(AccessGateService.class), mock(OrgUnitStampingService.class));
-    PromotionAccessPolicy policy = new PromotionAccessPolicy(ownerScopeService, authHelper);
+    PromotionAccessPolicy policy =
+        new PromotionAccessPolicy(
+            resolver,
+            mock(AccessGateService.class),
+            authHelper,
+            mock(OrgUnitMembershipQueryService.class),
+            mock(PromotionReach.class));
 
     assertThat(policy.isFeatureEnabledForCurrentScope())
         .as("feature flag")

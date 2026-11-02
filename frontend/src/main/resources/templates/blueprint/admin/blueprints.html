@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.blueprints.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.blueprints', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.blueprints.title},
         count=${totalElements}, countId='admin-bp-count', countFor='admin-bp-results')}"></th:block>
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>

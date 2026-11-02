@@ -112,7 +112,7 @@ class RelayParamBindingMvcTest {
   void adminPersonalInventoryPage_ignoresAMemberIdThatIsNotAUuid() throws Exception {
     mockMvc
         .perform(get("/admin/personal-inventory").param("userSub", "../../etc/passwd"))
-        .andExpect(status().isOk());
+        .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient, never())
         .get(contains("/api/v1/personal-inventory/admin/"), anyTypeRef());

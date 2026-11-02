@@ -28,7 +28,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Arrays;
 import java.util.List;
@@ -69,8 +68,8 @@ class LiveSyncPublisherTest {
   private double accepted(LiveSyncTopicClass topicClass) {
     return meterRegistry
         .counter(
-            MetricNames.LIVESYNC_PUBLISH_ACCEPTED,
-            MetricNames.TAG_TOPIC_CLASS,
+            LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED,
+            LivesyncMetricNames.TAG_TOPIC_CLASS,
             topicClass.metricLabel())
         .count();
   }

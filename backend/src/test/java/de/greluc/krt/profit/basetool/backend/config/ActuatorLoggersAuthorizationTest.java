@@ -84,8 +84,8 @@ class ActuatorLoggersAuthorizationTest {
   }
 
   @Test
-  @WithMockUser(roles = Roles.OFFICER)
-  void shouldForbidOfficerLoggerWrite() throws Exception {
+  @WithMockUser(roles = Roles.LOGISTICIAN)
+  void shouldForbidLogisticianLoggerWrite() throws Exception {
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isForbidden());

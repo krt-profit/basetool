@@ -66,17 +66,4 @@ class SettingsBackendClientTest {
       backend.expect("PUT", "/api/v1/settings/" + key, "{\"value\":\"7\",\"version\":3}");
     }
   }
-
-  @Test
-  void toggleListsArePagedByTemplate() {
-    String empty = "{\"content\":[],\"page\":0,\"size\":1000,\"totalElements\":0,\"totalPages\":0}";
-    backend.answerJson(empty);
-    backend.answerJson(empty);
-
-    client.squadronPage(2);
-    client.specialCommandPage(0);
-
-    backend.expect("GET", "/api/v1/squadrons?size=1000&sort=name,asc&page=2");
-    backend.expect("GET", "/api/v1/special-commands?size=1000&sort=name,asc&page=0");
-  }
 }

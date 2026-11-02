@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -27,6 +28,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
@@ -71,7 +77,7 @@ class NavigationRenderMvcTest {
 
   /**
    * An administrator gets the quick-access trigger and the bell in the header, a closed and inert
-   * drawer with the menu filter, the main groups, the four administration groups behind the
+   * drawer with the menu filter, the main groups, the three administration groups behind the
    * administration entry, the user row with logout, the palette dialog and the mobile tab bar.
    *
    * @throws Exception if the page cannot be rendered
@@ -86,19 +92,19 @@ class NavigationRenderMvcTest {
         .contains("data-testid=\"palette-open\"")
         .contains("data-testid=\"mobile-search-open\"")
         .contains("id=\"notification-bell\"")
+        .containsPattern("id=\"notification-badge\"[^>]*aria-hidden=\"true\"")
         .contains("id=\"hamburger\"");
     assertThat(sidebar)
         .startsWith("<div id=\"sidebar\" class=\"sidebar\" inert")
         .contains("data-testid=\"nav-filter\"")
-        .contains("data-group-key=\"missions\"")
+        .contains("data-group-key=\"operations\"")
         .contains("data-group-key=\"logistics\"")
         .contains("data-group-key=\"trade\"")
-        .contains("data-group-key=\"organisation\"")
-        .contains("data-group-key=\"resources\"")
+        .contains("data-group-key=\"unit\"")
+        .doesNotContain("data-group-key=\"resources\"")
         .contains("data-group-key=\"admin-members\"")
         .contains("data-group-key=\"admin-masterdata\"")
-        .contains("data-group-key=\"admin-bank\"")
-        .contains("data-group-key=\"admin-system\"")
+        .contains("data-group-key=\"admin-operations\"")
         .contains("data-testid=\"nav-admin-toggle\"")
         .contains("data-testid=\"nav-user-toggle\"")
         .contains("data-testid=\"nav-logout\"")
@@ -131,7 +137,7 @@ class NavigationRenderMvcTest {
       }
       count++;
     }
-    assertThat(count).as("main, personal and admin groups").isGreaterThanOrEqualTo(10);
+    assertThat(count).as("main, personal and admin groups").isGreaterThanOrEqualTo(8);
   }
 
   /**
@@ -164,20 +170,24 @@ class NavigationRenderMvcTest {
   @Test
   void quickAccessSourcesFollowTheRoles() throws Exception {
     String member = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    CapabilityStubs.logistician(backendApiClient);
     String logistician =
         render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    CapabilityStubs.report(backendApiClient, CapabilitiesResponse.NONE);
     String admin = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
     assertThat(member)
         .contains("data-entries-url=\"/quick-access/entries\"")
+        .contains("data-entity-search-url=\"/quick-access/search\"")
+        .contains("data-prefix-kind=\"mission\"")
         .contains("data-testid=\"palette-action-create-order\"")
         .contains("data-testid=\"palette-action-create-mission\"")
         .contains("data-testid=\"palette-action-create-refinery\"")
         .contains("data-testid=\"palette-action-book-my\"")
         .contains("data-testid=\"palette-action-handbook\"")
         .contains("href=\"/hangar/squadron\"")
-        .contains("href=\"/inventory/my\"")
-        .contains("href=\"/inventory/all\"")
+        .contains("href=\"/inventory?storage=my\"")
+        .contains("href=\"/inventory?storage=all\"")
         .doesNotContain("data-testid=\"palette-action-book-global\"")
         .doesNotContain("/admin/sync-reports/uex");
     assertThat(member.contains("data-testid=\"palette-action-lang-de\""))
@@ -204,6 +214,78 @@ class NavigationRenderMvcTest {
     assertThat(sidebar)
         .containsPattern("href=\"/hangar\" data-nav-keywords=\"[^\"]+\"")
         .containsPattern("href=\"/profile\" data-nav-keywords=\"[^\"]+\"");
+  }
+
+  /**
+   * The quick access can favourite exactly the group pages: their links carry {@code
+   * data-starrable}, and the palette carries the texts of the empty state and its live messages
+   * (REQ-UI-033).
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void quickAccessKnowsWhichLinksAreStarrable() throws Exception {
+    String html = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+
+    assertThat(section(SIDEBAR, html))
+        .containsPattern("href=\"/hangar\"[^>]*data-starrable=\"true\"");
+    assertThat(html)
+        .contains("data-favourites=\"")
+        .contains("data-frequent=\"")
+        .contains("data-live-favourite-added=\"")
+        .contains("data-palette-live");
+  }
+
+  /**
+   * The bell's accessible name carries the unread count while the visible badge stays out of it,
+   * and it is the plain label without unread notifications.
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void bellAccessibleNameCarriesTheUnreadCount() throws Exception {
+    String quiet = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(
+            new LayoutContextLoader.MeLayoutResponse(
+                null, List.of(), CapabilitiesResponse.NONE, 7L));
+    String unread = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+
+    assertThat(section(HEADER, quiet))
+        .containsPattern("id=\"notification-toggle\"[^>]*aria-label=\"Benachrichtigungen öffnen\"");
+    assertThat(section(HEADER, unread))
+        .containsPattern(
+            "id=\"notification-toggle\"[^>]*aria-label=\"Benachrichtigungen öffnen, 7 ungelesen\"")
+        .containsPattern("id=\"notification-badge\"[^>]*aria-hidden=\"true\"")
+        .contains("data-bell-open-unread=\"Benachrichtigungen öffnen, {0} ungelesen\"");
+  }
+
+  /**
+   * A member without profit access who is an assignee gets the „Aufträge" link and an orders tab
+   * that opens the list; without an entry neither shows (REQ-ORDERS-040).
+   *
+   * @throws Exception if the page cannot be rendered
+   */
+  @Test
+  void assigneeWithoutProfitAccessGetsTheOrdersLink() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, false, true));
+    String assignee =
+        render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, false, false));
+    String plainMember =
+        render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+
+    assertThat(section(SIDEBAR, assignee))
+        .containsPattern("href=\"/orders\"[^>]*data-testid=\"nav-orders-assigned\"")
+        .doesNotContain("data-testid=\"nav-orders\"")
+        .doesNotContain("data-testid=\"nav-orders-own\"");
+    assertThat(assignee)
+        .containsPattern("href=\"/orders\"[^>]*data-testid=\"mobile-tab-orders.assigned\"");
+    assertThat(section(SIDEBAR, plainMember))
+        .doesNotContain("data-testid=\"nav-orders-assigned\"")
+        .contains("data-testid=\"nav-orders-create\"");
   }
 
   /**

@@ -32,11 +32,14 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -60,6 +63,9 @@ public class JobOrderAssigneeService {
   /** Resolves the user being added as an assignee. */
   private final UserRepository userRepository;
 
+  /** Tells a direct member of the processing unit from an external assignee. */
+  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   /** Records the state-mutating assignee activities into the audit log (REQ-AUDIT-001). */
   private final AuditRecorder auditRecorder;
 
@@ -79,6 +85,7 @@ public class JobOrderAssigneeService {
    * @return the order with its refreshed assignee list
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when either id is
    *     unknown
+   * @throws BadRequestException when the user is not an active account
    */
   @Transactional
   public JobOrderDto addAssignee(UUID jobOrderId, UUID userId) {
@@ -93,6 +100,9 @@ public class JobOrderAssigneeService {
     }
     User user =
         Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
+    if (!user.isActiveAccount()) {
+      throw new BadRequestException("Only an active account can be assigned: " + userId);
+    }
     jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
     ActorRef actor = userService.currentActor();
@@ -102,7 +112,9 @@ public class JobOrderAssigneeService {
               saved.getId(), saved.getDisplayId(), saved.getHandle(), userId, actor));
     }
     auditRecorder.record(
-        AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
+        isExternal(saved, userId)
+            ? AuditEventType.JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED
+            : AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
         saved.getId(),
         JobOrderAuditLabel.of(saved),
         userId,
@@ -131,13 +143,29 @@ public class JobOrderAssigneeService {
       eventPublisher.publishEvent(
           JobOrderNotices.assigneeRemoved(saved.getId(), userId, userService.currentActor()));
       auditRecorder.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
+          isExternal(saved, userId)
+              ? AuditEventType.JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED
+              : AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
           saved.getId(),
           JobOrderAuditLabel.of(saved),
           userId,
           AuditDetails.of("assignee", userId));
     }
     return jobOrderStockProjectionService.mapToDtoWithStock(saved);
+  }
+
+  /**
+   * Decides whether {@code userId} is an external assignee of the order: not a direct member of its
+   * processing unit (REQ-ORDERS-047).
+   *
+   * @param order the order
+   * @param userId the assignee
+   * @return {@code true} iff the order has a processing unit the user is no direct member of
+   */
+  private boolean isExternal(JobOrder order, UUID userId) {
+    OrgUnit responsible = order.getResponsibleOrgUnit();
+    return responsible != null
+        && !orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, responsible.getId());
   }
 
   /**

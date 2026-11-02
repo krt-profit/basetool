@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
@@ -75,8 +76,6 @@ public class OrgUnitBankPageController {
       "hasAnyRole('"
           + Roles.ADMIN
           + "','"
-          + Roles.OFFICER
-          + "','"
           + Roles.LOGISTICIAN
           + "','"
           + Roles.MISSION_MANAGER
@@ -86,6 +85,9 @@ public class OrgUnitBankPageController {
 
   /** The bank domain's backend calls. */
   private final BankBackendClient bankClient;
+
+  /** The org-unit booking-request reads. */
+  private final OrgUnitBankRequestsBackendClient requestsClient;
 
   private final ParallelPageLoader parallelPageLoader;
 
@@ -228,8 +230,7 @@ public class OrgUnitBankPageController {
    */
   private List<BankBookingRequestDto> fetchOwnRequests() {
     List<BankBookingRequestDto> requests =
-        SectionFallback.load(
-            log, "org-unit-bank-own-requests", bankClient::ownOrgUnitRequests, null);
+        SectionFallback.load(log, "org-unit-bank-own-requests", requestsClient::own, null);
     return requests == null ? List.of() : requests;
   }
 
@@ -240,8 +241,7 @@ public class OrgUnitBankPageController {
    */
   private List<BankBookingRequestDto> fetchForeignRequests() {
     List<BankBookingRequestDto> requests =
-        SectionFallback.load(
-            log, "org-unit-bank-foreign-requests", bankClient::foreignOrgUnitRequests, null);
+        SectionFallback.load(log, "org-unit-bank-foreign-requests", requestsClient::foreign, null);
     return requests == null ? List.of() : requests;
   }
 

@@ -29,7 +29,7 @@ performs routinely.
 
 1. A controller takes the request; `@PreAuthorize` decides whether the caller may perform the
    operation at all.
-2. The **service layer** applies scope through `OwnerScopeService`: which org units this caller may
+2. The **service layer** applies scope through the scope kernel (`RequestScopeResolver`, `AccessGateService`): which org units this caller may
    see, and by which of the aggregate's scope kinds.
 3. The repository is asked only for what the scope allows.
 
@@ -194,3 +194,17 @@ action (REQ-XCH-034, ADR-0227).
 **A draft.** `drafts/blueprints` and `drafts/refinery-orders` write nothing: the backend builds the
 same preview the web's own upload builds, the gateway stages it for a one-time browser pickup and
 answers the review URL, and the member saves through the ordinary path — as in §6.5.
+
+## 6.9 A member arranges the navigation
+
+1. **Edit.** „Anpassen" shows the star, hide and move controls; each change is a `krtFetch` write of
+   one section (favourites, hidden pages, order, tab bar, appearance) with the section's `version`,
+   relayed by the frontend to `/api/v1/navigation/**`.
+2. **Store.** The backend writes the owner's own rows and bumps only that section's counter; a
+   change that moves a page between favourites and hidden pages writes both sections in one request.
+3. **Conflict.** A stale version is `409`: the write is dropped, only that section reloads and the
+   hint „In einem anderen Fenster geändert" shows.
+4. **Next load.** The frontend renders the registry's default with the stored choices on top; a key
+   the member may no longer see is deleted through the backend, and an entry unavailable only in the
+   active org unit renders greyed. Another tab shows the change on its next page load; the open
+   dashboard re-reads every ten minutes (REQ-UI-032, REQ-UI-034).

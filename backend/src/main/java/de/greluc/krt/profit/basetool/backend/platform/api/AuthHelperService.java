@@ -53,7 +53,6 @@ public class AuthHelperService {
   private static final Set<String> MEMBER_OR_ABOVE_ROLES =
       Set.of(
           Roles.authority(Roles.ADMIN),
-          Roles.authority(Roles.OFFICER),
           Roles.authority(Roles.MISSION_MANAGER),
           Roles.authority(Roles.LOGISTICIAN),
           Roles.authority(Roles.KRT_MEMBER));
@@ -125,8 +124,8 @@ public class AuthHelperService {
 
   /**
    * Shortcut for {@link #hasReachableRole(String) hasReachableRole("ROLE_LOGISTICIAN")}. Because
-   * the role hierarchy declares {@code ROLE_ADMIN > ROLE_LOGISTICIAN} and {@code ROLE_OFFICER >
-   * ROLE_LOGISTICIAN}, this returns {@code true} for any of the three elevated roles.
+   * the role hierarchy declares {@code ROLE_ADMIN > ROLE_LOGISTICIAN}, this returns {@code true}
+   * for an admin and for a derived or granted logistician.
    */
   public boolean isLogisticianOrAbove() {
     return hasReachableRole(Roles.authority(Roles.LOGISTICIAN));
@@ -139,17 +138,6 @@ public class AuthHelperService {
    */
   public boolean isAdmin() {
     return hasReachableRole(Roles.authority(Roles.ADMIN));
-  }
-
-  /**
-   * Programmatic twin of {@link Roles#ADMIN_OR_OFFICER}, evaluated through the {@link
-   * RoleHierarchy}.
-   *
-   * @return {@code true} for an admin or an officer, {@code false} otherwise, including anonymous
-   *     and unauthenticated callers
-   */
-  public boolean isAdminOrOfficer() {
-    return isAdmin() || hasReachableRole(Roles.authority(Roles.OFFICER));
   }
 
   /**

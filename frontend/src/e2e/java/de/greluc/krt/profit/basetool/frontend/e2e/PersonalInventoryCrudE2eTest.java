@@ -39,7 +39,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Functional coverage for the audited "Mein Inventar" area at {@code /personal-inventory}, distinct
- * from the Lager's personal view at {@code /inventory/my}.
+ * from the Lager's personal view at {@code /inventory?storage=my}.
  *
  * <p>Drives the in-place create and delete (REQ-AUDIT-001, REQ-FE-001) as {@code test-admin}; the
  * create uses the UEX-location typeahead with the seeded {@code "E2E Personal Inventory City"}.

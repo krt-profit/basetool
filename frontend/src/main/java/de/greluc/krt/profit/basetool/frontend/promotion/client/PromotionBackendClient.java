@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryW
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionReadView;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
@@ -97,60 +98,91 @@ public class PromotionBackendClient {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Lists every promotion topic.
+   * Lists every promotion topic of a view.
    *
+   * @param view whose topics to list
    * @return the topics, or {@code null} when the backend sent no body
    */
   @Nullable
-  public List<PromotionTopicDto> topics() {
-    return backendApiClient.get("/api/v1/promotion/topics/all", TOPIC_LIST);
+  public List<PromotionTopicDto> topics(@NotNull PromotionReadView view) {
+    return backendApiClient.get(
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/topics/all";
+          case MANAGEMENT -> "/api/v1/promotion/topics/all?view=MANAGEMENT";
+        },
+        TOPIC_LIST);
   }
 
   /**
    * Lists every category of one topic.
    *
    * @param topicId the topic, as the page received it
+   * @param view whose categories to list
    * @return the categories, or {@code null} when the backend sent no body
    */
   @Nullable
-  public List<PromotionCategoryDto> categoriesByTopic(@Nullable String topicId) {
+  public List<PromotionCategoryDto> categoriesByTopic(
+      @Nullable String topicId, @NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/categories/by-topic/{topicId}/all", CATEGORY_LIST, topicId);
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/categories/by-topic/{topicId}/all";
+          case MANAGEMENT -> "/api/v1/promotion/categories/by-topic/{topicId}/all?view=MANAGEMENT";
+        },
+        CATEGORY_LIST,
+        topicId);
   }
 
   /**
-   * Reads the first thousand categories of every topic.
+   * Reads the first thousand categories of every topic of a view.
    *
+   * @param view whose categories to read
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<PromotionCategoryDto> allCategories() {
-    return backendApiClient.get("/api/v1/promotion/categories?size=1000", CATEGORY_PAGE);
+  public PageResponse<PromotionCategoryDto> allCategories(@NotNull PromotionReadView view) {
+    return backendApiClient.get(
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/categories?size=1000";
+          case MANAGEMENT -> "/api/v1/promotion/categories?size=1000&view=MANAGEMENT";
+        },
+        CATEGORY_PAGE);
   }
 
   /**
    * Lists the level texts of one category.
    *
    * @param categoryId the category, as the page received it
+   * @param view whose level texts to list
    * @return the level texts, or {@code null} when the backend sent no body
    */
   @Nullable
-  public List<PromotionLevelContentDto> levelContents(@Nullable String categoryId) {
+  public List<PromotionLevelContentDto> levelContents(
+      @Nullable String categoryId, @NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/level-contents/by-category/{categoryId}",
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/level-contents/by-category/{categoryId}";
+          case MANAGEMENT ->
+              "/api/v1/promotion/level-contents/by-category/{categoryId}?view=MANAGEMENT";
+        },
         LEVEL_CONTENT_LIST,
         categoryId);
   }
 
   /**
-   * Reads the first thousand rank requirements, ordered by the rank they start at.
+   * Reads the first thousand rank requirements of a view, ordered by the rank they start at.
    *
+   * @param view whose requirements to read
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<RankRequirementDto> rankRequirements() {
+  public PageResponse<RankRequirementDto> rankRequirements(@NotNull PromotionReadView view) {
     return backendApiClient.get(
-        "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank", RANK_REQUIREMENT_PAGE);
+        switch (view) {
+          case MEMBER -> "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank";
+          case MANAGEMENT ->
+              "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank&view=MANAGEMENT";
+        },
+        RANK_REQUIREMENT_PAGE);
   }
 
   /**

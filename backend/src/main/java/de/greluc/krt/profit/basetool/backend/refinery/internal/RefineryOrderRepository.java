@@ -292,20 +292,6 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Page<RefineryOrder> findAll(Pageable pageable);
 
   /**
-   * Multi-tenant variant of {@link #findAll(Pageable)}: returns every refinery order whose owning
-   * squadron matches {@code owningSquadronId}, or every order when {@code owningSquadronId} is
-   * {@code null} (admin "all squadrons" mode). Refinery is a strict-staffel aggregate - there is no
-   * cross-squadron escape clause like Mission's {@code is_internal = false}.
-   */
-  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
-  @Query("SELECT r FROM RefineryOrder r WHERE " + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE)
-  Page<RefineryOrder> findAllScoped(
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      Pageable pageable);
-
-  /**
    * Bulk-clears the mission link on every refinery order tied to one of the given missions so the
    * orders survive a mission delete as unassigned.
    */

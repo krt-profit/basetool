@@ -19,26 +19,87 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api.events;
 
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The notices that tell a member somebody else booked out or sold part of their Lager stock
- * (REQ-INV-056) or moved it into another pool (REQ-INV-059), built from scalars so they can be
- * delivered after the commit.
+ * (REQ-INV-056) or moved it into another pool (REQ-INV-059), and the notice that a minimum stock
+ * level turned low (REQ-NOTIF-030), built from scalars so they can be delivered after the commit.
  */
 public final class InventoryNotices {
 
   /** Loose entity-type tag stored on the produced notification. */
   public static final String ENTITY_TYPE = InventoryTransferredFromUserEvent.ENTITY_TYPE;
 
+  /** Loose entity-type tag of the notices about one minimum stock level. */
+  public static final String STOCK_LEVEL_ENTITY_TYPE = "INVENTORY_STOCK_LEVEL";
+
   private InventoryNotices() {}
+
+  /**
+   * A minimum stock level turned low.
+   *
+   * @param levelId the level, the notification's loose entity id
+   * @param unitId the unit whose pool the level watches, the context unit the rule resolves
+   * @param unitKind the unit's kind
+   * @param unitName the unit's name
+   * @param entry the material or item name
+   * @param tierCode the tier's code, or {@code null} for any quality
+   * @param minimum the amount below which the level is low
+   * @param allocated the free stock allocated to the level
+   */
+  public record StockLevelLow(
+      @NotNull UUID levelId,
+      @NotNull UUID unitId,
+      @NotNull OrgUnitKind unitKind,
+      @NotNull String unitName,
+      @NotNull String entry,
+      @Nullable String tierCode,
+      double minimum,
+      double allocated) {}
+
+  /**
+   * A minimum stock level turned low; the unit's direct Logisticians and seat holders are told.
+   *
+   * @param level the level and its figures
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent stockLevelLow(@NotNull StockLevelLow level) {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("unit", level.unitName());
+    params.put(
+        "entry",
+        level.tierCode() == null ? level.entry() : level.entry() + " · " + level.tierCode());
+    params.put("minimum", amount(level.minimum()));
+    params.put("amount", amount(level.allocated()));
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.INVENTORY_STOCK_LEVEL_LOW)
+        .entityType(STOCK_LEVEL_ENTITY_TYPE)
+        .entityId(level.levelId())
+        .contextOrgUnits(
+            Map.of(
+                NotificationContextRole.RESPONSIBLE,
+                new OrgUnitRef(level.unitId(), level.unitKind())))
+        .renderParams(params)
+        .build();
+  }
+
+  private static String amount(double value) {
+    return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+  }
 
   /**
    * Somebody other than the owner discarded or sold part of a member's stock.

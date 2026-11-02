@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.settings.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -61,13 +60,6 @@ class AdminSettingsPageControllerReauthMvcTest {
   @Test
   void anExpiredSessionOnASettingRedirectsToLogin() throws Exception {
     when(client.read(SystemSetting.OPERATION_TRANSFER_FEE_RATE)).thenThrow(expiredSession());
-
-    mockMvc.perform(get("/admin/settings")).andExpect(redirectsToLogin());
-  }
-
-  @Test
-  void anExpiredSessionOnTheSquadronToggleRedirectsToLogin() throws Exception {
-    when(client.squadronPage(anyInt())).thenThrow(expiredSession());
 
     mockMvc.perform(get("/admin/settings")).andExpect(redirectsToLogin());
   }

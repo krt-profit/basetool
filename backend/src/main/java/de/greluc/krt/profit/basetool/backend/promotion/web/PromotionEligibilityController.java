@@ -45,7 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>The personal endpoints are filtered by JWT sub – callers never see another member's
  * eligibility through them. The {@code /user/{userId}} endpoint is restricted to {@code ADMIN} and
- * {@code OFFICER} so officers can drive promotion reviews from the management page.
+ * officer reach over the member so officers can drive promotion reviews from the management page.
  */
 @RestController
 @RequestMapping("/api/v1/promotion/eligibility")
@@ -104,8 +104,8 @@ public class PromotionEligibilityController {
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/user/{userId}")
-  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  @Operation(summary = "Evaluate eligibility for another member (ADMIN/OFFICER only).")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER_REACH)
+  @Operation(summary = "Evaluate eligibility for another member (ADMIN or officer reach only).")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

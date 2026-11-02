@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="card">
+    <div class="card" id="profile-appearance-card" data-testid="profile-appearance-card">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{profile.appearance.title}">Darstellung</h2>
+        </div>
+        <p class="acct-note">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+            <span th:text="#{profile.appearance.hint}">Wähle, wie die Navigation auf großen Bildschirmen erscheint.</span>
+        </p>
+        <th:block th:replace="~{kernel/fragments/nav-appearance :: switch('desktop-mode-profile')}"></th:block>
+        <p class="form-hint" th:text="#{profile.appearance.note}">Ab 1025 px Breite.</p>
+        <label class="krt-switch" for="profile-shortcuts-switch">
+            <input type="checkbox" role="switch" id="profile-shortcuts-switch" data-shortcuts-switch
+                   data-testid="profile-shortcuts-switch" th:checked="${navigationAppearance.shortcutsEnabled()}">
+            <span th:text="#{profile.appearance.shortcuts}">Tastenkürzel Alt+1 bis Alt+9 und Alt+0 verwenden</span>
+        </label>
+        <p class="form-hint" th:text="#{profile.appearance.shortcuts.hint}">Alt+1 bis Alt+9 öffnen die Favoriten, Alt+0 die Startseite.</p>
+        <th:block th:replace="~{kernel/fragments/nav-start-page :: selects}"></th:block>
+        <p class="form-hint" th:text="#{profile.startPage.hint}">Die Startseite öffnet nach der Anmeldung.</p>
+    </div>
+
+    <div class="card" id="profile-navigation-reset-card" data-testid="profile-navigation-reset-card">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{profile.reset.title}">Navigation zurücksetzen</h2>
+        </div>
+        <p class="form-hint" th:text="#{profile.reset.text}">Setzt Navigation, Dashboards und Startseiten zurück.</p>
+        <button type="button" class="btn btn-quiet-danger" data-trigger="open-modal-display"
+                data-modal-id="navigation-reset-modal" data-testid="navigation-reset-open"
+                th:disabled="${!navigationAppearance.loaded()}"
+                th:text="#{profile.reset.button}">Alles zurücksetzen</button>
+    </div>
+
+    <div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='navigation-reset-modal', titleKey='profile.reset.modal.title', variant='krt-modal--danger', body=~{::.navigation-reset-body})}">
+        <div class="navigation-reset-body">
+            <div class="krt-modal-body">
+                <p th:text="#{profile.reset.modal.text}">Alles kehrt zum Standard zurück.</p>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                        data-modal-id="navigation-reset-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-danger" data-trigger="nav-reset-confirm"
+                        data-testid="navigation-reset-confirm"
+                        th:data-done="#{profile.reset.done}" th:data-error="#{profile.reset.error}"
+                        th:text="#{profile.reset.confirm}">Zurücksetzen</button>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

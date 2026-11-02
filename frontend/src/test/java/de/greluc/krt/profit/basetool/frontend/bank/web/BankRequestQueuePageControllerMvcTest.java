@@ -194,7 +194,7 @@ class BankRequestQueuePageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"OFFICER"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void queue_nonStaffIsForbidden() throws Exception {
     mockMvc.perform(get("/bank/requests")).andExpect(status().isForbidden());
   }

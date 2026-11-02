@@ -28,12 +28,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.controller.RoleGateFixture;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
@@ -44,12 +44,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,7 +61,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * Pure-Mockito unit tests for {@link HangarController}: the {@code /my-ships} endpoints take the
  * owner from the JWT, never from the URL, and {@code /squadron-overview} passes {@code
- * includeOwnerDetails=true} only for ADMIN and OFFICER across {@link RoleGateFixture#callers()}.
+ * includeOwnerDetails} as the access policy answers for the caller's officer reach.
  */
 @ExtendWith(MockitoExtension.class)
 class HangarControllerTest {
@@ -74,6 +71,7 @@ class HangarControllerTest {
   @Mock private UserService userService;
   @Mock private ShipMapper shipMapper;
   @Mock private UserMapper userMapper;
+  @Mock private HangarAccessPolicy hangarAccessPolicy;
 
   private HangarController controller;
 
@@ -86,13 +84,7 @@ class HangarControllerTest {
             userService,
             shipMapper,
             userMapper,
-            RoleGateFixture.realAuthHelper(),
-            null);
-  }
-
-  @AfterEach
-  void clearSecurityContext() {
-    RoleGateFixture.clear();
+            hangarAccessPolicy);
   }
 
   private static ShipDto shipDto(String name) {
@@ -131,6 +123,20 @@ class HangarControllerTest {
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
     assertThat(result.content()).containsExactly(d1, d2);
     assertThat(result.totalElements()).isEqualTo(2L);
+  }
+
+  @Test
+  void getMyReadiness_resolvesOwnerFromJwt() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(hangarService.getMyReadiness(ownerId))
+        .thenReturn(new de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto(5, 2));
+
+    var result = controller.getMyReadiness(jwt);
+
+    assertThat(result.total()).isEqualTo(5L);
+    assertThat(result.fitted()).isEqualTo(2L);
   }
 
   @Test
@@ -184,26 +190,26 @@ class HangarControllerTest {
     verify(shipMapper, never()).toOwnerDto(any());
   }
 
-  static java.util.stream.Stream<String> callers() {
-    return RoleGateFixture.callers();
-  }
-
-  /**
-   * BE-SIMP-07: the owner-detail shaping moved from a raw {@code "ROLE_ADMIN" || "ROLE_OFFICER"}
-   * scan of the injected {@code Authentication} to {@code AuthHelperService.isAdminOrOfficer()}.
-   * Every caller shape must still get exactly the answer the raw scan gave.
-   */
-  @ParameterizedTest
-  @MethodSource("callers")
-  void getSquadronOverview_includesOwnerDetailsExactlyForAdminAndOfficer(String caller) {
-    boolean expected = RoleGateFixture.rawCheckAccepted(caller, "ROLE_ADMIN", "ROLE_OFFICER");
-    RoleGateFixture.authenticateAs(caller);
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(expected), isNull()))
+  @Test
+  void getSquadronOverview_includesOwnerDetailsWhenTheCallerHasOfficerReach() {
+    when(hangarAccessPolicy.canSeeOwnerDetails()).thenReturn(true);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true), isNull()))
         .thenReturn(new PageImpl<>(List.of()));
 
     controller.getSquadronOverview(0, 20, null, null);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(expected), isNull());
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true), isNull());
+  }
+
+  @Test
+  void getSquadronOverview_omitsOwnerDetailsWithoutOfficerReach() {
+    when(hangarAccessPolicy.canSeeOwnerDetails()).thenReturn(false);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    controller.getSquadronOverview(0, 20, null, null);
+
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
   }
 
   @Test

@@ -26,7 +26,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -171,8 +170,8 @@ class NotificationMuteServiceTest {
     assertThat(
             meterRegistry
                 .counter(
-                    MetricNames.NOTIFICATION_MUTED,
-                    MetricNames.TAG_NOTIFICATION_TYPE,
+                    NotificationMetricNames.NOTIFICATION_MUTED,
+                    NotificationMetricNames.TAG_NOTIFICATION_TYPE,
                     NotificationType.JOB_ORDER_CREATED.name())
                 .count())
         .isEqualTo(1);

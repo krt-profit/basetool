@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
@@ -31,9 +32,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,6 @@ class PromotionEligibilityServiceTest {
   @Mock private RankRequirementRepository rankRequirementRepository;
   @Mock private MemberEvaluationRepository memberEvaluationRepository;
 
-  @Mock private OwnerScopeService ownerScopeService;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   /**
@@ -63,9 +63,9 @@ class PromotionEligibilityServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient().when(promotionAccessPolicy.isFeatureEnabledForCurrentScope()).thenReturn(true);
-    lenient().when(promotionAccessPolicy.hasReadAccess()).thenReturn(true);
-    lenient().when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    lenient()
+        .when(promotionAccessPolicy.readScope(any()))
+        .thenReturn(Optional.of(new PromotionReadScope(null)));
   }
 
   @InjectMocks private PromotionEligibilityService service;
@@ -449,17 +449,19 @@ class PromotionEligibilityServiceTest {
   @Test
   void evaluateForRanks_shouldScopeRequirementAndEvaluationLoadsToActiveSquadron() {
     UUID scopeId = UUID.randomUUID();
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
-    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, scopeId))
+    Set<UUID> scope = Set.of(scopeId);
+    when(promotionAccessPolicy.readScope(PromotionReadView.MEMBER))
+        .thenReturn(Optional.of(new PromotionReadScope(scope)));
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, scope))
         .thenReturn(List.of());
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, scopeId))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, scope))
         .thenReturn(List.of());
 
     service.evaluateForRanks(USER, 20, 19);
 
-    verify(rankRequirementRepository).findAllForRankTransitionWithRelationsScoped(20, 19, scopeId);
+    verify(rankRequirementRepository).findAllForRankTransitionWithRelationsScoped(20, 19, scope);
     verify(memberEvaluationRepository, atLeastOnce())
-        .findAllByUserIdWithCategoryAndTopicScoped(USER, scopeId);
+        .findAllByUserIdWithCategoryAndTopicScoped(USER, scope);
   }
 
   private PromotionRequirementCheckResponse checkForRequirement(

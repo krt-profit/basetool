@@ -46,6 +46,7 @@ public class PurchasingQuickAccessContributor implements QuickAccessContributor 
 
   private static final String CRUMB = "nav.section.supply";
   private static final String ICON = "download";
+  private static final String PAGE = "purchasing.deals";
 
   private final PurchasingBackendClient purchasingClient;
   private final PurchasingFeatureState featureState;
@@ -77,27 +78,33 @@ public class PurchasingQuickAccessContributor implements QuickAccessContributor 
           entry(
               "/purchasing/partners",
               "palette.page.purchasingPartners",
-              "palette.keywords.purchasingPartners"));
+              "palette.keywords.purchasingPartners",
+              "purchasing.partners"));
     }
     if (tabs.delegates()) {
       out.add(
           entry(
               "/purchasing/delegates",
               "palette.page.purchasingDelegates",
-              "palette.keywords.purchasingDelegates"));
+              "palette.keywords.purchasingDelegates",
+              "purchasing.delegates"));
     }
     if (tabs.report()) {
       out.add(
           entry(
               "/purchasing/report",
               "palette.page.purchasingReport",
-              "palette.keywords.purchasingReport"));
+              "palette.keywords.purchasingReport",
+              "purchasing.report"));
     }
     return List.copyOf(out);
   }
 
   private static @NotNull QuickAccessEntry entry(
-      @NotNull String href, @NotNull String labelKey, @NotNull String keywordsKey) {
-    return new QuickAccessEntry(href, labelKey, CRUMB, ICON, keywordsKey);
+      @NotNull String href,
+      @NotNull String labelKey,
+      @NotNull String keywordsKey,
+      @NotNull String entryKey) {
+    return QuickAccessEntry.tab(href, labelKey, CRUMB, ICON, keywordsKey, PAGE, entryKey);
   }
 }

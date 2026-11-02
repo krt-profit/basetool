@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
@@ -81,10 +82,13 @@ class JobOrderBackendClientTest {
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
 
-    client.orders(false, false, 2, 100, List.of("OPEN", "IN_PROGRESS"), List.of(SQUADRON, OTHER));
-    client.orders(true, false, 0, 50, List.of("COMPLETED"), List.of(SQUADRON));
-    client.orders(false, true, 1, 200, List.of("OPEN"), List.of(SQUADRON));
+    client.orders(
+        OrderListScope.ALL, 2, 100, List.of("OPEN", "IN_PROGRESS"), List.of(SQUADRON, OTHER));
+    client.orders(OrderListScope.MINE, 0, 50, List.of("COMPLETED"), List.of(SQUADRON));
+    client.orders(OrderListScope.TO_PROCESS, 1, 200, List.of("OPEN"), List.of(SQUADRON));
+    client.orders(OrderListScope.ASSIGNED, 0, 100, List.of("OPEN"), List.of(SQUADRON));
 
     backend.expect(
         "GET",
@@ -96,6 +100,37 @@ class JobOrderBackendClientTest {
         "GET", "/api/v1/orders/requested?page=0&size=50&sort=priority,asc&status=COMPLETED");
     backend.expect(
         "GET", "/api/v1/orders?page=1&size=200&sort=priority,asc&status=OPEN&toProcess=true");
+    backend.expect(
+        "GET", "/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN&assignedToMe=true");
+  }
+
+  @Test
+  void processingOrdersCarryTheOptionalUnit() {
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
+
+    client.ordersToProcess(null, 5, List.of("OPEN", "IN_PROGRESS"));
+    client.ordersToProcess(SQUADRON, 3, List.of("OPEN"));
+
+    backend.expect(
+        "GET",
+        "/api/v1/orders?page=0&size=5&sort=priority,asc&status=OPEN,IN_PROGRESS&toProcess=true");
+    backend.expect(
+        "GET",
+        "/api/v1/orders?page=0&size=3&sort=priority,asc&status=OPEN&toProcess=true&orgUnitId="
+            + SQUADRON);
+  }
+
+  @Test
+  void materialDemandSummaryCarriesTheLimitAndTheOptionalUnit() {
+    backend.answerJson("{\"openBuckets\":0,\"rows\":[]}");
+    backend.answerJson("{\"openBuckets\":0,\"rows\":[]}");
+
+    client.materialDemandSummary(null, 5);
+    client.materialDemandSummary(SQUADRON, 10);
+
+    backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=5");
+    backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=10&orgUnitId=" + SQUADRON);
   }
 
   @Test

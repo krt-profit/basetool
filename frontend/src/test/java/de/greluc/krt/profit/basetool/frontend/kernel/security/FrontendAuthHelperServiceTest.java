@@ -88,7 +88,7 @@ class FrontendAuthHelperServiceTest {
 
   @Test
   void isMemberOrAbove_readsTokenAuthorities_notPrincipalObject() {
-    authenticateWith("ROLE_OFFICER");
-    assertTrue(service.isMemberOrAbove(), "officer authority on the token counts as member");
+    authenticateWith("ROLE_KRT_MEMBER");
+    assertTrue(service.isMemberOrAbove(), "member authority on the token counts as member");
   }
 }

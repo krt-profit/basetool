@@ -47,6 +47,8 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventT
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedLifecycleObserver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
@@ -216,6 +218,46 @@ class SupplyNeedServiceTest {
     assertThatThrownBy(() ->
             service.create(createRequest(material.getId(), UUID.randomUUID(), 2, false, null)))
         .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void leadRaisesNeedAsLogistician() {
+    AccessGateService accessGateService = org.mockito.Mockito.mock(AccessGateService.class);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
+    SupplyAccessPolicy realPolicy =
+        new SupplyAccessPolicy(
+            org.mockito.Mockito.mock(RequestScopeResolver.class),
+            accessGateService,
+            authHelperService,
+            settingsService,
+            org.mockito.Mockito.mock());
+    SupplyNeedService leadService =
+        new SupplyNeedService(
+            needRepository,
+            unitSettingRepository,
+            materialRepository,
+            gameItemRepository,
+            qualityTierRepository,
+            jobOrderRepository,
+            settingsService,
+            realPolicy,
+            mapper,
+            auditRecorder,
+            authHelperService,
+            new SimpleMeterRegistry(),
+            lifecycleObservers,
+            eventPublisher);
+    raisingUnit();
+    when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
+    when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
+    when(needRepository.save(any(SupplyNeed.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    leadService.create(createRequest(material.getId(), null, 3.0, false, null));
+
+    verify(accessGateService).hasRoleInOrgUnit(UNIT, "LOGISTICIAN");
+    verify(needRepository).save(any(SupplyNeed.class));
   }
 
   @Test

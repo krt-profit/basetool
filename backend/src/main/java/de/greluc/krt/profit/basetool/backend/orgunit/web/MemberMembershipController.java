@@ -77,8 +77,6 @@ public class MemberMembershipController {
       "hasAnyRole('"
           + Roles.ADMIN
           + "', '"
-          + Roles.OFFICER
-          + "', '"
           + Roles.KRT_MEMBER
           + "', '"
           + Roles.BANK_EMPLOYEE

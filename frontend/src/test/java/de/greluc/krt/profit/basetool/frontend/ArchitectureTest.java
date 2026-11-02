@@ -155,7 +155,7 @@ class ArchitectureTest {
     List<String> unmarked =
         CLASSES.stream()
             .filter(c -> c.isAnnotatedWith(Controller.class))
-            .filter(c -> !c.isAnnotatedWith(UsesLayoutModel.class))
+            .filter(c -> !usesLayoutModel(c))
             .map(JavaClass::getSimpleName)
             .sorted()
             .toList();
@@ -165,12 +165,21 @@ class ArchitectureTest {
         .isEmpty();
   }
 
+  /**
+   * Whether a class opts into the layout model, directly or through a composed annotation such as
+   * {@code @FragmentController}.
+   */
+  private static boolean usesLayoutModel(JavaClass type) {
+    return type.isAnnotatedWith(UsesLayoutModel.class)
+        || type.isMetaAnnotatedWith(UsesLayoutModel.class);
+  }
+
   @Test
   void noRestControllerOptsIntoTheLayoutModel() {
     List<String> marked =
         CLASSES.stream()
             .filter(c -> c.isAnnotatedWith(RestController.class))
-            .filter(c -> c.isAnnotatedWith(UsesLayoutModel.class))
+            .filter(ArchitectureTest::usesLayoutModel)
             .map(JavaClass::getSimpleName)
             .sorted()
             .toList();
@@ -189,7 +198,7 @@ class ArchitectureTest {
   void bodyWritingHandlersInLayoutControllersOnlyEverDecrease() {
     long count =
         CLASSES.stream()
-            .filter(c -> c.isAnnotatedWith(UsesLayoutModel.class))
+            .filter(ArchitectureTest::usesLayoutModel)
             .flatMap(c -> c.getMethods().stream())
             .filter(m -> m.isMetaAnnotatedWith(RequestMapping.class))
             .filter(ArchitectureTest::writesItsOwnBody)
@@ -212,7 +221,7 @@ class ArchitectureTest {
    * The maximum number of body-writing handlers inside {@code @UsesLayoutModel} controllers; lower
    * it when handlers move out, never raise it.
    */
-  private static final long BODY_HANDLERS_IN_LAYOUT_CONTROLLERS = 213L;
+  private static final long BODY_HANDLERS_IN_LAYOUT_CONTROLLERS = 211L;
 
   /**
    * Whether a handler method writes its response body directly, mirroring the shapes {@code

@@ -40,6 +40,8 @@
         </th:block>
     </th:block>
 
+    <th:block th:replace="~{identity/fragments/member-tabs :: tabs(${memberId}, 'hangar')}"></th:block>
+
     <div class="alert alert-info" data-testid="member-hangar-hint" th:text="#{memberHangar.hint}">Jede &Auml;nderung wird dem Mitglied mitgeteilt.</div>
     <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Fehler</div>
 

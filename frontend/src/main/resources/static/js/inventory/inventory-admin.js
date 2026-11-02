@@ -43,6 +43,7 @@ import { initPoolChange } from '/js/inventory/inventory-pool-change.js';
 const adminLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-admin',
     basePath: '/inventory/all',
+    storage: 'all',
     stackPerOwner: true,
     stackPersonalFlag: false,
     refreshTable() {
@@ -308,12 +309,12 @@ function filterInventory() {
     container.style.opacity = '0.5';
     container.style.pointerEvents = 'none';
 
-    const url = new URL(`${window.location.origin}/inventory/all`);
+    const url = adminLager.lagerPageUrl();
     url.searchParams.append('fragment', 'true');
 
     adminLager.appendLagerFilterParams(url.searchParams, selection);
 
-    const visibleUrl = new URL(`${window.location.origin}/inventory/all`);
+    const visibleUrl = adminLager.lagerPageUrl();
     adminLager.appendLagerFilterParams(visibleUrl.searchParams, selection);
     try {
         window.history.replaceState({}, '', visibleUrl.toString());

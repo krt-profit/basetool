@@ -1,7 +1,8 @@
 # ADR-0298 — Navigation preferences live server-side in a navigation module
 
-- **Status:** Accepted — implementation pending (the module, its tables and migrations do not
-  exist yet).
+- **Status:** Accepted — implemented (map #2800): the module, its root table, the favourites,
+  hidden-pages, order, appearance (desktop mode, shortcut switch, start pages) and tab-bar sections,
+  and the dashboards.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-032, REQ-UI-034,
@@ -26,10 +27,11 @@ page to its permission.
 
 1. **Split store.** Deliberate choices live server-side per user; incidental UI state (group
    collapse, recents, „Häufig", the dismissed dashboard hint) stays in the browser.
-2. **A new backend module `navigation`** (`api` / `internal` / `web`) owns the store and the
-   dashboard data of ADR-0299. Its tables are Flyway-owned and reference `app_user (id)` with
-   `ON DELETE CASCADE`, so account deletion removes them without an event or an `identity`
-   dependency.
+2. **A new backend module `navigation`** (`internal` / `web`, a leaf without an `api` package) owns
+   the store and the dashboard data of ADR-0299. Its tables are Flyway-owned: one root row per
+   member references `app_user (id)` with `ON DELETE CASCADE` and carries the section version
+   counters, and every further table references that root, so account deletion removes them
+   without an event or an `identity` dependency and the data export names one member column.
 3. **Five sections, each with its own version counter:** favourites with their order, hidden
    entries, the order of groups and links (per mode), the phone tab bar (per mode; no rows means
    automatic), and „Darstellung" (desktop mode, start page per mode, `shortcutsEnabled`).
@@ -67,7 +69,7 @@ page to its permission.
   the preferences; the price is that stale rows live until the member's next page load.
 - Preferences are an explicit exemption from the peer live-update rule of REQ-FE-010, stated in
   REQ-UI-032.
-- REQ-SEC-058, REQ-SEC-046 and REQ-DATA-021 gain planned amendments for the export section and
+- REQ-SEC-058, REQ-SEC-046 and REQ-DATA-021 gain amendments for the export section and
   the merge rule.
 - `module-boundaries.md` and arc42 §5 gain the module; `basetool_navigation_preference_writes_total`
   `{section, outcome}`, `basetool_navigation_personalised_accounts{section}` and a 5xx alert on the

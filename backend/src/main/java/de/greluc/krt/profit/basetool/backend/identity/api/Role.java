@@ -52,7 +52,7 @@ public class Role extends AbstractEntity<Long> {
   private Long id;
 
   /**
-   * Stable, machine-readable role identifier (e.g. {@code ADMIN}, {@code OFFICER}), set at seed
+   * Stable, machine-readable role identifier (e.g. {@code ADMIN}, {@code KRT_MEMBER}), set at seed
    * time and immutable. The seed logic matches on this code, so renaming the display label {@link
    * #name} never changes the role's identity.
    */

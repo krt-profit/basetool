@@ -141,6 +141,18 @@ function createLager(cfg) {
     let umbuchenCurrentOwningOrgUnitId = null;
 
     /**
+     * The address of the Lager tab with this page's storage option selected; the caller appends
+     * the filter parameters.
+     *
+     * @returns {URL} the address
+     */
+    function lagerPageUrl() {
+        const url = new URL(`${window.location.origin}/inventory`);
+        url.searchParams.set('storage', cfg.storage);
+        return url;
+    }
+
+    /**
      * Reports whether the Items view of the Lager is active, read from the URL's `view` parameter.
      *
      * @returns {boolean} true on the items view
@@ -1802,6 +1814,7 @@ function createLager(cfg) {
     }
 
     return {
+        lagerPageUrl,
         lagerIsItemsView,
         restoreExpandedTree,
         collectLeafOrderIds,

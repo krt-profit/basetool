@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionReadView;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -65,13 +67,14 @@ class PromotionLevelContentControllerTest {
   void list_wrapsServicePageIntoPageResponse() {
     PromotionLevelContentResponse a = content(UUID.randomUUID(), PromotionLevel.LEVEL_A);
     Page<PromotionLevelContentResponse> page = new PageImpl<>(List.of(a), PageRequest.of(0, 10), 1);
-    when(service.list(any(Pageable.class))).thenReturn(page);
+    when(service.list(any(Pageable.class), eq(PromotionReadView.MEMBER))).thenReturn(page);
 
-    PageResponse<PromotionLevelContentResponse> result = controller.list(0, 10, null);
+    PageResponse<PromotionLevelContentResponse> result =
+        controller.list(0, 10, null, PromotionReadView.MEMBER);
 
     assertThat(result.content()).containsExactly(a);
     assertThat(result.totalElements()).isEqualTo(1L);
-    verify(service).list(any(Pageable.class));
+    verify(service).list(any(Pageable.class), eq(PromotionReadView.MEMBER));
   }
 
   @Test
@@ -80,12 +83,13 @@ class PromotionLevelContentControllerTest {
     PromotionLevelContentResponse a = content(categoryId, PromotionLevel.LEVEL_A);
     PromotionLevelContentResponse b = content(categoryId, PromotionLevel.LEVEL_B);
     PromotionLevelContentResponse c = content(categoryId, PromotionLevel.LEVEL_C);
-    when(service.listByCategory(categoryId)).thenReturn(List.of(a, b, c));
+    when(service.listByCategory(categoryId, PromotionReadView.MEMBER)).thenReturn(List.of(a, b, c));
 
-    List<PromotionLevelContentResponse> result = controller.listByCategory(categoryId);
+    List<PromotionLevelContentResponse> result =
+        controller.listByCategory(categoryId, PromotionReadView.MEMBER);
 
     assertThat(result).containsExactly(a, b, c);
-    verify(service).listByCategory(categoryId);
+    verify(service).listByCategory(categoryId, PromotionReadView.MEMBER);
   }
 
   @Test

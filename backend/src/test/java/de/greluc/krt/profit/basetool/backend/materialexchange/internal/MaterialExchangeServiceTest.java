@@ -63,7 +63,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -104,7 +104,7 @@ class MaterialExchangeServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private ExchangeItemReferences exchangeItemReferences;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
@@ -133,7 +133,7 @@ class MaterialExchangeServiceTest {
             auditService,
             boardService,
             blueprintProductService,
-            ownerScopeService,
+            requestScopeResolver,
             eventPublisher,
             selfProvider);
     owner = user(ownerId, "Anbieter");
@@ -494,7 +494,7 @@ class MaterialExchangeServiceTest {
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(blueprintProductService.resolveByProductKey("venture helmet"))
         .thenReturn(Optional.of(new ResolvedProduct("venture helmet", "Venture Helmet", null)));
-    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
     when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
     when(interestRepository.countByOfferId(any())).thenReturn(0L);
     when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
@@ -547,7 +547,7 @@ class MaterialExchangeServiceTest {
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(blueprintProductService.resolveByProductKey("venture helmet"))
         .thenReturn(Optional.of(new ResolvedProduct("venture helmet", "Venture Helmet", null)));
-    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
     when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
     when(interestRepository.countByOfferId(any())).thenReturn(0L);
     when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());

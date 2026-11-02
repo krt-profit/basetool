@@ -10,7 +10,7 @@
 <th:block th:fragment="pageContent">
 <main>
     <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.hangar_data}, actions=~{::ship-data-actions})}">
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='hangar.catalog', eyebrowKey='nav.group.operations', titleText=#{nav.hangar_data}, actions=~{::ship-data-actions})}">
             <th:block th:ref="ship-data-actions">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='ship-data-menu', items=~{::ship-data-menu-items})}">
                     <th:block th:ref="ship-data-menu-items">
@@ -23,7 +23,7 @@
         </th:block>
     </th:block>
     <th:block sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.hangar_data})}"></th:block>
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='hangar.catalog', eyebrowKey='nav.group.operations', titleText=#{nav.hangar_data})}"></th:block>
     </th:block>
 
     <th:block th:replace="~{kernel/fragments/components :: alert('danger', ${error}, null)}"></th:block>

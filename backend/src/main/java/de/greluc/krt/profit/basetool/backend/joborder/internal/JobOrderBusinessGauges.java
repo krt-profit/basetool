@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMetricNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -47,13 +47,14 @@ public class JobOrderBusinessGauges implements BusinessGaugeSource {
   @Override
   public void register(@NotNull MeterRegistry registry) {
     BusinessGauges.countGauge(
-        registry, MetricNames.JOB_ORDER_OPEN, jobOrderOpen, JobOrderStatus.OPEN.name());
+        registry, JobOrderMetricNames.JOB_ORDER_OPEN, jobOrderOpen, JobOrderStatus.OPEN.name());
     BusinessGauges.countGauge(
         registry,
-        MetricNames.JOB_ORDER_OPEN,
+        JobOrderMetricNames.JOB_ORDER_OPEN,
         jobOrderInProgress,
         JobOrderStatus.IN_PROGRESS.name());
-    BusinessGauges.ageGauge(registry, MetricNames.JOB_ORDER_OPEN_OLDEST_AGE, jobOrderOldestAge);
+    BusinessGauges.ageGauge(
+        registry, JobOrderMetricNames.JOB_ORDER_OPEN_OLDEST_AGE, jobOrderOldestAge);
   }
 
   @Override

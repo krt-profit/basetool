@@ -131,7 +131,7 @@ class AdminSyncReportsPageControllerMvcTest {
             .getContentAsString();
 
     assertThat(html)
-        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>60<")
         .contains("data-list-count-for=\"sync-results\"")
         .containsPattern(

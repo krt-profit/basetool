@@ -212,6 +212,10 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     return user;
   }
 
+  private ReconciledUser krtMember() {
+    return new ReconciledUser(userWithNoRoles(), Set.of(namedRole("KRT Member")));
+  }
+
   private static OrgUnitMembership membership(UUID orgUnitId, OrgUnitKind kind) {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(USER_ID, orgUnitId));
@@ -422,7 +426,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void plainStaffelMember_getsNoLeadershipRolesAndNoCascade() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     OrgUnitMembership plain = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(plain));
     when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
@@ -436,8 +440,23 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   @Test
+  void flagOnlyBereichLogistician_isMintedForTheBereichAloneAndTheCascadeIsLeftToTheScopeLayer() {
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
+    OrgUnitMembership flagged = membership(BEREICH_ID, OrgUnitKind.BEREICH);
+    flagged.setLogistician(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(flagged));
+    when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", BEREICH_ID)));
+    assertFalse(
+        authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", DESCENDANT_STAFFEL_ID)));
+  }
+
+  @Test
   void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
@@ -456,7 +475,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void bereichsleiter_ownUnitAndCascadeYieldEachContextualAuthorityOnce() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     lead.setLogistician(true);
@@ -480,7 +499,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void olMember_getsFlatRolesAndContextualAuthoritiesForEveryReachedUnit() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
@@ -498,7 +517,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     UUID squadronId = UUID.randomUUID();
     OrgUnitMembership lead = membership(squadronId, OrgUnitKind.SQUADRON);
     lead.setRole(MembershipRole.STAFFELLEITER);
@@ -515,6 +534,48 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     assertFalse(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", foreignUnit)));
     assertFalse(
         authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", foreignUnit)));
+  }
+
+  @Test
+  void aRetainedSeatWithoutKrtMember_mintsNoRankDerivedAuthorityAndNoCascade() {
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
+    lead.setRole(MembershipRole.BEREICHSLEITER);
+    OrgUnitMembership staffelleiter = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
+    staffelleiter.setRole(MembershipRole.STAFFELLEITER);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID))
+        .thenReturn(List.of(lead, staffelleiter));
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    assertTrue(
+        authorities.stream().noneMatch(OrgUnitContextualAuthority.class::isInstance),
+        "no contextual authority comes from the rank");
+    verifyNoInteractions(orgUnitCascadeService);
+  }
+
+  @Test
+  void explicitFlagsWithoutKrtMember_stillMintTheirOwnUnitAuthorities() {
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    OrgUnitMembership logistician = membership(BEREICH_ID, OrgUnitKind.BEREICH);
+    logistician.setLogistician(true);
+    OrgUnitMembership missionManager = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
+    missionManager.setMissionManager(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID))
+        .thenReturn(List.of(logistician, missionManager));
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", BEREICH_ID)));
+    assertTrue(
+        authorities.contains(
+            new OrgUnitContextualAuthority("MISSION_MANAGER", DESCENDANT_STAFFEL_ID)));
+    assertFalse(
+        authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", BEREICH_ID)));
   }
 
   @Test

@@ -26,8 +26,8 @@ import java.util.UUID;
 
 /**
  * Write DTO for creating or upserting a {@code MemberEvaluation}. The {@code userId} is set
- * server-side from the JWT for self-assignments, or provided by ADMIN/OFFICER for managing other
- * users.
+ * server-side from the JWT for self-assignments, or provided by an admin or an officer for managing
+ * other users.
  */
 public record MemberEvaluationCreateRequest(
     @NotBlank @Size(max = 64) String userId,

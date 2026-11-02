@@ -96,7 +96,7 @@ class InventoryInputFormPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\" href=\"/inventory/my\"")
+        .containsPattern("class=\"page-eyebrow\" href=\"/inventory\\?storage=my\"")
         .containsPattern("<h1>Lagereintrag einbuchen</h1>")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
@@ -115,7 +115,7 @@ class InventoryInputFormPatternRenderTest {
     assertThat(html.split("btn--cta", -1)).hasSizeLessThanOrEqualTo(2);
     assertThat(html)
         .containsPattern(
-            "class=\"form-actions--sticky\">\\s*<a href=\"/inventory/my\""
+            "class=\"form-actions--sticky\">\\s*<a href=\"/inventory\\?storage=my\""
                 + " data-trigger=\"history-back\" class=\"btn btn-ghost\">Abbrechen</a>")
         .containsPattern("data-testid=\"inventory-input-submit\">.*<span>Einbuchen</span>");
   }
@@ -124,6 +124,7 @@ class InventoryInputFormPatternRenderTest {
   @Test
   void eyebrowFollowsTheSource() throws Exception {
     assertThat(render("aggregated")).containsPattern("class=\"page-eyebrow\" href=\"/inventory\"");
-    assertThat(render(null)).containsPattern("class=\"page-eyebrow\" href=\"/inventory/my\"");
+    assertThat(render(null))
+        .containsPattern("class=\"page-eyebrow\" href=\"/inventory\\?storage=my\"");
   }
 }

@@ -251,6 +251,7 @@ public class JobOrderStockProjectionService {
         baseDto.createdAt(),
         baseDto.version(),
         baseDto.canEdit(),
+        baseDto.canManageAssignees(),
         false);
   }
 

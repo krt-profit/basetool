@@ -937,7 +937,7 @@ you touch these areas.
 ### Multi-user data isolation
 
 - Every read / write must filter by JWT `sub` unless the caller has an
-  elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service
+  elevated role (`ADMIN`, …). Enforce this in the service
   layer, not the controller.
 - For a member below Logistician, the controller must explicitly clear
   sensitive fields (e-mail, real name, internal orders / items) via a
@@ -961,12 +961,12 @@ you touch these areas.
   that squadrons sign up for via material claims, a squadron-responsible
   order is private to that squadron + admins (reworked in #340, `V129`).
 - Scope is enforced in the service layer via
-  [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java);
+  [`AccessGateService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/AccessGateService.java);
   controllers gate detail / write endpoints with
-  `@PreAuthorize("@ownerScopeService.canEdit…")`.
+  `@PreAuthorize("@accessGateService.canEdit…")`.
 - ArchUnit rule `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
   breaks the build if a staffel-scoped service stops injecting
-  `AuthHelperService` / `OwnerScopeService`. Update the whitelist in
+  `AuthHelperService` or a scope-kernel service. Update the whitelist in
   [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
   when you add a new staffel-scoped aggregate.
 - Full scope model: [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`).

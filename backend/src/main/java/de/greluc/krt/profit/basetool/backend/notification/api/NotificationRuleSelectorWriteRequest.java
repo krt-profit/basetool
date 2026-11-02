@@ -25,7 +25,7 @@ import java.util.UUID;
 /**
  * Write payload for one recipient selector. Which of {@code userId} / {@code roleCode} / ({@code
  * orgRelativeRole} + {@code contextRole}) must be set follows from {@link #kind}; the service
- * validates the combination. The event-derived kinds ({@link SelectorKind#readsOnlyTheEvent()})
+ * validates the combination. The column-free kinds ({@link SelectorKind#readsNoSelectorColumns()})
  * need none of them, and the service stores them with every one of those fields null whatever the
  * request sent.
  *

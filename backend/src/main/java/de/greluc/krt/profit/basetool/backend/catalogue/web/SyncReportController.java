@@ -24,12 +24,15 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -59,6 +62,8 @@ public class SyncReportController {
 
   private static final int DEFAULT_PAGE_SIZE = 50;
   private static final int MAX_PAGE_SIZE = 200;
+  private static final int DEFAULT_RANGE_DAYS = 7;
+  private static final int MAX_RANGE_DAYS = 365;
 
   private final SyncReportService syncReportService;
   private final SyncReportMapper syncReportMapper;
@@ -91,6 +96,25 @@ public class SyncReportController {
     Page<ExternalSyncReport> events =
         syncReportService.findEvents(sourceFilter, PageRequest.of(safePage, safeSize));
     return PageResponse.of(events.map(syncReportMapper::toDto));
+  }
+
+  /**
+   * Counts, per source, the runs that finished inside the last {@code days} days.
+   *
+   * @param days the range in days (clamped to 1..365, default 7)
+   * @return one summary per source system, in a fixed order
+   */
+  @NotNull
+  @Operation(
+      summary = "Count sync runs in a range",
+      description =
+          "Admin-only. Returns, per source system (UEX / SCWIKI / P4K), how many runs finished "
+              + "inside the last N days and when the newest did. Only runs still retained count.")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "Run summaries returned")})
+  @GetMapping("/runs")
+  public List<SyncRunSummaryDto> runSummaries(@RequestParam(required = false) Integer days) {
+    int range = days == null ? DEFAULT_RANGE_DAYS : Math.clamp(days, 1, MAX_RANGE_DAYS);
+    return syncReportService.runSummaries(range, Instant.now());
   }
 
   /**

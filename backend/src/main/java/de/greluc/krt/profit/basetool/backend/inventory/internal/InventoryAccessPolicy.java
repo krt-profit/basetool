@@ -21,11 +21,13 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +49,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "inventoryAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserAccessPolicy userAccessPolicy;
 
@@ -61,7 +63,9 @@ public class InventoryAccessPolicy implements BookInPolicy {
   public boolean canSeeInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> ownerScopeService.permitsOwnedRow(i.getUser(), i.getOwningOrgUnit(), false))
+        .map(i ->
+            accessGateService.permitsOwnedRow(
+                i.getUser(), i.getOwningOrgUnit(), false, Roles.LOGISTICIAN))
         .orElse(false);
   }
 
@@ -75,19 +79,49 @@ public class InventoryAccessPolicy implements BookInPolicy {
   public boolean canEditInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> ownerScopeService.permitsOwnedRow(i.getUser(), i.getOwningOrgUnit(), true))
+        .map(i ->
+            accessGateService.permitsOwnedRow(
+                i.getUser(), i.getOwningOrgUnit(), true, Roles.LOGISTICIAN))
         .orElse(false);
   }
 
   /**
+   * Checks whether the caller handles Lager row {@code itemId} as Logistician: a Logistician grant
+   * in the row's owning unit inside the active scope, or an admin. A personal row without a unit is
+   * reserved to admins (REQ-SEC-005).
+   *
+   * @param itemId the row to inspect; never {@code null}
+   * @return {@code true} iff the caller may act on the row as Logistician; {@code false} for an
+   *     unknown row
+   */
+  public boolean isLogisticianOfItem(@NotNull UUID itemId) {
+    return inventoryItemRepository
+        .findById(itemId)
+        .map(i -> accessGateService.canActAsLogisticianInOwner(owningUnitId(i)))
+        .orElse(false);
+  }
+
+  /**
+   * Returns the id of the unit that owns {@code item}, or {@code null} for an ownerless row.
+   *
+   * @param item the row
+   * @return the owning unit id, or {@code null}
+   */
+  @Nullable
+  private static UUID owningUnitId(@NotNull InventoryItem item) {
+    return item.getOwningOrgUnit() == null ? null : item.getOwningOrgUnit().getId();
+  }
+
+  /**
    * Coarse pre-check for creating Lager rows in another member's name: admin, self, or a shared
-   * editable org unit (REQ-SEC-005). The per-row bound is the stamp validation.
+   * editable or Logistician-granted org unit (REQ-SEC-005). The per-row bound is the stamp
+   * validation.
    *
    * @param targetUserId the member whose Lager would receive the row; never {@code null}
    * @return {@code true} iff the caller may create Lager rows in that member's name
    */
   public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return userAccessPolicy.canActOnTargetUser(targetUserId, true);
+    return userAccessPolicy.canActOnTargetUserAsGrantee(targetUserId, Roles.LOGISTICIAN);
   }
 
   @Override

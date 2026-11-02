@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -111,7 +110,9 @@ public class NotificationMuteService {
         if (dropped > 0) {
           meterRegistry
               .counter(
-                  MetricNames.NOTIFICATION_MUTED, MetricNames.TAG_NOTIFICATION_TYPE, type.name())
+                  NotificationMetricNames.NOTIFICATION_MUTED,
+                  NotificationMetricNames.TAG_NOTIFICATION_TYPE,
+                  type.name())
               .increment(dropped);
         }
       }

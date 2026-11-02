@@ -188,6 +188,14 @@ public final class MetricNames {
    */
   public static final String CLIENT_CSP_VIOLATION = "basetool.client.csp.violation";
 
+  /**
+   * Counter {@code basetool_quick_access_search_total}, tags {@link #TAG_KIND} (a {@code
+   * QuickAccessSearchKind} key) and {@link #TAG_OUTCOME} ({@code hits} / {@code empty} / {@code
+   * error} / {@code timeout}): one per entity type asked by a quick-access search (REQ-UI-033). The
+   * search term never becomes a tag value.
+   */
+  public static final String QUICK_ACCESS_SEARCH = "basetool.quick.access.search";
+
   /** Counter {@code basetool_backend_client_errors_total} — tags {@code reason}, {@code method}. */
   public static final String BACKEND_CLIENT_ERRORS = "basetool.backend.client.errors";
 
@@ -252,7 +260,8 @@ public final class MetricNames {
 
   /**
    * Tag key: the browser-error class on {@link #CLIENT_ERROR}, resolved server-side against the
-   * five {@code CLIENT_ERROR_*} literals; a non-matching payload yields no series (REQ-OBS-006).
+   * five {@code CLIENT_ERROR_*} literals; a non-matching payload yields no series (REQ-OBS-006). On
+   * {@link #QUICK_ACCESS_SEARCH} the searched entity type.
    */
   public static final String TAG_KIND = "kind";
 
@@ -333,7 +342,10 @@ public final class MetricNames {
   /** Redis fan-out operation: consuming a peer's editor-presence snapshot (ADR-0126). */
   public static final String OP_PRESENCE_CONSUME = "presence_consume";
 
-  /** Tag key: the login outcome on {@link #LOGIN}. */
+  /**
+   * Tag key: the login outcome on {@link #LOGIN} and the per-type outcome on {@link
+   * #QUICK_ACCESS_SEARCH}.
+   */
   public static final String TAG_OUTCOME = "outcome";
 
   /** Tag key: the bot-protection reject rule on {@link #BOT_BLOCKED}. */

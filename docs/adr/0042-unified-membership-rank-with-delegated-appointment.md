@@ -1,7 +1,7 @@
 # ADR-0042 — Unified membership rank with a delegated appointment ladder
 
 - **Status:** Accepted — **amended by [ADR-0300](0300-officer-reach-is-derived-per-org-unit-and-the-keycloak-officer-role-is-retired.md)**
-  (planned: a leadership seat also confers officer reach in its unit, the flat `OFFICER` role is
+  (a leadership seat also confers officer reach in its unit, the flat `OFFICER` role is
   retired, and every seat requires `KRT Member`) and by
   [ADR-0322](0322-a-kommandoleiter-needs-no-kommandogruppe.md) (the Kommandogruppe is optional for
   Kommandoleiter and stellv. as well)

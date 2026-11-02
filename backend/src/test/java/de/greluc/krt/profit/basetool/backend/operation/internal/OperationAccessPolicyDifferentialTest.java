@@ -36,8 +36,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -85,7 +83,7 @@ class OperationAccessPolicyDifferentialTest {
 
   private static final List<UUID> OPERATIONS = List.of(OP_A, OP_B, OP_C, OP_OWNERLESS, OP_UNKNOWN);
 
-  private static final int GATES = 3;
+  private static final int GATES = 2;
 
   /**
    * One caller of the matrix.
@@ -175,11 +173,7 @@ class OperationAccessPolicyDifferentialTest {
         new Gate(
             "canSeeOperationLedger",
             ScopeHubOperationGates::canSeeOperationLedger,
-            OperationAccessPolicy::canSeeOperationLedger),
-        new Gate(
-            "canEditOperation",
-            ScopeHubOperationGates::canEditOperation,
-            OperationAccessPolicy::canEditOperation));
+            OperationAccessPolicy::canSeeOperationLedger));
   }
 
   private static String label(UUID operation) {
@@ -260,13 +254,7 @@ class OperationAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      OwnerScopeService ownerScopeService =
-          new OwnerScopeService(
-              resolver,
-              accessGateService,
-              new OrgUnitStampingService(
-                  resolver, accessGateService, authHelper, memberships, orgUnits));
-      policy = new OperationAccessPolicy(ownerScopeService, authHelper, operations);
+      policy = new OperationAccessPolicy(accessGateService, authHelper, operations);
       scopeHub = new ScopeHubOperationGates(accessGateService, authHelper, operations);
     }
 
@@ -314,15 +302,6 @@ class OperationAccessPolicyDifferentialTest {
               o.getOwningOrgUnit() == null
                   ? authHelper.isMemberOrAbove()
                   : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId()))
-          .orElse(false);
-    }
-
-    boolean canEditOperation(UUID operationId) {
-      return operationRepository
-          .findById(operationId)
-          .map(o ->
-              o.getOwningOrgUnit() == null
-                  || accessGateService.canEditSquadron(o.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 

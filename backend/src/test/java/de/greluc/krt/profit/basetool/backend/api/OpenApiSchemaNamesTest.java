@@ -167,7 +167,7 @@ class OpenApiSchemaNamesTest {
     ExposedTypes.controllers().forEach(controller -> scanned.add(controller.getSimpleName()));
 
     assertThat(new TreeSet<>(ApiDomains.controllers())).isEqualTo(scanned);
-    assertThat(ApiDomains.all()).hasSize(23);
+    assertThat(ApiDomains.all()).hasSize(24);
   }
 
   /**

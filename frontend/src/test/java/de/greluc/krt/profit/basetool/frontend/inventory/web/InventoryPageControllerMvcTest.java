@@ -58,6 +58,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
@@ -132,7 +133,7 @@ class InventoryPageControllerMvcTest {
 
     mockMvc
         .perform(
-            get("/inventory/my")
+            get("/inventory?storage=my")
                 .with(
                     oidcLogin()
                         .idToken(token -> token.subject(me.toString()))
@@ -149,7 +150,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(view().name("inventory/inventory-admin"))
         .andExpect(model().attributeExists("groupedItems"));
@@ -158,12 +159,13 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void viewAllInventory_AsLogistician_ShouldShowActions() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Einbuchen")));
@@ -177,7 +179,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("Einbuchen"))));
   }
@@ -190,7 +192,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"bookOutSubmitBtn\"")))
         .andExpect(content().string(containsString("data-text-discard=\"Ausbuchen\"")))
@@ -214,7 +216,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
@@ -225,7 +227,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"/inventory/my", "/inventory/all"})
+  @ValueSource(strings = {"/inventory?storage=my", "/inventory?storage=all"})
   @WithMockUser(roles = "KRT_MEMBER")
   void inventoryPages_ShouldBootstrapHerkunftAutoPrefillLabel(String path) throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
@@ -248,7 +250,7 @@ class InventoryPageControllerMvcTest {
    * @throws Exception if the request fails
    */
   @ParameterizedTest
-  @ValueSource(strings = {"/inventory/my", "/inventory/my?view=items"})
+  @ValueSource(strings = {"/inventory?storage=my", "/inventory?storage=my&view=items"})
   @WithMockUser(roles = "KRT_MEMBER")
   void viewMyInventory_rendersTheFiltersInsideTheToolbarPopover(String path) throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
@@ -287,7 +289,7 @@ class InventoryPageControllerMvcTest {
    * @throws Exception if the request fails
    */
   @ParameterizedTest
-  @ValueSource(strings = {"/inventory/all", "/inventory/all?view=items"})
+  @ValueSource(strings = {"/inventory?storage=all", "/inventory?storage=all&view=items"})
   @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_rendersTheFiltersInsideTheToolbarPopover(String path) throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
@@ -324,7 +326,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"bulkSelectAllBtn\"")))
         .andExpect(content().string(containsString("data-trigger=\"inv-my-select-all\"")))
@@ -345,7 +347,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"bulkRebookBtn\"")))
         .andExpect(content().string(containsString("data-trigger=\"inv-my-open-bulk-rebook\"")))
@@ -368,7 +370,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"bulkOrgUnitBtn\"")))
         .andExpect(content().string(containsString("data-trigger=\"inv-my-open-bulk-org-unit\"")))
@@ -391,7 +393,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -409,7 +411,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -427,7 +429,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -452,7 +454,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(
             content()
@@ -820,7 +822,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-scu-decimal")))
         .andExpect(content().string(containsString("inputmode=\"decimal\"")))
@@ -837,7 +839,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"inventoryTable\"")))
         .andExpect(content().string(containsString("data-user-id=\"test-user-123\"")));
@@ -851,7 +853,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"inventoryTable\"")))
         .andExpect(content().string(containsString("data-user-id=\"test-user-123\"")))
@@ -1528,6 +1530,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1602,6 +1605,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1701,7 +1705,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(locationName)))
         .andExpect(content().string(containsString("data-trigger=\"inv-my-toggle-stack\"")))
@@ -1757,7 +1761,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all"))
+        .perform(get("/inventory?storage=all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(locationName)))
         .andExpect(content().string(containsString(ownerName)))
@@ -1819,11 +1823,11 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my"))
+        .perform(get("/inventory?storage=my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-testid=\"lager-view-material\"")))
         .andExpect(content().string(containsString("data-testid=\"lager-view-items\"")))
-        .andExpect(content().string(containsString("/inventory/my?view=items")));
+        .andExpect(content().string(containsString("/inventory?storage=my&amp;view=items")));
   }
 
   @Test
@@ -1833,7 +1837,7 @@ class InventoryPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
-    for (String path : new String[] {"/inventory/my", "/inventory/all"}) {
+    for (String path : new String[] {"/inventory?storage=my", "/inventory?storage=all"}) {
       mockMvc
           .perform(get(path))
           .andExpect(status().isOk())
@@ -1885,7 +1889,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/my").param("view", "items"))
+        .perform(get("/inventory?storage=my").param("view", "items"))
         .andExpect(status().isOk())
         .andExpect(view().name("inventory/inventory-my"))
         .andExpect(content().string(containsString("Quantum Drive XL-1")))
@@ -1939,7 +1943,7 @@ class InventoryPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
 
     mockMvc
-        .perform(get("/inventory/all").param("view", "items"))
+        .perform(get("/inventory?storage=all").param("view", "items"))
         .andExpect(status().isOk())
         .andExpect(view().name("inventory/inventory-admin"))
         .andExpect(content().string(containsString("Quantum Drive XL-1")))
@@ -1979,7 +1983,9 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("RSI")))
         .andExpect(
             content()
-                .string(containsString("/inventory/all?view=items&amp;gameItemIds=" + gameItemId)))
+                .string(
+                    containsString(
+                        "/inventory?storage=all&amp;view=items&amp;gameItemIds=" + gameItemId)))
         .andExpect(content().string(not(containsString("Max. Qualit"))));
   }
 
@@ -2249,6 +2255,7 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllGameItemStackEntries_rendersItemLeaf() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -2350,6 +2357,7 @@ class InventoryPageControllerMvcTest {
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
   void viewAllGameItemStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed()
       throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
     UUID itemId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -2425,10 +2433,10 @@ class InventoryPageControllerMvcTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/inventory/my",
-        "/inventory/my?view=items",
-        "/inventory/all",
-        "/inventory/all?view=items"
+        "/inventory?storage=my",
+        "/inventory?storage=my&view=items",
+        "/inventory?storage=all",
+        "/inventory?storage=all&view=items"
       })
   @WithMockUser(roles = "ADMIN")
   void lagerViews_renderTheLocationFilterWithInScopeOptions(String path) throws Exception {

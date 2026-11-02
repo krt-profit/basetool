@@ -130,7 +130,6 @@ body:
         - KRT_MEMBER
         - LOGISTICIAN
         - MISSION_MANAGER
-        - OFFICER
         - ADMIN
         - Multiple / not relevant
 

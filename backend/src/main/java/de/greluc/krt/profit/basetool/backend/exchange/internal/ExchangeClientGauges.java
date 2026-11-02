@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -52,7 +53,7 @@ public class ExchangeClientGauges {
     for (ExchangeClientStatus status : ExchangeClientStatus.values()) {
       AtomicInteger count = new AtomicInteger();
       counts.put(status, count);
-      Gauge.builder(MetricNames.EXCHANGE_CLIENTS, count, AtomicInteger::get)
+      Gauge.builder(ExchangeMetricNames.EXCHANGE_CLIENTS, count, AtomicInteger::get)
           .description("Exchange registry clients per status.")
           .tag(MetricNames.TAG_STATUS, status.name())
           .register(meterRegistry);

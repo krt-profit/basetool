@@ -6,7 +6,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{adminTerms.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.terms', eyebrowKey='nav.admin.group.members', titleText=#{adminTerms.title},
         count=${termsPage != null ? termsPage.totalElements() : null}, countId='admin-terms-count', countFor='admin-terms-results')}"></th:block>
 
     <section class="list-panel">

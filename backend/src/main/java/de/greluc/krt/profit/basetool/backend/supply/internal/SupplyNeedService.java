@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyMetricNames;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import de.greluc.krt.profit.basetool.backend.supply.api.events.SupplyNotices;
@@ -106,6 +107,7 @@ public class SupplyNeedService {
    * @param statuses only these states, or empty for the visible ones
    * @param purchasable only purchasable ({@code true}) or non-purchasable needs, or {@code null}
    * @param materialId only this material, or {@code null}
+   * @param coverage only the open needs of this coverage, or {@code null}
    * @param pageable page, size and sort
    * @return one page of needs
    */
@@ -115,11 +117,15 @@ public class SupplyNeedService {
       @NotNull Set<NeedStatus> statuses,
       @Nullable Boolean purchasable,
       @Nullable UUID materialId,
+      @Nullable NeedCoverage coverage,
       @NotNull Pageable pageable) {
     settingsService.requireEnabled();
     final boolean seesAll = accessPolicy.isAdmin() || accessPolicy.isGoverningLeadership();
     final Set<UUID> managed = accessPolicy.managedUnitIds();
     Specification<SupplyNeed> spec = fetchCatalogue();
+    if (coverage != null) {
+      spec = spec.and(coverage.specification());
+    }
     if (orgUnitId != null) {
       spec = spec.and((root, query, cb) -> cb.equal(root.get("orgUnitId"), orgUnitId));
     }
@@ -527,7 +533,7 @@ public class SupplyNeedService {
   }
 
   private void count(@NotNull String event) {
-    meterRegistry.counter(MetricNames.SUPPLY_NEEDS, MetricNames.TAG_EVENT, event).increment();
+    meterRegistry.counter(SupplyMetricNames.SUPPLY_NEEDS, MetricNames.TAG_EVENT, event).increment();
   }
 
   private static @NotNull Specification<SupplyNeed> fetchCatalogue() {

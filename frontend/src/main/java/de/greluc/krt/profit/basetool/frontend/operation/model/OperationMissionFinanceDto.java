@@ -28,8 +28,11 @@ import java.util.UUID;
  * signed bottom line in the operation finance summary.
  *
  * @param missionId the mission's id (links the row to its lazy-loaded detail)
- * @param missionName the mission's display name
+ * @param missionName the mission's display name; {@code null} when anonymised
  * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
+ * @param anonymised {@code true} when the viewer may not see the mission; the row shows a neutral
+ *     label and no link
  */
 @DtoMirror
-public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}
+public record OperationMissionFinanceDto(
+    UUID missionId, String missionName, BigDecimal totalSum, boolean anonymised) {}

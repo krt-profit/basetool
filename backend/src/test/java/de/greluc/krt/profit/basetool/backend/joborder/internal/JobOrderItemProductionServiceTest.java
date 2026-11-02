@@ -62,7 +62,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.List;
 import java.util.Optional;
@@ -97,7 +97,7 @@ class JobOrderItemProductionServiceTest {
   @Mock private UserService userService;
   @Mock private UserRepository userRepository;
   @Mock private LocationRepository locationRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private BookInPolicy bookInPolicy;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
   @Mock private AuthHelperService authHelperService;
@@ -602,7 +602,7 @@ class JobOrderItemProductionServiceTest {
     when(bookInPolicy.mayBookInFor(ownerId)).thenReturn(true);
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, orgUnitId))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, orgUnitId))
         .thenReturn(orgUnit);
     when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -634,7 +634,7 @@ class JobOrderItemProductionServiceTest {
     assertThat(slice.getJobOrderId()).isEqualTo(order.getId());
     assertThat(slice.getAmount()).isEqualTo(2.0);
     assertThat(slice.getDelivered()).isFalse();
-    verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);
+    verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);
     org.mockito.InOrder callOrder = inOrder(inventoryItemRepository, inventoryCheckoutService);
     callOrder.verify(inventoryItemRepository).save(stockRow);
     callOrder.verify(inventoryCheckoutService).mergeStockIfRequested(stockRow, false);
@@ -761,7 +761,7 @@ class JobOrderItemProductionServiceTest {
     verify(inventoryItemRepository).save(captor.capture());
     assertThat(captor.getValue().getUser()).isSameAs(actor);
     verify(userRepository, never()).findById(any());
-    verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(actor, null);
+    verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(actor, null);
   }
 
   @Test

@@ -74,6 +74,12 @@ class OperationWritesAjaxControllerTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    when(backendApiClient.get(
+            "/api/v1/me/capabilities",
+            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
+                .CapabilitiesResponse.class))
+        .thenReturn(
+            de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager());
   }
 
   @Test

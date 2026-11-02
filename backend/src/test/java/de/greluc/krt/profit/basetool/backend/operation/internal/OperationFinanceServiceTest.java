@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -33,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceGroupAggregate;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.dto.*;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
@@ -45,6 +48,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -62,7 +66,14 @@ class OperationFinanceServiceTest {
 
   @Mock private RefineryOrderFinanceReader refineryOrderFinanceReader;
 
+  @Mock private MissionVisibility missionVisibility;
+
   @InjectMocks private OperationFinanceService operationFinanceService;
+
+  @BeforeEach
+  void everyMissionIsVisibleByDefault() {
+    lenient().when(missionVisibility.canSeeMission(any())).thenReturn(true);
+  }
 
   @Test
   void shouldCalculateCorrectTotalSumWithFinancesAndRefineryOrders() {
@@ -227,6 +238,104 @@ class OperationFinanceServiceTest {
     assertThrows(
         NotFoundException.class,
         () -> operationFinanceService.getMissionFinanceDetail(operationId, foreignMissionId));
+  }
+
+  @Test
+  void getOperationFinanceSummary_anonymisesAMissionTheCallerMayNotSee_keepingItsAmount() {
+    UUID operationId = UUID.randomUUID();
+    Operation operation = new Operation();
+    operation.setId(operationId);
+    Mission visible = new Mission();
+    visible.setId(UUID.randomUUID());
+    visible.setName("Zulu");
+    Mission hidden = new Mission();
+    hidden.setId(UUID.randomUUID());
+    hidden.setName("Secret Alpha");
+    operation.setMissions(Set.of(visible, hidden));
+    when(missionVisibility.canSeeMission(hidden)).thenReturn(false);
+
+    when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+    when(financeEntryRepository.aggregateFinanceByMissionIds(any()))
+        .thenReturn(
+            List.of(
+                new MissionFinanceGroupAggregate(visible.getId(), BigDecimal.valueOf(100), null),
+                new MissionFinanceGroupAggregate(hidden.getId(), BigDecimal.valueOf(900), null)));
+    when(refineryOrderFinanceReader.profitByMission(any())).thenReturn(Map.of());
+
+    OperationFinanceSummaryDto result =
+        operationFinanceService.getOperationFinanceSummary(operationId);
+
+    assertEquals(0, BigDecimal.valueOf(1000).compareTo(result.totalSum()));
+    assertEquals(2, result.missions().size());
+    OperationMissionFinanceDto first = result.missions().get(0);
+    assertEquals("Zulu", first.missionName());
+    assertFalse(first.anonymised());
+    OperationMissionFinanceDto last = result.missions().get(1);
+    assertEquals(hidden.getId(), last.missionId());
+    assertNull(last.missionName(), "the name of a hidden mission must not leave the service");
+    assertTrue(last.anonymised());
+    assertEquals(0, BigDecimal.valueOf(900).compareTo(last.totalSum()));
+  }
+
+  @Test
+  void getOperationFinances_anonymisesAHiddenMissionWithoutEntriesOrOrders() {
+    UUID operationId = UUID.randomUUID();
+    Operation operation = new Operation();
+    operation.setId(operationId);
+    Mission hidden = new Mission();
+    hidden.setId(UUID.randomUUID());
+    hidden.setName("Secret Alpha");
+    operation.setMissions(Set.of(hidden));
+    when(missionVisibility.canSeeMission(hidden)).thenReturn(false);
+    MissionFinanceEntry entry =
+        MissionFinanceEntry.builder()
+            .mission(hidden)
+            .amount(BigDecimal.valueOf(500))
+            .type(FinanceType.INCOME)
+            .build();
+    when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+    when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(List.of(entry));
+    when(refineryOrderFinanceReader.linesOfMissions(any())).thenReturn(List.of());
+
+    OperationFinanceDto result = operationFinanceService.getOperationFinances(operationId);
+
+    MissionFinanceSummaryDto line = result.missions().get(0);
+    assertTrue(line.anonymised());
+    assertNull(line.missionName());
+    assertTrue(line.entries().isEmpty());
+    assertTrue(line.refineryOrders().isEmpty());
+    assertEquals(0, BigDecimal.valueOf(500).compareTo(line.totalSum()));
+    assertEquals(0, BigDecimal.valueOf(500).compareTo(result.totalSum()));
+  }
+
+  @Test
+  void getMissionFinanceDetail_hiddenMission_returnsTheAnonymisedSummary() {
+    UUID operationId = UUID.randomUUID();
+    Operation operation = new Operation();
+    operation.setId(operationId);
+    Mission hidden = new Mission();
+    hidden.setId(UUID.randomUUID());
+    hidden.setName("Secret Alpha");
+    operation.setMissions(Set.of(hidden));
+    when(missionVisibility.canSeeMission(hidden)).thenReturn(false);
+    MissionFinanceEntry entry =
+        MissionFinanceEntry.builder()
+            .mission(hidden)
+            .amount(BigDecimal.valueOf(300))
+            .type(FinanceType.EXPENSE)
+            .build();
+    when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+    when(financeEntryRepository.findAllByMissionId(hidden.getId())).thenReturn(List.of(entry));
+    when(refineryOrderFinanceReader.linesOfMission(hidden.getId())).thenReturn(List.of());
+
+    MissionFinanceSummaryDto result =
+        operationFinanceService.getMissionFinanceDetail(operationId, hidden.getId());
+
+    assertTrue(result.anonymised());
+    assertNull(result.missionName());
+    assertTrue(result.entries().isEmpty());
+    assertTrue(result.refineryOrders().isEmpty());
+    assertEquals(0, BigDecimal.valueOf(-300).compareTo(result.totalSum()));
   }
 
   private static RefineryOrderLine orderLine(UUID missionId, Double oreSales, Double expenses) {

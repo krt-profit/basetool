@@ -55,7 +55,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -86,7 +86,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
   @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper squadronMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
@@ -160,12 +160,13 @@ class JobOrderServicePriorityAndStatusTest {
               null,
               o.getVersion(),
               null,
+              null,
               false);
         });
 
     Squadron testSquadron = new Squadron();
     testSquadron.setShorthand("Alpha");
-    lenient().when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(testSquadron));
+    lenient().when(requestScopeResolver.currentSquadron()).thenReturn(Optional.of(testSquadron));
   }
 
   @Nested

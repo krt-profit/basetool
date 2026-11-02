@@ -8,6 +8,8 @@
         <span class="tree-chevron toggle-icon">▶</span>
         <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
         <span class="lager-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${group.gameItem})}"></span>
+        <span th:if="${group.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
+              th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
     </div>
     <div class="tree-cell lager-cell-muted">
         <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>

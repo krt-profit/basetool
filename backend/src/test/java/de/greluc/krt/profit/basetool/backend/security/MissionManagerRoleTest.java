@@ -133,7 +133,9 @@ class MissionManagerRoleTest {
                         .jwt(builder -> builder.subject(managerMember.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                                "ROLE_MISSION_MANAGER")))
+                                "ROLE_MISSION_MANAGER"),
+                            new de.greluc.krt.profit.basetool.backend.platform.api
+                                .OrgUnitContextualAuthority("MISSION_MANAGER", iridium.getId())))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(coreJson()))
         .andExpect(status().isOk());
@@ -205,7 +207,9 @@ class MissionManagerRoleTest {
                         .jwt(builder -> builder.subject(managerMember.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                                "ROLE_MISSION_MANAGER"))))
+                                "ROLE_MISSION_MANAGER"),
+                            new de.greluc.krt.profit.basetool.backend.platform.api
+                                .OrgUnitContextualAuthority("MISSION_MANAGER", iridium.getId()))))
         .andExpect(status().isOk())
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.canEdit")

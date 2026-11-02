@@ -225,7 +225,7 @@ public class OrgUnitBankApprovalLimitService {
     bankAccountRepository.findByIdForUpdate(account.getId());
     Optional<BankAccountApprovalLimit> existing =
         switch (kind) {
-          case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
+          case MEMBERSHIP_ROLE ->
               approvalLimitRepository.findByAccountIdAndGranteeKindAndRoleCode(
                   account.getId(), kind, Objects.requireNonNull(roleCode));
           case USER ->

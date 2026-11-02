@@ -79,6 +79,21 @@ public class NotificationBackendClient {
   }
 
   /**
+   * Reads the caller's most recent unread notifications; the read ones never count against the
+   * limit.
+   *
+   * @param limit how many to read
+   * @return the unread notifications, newest first, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<NotificationDto> recentUnread(int limit) {
+    return backendApiClient.get(
+        NOTIFICATIONS + "/recent?limit={limit}&unreadOnly=true",
+        NOTIFICATION_LIST,
+        Integer.valueOf(limit));
+  }
+
+  /**
    * Reads one page of the caller's inbox, newest first.
    *
    * @param page the zero-based page index

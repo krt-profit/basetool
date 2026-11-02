@@ -41,9 +41,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * Multi-org-unit tenancy matrix for the Lager (REQ-ORG-002/003/004/008): who may see, create and
  * edit inventory as a squadron member, SK member, member of both, admin, and memberless user.
  *
- * <p>Asserted through the scoped backend endpoints per user, plus the {@code /inventory/all} UI for
- * one viewer. Shared stock is strictly scoped to its owning unit; an unpinned admin sees all, a
- * pinned admin only the pin. {@code /inventory/my} shows only the user's own rows.
+ * <p>Asserted through the scoped backend endpoints per user, plus the {@code
+ * /inventory?storage=all} UI for one viewer. Shared stock is strictly scoped to its owning unit; an
+ * unpinned admin sees all, a pinned admin only the pin. {@code /inventory?storage=my} shows only
+ * the user's own rows.
  */
 @Tag("e2e")
 class InventoryTenancyE2eTest {
@@ -348,8 +349,8 @@ class InventoryTenancyE2eTest {
   }
 
   /**
-   * UI boundary: a squadron-only member loading {@code /inventory/all} sees a group row for their
-   * own squadron's material but none for a foreign squadron's.
+   * UI boundary: a squadron-only member loading {@code /inventory?storage=all} sees a group row for
+   * their own squadron's material but none for a foreign squadron's.
    */
   @Test
   void squadronMemberUiLagerShowsOnlyOwnSquadronGroup() {
@@ -359,7 +360,7 @@ class InventoryTenancyE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=all");
         page.waitForLoadState();
         assertThat(page.locator("div.tree-row--group[data-material-id='" + matAId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

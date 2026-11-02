@@ -68,10 +68,11 @@ public class AdminPersonalInventoryPageController {
   private final PersonalInventoryBackendClient personalInventoryClient;
 
   /**
-   * Renders the admin personal-inventory page: the user picker and, with {@code userSub}, that
-   * user's inventory under the "ADMIN MODE" banner.
+   * Renders the Inventar tab of a member's detail: the inventory of {@code userSub} under the
+   * "ADMIN MODE" banner.
    *
-   * <p>A {@code userSub} that is not a UUID selects no member (REQ-SEC-051).
+   * <p>A {@code userSub} that is not a UUID selects no member and redirects to the member list
+   * (REQ-SEC-051).
    *
    * @param userSub Keycloak {@code sub} of the user whose inventory to show, or {@code null}
    * @param q optional free-text filter
@@ -97,20 +98,19 @@ public class AdminPersonalInventoryPageController {
     }
     final boolean isFragment = "results".equals(fragment);
     UUID selectedSub = RelayParams.uuidOrNull(userSub);
+    if (selectedSub == null) {
+      return "redirect:/members";
+    }
 
     model.addAttribute("selectedUserSub", selectedSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
 
-    if (selectedSub != null) {
-      PageResponse<PersonalInventoryItemDto> items = fetchItems(selectedSub, q, page, size, sort);
-      model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
-      model.addAttribute("page", items);
-      if (!isFragment) {
-        model.addAttribute("selectedUser", fetchUser(selectedSub));
-      }
-    } else {
-      model.addAttribute("items", Collections.emptyList());
+    PageResponse<PersonalInventoryItemDto> items = fetchItems(selectedSub, q, page, size, sort);
+    model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
+    model.addAttribute("page", items);
+    if (!isFragment) {
+      model.addAttribute("selectedUser", fetchUser(selectedSub));
     }
 
     return isFragment

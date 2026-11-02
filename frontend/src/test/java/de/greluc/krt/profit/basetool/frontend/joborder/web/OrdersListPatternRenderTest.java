@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
@@ -83,8 +84,22 @@ class OrdersListPatternRenderTest {
    * @throws Exception if the request fails
    */
   private @NotNull String render(boolean canViewJobOrders, @NotNull String query) throws Exception {
+    return render(LayoutResponses.capabilities(true, canViewJobOrders, true), query);
+  }
+
+  /**
+   * Renders {@code /orders} in German for a caller with the given layout answer.
+   *
+   * @param layout the caller's layout answer carrying the capability flags
+   * @param query the query string, without {@code ?}
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String render(
+      @NotNull LayoutContextLoader.MeLayoutResponse layout, @NotNull String query)
+      throws Exception {
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
-        .thenReturn(LayoutResponses.capabilities(true, canViewJobOrders, true));
+        .thenReturn(layout);
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(get("/orders?" + query).locale(Locale.GERMAN))
@@ -122,6 +137,7 @@ class OrdersListPatternRenderTest {
             Instant.now(),
             1L,
             null,
+            null,
             false);
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
   }
@@ -138,7 +154,7 @@ class OrdersListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Logistik<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .contains("data-list-count-for=\"orders-results\"")
         .contains("data-testid=\"orders-create-link\"")
@@ -278,5 +294,144 @@ class OrdersListPatternRenderTest {
 
     verify(backendApiClient)
         .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+  }
+
+  /** The four segments appear in the order Meine, Ich bearbeite, Zu bearbeiten, Alle. */
+  @Test
+  @WithMockUser
+  void offersTheFourSegmentsInOrder() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(onePage("OPEN"));
+
+    String html = render(true, "");
+
+    assertThat(html)
+        .contains(">Ich bearbeite<")
+        .containsSubsequence(
+            "data-testid=\"segment-scope-mine\"",
+            "data-testid=\"segment-scope-assigned\"",
+            "data-testid=\"segment-scope-to_process\"",
+            "data-testid=\"segment-scope-all\"");
+  }
+
+  /**
+   * The assigned segment reads the caller's own entries, hides the squadron filter and keeps the
+   * scope in the pagination links (REQ-ORDERS-040).
+   */
+  @Test
+  @WithMockUser
+  void assignedScopeReadsTheCallersEntries() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
+
+    String html = render(true, "scope=ASSIGNED&squadronId=" + UUID.randomUUID());
+
+    verify(backendApiClient)
+        .get(
+            eq(QUEUE_URL + "&assignedToMe=true"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS"));
+    assertThat(html)
+        .containsPattern("name=\"scope\" value=\"ASSIGNED\" checked=\"checked\"")
+        .containsPattern("id=\"ordersSquadronField\"[^>]*hidden")
+        .contains("/orders?scope=ASSIGNED&amp;status=OPEN&amp;status=IN_PROGRESS")
+        .doesNotContain("squadronId=")
+        .contains("data-testid=\"order-row\"");
+  }
+
+  /** The assigned list keeps the progress column: an assignee reads the order in full. */
+  @Test
+  @WithMockUser
+  void assignedScopeShowsTheProgressColumn() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(onePage("OPEN"));
+
+    String html = render(true, "scope=ASSIGNED");
+
+    assertThat(html).contains("orders-materials-table").contains(">Fortschritt<");
+  }
+
+  /** A member without profit access but with an entry sees only the assigned segment. */
+  @Test
+  @WithMockUser
+  void assigneeWithoutProfitAccessSeesOnlyTheAssignedSegment() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
+
+    String html = render(LayoutResponses.orderAccess(false, false, true), "scope=ALL");
+
+    verify(backendApiClient)
+        .get(
+            eq(QUEUE_URL + "&assignedToMe=true"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS"));
+    assertThat(html)
+        .contains("data-testid=\"segment-scope-assigned\"")
+        .containsPattern("name=\"scope\" value=\"ASSIGNED\" checked=\"checked\"")
+        .doesNotContain("data-testid=\"segment-scope-mine\"")
+        .doesNotContain("data-testid=\"segment-scope-to_process\"")
+        .doesNotContain("data-testid=\"segment-scope-all\"")
+        .doesNotContain("id=\"squadronFilterContainer\"")
+        .contains("data-testid=\"order-row\"")
+        .contains("/orders?scope=ASSIGNED&amp;status=OPEN&amp;status=IN_PROGRESS");
+  }
+
+  /** Such a member cannot reach the queue or the to-process list through the URL. */
+  @Test
+  @WithMockUser
+  void assigneeWithoutProfitAccessCannotMoveOntoAnotherList() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(onePage("OPEN"));
+
+    render(LayoutResponses.orderAccess(false, false, true), "scope=TO_PROCESS");
+
+    verify(backendApiClient)
+        .get(
+            eq(QUEUE_URL + "&assignedToMe=true"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS"));
+  }
+
+  /** A requester who is also an assignee chooses between their own and the assigned orders. */
+  @Test
+  @WithMockUser
+  void requesterWhoIsAnAssigneeChoosesBetweenMineAndAssigned() throws Exception {
+    when(backendApiClient.get(
+            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(onePage("OPEN"));
+
+    String html = render(LayoutResponses.orderAccess(false, true, true), "");
+
+    verify(backendApiClient)
+        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+    assertThat(html)
+        .containsSubsequence(
+            "data-testid=\"segment-scope-mine\"", "data-testid=\"segment-scope-assigned\"")
+        .containsPattern("name=\"scope\" value=\"MINE\" checked=\"checked\"")
+        .doesNotContain("data-testid=\"segment-scope-to_process\"")
+        .doesNotContain("data-testid=\"segment-scope-all\"");
+  }
+
+  /** A member with no list at all is sent to the order form. */
+  @Test
+  @WithMockUser
+  void aMemberWithoutAnyListIsRedirectedToTheForm() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, false, false));
+    MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+    mockMvc
+        .perform(get("/orders").locale(Locale.GERMAN))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/create"));
   }
 }

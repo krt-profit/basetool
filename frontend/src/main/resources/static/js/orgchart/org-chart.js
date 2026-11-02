@@ -727,3 +727,21 @@ function initOrgChart() {
 }
 
 initOrgChart();
+
+/**
+ * Marks the unit or person named by the `highlight` query parameter, as the quick access links
+ * them, and scrolls the first one into view.
+ */
+function highlightFromUrl() {
+    const key = new URLSearchParams(window.location.search).get('highlight');
+    if (!chart || !key) return;
+    const targets = Array.from(chart.querySelectorAll('[data-oc-key]')).filter((el) => {
+        return el.getAttribute('data-oc-key') === key;
+    });
+    targets.forEach((el) => {
+        el.classList.add('is-highlighted');
+    });
+    if (targets.length > 0) targets[0].scrollIntoView({ block: 'center', inline: 'center' });
+}
+
+highlightFromUrl();

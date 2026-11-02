@@ -40,7 +40,7 @@ builtin_scopes = ["acr", "address", "basic", "email", "microprofile-jwt", "offli
 scopes = [{"id": f"s-{n}", "name": n, "protocol": "openid-connect", "attributes": {}}
           for n in builtin_scopes]
 roles = [{"id": "r-default", "name": "default-roles-basetool"},
-         {"id": "r-krt", "name": "KRT Member"}, {"id": "r-off", "name": "Officer"},
+         {"id": "r-krt", "name": "KRT Member"},
          {"id": "r-adm", "name": "Admin"}, {"id": "r-bem", "name": "Bank Employee"},
          {"id": "r-offline", "name": "offline_access"},
          {"id": "r-uma", "name": "uma_authorization"}]
@@ -322,6 +322,15 @@ if verb == "update":
         data[parts[1]] = body
         save()
         sys.exit(0)
+    if parts[0] == "roles" and len(parts) == 2:
+        victim = next((r for r in data["roles"] if r["name"] == parts[1]), None)
+        if victim is None:
+            fail(f"stub: no realm role {parts[1]}")
+        data["roles"] = [r for r in data["roles"] if r["id"] != victim["id"]]
+        for user in data["users"].values():
+            user["realm_roles"] = [rid for rid in user["realm_roles"] if rid != victim["id"]]
+        save()
+        sys.exit(0)
     if parts[0] == "clients" and len(parts) == 2:
         if policy_freezes(parts[1]):
             fail("Invalid client metadata: DPoP token is disabled [invalid_client_metadata]")
@@ -365,6 +374,15 @@ if verb == "delete":
         if parts[1] not in data[key]:
             fail(f"stub: scope {parts[1]} is not a realm {key}")
         data[key] = [s for s in data[key] if s != parts[1]]
+        save()
+        sys.exit(0)
+    if parts[0] == "roles" and len(parts) == 2:
+        victim = next((r for r in data["roles"] if r["name"] == parts[1]), None)
+        if victim is None:
+            fail(f"stub: no realm role {parts[1]}")
+        data["roles"] = [r for r in data["roles"] if r["id"] != victim["id"]]
+        for user in data["users"].values():
+            user["realm_roles"] = [rid for rid in user["realm_roles"] if rid != victim["id"]]
         save()
         sys.exit(0)
     if parts[0] == "clients" and len(parts) == 2:
@@ -606,6 +624,34 @@ output="$(run_provisioner "$state" --apply)"
 assert_eq "$(cat "${state}/rc")" "0" "a client whose policy is already gone is deleted on its own"
 assert_eq "$(grep -cE '^update client-policies' "${state}/calls.log" || true)" "0" "and the policy lists are left alone"
 assert_eq "$(query "$state" "client('basetool-android') is None")" "True" "the client is gone"
+rm -rf "$state"
+
+echo "4b. the retired Officer realm role is deleted (ADR-0300)"
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["roles"].append({"id": "r-off", "name": "Officer"})
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+before="$(cat "${state}/state.json")"
+output="$(run_provisioner "$state")"
+assert_eq "$(cat "${state}/rc")" "2" "a realm still holding the Officer role plans a change"
+planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ')"
+assert_eq "$planned" "  - realm role 'Officer' deleted with its user mappings (retired with the OFFICER role, ADR-0300)" \
+  "the plan deletes exactly the Officer role"
+assert_eq "$(cat "${state}/state.json")" "$before" "the dry run writes nothing"
+output="$(run_provisioner "$state" --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "'Officer' in [r['name'] for r in d['roles']]")" "False" "the Officer role is gone"
+assert_eq "$(query "$state" "sorted(r['name'] for r in d['roles'] if r['name'] in ('KRT Member', 'Admin'))")" \
+  "['Admin', 'KRT Member']" "and the application roles survive"
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "No changes" "a second apply is empty"
+assert_eq "$(writes_in "$state")" "0" "and sends no write"
 rm -rf "$state"
 
 echo "5. objects only the target realm has are reported, never deleted"

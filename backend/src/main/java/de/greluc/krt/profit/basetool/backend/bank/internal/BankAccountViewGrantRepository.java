@@ -63,7 +63,7 @@ public interface BankAccountViewGrantRepository extends JpaRepository<BankAccoun
    * Whether the account already carries a role grant of the given kind and role code.
    *
    * @param accountId the account; never {@code null}
-   * @param granteeKind {@code MEMBERSHIP_ROLE} or {@code GLOBAL_ROLE}; never {@code null}
+   * @param granteeKind {@code MEMBERSHIP_ROLE}; never {@code null}
    * @param roleCode the role code; never {@code null}
    * @return {@code true} iff such a grant exists
    */
@@ -92,7 +92,7 @@ public interface BankAccountViewGrantRepository extends JpaRepository<BankAccoun
    * Removes the account's role grant of the given kind and role code.
    *
    * @param accountId the account; never {@code null}
-   * @param granteeKind {@code MEMBERSHIP_ROLE} or {@code GLOBAL_ROLE}; never {@code null}
+   * @param granteeKind {@code MEMBERSHIP_ROLE}; never {@code null}
    * @param roleCode the role code to remove; never {@code null}
    * @return the number of rows removed (0 or 1)
    */

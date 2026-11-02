@@ -58,16 +58,6 @@ public class DataInitializer {
           "KRT Member",
           Set.of(Permissions.HANGAR_READ, Permissions.HANGAR_WRITE, Permissions.MISSION_READ));
       createRoleIfNotFound(
-          Roles.OFFICER,
-          "Officer",
-          Set.of(
-              Permissions.HANGAR_READ,
-              Permissions.HANGAR_WRITE,
-              Permissions.MISSION_READ,
-              Permissions.MISSION_WRITE,
-              Permissions.MISSION_MANAGE,
-              Permissions.USER_MANAGE));
-      createRoleIfNotFound(
           Roles.ADMIN,
           "Admin",
           Set.of(

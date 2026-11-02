@@ -12,7 +12,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='orders.create.back', eyebrowHref=@{/orders},
         titleText=(${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}))}"></th:block>
 
-    <div class="form-layout card orders-create">
+    <div class="form-layout card orders-create" th:with="itemMode=${editOrderId != null or startInItemMode == true}">
         <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
         <div th:if="${success}" class="alert alert-success" role="status" th:text="#{__${success}__}">Erfolg</div>
 
@@ -21,19 +21,19 @@
              th:hidden="${editOrderId != null}">
             <label class="krt-segmented__item" data-testid="order-mode-material">
                 <input type="radio" name="orderModeToggle" value="material"
-                       th:checked="${editOrderId == null}"
+                       th:checked="${!itemMode}"
                        data-trigger="order-mode-toggle" />
                 <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
             </label>
             <label class="krt-segmented__item" data-testid="order-mode-item">
                 <input type="radio" name="orderModeToggle" value="item"
-                       th:checked="${editOrderId != null}"
+                       th:checked="${itemMode}"
                        data-trigger="order-mode-toggle" />
                 <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
             </label>
         </div>
 
-        <div id="mode-material" th:hidden="${editOrderId != null}">
+        <div id="mode-material" th:hidden="${itemMode}">
             <form class="orders-create__form" th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
                 <input type="hidden" th:field="*{source}" />
 
@@ -120,7 +120,7 @@
             </form>
         </div>
 
-        <div id="mode-item" th:hidden="${editOrderId == null}">
+        <div id="mode-item" th:hidden="${!itemMode}">
             <form class="orders-create__form" th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
                 <input type="hidden" th:field="*{source}" />
 

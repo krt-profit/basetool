@@ -125,12 +125,12 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * Stubs the caller as Logistician-or-above by default, so the peer redaction is a no-op unless a
-   * case overrides it (REQ-SEC-007).
+   * Stubs the caller as an admin by default, so the peer redaction is a no-op unless a case
+   * overrides it (REQ-SEC-007).
    */
   @BeforeEach
   void assumeALogisticianUnlessACaseSaysOtherwise() {
-    org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    org.mockito.Mockito.lenient().when(authHelperService.isAdmin()).thenReturn(true);
   }
 
   private static Jwt jwt(String sub) {
@@ -250,11 +250,11 @@ class MissionControllerLifecycleTest {
     empty.setId(UUID.randomUUID());
     Page<Mission> page = new PageImpl<>(List.of(crowded, empty), PageRequest.of(0, 20), 2);
     when(missionService.searchMissions(
-            any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+            any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
     when(missionService.registeredCounts(any())).thenReturn(Map.of(crowded.getId(), 7L));
 
-    controller.getAllMissions(null, null, null, null, null, null, null, null);
+    controller.getAllMissions(null, null, null, null, null, null, null, null, null);
 
     ArgumentCaptor<Long> counts = ArgumentCaptor.forClass(Long.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture(), anyBoolean());
@@ -274,12 +274,12 @@ class MissionControllerLifecycleTest {
     other.setId(UUID.randomUUID());
     Page<Mission> page = new PageImpl<>(List.of(joined, other), PageRequest.of(0, 50), 2);
     when(missionService.searchMissions(
-            any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+            any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
     when(missionService.registeredCounts(any())).thenReturn(Map.of());
     when(missionService.signedUpMissionIds(any())).thenReturn(Set.of(joined.getId()));
 
-    controller.getAllMissions(null, null, null, List.of("PLANNED"), null, 0, 50, null);
+    controller.getAllMissions(null, null, null, List.of("PLANNED"), null, null, 0, 50, null);
 
     ArgumentCaptor<Boolean> flags = ArgumentCaptor.forClass(Boolean.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), anyLong(), flags.capture());
@@ -318,17 +318,19 @@ class MissionControllerLifecycleTest {
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
-        controller.getAllMissions(null, null, null, null, null, 0, 20, null);
+        controller.getAllMissions(null, null, null, null, null, null, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(missionService)
         .searchMissions(
+            org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
@@ -343,7 +345,7 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getAllMissions_withQAndFilters_isTheFormerSearchPassedThroughVerbatim() {
+  void getAllMissions_withQAndFilters_isPassedThroughVerbatimIncludingTheOrgUnit() {
     Mission m = new Mission();
     MissionListDto listDto =
         new MissionListDto(
@@ -368,6 +370,7 @@ class MissionControllerLifecycleTest {
     Instant start = Instant.parse("2026-04-01T00:00:00Z");
     Instant end = Instant.parse("2026-06-01T00:00:00Z");
     UUID operationId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
     when(missionService.searchMissions(
             eq("foo"),
             eq(start),
@@ -375,13 +378,14 @@ class MissionControllerLifecycleTest {
             eq(List.of("COMPLETED")),
             eq(null),
             eq(operationId),
+            eq(orgUnitId),
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
         controller.getAllMissions(
-            "foo", start, end, List.of("COMPLETED"), operationId, 0, 20, null);
+            "foo", start, end, List.of("COMPLETED"), operationId, orgUnitId, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     verify(missionService)
@@ -392,6 +396,7 @@ class MissionControllerLifecycleTest {
             eq(List.of("COMPLETED")),
             eq(null),
             eq(operationId),
+            eq(orgUnitId),
             any(Pageable.class));
   }
 
@@ -402,7 +407,7 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(entity);
     when(missionMapper.toDto(entity)).thenReturn(full);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     MissionDto result = controller.getMissionById(id);
 
@@ -418,7 +423,7 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id, false);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(authHelperService.isAdmin()).thenReturn(false);
 
     MissionDto result = controller.getMissionById(id);
 
@@ -426,14 +431,14 @@ class MissionControllerLifecycleTest {
     assertThat(result.name()).isEqualTo("Op Foxglove");
     assertThat(result.status()).isEqualTo("PLANNED");
     assertThat(result.description()).isEqualTo("internal description");
-    assertThat(result.owner()).isNull();
-    assertThat(result.managers()).isNull();
+    assertThat(result.owner()).isNotNull();
+    assertThat(result.managers()).isNotNull();
     assertThat(result.canEdit()).isFalse();
     assertThat(result.canManageManagers()).isFalse();
     assertThat(result.participants()).hasSize(1);
     MissionParticipantDto rosterParticipant = result.participants().iterator().next();
     UserDto rosterUser = rosterParticipant.user();
-    assertThat(rosterUser.username()).isEqualTo("alice");
+    assertThat(rosterUser.username()).isNull();
     assertThat(rosterUser.email()).isNull();
     assertThat(rosterUser.roles()).isNull();
     assertThat(rosterParticipant.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
@@ -455,7 +460,7 @@ class MissionControllerLifecycleTest {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id, false);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(authHelperService.isAdmin()).thenReturn(false);
     when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
@@ -464,7 +469,7 @@ class MissionControllerLifecycleTest {
     verify(missionService).getNextMission();
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody().owner()).isNull();
+    assertThat(response.getBody().owner()).isNotNull();
   }
 
   @Test
@@ -472,7 +477,7 @@ class MissionControllerLifecycleTest {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
     when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
@@ -494,7 +499,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
@@ -516,7 +521,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     MissionDto result =
         controller.joinMission(
@@ -540,7 +545,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     MissionDto result =
         controller.joinMission(
@@ -567,13 +572,13 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(full);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(authHelperService.isAdmin()).thenReturn(false);
 
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
     assertThat(result).isNotSameAs(full);
-    assertThat(result.owner()).isNull();
-    assertThat(result.managers()).isNull();
+    assertThat(result.owner()).isNotNull();
+    assertThat(result.managers()).isNotNull();
     assertThat(result.participants().iterator().next().user().email()).isNull();
   }
 

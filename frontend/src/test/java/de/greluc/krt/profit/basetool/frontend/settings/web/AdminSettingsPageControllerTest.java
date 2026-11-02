@@ -19,27 +19,19 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
-import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
@@ -72,26 +64,5 @@ class AdminSettingsPageControllerTest {
 
     verify(backendApiClient, never())
         .put(eq("/api/v1/settings/job_order.intake_special_command_id"), any(), any());
-  }
-
-  @Test
-  void viewSettings_walksAllSquadronPickerPages() {
-    SquadronDto first = new SquadronDto(UUID.randomUUID(), "Alpha", "AL", "", true, true, true, 0L);
-    SquadronDto second = new SquadronDto(UUID.randomUUID(), "Zulu", "ZU", "", true, true, true, 0L);
-    String squadronsBase = "/api/v1/squadrons?size=1000&sort=name,asc";
-    when(backendApiClient.get(eq(squadronsBase + "&page={page}"), anyTypeRef(), eq(0)))
-        .thenReturn(new PageResponse<>(List.of(second), 0, 1000, 2, 2, List.of()));
-    when(backendApiClient.get(eq(squadronsBase + "&page={page}"), anyTypeRef(), eq(1)))
-        .thenReturn(new PageResponse<>(List.of(first), 1, 1000, 2, 2, List.of()));
-    ConcurrentModel model = new ConcurrentModel();
-
-    controller.viewSettings(model);
-
-    @SuppressWarnings("unchecked")
-    List<SquadronDto> squadrons = (List<SquadronDto>) model.getAttribute("squadrons");
-    assertEquals(2, squadrons.size(), "the second backend page must not be dropped");
-    assertEquals("Alpha", squadrons.get(0).name());
-    assertEquals("Zulu", squadrons.get(1).name());
-    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 }

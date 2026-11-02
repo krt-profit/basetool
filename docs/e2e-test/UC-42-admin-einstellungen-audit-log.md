@@ -37,7 +37,7 @@ Der Admin speichert Systemeinstellungen, liest das Audit-Log oder öffnet eine d
 
 ### Adminseiten-Smoke (`AdminPagesSmokeE2eTest`)
 
-7. Parametrisiert über `FrontendPageRoutes#ADMIN_SMOKE` (Modul `test-support`) jede Seite laden: `/members`, `/organisation/leitung`, `/admin/locations`, `/admin/material-aliases`, `/admin/uex-data`, `/admin/discord-registrations`, `/admin/sync-reports`, `/admin/p4k-import`, `/admin/announcement`, `/admin/notification-rules`, `/admin/org-structure`, `/admin/blueprints`, `/admin/personal-inventory`, `/admin/personal-blueprints`.
+7. Parametrisiert über `FrontendPageRoutes#ADMIN_SMOKE` (Modul `test-support`) jede Seite laden: `/members`, `/organisation/leitung`, `/admin/locations`, `/admin/material-aliases`, `/admin/uex-data`, `/admin/discord-registrations`, `/admin/sync-reports`, `/admin/p4k-import`, `/admin/notification-rules`, `/admin/org-structure`, `/admin/blueprints`, `/admin/personal-inventory`, `/admin/personal-blueprints`.
 
 ### Material anlegen in place (`AdminMaterialCreateInPlaceE2eTest`, #2002, FE-SEC-03 / FE-PERF-06)
 

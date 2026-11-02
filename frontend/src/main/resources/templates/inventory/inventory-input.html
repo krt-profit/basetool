@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main class="page--narrow" th:with="inputSource=${inventoryForm.source},
-               backHref=${inputSource == 'admin' ? '/inventory/all' : (inputSource == 'aggregated' ? '/inventory' : '/inventory/my')},
+               backHref=${inputSource == 'admin' ? '/inventory?storage=all' : (inputSource == 'aggregated' ? '/inventory' : '/inventory?storage=my')},
                backKey=${inputSource == 'admin' ? 'inventory.overview.global' : (inputSource == 'aggregated' ? 'nav.inventory' : 'inventory.overview.my')}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${backKey}, eyebrowHref=@{${backHref}},
         titleText=#{inventory.input.title})}"></th:block>

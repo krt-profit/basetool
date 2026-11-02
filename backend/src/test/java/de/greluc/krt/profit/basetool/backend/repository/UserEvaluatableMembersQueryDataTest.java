@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
@@ -44,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for {@link UserRepository#findEvaluatableMembers(UUID,
  * org.springframework.data.domain.Pageable)} against real Postgres: squadron members with the
- * {@code ADMIN} or {@code OFFICER} realm role are excluded from the promotion matrix.
+ * {@code ADMIN} realm role or a leadership seat are excluded from the promotion matrix.
  *
  * <p>Each test rolls back and asserts only on its own user ids.
  */
@@ -59,14 +60,14 @@ class UserEvaluatableMembersQueryDataTest {
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * The squadron-scoped query returns a {@code KRT_MEMBER} and a role-less member but drops an
-   * {@code OFFICER} and an {@code ADMIN}.
+   * The squadron-scoped query returns a {@code KRT_MEMBER} and a role-less member but drops a
+   * leadership-seat holder and an {@code ADMIN}.
    */
   @Test
-  void findEvaluatableMembers_squadronScope_keepsSimpleMembersDropsOfficersAndAdmins() {
+  void findEvaluatableMembers_squadronScope_keepsSimpleMembersDropsSeatHoldersAndAdmins() {
     User simpleMember = createIridiumMember("KRT_MEMBER");
     User rolelessMember = createIridiumMember(null);
-    User officer = createIridiumMember("OFFICER");
+    User leader = createIridiumLeader();
     User admin = createIridiumMember("ADMIN");
     entityManager.flush();
     entityManager.clear();
@@ -81,19 +82,19 @@ class UserEvaluatableMembersQueryDataTest {
         .as("simple squadron members (with or without the KRT_MEMBER role) stay evaluatable")
         .contains(simpleMember.getId(), rolelessMember.getId());
     assertThat(evaluatableIds)
-        .as("officers and admins are excluded from the promotion matrix (issue #817)")
-        .doesNotContain(officer.getId(), admin.getId());
+        .as("seat holders and admins are excluded from the promotion matrix")
+        .doesNotContain(leader.getId(), admin.getId());
   }
 
   /**
    * Verifies the {@code :scopeSquadronId IS NULL} "all squadrons" branch (an admin without a pinned
-   * squadron) applies the same officer/admin exclusion: a seeded officer never appears, a seeded
-   * ordinary member does.
+   * squadron) applies the same seat/admin exclusion: a seat holder never appears, a seeded ordinary
+   * member does.
    */
   @Test
-  void findEvaluatableMembers_allSquadronsScope_stillExcludesOfficers() {
+  void findEvaluatableMembers_allSquadronsScope_stillExcludesSeatHolders() {
     User simpleMember = createIridiumMember("KRT_MEMBER");
-    User officer = createIridiumMember("OFFICER");
+    User leader = createIridiumLeader();
     entityManager.flush();
     entityManager.clear();
 
@@ -107,19 +108,32 @@ class UserEvaluatableMembersQueryDataTest {
         .as("the ordinary member is evaluatable in all-squadrons mode")
         .contains(simpleMember.getId());
     assertThat(evaluatableIds)
-        .as("the officer is excluded even without a pinned squadron (issue #817)")
-        .doesNotContain(officer.getId());
+        .as("the seat holder is excluded even without a pinned squadron")
+        .doesNotContain(leader.getId());
   }
 
   /**
    * Persists a user with the seeded role of the given code and a membership in the IRIDIUM
    * squadron.
    *
-   * @param roleCode the seeded role code to assign (e.g. {@code OFFICER}, {@code ADMIN}, {@code
-   *     KRT_MEMBER}), or {@code null} for a role-less ordinary member.
+   * @param roleCode the seeded role code to assign (e.g. {@code ADMIN}, {@code KRT_MEMBER}), or
+   *     {@code null} for a role-less ordinary member.
    * @return the persisted user.
    */
   private User createIridiumMember(String roleCode) {
+    return createIridiumMember(roleCode, MembershipRole.MEMBER);
+  }
+
+  /**
+   * Persists a role-less user holding an Ensign seat in the IRIDIUM squadron.
+   *
+   * @return the persisted user.
+   */
+  private User createIridiumLeader() {
+    return createIridiumMember(null, MembershipRole.ENSIGN);
+  }
+
+  private User createIridiumMember(String roleCode, MembershipRole membershipRole) {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("promo-" + UUID.randomUUID());
@@ -135,6 +149,7 @@ class UserEvaluatableMembersQueryDataTest {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
     membership.setUser(user);
+    membership.setRole(membershipRole);
     membership.setJoinedAt(Instant.now());
     orgUnitMembershipRepository.save(membership);
     return user;

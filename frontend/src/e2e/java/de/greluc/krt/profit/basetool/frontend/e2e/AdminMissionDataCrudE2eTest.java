@@ -64,14 +64,12 @@ class AdminMissionDataCrudE2eTest {
    * that shows the section.
    */
   private static final String[][] FILTERS = {
-    {"includeInactiveSquadrons", "squadrons-results", "md-kind-squadrons"},
     {"includeInactiveJobTypes", "jobtypes-results", "md-kind-jobtypes"},
     {"includeInactiveFrequencyTypes", "freqtypes-results", "md-kind-freqtypes"},
   };
 
   /** Each master row paired with the create button its section shows and the dialog it opens. */
   private static final String[][] DIALOGS = {
-    {"md-kind-squadrons", "add-squadron-btn", "squadron-modal"},
     {"md-kind-jobtypes", "add-jobtype-btn", "jobtype-modal"},
     {"md-kind-freqtypes", "add-freqtype-btn", "frequency-type-modal"},
   };
@@ -117,7 +115,7 @@ class AdminMissionDataCrudE2eTest {
     try (BrowserContext context = authedContext()) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/admin/mission-data");
+        E2eSupport.navigate(page, baseUrl + "/admin/org-structure/squadrons");
         page.waitForLoadState();
         page.evaluate("() => { window.__krtNoReload = true; }");
 
@@ -129,7 +127,7 @@ class AdminMissionDataCrudE2eTest {
         page.locator("#sq-desc").fill("Created by AdminMissionDataCrudE2eTest.");
         page.waitForResponse(
             response ->
-                response.url().endsWith("/admin/mission-data/squadrons")
+                response.url().endsWith("/admin/org-structure/squadrons")
                     && "POST".equals(response.request().method()),
             () -> page.locator("#squadron-form button[type='submit']").click());
         assertThat(squadronRow(page))
@@ -140,7 +138,7 @@ class AdminMissionDataCrudE2eTest {
         assertThat(page.locator("#delete-confirm-modal")).isVisible();
         page.waitForResponse(
             response ->
-                response.url().contains("/admin/mission-data/squadrons/")
+                response.url().contains("/admin/org-structure/squadrons/")
                     && response.url().endsWith("/delete")
                     && "POST".equals(response.request().method()),
             () -> page.locator("#delete-confirm-form button[type='submit']").click());

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
@@ -44,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -491,13 +491,15 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    Counter counter = meterRegistry.find(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).counter();
+    Counter counter =
+        meterRegistry.find(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).counter();
     assertNotNull(counter, "an enabled run must register the counter so increase() sees it rise");
     assertEquals(0.0, counter.count());
   }
 
   private double unknownClassCount() {
-    Counter counter = meterRegistry.find(MetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).counter();
+    Counter counter =
+        meterRegistry.find(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).counter();
     return counter == null ? 0.0 : counter.count();
   }
 

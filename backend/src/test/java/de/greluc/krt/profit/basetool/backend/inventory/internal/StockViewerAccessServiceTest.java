@@ -64,7 +64,7 @@ class StockViewerAccessServiceTest {
   void mayEditInventoryItem_anotherMembersRowInScope_isFalseForAPlainMember() {
     when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(ITEM_ID)).thenReturn(false);
 
     assertFalse(service.mayEditInventoryItem(ITEM_ID, OTHER_MEMBER_ID));
   }
@@ -73,7 +73,7 @@ class StockViewerAccessServiceTest {
   void mayEditInventoryItem_anotherMembersRowInScope_isTrueForALogisticianOrAbove() {
     when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(ITEM_ID)).thenReturn(true);
 
     assertTrue(service.mayEditInventoryItem(ITEM_ID, OTHER_MEMBER_ID));
   }
@@ -81,7 +81,7 @@ class StockViewerAccessServiceTest {
   @Test
   void mayEditInventoryItem_rowOutOfScope_isFalseEvenForALogisticianOrAbove() {
     when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(false);
-    lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    lenient().when(inventoryAccessPolicy.isLogisticianOfItem(ITEM_ID)).thenReturn(true);
 
     assertFalse(service.mayEditInventoryItem(ITEM_ID, OTHER_MEMBER_ID));
   }
@@ -89,7 +89,7 @@ class StockViewerAccessServiceTest {
   @Test
   void mayEditInventoryItem_unknownOwner_countsAsNotTheCaller() {
     when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(ITEM_ID)).thenReturn(false);
 
     assertFalse(service.mayEditInventoryItem(ITEM_ID, null));
     verify(authHelperService, never()).currentUserId();
@@ -99,7 +99,7 @@ class StockViewerAccessServiceTest {
   void mayEditInventoryItem_unauthenticatedCaller_isNotTheOwner() {
     when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(ITEM_ID)).thenReturn(false);
 
     assertFalse(service.mayEditInventoryItem(ITEM_ID, CALLER_ID));
   }

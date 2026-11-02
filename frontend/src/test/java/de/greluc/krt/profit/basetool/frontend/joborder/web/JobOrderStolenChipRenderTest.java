@@ -226,6 +226,7 @@ class JobOrderStolenChipRenderTest extends JobOrderPageMvcTestBase {
         Instant.now(),
         1L,
         null,
+        null,
         false);
   }
 

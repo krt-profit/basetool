@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -44,7 +45,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
@@ -53,6 +56,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -91,7 +95,9 @@ public class HangarService {
   private final ShipDeletionObserver shipDeletionObserver;
   private final ShipTypeMapper shipTypeMapper;
   private final EntityManager entityManager;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
   private final UserService userService;
@@ -105,7 +111,7 @@ public class HangarService {
    * @return paged list of ships in the caller's squadron context
    */
   public Page<Ship> getAllShips(@NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
     return shipRepository.findAllScoped(
         scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
@@ -128,7 +134,7 @@ public class HangarService {
     return create(
         user,
         dto,
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId()));
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId()));
   }
 
   /**
@@ -145,7 +151,7 @@ public class HangarService {
   @Transactional
   public Ship addShipForClient(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    return create(user, dto, ownerScopeService.resolveOrgUnitForClientCreate(user));
+    return create(user, dto, orgUnitStampingService.resolveOrgUnitForClientCreate(user));
   }
 
   /**
@@ -164,7 +170,7 @@ public class HangarService {
   public Ship addShipForClientInOrgUnit(
       @NotNull UUID userId, @NotNull ShipRequestDto dto, @Nullable UUID orgUnitId) {
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    return create(user, dto, ownerScopeService.resolveOwnerMembershipTarget(user, orgUnitId));
+    return create(user, dto, orgUnitStampingService.resolveOwnerMembershipTarget(user, orgUnitId));
   }
 
   /**
@@ -238,10 +244,21 @@ public class HangarService {
   }
 
   /**
+   * Returns how many ships the user owns and how many of them are fitted (REQ-HANGAR-016).
+   *
+   * @param userId owner id
+   * @return the user's hangar readiness
+   */
+  public ShipReadinessDto getMyReadiness(@NotNull UUID userId) {
+    return shipRepository.readinessOf(userId);
+  }
+
+  /**
    * Returns the per-ship-type unit overview in the caller's unit-overview scope (REQ-HANGAR-003),
    * optionally with the per-ship owner, location and fitted breakdown. Counts and breakdown use the
    * same {@link ScopePredicate}, so no ship outside the caller's scope is surfaced; whether the
-   * caller may see owner details is decided by the controller.
+   * caller may see owner details is decided by the controller, and the breakdown covers only the
+   * ships of units in which the caller holds officer reach.
    *
    * @param pageable page request (sortable by {@code shipType.name})
    * @param includeOwnerDetails whether to load the per-ship owner/location/fitted breakdown
@@ -250,7 +267,7 @@ public class HangarService {
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails, String query) {
-    ScopePredicate scope = ownerScopeService.currentUnitOverviewScope();
+    ScopePredicate scope = requestScopeResolver.currentUnitOverviewScope();
     String normalizedQuery = LikePatterns.escapeNullable(StringNormalization.trimToNull(query));
     Page<Object[]> p =
         shipRepository.countShipsByType(
@@ -267,8 +284,12 @@ public class HangarService {
 
     List<Ship> ships =
         includeOwnerDetails && !types.isEmpty()
-            ? shipRepository.findByShipTypeInScoped(
-                types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
+            ? shipRepository
+                .findByShipTypeInScoped(
+                    types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
+                .stream()
+                .filter(s -> accessGateService.canActAsOfficerInOwner(owningUnitId(s)))
+                .toList()
             : Collections.emptyList();
 
     Map<UUID, List<Ship>> shipsByType =
@@ -440,7 +461,8 @@ public class HangarService {
     if (Objects.equals(current == null ? null : current.getId(), orgUnitId)) {
       return new ShipMove(ship, false);
     }
-    OrgUnit target = ownerScopeService.resolveOwnerMembershipTarget(ship.getOwner(), orgUnitId);
+    OrgUnit target =
+        orgUnitStampingService.resolveOwnerMembershipTarget(ship.getOwner(), orgUnitId);
     String from = orgUnitRef(current);
     String shipTypeName = ship.getShipType().getName();
     if (shipRepository.changeOwningOrgUnitIfVersionMatches(shipId, target, owningOrgUnitVersion)
@@ -531,7 +553,8 @@ public class HangarService {
       return new BulkMove(List.of(), new ShipBulkOrgUnitResultDto(0, skipped));
     }
     OrgUnit target =
-        ownerScopeService.resolveOwnerMembershipTarget(moving.getFirst().getOwner(), orgUnitId);
+        orgUnitStampingService.resolveOwnerMembershipTarget(
+            moving.getFirst().getOwner(), orgUnitId);
     List<OrgUnit> touched = new ArrayList<>();
     touched.add(target);
     moving.forEach(ship -> touched.add(ship.getOwningOrgUnit()));
@@ -670,12 +693,12 @@ public class HangarService {
   }
 
   /**
-   * Clears the {@code fitted} flag on every ship in the caller's squadron scope; in the admin
-   * all-squadrons mode on every ship.
+   * Clears the {@code fitted} flag on every ship of the units in the caller's scope in which the
+   * caller holds officer reach; in the admin all-squadrons mode on every ship.
    */
   @Transactional
   public void resetAllFittedStatus() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = officerResetScope(requestScopeResolver.currentScopePredicate());
     List<ShipRepository.OwnerShipCount> perOwner =
         shipRepository.countFittedByOwnerScoped(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
@@ -699,6 +722,30 @@ public class HangarService {
       }
       unitLiveSync.unitsChanged(units);
     }
+  }
+
+  /**
+   * Narrows {@code scope} to the units in which the caller holds officer reach; the admin all-scope
+   * stays as it is.
+   */
+  private @NotNull ScopePredicate officerResetScope(@NotNull ScopePredicate scope) {
+    if (scope.adminAllScope()) {
+      return scope;
+    }
+    Set<UUID> candidates =
+        scope.activeOrgUnitId() == null
+            ? scope.memberOrgUnitIds()
+            : Set.of(scope.activeOrgUnitId());
+    return new ScopePredicate(
+        false,
+        null,
+        candidates.stream()
+            .filter(accessGateService::canActAsOfficerIn)
+            .collect(Collectors.toSet()));
+  }
+
+  private static @Nullable UUID owningUnitId(@NotNull Ship ship) {
+    return ship.getOwningOrgUnit() == null ? null : ship.getOwningOrgUnit().getId();
   }
 
   /**

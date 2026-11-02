@@ -29,7 +29,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryAllocationInput;
@@ -90,7 +90,7 @@ class InventoryInputAjaxControllerTest {
                 .param("amount", "5")
                 .param("source", "my"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.targetUrl").value("/inventory/my"));
+        .andExpect(jsonPath("$.targetUrl").value("/inventory?storage=my"));
 
     verify(backendApiClient).post(eq("/api/v1/inventory"), any(), eq(InventoryItemDto.class));
   }
@@ -109,7 +109,7 @@ class InventoryInputAjaxControllerTest {
                 .param("amount", "5")
                 .param("source", "my"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.targetUrl").value("/inventory/my"));
+        .andExpect(jsonPath("$.targetUrl").value("/inventory?storage=my"));
 
     InventoryItemCreateDto request = captureCreateRequest();
     org.assertj.core.api.Assertions.assertThat(request.gameItemId()).isEqualTo(gameItemId);
@@ -423,6 +423,6 @@ class InventoryInputAjaxControllerTest {
                 .param("amount", "5")
                 .param("source", "my"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrlPattern("/inventory/**"));
+        .andExpect(redirectedUrl("/inventory?storage=my"));
   }
 }

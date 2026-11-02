@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.uex.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.uex', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.uex.title},
         count=${starSystems != null ? starSystems.size() : 0}, countId='uex-count', actions=~{::uex-actions})}">
         <th:block th:ref="uex-actions">
             <a th:href="@{/admin/sync-reports/uex}" class="btn btn-ghost" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>

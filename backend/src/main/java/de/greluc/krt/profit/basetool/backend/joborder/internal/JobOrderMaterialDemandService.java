@@ -31,10 +31,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -71,7 +72,7 @@ public class JobOrderMaterialDemandService {
   private final JobOrderRepository jobOrderRepository;
 
   /** Supplies the caller's visibility scope and the viewer-side profit gate. */
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /** Normalises either order kind into its outstanding material requirement buckets. */
   private final JobOrderMaterialRequirementResolver materialRequirementResolver;
@@ -95,10 +96,10 @@ public class JobOrderMaterialDemandService {
   @NotNull
   @Transactional(readOnly = true)
   public MaterialDemandOverviewDto getMaterialDemandOverview() {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return new MaterialDemandOverviewDto(List.of());
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<JobOrder> orders =
         jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             NON_TERMINAL_STATUSES,

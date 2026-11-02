@@ -324,6 +324,12 @@ public enum NotificationEventType {
   INVENTORY_POOL_CHANGED_BY_OTHER,
 
   /**
+   * A minimum stock level of a unit's pool turned low (REQ-NOTIF-030). The default rule notifies
+   * the direct Logisticians and the seat holders of the unit.
+   */
+  INVENTORY_STOCK_LEVEL_LOW,
+
+  /**
    * The responsible holder approved an over-limit booking request, so it is ready to be confirmed
    * (REQ-BANK-057). The default rule notifies the bank employees granted on the account, the bank
    * management and the requester.
@@ -379,13 +385,13 @@ public enum NotificationEventType {
   BANK_HOLDER_NOTICE_CLEARED,
 
   /**
-   * A leadership seat was filled or vacated and the member's OFFICER role does not fit the new seat
-   * set (REQ-ORG-029). The default rule notifies the admins.
+   * A leadership seat holder lacks the {@code KRT Member} role after a seat change or a role
+   * reconciliation (REQ-ORG-029). The default rule notifies the admins.
    */
   ORG_LEADERSHIP_ROLE_MISMATCH,
 
   /**
-   * A member's roles were reconciled and now fit their seats (REQ-ORG-029). Creates no
+   * A member holds {@code KRT Member} again or no seat any more (REQ-ORG-029). Creates no
    * notification; clears the member's mismatch notice.
    */
   ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED,

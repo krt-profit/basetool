@@ -40,6 +40,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.MemberCreatedObserver;
@@ -54,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatNotifier;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -188,6 +188,24 @@ class UserReconciliationServiceTest {
     assertTrue(existing.isEnabledInKeycloak());
   }
 
+  /** The retired {@code Officer} realm role has no catalogue entry, so it is never mirrored. */
+  @Test
+  void doesNotMirrorTheRetiredOfficerRealmRole() {
+    Role krtMember = codeRole("KRT_MEMBER", "KRT Member");
+    when(roleRepository.findAllWithPermissions()).thenReturn(List.of(krtMember));
+    User existing = new User();
+    existing.setId(USER_ID);
+    existing.setApprovalStatus(ApprovalStatus.ACTIVE);
+    existing.setRoles(new HashSet<>());
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    userReconciliationService.syncUser(
+        new KeycloakUserDto(
+            USER_ID, "alice", "alice@example.com", true, Set.of("Officer", "KRT Member"), null));
+
+    assertEquals(Set.of(krtMember), existing.getRoles());
+  }
+
   @Nested
   class SyncJwtUserTests {
 
@@ -250,7 +268,7 @@ class UserReconciliationServiceTest {
 
       assertEquals(
           1.0,
-          meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).count(),
+          meterRegistry.counter(IdentityMetricNames.USER_CALLSIGN_COLLISIONS).count(),
           "a callsign collision must be counted");
     }
 
@@ -279,7 +297,7 @@ class UserReconciliationServiceTest {
 
       assertEquals(
           1.0,
-          meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count(),
+          meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count(),
           "an account that arrives already holding ADMIN must be counted");
     }
 
@@ -304,7 +322,8 @@ class UserReconciliationServiceTest {
       userReconciliationService.syncUser(jwt);
 
       assertEquals(
-          0.0, meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count());
+          0.0,
+          meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count());
     }
 
     /** No collision, no counter: an ordinary first login must not look like an incident. */
@@ -318,7 +337,8 @@ class UserReconciliationServiceTest {
 
       userReconciliationService.syncUser(jwt);
 
-      assertEquals(0.0, meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).count());
+      assertEquals(
+          0.0, meterRegistry.counter(IdentityMetricNames.USER_CALLSIGN_COLLISIONS).count());
     }
 
     @Test
@@ -584,7 +604,7 @@ class UserReconciliationServiceTest {
           "the link belongs to the other account until it is resolved");
       assertEquals(
           1.0,
-          meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).count(),
+          meterRegistry.counter(IdentityMetricNames.USER_DISCORD_LINK_COLLISIONS).count(),
           "the collision is counted so an alert can watch it");
     }
 
@@ -602,7 +622,8 @@ class UserReconciliationServiceTest {
       userReconciliationService.syncUser(discordJwt(true, List.of()));
 
       assertEquals(DISCORD_ID, existing.getDiscordUserId());
-      assertEquals(0.0, meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).count());
+      assertEquals(
+          0.0, meterRegistry.counter(IdentityMetricNames.USER_DISCORD_LINK_COLLISIONS).count());
     }
 
     private Jwt discordJwt(boolean withDiscord, List<String> realmRoles) {
@@ -820,7 +841,8 @@ class UserReconciliationServiceTest {
       userReconciliationService.syncUser(dto);
 
       org.junit.jupiter.api.Assertions.assertNull(existing.getDiscordUserId());
-      assertEquals(1.0, meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).count());
+      assertEquals(
+          1.0, meterRegistry.counter(IdentityMetricNames.USER_DISCORD_LINK_COLLISIONS).count());
     }
 
     @Test

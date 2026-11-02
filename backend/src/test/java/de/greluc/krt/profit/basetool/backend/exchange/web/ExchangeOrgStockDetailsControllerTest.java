@@ -158,20 +158,25 @@ class ExchangeOrgStockDetailsControllerTest {
   }
 
   @Test
-  void aBereichRankGetsEntriesForItsOwnPoolButNoneForAChildUnit() throws Exception {
+  void aBereichRankGetsEntriesForItsOwnPoolAndTheUnitsBelowButNoneOutsideIt() throws Exception {
     UUID bereich = orgUnit("BEREICH", null);
     UUID child = orgUnit("SPECIAL_COMMAND", bereich);
+    UUID otherBereich = orgUnit("BEREICH", null);
+    UUID outside = orgUnit("SPECIAL_COMMAND", otherBereich);
     joins(member, bereich, "BEREICHSLEITER", false);
     joins(member, child, "MEMBER", false);
+    joins(member, outside, "MEMBER", false);
     UUID titanium = material();
     UUID area18 = location();
     stock(holder, titanium, area18, 4, bereich);
     stock(holder, titanium, area18, 5, child);
+    stock(holder, titanium, area18, 6, outside);
 
     String body = body(relayed(get(PATH), DETAILS));
 
     assertThat(entriesOf(body, bereich)).hasSize(1);
-    assertThat(JsonPath.<List<Object>>read(body, unitLots(child) + ".entries")).isEmpty();
+    assertThat(entriesOf(body, child)).hasSize(1);
+    assertThat(JsonPath.<List<Object>>read(body, unitLots(outside) + ".entries")).isEmpty();
   }
 
   @Test

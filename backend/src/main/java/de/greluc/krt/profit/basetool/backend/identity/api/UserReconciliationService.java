@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
@@ -119,7 +118,7 @@ public class UserReconciliationService {
     if (existingUser.isEmpty() && username != null) {
       List<UUID> sameCallsign = userRepository.findIdsByUsername(username);
       if (!sameCallsign.isEmpty()) {
-        meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).increment();
+        meterRegistry.counter(IdentityMetricNames.USER_CALLSIGN_COLLISIONS).increment();
         log.warn(
             "Callsign collision: subject {} is unknown, but {} existing account(s) hold the same"
                 + " preferred_username (value omitted, PII), e.g. {}. Provisioning a NEW pending"
@@ -206,7 +205,7 @@ public class UserReconciliationService {
       changed = true;
     }
     if (created && isAdmin) {
-      meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
+      meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (changed || user.isNew()) {
@@ -303,7 +302,7 @@ public class UserReconciliationService {
       changed = true;
     } else if (created
         && localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
-      meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
+      meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (wasActive && !enabled) {
@@ -344,7 +343,7 @@ public class UserReconciliationService {
     }
     Optional<UUID> holder = userRepository.findIdByDiscordUserId(discordUserId);
     if (holder.isPresent() && !holder.get().equals(user.getId())) {
-      meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).increment();
+      meterRegistry.counter(IdentityMetricNames.USER_DISCORD_LINK_COLLISIONS).increment();
       log.warn(
           "Discord link not written for user {}: account {} already holds the same identity."
               + " Consolidate the two accounts; the link follows once the duplicate row is gone.",

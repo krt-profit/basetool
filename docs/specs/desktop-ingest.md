@@ -118,7 +118,7 @@ Guard 4 splits into two counted reasons — a subject that is not a UUID never r
 so `basetool_on_behalf_of_refused_total{reason}` carries **five** values for these four guards. The
 exchange relay headers (REQ-XCH-010) add three more — `forged_exchange_header`,
 `exchange_client_invalid` and `exchange_installation_invalid` — so the metric carries **eight**
-values in all (`MetricNames.ON_BEHALF_OF_*`). The
+values in all (`ExchangeMetricNames.ON_BEHALF_OF_*`). The
 refusal *answer* is byte-identical for all of them: an unknown member and an offboarded one must
 look the same from outside, or the endpoint becomes an oracle for which subjects exist. The reason
 lives only in the metric and the log line.

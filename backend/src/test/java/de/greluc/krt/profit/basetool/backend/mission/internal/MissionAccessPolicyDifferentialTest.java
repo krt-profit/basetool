@@ -38,8 +38,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -162,11 +160,7 @@ class MissionAccessPolicyDifferentialTest {
         new Gate(
             "canSeeMission",
             ScopeHubMissionGates::canSeeMission,
-            MissionAccessPolicy::canSeeMission),
-        new Gate(
-            "canEditMission",
-            ScopeHubMissionGates::canEditMission,
-            MissionAccessPolicy::canEditMission));
+            MissionAccessPolicy::canSeeMission));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
@@ -248,16 +242,10 @@ class MissionAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      OwnerScopeService ownerScopeService =
-          new OwnerScopeService(
-              resolver,
-              accessGateService,
-              new OrgUnitStampingService(
-                  resolver, accessGateService, authHelper, memberships, orgUnits));
       scopeHub = new ScopeHubMissionGates(accessGateService, authHelper, repository);
       policy =
           new MissionAccessPolicy(
-              ownerScopeService, authHelper, repository, null, null, null, null);
+              accessGateService, authHelper, repository, null, null, null, null);
     }
 
     private static Mission mission(UUID unit, boolean internal, Mission parent) {
@@ -308,15 +296,6 @@ class MissionAccessPolicyDifferentialTest {
             }
             return true;
           })
-          .orElse(false);
-    }
-
-    boolean canEditMission(UUID missionId) {
-      return missions
-          .findByIdForAuthorization(missionId)
-          .map(m ->
-              m.getOwningOrgUnit() == null
-                  || accessGateService.canEditSquadron(m.getOwningOrgUnit().getId()))
           .orElse(false);
     }
 

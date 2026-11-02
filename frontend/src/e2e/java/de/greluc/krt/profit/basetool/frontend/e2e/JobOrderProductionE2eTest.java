@@ -138,7 +138,7 @@ class JobOrderProductionE2eTest {
             stockAfter,
             0.001,
             "the production booking must book the produced unit in as item stock");
-        E2eSupport.navigate(page, baseUrl + "/inventory/all?view=items");
+        E2eSupport.navigate(page, baseUrl + "/inventory?storage=all&view=items");
         Locator itemGroupRow =
             page.locator("div.tree-row--group[data-game-item-id='" + gameItemId + "']");
         assertThat(itemGroupRow)
@@ -337,7 +337,7 @@ class JobOrderProductionE2eTest {
 
   /**
    * Sums the squadron-wide item-stock total of one game item through the same grouped {@code
-   * catalog=ITEM} endpoint the {@code /inventory/all} item view itself renders from
+   * catalog=ITEM} endpoint the {@code /inventory?storage=all} item view itself renders from
    * (REQ-INV-030/032), so the before/after delta proves the production book-in without racing the
    * post-write render.
    *

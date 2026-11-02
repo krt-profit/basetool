@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.app.api;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,14 +65,10 @@ class SecurityConfigTest {
   }
 
   @Test
-  void officer_reachesLogisticianAndMissionManagerButNotBankRoles() {
-    Set<String> reachable = reachableFrom(Roles.OFFICER);
-    assertTrue(reachable.contains(Roles.authority(Roles.LOGISTICIAN)));
-    assertTrue(reachable.contains(Roles.authority(Roles.MISSION_MANAGER)));
-    assertFalse(
-        reachable.contains(Roles.authority(Roles.BANK_MANAGEMENT)),
-        "OFFICER must not imply BANK_MANAGEMENT — only ADMIN does");
-    assertFalse(reachable.contains(Roles.authority(Roles.BANK_EMPLOYEE)));
+  void retiredOfficerAuthority_impliesNothing() {
+    Set<String> reachable = reachableFrom("OFFICER");
+    assertEquals(
+        Set.of("ROLE_OFFICER"), reachable, "the retired OFFICER role must carry no hierarchy edge");
   }
 
   @Test

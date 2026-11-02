@@ -10,15 +10,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{nav.inventory},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='storage.overview', eyebrowKey='nav.group.logistics', titleText=#{nav.inventory},
         count=${inventoryPage != null ? inventoryPage.totalElements() : null}, countId='inventory-count', countFor='inventory-results', actions=~{::inventory-actions})}">
         <th:block th:ref="inventory-actions">
-            <nav class="krt-segmented" th:aria-label="#{inventory.overview.switch.aria}">
-                <a th:href="${view == 'items'} ? @{/inventory/all(view='items')} : @{/inventory/all}" class="krt-segmented__item"
-                   data-testid="inventory-global-link" th:text="#{inventory.overview.global}">Globales Lager</a>
-                <a th:href="${view == 'items'} ? @{/inventory/my(view='items')} : @{/inventory/my}" class="krt-segmented__item"
-                   data-testid="inventory-my-link" th:text="#{inventory.overview.my}">Mein Lager</a>
-            </nav>
+            <th:block th:replace="~{inventory/fragments/storage-switch :: storageSwitch(selected=null)}"></th:block>
         </th:block>
     </th:block>
 
@@ -53,9 +48,11 @@
                 <tbody>
                     <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
                         <td>
-                            <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(materialIds=${item.material.id})}">
+                            <a class="row-link" data-testid="row-link" th:href="@{/inventory(storage='all', materialIds=${item.material.id})}">
                                 <span class="cell-title" th:text="${item.material.name}">Material</span>
                             </a>
+                            <span th:if="${item.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
+                                  th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
                         </td>
                         <td class="num" th:attr="data-label=#{inventory.aggregated.col.avgQuality}"
                             th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'DEFAULT', 2, 'DEFAULT') : '0.00'}">100.00</td>
@@ -73,7 +70,7 @@
 
         <th:block th:if="${#lists.isEmpty(aggregated)}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.aggregated.empty', textKey='inventory.aggregated.empty.text',
-                actionHref=@{/inventory/my}, actionKey='inventory.overview.my')}"></th:block>
+                actionHref=@{/inventory(storage='my')}, actionKey='inventory.overview.my')}"></th:block>
         </th:block>
 
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></th:block>
@@ -92,10 +89,12 @@
                 <tbody>
                     <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
                         <td>
-                            <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(view='items', gameItemIds=${item.gameItem.id})}">
+                            <a class="row-link" data-testid="row-link" th:href="@{/inventory(storage='all', view='items', gameItemIds=${item.gameItem.id})}">
                                 <span class="cell-title" th:text="${item.gameItem.name}">Item</span>
                                 <span class="cell-sub" th:text="${item.gameItem.manufacturer} ?: '&mdash;'">Hersteller</span>
                             </a>
+                            <span th:if="${item.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
+                                  th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
                         </td>
                         <td>
                             <span class="lager-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
@@ -109,7 +108,7 @@
 
         <th:block th:if="${#lists.isEmpty(aggregated)}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.items.aggregated.empty', textKey='inventory.items.aggregated.empty.text',
-                actionHref=@{/inventory/my(view='items')}, actionKey='inventory.overview.my')}"></th:block>
+                actionHref=@{/inventory(storage='my', view='items')}, actionKey='inventory.overview.my')}"></th:block>
         </th:block>
 
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${inventoryPage}, baseUrl='/inventory?view=items')}"></th:block>

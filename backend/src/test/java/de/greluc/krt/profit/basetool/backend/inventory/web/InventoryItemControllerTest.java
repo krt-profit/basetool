@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookResult
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkStolenMarkRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationWriteDto;
@@ -63,7 +64,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.LagerFilter;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -87,7 +87,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *       UserService#getUserIdFromJwt}, never from the URL.
  *   <li>{@code create}, {@code book-out}, {@code update-delivered}, {@code update-note}, {@code
  *       stolen} and the three {@code allocation} writes pass the boundary's {@code
- *       isLogisticianOrAbove()} result to the service.
+ *       isLogisticianOfItem} result to the service.
  *   <li>{@code POST /{id}/book-out} answers {@code 200} with a DTO and {@code 204} when the row was
  *       removed.
  *   <li>{@code POST /bulk-checkout} and {@code POST /bulk-rebook} (REQ-INV-036) forward only the
@@ -100,7 +100,7 @@ class InventoryItemControllerTest {
   @Mock private InventoryItemService inventoryItemService;
   @Mock private InventoryAggregationService inventoryAggregationService;
   @Mock private UserService userService;
-  @Mock private AuthHelperService authHelperService;
+  @Mock private InventoryAccessPolicy inventoryAccessPolicy;
   @Mock private InventoryOrgUnitChangeService inventoryOrgUnitChangeService;
   @Mock private InventoryStolenMarkService inventoryStolenMarkService;
 
@@ -323,7 +323,7 @@ class InventoryItemControllerTest {
             LagerFilter.builder().catalog(InventoryCatalog.MATERIAL).build());
 
     assertThat(result).containsExactly(group);
-    verifyNoInteractions(userService, authHelperService);
+    verifyNoInteractions(userService, inventoryAccessPolicy);
   }
 
   @Test
@@ -409,7 +409,7 @@ class InventoryItemControllerTest {
             null);
 
     assertThat(result.content()).containsExactly(dto);
-    verifyNoInteractions(userService, authHelperService);
+    verifyNoInteractions(userService, inventoryAccessPolicy);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(inventoryItemService)
         .getAllStackEntries(
@@ -1163,7 +1163,7 @@ class InventoryItemControllerTest {
 
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).createInventoryItem(createDto, callerId);
-    verify(authHelperService, never()).isLogisticianOrAbove();
+    verify(inventoryAccessPolicy, never()).isLogisticianOfItem(any());
   }
 
   @Test
@@ -1175,7 +1175,7 @@ class InventoryItemControllerTest {
         new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L, null, null, null, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
     when(inventoryItemService.bookOutInventoryItem(itemId, bookOutDto, ownerId, false))
         .thenReturn(persisted);
 
@@ -1194,7 +1194,7 @@ class InventoryItemControllerTest {
     InventoryItemBookOutDto bookOutDto =
         new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L, null, null, null, null);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
     when(inventoryItemService.bookOutInventoryItem(itemId, bookOutDto, ownerId, true))
         .thenReturn(null);
 
@@ -1214,7 +1214,7 @@ class InventoryItemControllerTest {
         new InventoryItemPersonalRebookDto(4.0, 1L, UUID.randomUUID(), null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
     when(inventoryItemService.rebookPersonal(itemId, rebookDto, ownerId, true))
         .thenReturn(persisted);
 
@@ -1233,7 +1233,7 @@ class InventoryItemControllerTest {
         new InventoryItemPersonalRebookDto(2.0, 3L, null, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
     when(inventoryItemService.rebookPersonal(itemId, rebookDto, ownerId, false))
         .thenReturn(persisted);
 
@@ -1254,7 +1254,7 @@ class InventoryItemControllerTest {
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("new note", 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
     when(inventoryItemService.updateNote(itemId, request, ownerId, true)).thenReturn(persisted);
 
     InventoryItemDto result = controller.updateInventoryItemNote(jwt, itemId, request);
@@ -1271,7 +1271,7 @@ class InventoryItemControllerTest {
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest(null, 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
     when(inventoryItemService.updateNote(itemId, request, ownerId, false)).thenReturn(persisted);
 
     InventoryItemDto result = controller.updateInventoryItemNote(jwt, itemId, request);
@@ -1291,7 +1291,7 @@ class InventoryItemControllerTest {
     controller.bulkCheckout(jwt, request);
 
     verify(inventoryItemService).bulkCheckout(request, ownerId);
-    verify(authHelperService, never()).isLogisticianOrAbove();
+    verify(inventoryAccessPolicy, never()).isLogisticianOfItem(any());
   }
 
   @Test
@@ -1314,7 +1314,7 @@ class InventoryItemControllerTest {
 
     assertThat(result).isSameAs(expected);
     verify(inventoryItemService).bulkRebook(request, ownerId);
-    verify(authHelperService, never()).isLogisticianOrAbove();
+    verify(inventoryAccessPolicy, never()).isLogisticianOfItem(any());
   }
 
   @Test
@@ -1350,7 +1350,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryItemStolenMarkDto dto = new InventoryItemStolenMarkDto(1L, true, 2.0);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
 
     controller.markStolen(jwt, itemId, dto);
 
@@ -1364,7 +1364,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryItemStolenMarkDto dto = new InventoryItemStolenMarkDto(1L, false, null);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
 
     controller.markStolen(jwt, itemId, dto);
 
@@ -1391,7 +1391,7 @@ class InventoryItemControllerTest {
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
     when(inventoryItemService.updateDelivered(itemId, request, ownerId, true))
         .thenReturn(persisted);
 
@@ -1409,7 +1409,7 @@ class InventoryItemControllerTest {
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(false, UUID.randomUUID(), 2L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
     when(inventoryItemService.updateDelivered(itemId, request, ownerId, false))
         .thenReturn(persisted);
 
@@ -1438,7 +1438,7 @@ class InventoryItemControllerTest {
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
     when(inventoryItemService.addAllocation(itemId, dto, callerId, true)).thenReturn(persisted);
 
     InventoryItemDto result = controller.addAllocation(jwt, itemId, dto);
@@ -1457,7 +1457,7 @@ class InventoryItemControllerTest {
             InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
     when(inventoryItemService.changeAllocation(itemId, dto, callerId, false)).thenReturn(persisted);
 
     InventoryItemDto result = controller.changeAllocation(jwt, itemId, dto);
@@ -1476,7 +1476,7 @@ class InventoryItemControllerTest {
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
     when(inventoryItemService.removeAllocation(itemId, dto, callerId, false)).thenReturn(persisted);
 
     InventoryItemDto result = controller.removeAllocation(jwt, itemId, dto);

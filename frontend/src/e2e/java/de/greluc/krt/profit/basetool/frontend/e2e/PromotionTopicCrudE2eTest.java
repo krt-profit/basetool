@@ -72,8 +72,8 @@ class PromotionTopicCrudE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
-      seeder.assignStaffelMembership(
-          ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
+      seeder.assignStaffelleiterSeat(
+          ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false);
     }
     storageState =
         E2eSupport.authenticatedStorageState(

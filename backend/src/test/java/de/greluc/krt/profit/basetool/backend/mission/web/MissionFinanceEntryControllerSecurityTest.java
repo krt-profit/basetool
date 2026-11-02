@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -72,7 +71,6 @@ class MissionFinanceEntryControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionFinanceEntryService financeEntryService;
-  @MockitoBean private OwnerScopeService ownerScopeService;
 
   @MockitoBean private MissionAccessPolicy missionAccessPolicy;
 
@@ -82,7 +80,7 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   private static SimpleGrantedAuthority officer() {
-    return new SimpleGrantedAuthority("ROLE_OFFICER");
+    return new SimpleGrantedAuthority("ROLE_MISSION_MANAGER");
   }
 
   private static SimpleGrantedAuthority member() {
@@ -194,7 +192,7 @@ class MissionFinanceEntryControllerSecurityTest {
                             + "\",\"type\":\"INCOME\",\"amount\":500.00,\"note\":\"my-line\"}")
                     .with(jwt().authorities(member())))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.participant.user.username").value("bob.callsign"))
+            .andExpect(jsonPath("$.participant.user.username").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -223,7 +221,7 @@ class MissionFinanceEntryControllerSecurityTest {
                             + "\",\"type\":\"INCOME\",\"amount\":500.00}")
                     .with(jwt().authorities(officer())))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.participant.user.username").value("bob.callsign"))
+            .andExpect(jsonPath("$.participant.user.username").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -358,7 +356,7 @@ class MissionFinanceEntryControllerSecurityTest {
                 get("/api/v1/missions/{id}/finance-entries", missionId)
                     .with(jwt().authorities(member())))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content[0].participant.user.username").value("bob.callsign"))
+            .andExpect(jsonPath("$.content[0].participant.user.username").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -381,7 +379,7 @@ class MissionFinanceEntryControllerSecurityTest {
                 get("/api/v1/missions/{id}/finance-entries", missionId)
                     .with(jwt().authorities(officer())))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content[0].participant.user.username").value("bob.callsign"))
+            .andExpect(jsonPath("$.content[0].participant.user.username").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();

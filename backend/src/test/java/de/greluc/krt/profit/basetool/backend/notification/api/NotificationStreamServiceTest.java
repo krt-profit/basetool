@@ -232,8 +232,8 @@ class NotificationStreamServiceTest {
         1.0,
         service
             .registry
-            .get(MetricNames.SSE_SEND_FAILURES)
-            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_NOTIFICATION)
+            .get(NotificationMetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, NotificationMetricNames.SSE_EVENT_NOTIFICATION)
             .counter()
             .count());
     assertEquals(0.0, sseConnections(service));
@@ -250,7 +250,7 @@ class NotificationStreamServiceTest {
 
     assertEquals(
         (double) NotificationStreamService.MAX_EMITTERS_PER_SUB,
-        service.registry.get(MetricNames.SSE_CONNECTIONS).gauge().value());
+        service.registry.get(NotificationMetricNames.SSE_CONNECTIONS).gauge().value());
 
     SseEmitter oldest = service.created.get(0);
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
@@ -276,8 +276,8 @@ class NotificationStreamServiceTest {
         1.0,
         service
             .registry
-            .get(MetricNames.SSE_SEND_FAILURES)
-            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_CONNECTED)
+            .get(NotificationMetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, NotificationMetricNames.SSE_EVENT_CONNECTED)
             .counter()
             .count());
     assertEquals(0.0, sseConnections(service));
@@ -299,8 +299,8 @@ class NotificationStreamServiceTest {
         1.0,
         service
             .registry
-            .get(MetricNames.SSE_SEND_FAILURES)
-            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_HEARTBEAT)
+            .get(NotificationMetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, NotificationMetricNames.SSE_EVENT_HEARTBEAT)
             .counter()
             .count());
     assertEquals(0.0, sseConnections(service));
@@ -322,8 +322,8 @@ class NotificationStreamServiceTest {
         1.0,
         service
             .registry
-            .get(MetricNames.SSE_SEND_FAILURES)
-            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_NOTIFICATION)
+            .get(NotificationMetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, NotificationMetricNames.SSE_EVENT_NOTIFICATION)
             .tag(MetricNames.TAG_CAUSE, MetricNames.CAUSE_IO)
             .counter()
             .count());
@@ -349,8 +349,8 @@ class NotificationStreamServiceTest {
         1.0,
         service
             .registry
-            .get(MetricNames.SSE_SEND_FAILURES)
-            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_HEARTBEAT)
+            .get(NotificationMetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, NotificationMetricNames.SSE_EVENT_HEARTBEAT)
             .tag(MetricNames.TAG_CAUSE, MetricNames.CAUSE_ILLEGAL_STATE)
             .counter()
             .count());
@@ -370,8 +370,8 @@ class NotificationStreamServiceTest {
         1.0,
         service
             .registry
-            .get(MetricNames.SSE_SEND_FAILURES)
-            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_CONNECTED)
+            .get(NotificationMetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, NotificationMetricNames.SSE_EVENT_CONNECTED)
             .tag(MetricNames.TAG_CAUSE, MetricNames.CAUSE_OTHER)
             .counter()
             .count());
@@ -389,7 +389,8 @@ class NotificationStreamServiceTest {
           }
         });
 
-    assertEquals(2.0, service.registry.get(MetricNames.SSE_EMITTERS_EVICTED).counter().count());
+    assertEquals(
+        2.0, service.registry.get(NotificationMetricNames.SSE_EMITTERS_EVICTED).counter().count());
     ILoggingEvent evictionLine =
         events.stream()
             .filter(e -> e.getFormattedMessage().contains("Evicting oldest SSE emitter"))
@@ -434,6 +435,6 @@ class NotificationStreamServiceTest {
    * @return the current summed-connection gauge value
    */
   private static double sseConnections(CapturingStreamService service) {
-    return service.registry.get(MetricNames.SSE_CONNECTIONS).gauge().value();
+    return service.registry.get(NotificationMetricNames.SSE_CONNECTIONS).gauge().value();
   }
 }

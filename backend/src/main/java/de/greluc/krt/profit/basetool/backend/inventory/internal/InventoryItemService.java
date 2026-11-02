@@ -45,10 +45,12 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.util.HashSet;
@@ -88,7 +90,8 @@ public class InventoryItemService {
   private final LocationRepository locationRepository;
   private final InventoryEarmarkLookup earmarkTargets;
   private final InventoryItemMapper inventoryItemMapper;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final InventoryAccessPolicy inventoryAccessPolicy;
   private final StockCommands stockCommands;
   private final EarmarkTargets.JobOrders jobOrders;
@@ -314,7 +317,7 @@ public class InventoryItemService {
    */
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getMissionInventory(UUID missionId) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findByMissionIdScoped(
             missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
@@ -406,7 +409,7 @@ public class InventoryItemService {
     Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
 
     final OrgUnit owningOrgUnit =
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
@@ -524,7 +527,7 @@ public class InventoryItemService {
     OrgUnit owningOrgUnit;
     try {
       owningOrgUnit =
-          ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId);
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId);
     } catch (AppException refused) {
       return false;
     }

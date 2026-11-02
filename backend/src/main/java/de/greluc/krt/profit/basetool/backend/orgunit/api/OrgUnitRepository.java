@@ -36,7 +36,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
    * Counts how many of the given org units are flagged {@code is_profit_eligible}; drives {@code
-   * OwnerScopeService.canViewJobOrders()}.
+   * RequestScopeResolver.canViewJobOrders()}.
    *
    * @param ids the org-unit ids to inspect (the caller's membership ids); must be non-empty.
    * @return the number of those ids whose org unit is profit-eligible; {@code 0} when none.
@@ -86,6 +86,50 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT o.id FROM OrgUnit o")
   List<UUID> findAllOrgUnitIds();
+
+  /**
+   * Narrows {@code ids} to the leadership units among them: the Organisationsleitung and every
+   * Bereich.
+   *
+   * @param ids the candidate org-unit ids; never {@code null}
+   * @return the ids of {@code ids} that name an Organisationsleitung or a Bereich; never {@code
+   *     null}, possibly empty
+   */
+  @Query(
+      "SELECT o.id FROM OrgUnit o WHERE o.id IN :ids AND TYPE(o) IN (Bereich,"
+          + " Organisationsleitung)")
+  List<UUID> findLeadershipOrgUnitIdsAmong(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Narrows {@code ids} to the Organisationsleitung among them.
+   *
+   * @param ids the candidate org-unit ids; never {@code null}
+   * @return the ids of {@code ids} that name the Organisationsleitung; never {@code null}, possibly
+   *     empty
+   */
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.id IN :ids AND TYPE(o) = Organisationsleitung")
+  List<UUID> findOrganisationsleitungIdsAmong(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Narrows {@code ids} to the units that have the promotion subsystem switched on; a Bereich, a
+   * Spezialkommando and the Organisationsleitung never have it.
+   *
+   * @param ids the candidate org-unit ids; never {@code null} and non-empty
+   * @return the ids of {@code ids} with {@code is_promotion_enabled}; never {@code null}, possibly
+   *     empty
+   */
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.id IN :ids AND o.isPromotionEnabled = true")
+  List<UUID> findPromotionEnabledIdsAmong(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Id-only batch form of {@link #findChildOrgUnitIds(UUID)}: the direct children of any of {@code
+   * parentOrgUnitIds}.
+   *
+   * @param parentOrgUnitIds the parent org-unit ids; never {@code null}
+   * @return the direct child org-unit ids in arbitrary order; never {@code null}, possibly empty
+   */
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.parent.id IN :parentOrgUnitIds")
+  List<UUID> findChildOrgUnitIdsIn(@Param("parentOrgUnitIds") Collection<UUID> parentOrgUnitIds);
 
   /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich} for the

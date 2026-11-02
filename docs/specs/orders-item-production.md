@@ -68,7 +68,7 @@ is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`).
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
-hasRole('OFFICER') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id)` — the same
+hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id)` — the same
 authorisation as the item handovers. The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
 the line `version`, a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming an
 `inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`, and an
@@ -205,7 +205,7 @@ registry), and the receiver's apply map.
 - [ ] A booking with a `bookIn` block creates (or merges into) the matching game-item stack,
   earmarked to the order unless deselected, audited as `INVENTORY_RECEIVED_FROM_PRODUCTION` in
   the same transaction (REQ-INV-032); a payload without `bookIn` is rejected with 400.
-- [ ] The endpoint is reachable only by a LOGISTICIAN/OFFICER/ADMIN with `canEditJobOrder`; the
+- [ ] The endpoint is reachable only by a LOGISTICIAN/ADMIN with `canEditJobOrder`; the
   success response re-renders the `items` (booking surface + inline stock) and `kpi` sections, among
   others, in place and propagates them to a peer without a reload.
 
@@ -495,6 +495,14 @@ pages); the JS drill-down / orphaned / Herstellung surfaces already fall back to
 A requester-**only** viewer (`redacted == true`, i.e. `!canSeeJobOrder`) is refused all four
 endpoints with `403` and never reaches the redactor at all.
 
+**Mission slices.** The two pickers also carry the mission slices of each row (REQ-INV-027). For
+every caller, whatever the owner gate says, a slice whose mission the caller may not read (the
+mission detail rule, `MissionVisibility`, REQ-MISSION-008) is anonymised by
+`JobOrderMissionAllocationRedactor`: the slice and its amount stay so the row's sums remain
+traceable, the mission's name and planned start are dropped (the frontend renders its „unknown
+mission" label). Access to the order — including the assignee grant of REQ-ORDERS-047 — never
+widens access to a mission referenced by its stock.
+
 **Accepted trade-off.** A cross-unit LOGISTICIAN processing an SK-public order (requesting-squadron
 member, not in the responsible SK) also sees `—` for owner/location in the pickers. Nothing breaks
 functionally (production books by `inventoryItemId` + slice + version, never by owner/location); it
@@ -507,12 +515,16 @@ is deliberately kept uniform rather than widening the picker gate to `… or can
 - [ ] A squadron-responsible order is unaffected — every viewer who passes `canSeeJobOrder` sees
   owner/location.
 - [ ] A requester-only viewer (`redacted`) gets `403` on all four endpoints.
+- [ ] A caller who may read the order but not an internal mission earmarked on its linked stock sees
+  that slice without name and start on both pickers; a caller who may read the mission sees both.
 - [ ] The redacted inline item stock / Itemsammelübersicht / material-collection page render `—`
   for owner/location.
 
-**Enforced by:** `OwnerScopeServiceTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
+**Enforced by:** `ScopeKernelTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
 SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorTest` (the three
-redaction passes blank owner/location, keep the rest, null-safe), `JobOrderItemStockControllerTest`
+redaction passes blank owner/location, keep the rest, null-safe),
+`JobOrderMissionAllocationRedactorTest` + `JobOrderLinkedStockMissionAllocationIntegrationTest` (the
+assignee of another unit gets the internal mission's slice anonymised over HTTP), `JobOrderItemStockControllerTest`
 + `MaterialCollectionControllerTest` + `JobOrderControllerTest` (redaction wiring: unredacted when
 entitled, redactor output otherwise) · **Code:**
 `JobOrderAccessPolicy.canSeeJobOrderInventoryOwners`,
@@ -771,7 +783,7 @@ the handed-over items with their whole-unit quantities. It is the item counterpa
 handover protocol (`GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report`).
 
 - `GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report`, gated
-  `hasAnyRole(LOGISTICIAN, OFFICER, ADMIN) and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)` —
+  `hasAnyRole(LOGISTICIAN, ADMIN) and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)` —
   the same gate as the material report; answers `application/pdf` as an attachment
   (`uebergabeprotokoll-<orderId>.pdf`).
 - A handover id that belongs to a different order is a 404, never another order's document.

@@ -49,7 +49,6 @@ PRESENTER_FILE = "praesentation.csv"
 EXTRACT_FILE = "extractor-beispiel.json"
 
 ROLE_MEMBER = "KRT Member"
-ROLE_OFFICER = "Officer"
 ROLE_ADMIN = "Admin"
 ROLE_BANK_MANAGEMENT = "Bank Management"
 
@@ -125,11 +124,11 @@ def plan_accounts(participants: int) -> list[Account]:
         Account("demo-mitglied", "Demo", "Mitglied", [ROLE_MEMBER], "presenter", alpha),
         Account("demo-logistiker", "Demo", "Logistiker", [ROLE_MEMBER], "presenter", alpha,
                 TRACK_LOGISTICS, logistician=True),
-        Account("demo-offizier", "Demo", "Offizier", [ROLE_MEMBER, ROLE_OFFICER], "presenter",
+        Account("demo-offizier", "Demo", "Offizier", [ROLE_MEMBER], "presenter",
                 alpha, TRACK_OFFICER, rank="KOMMANDOLEITER", mission_manager=True),
-        Account("demo-staffelleitung", "Demo", "Staffelleitung", [ROLE_MEMBER, ROLE_OFFICER],
+        Account("demo-staffelleitung", "Demo", "Staffelleitung", [ROLE_MEMBER],
                 "presenter", alpha, TRACK_LEAD, rank="STAFFELLEITER"),
-        Account("demo-bereichsleitung", "Demo", "Bereichsleitung", [ROLE_MEMBER, ROLE_OFFICER],
+        Account("demo-bereichsleitung", "Demo", "Bereichsleitung", [ROLE_MEMBER],
                 "presenter", None, TRACK_LEAD),
     ]
     leads = [(bravo, "STAFFELLEITER", False), (charlie, "STAFFELLEITER", False),
@@ -139,8 +138,8 @@ def plan_accounts(participants: int) -> list[Account]:
         username = f"teilnehmer-{index:02d}"
         if index <= len(leads):
             staffel, rank, sk_lead = leads[index - 1]
-            roles = [ROLE_MEMBER, ROLE_OFFICER] if rank else [ROLE_MEMBER]
-            accounts.append(Account(username, "Teilnehmer", f"{index:02d}", roles, "participant",
+            accounts.append(Account(username, "Teilnehmer", f"{index:02d}", [ROLE_MEMBER],
+                                    "participant",
                                     staffel, TRACK_LEAD, rank=rank, special_command=sk_lead,
                                     special_command_lead=sk_lead))
             continue
@@ -148,7 +147,7 @@ def plan_accounts(participants: int) -> list[Account]:
         officer = track == TRACK_OFFICER
         accounts.append(Account(
             username, "Teilnehmer", f"{index:02d}",
-            [ROLE_MEMBER, ROLE_OFFICER] if officer else [ROLE_MEMBER], "participant",
+            [ROLE_MEMBER], "participant",
             staffeln[(index - len(leads) - 1) % len(staffeln)], track,
             rank="ENSIGN" if officer else None,
             logistician=track == TRACK_LOGISTICS,
@@ -1114,8 +1113,8 @@ def selftest() -> int:
     check(sum(a.special_command_lead for a in accounts) == 1, "exactly one SK lead")
     check(all(a.staffel is None for a in accounts if a.special_command_lead),
           "the SK lead belongs to no Staffel")
-    check(all(ROLE_OFFICER in a.realm_roles for a in accounts if a.rank),
-          "every ranked account holds the Officer role")
+    check(all(ROLE_MEMBER in a.realm_roles for a in accounts if a.rank),
+          "every ranked account holds the KRT Member role")
     check(not any(ROLE_ADMIN in a.realm_roles for a in accounts if a.kind != "service"),
           "no presenter or participant is an admin")
     for url in ("https://profit-base.online", "https://auth.profit-base.online/auth",

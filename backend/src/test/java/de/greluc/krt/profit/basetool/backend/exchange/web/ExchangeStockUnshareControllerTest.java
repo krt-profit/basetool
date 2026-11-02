@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -413,9 +414,9 @@ class ExchangeStockUnshareControllerTest {
   private double writes(@NotNull String outcome) {
     Counter counter =
         meterRegistry
-            .find(MetricNames.EXCHANGE_WRITES)
+            .find(ExchangeMetricNames.EXCHANGE_WRITES)
             .tag(MetricNames.TAG_CLIENT_ID, client)
-            .tag(MetricNames.TAG_RESOURCE, "stock")
+            .tag(ExchangeMetricNames.TAG_RESOURCE, "stock")
             .tag(MetricNames.TAG_OUTCOME, outcome)
             .counter();
     return counter == null ? 0 : counter.count();

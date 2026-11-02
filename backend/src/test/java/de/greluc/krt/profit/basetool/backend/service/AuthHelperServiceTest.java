@@ -250,10 +250,10 @@ class AuthHelperServiceTest {
 
     @Test
     void trueWhenAuthorityIsDirectlyHeld() {
-      authContextWith("ROLE_OFFICER");
-      stubHierarchyReaches(List.of("ROLE_OFFICER"));
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
-      assertTrue(helper.hasReachableRole("ROLE_OFFICER"));
+      assertTrue(helper.hasReachableRole("ROLE_KRT_MEMBER"));
     }
 
     @Test
@@ -307,14 +307,6 @@ class AuthHelperServiceTest {
     }
 
     @Test
-    void trueWhenOfficerReachesLogistician() {
-      authContextWith("ROLE_OFFICER");
-      stubHierarchyReaches(List.of("ROLE_OFFICER", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
-
-      assertTrue(helper.isLogisticianOrAbove());
-    }
-
-    @Test
     void trueForDirectLogistician() {
       authContextWith("ROLE_LOGISTICIAN");
       stubHierarchyReaches(List.of("ROLE_LOGISTICIAN"));
@@ -333,40 +325,6 @@ class AuthHelperServiceTest {
     @Test
     void falseWhenNobodyIsLoggedIn() {
       assertFalse(helper.isLogisticianOrAbove());
-      verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
-    }
-  }
-
-  @Nested
-  class IsAdminOrOfficerTests {
-
-    @Test
-    void trueForAnAdmin() {
-      authContextWith("ROLE_ADMIN");
-      stubHierarchyReaches(List.of("ROLE_ADMIN", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
-
-      assertTrue(helper.isAdminOrOfficer());
-    }
-
-    @Test
-    void trueForAnOfficer() {
-      authContextWith("ROLE_OFFICER");
-      stubHierarchyReaches(List.of("ROLE_OFFICER", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
-
-      assertTrue(helper.isAdminOrOfficer());
-    }
-
-    @Test
-    void falseForARoleTheTwoImplyButThatImpliesNeither() {
-      authContextWith("ROLE_MISSION_MANAGER");
-      stubHierarchyReaches(List.of("ROLE_MISSION_MANAGER"));
-
-      assertFalse(helper.isAdminOrOfficer());
-    }
-
-    @Test
-    void falseWhenNobodyIsLoggedIn() {
-      assertFalse(helper.isAdminOrOfficer());
       verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
     }
   }
@@ -412,14 +370,6 @@ class AuthHelperServiceTest {
     void trueForLegacyMemberAlias() {
       authContextWith("ROLE_KRT_MEMBER");
       stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
-
-      assertTrue(helper.isMemberOrAbove());
-    }
-
-    @Test
-    void trueForOfficer() {
-      authContextWith("ROLE_OFFICER");
-      stubHierarchyReaches(List.of("ROLE_OFFICER", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
 
       assertTrue(helper.isMemberOrAbove());
     }

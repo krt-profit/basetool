@@ -137,7 +137,7 @@ class MembersListPatternRenderTest {
 
     assertThat(html)
         .contains("class=\"page-head\"")
-        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Mitglieder &amp; Organisation<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
         .contains("data-list-count-for=\"members-results\"")
         .doesNotContain("class=\"greeting")

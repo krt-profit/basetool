@@ -216,7 +216,7 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   /**
    * The org unit whose physical stock this row represents, or {@code null} for an ownerless
    * personal item visible only to its {@link #user} (and admins). Stamped via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}.
+   * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable}.
    */
   @Getter(onMethod_ = @__(@Override))
   @ManyToOne(fetch = FetchType.LAZY)

@@ -1,6 +1,6 @@
 # ADR-0301 — Being a job-order assignee grants read visibility of the order
 
-- **Status:** Accepted — implementation pending (the requirements it drives are marked planned).
+- **Status:** Accepted — implemented: the grant, the picker, the external-assignee audit (REQ-ORDERS-047, the tenancy exception), the „Ich bearbeite“ segment and its capability flag (REQ-ORDERS-040).
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (the assignee-grant

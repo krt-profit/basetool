@@ -50,12 +50,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.LinkedHashSet;
@@ -84,7 +85,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class JobOrderMaterialDemandServiceTest {
 
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderStockProjectionService jobOrderStockProjectionService;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private MaterialClaimService materialClaimService;
@@ -115,7 +116,7 @@ class JobOrderMaterialDemandServiceTest {
     service =
         new JobOrderMaterialDemandService(
             jobOrderRepository,
-            ownerScopeService,
+            requestScopeResolver,
             materialRequirementResolver,
             jobOrderStockProjectionService,
             materialClaimService,
@@ -141,8 +142,8 @@ class JobOrderMaterialDemandServiceTest {
    * @param orders the orders the scoped query returns.
    */
   private void givenVisibleOrders(List<JobOrder> orders) {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))
@@ -313,8 +314,8 @@ class JobOrderMaterialDemandServiceTest {
   void queriesOnlyNonTerminalOrdersWithinTheCallersScope() {
     UUID activeOrgUnit = UUID.randomUUID();
     Set<UUID> memberships = Set.of(UUID.randomUUID());
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, activeOrgUnit, memberships));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(false), eq(activeOrgUnit), eq(memberships)))
@@ -336,7 +337,7 @@ class JobOrderMaterialDemandServiceTest {
   @Test
   @DisplayName("A caller outside the order workflow gets an empty overview and no query")
   void nonProfitCallerGetsEmptyOverview() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
 
@@ -354,8 +355,8 @@ class JobOrderMaterialDemandServiceTest {
     skCommand.setShorthand("SKL");
     JobOrder order = materialOrder(skCommand, 5, titanium, QualityTierFixtures.none(), 500.0);
 
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))
@@ -432,8 +433,8 @@ class JobOrderMaterialDemandServiceTest {
     MaterialDto stileronDto = materialDto(stileron);
     JobOrder order = materialOrder(alpha, 7, stileron, QualityTierFixtures.good(), 0.1);
     order.getMaterials().add(line(stileron, QualityTierFixtures.none(), 2.64));
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))

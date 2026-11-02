@@ -97,6 +97,9 @@ public enum CachedCatalog {
   /** The whole quality-tier catalogue, inactive tiers included (REQ-ORDERS-036). */
   QUALITY_TIERS(
       "/api/v1/quality-tiers?includeInactive=true", CacheDomain.QUALITY_TIER, Fetch.SINGLE),
+  /** The dashboard widget catalogue: types, options, defaults and choices (REQ-UI-034). */
+  DASHBOARD_WIDGETS(
+      "/api/v1/navigation/dashboard-widgets", CacheDomain.DASHBOARD_WIDGET, Fetch.SINGLE),
   /** The typed job-order settings: the yellow and the red ageing threshold. */
   SETTINGS_JOB_ORDER("/api/v1/orders/settings", CacheDomain.SETTINGS, Fetch.SINGLE);
 

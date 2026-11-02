@@ -65,11 +65,10 @@ class UserReferenceSearchTest {
     "/api/v1/users/search/references, ROLE_NO_ROLE, 403",
     "/api/v1/users/search/references, ROLE_BANK_EMPLOYEE, 403",
     "/api/v1/users/search/references, ROLE_KRT_MEMBER, 200",
-    "/api/v1/users/search/references, ROLE_OFFICER, 200",
     "/api/v1/bank/members/search/references, ROLE_NO_ROLE, 403",
     "/api/v1/bank/members/search/references, ROLE_BANK_EMPLOYEE, 200",
     "/api/v1/bank/members/search/references, ROLE_KRT_MEMBER, 200",
-    "/api/v1/bank/members/search/references, ROLE_OFFICER, 200",
+    "/api/v1/bank/members/search/references, ROLE_OFFICER, 403",
   })
   void gatesMatchTheFullDtoTwins(String path, String role, int expected) throws Exception {
     mockMvc

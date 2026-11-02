@@ -276,7 +276,8 @@ class MissionDetailPatternRenderTest {
                     "OPEN",
                     List.of(),
                     null,
-                    1L)));
+                    1L,
+                    null)));
     String html = render("/missions/" + MISSION_ID);
 
     String actions = between(html, "class=\"page-actions\"", "class=\"facts-bar\"");
@@ -305,7 +306,7 @@ class MissionDetailPatternRenderTest {
 
   /** The create page uses the page head with its back link and the numbered form sections. */
   @Test
-  @WithMockUser(roles = "OFFICER")
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void rendersTheCreatePageOnTheFormPattern() throws Exception {
     String html = render("/missions/new");
 

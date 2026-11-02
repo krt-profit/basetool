@@ -41,15 +41,17 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -82,7 +84,15 @@ class InventoryItemServiceAggregateTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private StockLevelService stockLevelService;
+
+  @BeforeEach
+  void noLowLevels() {
+    lenient()
+        .when(stockLevelService.lowSubjects())
+        .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
+  }
 
   @InjectMocks private InventoryAggregationService service;
 
@@ -299,7 +309,7 @@ class InventoryItemServiceAggregateTest {
   /** Stubs the scoped stack query to return no stacks (for the filter-routing verifications). */
   private void stubFindGlobalStacks() {
     lenient()
-        .when(ownerScopeService.currentScopePredicate())
+        .when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     lenient()
         .when(
@@ -324,7 +334,7 @@ class InventoryItemServiceAggregateTest {
   /** Stubs the scoped stack query to return the given per-stack aggregates. */
   private void stubGlobalStacks(InventoryStackAggregate... aggregates) {
     lenient()
-        .when(ownerScopeService.currentScopePredicate())
+        .when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(inventoryItemRepository.findGlobalStacks(
             anyBoolean(),

@@ -35,18 +35,27 @@ import de.greluc.krt.profit.basetool.frontend.orgchart.model.OlChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartNodeDto;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.SquadronChartDto;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.MessageSource;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * Full Thymeleaf render tests for the org-chart page and its {@code ocNode} fragment, so a broken
@@ -56,7 +65,12 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class OrgChartPageRenderTest {
 
+  private static final Pattern NODE_NAME =
+      Pattern.compile("<span class=\"oc-node-name\"[^>]*>([^<]*)</span>");
+
   @Autowired private WebApplicationContext context;
+
+  @Autowired private MessageSource messages;
 
   private MockMvc mockMvc;
 
@@ -813,5 +827,38 @@ class OrgChartPageRenderTest {
     assertThat(html)
         .as("each Bereich carries a collapse toggle")
         .contains("data-trigger=\"oc-collapse\"");
+  }
+
+  /** The people the page renders are exactly the people the quick access finds (REQ-UI-033). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void quickAccessFindsExactlyThePeopleThePageRenders() throws Exception {
+    OrgChartDto chart = OrgChartFixture.chart();
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    Set<String> vacant =
+        Stream.of(Locale.GERMAN, Locale.ENGLISH)
+            .map(locale -> messages.getMessage("orgChart.vacant", null, locale))
+            .collect(Collectors.toSet());
+    Set<String> rendered = new HashSet<>();
+    Matcher names = NODE_NAME.matcher(html);
+    while (names.find()) {
+      rendered.add(HtmlUtils.htmlUnescape(names.group(1)));
+    }
+    rendered.removeAll(vacant);
+    Set<String> found =
+        OrgChartSearchEntries.matchingPeople(chart, "", Integer.MAX_VALUE).stream()
+            .map(OrgChartSearchEntries.PersonEntry::name)
+            .collect(Collectors.toSet());
+
+    assertThat(found).isNotEmpty().isEqualTo(rendered);
   }
 }

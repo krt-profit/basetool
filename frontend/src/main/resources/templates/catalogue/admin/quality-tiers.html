@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.qualityTiers.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.qualitytiers', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.qualityTiers.title},
         count=${tiers != null ? tiers.size() : null}, countId='qt-count', countFor='qt-results', actions=~{::qt-actions})}">
         <th:block th:ref="qt-actions">
             <button type="button" id="qt-add-btn" class="btn btn--cta" data-testid="qt-add" th:text="#{admin.qualityTiers.action.create}">Neue Stufe</button>

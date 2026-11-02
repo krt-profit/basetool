@@ -88,6 +88,7 @@ class TableOwnershipTest {
           "audit",
           "notification",
           "livesync",
+          "navigation",
           "catalogue",
           "identity",
           "orgunit",

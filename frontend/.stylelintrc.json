@@ -30,21 +30,24 @@
         "width": [
           "768px",
           "1024px",
+          "1280px",
           "1440px"
         ],
         "min-width": [
           "768px",
           "1024px",
+          "1280px",
           "1440px"
         ],
         "max-width": [
           "768px",
           "1024px",
+          "1280px",
           "1440px"
         ]
       },
       {
-        "message": "Breakpoints are only 768px, 1024px and 1440px, the device classes of REQ-UI-009 (DS-11). A component that has to react to its own width uses a container query."
+        "message": "Breakpoints are only 768px, 1024px, 1280px and 1440px, the device classes of REQ-UI-009 (DS-11) and the pinned sidebar of REQ-UI-026. A component that has to react to its own width uses a container query."
       }
     ]
   },

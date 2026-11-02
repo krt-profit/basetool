@@ -176,6 +176,27 @@ groups:
           summary: "p95 request latency >2s ({{ $labels.application }})"
           description: "The 95th-percentile request latency for {{ $labels.application }} exceeded 2 seconds for 10 minutes."
 
+      - alert: QuickAccessSearchSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="basetool-frontend", uri="/quick-access/search"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Quick-access search p95 >1s"
+          description: "The quick access's entity search (/quick-access/search) answered slower than 1 second at the 95th percentile for 10 minutes (REQ-UI-033). Every entity type is asked in parallel and capped at 2 seconds, so one slow backend list read drags the whole answer. Runbook: sum by (kind, outcome) (rate(basetool_quick_access_search_total[10m])) names the type that times out or fails; check that type's backend list endpoint latency on dashboard 03 and the backend's slow-query log."
+
+      - alert: NavigationEndpointsErroring
+        expr: |
+          sum(rate(http_server_requests_seconds_count{uri=~"/api/v1/navigation/.*|/navigation/.*|/dashboard/.*", status=~"5.."}[10m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{uri=~"/api/v1/navigation/.*|/navigation/.*|/dashboard/.*"}[10m])), 0.01) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Navigation preference and dashboard endpoints answering 5xx"
+          description: "More than 5 % of the navigation preference and dashboard requests (/api/v1/navigation/* on the backend, /navigation/* and /dashboard/* on the frontend) failed with a 5xx for 10 minutes (REQ-UI-032, REQ-UI-034). The pages still render with the defaults and the stars off, but members cannot save their favourites or hidden pages or arrange the dashboard, and a failing widget shows its own error. Runbook: sum by (application, uri, status) (rate(http_server_requests_seconds_count{uri=~\"/api/v1/navigation/.*|/navigation/.*|/dashboard/.*\", status=~\"5..\"}[10m])) names the failing route; check the backend log for the correlation id and the database connection pool."
+
       - alert: FrontendBackendFanoutHigh
         expr: |
           sum(rate(http_client_requests_seconds_count{application="basetool-frontend"}[5m]))

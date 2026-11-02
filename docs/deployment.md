@@ -1618,6 +1618,55 @@ since the extractor's DPoP rollout; a host that runs the `prod` profile without 
 included — must set it **before** deploying a release that carries the guard, or the gateway stays
 down.
 
+### Pre-cut report for the OFFICER retirement
+
+The release that retires the Keycloak role `OFFICER` (ADR-0300, REQ-SEC-004) is promoted only when
+`scripts/officer-cut-report.sql` shows no leadership seat holder without `KRT Member`. The script opens
+a read-only session, runs SELECTs only and prints ids and coded words, never a name or an e-mail
+address. Feed it on stdin, as the realm snapshot is fed (`docs/keycloak/README.md`), so
+`$POSTGRES_USER` / `$POSTGRES_DB` expand inside the container; from PowerShell, strip the carriage
+returns first:
+
+```sh
+ssh <host> 'cd / && sudo -n -u basetool podman exec -i db-backend sh -c "psql -qAt -U \$POSTGRES_USER -d \$POSTGRES_DB -p 15432 -f -"' \
+    < scripts/officer-cut-report.sql
+```
+
+Every section prints a `count=` line, then one line per row:
+
+| Section | Meaning | Before the cut |
+| --- | --- | --- |
+| `seat_without_krt_member` | a seat holder without `KRT Member`; loses reach and member rights at the cut | must be `count=0` |
+| `officer_without_seat` | a hand-granted `OFFICER` without a seat; loses officer power at the cut | release note |
+| `bank_view_grant_officer` | a special-account `GLOBAL_ROLE OFFICER` view grant the cut deletes | expected rows |
+| `bank_approval_limit_officer` | a special-account `GLOBAL_ROLE OFFICER` approval limit the cut deletes | expected rows |
+| `notification_rule_role_officer` | a `ROLE OFFICER` rule selector the cut moves to the seat holders | expected rows |
+
+`user_roles` is the role mirror the reconciliation and every login refresh, so run the report after
+the daily Keycloak user sync (`UserSyncTask`, 05:00 Europe/Berlin). A blocking row is resolved in Keycloak (grant `KRT Member`) or in the org
+chart (vacate the seat); then run the report again. Attach only the `count=` lines to the release PR.
+
+### Deleting the Officer realm role after the OFFICER retirement
+
+The release carries migrations `V318`–`V320`; the realm role `Officer` is deleted afterwards by the
+provisioner (ADR-0202 amendment 8), as a separate step that needs @greluc's explicit approval for
+this host. Order: the release is live and the report above was clean, then the dry run, then the
+apply.
+
+```sh
+python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin>            # dry run, writes nothing
+python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --apply
+```
+
+The dry run lists exactly `- realm role 'Officer' deleted with its user mappings (retired with the
+OFFICER role, ADR-0300)` and exits `2`; the apply re-plans and fails unless the second plan is
+empty. A realm without the role receives no write.
+
+**Rollback.** Re-creating the role restores nothing: the user mappings are gone with it. If the
+release is rolled back past the cut, create the role again (`kcadm.sh create roles -r basetool -s
+name=Officer`) and grant it to the accounts the report listed under `officer_without_seat` and to
+the seat holders; the application mirror (`user_roles`) refreshes at the next login or user sync.
+
 ### Updating the operational scripts and units
 
 `deploy.sh`, the other scripts and the `basetool-*` units are **not** in the config bundle — a deployer
