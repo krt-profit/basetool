@@ -280,8 +280,9 @@ there is no "rerun until it passes" allowance.
 build runs with the cache switched on and strict: `gradle.properties` sets
 `org.gradle.configuration-cache=true` for local builds too, and CI passes
 `--configuration-cache` as well. `--no-configuration-cache` turns it off for one
-run; a task a plugin marks incompatible (the OWASP `dependencyCheckAggregate`)
-makes Gradle skip the cache for that run on its own. The image builds in
+run; a task marked incompatible (the OWASP `dependencyCheckAggregate` by its
+plugin, `dependencyCheckUpdate` in the root `build.gradle.kts`) makes Gradle
+skip the cache for that run on its own. The image builds in
 `docker/app/Dockerfile` and `docker/sandbox/keycloak/Dockerfile` pass
 `--no-configuration-cache`: their context has no git checkout, and the
 frontend's `git describe` version probe is a cache problem there. The usual mistakes are a task

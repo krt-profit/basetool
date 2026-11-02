@@ -28,7 +28,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-    timeout-minutes: 75
+    timeout-minutes: 100
     outputs:
       key: ${{ steps.key.outputs.key }}
 
@@ -58,23 +58,27 @@ jobs:
             nvd-feed-v2-${{ runner.os }}-
 
       - name: Run dependencyCheckUpdate
-        timeout-minutes: 65
+        timeout-minutes: 85
         env:
           ORG_GRADLE_PROJECT_nvdApiKey: ${{ secrets.NVD_API_KEY }}
           ATTEMPTS: '3'
-          ATTEMPT_MINUTES: '20'
+          ATTEMPT_MINUTES: '25'
         run: |
           set -uo pipefail
+          data=~/.gradle/dependency-check-data
           for attempt in $(seq 1 "$ATTEMPTS"); do
             if timeout --kill-after=60s "${ATTEMPT_MINUTES}m" \
                 ./gradlew dependencyCheckUpdate --no-parallel --stacktrace; then
-              date -u +%s > ~/.gradle/dependency-check-data/refreshed-at
+              date -u +%s > "${data}/refreshed-at"
               echo "NVD feed refreshed in attempt ${attempt} of ${ATTEMPTS}." | tee -a "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             echo "::warning::dependencyCheckUpdate attempt ${attempt} of ${ATTEMPTS} failed or ran past ${ATTEMPT_MINUTES} minutes"
+            # timeout kills only the client; the daemon would keep the update running and the dataset locked.
+            ./gradlew --stop
+            find "$data" \( -name '*.lock' -o -name '*.lock.db' \) -print -delete 2>/dev/null || true
             if [ "$attempt" -lt "$ATTEMPTS" ]; then
-              sleep 60
+              sleep 30
             fi
           done
           echo "::error::dependencyCheckUpdate failed ${ATTEMPTS} times; the cached NVD feed was not replaced"
