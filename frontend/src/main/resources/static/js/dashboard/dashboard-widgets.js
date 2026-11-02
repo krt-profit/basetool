@@ -41,18 +41,24 @@ const LIVE_TYPES = new Set([
     'ASSIGNED_ORDERS',
     'LOW_STOCK',
     'BANK',
+    'MARKET',
+    'SUPPLY_NEEDS',
+    'BANK_REQUESTS',
 ]);
 
 /**
- * The global live-sync rooms that reload the instances of a widget type, each with the section of
- * the room that carries the change (REQ-FE-015).
+ * The global live-sync rooms that reload the instances of a widget type, each with the sections of
+ * the room that carry the change (REQ-FE-015).
  *
- * @type {Record<string, { topic: string, section: string }>}
+ * @type {Record<string, { topic: string, sections: string[] }>}
  */
 const LIVE_ROOMS = {
-    ASSIGNED_ORDERS: { topic: 'orders', section: 'queue' },
-    LOW_STOCK: { topic: 'inventory', section: 'stock-levels' },
-    BANK: { topic: 'orgunit-bank', section: 'orgUnitBank' },
+    ASSIGNED_ORDERS: { topic: 'orders', sections: ['queue'] },
+    LOW_STOCK: { topic: 'inventory', sections: ['stock-levels'] },
+    BANK: { topic: 'orgunit-bank', sections: ['orgUnitBank'] },
+    MARKET: { topic: 'materialboard', sections: ['board', 'requests'] },
+    SUPPLY_NEEDS: { topic: 'supply-needs', sections: ['needs', 'stats'] },
+    BANK_REQUESTS: { topic: 'orgunit-bank', sections: ['orgUnitBank'] },
 };
 
 /** The options a widget request carries, as the item's data attributes name them. */
@@ -107,6 +113,7 @@ function showError(item, body) {
     const message = document.createElement('p');
     message.className = 'home-notifs__empty';
     message.setAttribute('role', 'alert');
+    message.dataset.testid = `dashboard-${item.dataset.widgetSlug ?? 'widget'}-error`;
     message.textContent = board instanceof HTMLElement ? (board.dataset.widgetError ?? '') : '';
     const retry = document.createElement('button');
     retry.type = 'button';
@@ -221,7 +228,12 @@ function followRoom(type) {
     followedRooms.add(type);
     krtLiveSync.createReceiver({
         topic: room.topic,
-        sections: { [room.section]: { container: `[data-widget-type="${type}"]` } },
+        sections: Object.fromEntries(
+            room.sections.map((section) => [
+                section,
+                { container: `[data-widget-type="${type}"]` },
+            ]),
+        ),
         coalesceMs: 1500,
         refresh() {
             reloadType(type);

@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.internal.CreateNeedRequest;
+import de.greluc.krt.profit.basetool.backend.supply.internal.NeedCoverage;
 import de.greluc.krt.profit.basetool.backend.supply.internal.NeedDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.NeedJobOrderOptionDto;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeedService;
@@ -71,6 +72,7 @@ public class SupplyNeedController {
    * @param status only these states; the visible ones when omitted
    * @param purchasable only purchasable or only non-purchasable needs
    * @param materialId only this material
+   * @param coverage only the open needs that are uncovered or partly covered
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
@@ -83,6 +85,7 @@ public class SupplyNeedController {
       @RequestParam(required = false) Set<NeedStatus> status,
       @RequestParam(required = false) Boolean purchasable,
       @RequestParam(required = false) UUID materialId,
+      @RequestParam(required = false) NeedCoverage coverage,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -95,7 +98,12 @@ public class SupplyNeedController {
             "createdAt");
     return PageResponse.of(
         needService.list(
-            orgUnitId, status == null ? Set.of() : status, purchasable, materialId, pageable));
+            orgUnitId,
+            status == null ? Set.of() : status,
+            purchasable,
+            materialId,
+            coverage,
+            pageable));
   }
 
   /**

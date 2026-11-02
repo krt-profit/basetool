@@ -309,6 +309,31 @@ class DashboardRenderMvcTest {
   }
 
   @Test
+  @DisplayName("a member may add the trade widgets, whose options dialog offers their own statuses")
+  void offersTheTradeWidgetsWithTheirOptions() throws Exception {
+    stored(
+        true,
+        1,
+        widget(DashboardWidgetType.MARKET, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(DashboardWidgetType.SUPPLY_NEEDS, DashboardColumn.NARROW, UUID.randomUUID(), null),
+        widget(DashboardWidgetType.BANK_REQUESTS, DashboardColumn.NARROW, UUID.randomUUID(), null));
+
+    String html = home(member());
+
+    assertThat(html)
+        .contains("data-testid=\"dashboard-add-market\"")
+        .contains("data-testid=\"dashboard-add-bank-requests\"")
+        .contains("data-widget-slug=\"market\"")
+        .contains("data-widget-slug=\"supply-needs\"")
+        .contains("data-widget-slug=\"bank-requests\"")
+        .contains("data-status-choices=\"BOTH OFFERS REQUESTS\"")
+        .contains("data-status-choices=\"ALL_OPEN UNCOVERED PARTIAL\"")
+        .contains("data-status-choices=\"ALL OPEN DECIDED\"")
+        .contains("data-options=\"unit rows status\"")
+        .contains("data-options=\"rows status\"");
+  }
+
+  @Test
   @DisplayName(
       "a member may add the next-mission widget with its rows option and the hangar-readiness"
           + " widget without options")

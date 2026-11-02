@@ -105,6 +105,24 @@ class SupplyBackendClientTest {
   }
 
   @Test
+  void needReadsCarryTheCoverageWhenGiven() {
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
+
+    assertThat(client.needs(null, "OPEN", "UNCOVERED", 0, 5)).isNotNull();
+    assertThat(client.needs(UNIT, "OPEN", " ", 0, 5)).isNotNull();
+
+    backend.expect(
+        "GET",
+        "/api/v1/supply/needs?page=0&size=5&sort=createdAt,desc&status=OPEN&coverage=UNCOVERED");
+    backend.expect(
+        "GET",
+        "/api/v1/supply/needs?page=0&size=5&sort=createdAt,desc&orgUnitId="
+            + UNIT
+            + "&status=OPEN");
+  }
+
+  @Test
   void donationReadsAndStatistics() {
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);

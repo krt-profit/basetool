@@ -148,7 +148,34 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 3, null));
+      new DashboardOptions(null, null, 3, null)),
+
+  /** The open Materialbörse entries: offers, wanted-listings or both. */
+  MARKET(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      new DashboardOptions(null, null, 5, DashboardStatus.BOTH),
+      EnumSet.of(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
+
+  /** The open supply needs, optionally the uncovered or partly covered ones. */
+  SUPPLY_NEEDS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
+      new DashboardOptions(null, null, 5, DashboardStatus.ALL_OPEN),
+      EnumSet.of(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
+
+  /** The member's own bank requests: pending, decided or all. */
+  BANK_REQUESTS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      new DashboardOptions(null, null, 3, DashboardStatus.OPEN),
+      EnumSet.of(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */
   public static final Set<Integer> DAY_CHOICES = Set.of(3, 7, 14);

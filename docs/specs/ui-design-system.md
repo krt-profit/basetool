@@ -2587,11 +2587,11 @@ ADR-0282, ADR-0297
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
 > one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
-> bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
-> Favoriten and Benachrichtigungen, with the options of the matrix below, the admin
-> dashboard with its five widgets and the start page per mode. Not built yet (planned): the
-> catalogue widgets Aufträge zu bearbeiten, Meine Aufträge, Materialbedarf, Raffinerie: fertig,
-> Materialbörse, Bedarf & Spenden and Meine Bankanträge with their options.
+> bearbeite, Bestand niedrig, Bank, Materialbörse, Bedarf & Spenden, Meine Bankanträge,
+> Information (with the inline editor for administrators), Favoriten and Benachrichtigungen,
+> with the options of the matrix below, the admin dashboard with its five widgets and the start
+> page per mode. Not built yet (planned): the catalogue widgets Aufträge zu bearbeiten, Meine
+> Aufträge, Materialbedarf and Raffinerie: fertig with their options.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2661,6 +2661,17 @@ fails on its own, never blocking the page. A widget whose area has a live-sync t
 (REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
 reload at once when the tab becomes visible again.
 
+**Trade widgets.** Read-only and not audited. „Materialbörse" merges the offer and the wanted
+board, newest first, and counts both page totals. „Bedarf & Spenden" reads the open needs
+(REQ-SUP-006) and counts the page total; „Ungedeckt" is an open need nothing is credited to,
+„Teilweise gedeckt" one that is credited in part (the `coverage` filter of the needs list);
+unpinned and following no pinned context it shows every unit's open needs, each row labelled with
+its unit, and it is offered only while the supply surface is on (REQ-SUP-001). „Meine
+Bankanträge" lists the caller's own requests (REQ-BANK-022) only; „Offen" is pending,
+„Entschieden" every request that has reached a final state. The live-sync rooms are `materialboard`
+(`board`, `requests`), `supply-needs` (`needs`, `stats`) and `orgunit-bank` (`orgUnitBank`). A
+failed load shows the instance's error state with the test id `dashboard-<slug>-error`.
+
 **Store.** In the `navigation` module, owner-only and not audited, like REQ-UI-032: the layout
 (instances, column, order) is one section per mode with its own version, and the options of each
 instance carry their own version, so an option change never collides with a reorder. Conflicts and
@@ -2713,6 +2724,9 @@ instances, the empty and error states, deletion on role loss, the hint, the cata
 Hangar-Bereitschaft: the rows and their rows option, the counts, the empty states, the member's hangar room),
 `DashboardWorkWidgetsMvcTest` (Ich bearbeite, Bestand niedrig and Bank: the read per option, the
 page total as count, the rows, the unit label, the target bar and trend, the empty states),
+`DashboardTradeWidgetsMvcTest` (Materialbörse, Bedarf & Spenden and Meine Bankanträge: the read
+per option, the merged boards, the coverage and status filters, the counts, the unit label, the
+empty states), `NeedCoverageDataTest` (the uncovered and partly covered needs),
 `DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
 widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
 `NavigationLegacyRedirectMvcTest` (`/admin/announcement`), `StartPageRedirectMvcTest` (the start

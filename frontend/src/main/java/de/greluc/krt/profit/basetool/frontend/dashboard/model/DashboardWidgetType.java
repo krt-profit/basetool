@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -142,7 +143,31 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.ROWS));
+      EnumSet.of(DashboardOption.ROWS)),
+
+  /** The open Materialbörse entries; the board is for members and above. */
+  MARKET(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
+
+  /** The open supply needs; the supply surface is for members while it is switched on. */
+  SUPPLY_NEEDS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER).andRequires(NavigationFlag.SUPPLY),
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
+
+  /** The member's own bank requests; the org-unit bank page is for members and above. */
+  BANK_REQUESTS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      EnumSet.of(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
 
   /** The day counts the days option offers. */
   public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);

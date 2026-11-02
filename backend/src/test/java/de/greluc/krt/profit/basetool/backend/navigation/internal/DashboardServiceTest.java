@@ -575,6 +575,102 @@ class DashboardServiceTest {
   }
 
   @Test
+  @DisplayName("the trade widgets start with the matrix defaults and stay out of the default")
+  void addsTheTradeWidgetsWithTheirDefaults() {
+    UUID owner = member();
+
+    DashboardResponse written =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(
+                    item(DashboardWidgetType.MARKET),
+                    item(DashboardWidgetType.SUPPLY_NEEDS),
+                    item(DashboardWidgetType.BANK_REQUESTS)),
+                0L));
+
+    DashboardWidgetResponse market = written.widgets().get(0);
+    assertThat(market.rows()).isEqualTo(5);
+    assertThat(market.status()).isEqualTo(DashboardStatus.BOTH);
+    assertThat(market.orgUnitId()).isNull();
+    DashboardWidgetResponse needs = written.widgets().get(1);
+    assertThat(needs.rows()).isEqualTo(5);
+    assertThat(needs.status()).isEqualTo(DashboardStatus.ALL_OPEN);
+    DashboardWidgetResponse requests = written.widgets().get(2);
+    assertThat(requests.rows()).isEqualTo(3);
+    assertThat(requests.status()).isEqualTo(DashboardStatus.OPEN);
+    assertThat(service.read(member(), MEMBER).widgets())
+        .extracting(DashboardWidgetResponse::type)
+        .doesNotContain(
+            DashboardWidgetType.MARKET,
+            DashboardWidgetType.SUPPLY_NEEDS,
+            DashboardWidgetType.BANK_REQUESTS);
+  }
+
+  @Test
+  @DisplayName("each trade widget accepts only its own options")
+  void acceptsOnlyTheOptionsOfTheTradeWidgets() {
+    UUID owner = member();
+    DashboardResponse written =
+        service.replaceLayout(
+            owner,
+            MEMBER,
+            new DashboardLayoutRequest(
+                List.of(
+                    item(DashboardWidgetType.MARKET),
+                    item(DashboardWidgetType.SUPPLY_NEEDS),
+                    item(DashboardWidgetType.BANK_REQUESTS)),
+                0L));
+    DashboardWidgetResponse market = written.widgets().get(0);
+    DashboardWidgetResponse needs = written.widgets().get(1);
+    DashboardWidgetResponse requests = written.widgets().get(2);
+    UUID unit = UUID.randomUUID();
+
+    DashboardWidgetResponse market2 =
+        service.replaceOptions(
+            owner,
+            MEMBER,
+            market.id(),
+            new DashboardOptionsRequest(
+                null, null, 10, DashboardStatus.REQUESTS, market.optionsVersion()));
+    DashboardWidgetResponse needs2 =
+        service.replaceOptions(
+            owner,
+            MEMBER,
+            needs.id(),
+            new DashboardOptionsRequest(
+                null, null, 5, DashboardStatus.PARTIAL, needs.optionsVersion()));
+    DashboardWidgetResponse requests2 =
+        service.replaceOptions(
+            owner,
+            MEMBER,
+            requests.id(),
+            new DashboardOptionsRequest(
+                null, null, 3, DashboardStatus.DECIDED, requests.optionsVersion()));
+
+    assertThat(market2.status()).isEqualTo(DashboardStatus.REQUESTS);
+    assertThat(needs2.status()).isEqualTo(DashboardStatus.PARTIAL);
+    assertThat(requests2.status()).isEqualTo(DashboardStatus.DECIDED);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                market.id(),
+                new DashboardOptionsRequest(
+                    unit, null, 5, DashboardStatus.BOTH, market2.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() ->
+            service.replaceOptions(
+                owner,
+                MEMBER,
+                requests.id(),
+                new DashboardOptionsRequest(
+                    null, null, 3, DashboardStatus.UNCOVERED, requests2.optionsVersion())))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
   @DisplayName("a stale option version is rejected")
   void rejectsAStaleOptionVersion() {
     UUID owner = member();

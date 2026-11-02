@@ -74651,6 +74651,14 @@
           }
         }, {
           "in" : "query",
+          "name" : "coverage",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "UNCOVERED", "PARTIAL" ]
+          }
+        }, {
+          "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
@@ -84670,7 +84678,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "MARKET", "SUPPLY_NEEDS", "BANK_REQUESTS" ]
           }
         },
         "required" : [ "column", "type" ]
@@ -84711,7 +84719,7 @@
           },
           "status" : {
             "type" : "string",
-            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ]
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "BOTH", "OFFERS", "REQUESTS", "ALL_OPEN", "UNCOVERED", "PARTIAL", "DECIDED" ]
           },
           "version" : {
             "type" : "integer",
@@ -84728,7 +84736,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK" ]
+              "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "MARKET", "SUPPLY_NEEDS", "BANK_REQUESTS" ]
             },
             "maxItems" : 32,
             "minItems" : 0
@@ -84787,11 +84795,11 @@
           },
           "status" : {
             "type" : "string",
-            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS" ]
+            "enum" : [ "UNREAD", "ALL", "OPEN_ACTIVE", "OPEN", "IN_PROGRESS", "BOTH", "OFFERS", "REQUESTS", "ALL_OPEN", "UNCOVERED", "PARTIAL", "DECIDED" ]
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK" ]
+            "enum" : [ "UPCOMING_DAYS", "INFORMATION", "FAVOURITES", "NOTIFICATIONS", "NEXT_MISSION", "HANGAR_READINESS", "ADMIN_HUB", "DELETION_REQUESTS", "DISCORD_REGISTRATIONS", "SYNC_STATUS", "OPEN_TERMS", "ASSIGNED_ORDERS", "LOW_STOCK", "BANK", "MARKET", "SUPPLY_NEEDS", "BANK_REQUESTS" ]
           }
         }
       },

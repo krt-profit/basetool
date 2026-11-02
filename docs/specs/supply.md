@@ -91,8 +91,12 @@ governing Bereich's Bereichsleiter, the Organisationsleitung, admin) and a trade
 `NeedPriceAudience` SPI the purchasing module implements); for everyone else the properties are absent
 from the response, not null-filled by the client.
 
-**Enforced by:** `SupplyMapperTest` · **Code:** `supply/internal/SupplyMapper`,
-`supply/internal/SupplyAccessPolicy`
+The needs list takes an optional `coverage` filter: `UNCOVERED` keeps the open needs nothing is
+credited to, `PARTIAL` the open needs credited in part. The page total counts the filtered set
+(the „Bedarf & Spenden“ dashboard widget, REQ-UI-034).
+
+**Enforced by:** `SupplyMapperTest`, `NeedCoverageDataTest` · **Code:** `supply/internal/SupplyMapper`,
+`supply/internal/SupplyAccessPolicy`, `supply/internal/NeedCoverage`
 
 ### REQ-SUP-007 — Pledge
 
