@@ -134,7 +134,7 @@ whichever name they use for the person.
 **Rather more than half of it is still your job, and the tool now says which half.** The eleven
 columns above are the ones a rule can rewrite safely: a column that holds a name and nothing else.
 The larger part of the schema holds the name **inside a sentence somebody wrote** — a booking
-justification, a mission description, an announcement, an org-chart placeholder, a market remark. No
+justification, a mission description, an announcement, a market remark. No
 rule can rewrite those without either corrupting the sentence or missing the mention, so an admin
 edits them by hand, which is what the name search is for and why this document has always required
 it.
@@ -189,7 +189,7 @@ supervisory authority. The competent authority is the one named in the privacy p
 ## Finding every mention of a person
 
 A name can sit in a free-text field with no foreign key — an external mission participant, a job-order
-handover recipient, an org-chart placeholder, a note or a booking reason. **Admin → Personensuche**
+handover recipient, a note or a booking reason. **Admin → Personensuche**
 searches those surfaces for a name and lists every entry, so a rectification or erasure covers all of
 them instead of the ones somebody happened to remember.
 

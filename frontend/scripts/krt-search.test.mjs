@@ -75,12 +75,12 @@ assert.deepEqual(plain(parse('')), { kind: null, term: '', help: false });
 assert.deepEqual(plain(parse('?')), { kind: null, term: '', help: true });
 assert.deepEqual(plain(parse(' ? ')), { kind: null, term: '', help: true });
 assert.deepEqual(plain(parse('?x')), { kind: null, term: '?x', help: false });
+assert.deepEqual(plain(parse('@Lucas')), { kind: null, term: '@Lucas', help: false });
 
 const symbols = [
     ['>neu', 'action', 'neu'],
     ['/ hangar', 'page', 'hangar'],
     ['#123', 'job_order', '123'],
-    ['@Lucas', 'member', 'Lucas'],
     ['>', 'action', ''],
 ];
 for (const [input, kind, term] of symbols) {
@@ -94,16 +94,12 @@ const words = [
     ['page: neu', 'page'],
     ['auftrag: neu', 'job_order'],
     ['order: neu', 'job_order'],
-    ['mitglied: neu', 'member'],
-    ['member: neu', 'member'],
     ['mission: neu', 'mission'],
     ['operation: neu', 'operation'],
     ['material: neu', 'material'],
     ['blueprint: neu', 'blueprint'],
     ['schiff: neu', 'ship'],
     ['ship: neu', 'ship'],
-    ['einheit: neu', 'org_unit'],
-    ['unit: neu', 'org_unit'],
     ['MISSION: neu', 'mission'],
     ['Schiff:neu', 'ship'],
 ];
@@ -122,18 +118,7 @@ assert.deepEqual(plain(parse('mission control')), {
 const prefixes = vm.runInContext('KRT_SEARCH_PREFIXES', context);
 assert.deepEqual(
     Array.from(prefixes, (p) => p.kind),
-    [
-        'action',
-        'page',
-        'job_order',
-        'member',
-        'mission',
-        'operation',
-        'material',
-        'blueprint',
-        'ship',
-        'org_unit',
-    ],
+    ['action', 'page', 'job_order', 'mission', 'operation', 'material', 'blueprint', 'ship'],
 );
 for (const p of prefixes) {
     const prefix = p.symbol || `${p.words[0]}:`;
@@ -168,20 +153,6 @@ assert.deepEqual(
     ['Hangar', 'Hangar-Check', 'Mein Hangar', 'Lager', 'Ankerpunkt'],
 );
 assert.equal(rank([item('Lager', '', false)], fold('hangar')).length, 0);
-
-const hitHref = vm.runInContext('krtSearchHitHref', context);
-const memberHit = { href: '/org-chart?highlight=1', adminHref: '/members/1' };
-assert.equal(hitHref(memberHit, true), '/members/1');
-assert.equal(hitHref(memberHit, false), '/org-chart?highlight=1');
-assert.equal(
-    hitHref({ href: '/org-chart?highlight=2', adminHref: null }, true),
-    '/org-chart?highlight=2',
-);
-assert.equal(hitHref({ href: '/orders/3' }, true), '/orders/3');
-assert.equal(
-    hitHref({ href: '/org-chart', adminHref: 'https://evil.example' }, true),
-    '/org-chart',
-);
 
 const byUse = (label, rest, frequency, fromServer = false) => ({
     ...item(label, rest, fromServer),

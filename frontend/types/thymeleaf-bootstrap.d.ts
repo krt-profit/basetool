@@ -389,9 +389,6 @@ declare const KRT_DEMAND_LIVESYNC_UPDATES: string;
 /** Injected by the page bootstrap (declared in orders-material-demand.html). */
 declare const KRT_DEMAND_SECTION_REFRESH_ERROR: string;
 
-/** Injected by the page bootstrap (declared in org-chart.html). */
-declare const OC_I18N: KrtI18nDict;
-
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MSG_RFC_CREATE_FAILED: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */

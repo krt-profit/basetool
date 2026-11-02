@@ -38,7 +38,6 @@ function initAdminOrgStructure() {
             return '/admin/org-structure';
         },
         topic: 'org-structure',
-        alsoBroadcast: ['chart'],
         receiver: {
             coalesceMs: 1500,
             /**

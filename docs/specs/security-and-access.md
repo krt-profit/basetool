@@ -1263,7 +1263,7 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
 - **A seat confers reach only while its holder holds `KRT Member`.** An appointment of a member
   without it is refused with `409 LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER` — every seat-writing path of
   `OrgUnitMembershipService`: Bereich rank, OL seat, Grand Admiral, SK lead, squadron rank. A seat
-  whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029): the
+  whose holder loses it later stays in place and confers nothing (REQ-ORG-029): the
   authority converter then mints no rank-derived `LOGISTICIAN` / `MISSION_MANAGER` authority, flat
   or contextual, and no cascaded one; only the explicit `is_logistician` / `is_mission_manager`
   flags stay in force. The same holds wherever else a rank is read: the exchange's Logistician
@@ -2287,7 +2287,7 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/live-sync/**` | **new** — the stream names the topics accepted for this caller |
 | `/api/v1/material-exchange/**` (the request board `/api/v1/material-exchange/requests/**` included) | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
 | `/api/v1/orders/**` | **new** — assignee and requester handles, claims, handovers, blueprint owners, viewer `canEdit` |
-| `/api/v1/org-chart/**` | **new** — named position holders and viewer-specific `canAdd…` flags |
+| `/api/v1/leadership/**` | **new** — the Leitung rosters and viewer-specific capability flags |
 | `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
 | `/api/v1/terms/**` | **new** — `/terms/status` is the caller's own acceptance |
 
@@ -3621,7 +3621,7 @@ would not repair an identity, it would falsify history.
 |                                               Follows                                               |                                                         Stays                                                         |
 |-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | Stock, hangar, refinery orders, personal inventory and blueprints                                   | The audit trail, in both its forms                                                                                    |
-| Org-unit memberships, org-chart positions, the Grand-Admiral office                                 | Who granted, requested, decided, initiated, executed, paid out                                                        |
+| Org-unit memberships and the Grand-Admiral office                                                   | Who granted, requested, decided, initiated, executed, paid out                                                        |
 | Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
 | Materialbörse offers, requests and interest                                                         | `user_roles` — re-derived from the token and the roster sync, not owned (REQ-SEC-013, REQ-SEC-036)                    |
 | Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
@@ -4982,8 +4982,7 @@ carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (
 (`mission.name`, already scrubbed in the two sibling sections that select it),
 `missionUnitResponsibilities.unit` (`mission_unit.name`), `notificationRuleTargets.rule`
 (`notification_rule.description`), `bankAccountGrants.account`, `bankAccountBookingGrants.account`
-and `bankApprovalLimits.account` (`bank_account.name`) and the two `orgChartPositions` name
-columns. Each is a person-name surface in
+and `bankApprovalLimits.account` (`bank_account.name`). Each is a person-name surface in
 the person-mention sources (REQ-SEC-060), whose union is the registry that settles the question
 rather than a per-section judgement call.
 
@@ -5283,8 +5282,8 @@ An admin MUST be able to find **every** place a given name appears, case-insensi
 free-text surface of the application.
 
 **Why.** A name can sit where no foreign key points: an external mission participant
-(`mission_participant.guest_name`), a party lead with no account, a job-order handover recipient, an
-org-chart placeholder, a booking reason, an admin's note on a refused registration. Before this, an
+(`mission_participant.guest_name`), a party lead with no account, a job-order handover recipient, a
+booking reason, an admin's note on a refused registration. Before this, an
 Art. 16 rectification or Art. 17 erasure request from such a person **could not be served at all** —
 nothing could find the entries. And for a member it was no better than partial: a rectification that
 fixes one of four occurrences is not a rectification.
@@ -6085,7 +6084,7 @@ Two reviewed lists hold today's deliberate exceptions, and a stale entry fails t
 - **Reviewed client inputs:** components that look server-managed but are a validated choice — the
   create-time owning unit resolved by `OrgUnitStampingService.resolveOrgUnitForPickerOutput`
   (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
-  counterparty, an ADMIN's org-chart or hierarchy choice, and the lifecycle `status` of the mission
+  counterparty, an ADMIN's hierarchy choice, and the lifecycle `status` of the mission
   and operation sections, each with its reason.
 
 A new request type complies with no exception.

@@ -29,11 +29,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * AJAX proxy of the crew board's „Alle einchecken" / „Alle auschecken" buttons (REQ-MISSION-032);
@@ -41,7 +40,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * for every handler (REQ-SEC-052).
  */
 @Slf4j
-@Controller
+@RestController
 @RequestMapping("/missions/{id}/participants")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
@@ -56,7 +55,6 @@ public class MissionCheckInWriteController {
    * @return 204 on success, otherwise the relayed backend problem
    */
   @PostMapping(value = "/check-in-all/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
-  @ResponseBody
   public ResponseEntity<Object> checkInAllAjax(@PathVariable @NotNull UUID id) {
     return relay(
         log,
@@ -74,7 +72,6 @@ public class MissionCheckInWriteController {
    * @return 204 on success, otherwise the relayed backend problem
    */
   @PostMapping(value = "/check-out-all/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
-  @ResponseBody
   public ResponseEntity<Object> checkOutAllAjax(@PathVariable @NotNull UUID id) {
     return relay(
         log,

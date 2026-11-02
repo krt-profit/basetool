@@ -462,10 +462,10 @@ own.
 - **One tag per domain.** `OpenApiDomainConfig.domainTagCustomizer` (an `OperationCustomizer`)
   replaces every operation's tags with exactly one, its controller's domain, and mirrors it as
   `x-domain`; the document's `tags` list holds those domains and nothing else, and springdoc's
-  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are the 21 of the REST
+  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are the 20 of the REST
   API cut's *Today's surface* that still exist (`admin-system`, `audit`, `bank`, `blueprint`, `catalogue`,
   `dashboard`, `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `leadership`, `livesync`,
-  `materialexchange`, `mission`, `notification`, `operation`, `orgchart`, `orgunit`,
+  `materialexchange`, `mission`, `notification`, `operation`, `orgunit`,
   `personalinventory`, `refinery`). The controller-to-domain table is explicit in main
   code, `platform/internal/ApiDomains`: the backend domain map of plan guard G-09
   (`backend/src/test/resources/architecture/domain-map.txt`, REQ-MOD-001) lives in test scope, where

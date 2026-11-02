@@ -69,13 +69,13 @@ class ModularityTest {
           "inventory",
           "joborder",
           "kernel",
+          "leadership",
           "livesync",
           "materialexchange",
           "mission",
           "navigation",
           "notification",
           "operation",
-          "orgchart",
           "orgunit",
           "personalinventory",
           "platform",
@@ -98,7 +98,7 @@ class ModularityTest {
    * other module may depend on them and no declaration allows them.
    */
   private static final Set<String> INTERNAL_ONLY_MODULES =
-      Set.of("dashboard", "navigation", "orgchart", "personalinventory");
+      Set.of("dashboard", "leadership", "navigation", "personalinventory");
 
   private static final String API = "api";
 

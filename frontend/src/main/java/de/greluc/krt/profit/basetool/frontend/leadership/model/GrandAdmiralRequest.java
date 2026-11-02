@@ -25,8 +25,7 @@ import java.util.UUID;
 /**
  * Body of the backend call that designates the Grand Admiral (REQ-ORG-021).
  *
- * @param userId the designated member, or {@code null}
- * @param displayName a free display name, or {@code null}
+ * @param userId the designated member
  */
 @DtoMirror
-public record GrandAdmiralRequest(UUID userId, String displayName) {}
+public record GrandAdmiralRequest(UUID userId) {}

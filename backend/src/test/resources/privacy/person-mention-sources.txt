@@ -61,10 +61,7 @@ target|NOTIFICATION|notification_rule|description|id|null
 target|OPERATION|operation|description|id|OPERATION
 target|OPERATION|operation|name|id|OPERATION
 target|ORG|kommando_group|name|id|ORG
-target|ORG|org_chart_position|display_name|id|ORG
-target|ORG|org_chart_position|name|id|ORG
 target|ORG|org_unit|description|id|ORG
-target|ORG|org_unit|grand_admiral_display_name|id|ORG
 target|ORG|org_unit|name|id|ORG
 target|ORG|org_unit|shorthand|id|ORG
 target|PERSONAL_INVENTORY|personal_blueprint|note|id|null
@@ -213,7 +210,6 @@ exempt-column|notification_rule_selector.org_relative_role
 exempt-column|notification_rule_selector.role_code
 exempt-column|operation.status
 exempt-column|operation_payout_status.participant_key
-exempt-column|org_chart_position.position_type
 exempt-column|org_unit.department
 exempt-column|org_unit.kind
 exempt-column|org_unit_membership.kind

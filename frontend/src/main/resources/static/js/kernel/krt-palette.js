@@ -35,7 +35,7 @@ import { remember } from '/js/kernel/krt-palette-history.js';
 import { createPageIndex } from '/js/kernel/krt-palette-index.js';
 import { toggleFavourite } from '/js/kernel/krt-palette-personalise.js';
 import { createView } from '/js/kernel/krt-palette-view.js';
-import { krtSearchHitHref, krtSearchParse } from '/js/kernel/krt-search.js';
+import { krtSearchParse } from '/js/kernel/krt-search.js';
 
 /** @import { PaletteItem } from '/js/kernel/krt-palette-items.js' */
 
@@ -101,10 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const newTabTarget = function (item) {
         if (item.fill) return null;
-        if (item.fromServer) {
-            const adminMode = !!krtChrome.nav && krtChrome.nav.isAdminMode();
-            return krtSearchHitHref(/** @type {any} */ (item), adminMode);
-        }
         return item.href || item.tabHref || null;
     };
 
@@ -138,12 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             item.run();
         } else if (item.href) {
             if (!item.fromServer) remember(item);
-            const adminMode = !!krtChrome.nav && krtChrome.nav.isAdminMode();
-            window.location.assign(
-                item.fromServer
-                    ? krtSearchHitHref(/** @type {any} */ (item), adminMode)
-                    : item.href,
-            );
+            window.location.assign(item.href);
         }
     };
 

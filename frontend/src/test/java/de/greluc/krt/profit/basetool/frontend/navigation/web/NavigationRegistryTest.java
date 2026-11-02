@@ -158,7 +158,7 @@ class NavigationRegistryTest {
             "/materialboerse",
             "/supply/needs",
             "/purchasing/deals",
-            "/org-chart",
+            "/org-unit-bank",
             "/bank");
   }
 
@@ -187,7 +187,6 @@ class NavigationRegistryTest {
             "/supply/needs",
             "/supply/donations/mine",
             "/purchasing/deals",
-            "/org-chart",
             "/organisation/leitung",
             "/org-unit-bank",
             "/bank",

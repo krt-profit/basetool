@@ -21,7 +21,7 @@ Nach dem Login wird jede Kernseite einzeln aufgerufen (parametrisierter Test üb
 
 ## Hauptablauf
 
-Für jeden Pfad in `/`, `/missions`, `/orders`, `/refinery-orders`, `/hangar`, `/operations`, `/materials`, `/materials/overview`, `/materials/profit-calculation`, `/ship-data`, `/blueprint-overview`, `/org-chart`, `/notifications`, `/personal-inventory`, `/personal-inventory/blueprints`:
+Für jeden Pfad in `/`, `/missions`, `/orders`, `/refinery-orders`, `/hangar`, `/operations`, `/materials`, `/materials/overview`, `/materials/profit-calculation`, `/ship-data`, `/blueprint-overview`, `/notifications`, `/personal-inventory`, `/personal-inventory/blueprints`:
 
 1. Navigiere mit der authentifizierten Session (einmal im `@BeforeAll` als `storageState` gesichert) zu `<baseUrl><pfad>`.
 2. Prüfe, dass die authentifizierte App-Shell rendert: das Abmelde-Element `nav-logout` der Seitenleiste ist sichtbar.

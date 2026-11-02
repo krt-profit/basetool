@@ -48,14 +48,8 @@ public enum QuickAccessSearchKind {
   /** Ship types of the unit hangar, opening the hangar filtered to the type. */
   SHIP("ship", "swap"),
 
-  /** Org units of the org chart, opening it with the unit highlighted. */
-  ORG_UNIT("org_unit", "users"),
-
   /** Job orders by their number, opening the order. */
-  JOB_ORDER("job_order", "clipboard-check", 1),
-
-  /** Members shown on the org chart, opening it with the person highlighted. */
-  MEMBER("member", "user");
+  JOB_ORDER("job_order", "clipboard-check", 1);
 
   private static final int DEFAULT_MIN_TERM_LENGTH = 2;
 

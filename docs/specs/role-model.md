@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029),
-> ADR-0300
+> ADR-0300, ADR-0331
 
 # Functional rank & permission model (squadron / area / OL)
 
@@ -19,12 +19,12 @@ this org unit" — so that other features can key permissions off these ranks. T
 consumer: an account's responsible holder (Staffelleiter, SK lead, Bereichsleiter, the OL members) is
 derived from the rank inside the `OrgUnitBankAccessService` seam ([`bank.md`](bank.md) REQ-BANK-034,
 ADR-0043). It is the anchor for the rank-related amendments in
-[`org-unit-tenancy.md`](org-unit-tenancy.md), [`security-and-access.md`](security-and-access.md) and
-[`org-chart.md`](org-chart.md), and for the role matrix in
+[`org-unit-tenancy.md`](org-unit-tenancy.md) and [`security-and-access.md`](security-and-access.md),
+and for the role matrix in
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800, now complete
 (Phases 1–3: the additive rank column + Kommandogruppe, the authorisation layer reads the rank with
 the squadron-rank baseline grant, and the delegated appointment ladder + Kommandogruppe CRUD + ROLE
-audit; Phase 4 mirrors the ranks onto the org chart (REQ-ROLE-006) and adds the delegated Leitung UI;
+audit; Phase 4 adds the delegated Leitung UI;
 Phase 5 (V187) drops the five legacy boolean leadership flags so `role` is the sole source of truth).
 
 Every role and membership mutation (assign / change / revoke a rank, grant / revoke a membership,
@@ -123,7 +123,7 @@ the officer standing they stood next to is no longer a Keycloak role.
 - **No manual grant.** There is no per-membership flag and no global override. Bank management
   confers no reach; a bank manager with a seat has reach there like anyone else.
 - **`KRT Member` is required for every seat.** Appointing a member without the Keycloak role
-  `KRT Member` is refused. A seat whose holder loses the role later stays in the org chart and
+  `KRT Member` is refused. A seat whose holder loses the role later stays in place and
   confers no reach until the role is back (REQ-ORG-029).
 - **Gates read the target's owning unit.** An officer check asks for reach in the owning unit of the
   mission, job order, ship or other target; lists are filtered to the caller's
@@ -172,7 +172,7 @@ group, and a group at most one Kommandoleiter and one stellv. (ADR-0322).
 - [x] The three singleton caps (≤1 Staffelleiter/squadron, ≤1 KL + ≤1 stellv./group) are
   DB-backstopped by partial unique indexes (V188), so a concurrent double-assign fails on the
   constraint rather than committing a duplicate; the per-squadron caps of four stay
-  service-layer-only (a count, like the org chart's own ≤4 ENSIGN cap).
+  service-layer-only (a count).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`, `v313AllowsKommandoleiterWithoutGroup`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality, ungrouped ranks) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRankCaps`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql`, `V313__allow_kommandoleiter_without_group.sql` · **Decision:** ADR-0042, ADR-0322 · **Issues:** #800
 
@@ -202,7 +202,7 @@ branch). Only an admin sets, changes or clears their own rank; a Bereichsleiter 
 themselves Staffelleiter, a Staffelleiter cannot demote themselves to Kommandoleiter. (Since
 2026-09-27.)
 
-**What the view shows.** `GET /api/v1/org-chart/leadership` lists the units the caller **leads and those
+**What the view shows.** `GET /api/v1/leadership` lists the units the caller **leads and those
 below them**, independent of what they may change: a squadron rank or `SK_LEAD` shows its own unit,
 an area rank its Bereich with the Bereich's direct children (`OrgUnitCascadeService`), an
 `OL_MEMBER` seat every unit including the OL, an admin everything; a plain `MEMBER` seat shows
@@ -275,62 +275,35 @@ widened for a Bereichsleiter.
 
 **Enforced by:** `OrgUnitCascadeServiceTest`, `ScopeKernelTest` · **Code:** `OrgUnitCascadeService` · **Decision:** ADR-0042 · **Issues:** #800
 
-### REQ-ROLE-006 — Roles are the source of truth; the org chart mirrors
+### REQ-ROLE-006 — Roles are the single source of truth
 
-The functional rank on `org_unit_membership` is the source of truth. The org chart
-(`org_chart_position`) only **mirrors** account-linked seats descriptively and grants nothing
-(REQ-ORG-010); free-text / account-less chart holders stay chart-only. Account-linked chart seats are
-derived from the ranks; the authority cascade never reads the chart.
+The functional rank on `org_unit_membership` is the single source of truth for leadership. No other
+store mirrors it: the appointment flow writes the rank and the Kommandogruppe binding, and every
+reader — officer reach, the bank's responsible holders, the Leitung view (REQ-ROLE-004) — reads the
+rank. The org-unit module therefore reports no leadership change to another module; the
+descriptive org chart that once mirrored the ranks is removed (ADR-0331).
 
-The mirror is written in the same transaction as the rank change, by `OrgChartService` through
-the org-unit module's `orgunit.api.MembershipChangeObserver` SPI (`MANDATORY`), called from the
-appointment flow (never by giving the chart scope awareness): the flat seats
-(Bereichsleiter / -koordinator / -operator, OL member, SK-Leiter, Staffelleiter) map 1:1 onto a
-chart position keyed by org unit (singletons are reassigned, not duplicated, so the partial unique
-indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
-node tied to its Kommandogruppe via the V186 `kommando_group_id` link carries the Kommandoleiter, and
-the stellv. Kommandoleiter / Ensigns hang off it. A Kommandoleiter without a group holds an own
-unnamed `COMMAND_LEAD` node without a group link; a stellv. or Ensign without a group reports
-straight to the Staffelleiter (`SquadronChartDto.directDeputies` / `directEnsigns`). A Kommandogruppe
-create / rename / delete mirrors the leaderless node, and revoking a rank vacates a led Kommando
-(keeping the node, REQ-ORG-025) or removes the other seats; an unnamed ungrouped Kommando that
-nothing reports into is removed with its leader's rank (ADR-0322). Legacy admin-authored Kommandos
-(no `kommando_group_id`) stay chart-only.
+The **Grand Admiral** (REQ-ORG-021) is a **title on top of the `OL_MEMBER` rank, not a separate
+rank**: the holder is an ordinary OL member with unchanged rights, recorded in the OL's
+`grand_admiral_user_id`. No rights-read point changes — reusing `OL_MEMBER` is what keeps the Grand
+Admiral's reach identical to an OL member's by construction.
 
-The mirror is the **single writer** of account-linked chart seats: the chart editor itself is
-account-free — its write API rejects setting an account holder, and editing / vacating / deleting a
-mirror-managed seat (account-held or `kommando_group`-linked), with
-`problem.org_chart.account_managed_in_leitung`. So an admin can no longer manually set an
-account-linked seat on the chart (no drift); only free-text holders stay editable there
-(org-chart.md REQ-ORG-010 / -025 / -020 amendments). A `kommando_group`-linked Kommando is read-only
-as a whole subtree: `CommandChartDto.kommandoGroupId` drives the editor to suppress every affordance
-on it (rename / remove / assign-lead / add-child) and the backend additionally **rejects creating a
-child** (Stv. / Ensign) under a `kommando_group`-linked parent — so no chart-only seat can be bolted
-onto a Leitung-managed Kommando.
-
-When the appointment mints a **new** account seat for a multi-holder post (OL member, SK-Leiter,
-Bereichskoordinator/-operator, Ensign), the mirror first **consumes a matching free-text
-placeholder**: a free-text seat of the same type/unit/parent whose typed name matches the appointee's
-effective name is converted in place instead of leaving a duplicate, so an admin who typed a name and
-later appoints that person's account need not delete the placeholder by hand. The singleton posts
-(Staffelleiter, Bereichsleiter, Kommandoleiter, Stv.) already reuse their single seat; the match is
-name-scoped, so it never touches a different member's placeholder.
-
-The **Grand Admiral** (org-chart.md REQ-ORG-021) is a **title on top of the `OL_MEMBER` rank, not a
-separate rank**: the holder is an ordinary OL member with unchanged rights, and the chart mirrors the
-OL's `grand_admiral_user_id` designation by rendering that one member at the top of the OL. No
-rights-read point changes — reusing `OL_MEMBER` is what keeps the Grand Admiral's reach identical to
-an OL member's by construction.
+The Leitung view reports each unit's Bereich and its department (`LeitungUnitDto.bereichName`,
+`.department`) from the hierarchy itself, so the Leitung tree colours and places its units without
+another read.
 
 **Acceptance**
 
-- [x] Granting / revoking a rank updates the account-linked chart seat in the same transaction; the
-  chart still grants nothing and the ArchUnit chart pins stay green.
-- [x] A `kommando_group`-linked Kommando renders read-only in the chart (no rename / remove /
-  assign-lead / add-child), and creating a child under it is rejected with
-  `problem.org_chart.account_managed_in_leitung`.
+- [x] Granting, changing or revoking a rank writes only `org_unit_membership` (and the audit row).
+- [x] The Leitung view carries each unit's Bereich name and department: a Bereich its own
+  department, a Staffel or Spezialkommando its Bereich's name and department, the OL and a unit
+  without a Bereich neither.
 
-**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases of the `MembershipChangeObserver` methods, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgUnitMembershipServiceTest`, `KommandoGroupServiceTest`,
+`LeitungViewServiceTest#everyUnitCarriesTheNameAndDepartmentOfItsBereich`,
+`LeitungPageControllerTest#leitung_unitContext_placesUnitsUnderTheirBereich` · **Code:**
+`OrgUnitMembershipService`, `KommandoGroupService`, `LeitungViewService`, `LeitungPageController` ·
+**Decision:** ADR-0042, ADR-0331 · **Issues:** #800, #2987
 
 ### REQ-ROLE-007 — The member rank follows officer reach
 

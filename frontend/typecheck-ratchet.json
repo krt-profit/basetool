@@ -202,9 +202,6 @@
       "operation/operations-index.js",
       "operation/operations.js"
     ],
-    "orgchart": [
-      "orgchart/org-chart.js"
-    ],
     "orgunit": [
       "orgunit/admin-org-structure.js",
       "orgunit/special-command-detail.js",

@@ -62,7 +62,7 @@ class AssetLayoutTest {
 
   private static final int SCRIPT_FLOOR = 124;
 
-  private static final int STYLESHEET_FLOOR = 87;
+  private static final int STYLESHEET_FLOOR = 86;
 
   @Test
   void everyTemplateScriptAndStylesheetLivesInItsDomainFolder() throws IOException {

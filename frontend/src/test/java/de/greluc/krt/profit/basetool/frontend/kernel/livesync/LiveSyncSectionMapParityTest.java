@@ -412,56 +412,11 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
-  void orgStructureSeamMaps_partitionTheOrgStructureTopicWhitelist() throws IOException {
+  void orgStructureSeamMap_matchesTheOrgStructureTopicWhitelist() throws IOException {
     Set<String> editorKeys = seamMapKeys("/static/js/orgunit/admin-org-structure.js", "sections");
-    Set<String> chartKeys = seamMapKeys("/static/js/orgchart/org-chart.js", "sections");
-    Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
-
     assertThat(editorKeys)
         .as("sections keys in admin-org-structure.js vs the ORG_STRUCTURE whitelist")
-        .isSubsetOf(whitelist);
-    assertThat(chartKeys)
-        .as("sections keys in org-chart.js vs the ORG_STRUCTURE whitelist")
-        .isSubsetOf(whitelist);
-
-    Set<String> union = new LinkedHashSet<>(editorKeys);
-    union.addAll(chartKeys);
-    assertThat(union)
-        .as("every ORG_STRUCTURE section is rendered by exactly one of the two pages")
-        .containsExactlyInAnyOrderElementsOf(whitelist);
-  }
-
-  @Test
-  void orgStructureCrossPublishConstants_nameTheOtherPagesSection() throws IOException {
-    String editorJs = readResource("/static/js/orgunit/admin-org-structure.js");
-    String chartJs = readResource("/static/js/orgchart/org-chart.js");
-    Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
-
-    Matcher alsoBroadcast =
-        Pattern.compile("alsoBroadcast:\\s*\\['([\\w-]+)'\\]").matcher(editorJs);
-    assertThat(alsoBroadcast.find()).as("alsoBroadcast: ['<key>'] present").isTrue();
-    assertThat(whitelist)
-        .as("alsoBroadcast key in admin-org-structure.js is a whitelisted key")
-        .contains(alsoBroadcast.group(1));
-    assertThat(whitelist)
-        .as("ORG_CHART_UNITS_SECTION in org-chart.js is a whitelisted key")
-        .contains(constantValue(chartJs, "ORG_CHART_UNITS_SECTION"));
-  }
-
-  /**
-   * Reads the string literal assigned to a top-level {@code const <name> = '<value>';} in a JS
-   * module.
-   *
-   * @param js the module source
-   * @param constantName the constant to read
-   * @return the assigned string value
-   */
-  private static String constantValue(String js, String constantName) {
-    Matcher matcher =
-        Pattern.compile("\\b" + Pattern.quote(constantName) + "\\s*=\\s*['\"]([\\w-]+)['\"]")
-            .matcher(js);
-    assertThat(matcher.find()).as("%s = '<value>' assignment present", constantName).isTrue();
-    return matcher.group(1);
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORG_STRUCTURE.allowedSections());
   }
 
   @Test

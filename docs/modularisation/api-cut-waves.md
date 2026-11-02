@@ -192,7 +192,7 @@ is missed); ingest, Keycloak SPI and the app: none (all T2). E2E: `BackendSeeder
 
 | Example old path | Example new path | Ops | T1 | App-called |
 | --- | --- | ---: | ---: | ---: |
-| `/leitung/view` | `/org-chart/leadership` | 1 | 0 | 0 |
+| `/leitung/view` | `/leadership` | 1 | 0 | 0 |
 | `/me/active-org-unit` | `/org-units/me/active` | 1 | 1 | 1 |
 | `/me/org-units` | `/org-units/me/switchable` | 1 | 1 | 1 |
 | `/org-hierarchy/bereiche` | `/org-units/bereiche` | 10 | 0 | 0 |

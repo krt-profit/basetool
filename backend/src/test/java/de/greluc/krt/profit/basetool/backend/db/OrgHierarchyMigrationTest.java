@@ -251,53 +251,25 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * Verifies V186 (REQ-ROLE-006): a {@code COMMAND_LEAD} node may link one Kommandogruppe, a second
-   * node for the same group is rejected, and non-{@code COMMAND_LEAD} ranks cannot link one.
+   * Verifies V332 and V333: the free-text Grand Admiral column and the org-chart table are gone,
+   * and the Grand Admiral account stays confined to the Organisationsleitung row.
    */
   @Test
-  void v186LinksOrgChartCommandNodeToKommandoGroup() {
+  void v332AndV333DropTheOrgChartData() {
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-    assertColumnExists(jdbc, "org_chart_position", "kommando_group_id");
-    assertConstraintExists(jdbc, "chk_org_chart_kommando_group_type");
-    assertConstraintExists(jdbc, "fk_org_chart_position_kommando_group");
-    assertIndexExists(jdbc, "org_chart_position", "uq_org_chart_one_command_per_group");
-
-    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000f0");
-    UUID userId = UUID.fromString("ffffff00-0000-0000-0000-0000000000f1");
-    UUID groupId = UUID.fromString("ffffff00-0000-0000-0000-0000000000f2");
-    UUID cmd1 = UUID.fromString("ffffff00-0000-0000-0000-0000000000f3");
-    UUID cmd2 = UUID.fromString("ffffff00-0000-0000-0000-0000000000f4");
-    UUID lead = UUID.fromString("ffffff00-0000-0000-0000-0000000000f5");
-    cleanupOrgChartPositions(jdbc, cmd1, cmd2, lead);
-    cleanupKommandoGroups(jdbc, squadronId);
-    cleanupMemberships(jdbc, userId);
-    cleanup(jdbc, squadronId);
-    cleanupUser(jdbc, userId);
-    try {
-      insertUser(jdbc, userId);
-      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_OC_SQ", "TOCS", null);
-      insertKommandoGroup(jdbc, groupId, squadronId, "Alpha");
-
-      insertOrgChartPosition(jdbc, cmd1, "COMMAND_LEAD", squadronId, null, "Alpha", groupId);
-      assertThat(orgChartPositionCount(jdbc, cmd1)).isOne();
-
-      assertThatThrownBy(() ->
-              insertOrgChartPosition(
-                  jdbc, cmd2, "COMMAND_LEAD", squadronId, null, "Alpha2", groupId))
-          .isInstanceOf(DataAccessException.class);
-
-      assertThatThrownBy(() ->
-              insertOrgChartPosition(
-                  jdbc, lead, "SQUADRON_LEAD", squadronId, userId, null, groupId))
-          .isInstanceOf(DataAccessException.class)
-          .hasMessageContaining("chk_org_chart_kommando_group_type");
-    } finally {
-      cleanupOrgChartPositions(jdbc, cmd1, cmd2, lead);
-      cleanupKommandoGroups(jdbc, squadronId);
-      cleanupMemberships(jdbc, userId);
-      cleanup(jdbc, squadronId);
-      cleanupUser(jdbc, userId);
-    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_name ="
+                    + " 'org_chart_position'",
+                Integer.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'org_unit'"
+                    + " AND column_name = 'grand_admiral_display_name'",
+                Integer.class))
+        .isZero();
+    assertConstraintExists(jdbc, "chk_org_unit_grand_admiral_only_ol");
   }
 
   /**
@@ -544,40 +516,6 @@ class OrgHierarchyMigrationTest {
   private static void cleanupKommandoGroups(JdbcTemplate jdbc, UUID... squadronIds) {
     for (UUID id : squadronIds) {
       jdbc.update("DELETE FROM kommando_group WHERE squadron_org_unit_id = ?", id);
-    }
-  }
-
-  /** Inserts an org-chart position (V186); version / sort_index / timestamps fall to defaults. */
-  private static void insertOrgChartPosition(
-      JdbcTemplate jdbc,
-      UUID id,
-      String positionType,
-      UUID orgUnitId,
-      UUID userId,
-      String name,
-      UUID kommandoGroupId) {
-    jdbc.update(
-        "INSERT INTO org_chart_position (id, position_type, org_unit_id, user_id, name,"
-            + " kommando_group_id) VALUES (?, ?, ?, ?, ?, ?)",
-        id,
-        positionType,
-        orgUnitId,
-        userId,
-        name,
-        kommandoGroupId);
-  }
-
-  private static int orgChartPositionCount(JdbcTemplate jdbc, UUID id) {
-    Integer count =
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM org_chart_position WHERE id = ?", Integer.class, id);
-    return count == null ? 0 : count;
-  }
-
-  /** Removes throwaway org-chart positions before their group / org-unit rows are deleted. */
-  private static void cleanupOrgChartPositions(JdbcTemplate jdbc, UUID... ids) {
-    for (UUID id : ids) {
-      jdbc.update("DELETE FROM org_chart_position WHERE id = ?", id);
     }
   }
 

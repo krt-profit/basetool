@@ -334,8 +334,7 @@ Kommandoleiter / Stellvertreter / Ensigns + Kommandogruppen (own Staffel, at mos
 four Kommandogruppen and four of each of the three ranks; a Kommandogruppe is
 optional for all three, ADR-0322). To appoint a rank, you must hold a **strictly higher**
 rank — nobody promotes themselves. Every appointment is logged in the audit log
-„Rollen & Mitglieder" and is reflected in the same transaction in the
-account-bound org-chart seat (REQ-ROLE-006).
+„Rollen & Mitglieder"; the rank is the only record of the seat (REQ-ROLE-006).
 
 ### Officer reach (leadership & bank)
 
@@ -680,8 +679,6 @@ participants (REQ-SEC-042).
 | **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
 | Appoint / clear the SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN') or canAppointSkLead`)                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
 | Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-units/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Read the org chart (`GET /api/v1/org-chart`, `/org-chart`)                                                                                                          |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Edit the org chart — free-text holders and structure only; account seats mirror the ranks (`/api/v1/org-chart/positions/**`, `hasRole('ADMIN')`, REQ-ROLE-006) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ² Non-admins switch between their memberships; admins additionally „Alle Staffeln" (all Staffeln). ³ SK member management
 is **admin or SK-Lead of this SK** — not tied
@@ -702,12 +699,12 @@ nobody promotes themselves. The verdict is `@orgRoleManagementSecurityService` a
 caller's own membership ranks — never the admin pin, contextual authorities or the org-unit scope services
 (ArchUnit `delegatedRoleAuthoriserMustNotConsultOwnerScope`); Admin short-circuits at each
 `@PreAuthorize` (`hasRole('ADMIN') or …`). The parent Bereich is always read from the target unit's
-persisted `parent` edge. Every appointment is audited in „Rollen & Mitglieder" (REQ-AUDIT-001) and
-mirrored onto the org chart in the same transaction (REQ-ROLE-006).
+persisted `parent` edge. Every appointment is audited in „Rollen & Mitglieder" (REQ-AUDIT-001); the
+rank is the only record of the seat (REQ-ROLE-006).
 
 | Function (endpoint)                                                                                                   | Staffelleiter (own Staffel) | Bereichsleiter (own Bereich) | OL member | Admin |
 |:----------------------------------------------------------------------------------------------------------------------|:---------------------------:|:----------------------------:|:---------:|:-----:|
-| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/org-chart/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
+| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
 | Assign / clear Kommandoleiter, Stv., Ensign (`PUT`/`DELETE /api/v1/squadrons/{id}/ranks/{userId}`)                  |              ✅              |              ❌               |     ❌     |   ✅   |
 | Create / rename / delete a Kommandogruppe (≤ 4 per Staffel) (`/api/v1/squadrons/{id}/kommando-groups`, `/api/v1/kommando-groups/{id}`) |              ✅              |              ❌               |     ❌     |   ✅   |
 | Assign / clear the **Staffelleiter** of a child Staffel (same endpoints)                                            |              ❌              |              ✅               |     ❌     |   ✅   |
@@ -1201,7 +1198,7 @@ layout read grants them: the incoming donations to the lead or a Logistician of 
 accepts donations (and to `ADMIN`), the statistics to the governing leadership and any unit
 manager, the partners to a trade delegate and the governing leadership, the delegates to the
 governing leadership, the report to a delegate, the governing leadership, bank staff and any unit
-manager (REQ-UI-026). Its entity search, `GET /quick-access/search` (`isAuthenticated()`, REQ-UI-033), reads the backend read behind each page it opens — missions and operations as their lists show them, materials from the visible catalogue, blueprints from the availability overview, ship types from the unit hangar overview, job orders by number through the order list's scope and the assignee grant (`GET /api/v1/orders/by-number`, `isAuthenticated()`, REQ-ORDERS-048), org units and members exactly as the org chart shows them (display name, the username only when none is set) — so a hit never reveals more than that page. Its actions follow the same buttons: „Ins globale Lager
+manager (REQ-UI-026). Its entity search, `GET /quick-access/search` (`isAuthenticated()`, REQ-UI-033), reads the backend read behind each page it opens — missions and operations as their lists show them, materials from the visible catalogue, blueprints from the availability overview, ship types from the unit hangar overview and job orders by number through the order list's scope and the assignee grant (`GET /api/v1/orders/by-number`, `isAuthenticated()`, REQ-ORDERS-048) — so a hit never reveals more than that page. Its actions follow the same buttons: „Ins globale Lager
 einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMIN`. Page controllers live under `frontend/.../<domain>/web/`.
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
@@ -1214,10 +1211,9 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Blueprint-Verfügbarkeit (`/blueprint-overview`)                                                                                      | `isAuthenticated()` (backend `canAccessBlueprintOverview`)              | if `canAccessBlueprintOverview`                                                |
 | Materialien, Material-Übersicht, Profitberechnung (`/materials/**`, `/materials/profit-calculation`)                                | `isAuthenticated()`; profit calculation `KRT_MEMBER`/`ADMIN`             | always                                                                         |
 | Mein Inventar, Meine Blueprints (`/personal-inventory/**`)                                                                           | `isAuthenticated()`                                                     | always, in the personal menu („Persönlich“) of the drawer’s user row           |
-| Organigramm (`/org-chart`)                                                                                                           | `isAuthenticated()`; edits `ADMIN`                                      | always                                                                         |
 | Star-Citizen-Links (`/sc-links`, REQ-UI-025)                                                                                         | `isAuthenticated()`; read-only                                          | always, as a link in the footer                                              |
-| Leitung (`/organisation/leitung`)                                                                                                    | `ADMIN_OR_OFFICER` (page and every write proxy)                         | tab „Leitung" of Organisation, if `canOpenLeitung`                                                              |
-| Org-Einheits-Bank (`/org-unit-bank/**`)                                                                                              | member-or-above                                                         | `ADMIN`/`OFFICER`/`LOGISTICIAN`/`MISSION_MANAGER`/`KRT_MEMBER`                 |
+| Leitung (`/organisation/leitung`)                                                                                                    | `ADMIN_OR_OFFICER` (page and every write proxy)                         | tab „Leitung" of Org-Einheits-Bank, if `canOpenLeitung`                                                              |
+| Org-Einheits-Bank (`/org-unit-bank/**`) | member-or-above | link „Org-Einheits-Bank" in the Staffel group for `ADMIN`/`OFFICER`/`LOGISTICIAN`/`MISSION_MANAGER`/`KRT_MEMBER` |
 | Bank-Dashboard, Bankverwaltung, Anträge (`/bank`, `/bank/manage`, `/bank/requests`, `/bank/accounts/{id}`, `/bank/holders/{id}`)    | `BANK_EMPLOYEE`                                                         | `BANK_EMPLOYEE`                                                                |
 | Berechtigungen (`/bank/grants`)                                                                                                      | `BANK_MANAGEMENT`                                                       | `BANK_MANAGEMENT`                                                              |
 | Mitgliederverwaltung (`/members/**`) and every `/admin/**` page — Spezialkommandos, Organisationsstruktur, Informationen, Nutzungsbedingungen, Missionsdaten, Orte, Materialien, Material-Aliase, Blueprints, Standard-Blueprints, UEX-Daten, P4K-Import, Bank-Administration, Audit-Logs, Systemeinstellungen, Notification rules, Sync-Berichte, Discord-Registrierungen, Löschanträge, Personensuche, Pers. Inventar/Blueprints (Admin) | `hasRole('ADMIN')`                                                      | `ADMIN`, in the drawer’s administration mode                                   |
@@ -1247,7 +1243,7 @@ backend serves every member) but no control that writes.
 - **Bank Management keeps its `BANK_*` rights only** (REQ-BANK-007) and gets no officer reach of its
   own; a bank manager who also holds a leadership seat has reach there like anyone else.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
-  whose holder loses it stays in the org chart and confers no reach. Membership rights rest on
+  whose holder loses it stays in place and confers no reach. Membership rights rest on
   `KRT Member`.
 - An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
   at least one unit (REQ-ROLE-007). The bank's global

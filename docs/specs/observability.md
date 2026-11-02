@@ -2748,7 +2748,7 @@ label**, a tag, an MDC field or a log line.
 - `basetool_quick_access_search_total{kind, outcome}` counter in the frontend's
   quick-access search (REQ-UI-033, `QuickAccessSearchMetrics`), one increment per entity type per
   search, every pair registered at zero. `kind` ∈ the `QuickAccessSearchKind` keys
-  (`mission`, `operation`, `material`, `blueprint`, `ship`, `org_unit`, `job_order`, `member`);
+  (`mission`, `operation`, `material`, `blueprint`, `ship`, `job_order`);
   `outcome` ∈ `hits`, `empty`, `error` (a contributor that failed closed),
   `timeout` (a contributor that did not answer within 2 s).
 - `basetool_notification_created_total{notification_type}` and

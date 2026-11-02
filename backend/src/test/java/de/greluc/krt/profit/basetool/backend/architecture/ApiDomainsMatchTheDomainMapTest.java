@@ -54,10 +54,6 @@ class ApiDomainsMatchTheDomainMapTest {
   static final Map<String, String> CONTROLLER_TO_API =
       Map.ofEntries(
           Map.entry(
-              "LeitungController",
-              "leadership: the REST cut keeps the Leitung endpoints a domain; the code places the"
-                  + " Leitung view in orgchart"),
-          Map.entry(
               "BlueprintController",
               "blueprint: the REST cut serves the recipe graph with the blueprints; the code keeps"
                   + " the synced graph in the catalogue"),

@@ -61,10 +61,7 @@ NOTIFICATION|notification_rule|description|null|Vor ZzzMentionZzz nach
 OPERATION|operation|description|OPERATION|Vor ZzzMentionZzz nach
 OPERATION|operation|name|OPERATION|Vor ZzzMentionZzz nach
 ORG|kommando_group|name|ORG|Vor ZzzMentionZzz nach
-ORG|org_chart_position|display_name|ORG|Vor ZzzMentionZzz nach
-ORG|org_chart_position|name|ORG|Vor ZzzMentionZzz nach
 ORG|org_unit|description|ORG|Vor ZzzMentionZzz nach
-ORG|org_unit|grand_admiral_display_name|ORG|Vor ZzzMentionZzz nach
 ORG|org_unit|name|ORG|Vor ZzzMentionZzz nach
 ORG|org_unit|shorthand|ORG|Vor ZzzMentionZzz nach
 PERSONAL_INVENTORY|personal_blueprint|note|null|Vor ZzzMentionZzz nach

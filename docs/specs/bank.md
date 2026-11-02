@@ -44,7 +44,7 @@ account types:
 |     Type      |                                 Owner reference                                 |       Cardinality        |
 |---------------|---------------------------------------------------------------------------------|--------------------------|
 | `ORG_UNIT`    | FK → `org_unit` (Staffel **or** Spezialkommando)                                | at most one per org unit |
-| `AREA`        | free-form area name (Bereiche are not entities — see `docs/specs/org-chart.md`) | many                     |
+| `AREA`        | free-form area name                                                            | many                     |
 | `CARTEL`      | none (the organization as a whole)                                              | singleton                |
 | `CARTEL_BANK` | none (the bank's own operating account)                                         | singleton                |
 | `SPECIAL`     | free-form name, dynamically created                                             | many                     |
@@ -538,7 +538,7 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > **per Bereich** (A→Z by Bereich name, each leading with its `AREA` account then its Staffel/SK
 > accounts), the **Sonderkonten**, an **"Ohne Bereich"** bucket for org-unit accounts with no Bereich,
 > and finally every **closed** account. Each Bereich header is tinted with its department's
-> Bereichsfarbe (`--color-dept-*`, REQ-ORG-026), mirroring the org chart. The account→Bereich mapping
+> Bereichsfarbe (`--color-dept-*`), as in the Leitung tree (REQ-ROLE-004). The account→Bereich mapping
 > is a display-only owner-label read resolved from the account's owning org unit + its parent via one
 > bounded query (no per-account N+1); the bank stays org-unit-blind (REQ-BANK-008 —
 > `BankDashboardService` reads `OrgUnitRepository`, never an org-unit scope service). The account-name

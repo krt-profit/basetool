@@ -109,7 +109,6 @@ class OrgUnitMembershipServiceProxyIntegrationTest {
     membership.setJoinedAt(Instant.now());
     membershipRepository.saveAndFlush(membership);
     ol.setGrandAdmiralUserId(userId);
-    ol.setGrandAdmiralDisplayName(null);
     organisationsleitungRepository.saveAndFlush(ol);
     entityManager.clear();
     return new UUID[] {olId, userId};

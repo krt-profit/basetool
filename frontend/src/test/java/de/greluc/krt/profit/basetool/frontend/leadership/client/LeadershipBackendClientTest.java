@@ -89,18 +89,15 @@ class LeadershipBackendClientTest {
     backend.answerJson(
         "{\"admin\":false,\"organisationsleitungen\":[],\"bereiche\":[],\"squadrons\":[],"
             + "\"specialCommands\":[]}");
-    backend.answerJson("{}");
     backend.answerJson("[" + membership(SK, "SPECIAL_COMMAND") + "]");
 
     assertThat(client.leitungView()).isNotNull();
-    assertThat(client.orgChart()).isNotNull();
     assertThat(client.specialCommandMembers(SK))
         .containsExactly(
             new OrgUnitMembershipDto(
                 USER, "Pilot", SK, OrgUnitKind.SPECIAL_COMMAND, false, false, true, null, 4L));
 
-    backend.expect("GET", "/api/v1/org-chart/leadership");
-    backend.expect("GET", "/api/v1/org-chart");
+    backend.expect("GET", "/api/v1/leadership");
     backend.expect("GET", "/api/v1/special-commands/" + SK + "/members");
   }
 
@@ -169,7 +166,7 @@ class LeadershipBackendClientTest {
     client.removeBereichLeader(BEREICH, USER);
     OlMemberResponse olMember = client.addOlMember(OL, new AddOlMemberRequest(USER));
     client.removeOlMember(OL, USER);
-    client.setGrandAdmiral(OL, new GrandAdmiralRequest(USER, null));
+    client.setGrandAdmiral(OL, new GrandAdmiralRequest(USER));
     client.removeGrandAdmiral(OL);
 
     assertThat(bereichMember)
@@ -189,7 +186,7 @@ class LeadershipBackendClientTest {
     backend.expect(
         "PUT",
         "/api/v1/org-units/organisationsleitung/" + OL + "/grand-admiral",
-        "{\"userId\":\"" + USER + "\",\"displayName\":null}");
+        "{\"userId\":\"" + USER + "\"}");
     backend.expect(
         "DELETE", "/api/v1/org-units/organisationsleitung/" + OL + "/grand-admiral", null);
   }

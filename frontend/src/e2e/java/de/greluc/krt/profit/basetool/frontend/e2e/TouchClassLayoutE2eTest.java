@@ -819,7 +819,7 @@ class TouchClassLayoutE2eTest {
                 + ": --krt-footer-height is "
                 + heightVar
                 + " on the phone class, but a scrolling footer covers nothing — every consumer of"
-                + " it (main's reserve, the max-height calcs, the org-chart scrollbar) would"
+                + " it (main's reserve, the max-height calcs) would"
                 + " reserve space twice.");
       }
       if (tabbarH > reserved + SLACK_PX) {

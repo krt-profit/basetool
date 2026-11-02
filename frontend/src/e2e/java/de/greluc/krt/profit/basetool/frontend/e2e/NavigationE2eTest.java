@@ -28,9 +28,11 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -126,9 +128,10 @@ class NavigationE2eTest {
           assertThat(page.locator("#nav-palette .palette-row").first())
               .hasClass(Pattern.compile("\\bis-selected\\b"));
 
-          String orgChart = page.getByTestId("nav-org-chart").textContent().trim();
-          page.getByTestId("palette-input").fill(orgChart);
-          assertThat(page.locator("#nav-palette .palette-row[data-href='/org-chart']")).isVisible();
+          String unitBank = page.getByTestId("nav-org-unit-bank").textContent().trim();
+          page.getByTestId("palette-input").fill(unitBank);
+          assertThat(page.locator("#nav-palette .palette-row[data-href='/org-unit-bank']"))
+              .isVisible();
           page.keyboard().press("Escape");
           assertThat(page.locator("#nav-palette")).isHidden();
         });
@@ -512,17 +515,22 @@ class NavigationE2eTest {
    */
   @Test
   void hiddenPagesLeaveTheQuickAccessButTheirHitsStay() {
+    Assumptions.assumeTrue(STACK.managesStack(), "needs a seeded mission");
+    String missionName = "Hidden " + UUID.randomUUID().toString().substring(0, 6);
+    BackendSeeder seeder = new BackendSeeder();
+    seeder.ensureIridiumMembership(USERNAME, PASSWORD);
+    String missionId = seeder.createMission(USERNAME, PASSWORD, missionName, false);
     run(
         1440,
         900,
         "nav-palette-hidden",
         page -> {
-          E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
-          String hide = "#sidebar [data-trigger='nav-hide'][data-entry-key='orgchart.view']";
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          String hide = "#sidebar [data-trigger='nav-hide'][data-entry-key='missions.list']";
           String hideLabel = page.locator(hide).getAttribute("aria-label");
           page.evaluate(
               "() => { const now = Date.now(); localStorage.setItem('krt.frequent',"
-                  + " JSON.stringify({ 'orgchart.view': [now, now, now] })); }");
+                  + " JSON.stringify({ 'missions.list': [now, now, now] })); }");
           try {
             page.keyboard().press("Control+k");
             Locator input = page.getByTestId("palette-input");
@@ -531,14 +539,14 @@ class NavigationE2eTest {
                 .filter(new Locator.FilterOptions().setHasText(hideLabel))
                 .first()
                 .click();
-            assertThat(page.getByTestId("nav-more-orgchart.view")).hasCount(1);
+            assertThat(page.getByTestId("nav-more-missions.list")).hasCount(1);
 
             page.keyboard().press("Control+k");
-            assertThat(page.locator("#nav-palette [data-key^='orgchart.']")).hasCount(0);
-            input.fill("unit: iridium");
+            assertThat(page.locator("#nav-palette [data-key='missions.list']")).hasCount(0);
+            input.fill("mission: " + missionName);
             assertThat(
-                    page.locator("#nav-palette .palette-row[data-href^='/org-chart?highlight=']")
-                        .first())
+                    page.locator(
+                        "#nav-palette .palette-row[data-href='/missions/" + missionId + "']"))
                 .isVisible();
             input.fill("> ");
             String create =
@@ -554,9 +562,9 @@ class NavigationE2eTest {
           } finally {
             page.keyboard().press("Escape");
             page.locator("#hamburger").click();
-            page.locator("#sidebar [data-nav-action='unhide'][data-entry-key='orgchart.view']")
+            page.locator("#sidebar [data-nav-action='unhide'][data-entry-key='missions.list']")
                 .click();
-            assertThat(page.getByTestId("nav-more-orgchart.view")).hasCount(0);
+            assertThat(page.getByTestId("nav-more-missions.list")).hasCount(0);
           }
         });
   }

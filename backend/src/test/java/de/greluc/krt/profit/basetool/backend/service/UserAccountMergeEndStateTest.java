@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  * is dropped, which row of a bystander and which row recording an act stays, and the {@code
  * USER_MERGED} audit row with its exact details and key order.
  *
- * <p>The source account owns rows in every one of the 28 followed columns, the target holds the
+ * <p>The source account owns rows in every one of the 27 followed columns, the target holds the
  * same key in every table with a unique constraint, and a bystander owns a row of each kind. The
  * expectation list is spelled out here, independent of the code under test, so the steps can move
  * into the owning modules.
@@ -77,7 +77,6 @@ class UserAccountMergeEndStateTest {
     EXPECTED_MOVED.put("personal_inventory_item.owner_user_id", 1);
     EXPECTED_MOVED.put("personal_blueprint.owner_user_id", 1);
     EXPECTED_MOVED.put("org_unit_membership.user_id", 1);
-    EXPECTED_MOVED.put("org_chart_position.user_id", 1);
     EXPECTED_MOVED.put("org_unit.grand_admiral_user_id", 1);
     EXPECTED_MOVED.put("mission.owner_id", 1);
     EXPECTED_MOVED.put("mission_ownership.owner_id", 1);
@@ -118,7 +117,6 @@ class UserAccountMergeEndStateTest {
   private UUID material;
   private UUID shipType;
   private UUID skUnit;
-  private UUID olUnit;
   private UUID rule;
   private UUID exchangeClient;
 
@@ -141,7 +139,7 @@ class UserAccountMergeEndStateTest {
 
     Map<String, Integer> targetBefore = counts(target);
     Map<String, Integer> bystanderBefore = counts(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(28);
+    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(27);
     assertThat(counts(source).values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
@@ -232,7 +230,7 @@ class UserAccountMergeEndStateTest {
   }
 
   private String expectedDetails(UUID source) {
-    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=32");
+    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=31");
     EXPECTED_MOVED.forEach(
         (column, rows) -> details.append(' ').append(column).append('=').append(rows));
     return details.toString();
@@ -296,7 +294,6 @@ class UserAccountMergeEndStateTest {
     sk.setShorthand("M" + tag);
     sk.setProfitEligible(true);
     skUnit = specialCommandRepository.save(sk).getId();
-    olUnit = orgUnitWithGrandAdmiral("Merge-OL-" + tag, null);
     rule = jdbc.queryForObject("SELECT id FROM notification_rule LIMIT 1", UUID.class);
     exchangeClient = UUID.randomUUID();
     jdbc.update(
@@ -335,8 +332,6 @@ class UserAccountMergeEndStateTest {
     blueprint(source, "own-" + tag);
     membership(source, Squadron.IRIDIUM_ID, "SQUADRON");
     membership(source, skUnit, "SPECIAL_COMMAND");
-    chartPosition("OL_MEMBER", olUnit, source);
-    chartPosition("AREA_COORDINATOR", null, source);
 
     UUID m1 = mission("M1", source, null);
     UUID m2 = mission("M2", bystander, source);
@@ -397,7 +392,6 @@ class UserAccountMergeEndStateTest {
   private void seedTarget(UUID target) {
     blueprint(target, "shared-" + tag);
     membership(target, Squadron.IRIDIUM_ID, "SQUADRON");
-    chartPosition("AREA_OPERATOR", null, target);
     installation(target, "a");
     shipLink(target, "ext1", ship(target, "T1"));
   }
@@ -409,7 +403,6 @@ class UserAccountMergeEndStateTest {
     personalItem(by);
     blueprint(by, "shared-" + tag);
     membership(by, Squadron.IRIDIUM_ID, "SQUADRON");
-    chartPosition("OL_MEMBER", olUnit, by);
     orgUnitWithGrandAdmiral("Merge-OL3-" + tag, by);
     UUID m3 = mission("M3", by, by);
     ownership(m3, by);
@@ -492,16 +485,6 @@ class UserAccountMergeEndStateTest {
         user,
         orgUnit,
         kind);
-  }
-
-  private void chartPosition(String type, UUID orgUnit, UUID user) {
-    jdbc.update(
-        "INSERT INTO org_chart_position (id, position_type, org_unit_id, user_id)"
-            + " VALUES (?, ?, ?, ?)",
-        UUID.randomUUID(),
-        type,
-        orgUnit,
-        user);
   }
 
   private UUID mission(String name, UUID owner, UUID partyLead) {

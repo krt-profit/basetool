@@ -36,8 +36,7 @@ public enum BankAccountType {
   ORG_UNIT,
 
   /**
-   * Account for a Bereich. Bereiche are not entities (see {@code docs/specs/org-chart.md}), so the
-   * account carries the free-form area name in {@link BankAccount#getAreaName()}.
+   * Account for a Bereich, carrying the free-form area name in {@link BankAccount#getAreaName()}.
    */
   AREA,
 

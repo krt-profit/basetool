@@ -91,7 +91,6 @@ notification_rule_selector notification
 operation operation
 operation_payout_status operation
 orbit catalogue
-org_chart_position orgchart
 org_unit orgunit
 org_unit_membership orgunit
 outpost catalogue

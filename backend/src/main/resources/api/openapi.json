@@ -47,8 +47,6 @@
   }, {
     "name" : "operation"
   }, {
-    "name" : "orgchart"
-  }, {
     "name" : "orgunit"
   }, {
     "name" : "personalinventory"
@@ -24562,6 +24560,118 @@
         },
         "tags" : [ "catalogue" ],
         "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/leadership" : {
+      "get" : {
+        "operationId" : "view",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LeitungViewDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "The org units the caller may appoint leadership ranks into, by tier",
+        "tags" : [ "leadership" ],
+        "x-domain" : "leadership"
       }
     },
     "/api/v1/locations" : {
@@ -49379,697 +49489,6 @@
         "x-domain" : "joborder"
       }
     },
-    "/api/v1/org-chart" : {
-      "get" : {
-        "description" : "Returns the full org chart: the Bereichsleitung on top and a column for every active, profit-eligible Staffel and Spezialkommando below. Read-only and open to every authenticated user; editing is ADMIN-only via the position endpoints.",
-        "operationId" : "getOrgChart",
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/OrgChartDto"
-                }
-              }
-            },
-            "description" : "The assembled org chart.",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "summary" : "Get the Profit-Bereich org chart",
-        "tags" : [ "orgchart" ],
-        "x-domain" : "orgchart"
-      }
-    },
-    "/api/v1/org-chart/leadership" : {
-      "get" : {
-        "operationId" : "view",
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/LeitungViewDto"
-                }
-              }
-            },
-            "description" : "OK",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "summary" : "The org units the caller may appoint leadership ranks into, by tier",
-        "tags" : [ "leadership" ],
-        "x-domain" : "leadership"
-      }
-    },
-    "/api/v1/org-chart/positions" : {
-      "post" : {
-        "description" : "Creates a position binding a user to a functional rank within a scope (area leadership, Staffel or SK). A Kommando (COMMAND_LEAD) may instead be created without a holder and with a name, so its Stv. Kommandoleiter and Ensigns can be filled before its Kommandoleiter is assigned; every other rank requires a holder and rejects a name. Enforces the per-Staffel limits (≤4 Kommandos, ≤4 Ensign), the ≤2 SK-Leiter limit, the scope/parent consistency rules and one-user-per-scope. ADMIN-only.",
-        "operationId" : "createPosition",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/OrgChartPositionCreateRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/OrgChartPositionDto"
-                }
-              }
-            },
-            "description" : "Position created."
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "summary" : "Assign a user to an org-chart position",
-        "tags" : [ "orgchart" ],
-        "x-domain" : "orgchart"
-      }
-    },
-    "/api/v1/org-chart/positions/{id}" : {
-      "delete" : {
-        "description" : "Deletes the position. Removing a Kommando (COMMAND_LEAD) also removes its Stv. Kommandoleiter and the Ensigns reporting into it. ADMIN-only.",
-        "operationId" : "deletePosition",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "Position removed."
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "summary" : "Remove an org-chart position",
-        "tags" : [ "orgchart" ],
-        "x-domain" : "orgchart"
-      },
-      "put" : {
-        "description" : "Changes the holder, the Kommando name (COMMAND_LEAD only) and/or the display order of an existing position. The functional rank and scope cannot change (move = remove + re-add). Assigning a holder to a still-leaderless Kommando is a reassign through this endpoint. ADMIN-only.",
-        "operationId" : "updatePosition",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/OrgChartPositionUpdateRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/OrgChartPositionDto"
-                }
-              }
-            },
-            "description" : "Position updated."
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "summary" : "Reassign or reorder an org-chart position",
-        "tags" : [ "orgchart" ],
-        "x-domain" : "orgchart"
-      }
-    },
-    "/api/v1/org-chart/positions/{id}/leader" : {
-      "delete" : {
-        "description" : "Clears the Kommandoleiter (holder) of a Kommando (COMMAND_LEAD) while keeping the Kommando, its name, its Stv. Kommandoleiter and its Ensigns. This is how a Kommando outlives a departing leader instead of being deleted and rebuilt; removing the whole Kommando is the position DELETE. Rejects any non-COMMAND_LEAD rank, whose holder is mandatory — remove that position instead. ADMIN-only.",
-        "operationId" : "vacateCommandLeader",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "in" : "query",
-          "name" : "version",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/OrgChartPositionDto"
-                }
-              }
-            },
-            "description" : "Kommandoleiter vacated; the Kommando stays."
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "summary" : "Vacate a Kommando's Kommandoleiter",
-        "tags" : [ "orgchart" ],
-        "x-domain" : "orgchart"
-      }
-    },
     "/api/v1/org-units" : {
       "get" : {
         "description" : "Admin-only flat list of every active org unit (all four kinds) with its current parent and optimistic-lock version, for the hierarchy-management surface.",
@@ -52236,7 +51655,7 @@
         "x-domain" : "orgunit"
       },
       "put" : {
-        "description" : "Designates the single Grand Admiral rendered at the top of the Organisationsleitung (REQ-ORG-021). Supply either a userId (an account holder, kept with OL-member rights, auto-adds OL membership) or a displayName (a free-text holder for a member without an account, grants nothing) — mutually exclusive. ADMIN-only.",
+        "description" : "Designates the single Grand Admiral of the Organisationsleitung (REQ-ORG-021). The account keeps OL-member rights and is added to the OL when needed. ADMIN-only.",
         "operationId" : "setGrandAdmiral",
         "parameters" : [ {
           "in" : "path",
@@ -74472,7 +73891,7 @@
     },
     "/api/v1/users/admin/person-search" : {
       "get" : {
-        "description" : "Case-insensitive substring search over every registered free-text column - external mission participants, party leads, handover recipients, org-chart placeholders, notes, booking reasons and the audit trails. Bounded: 25 hits per column, 300 in total, and the response says when it was capped. Run it for EVERY Art. 16 or Art. 17 request: a rectification that fixes one of four occurrences is not one.",
+        "description" : "Case-insensitive substring search over every registered free-text column - external mission participants, party leads, handover recipients, notes, booking reasons and the audit trails. Bounded: 25 hits per column, 300 in total, and the response says when it was capped. Run it for EVERY Art. 16 or Art. 17 request: a rectification that fixes one of four occurrences is not one.",
         "operationId" : "search",
         "parameters" : [ {
           "in" : "query",
@@ -78322,32 +77741,6 @@
           }
         }
       },
-      "AreaLeadershipDto" : {
-        "type" : "object",
-        "properties" : {
-          "commanders" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "coordinators" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "lead" : {
-            "$ref" : "#/components/schemas/OrgChartNodeDto"
-          },
-          "operators" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          }
-        }
-      },
       "AssignSquadronRankRequest" : {
         "type" : "object",
         "properties" : {
@@ -79283,40 +78676,6 @@
         },
         "required" : [ "accountId", "amount", "holderId" ]
       },
-      "BereichChartDto" : {
-        "type" : "object",
-        "properties" : {
-          "department" : {
-            "type" : "string",
-            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
-          },
-          "leadership" : {
-            "$ref" : "#/components/schemas/AreaLeadershipDto"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "shorthand" : {
-            "type" : "string"
-          },
-          "specialCommands" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/SpecialCommandChartDto"
-            }
-          },
-          "squadrons" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/SquadronChartDto"
-            }
-          }
-        }
-      },
       "BereichDto" : {
         "type" : "object",
         "properties" : {
@@ -80176,49 +79535,6 @@
           "id" : {
             "type" : "string",
             "format" : "uuid"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        }
-      },
-      "CommandChartDto" : {
-        "type" : "object",
-        "properties" : {
-          "deputy" : {
-            "$ref" : "#/components/schemas/OrgChartNodeDto"
-          },
-          "ensigns" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "kommandoGroupId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "leaderDisplayName" : {
-            "type" : "string"
-          },
-          "leaderUserId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "leaderUserName" : {
-            "type" : "string"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "positionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "sortIndex" : {
-            "type" : "integer",
-            "format" : "int32"
           },
           "version" : {
             "type" : "integer",
@@ -82327,16 +81643,12 @@
       "GrandAdmiralRequest" : {
         "type" : "object",
         "properties" : {
-          "displayName" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
           "userId" : {
             "type" : "string",
             "format" : "uuid"
           }
-        }
+        },
+        "required" : [ "userId" ]
       },
       "GroupedInventoryDto" : {
         "type" : "object",
@@ -83848,11 +83160,18 @@
       "LeitungUnitDto" : {
         "type" : "object",
         "properties" : {
+          "bereichName" : {
+            "type" : "string"
+          },
           "canAppointLead" : {
             "type" : "boolean"
           },
           "canManageRoster" : {
             "type" : "boolean"
+          },
+          "department" : {
+            "type" : "string",
+            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
           },
           "grandAdmiralUserId" : {
             "type" : "string",
@@ -86066,30 +85385,6 @@
           }
         }
       },
-      "OlChartDto" : {
-        "type" : "object",
-        "properties" : {
-          "grandAdmiral" : {
-            "$ref" : "#/components/schemas/OrgChartNodeDto"
-          },
-          "members" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "shorthand" : {
-            "type" : "string"
-          }
-        }
-      },
       "OlMemberResponse" : {
         "type" : "object",
         "properties" : {
@@ -86409,172 +85704,6 @@
           }
         },
         "required" : [ "keys", "version" ]
-      },
-      "OrgChartDto" : {
-        "type" : "object",
-        "properties" : {
-          "areaLeadership" : {
-            "$ref" : "#/components/schemas/AreaLeadershipDto"
-          },
-          "bereiche" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/BereichChartDto"
-            }
-          },
-          "organisationsleitung" : {
-            "$ref" : "#/components/schemas/OlChartDto"
-          },
-          "specialCommands" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/SpecialCommandChartDto"
-            }
-          },
-          "squadrons" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/SquadronChartDto"
-            }
-          }
-        }
-      },
-      "OrgChartNodeDto" : {
-        "type" : "object",
-        "properties" : {
-          "displayName" : {
-            "type" : "string"
-          },
-          "positionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "positionType" : {
-            "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
-          },
-          "sortIndex" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "userId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "userName" : {
-            "type" : "string"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        }
-      },
-      "OrgChartPositionCreateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "displayName" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
-          "name" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "parentId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "positionType" : {
-            "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
-          },
-          "sortIndex" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "userId" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        },
-        "required" : [ "positionType" ]
-      },
-      "OrgChartPositionDto" : {
-        "type" : "object",
-        "properties" : {
-          "displayName" : {
-            "type" : "string"
-          },
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "parentId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "positionType" : {
-            "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
-          },
-          "sortIndex" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "userId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "userName" : {
-            "type" : "string"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        }
-      },
-      "OrgChartPositionUpdateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "displayName" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
-          "name" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
-          "sortIndex" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "userId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        },
-        "required" : [ "version" ]
       },
       "OrgUnitBalanceTargetRequest" : {
         "type" : "object",
@@ -91179,30 +90308,6 @@
         },
         "required" : [ "action", "orgUnitId" ]
       },
-      "SpecialCommandChartDto" : {
-        "type" : "object",
-        "properties" : {
-          "canAddCommander" : {
-            "type" : "boolean"
-          },
-          "commanders" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "shorthand" : {
-            "type" : "string"
-          }
-        }
-      },
       "SpecialCommandDto" : {
         "type" : "object",
         "properties" : {
@@ -91243,48 +90348,6 @@
         "properties" : {
           "eligible" : {
             "type" : "boolean"
-          }
-        }
-      },
-      "SquadronChartDto" : {
-        "type" : "object",
-        "properties" : {
-          "canAddCommand" : {
-            "type" : "boolean"
-          },
-          "canAddEnsign" : {
-            "type" : "boolean"
-          },
-          "commands" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/CommandChartDto"
-            }
-          },
-          "directDeputies" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "directEnsigns" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/OrgChartNodeDto"
-            }
-          },
-          "lead" : {
-            "$ref" : "#/components/schemas/OrgChartNodeDto"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "shorthand" : {
-            "type" : "string"
           }
         }
       },

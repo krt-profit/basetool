@@ -84,8 +84,8 @@ class ListenerAndObserverRulesTest {
   private static final int LISTENER_FLOOR = 14;
 
   /**
-   * Observer SPIs today: {@code MembershipChangeObserver}; the fixtures prove the rule fails on a
-   * non-compliant implementation.
+   * The least number of observer SPIs the selection must find; the fixtures prove the rule fails on
+   * a non-compliant implementation.
    */
   private static final int OBSERVER_SPI_FLOOR = 1;
 

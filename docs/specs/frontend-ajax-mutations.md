@@ -195,7 +195,7 @@ MUST pass an explicit `submitter` (e.g. the operation-detail delete form).
 **Lint-enforced since 2026-09-22 (FE-SEC-03).** Twenty-three `fetch` writes in fifteen files had
 drifted back past the review guard — each with its own CSRF read and, mostly, no retry-on-403, no
 `X-Reauthenticate` redirect and no double-submit guard — plus two whose init object was built in a
-helper (the order-detail assignee `oaSend` loop and the org-chart `doFetch`). All of them now go
+helper (the order-detail assignee `oaSend` loop and one page's `doFetch`). All of them now go
 through `krtFetch.write` / `submitForm`, the page-local CSRF helpers are deleted, and
 `eslint.config.mjs` rejects a `fetch(…)` / `window.fetch(…)` whose init names a `method` other than a
 literal `GET` (`no-restricted-syntax`, an error in `:frontend:lintJs`). Only `krt-fetch.js` (the
@@ -554,17 +554,8 @@ write succeeds but only its follow-up refresh GET bounces, the swap surfaces a d
 reload" message rather than the generic "action failed" text, so a committed money booking is never
 mistaken for a failure.
 
-The organisation / members / profile area (#581) converts the org-chart inline editor, the member
-list and the profile + home-page writes. The org-chart position operations (add / reassign / rename /
-vacate / remove) drop the `setTimeout(location.reload)` that followed each `send()` for a `chartBody`
-fragment swap (`GET /org-chart?fragment=chartBody`): the chart is a flat, CSS-connected pre-order ARIA
-tree whose add affordances and vacant/filled transitions are derived aggregate state, so a per-node
-patch would desync the "+" buttons and the roving-tabindex order — the swap re-stamps every
-`data-version` and the inline JS re-inits the tree keyboard navigation on `krt:swapped`; the bespoke
-`csrfHeaders()` reader moves onto `krtCsrf` with retry-on-403. The chart's horizontal scroll is
-captured before the focus-returning `closeModal()` and re-applied across animation frames until the
-freshly-swapped tree's layout settles, so the offset survives the in-place refresh on every engine.
-The member list converts the delete (a `@DeleteMapping` JSON twin whose success re-swaps the results
+The organisation / members / profile area (#581) converts the member list and the profile +
+home-page writes. The member list converts the delete (a `@DeleteMapping` JSON twin whose success re-swaps the results
 fragment so pagination and the Staffel + SK columns stay coherent); its filter `fragment` param
 changes from `boolean` to `String` so it binds the `krtFetch.swap` helper's `fragment=results` value
 (a `boolean` param silently 400'd that swap). The list-level per-flag Logistician / Mission-Manager
@@ -659,7 +650,7 @@ swap with no navigation request). **Issues:** the epic children
 `joborder/orders-index.html`, `joborder/orders-detail.html`, `refinery/refinery-orders-create.html`, `datetime-splitter.js`,
 `hangar/hangar.html`, `catalogue/ship-data.html`, `personalinventory/personal-inventory.html`, `blueprint/personal-inventory-blueprints.html`,
 `personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
-`bank/bank-grants.html`, `orgchart/org-chart.html`, `identity/members.html`, `identity/member-edit.html`, `identity/profile.html`,
+`bank/bank-grants.html`, `identity/members.html`, `identity/member-edit.html`, `identity/profile.html`,
 `dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
 `catalogue/materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
 `catalogue/fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
@@ -667,7 +658,7 @@ swap with no navigation request). **Issues:** the epic children
 `RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
 `PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
 `BankManagePageController`, `BankGrantsPageController`,
-`OrgChartPageController`, `MemberManagementController`, `ProfileController`, `HomeController`,
+`MemberManagementController`, `ProfileController`, `HomeController`,
 `AdminAnnouncementPageController`, `AdminSyncReportsPageController`, `AdminBankPageController`,
 `AdminLocationsPageController`, `AdminMaterialsPageController`, `AdminMaterialAliasesPageController`,
 `AdminSettingsPageController`, `AdminUexPageController`, `AdminMissionDataPageController` and
@@ -1288,7 +1279,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
 | `exchange-clients` (global) | registry, undoRuns (the admin bulk undo runs, REQ-XCH-034)                                                                    | no            | `ROLE_ADMIN` (local check — the `/admin/exchange-clients` class-level page gate)                      |
 | `admin-dashboard` (global) | deletion-requests, discord-registrations, terms, sync-status (the admin dashboard widgets, REQ-UI-034, ADR-0328)               | no            | `ROLE_ADMIN` (local check; the backend publishes it after the commit)                                 |
-| `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
+| `org-structure` (global) | units, forms | no | authenticated (the admin sections stay protected per fragment) |
 | `hangar:{userId}`        | ships                                                                                                                         | no            | the member whose id it is, or `ROLE_ADMIN` for the admin member hangar (local check against the socket's subject and authorities, fails closed) |
 | `hangar-unit:{orgUnitId}` | ships (the unit tab with a pinned unit, ADR-0260)                                                                            | no            | `GET /api/v1/hangar/units/{id}/overview-access` (the unit-overview scope, REQ-HANGAR-003)             |
 | `hangar-units` (global)  | ships (the unit tab across every unit the viewer sees, ADR-0260)                                                              | no            | authenticated (each viewer re-pulls its own scoped overview)                                          |
@@ -1368,22 +1359,15 @@ whose receivers re-fetch the viewer's *own* filter and page:
   start arriving through the room, or a page opened while one runs — re-reads the list every 3 s
   until no run is running. Role-gated like `members`. *Added 2026-09-27; before, the registry section
   had no room at all and another admin's change showed only after a reload.*
-- **`org-structure`** — shared by the admin Organisationsstruktur editor (`units` = the unit +
-  parent-edge table, `forms` = its create forms, whose Bereich/OL pickers go stale when a peer adds
-  one) and the member-visible Organigramm (`chart`). One room because both render the same
-  hierarchy: an admin's parent-edge change refreshes a peer's chart, and an org-chart position edit
-  refreshes the editor. Subscribe is authenticated-only *by design* — gating the room on ADMIN would
-  cut members off from their own chart; the admin-only fragments stay protected per-fragment, and a
-  receiver silently skips a key whose container its page does not have. Because the two pages each
-  render only part of the whitelist, their seam maps are parity-checked as **subsets** whose
-  **union** must equal the registry whitelist — the union check is what catches an orphaned key no
-  page renders. Each page pokes the other's key through a named constant that the same test pins
-  against the registry.
+- **`org-structure`** — the admin Organisationsstruktur editor (`units` = the unit + parent-edge
+  table, `forms` = its create forms, whose Bereich/OL pickers go stale when a peer adds one).
+  Subscribe is authenticated-only; the admin-only fragments stay protected per fragment, and the
+  editor's seam map equals the registry whitelist (`LiveSyncSectionMapParityTest`).
 
 The **publish side differs per room** and follows one rule: publish from the client when the acting
 page stays open, server-side when it does not. `org-structure` broadcasts from the client
-(`admin-org-structure.js` / `org-chart.js` — both surfaces are XHR-only and stay put, so the origin
-session is excluded and the actor does not re-fetch its own change). `missions`, `refinery` and
+(`admin-org-structure.js` — the editor is XHR-only and stays put, so the origin session is excluded
+and the actor does not re-fetch its own change). `missions`, `refinery` and
 `members` publish **server-side** through `LiveSyncLocalBus`: every one of their mutations navigates
 away (a redirect, or an AJAX `targetUrl` the page immediately follows) or happens on a different page
 than the list it invalidates (`/members/{id}/edit`), so a client broadcast would race the socket
@@ -1576,8 +1560,8 @@ because an ordinary navigation also ends a socket after seconds and no threshold
   success or leaving peers stale. The Phase-3 four (`missions`, `refinery`, `members`,
   `org-structure`) were the last gap and are closed (#1235).
 - [ ] Storing a refinery order refreshes a peer's open Lager, not just the refinery queue.
-- [ ] An admin's parent-edge change on `/admin/org-structure` refreshes a *member's* open
-  `/org-chart`, and an org-chart position edit refreshes another admin's open editor.
+- [ ] An admin's parent-edge change on `/admin/org-structure` refreshes another admin's open
+  editor.
 - [ ] A backend write that failed publishes nothing — peers do not re-fetch for a change that
   never happened.
 - [ ] A tab left open on a silent surface keeps **one** socket for as long as it is open: no
@@ -1620,7 +1604,7 @@ maps
 `ORGUNIT_BANK_SECTIONS`, materialboard — two section keys: `board` (Angebote) and `requests`
 (Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` / `materialgesuch-modal.js`, pinned by
 `LiveSyncSectionMapParityTest`; Phase-3: `MISSIONS_SECTIONS`, `REFINERY_SECTIONS`,
-`MEMBERS_SECTIONS`, `ORG_STRUCTURE_SECTIONS` + `ORG_CHART_SECTIONS`; `REFINERY_ORDER_SECTIONS`) ·
+`MEMBERS_SECTIONS`, `ORG_STRUCTURE_SECTIONS`; `REFINERY_ORDER_SECTIONS`) ·
 **ADR:** ADR-0094, ADR-0126 · **Issues:** #1102, #1115, #1120, #1237, #1235, #1238
 
 ### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
@@ -2317,7 +2301,7 @@ dispatcher actually serves:
 
 - [x] The snapshot holds all 538 mappings (536 application handlers, 2 of Spring Boot's error
   controller) and matches the committed file (2026-10-02).
-- [x] The four member handlers that relied on the URL rule alone — `/org-chart`, `/ship-data` and
+- [x] The member handlers that relied on the URL rule alone — `/ship-data` and
   both `/announcement/read` variants — declare `isAuthenticated()`, so the allow-list holds only the
   nine public handlers (2026-10-02).
 - [x] A stale allow-list entry fails; a handler moved into an ungated class fails and changes its
@@ -2806,7 +2790,7 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
 
 - [x] The broad catch clauses of the `web` packages were classified on 2026-10-17: of 386, 53
   duplicated the central mapping and were removed — 43 AJAX arms after a `BackendServiceException`
-  arm, the four org-chart position writes behind a local helper, and six endpoints without a backend
+  arm, four writes behind a page-local helper, and six endpoints without a backend
   arm that answered every failure with `500`/`502`. The other 333 are section fallbacks, form-post
   fallbacks, silent fallbacks and translations, and stay frozen. After the
   `SectionFallback` migration and the mission option lists reporting their failures

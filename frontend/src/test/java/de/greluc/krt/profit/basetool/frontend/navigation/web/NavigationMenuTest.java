@@ -105,7 +105,7 @@ class NavigationMenuTest {
 
     assertThat(menu.main())
         .extracting(group -> group.group().key())
-        .containsExactly("operations", "logistics", "trade", "unit", "bank", "resources");
+        .containsExactly("operations", "logistics", "trade", "bank", "resources");
     assertThat(keys(menu, "bank")).containsExactly("bank.dashboard");
     assertThat(keys(menu, "resources")).isEmpty();
     assertThat(menu.pageTabs("bank.dashboard", "/bank"))
@@ -204,12 +204,10 @@ class NavigationMenuTest {
     NavigationMenu withoutFlag = resolve(Set.of("KRT_MEMBER", "OFFICER"), Set.of());
     NavigationMenu withFlag = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.OPEN_LEITUNG));
 
-    assertThat(withoutFlag.pageTabs("orgchart.view", "/org-chart"))
+    assertThat(withoutFlag.pageTabs("orgunitbank.overview", "/org-unit-bank")).isEmpty();
+    assertThat(withFlag.pageTabs("orgunitbank.overview", "/org-unit-bank"))
         .extracting(tab -> tab.entry().key())
-        .containsExactly("orgchart.view", "orgunitbank.overview");
-    assertThat(withFlag.pageTabs("orgchart.view", "/org-chart"))
-        .extracting(tab -> tab.entry().key())
-        .containsExactly("orgchart.view", "orgunitbank.overview", "organisation.leadership");
+        .containsExactly("orgunitbank.overview", "organisation.leadership");
   }
 
   /** The storage page has exactly the two tabs; the storage option keeps the Lager tab current. */

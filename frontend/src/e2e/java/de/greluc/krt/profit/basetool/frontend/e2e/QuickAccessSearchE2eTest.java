@@ -68,10 +68,7 @@ class QuickAccessSearchE2eTest {
   private static Browser browser;
   private static Path storageState;
   private static String missionId;
-  private static String squadronId;
-  private static String squadronName;
   private static String adminUserId;
-  private static String adminName;
   private static String jobOrderId;
   private static int jobOrderNumber;
 
@@ -89,10 +86,8 @@ class QuickAccessSearchE2eTest {
       seeder.createOperation(USERNAME, PASSWORD, TOKEN + " Operation");
       String materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, TOKEN + " Material");
       String tag = UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
-      squadronName = TOKEN + " Squad";
-      squadronId = seeder.createSquadron(USERNAME, PASSWORD, squadronName, "QF" + tag);
+      String squadronId = seeder.createSquadron(USERNAME, PASSWORD, TOKEN + " Squad", "QF" + tag);
       adminUserId = seeder.getUserId(USERNAME, PASSWORD);
-      adminName = seeder.getEffectiveName(USERNAME, PASSWORD);
       seeder.assignSecondStaffelleiterSeat(
           USERNAME, PASSWORD, adminUserId, IRIDIUM_SQUADRON_ID, squadronId);
       seeder.setSquadronProfitEligible(USERNAME, PASSWORD, squadronId, true);
@@ -193,7 +188,7 @@ class QuickAccessSearchE2eTest {
           page.keyboard().press("Control+k");
           Locator input = page.getByTestId("palette-input");
           input.fill("?");
-          assertThat(page.locator("#nav-palette .palette-row")).hasCount(10);
+          assertThat(page.locator("#nav-palette .palette-row")).hasCount(8);
 
           String missionsOnly =
               page.locator(".palette-source-prefixes [data-prefix-kind='mission']")
@@ -231,33 +226,6 @@ class QuickAccessSearchE2eTest {
           assertThat(hit.locator(".palette-row-label")).hasText("#" + jobOrderNumber);
           hit.click();
           page.waitForURL(Pattern.compile(".*/orders/" + jobOrderId + "$"));
-        });
-  }
-
-  /** An org unit and a member open the org chart with exactly that unit or person highlighted. */
-  @Test
-  void orgUnitAndMemberHighlightTheChart() {
-    Assumptions.assumeTrue(STACK.managesStack(), "needs the seeded entities");
-    run(
-        "quick-search-org-chart",
-        page -> {
-          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory");
-          page.keyboard().press("Control+k");
-          Locator input = page.getByTestId("palette-input");
-          input.fill("unit: " + squadronName);
-          page.locator(
-                  "#nav-palette .palette-row[data-href='/org-chart?highlight=" + squadronId + "']")
-              .click();
-          page.waitForURL(Pattern.compile(".*/org-chart\\?highlight=" + squadronId + "$"));
-          assertThat(page.locator(".oc-unit-box.is-highlighted")).hasCount(1);
-
-          page.keyboard().press("Control+k");
-          page.getByTestId("palette-input").fill("@" + adminName);
-          page.locator(
-                  "#nav-palette .palette-row[data-href='/org-chart?highlight=" + adminUserId + "']")
-              .click();
-          page.waitForURL(Pattern.compile(".*/org-chart\\?highlight=" + adminUserId + "$"));
-          assertThat(page.locator(".oc-node.is-highlighted").first()).isVisible();
         });
   }
 

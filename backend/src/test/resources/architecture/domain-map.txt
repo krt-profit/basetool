@@ -12,7 +12,7 @@ module orgunit 4
 module scope 5
 module admin 6
 module dashboard 6
-module orgchart 7
+module leadership 7
 module personalinventory 7
 module hangar 7
 module blueprint 7
@@ -172,7 +172,7 @@ package platform platform the platform's package tree (plan 5.1 rank 0)
 package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
 package dashboard dashboard the dashboard module's package tree (plan 5.2)
-package orgchart orgchart the org chart module's package tree (plan 5.2)
+package leadership leadership the leadership module's package tree (plan 5.2)
 package admin admin the admin module's package tree (plan 5.2)
 package operation operation the operation module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)

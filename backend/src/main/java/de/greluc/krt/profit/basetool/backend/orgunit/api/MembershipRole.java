@@ -25,9 +25,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
  * The leadership rank a user holds on one {@link OrgUnitMembership} (REQ-ROLE-001); exactly one
  * rank per seat, restricted by a CHECK to ranks valid for the org unit's kind.
  *
- * <p>The rank is the source of truth for permissions; the org chart only mirrors it. The capability
- * flags {@link OrgUnitMembership#isLogistician()} / {@link OrgUnitMembership#isMissionManager()}
- * are independent of it.
+ * <p>The rank is the source of truth for permissions. The capability flags {@link
+ * OrgUnitMembership#isLogistician()} / {@link OrgUnitMembership#isMissionManager()} are independent
+ * of it.
  */
 public enum MembershipRole {
 

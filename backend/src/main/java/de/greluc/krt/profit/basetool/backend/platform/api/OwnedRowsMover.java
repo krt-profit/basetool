@@ -48,8 +48,7 @@ public class OwnedRowsMover {
    * Moves each declared table from the source account to the target.
    *
    * <p>{@code IS NOT DISTINCT FROM} rather than {@code =} compares the conflict keys, so a nullable
-   * key column (an org-chart position with no org unit) matches the way the partial unique index
-   * does.
+   * key column matches the way a partial unique index does.
    *
    * @param rows the tables to move, in the order they are moved
    * @param source the account being emptied
