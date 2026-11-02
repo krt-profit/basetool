@@ -377,11 +377,9 @@ entry does no harm).
   configuration, so a PR that touches any `build.gradle.kts` (which runs
   `dependency-check.yml`) failed on 23 POMs nothing else ever resolved — Keycloak's
   OpenTelemetry, Jackson 2 and webauthn4j among them — from 2026-09-23 (#2034).
-  Regenerate them without downloading the NVD feed: a one-line init script
-  `allprojects { plugins.withId('org.owasp.dependencycheck') { dependencyCheck { autoUpdate = false } } }`
-  saved as `no-nvd-update.gradle`, then
-  `./gradlew --no-parallel --write-verification-metadata sha256 -I no-nvd-update.gradle dependencyCheckAggregate`.
-  The task then fails with *Analysis failed* for want of a database; the
+  Regenerate them without downloading the NVD feed:
+  `./gradlew --no-parallel --write-verification-metadata sha256 -PdependencyCheckAutoUpdate=false dependencyCheckAggregate`.
+  Without a local NVD dataset the task then fails with *Analysis failed*; the
   resolution before it, which is what the writer needs, has already run. Check
   the additions against Maven Central as above.
 - **Dependabot** only manages GitHub Actions, Docker images and the frontend's
@@ -479,10 +477,23 @@ CodeQL additionally runs weekly, and the OWASP
 [dependency check](.github/workflows/dependency-check.yml) runs weekly
 and on every PR that touches the build files, the version catalog or its
 suppression file; if your change introduces a new security finding,
-expect to address it before merge. It loads the NVD from the NVD's official
-JSON 2.0 data feeds (`nvd.datafeedUrl` in the root `build.gradle.kts`,
+expect to address it before merge. In CI the scan never downloads the NVD
+(REQ-OPS-054, ADR-0324): the
+[NVD feed refresh](.github/workflows/nvd-feed-refresh.yml) runs
+`dependencyCheckUpdate` daily, on a `main` push that touches the root build
+script or the catalog and on demand, retries a stalled download three times,
+saves the dataset as a new `nvd-feed-v2-` cache with a `refreshed-at` stamp and
+deletes the older ones. The scan restores the newest of them, runs with
+`-PdependencyCheckAutoUpdate=false`, and fails within seconds when no feed is
+cached or the cached one is older than seven days — re-run the refresh
+(*Actions → NVD Feed Refresh → Run workflow*), then the scan. A failed daily
+refresh opens the issue *Daily NVD feed refresh failed*.
+
+Locally the property defaults to `true`, so the scan updates its own dataset.
+The feed comes from the NVD's official JSON 2.0 data feeds (`nvd.datafeedUrl`
+in the root `build.gradle.kts`,
 `https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz`), not from
-the paginated NVD API, so it needs no API key and runs locally as well:
+the paginated NVD API, so it needs no API key:
 `./gradlew dependencyCheckAggregate --no-parallel` builds the dataset from
 nothing in about seven minutes into `~/.gradle/dependency-check-data/11.0`
 and re-uses it for a week (`nvd.validForHours = 168`). Setting
