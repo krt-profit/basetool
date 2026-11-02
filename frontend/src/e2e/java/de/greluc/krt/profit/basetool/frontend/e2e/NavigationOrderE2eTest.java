@@ -68,6 +68,29 @@ class NavigationOrderE2eTest {
       }
       """;
 
+  private static final String SET_FAVOURITES =
+      """
+      async (keys) => {
+        const state = document.querySelector('[data-favourites-state]');
+        await window.krtFetch.write({
+          method: 'PUT',
+          url: '/navigation/favourites',
+          payload: { keys, version: Number(state.dataset.version) },
+          toast: false,
+        });
+      }
+      """;
+
+  private static final String FAVOURITE_KEYS =
+      """
+      () => Array.from(document.querySelectorAll(
+          "#sidebar .nav-favourites[data-favourites-mode='member'] .nav-row[data-entry-key]"))
+        .map((row) => row.dataset.entryKey)
+      """;
+
+  private static final String FAVOURITE_ROW =
+      "#sidebar .nav-favourites[data-favourites-mode='member'] .nav-row[data-entry-key='%s']";
+
   private static final String LINK_KEYS =
       """
       () => Array.from(document.querySelectorAll(
@@ -179,6 +202,48 @@ class NavigationOrderE2eTest {
 
           page.reload();
           assertEquals(after, keys(page, LINK_KEYS));
+        });
+  }
+
+  /**
+   * A favourite moves with its buttons and with Alt+Arrow, the focus stays, the order survives a
+   * reload and Alt+1 opens the favourite that now comes first.
+   */
+  @Test
+  void aFavouriteMovesAndAltDigitFollowsTheOrder() {
+    run(
+        "nav-order-favourites",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          try {
+            page.evaluate(SET_FAVOURITES, List.of("missions.list", "hangar.overview"));
+            page.reload();
+            startEditing(page);
+            assertEquals(List.of("missions.list", "hangar.overview"), keys(page, FAVOURITE_KEYS));
+
+            Locator down =
+                page.locator(
+                    FAVOURITE_ROW.formatted("missions.list") + " [data-reorder-move='down']");
+            down.click();
+
+            awaitKeys(page, FAVOURITE_KEYS, List.of("hangar.overview", "missions.list"));
+            assertThat(down).isFocused();
+            assertThat(page.getByTestId("nav-live")).containsText("verschoben");
+
+            page.reload();
+            assertEquals(List.of("hangar.overview", "missions.list"), keys(page, FAVOURITE_KEYS));
+            page.keyboard().press("Alt+Digit1");
+            page.waitForURL(Pattern.compile(".*/hangar.*"));
+
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            startEditing(page);
+            page.locator(FAVOURITE_ROW.formatted("missions.list") + " a.nav-link").focus();
+            page.keyboard().press("Alt+ArrowUp");
+            awaitKeys(page, FAVOURITE_KEYS, List.of("missions.list", "hangar.overview"));
+          } finally {
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            page.evaluate(SET_FAVOURITES, List.of());
+          }
         });
   }
 
