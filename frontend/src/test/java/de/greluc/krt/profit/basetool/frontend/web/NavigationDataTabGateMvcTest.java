@@ -140,6 +140,31 @@ class NavigationDataTabGateMvcTest {
     return html.substring(start, html.indexOf("</select>", start));
   }
 
+  @NotNull
+  private static String paletteSource(@NotNull String html) {
+    int start = html.indexOf("data-testid=\"palette-source-pages\"");
+    assertThat(start).as("the quick access's own page list").isNotNegative();
+    return html.substring(start, html.indexOf("data-testid=\"palette-source-actions\"", start));
+  }
+
+  @Test
+  @DisplayName("the quick access indexes exactly the granted tabs from the rendered page")
+  void theQuickAccessIndexesTheGrantedTabs() throws Exception {
+    surfaces(true);
+    flags(LayoutResponses.tabs(true, false, false, false, true));
+    stored(null);
+
+    String source = paletteSource(profile());
+
+    assertThat(source)
+        .contains("data-entry-key=\"supply.incoming\"")
+        .contains("data-entry-key=\"purchasing.report\"")
+        .doesNotContain("data-entry-key=\"supply.stats\"")
+        .doesNotContain("data-entry-key=\"purchasing.partners\"")
+        .doesNotContain("data-entry-key=\"purchasing.delegates\"")
+        .doesNotContainPattern("data-nav-skip=\"true\"[^>]*data-entry-key=\"purchasing.report\"");
+  }
+
   @Test
   @DisplayName("a plain member is offered none of the five tabs as a start page")
   void aPlainMemberIsOfferedNoDataTab() throws Exception {

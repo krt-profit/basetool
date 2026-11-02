@@ -177,7 +177,7 @@ class NavigationRenderMvcTest {
     String admin = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
     assertThat(member)
-        .contains("data-entries-url=\"/quick-access/entries\"")
+        .doesNotContain("data-entries-url")
         .contains("data-entity-search-url=\"/quick-access/search\"")
         .contains("data-prefix-kind=\"mission\"")
         .contains("data-testid=\"palette-action-create-order\"")

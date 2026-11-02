@@ -1312,7 +1312,7 @@ consumer instead of reusing the heaviest projection that happens to contain the 
   `/me/capabilities` and `/notifications/unread-count` — so a client may use either shape and gets
   the same answers. It answers all four parts or fails as a whole; ADR-0151's fail-closed handling of
   the capabilities stays the client's. The capabilities include the five supply and purchasing tab
-  flags of REQ-UI-026 (ADR-0282, Amendment 1); they read a few rows and add no statement per org
+  flags of REQ-UI-026 (ADR-0329); they read a few rows and add no statement per org
   unit.
 
 Both serve the web frontend over the internal hop; since the API vhost is gone (ADR-0268) no other
