@@ -1,0 +1,44 @@
+name: Report a failed scheduled run
+
+description: >
+  Opens an issue with the given title, or comments on the open one that carries it, with the date,
+  the message and a link to the current run. One open issue per title, however often the run fails.
+
+inputs:
+  title:
+    description: Exact title of the issue to open or comment on.
+    required: true
+  message:
+    description: Markdown paragraph that says what failed and where to look.
+    required: true
+  label:
+    description: Label a newly opened issue gets.
+    required: false
+    default: SEC
+  token:
+    description: 'Token with `issues: write`, usually `github.token`.'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Open or update the issue
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        TITLE: ${{ inputs.title }}
+        MESSAGE: ${{ inputs.message }}
+        LABEL: ${{ inputs.label }}
+      run: |
+        set -euo pipefail
+        body="$(printf '%s\n\n%s\n\nRun: %s\n' "$(date -u +%Y-%m-%d)" "$MESSAGE" "$RUN_URL")"
+        number="$(gh issue list --repo "$REPO" --state open --search "\"${TITLE}\" in:title" \
+                    --json number,title --jq '.[] | select(.title == env.TITLE) | .number' | head -n 1)"
+        if [ -n "$number" ]; then
+          gh issue comment "$number" --repo "$REPO" --body "$body"
+          echo "commented on #${number}"
+        else
+          gh issue create --repo "$REPO" --title "$TITLE" --label "$LABEL" --body "$body"
+        fi
