@@ -73,9 +73,7 @@ public class SupplyStatsService {
   @Transactional(readOnly = true)
   public @NotNull SupplyStatsDto stats(int months) {
     settingsService.requireEnabled();
-    boolean leadership = accessPolicy.isGoverningLeadership();
-    Set<UUID> managed = accessPolicy.managedUnitIds();
-    if (!leadership && managed.isEmpty()) {
+    if (!accessPolicy.canReadStats()) {
       throw new AccessDeniedException("The caller sees no donation statistics");
     }
     int span = Math.max(1, Math.min(MAX_MONTHS, months));
@@ -99,6 +97,8 @@ public class SupplyStatsService {
           .computeIfAbsent(key(row.unitId(), row.year(), row.month()), k -> new ArrayList<>())
           .add(new SupplyStatsDto.EntryAmount(row.entry(), row.amount()));
     }
+    boolean leadership = accessPolicy.isGoverningLeadership();
+    Set<UUID> managed = accessPolicy.managedUnitIds();
     List<SupplyStatsDto.UnitMonth> units = new ArrayList<>();
     for (DonationStatRow row : donationRepository.statsByUnitAndMonth(RECEIVED, from, to)) {
       if (!leadership && !managed.contains(row.unitId())) {

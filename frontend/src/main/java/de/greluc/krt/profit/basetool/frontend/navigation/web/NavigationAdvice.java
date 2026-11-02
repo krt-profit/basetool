@@ -113,6 +113,11 @@ public class NavigationAdvice {
           capabilities.canManagePromotionsAnywhere(),
           NavigationFlag.MANAGE_PROMOTIONS_ANYWHERE);
       addIf(flags, capabilities.canUsePromotionAnywhere(), NavigationFlag.PROMOTION_ANYWHERE);
+      addIf(flags, capabilities.canViewSupplyIncoming(), NavigationFlag.SUPPLY_INCOMING);
+      addIf(flags, capabilities.canViewSupplyStats(), NavigationFlag.SUPPLY_STATS);
+      addIf(flags, capabilities.canViewPurchasingPartners(), NavigationFlag.PURCHASING_PARTNERS);
+      addIf(flags, capabilities.canViewPurchasingDelegates(), NavigationFlag.PURCHASING_DELEGATES);
+      addIf(flags, capabilities.canViewPurchasingReport(), NavigationFlag.PURCHASING_REPORT);
     }
     addIf(flags, Boolean.TRUE.equals(supplyEnabled), NavigationFlag.SUPPLY);
     addIf(flags, Boolean.TRUE.equals(purchasingEnabled), NavigationFlag.PURCHASING);

@@ -31,7 +31,12 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PROMOTION;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_DELEGATES;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_PARTNERS;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_REPORT;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY_INCOMING;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY_STATS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.EXTERNAL;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.LABEL_WITH_ICON;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.NOT_INDEXED;
@@ -554,27 +559,27 @@ public class NavigationRegistry {
                 "/supply/donations/incoming",
                 "supply.tab.incoming",
                 "supplyIncoming")
-            .gate(NavigationGate.requires(SUPPLY)),
+            .gate(NavigationGate.requires(SUPPLY, SUPPLY_INCOMING)),
         dataTab("supply.stats", "/supply/stats", "supply.tab.stats", "supplyStats")
-            .gate(NavigationGate.requires(SUPPLY)),
+            .gate(NavigationGate.requires(SUPPLY, SUPPLY_STATS)),
         dataTab(
                 "purchasing.partners",
                 "/purchasing/partners",
                 "purchasing.tab.partners",
                 "purchasingPartners")
-            .gate(NavigationGate.requires(PURCHASING)),
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_PARTNERS)),
         dataTab(
                 "purchasing.delegates",
                 "/purchasing/delegates",
                 "purchasing.tab.delegates",
                 "purchasingDelegates")
-            .gate(NavigationGate.requires(PURCHASING)),
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_DELEGATES)),
         dataTab(
                 "purchasing.report",
                 "/purchasing/report",
                 "purchasing.tab.report",
                 "purchasingReport")
-            .gate(NavigationGate.requires(PURCHASING)));
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_REPORT)));
   }
 
   /**

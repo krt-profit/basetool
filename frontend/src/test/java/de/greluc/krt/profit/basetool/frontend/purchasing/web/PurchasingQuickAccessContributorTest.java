@@ -23,43 +23,55 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry;
 import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationRegistry;
-import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
-import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingStateDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link PurchasingQuickAccessContributor}: the same tabs the purchasing pages show.
+ * Unit tests for {@link PurchasingQuickAccessContributor}: the tabs the layout read's flags grant,
+ * the same the purchasing pages show.
  */
 @ExtendWith(MockitoExtension.class)
 class PurchasingQuickAccessContributorTest {
 
-  @Mock private PurchasingBackendClient purchasingClient;
   @Mock private PurchasingFeatureState featureState;
+  @Mock private LayoutContextLoader layoutContextLoader;
+  @Mock private HttpServletRequest request;
 
-  @InjectMocks private PurchasingQuickAccessContributor contributor;
+  private PurchasingQuickAccessContributor contributor;
 
-  /** While the purchasing surface is off, nothing is offered and the backend is not asked. */
+  @BeforeEach
+  void setUp() {
+    contributor = new PurchasingQuickAccessContributor(featureState, layoutContextLoader, request);
+  }
+
+  private void grant(CapabilitiesResponse capabilities) {
+    when(featureState.enabled()).thenReturn(true);
+    when(layoutContextLoader.capabilities(request)).thenReturn(capabilities);
+  }
+
+  /** While the purchasing surface is off, nothing is offered and no flags are read. */
   @Test
   void offersNothingWhileTheSurfaceIsOff() {
     when(featureState.enabled()).thenReturn(false);
 
     assertThat(contributor.entries()).isEmpty();
-    verifyNoInteractions(purchasingClient);
+    verifyNoInteractions(layoutContextLoader);
   }
 
-  /** A governing member who may read the report gets all three tabs. */
+  /** Every purchasing flag offers its tab. */
   @Test
-  void governingMemberGetsEveryTab() {
-    when(featureState.enabled()).thenReturn(true);
-    when(purchasingClient.state())
-        .thenReturn(new PurchasingStateDto(true, false, true, false, false, true, false));
+  void everyFlagOffersItsTab() {
+    grant(LayoutResponses.tabs(false, false, true, true, true));
 
     assertThat(contributor.entries())
         .extracting(QuickAccessEntry::href)
@@ -69,9 +81,7 @@ class PurchasingQuickAccessContributorTest {
   /** Every tab carries the key and the path of the registered tab, so it can be starred. */
   @Test
   void everyTabCarriesTheKeyOfItsRegisteredEntry() {
-    when(featureState.enabled()).thenReturn(true);
-    when(purchasingClient.state())
-        .thenReturn(new PurchasingStateDto(true, false, true, false, false, true, false));
+    grant(LayoutResponses.tabs(false, false, true, true, true));
     NavigationRegistry registry = new NavigationRegistry();
 
     assertThat(contributor.entries())
@@ -83,35 +93,20 @@ class PurchasingQuickAccessContributorTest {
                 .contains(entry.href()));
   }
 
-  /** A delegate gets the partners only. */
+  /** The report flag alone offers the report only. */
   @Test
-  void delegateGetsThePartners() {
-    when(featureState.enabled()).thenReturn(true);
-    when(purchasingClient.state())
-        .thenReturn(new PurchasingStateDto(true, true, false, false, false, false, false));
+  void theReportFlagAloneOffersTheReport() {
+    grant(LayoutResponses.tabs(true, true, false, false, true));
 
     assertThat(contributor.entries())
         .extracting(QuickAccessEntry::href)
-        .containsExactly("/purchasing/partners");
+        .containsExactly("/purchasing/report");
   }
 
-  /** A state that reports the surface off, or no state at all, offers nothing. */
+  /** A plain member, or a failed layout read, gets no tab. */
   @Test
-  void disabledOrMissingStateOffersNothing() {
-    when(featureState.enabled()).thenReturn(true);
-    when(purchasingClient.state())
-        .thenReturn(new PurchasingStateDto(false, true, true, false, false, true, false))
-        .thenReturn(null);
-
-    assertThat(contributor.entries()).isEmpty();
-    assertThat(contributor.entries()).isEmpty();
-  }
-
-  /** A failed read fails closed. */
-  @Test
-  void failedReadOffersNothing() {
-    when(featureState.enabled()).thenReturn(true);
-    when(purchasingClient.state()).thenThrow(new IllegalStateException("backend down"));
+  void noFlagOffersNothing() {
+    grant(CapabilitiesResponse.NONE);
 
     assertThat(contributor.entries()).isEmpty();
   }

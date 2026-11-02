@@ -84318,6 +84318,21 @@
           "canViewOwnJobOrders" : {
             "type" : "boolean"
           },
+          "canViewPurchasingDelegates" : {
+            "type" : "boolean"
+          },
+          "canViewPurchasingPartners" : {
+            "type" : "boolean"
+          },
+          "canViewPurchasingReport" : {
+            "type" : "boolean"
+          },
+          "canViewSupplyIncoming" : {
+            "type" : "boolean"
+          },
+          "canViewSupplyStats" : {
+            "type" : "boolean"
+          },
           "hasOfficerReach" : {
             "type" : "boolean"
           },

@@ -36,6 +36,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -52,6 +54,7 @@ import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingPageContr
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -64,6 +67,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import org.springframework.web.server.ResponseStatusException;
@@ -79,6 +83,7 @@ class PurchasingPageControllerTest {
   @Mock private SupplyBackendClient supplyClient;
   @Mock private PurchasingFeatureState featureState;
   @Mock private QualityTierCatalog qualityTierCatalog;
+  @Mock private LayoutContextLoader layoutContextLoader;
 
   private PurchasingPageController controller;
 
@@ -86,7 +91,7 @@ class PurchasingPageControllerTest {
   void setUp() {
     controller =
         new PurchasingPageController(
-            purchasingClient, supplyClient, featureState, qualityTierCatalog);
+            purchasingClient, supplyClient, featureState, qualityTierCatalog, layoutContextLoader);
   }
 
   private void switchOn() {
@@ -329,25 +334,25 @@ class PurchasingPageControllerTest {
   }
 
   @Test
-  void aDelegateSeesThePartnersAndDelegatesTabs() {
-    assertThat(controller.purchasingTabs(state(true, false, false)))
-        .isEqualTo(new PurchasingTabs(true, false, false));
+  void eachTabFollowsItsOwnFlagOfTheLayoutRead() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    when(layoutContextLoader.capabilities(request))
+        .thenReturn(LayoutResponses.tabs(true, true, true, false, true))
+        .thenReturn(LayoutResponses.tabs(false, false, false, true, false));
+
+    assertThat(controller.purchasingTabs(request)).isEqualTo(new PurchasingTabs(true, false, true));
+    assertThat(controller.purchasingTabs(request))
+        .isEqualTo(new PurchasingTabs(false, true, false));
   }
 
   @Test
-  void theGoverningLeadershipSeesThePartnersAndDelegatesTabs() {
-    assertThat(controller.purchasingTabs(state(false, true, false)))
-        .isEqualTo(new PurchasingTabs(true, true, false));
-  }
+  void noFlagsShowNoTab() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    when(layoutContextLoader.capabilities(request)).thenReturn(CapabilitiesResponse.NONE);
 
-  @Test
-  void theReportTabFollowsTheReportCapabilityAlone() {
-    PurchasingStateDto reader =
-        new PurchasingStateDto(true, false, false, true, false, true, false);
-
-    assertThat(controller.purchasingTabs(reader)).isEqualTo(new PurchasingTabs(false, false, true));
-    assertThat(controller.purchasingTabs(NOTHING))
+    assertThat(controller.purchasingTabs(request))
         .isEqualTo(new PurchasingTabs(false, false, false));
+    assertThat(PurchasingTabs.of(null)).isEqualTo(new PurchasingTabs(false, false, false));
   }
 
   @Test

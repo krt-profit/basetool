@@ -46,7 +46,8 @@ public class CapabilityFlagsAdvice {
   /**
    * Resolves the caller's UI capability flags once per request: all role gates on for admins, all
    * off for anonymous callers, otherwise from {@link LayoutContextLoader}. The server switch {@code
-   * canMarkStolen} always comes from the backend, admins included. Fails closed to all off.
+   * canMarkStolen} and the supply and purchasing tab flags always come from the backend, admins
+   * included. Fails closed to all off.
    *
    * @param request the current request, through which the layout context is memoised
    * @return the caller's capability flags; never {@code null}
@@ -57,8 +58,7 @@ public class CapabilityFlagsAdvice {
       return CapabilitiesResponse.NONE;
     }
     if (authHelper.isAdmin()) {
-      return CapabilitiesResponse.admin(
-          layoutContextLoader.load(request).capabilities().canMarkStolen());
+      return CapabilitiesResponse.admin(layoutContextLoader.load(request).capabilities());
     }
     return layoutContextLoader.load(request).capabilities();
   }
@@ -272,6 +272,16 @@ public class CapabilityFlagsAdvice {
    *     with promotion enabled, whatever unit is pinned
    * @param canUsePromotionAnywhere whether the caller belongs to or reaches at least one unit with
    *     promotion enabled, whatever unit is pinned
+   * @param canViewSupplyIncoming whether „Eingehende Spenden" is offered: the supply surface is on
+   *     and the caller manages an active unit that accepts donations
+   * @param canViewSupplyStats whether the donation statistics are offered: the supply surface is on
+   *     and the caller belongs to the governing leadership or manages a unit
+   * @param canViewPurchasingPartners whether the purchasing partners are offered: the purchasing
+   *     surface is on and the caller is a trade delegate or the governing leadership
+   * @param canViewPurchasingDelegates whether the trade delegates are offered: the purchasing
+   *     surface is on and the caller is the governing leadership
+   * @param canViewPurchasingReport whether the purchasing report is offered: the purchasing surface
+   *     is on and the caller may read it
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -289,22 +299,27 @@ public class CapabilityFlagsAdvice {
       boolean canManageMissionFinance,
       boolean canActAsOfficerAnywhere,
       boolean canManagePromotionsAnywhere,
-      boolean canUsePromotionAnywhere) {
+      boolean canUsePromotionAnywhere,
+      boolean canViewSupplyIncoming,
+      boolean canViewSupplyStats,
+      boolean canViewPurchasingPartners,
+      boolean canViewPurchasingDelegates,
+      boolean canViewPurchasingReport) {
 
     /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
     public static final CapabilitiesResponse NONE =
         new CapabilitiesResponse(
             false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false);
+            false, false, false, false, false, false, false, false, false);
 
     /**
-     * Every role-derived capability on, as an admin passes each gate; the server switch stays the
-     * backend's.
+     * Every role-derived capability on, as an admin passes each gate; the server switch and the tab
+     * flags, which depend on switches and configured units, stay the backend's.
      *
-     * @param canMarkStolen the backend's „gestohlen" switch
+     * @param backend the backend's answer for the admin
      * @return the admin's capability flags
      */
-    public static CapabilitiesResponse admin(boolean canMarkStolen) {
+    public static CapabilitiesResponse admin(CapabilitiesResponse backend) {
       return new CapabilitiesResponse(
           true,
           true,
@@ -312,7 +327,7 @@ public class CapabilityFlagsAdvice {
           true,
           true,
           true,
-          canMarkStolen,
+          backend.canMarkStolen(),
           true,
           true,
           true,
@@ -321,7 +336,12 @@ public class CapabilityFlagsAdvice {
           true,
           true,
           true,
-          true);
+          true,
+          backend.canViewSupplyIncoming(),
+          backend.canViewSupplyStats(),
+          backend.canViewPurchasingPartners(),
+          backend.canViewPurchasingDelegates(),
+          backend.canViewPurchasingReport());
     }
   }
 }
