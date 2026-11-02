@@ -56,9 +56,8 @@ class DataExportMaterialClaimSectionIntegrationTest {
     UUID subject = userRepository.saveAndFlush(member).getId();
     UUID unit = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', 'Zzz Claim Staffel', ?, TRUE, FALSE,"
-            + " TRUE)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', 'Zzz Claim Staffel', ?, TRUE, TRUE)",
         unit,
         "C" + unit.toString().substring(0, 6));
     UUID material = UUID.randomUUID();

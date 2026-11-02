@@ -39,8 +39,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
  * Adds the active org-unit context to every model of a {@link UsesLayoutModel} controller for the
- * layout fragments: {@code activeSquadronId}, {@code activeSquadron}, {@code activeOrgUnit}, {@code
- * availableSquadrons}, {@code availableOrgUnits} and {@code isAllSquadronsMode}.
+ * layout fragments: {@code activeSquadronId}, {@code activeOrgUnit}, {@code availableSquadrons},
+ * {@code availableOrgUnits} and {@code isAllSquadronsMode}.
  *
  * <p>Data comes from the request's {@code GET /api/v1/me/layout} read via {@link
  * LayoutContextLoader} and the cached squadron catalogue. Backend failures degrade to empty or
@@ -94,27 +94,6 @@ public class OrgUnitContextAdvice {
   }
 
   /**
-   * Resolves the {@link SquadronDto} matching {@link #activeSquadronId} from the loaded catalogue.
-   *
-   * @param activeSquadronId the id resolved by {@link #activeSquadronId}
-   * @param availableSquadrons the loaded squadron catalogue
-   * @return matching squadron, or {@code null}.
-   */
-  @Nullable
-  @ModelAttribute("activeSquadron")
-  public SquadronDto activeSquadron(
-      @ModelAttribute("activeSquadronId") UUID activeSquadronId,
-      @ModelAttribute("availableSquadrons") List<SquadronDto> availableSquadrons) {
-    if (activeSquadronId == null || availableSquadrons == null) {
-      return null;
-    }
-    return availableSquadrons.stream()
-        .filter(s -> activeSquadronId.equals(s.id()))
-        .findFirst()
-        .orElse(null);
-  }
-
-  /**
    * Resolves the active pin to a kind-tagged {@link OrgUnitMembershipOptionDto} from {@link
    * #availableOrgUnits(HttpServletRequest)}, so the context chip can render Staffel and SK pins
    * differently.
@@ -139,9 +118,8 @@ public class OrgUnitContextAdvice {
   }
 
   /**
-   * Loads the squadron catalogue once per request for the admin switcher and {@link
-   * #activeSquadron(UUID, List)}. Empty for anonymous callers, on backend failure, and for handlers
-   * that read no model attribute.
+   * Loads the squadron catalogue once per request for the squadron pickers. Empty for anonymous
+   * callers, on backend failure, and for handlers that read no model attribute.
    *
    * @param request the current request, carrying the matched handler
    * @return list of active squadrons, ordered by name; never {@code null}.

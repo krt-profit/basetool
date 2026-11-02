@@ -26,10 +26,8 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_EN;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LOGISTICIAN_HERE;
-import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.MANAGE_PROMOTIONS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
-import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PROMOTION;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_DELEGATES;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_PARTNERS;
@@ -115,9 +113,6 @@ public class NavigationRegistry {
           "admin.dataimports", List.of("admin.syncreports.uex", "admin.syncreports.scwiki"));
 
   private static final NavigationGate LEITUNG_GATE = NavigationGate.requires(OPEN_LEITUNG);
-
-  private static final NavigationGate PROMOTION_MANAGEMENT_GATE =
-      NavigationGate.requires(MANAGE_PROMOTIONS);
 
   /** The two links above the member groups: home and notifications. */
   private final NavigationGroup top = buildTop();
@@ -403,7 +398,6 @@ public class NavigationRegistry {
     for (NavigationPageTabs bar : pageTabs) {
       boolean adminBar = adminKeys.contains(bar.entryKeys().getFirst());
       Set<String> barKeys = new LinkedHashSet<>(bar.entryKeys());
-      bar.covered().values().forEach(barKeys::addAll);
       Set<String> tabHrefs =
           bar.entryKeys().stream()
               .flatMap(key -> entry(key).stream())
@@ -619,23 +613,6 @@ public class NavigationRegistry {
         of("organisation.leadership", "/organisation/leitung", "nav.leitung")
             .gate(LEITUNG_GATE)
             .testId("nav-leitung")
-            .with(PALETTE_ONLY),
-        of("promotion.overview", "/promotion/overview", "nav.promotion")
-            .tab("nav.tab.overview")
-            .keywords("palette.keywords.promotion")
-            .gate(NavigationGate.requires(PROMOTION)),
-        of("promotion.evaluations", "/promotion/my-evaluations", "nav.promotion.my_evaluations")
-            .gate(NavigationGate.requires(PROMOTION))
-            .with(PALETTE_ONLY),
-        of("promotion.manage", "/promotion/manage", "nav.promotion.manage")
-            .tab("nav.tab.manage")
-            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
-            .with(PALETTE_ONLY),
-        of("promotion.topics", "/promotion/admin/topics", "nav.promotion.admin_topics")
-            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
-            .with(PALETTE_ONLY),
-        of("promotion.ranks", "/promotion/admin/rank-requirements", "nav.promotion.admin_ranks")
-            .gate(PROMOTION_MANAGEMENT_GATE.andRequires(PROMOTION))
             .with(PALETTE_ONLY));
   }
 
@@ -832,8 +809,6 @@ public class NavigationRegistry {
             "purchasing.delegates",
             "purchasing.report"),
         NavigationPageTabs.of("orgchart.view", "orgunitbank.overview", "organisation.leadership"),
-        NavigationPageTabs.of("promotion.overview", "promotion.evaluations", "promotion.manage")
-            .covering("promotion.manage", "promotion.topics", "promotion.ranks"),
         NavigationPageTabs.of("bank.dashboard", "bank.manage", "bank.grants", "bank.requests"),
         NavigationPageTabs.of("admin.members.list", "admin.discordregistrations", "admin.terms"),
         NavigationPageTabs.of(

@@ -41,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess.PurchasingTabGrants;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess.SupplyTabGrants;
@@ -61,8 +60,6 @@ class MeControllerTest {
 
   @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private AccessGateService accessGateService;
-
-  @Mock private PromotionReach promotionReach;
 
   @Mock private AuthHelperService authHelperService;
 
@@ -241,13 +238,11 @@ class MeControllerTest {
   @Test
   void getCapabilities_officerFlagsFollowTheReachInTheActiveContext() {
     when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(true);
-    when(promotionReach.canManageInActiveContext()).thenReturn(true);
 
     MeController.CapabilitiesResponse response = controller.getCapabilities();
 
     assertTrue(response.hasOfficerReach());
     assertTrue(response.canOpenLeitung());
-    assertTrue(response.canManagePromotions());
     assertTrue(response.canSeeHangarOwnerDetails());
     assertTrue(response.canManageJobOrders());
     assertTrue(response.canManageMissionFinance());
@@ -261,7 +256,6 @@ class MeControllerTest {
 
     assertFalse(response.hasOfficerReach());
     assertFalse(response.canOpenLeitung());
-    assertFalse(response.canManagePromotions());
     assertFalse(response.canSeeHangarOwnerDetails());
     assertFalse(response.canManageJobOrders());
     assertFalse(response.canManageMissionFinance());
@@ -276,36 +270,6 @@ class MeControllerTest {
 
     assertFalse(response.hasOfficerReach());
     assertTrue(response.canActAsOfficerAnywhere());
-  }
-
-  @Test
-  void getCapabilities_promotionManagementCountsOnlyUnitsWithPromotionEnabled() {
-    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(true);
-    when(accessGateService.canActAsOfficerAnywhere()).thenReturn(true);
-    when(promotionReach.canManageInActiveContext()).thenReturn(false);
-    when(promotionReach.canManageAnywhere()).thenReturn(false);
-    when(promotionReach.canUseAnywhere()).thenReturn(false);
-
-    MeController.CapabilitiesResponse response = controller.getCapabilities();
-
-    assertTrue(response.hasOfficerReach());
-    assertTrue(response.canOpenLeitung());
-    assertFalse(response.canManagePromotions());
-    assertFalse(response.canManagePromotionsAnywhere());
-    assertFalse(response.canUsePromotionAnywhere());
-  }
-
-  @Test
-  void getCapabilities_promotionAnywhereIgnoresThePin() {
-    when(promotionReach.canManageInActiveContext()).thenReturn(false);
-    when(promotionReach.canManageAnywhere()).thenReturn(true);
-    when(promotionReach.canUseAnywhere()).thenReturn(true);
-
-    MeController.CapabilitiesResponse response = controller.getCapabilities();
-
-    assertFalse(response.canManagePromotions());
-    assertTrue(response.canManagePromotionsAnywhere());
-    assertTrue(response.canUsePromotionAnywhere());
   }
 
   @Test

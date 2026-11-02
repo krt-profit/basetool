@@ -46,7 +46,6 @@ body:
         - INV (inventory / stock)
         - HANGAR (hangar)
         - MARKET (material-exchange board)
-        - PROMO (promotion system)
         - NOTIF (notifications)
         - INGEST (desktop ingest)
         - UEX (UEX integration)

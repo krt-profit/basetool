@@ -198,8 +198,6 @@ public final class HandleErasureCoverage {
               "mission_unit.name",
               "A unit within a mission -- a formation label from the mission plan rather than"
                   + " the name of a participant."),
-          notTheMember("promotion_category.name", "A promotion catalogue entry."),
-          notTheMember("promotion_topic.name", "A promotion catalogue entry."),
           byHand(
               "announcement.content",
               "An administrator's announcement. It can name a member mid-sentence, and rewriting"
@@ -252,10 +250,6 @@ public final class HandleErasureCoverage {
                   + " account backs it."),
           byHand("org_chart_position.display_name", "See org_chart_position.name."),
           byHand("org_unit.description", "An organisational unit's prose."),
-          byHand("promotion_category.description", "Promotion catalogue prose."),
-          byHand("promotion_topic.description", "Promotion catalogue prose."),
-          byHand("promotion_level_content.description", "Promotion catalogue prose."),
-          byHand("rank_requirement.description", "Promotion catalogue prose."),
           byHand(
               "blueprint_external_alias.created_by",
               "Who created an alias, stored as a name rather than a reference. Prose in effect,"

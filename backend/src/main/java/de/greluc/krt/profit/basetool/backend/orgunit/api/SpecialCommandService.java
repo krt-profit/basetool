@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * CRUD service for {@link SpecialCommand} (Spezialkommando), mirroring {@link SquadronService}
- * without the promotion toggle and without caching.
+ * without caching.
  *
  * <p>Same soft-delete, case-insensitive uniqueness and optimistic-locking semantics as {@link
  * SquadronService}. The explicit duplicate check sees only other SKs; a clash with a Squadron name
@@ -88,8 +88,7 @@ public class SpecialCommandService {
   }
 
   /**
-   * Persists a new Spezialkommando after a case-insensitive name check against other SKs; promotion
-   * is always disabled.
+   * Persists a new Spezialkommando after a case-insensitive name check against other SKs.
    *
    * @param specialCommand transient entity built from the inbound DTO.
    * @return the persisted entity with id and version populated.

@@ -302,26 +302,6 @@ public class AdminAuditLogPageController {
                   "ROLE_AUDIT_EXPORTED",
                   "ROLE_AUDIT_PURGED")),
           Map.entry(
-              "PROMOTION",
-              List.of(
-                  "PROMOTION_TOPIC_CREATED",
-                  "PROMOTION_TOPIC_UPDATED",
-                  "PROMOTION_TOPIC_DELETED",
-                  "PROMOTION_CATEGORY_CREATED",
-                  "PROMOTION_CATEGORY_UPDATED",
-                  "PROMOTION_CATEGORY_DELETED",
-                  "PROMOTION_LEVEL_CONTENT_CREATED",
-                  "PROMOTION_LEVEL_CONTENT_UPDATED",
-                  "PROMOTION_LEVEL_CONTENT_DELETED",
-                  "PROMOTION_RANK_REQUIREMENT_CREATED",
-                  "PROMOTION_RANK_REQUIREMENT_UPDATED",
-                  "PROMOTION_RANK_REQUIREMENT_DELETED",
-                  "PROMOTION_EVALUATION_CREATED",
-                  "PROMOTION_EVALUATION_UPDATED",
-                  "PROMOTION_EVALUATION_DELETED",
-                  "PROMOTION_AUDIT_EXPORTED",
-                  "PROMOTION_AUDIT_PURGED")),
-          Map.entry(
               "MARKET",
               List.of(
                   "MARKET_OFFER_RELEASED",

@@ -165,7 +165,6 @@ class LayoutModelScopeMvcTest {
         .andExpect(status().isOk())
         .andExpect(model().attribute("hasOfficerReach", true))
         .andExpect(model().attribute("canOpenLeitung", true))
-        .andExpect(model().attribute("canManagePromotions", true))
         .andExpect(model().attribute("canSeeHangarOwnerDetails", true))
         .andExpect(model().attribute("canManageJobOrders", true))
         .andExpect(model().attribute("canManageMissionFinance", true));

@@ -570,57 +570,6 @@ public enum AuditEventType {
   /** Role &amp; membership audit rows older than an admin-chosen cutoff were purged (retention). */
   ROLE_AUDIT_PURGED(AuditDomain.ROLE),
 
-  /** A promotion topic (the catalogue's top-level grouping) was created. */
-  PROMOTION_TOPIC_CREATED(AuditDomain.PROMOTION),
-
-  /** A promotion topic's name / description / sort order was edited. */
-  PROMOTION_TOPIC_UPDATED(AuditDomain.PROMOTION),
-
-  /** A promotion topic was deleted (its categories and their level contents cascade-removed). */
-  PROMOTION_TOPIC_DELETED(AuditDomain.PROMOTION),
-
-  /** A promotion category was created under a topic. */
-  PROMOTION_CATEGORY_CREATED(AuditDomain.PROMOTION),
-
-  /** A promotion category was edited (name / description / sort order / topic re-binding). */
-  PROMOTION_CATEGORY_UPDATED(AuditDomain.PROMOTION),
-
-  /** A promotion category was deleted (its level contents cascade-removed). */
-  PROMOTION_CATEGORY_DELETED(AuditDomain.PROMOTION),
-
-  /** A promotion level content (the per-level rubric of a category) was created. */
-  PROMOTION_LEVEL_CONTENT_CREATED(AuditDomain.PROMOTION),
-
-  /** A promotion level content was edited (description / category re-binding). */
-  PROMOTION_LEVEL_CONTENT_UPDATED(AuditDomain.PROMOTION),
-
-  /** A promotion level content was deleted. */
-  PROMOTION_LEVEL_CONTENT_DELETED(AuditDomain.PROMOTION),
-
-  /** A rank requirement (the rules for one rank step) was created. */
-  PROMOTION_RANK_REQUIREMENT_CREATED(AuditDomain.PROMOTION),
-
-  /** A rank requirement was edited (ranks / minimum level / required count / references). */
-  PROMOTION_RANK_REQUIREMENT_UPDATED(AuditDomain.PROMOTION),
-
-  /** A rank requirement was deleted. */
-  PROMOTION_RANK_REQUIREMENT_DELETED(AuditDomain.PROMOTION),
-
-  /** A member's evaluation level for a category was assigned for the first time. */
-  PROMOTION_EVALUATION_CREATED(AuditDomain.PROMOTION),
-
-  /** A member's existing evaluation level for a category was changed. */
-  PROMOTION_EVALUATION_UPDATED(AuditDomain.PROMOTION),
-
-  /** A member's evaluation entry for a category was deleted (their standing removed). */
-  PROMOTION_EVALUATION_DELETED(AuditDomain.PROMOTION),
-
-  /** The promotion audit log was exported as a PDF or JSON for a period. */
-  PROMOTION_AUDIT_EXPORTED(AuditDomain.PROMOTION),
-
-  /** Promotion audit rows older than an admin-chosen cutoff were purged (retention). */
-  PROMOTION_AUDIT_PURGED(AuditDomain.PROMOTION),
-
   /** A Lager row was released to the Materialbörse (an offer became publicly listed). */
   MARKET_OFFER_RELEASED(AuditDomain.MARKET),
 

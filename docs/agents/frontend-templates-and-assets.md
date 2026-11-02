@@ -121,7 +121,7 @@ A condition or iteration goes on a `<th:block>` around the call. In a fragment f
 (`~{bank/fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
 `UNREACHED` entry with the reason. Render a dialog under the same condition as its openers and the
 script that drives it: a dialog nothing can open, or whose handlers were never loaded, is dead
-markup (the promotion admin all-squadrons view and the bare admin blueprint page were).
+markup (the bare admin blueprint page was).
 
 ## Page templates: one layout fragment (binding)
 

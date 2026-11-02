@@ -142,8 +142,7 @@ public class UserDeletionService implements AccountErasure {
    *
    * <ul>
    *   <li><b>Purged</b> ({@code DELETE} phase): warehouse rows and the offers on them, hangar,
-   *       "Mein Inventar", personal blueprints, notifications, notification-rule selectors and
-   *       promotion evaluations.
+   *       "Mein Inventar", personal blueprints, notifications and notification-rule selectors.
    *   <li><b>Reassigned to the fallback admin</b> ({@code REASSIGN}): missions with their {@code
    *       mission_ownership} companion, and refinery orders.
    *   <li><b>Unlinked</b> ({@code UNLINK}): mission managers and participants, job-order assignees
@@ -227,7 +226,6 @@ public class UserDeletionService implements AccountErasure {
     int blueprintsDeleted = erased.getOrDefault(Erased.BLUEPRINTS, 0);
     int notificationsDeleted = erased.getOrDefault(Erased.NOTIFICATIONS, 0);
     int ruleSelectorsDeleted = erased.getOrDefault(Erased.RULE_SELECTORS, 0);
-    int evaluationsDeleted = erased.getOrDefault(Erased.EVALUATIONS, 0);
     int refineryReassigned = erased.getOrDefault(Erased.REFINERY_ORDERS_REASSIGNED, 0);
 
     if (inventoryDeleted > 0 || shipsDeleted > 0) {
@@ -244,8 +242,7 @@ public class UserDeletionService implements AccountErasure {
     if (personalInventoryDeleted > 0
         || blueprintsDeleted > 0
         || notificationsDeleted > 0
-        || ruleSelectorsDeleted > 0
-        || evaluationsDeleted > 0) {
+        || ruleSelectorsDeleted > 0) {
       auditRecorder.record(
           AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION,
           null,
@@ -255,8 +252,7 @@ public class UserDeletionService implements AccountErasure {
               .with("personalInventory", personalInventoryDeleted)
               .with("blueprints", blueprintsDeleted)
               .with("notifications", notificationsDeleted)
-              .with("ruleSelectors", ruleSelectorsDeleted)
-              .with("evaluations", evaluationsDeleted));
+              .with("ruleSelectors", ruleSelectorsDeleted));
     }
     if (refineryReassigned > 0) {
       auditRecorder.record(
@@ -288,7 +284,6 @@ public class UserDeletionService implements AccountErasure {
             .with("blueprints", blueprintsDeleted)
             .with("notifications", notificationsDeleted)
             .with("ruleSelectors", ruleSelectorsDeleted)
-            .with("evaluations", evaluationsDeleted)
             .with("refineryOrdersReassignedTo", admin.getId()));
 
     userRepository.delete(user);
@@ -296,8 +291,8 @@ public class UserDeletionService implements AccountErasure {
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     log.info(
         "User {} deleted: purged {} inventory rows, {} ships, {} personal inventory, {} blueprints,"
-            + " {} notifications, {} rule selectors, {} evaluations; missions and refinery orders"
-            + " reassigned to admin {}",
+            + " {} notifications, {} rule selectors; missions and refinery orders reassigned to"
+            + " admin {}",
         userId,
         inventoryDeleted,
         shipsDeleted,
@@ -305,7 +300,6 @@ public class UserDeletionService implements AccountErasure {
         blueprintsDeleted,
         notificationsDeleted,
         ruleSelectorsDeleted,
-        evaluationsDeleted,
         admin.getId());
   }
 

@@ -1,6 +1,6 @@
 # Record of processing activities (Art. 30 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-17.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-02.
 
 Art. 30 GDPR requires a controller to maintain a record of its processing activities. The small-
 organisation exemption in **Art. 30(5) does not apply**: it is available only where processing is
@@ -49,8 +49,8 @@ requires it and duplicating it into further files spreads personal data for no g
 ### A2 — Squadron operations
 
 - **Purpose:** plan and settle missions, operations, warehouse stock, job orders, refinery orders,
-  the hangar and the personal inventory; run the material exchange; keep the organisation chart and
-  the promotion / evaluation matrix; publish announcements.
+  the hangar and the personal inventory; run the material exchange; keep the organisation chart;
+  publish announcements.
 - **Data:** everything a member creates or that is attributed to them, including **free-text fields**
   (notes, comments, booking reasons, mission descriptions) which may contain personal data about
   others if a member enters it there.
@@ -64,7 +64,7 @@ requires it and duplicating it into further files spreads personal data for no g
   `navigation_dashboard_layout`,
   `navigation_dashboard_widget` (the member's own dashboard: widget types, columns and option
   choices, no free text),
-  `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,
+  `material_exchange_*`, `material_claim`, `org_chart_position`,
   `announcement`.
 - **Transient only:** while a member has a mission open, the frontend shares their handle and the
   section they are editing with the other members viewing it (editor presence, ADR-0126). It is held

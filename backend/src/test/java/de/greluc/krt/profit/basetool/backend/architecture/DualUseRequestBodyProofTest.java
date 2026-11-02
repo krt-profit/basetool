@@ -393,8 +393,6 @@ class DualUseRequestBodyProofTest {
                 "FST",
                 "active",
                 true,
-                "isPromotionEnabled",
-                false,
                 "isProfitEligible",
                 false,
                 "version",

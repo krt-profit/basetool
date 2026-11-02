@@ -158,6 +158,11 @@ something broke once.
   - **External exchange** — the client registry, its capabilities, the global switch and the
     mirror's revision sequence (V248, REQ-XCH-003); installations and client revocations (V249,
     REQ-XCH-007/-008).
+  - **Promotion system removal** — V331 drops `promotion_topic`, `promotion_category`,
+    `promotion_level_content`, `rank_requirement`, `member_evaluation`,
+    `org_unit.is_promotion_enabled` with its CHECK `chk_org_unit_promotion_only_squadron`, and
+    the `audit_event` rows of domain `PROMOTION`. The promotion objects V97, V99, V101, V105 and
+    the rank-requirement-owner migration above name do not exist on a migrated schema.
 
 This timeline is curated, not exhaustive (checked against the directory on
 2026-09-27, tip V248). `ls | sort -V | tail -1` in this directory is the only reliable

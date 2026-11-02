@@ -64,13 +64,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityS
 import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
-import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
-import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement;
-import de.greluc.krt.profit.basetool.backend.promotion.web.MemberEvaluationController;
-import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionCategoryController;
-import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionLevelContentController;
-import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionTopicController;
-import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementController;
 import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingDeal;
 import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingUnitPause;
@@ -236,36 +229,6 @@ class TenancyGuardTest {
               new HandlerKey(SupplyDonationController.class, "withdraw"),
               "SupplyDonationService.withdraw checks canWithdrawPledge: the donor or an admin"),
           Map.entry(
-              new HandlerKey(PromotionLevelContentController.class, "update"),
-              "PromotionLevelContentService checks canEditSquadron on the topic's owning Staffel"),
-          Map.entry(
-              new HandlerKey(PromotionLevelContentController.class, "delete"),
-              "PromotionLevelContentService checks canEditSquadron on the topic's owning Staffel"),
-          Map.entry(
-              new HandlerKey(MemberEvaluationController.class, "upsert"),
-              "MemberEvaluationService checks canEditSquadron on the topic's owning Staffel"),
-          Map.entry(
-              new HandlerKey(MemberEvaluationController.class, "delete"),
-              "MemberEvaluationService checks canEditSquadron on the evaluated member's Staffel"),
-          Map.entry(
-              new HandlerKey(RankRequirementController.class, "update"),
-              "RankRequirementService checks canEditSquadron on the owning Staffel"),
-          Map.entry(
-              new HandlerKey(RankRequirementController.class, "delete"),
-              "RankRequirementService checks canEditSquadron on the owning Staffel"),
-          Map.entry(
-              new HandlerKey(PromotionTopicController.class, "update"),
-              "PromotionTopicService checks canEditSquadron on the owning Staffel"),
-          Map.entry(
-              new HandlerKey(PromotionTopicController.class, "delete"),
-              "PromotionTopicService checks canEditSquadron on the owning Staffel"),
-          Map.entry(
-              new HandlerKey(PromotionCategoryController.class, "update"),
-              "PromotionCategoryService checks canEditSquadron on the topic's owning Staffel"),
-          Map.entry(
-              new HandlerKey(PromotionCategoryController.class, "delete"),
-              "PromotionCategoryService checks canEditSquadron on the topic's owning Staffel"),
-          Map.entry(
               new HandlerKey(MissionController.class, "joinMission"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
@@ -396,9 +359,7 @@ class TenancyGuardTest {
           Ship.class,
           InventoryItem.class,
           RefineryOrder.class,
-          JobOrder.class,
-          PromotionTopic.class,
-          RankRequirement.class);
+          JobOrder.class);
 
   private static final int REFERENCE_FLOOR = 22;
 

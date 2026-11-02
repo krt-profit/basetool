@@ -159,7 +159,7 @@ class LayoutContextLoaderTest {
     MockHttpServletRequest request = requestFor("view");
 
     assertThat(loader.capabilities(request).hasOfficerReach()).isTrue();
-    assertThat(loader.load(request).capabilities().canManagePromotions()).isTrue();
+    assertThat(loader.load(request).capabilities().canSeeHangarOwnerDetails()).isTrue();
 
     verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
   }
@@ -173,7 +173,7 @@ class LayoutContextLoaderTest {
     MockHttpServletRequest request = requestFor("json");
 
     assertThat(loader.capabilities(request).canOpenLeitung()).isTrue();
-    assertThat(loader.capabilities(request).canManagePromotions()).isTrue();
+    assertThat(loader.capabilities(request).canManageJobOrders()).isTrue();
 
     verify(backendApiClient, times(1)).get(LayoutResponses.PATH, MeLayoutResponse.class);
   }

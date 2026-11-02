@@ -131,7 +131,6 @@ class PagedFindersNoCollectionFetchTest {
                   "paged-", "paged-", PAGE)
               .getContent(),
           User::getRoles);
-      userRepository.findEvaluatableMembers(null, PAGE);
       assertUnfetched(
           missionRepository
               .searchMissions(

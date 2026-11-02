@@ -100,7 +100,7 @@ Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC
 The tenant is the **OrgUnit**. Scoping happens in the service layer through the scope kernel (`RequestScopeResolver`, `AccessGateService`),
 and the aggregates genuinely differ: strict-Staffel scoping for most, a public escape for
 non-internal Missions, and a separate responsible/requesting pair for Job Orders. Creation stamps
-ownership according to a documented matrix, the admin area and promotion are explicit carve-outs,
+ownership according to a documented matrix, the admin area is an explicit carve-out,
 and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
 and across the module boundary.
 
@@ -375,7 +375,7 @@ removed with the `/v1` routes on 2026-09-28.)*
 ## 8.8 Audit
 
 Thirteen audited areas (Bank, Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen,
-Rollen, Beförderung, Materialbörse, Hangar, Blueprints, Verbundene Anwendungen) log **every** state-mutating activity to an append-only trail. Adding a
+Rollen, Materialbörse, Hangar, Blueprints, Verbundene Anwendungen, Bedarf & Spenden) log **every** state-mutating activity to an append-only trail. Adding a
 mutation to an audited area without its audit event is an incomplete change — including the event
 type, the recording call, the viewer's per-area filter, the DE/EN labels and the coverage list. No
 user free text and no personal data in the details payload.

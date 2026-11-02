@@ -124,9 +124,12 @@ class UserIdentityColumnForeignKeyTest {
                 .isTrue());
   }
 
-  /** Verifies the five V235 foreign keys by name and that each uses {@code ON DELETE CASCADE}. */
+  /**
+   * Verifies the four surviving V235 foreign keys by name and that each uses {@code ON DELETE
+   * CASCADE}.
+   */
   @Test
-  @DisplayName("the five V235 foreign keys exist and cascade")
+  @DisplayName("the four surviving V235 foreign keys exist and cascade")
   void v235ForeignKeysCascadeOnDelete() {
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     assertCascadingAppUserFk(jdbc, "notification", "fk_notification_recipient");
@@ -134,7 +137,6 @@ class UserIdentityColumnForeignKeyTest {
         jdbc, "notification_rule_selector", "fk_notification_rule_selector_user");
     assertCascadingAppUserFk(jdbc, "personal_blueprint", "fk_personal_blueprint_owner");
     assertCascadingAppUserFk(jdbc, "personal_inventory_item", "fk_personal_inventory_item_owner");
-    assertCascadingAppUserFk(jdbc, "member_evaluation", "fk_member_evaluation_user");
   }
 
   /**

@@ -248,8 +248,8 @@ class ExchangeChangeRetentionServiceTest {
   private @NotNull UUID orgUnit() {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE, FALSE)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, FALSE)",
         id,
         "Retention " + id,
         "R" + id.toString().substring(0, 8));

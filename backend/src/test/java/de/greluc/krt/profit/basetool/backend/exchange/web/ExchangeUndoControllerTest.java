@@ -996,8 +996,8 @@ class ExchangeUndoControllerTest {
   private @NotNull UUID orgUnit(@NotNull String kind) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_promotion_enabled,"
-            + " is_profit_eligible) VALUES (?, ?, ?, ?, TRUE, FALSE, FALSE)",
+        "INSERT INTO org_unit (id, kind, name, shorthand, active,"
+            + " is_profit_eligible) VALUES (?, ?, ?, ?, TRUE, FALSE)",
         id,
         kind,
         "Unit " + id,

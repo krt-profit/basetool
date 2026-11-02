@@ -250,7 +250,7 @@ class UserDeletionServiceTest {
                     && d.toString()
                         .equals(
                             "reason=user-deletion personalInventory=0 blueprints=8"
-                                + " notifications=0 ruleSelectors=0 evaluations=0")));
+                                + " notifications=0 ruleSelectors=0")));
     verify(auditService)
         .record(
             eq(AuditEventType.REFINERY_ORDERS_REASSIGNED),
@@ -276,7 +276,7 @@ class UserDeletionServiceTest {
                     && d.toString()
                         .equals(
                             "inventoryRows=3 ships=7 personalInventory=0 blueprints=8"
-                                + " notifications=0 ruleSelectors=0 evaluations=0"
+                                + " notifications=0 ruleSelectors=0"
                                 + " refineryOrdersReassignedTo="
                                 + adminId)));
   }

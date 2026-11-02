@@ -38,9 +38,9 @@ class DomainMapTest {
 
   private static final int SOURCE_TYPE_FLOOR = 1389;
 
-  private static final int MAPPER_FLOOR = 49;
+  private static final int MAPPER_FLOOR = 44;
 
-  private static final int MODULE_COUNT = 29;
+  private static final int MODULE_COUNT = 28;
 
   @Test
   void everyBackendClassIsAssignedToExactlyOneModule() {

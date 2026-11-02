@@ -191,19 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     wireInstantToggle({
-        selector: '.squadron-promotion-toggle',
-        idAttribute: 'data-squadron-id',
-        urlFor: (id) => `/api/proxy/squadrons/${encodeURIComponent(id)}/promotion-enabled`,
-        bodyFor: (checked) => ({ enabled: checked }),
-        labels: {
-            on: SQUADRON_MSG.promotionOn,
-            off: SQUADRON_MSG.promotionOff,
-            saved: SQUADRON_MSG.promotionSaved,
-            error: SQUADRON_MSG.promotionError,
-        },
-        conflict: SQUADRON_CONFLICT,
-    });
-    wireInstantToggle({
         selector: '.squadron-profit-toggle',
         idAttribute: 'data-squadron-id',
         urlFor: (id) => `/api/proxy/squadrons/${encodeURIComponent(id)}/profit-eligible`,

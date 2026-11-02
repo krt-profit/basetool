@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
 > **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233, ADR-0298
 
 # Backend module boundaries
@@ -205,7 +205,7 @@ A module without an `api` package keeps all its types in its base package, which
 interface: `kernel` today. A module that publishes nothing keeps every type below its base
 package and outside an `api` package, so it exposes no type at all; no declaration allows it,
 and Spring Modulith reports any module that reaches into it: `dashboard`, `navigation`,
-`orgchart`, `personalinventory` and `promotion` today, which no other module uses. Such a leaf
+`orgchart` and `personalinventory` today, which no other module uses. Such a leaf
 module is laid out in `internal` and `web` only and consumes the `api` of other modules alone;
 `navigation` is leaf by design, since the frontend reaches it over REST. For a module that
 keeps its types in the base package, its dependents allow it by bare name (`"kernel"`, not
@@ -216,7 +216,7 @@ annotation's default is Spring Modulith's "everything allowed" sentinel, not an 
 Declared on `main`: `admin`, `app`, `audit`, `bank`, `blueprint`, `catalogue`, `dashboard`,
 `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`,
 `mission`, `navigation`, `notification`, `operation`, `orgchart`, `orgunit`, `personalinventory`,
-`platform`, `privacy`, `promotion`, `purchasing`, `refinery`, `scope`, `supply` (floor 29). `mission` publishes `mission.api.MissionCommands`, its first
+`platform`, `privacy`, `purchasing`, `refinery`, `scope`, `supply` (floor 28). `mission` publishes `mission.api.MissionCommands`, its first
 command (`detachFromOperation`, plan §5.3). `bank.api` carries `BankAmounts` and `BankBookingRequestType`, which its
 events and its conflict exception expose.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
@@ -224,7 +224,7 @@ Every `<module>.web` and `<module>.internal` package is internal to its module.
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay
 acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `orgchart`, `admin`,
-`personalinventory`, `promotion`, `exchange`, `materialexchange`, `refinery`, `joborder`, `mission` and `inventory` are laid out this way (the inventory publishes the DTOs the job order returns, `InventoryItemDto` and its allocation DTOs, in `inventory.api`); the exchange's frozen relay
+`personalinventory`, `exchange`, `materialexchange`, `refinery`, `joborder`, `mission` and `inventory` are laid out this way (the inventory publishes the DTOs the job order returns, `InventoryItemDto` and its allocation DTOs, in `inventory.api`); the exchange's frozen relay
 wire records sit in `exchange.internal.dto`.
 
 **Acceptance**

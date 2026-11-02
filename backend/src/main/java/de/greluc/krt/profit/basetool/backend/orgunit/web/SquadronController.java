@@ -139,24 +139,6 @@ public class SquadronController {
   }
 
   /**
-   * Per-squadron promotion-system feature toggle. Admins flip the flag to hide / re-expose the
-   * promotion menu for a whole squadron without losing any data. ADMIN-only — the regular {@code
-   * PUT /api/v1/squadrons/{id}} update path intentionally does NOT touch this flag so an accidental
-   * description edit cannot disable the feature.
-   *
-   * @param id squadron id
-   * @param body request payload {@code { "enabled": true|false }}
-   * @return the updated squadron DTO with the new flag value
-   */
-  @PatchMapping("/{id}/promotion-enabled")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public SquadronDto setPromotionEnabled(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @Valid SquadronPromotionToggleRequest body) {
-    return squadronMapper.toDto(squadronService.setPromotionEnabled(id, body.enabled()));
-  }
-
-  /**
    * Per-squadron profit-eligibility toggle. Admins flip the flag to opt a squadron in or out of the
    * Job-Order responsible (processing) picker without losing any data. ADMIN-only and isolated from
    * the regular {@code PUT /api/v1/squadrons/{id}} update path so an accidental description edit
@@ -173,14 +155,6 @@ public class SquadronController {
       @NotNull @RequestBody @Valid SquadronProfitEligibleToggleRequest body) {
     return squadronMapper.toDto(squadronService.setProfitEligible(id, body.eligible()));
   }
-
-  /**
-   * Request body for the per-squadron promotion-feature toggle endpoint. Carries a single boolean
-   * so a future expansion (e.g. effective-from date) can be added without breaking the wire format.
-   *
-   * @param enabled new value of {@code Squadron.isPromotionEnabled}
-   */
-  public record SquadronPromotionToggleRequest(boolean enabled) {}
 
   /**
    * Request body for the per-squadron profit-eligibility toggle endpoint. Carries a single boolean

@@ -115,7 +115,7 @@ reaches part of the tool. In particular, and because each of these answered anon
   star systems, job types, frequency types, settings and the Staffel list. Two of those were the
   ones the mobile app read before its first login.
 - **Everything member-gated already** — bank, Lager, refinery, hangar, personal inventory and
-  blueprints, the user directory, the promotion system, the admin area.
+  blueprints, the user directory, the admin area.
 
 **And there is nothing below member.** An approved account whose assembled authority set is empty
 holds the `ROLE_NO_ROLE` marker and is refused with `403 NO_ROLE` before a handler runs
@@ -667,48 +667,6 @@ write and therefore no longer rides the read-level `canSeeMission`, whose cross-
 escape let any member book into a foreign squadron's ledger and attribute the row to one of its
 participants (REQ-SEC-042).
 
-### 3.8 Promotion system
-
-All promotion controllers are class-level `isAuthenticated()`. The promotion system
-is **Staffel-scoped throughout**: every Staffel runs its own system
-(topic areas, categories, level contents, rank prerequisites, evaluations) and
-sees exclusively its own data. Read **and** write access are filtered in the
-service layer via the active Staffel context
-(`RequestScopeResolver.currentSquadronId()` for lists/eligibility,
-`canSeeSquadron` for detail reads, officer reach `canActAsOfficerIn(topic.owningSquadron.id)` for
-maintenance and evaluations, REQ-SEC-015).
-
-- **Only Staffeln with promotion enabled count.** Evaluations, promotion management and the
-  navigation entries for them cover exactly the Staffeln that have promotion switched on; a seat
-  in a Staffel with promotion off reads and maintains nothing there, and a pin on such a Staffel
-  leaves the management pages empty. A caller with no promotion-enabled Staffel among their units
-  and reach does not see the promotion entries at all (REQ-PROMO-004). Admins are not narrowed.
-- **Member/Officer** see only their home Staffel's system.
-- **Admins** see that of the actively pinned Staffel; without a pin (all-Staffeln mode)
-  the pages show a „Staffel wählen" (select Staffel) hint instead of mixing all Staffeln.
-- A **user without Staffel affiliation who is not an admin** has no promotion
-  system of their own: the menu item is hidden, every list/eligibility read
-  returns empty, and a direct page call is blocked with 403 (`PromotionAccessPolicy.hasReadAccess()`).
-- The **evaluation matrix** (the member list of the evaluation management) lists exclusively the
-  **plain members** of a Staffel: whoever holds the `ADMIN` role or a leadership seat **never** appears
-  there as a row to be evaluated — admins are Staffel-less, and seat holders carry out the evaluation
-  instead of being evaluated themselves. The promotion system considers only plain members
-  of a Staffel and is not available to any other OrgUnit kind (#817).
-
-| Function (gate)                                                                                                 | Member | Log. | MM | Officer | Admin |
-|:----------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
-| Read topic areas/categories/level contents/rank prerequisites (`isAuthenticated()`, **own Staffel only**)       |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| …**maintain** (service: admin **or** officer of the owning Staffel **with promotion enabled**)                  |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
-| View own evaluations / eligibility (`/my`, JWT sub, **own Staffel**)                                            |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| View **others'** evaluations/eligibility, member list (officer reach, **only the units of reach with promotion enabled**⁵) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
-| Enable/disable promotion subsystem per Staffel (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)  |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-
-¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `PromotionAccessPolicy.hasReadAccess()` is false, the menu is hidden, direct call 403.
-² Admin: the actively pinned Staffel; in all-Staffeln mode a „Staffel wählen" (select Staffel) hint instead of mixing.
-³ Only for one's own Staffel. **SKs are permanently excluded from the promotion system via DB CHECK/trigger + ArchUnit rule.**
-⁴ The **member list** to be evaluated (`GET /api/v1/promotion/evaluations/members`) contains only the **plain members** of the Staffel — holders of the `ADMIN` and `OFFICER` roles are filtered out (#817), since they carry out the evaluation instead of being evaluated themselves. Officer/Admin therefore **read** the matrix but do **not appear** as a row in it.
-⁵ Reads on the management pages are filtered, not just the writes refused: with a seat in Staffel A and plain membership of Staffel B, the member list, the evaluations, the topics, categories, level texts, rank requirements and the eligibility of others cover Staffel A only; the Leitung page lists Staffel A only. A pin narrows to the pinned unit (plus what a Bereich or OL seat on it reaches below) when it is within reach and to nothing otherwise (the pages are hidden); unpinned, the units of reach are the union (REQ-ROLE-007). In every case only Staffeln with promotion enabled count (REQ-PROMO-004).
-
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 
 | Function (gate)                                                                                                                                                     | Member | Log. | MM | Officer | Admin |
@@ -716,7 +674,7 @@ maintenance and evaluations, REQ-SEC-015).
 | Read Staffel list / active OrgUnit list (`/org-units/active`)                                                                                                       |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read SK list (`isAuthenticated()`; inactive ones admin only; the detail view `GET /special-commands/{id}` admin **or SK-Lead of this SK**, `canManageMembers`)     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Switch the active OrgUnit context (sidebar switcher)                                                                                                                |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
-| Staffel lifecycle (create/rename/delete/activate, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`)                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Staffel lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Set Staffel membership flags (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
@@ -779,7 +737,7 @@ OL seat (REQ-ROLE-005) does not count.
 | **Read** announcement (`GET /announcements/current`, `isAuthenticated()`)                                                                                                                                                                           |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Write/delete** announcement (incl. raw read view `GET /announcements/current/admin`) (`hasRole('ADMIN')`)                                                                                                                                         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read/clean up sync reports (`hasRole('ADMIN')`)                                                                                                                                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Read **audit logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Beförderung/Materialbörse/Hangar/Blueprints/Verbundene Anwendungen) + time-range PDF/JSON + retention cleanup (`/admin/audit-log`, `/api/v1/audit/**`, URL **and** method gate `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read **audit logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Materialbörse/Hangar/Blueprints/Verbundene Anwendungen/Bedarf & Spenden) + time-range PDF/JSON + retention cleanup (`/admin/audit-log`, `/api/v1/audit/**`, URL **and** method gate `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read system settings (`GET /settings`, `GET /settings/{key}`, `hasRole('ADMIN')`; members read the typed `GET /orders/settings` and `GET /refinery-orders/settings`)                                                                       |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Role/permission management, member attributes/rank, Staffel memberships + flags, Keycloak roster sync now (`/api/v1/admin/**`, `/api/v1/users/*/...`, `POST /api/v1/users/sync`, `/members`, `hasRole('ADMIN')`)                          |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -1154,7 +1112,7 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 - **No admin rights:** the reach is a concrete `memberOrgUnitIds` union, **never** the
   `adminAllScope` branch. An OL/Bereich principal **never** satisfies `isAdmin()`; all
   `hasRole('ADMIN')` gates (admin area, SK lifecycle, system settings, master data,
-  promotion topic guards, bank admin/audit) stay closed.
+  bank admin/audit) stay closed.
 - **Strict separation:** a Bereichsleitung views/edits **only** their own Bereich; **only** the
   OL is cross-Bereich.
 - **SK-Leiter stays SK-only:** their Bereichsleitung membership is purely organizational (a seat in the
@@ -1211,8 +1169,8 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    SK/Staffel lifecycle) is `hasRole('ADMIN')`. Officers retain their
    Staffel-internal functions (mission management, hangar write incl.
    `resetAllFittedStatus`, refinery, Logistician via hierarchy, the
-   job-order workflow and — as the only Officer carve-outs — promotion maintenance of
-   their own Staffel as well as SK member management **only** as SK-Lead).
+   job-order workflow and — as the only carve-out — SK member management **only** as
+   SK-Lead).
 6. **Architecture guards (ArchUnit, `ArchitectureTest`):** every `@RestController` carries an
    authorisation annotation and every read and write endpoint declares one
    (`everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation`,
@@ -1233,7 +1191,7 @@ the public surface (REQ-FE-025, `RouteGateSnapshotTest`, whose committed snapsho
 gate). The table names the **frontend** gate of each screen and how the
 navigation (`kernel/fragments/sidebar.html`) shows it; what the screen then *contains* is decided by the
 backend gates of §3. The quick access (`Ctrl`/`⌘` + `K`, REQ-UI-026) reads its pages from that
-rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. The member drawer holds ten links in four task groups; the former sibling screens are tabs of them
+rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. The member drawer holds nine links in four task groups; the former sibling screens are tabs of them
 (REQ-UI-026), shown under the same condition as before. It also adds „Mein Lager“, „Globales Lager“ and the
 hangar's „Org-Einheit“ tab for every member, the sync-report tabs for `ADMIN`, and the supply and
 purchasing tabs for the members those pages show them to (ADR-0329). Those five tabs („Eingehende Spenden", „Statistik",
@@ -1256,8 +1214,6 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Blueprint-Verfügbarkeit (`/blueprint-overview`)                                                                                      | `isAuthenticated()` (backend `canAccessBlueprintOverview`)              | if `canAccessBlueprintOverview`                                                |
 | Materialien, Material-Übersicht, Profitberechnung (`/materials/**`, `/materials/profit-calculation`)                                | `isAuthenticated()`; profit calculation `KRT_MEMBER`/`ADMIN`             | always                                                                         |
 | Mein Inventar, Meine Blueprints (`/personal-inventory/**`)                                                                           | `isAuthenticated()`                                                     | always, in the personal menu („Persönlich“) of the drawer’s user row           |
-| Beförderungssystem, Meine Bewertungen (`/promotion/overview`, `/promotion/my-evaluations`)                                           | `isAuthenticated()` + `promotionFeatureEnabled` (403 when the caller's Staffel has promotion off or there is no Staffel, §3.8) | link „Beförderung" if `promotionFeatureEnabled`                                       |
-| Bewertungsverwaltung, Themenbereiche, Rangvoraussetzungen (`/promotion/manage`, `/promotion/admin/**`)                               | `ADMIN_OR_OFFICER` + `promotionFeatureEnabled`                          | tab „Verwaltung" of Beförderung, if `canManagePromotions`                                       |
 | Organigramm (`/org-chart`)                                                                                                           | `isAuthenticated()`; edits `ADMIN`                                      | always                                                                         |
 | Star-Citizen-Links (`/sc-links`, REQ-UI-025)                                                                                         | `isAuthenticated()`; read-only                                          | always, as a link in the footer                                              |
 | Leitung (`/organisation/leitung`)                                                                                                    | `ADMIN_OR_OFFICER` (page and every write proxy)                         | tab „Leitung" of Organisation, if `canOpenLeitung`                                                              |

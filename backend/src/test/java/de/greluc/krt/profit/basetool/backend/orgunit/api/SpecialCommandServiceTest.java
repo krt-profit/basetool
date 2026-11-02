@@ -50,8 +50,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 /**
  * Mockito unit tests for {@link SpecialCommandService}. Pins the CRUD contract that the admin SK UI
  * relies on: case-insensitive uniqueness on create/update, optimistic-lock failures, soft- delete +
- * activate semantics, NotFoundException propagation, and the {@link SpecialCommand} constructor's
- * enforcement of {@code isPromotionEnabled = false}.
+ * activate semantics and NotFoundException propagation.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandServiceTest {
@@ -161,16 +160,6 @@ class SpecialCommandServiceTest {
             () -> specialCommandService.createSpecialCommand(alpha));
     assertTrue(ex.getMessage().contains("Alpha"));
     verify(specialCommandRepository, never()).save(any());
-  }
-
-  @Test
-  void createSpecialCommand_enforcesPromotionDisabled() {
-    SpecialCommand fresh = new SpecialCommand();
-    fresh.setName("Bravo");
-    fresh.setShorthand("BRV");
-    assertFalse(
-        fresh.isPromotionEnabled(),
-        "SpecialCommand constructor must initialise isPromotionEnabled = false");
   }
 
   @Test

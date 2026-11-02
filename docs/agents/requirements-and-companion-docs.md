@@ -13,8 +13,8 @@ in its [`INDEX.md`](../specs/INDEX.md)), and architecture/design decisions in
   `REQ-<AREA>-NNN` or adapt the existing one(s) it touches. Code and spec move together; a
   behaviour change with no matching spec change is incomplete.
 - **Every change to an audited area keeps its audit log in sync** — the audited areas (Bank,
-  which keeps its own `bank_audit_event` trail, plus the thirteen `AuditDomain` values: Lager, Aufträge,
-  Raffinerie, Mein Inventar, Missionen, Operationen, Rollen, Beförderung, Materialbörse, Hangar,
+  which keeps its own `bank_audit_event` trail, plus the twelve `AuditDomain` values: Lager, Aufträge,
+  Raffinerie, Mein Inventar, Missionen, Operationen, Rollen, Materialbörse, Hangar,
   Blueprints, Verbundene Anwendungen, Bedarf & Spenden) log
   **every** state-mutating
   activity (REQ-AUDIT-001, [`docs/specs/audit.md`](../specs/audit.md)). When you add, change or

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -29,7 +28,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
  * Resolves the caller's UI capability flags once per request and exposes the model attributes the
- * layout menu entries are gated on, including {@code promotionFeatureEnabled}.
+ * layout menu entries are gated on.
  *
  * <p>Fails closed: a backend error turns every flag off. Scoped to {@link UsesLayoutModel}; the
  * flags come from the request's shared {@link LayoutContextLoader} read.
@@ -175,17 +174,6 @@ public class CapabilityFlagsAdvice {
   }
 
   /**
-   * Whether promotion management is offered in the active context.
-   *
-   * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
-   * @return {@code true} iff the backend offers promotion management
-   */
-  @ModelAttribute("canManagePromotions")
-  public boolean canManagePromotions(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
-    return caps != null && caps.canManagePromotions();
-  }
-
-  /**
    * Whether hangar owner details are offered in the active context.
    *
    * @param caps the per-request capability flags from {@link #meCapabilities(HttpServletRequest)}
@@ -218,28 +206,5 @@ public class CapabilityFlagsAdvice {
   public boolean canManageMissionFinance(
       @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
     return caps != null && caps.canManageMissionFinance();
-  }
-
-  /**
-   * Computes whether the promotion subsystem is exposed to the caller, based on the active
-   * squadron.
-   *
-   * <p>An admin without a pin sees the menu; otherwise the active squadron's promotion flag
-   * decides, and a caller without a squadron sees nothing. {@code PromotionPageController} answers
-   * 403 when this is {@code false}.
-   *
-   * @param activeSquadron the resolved active squadron, or {@code null}
-   * @return {@code true} when the promotion menu should be exposed
-   */
-  @ModelAttribute("promotionFeatureEnabled")
-  public boolean promotionFeatureEnabled(
-      @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
-    if (activeSquadron == null) {
-      return authHelper.isAdmin();
-    }
-    if (activeSquadron.isPromotionEnabled() == null) {
-      return true;
-    }
-    return activeSquadron.isPromotionEnabled();
   }
 }

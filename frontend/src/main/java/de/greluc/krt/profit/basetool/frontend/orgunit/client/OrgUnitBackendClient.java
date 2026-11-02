@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.Organisationsleitung
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -252,17 +251,6 @@ public class OrgUnitBackendClient {
       @NotNull UUID id, @NotNull SpecialCommandProfitEligibleToggleRequest request) {
     backendApiClient.patch(
         "/api/v1/special-commands/{id}/profit-eligible", request, Void.class, id);
-  }
-
-  /**
-   * Sets whether the promotion feature is on for a squadron.
-   *
-   * @param id the squadron
-   * @param request the new flag
-   */
-  public void setSquadronPromotionEnabled(
-      @NotNull UUID id, @NotNull SquadronPromotionToggleRequest request) {
-    backendApiClient.patch("/api/v1/squadrons/{id}/promotion-enabled", request, Void.class, id);
   }
 
   /**

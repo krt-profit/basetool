@@ -473,40 +473,6 @@ GET /api/v1/pois | PoiController#getAllPois | pre=hasRole('ADMIN') | url=anyRequ
 GET /api/v1/pois/{id} | PoiController#getPoi | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PATCH /api/v1/pois/{id}/loading-dock | PoiController#setLoadingDockOverride | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/pois/{id}/loading-dock-override | PoiController#clearLoadingDockOverride | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/promotion/categories | PromotionCategoryController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/promotion/categories | PromotionCategoryController#create | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/categories/by-topic/{topicId} | PromotionCategoryController#listByTopic | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/categories/by-topic/{topicId}/all | PromotionCategoryController#listAllByTopic | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/promotion/categories/{id} | PromotionCategoryController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/categories/{id} | PromotionCategoryController#get | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/promotion/categories/{id} | PromotionCategoryController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/eligibility/my | PromotionEligibilityController#myEligibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/eligibility/my/by-ranks | PromotionEligibilityController#myEligibilityForRanks | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/eligibility/user/{userId} | PromotionEligibilityController#eligibilityForUser | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
-GET /api/v1/promotion/evaluations/all | MemberEvaluationController#listAll | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/evaluations/members | MemberEvaluationController#listEvaluatableMembers | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
-GET /api/v1/promotion/evaluations/my | MemberEvaluationController#listMy | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/evaluations/my/paged | MemberEvaluationController#listMyPaged | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/promotion/evaluations/user/{userId}/category/{categoryId} | MemberEvaluationController#upsert | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/promotion/evaluations/{id} | MemberEvaluationController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/level-contents | PromotionLevelContentController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/promotion/level-contents | PromotionLevelContentController#create | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/level-contents/by-category/{categoryId} | PromotionLevelContentController#listByCategory | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/promotion/level-contents/{id} | PromotionLevelContentController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/level-contents/{id} | PromotionLevelContentController#get | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/promotion/level-contents/{id} | PromotionLevelContentController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/rank-requirements | RankRequirementController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/promotion/rank-requirements | RankRequirementController#create | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/rank-requirements/by-ranks | RankRequirementController#listByRanks | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/promotion/rank-requirements/{id} | RankRequirementController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/rank-requirements/{id} | RankRequirementController#get | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/promotion/rank-requirements/{id} | RankRequirementController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/topics | PromotionTopicController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/promotion/topics | PromotionTopicController#create | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/topics/all | PromotionTopicController#listAll | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/promotion/topics/{id} | PromotionTopicController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/topics/{id} | PromotionTopicController#get | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/promotion/topics/{id} | PromotionTopicController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/purchasing/admin/funding-accounts | PurchasingAdminController#fundingAccounts | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/purchasing/admin/risk-classes | PurchasingAdminController#riskClasses | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/purchasing/admin/risk-classes | PurchasingAdminController#updateRiskClasses | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -592,7 +558,6 @@ PUT /api/v1/squadrons/{id} | SquadronController#updateSquadron | pre=hasRole('AD
 POST /api/v1/squadrons/{id}/activate | SquadronController#activateSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PATCH /api/v1/squadrons/{id}/members/{userId} | SquadronMembershipController#patchFlags | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PATCH /api/v1/squadrons/{id}/profit-eligible | SquadronController#setProfitEligible | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-PATCH /api/v1/squadrons/{id}/promotion-enabled | SquadronController#setPromotionEnabled | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/squadrons/{squadronId}/kommando-groups | KommandoGroupController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/squadrons/{squadronId}/kommando-groups | KommandoGroupController#create | pre=hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroups(#squadronId, authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/squadrons/{squadronId}/kommando-groups/{groupId} | KommandoGroupController#delete | pre=hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId, authentication) | url=anyRequest -> authenticated
@@ -686,22 +651,5 @@ GET /v3/api-docs | OpenApiWebMvcResource#openapiJson | pre=none | url=/v3/api-do
 GET /v3/api-docs.yaml | OpenApiWebMvcResource#openapiYaml | pre=none | url=/v3/api-docs* -> hasAnyAuthority(ROLE_ADMIN)
 
 [service-gates]
-MemberEvaluationService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-MemberEvaluationService#listAll(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-MemberEvaluationService#listEvaluatableMembers(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-MemberEvaluationService#upsert(3) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
 MissionFinanceEntryService#deleteEntry(2) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
 MissionFinanceEntryService#updateEntry(3) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
-PromotionCategoryService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionCategoryService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionCategoryService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionEligibilityService#evaluateAllForUserAsAdmin(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionLevelContentService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionLevelContentService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionLevelContentService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionTopicService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionTopicService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-PromotionTopicService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-RankRequirementService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-RankRequirementService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
-RankRequirementService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()

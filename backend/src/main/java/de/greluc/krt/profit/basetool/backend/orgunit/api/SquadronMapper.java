@@ -29,13 +29,11 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class)
 public interface SquadronMapper {
   /**
-   * Maps a {@link Squadron} to its full DTO, including the {@code isPromotionEnabled} and {@code
-   * isProfitEligible} flags.
+   * Maps a {@link Squadron} to its full DTO, including the {@code isProfitEligible} flag.
    *
    * @param entity the squadron to project; {@code null} maps to {@code null}
    * @return the squadron DTO
    */
-  @Mapping(target = "isPromotionEnabled", source = "promotionEnabled")
   @Mapping(target = "isProfitEligible", source = "profitEligible")
   SquadronDto toDto(Squadron entity);
 
@@ -67,12 +65,11 @@ public interface SquadronMapper {
   /**
    * Builds a new {@link Squadron} entity from the DTO.
    *
-   * <p>Ignores timestamps, the {@code promotionEnabled} and {@code profitEligible} flags (changed
-   * only through their dedicated endpoints) and the {@code parent} hierarchy link.
+   * <p>Ignores timestamps, the {@code profitEligible} flag (changed only through its dedicated
+   * endpoints) and the {@code parent} hierarchy link.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  @Mapping(target = "promotionEnabled", ignore = true)
   @Mapping(target = "profitEligible", ignore = true)
   @Mapping(target = "parent", ignore = true)
   @Mapping(target = "department", ignore = true)

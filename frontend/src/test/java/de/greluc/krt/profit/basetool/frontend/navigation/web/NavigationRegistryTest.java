@@ -136,20 +136,6 @@ class NavigationRegistryTest {
         .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
   }
 
-  /** Covered entries of a tab are registered entries. */
-  @Test
-  void coveredEntriesAreRegistered() {
-    List<String> covered =
-        registry.pageTabs().stream()
-            .flatMap(tabs -> tabs.covered().values().stream())
-            .flatMap(List::stream)
-            .toList();
-
-    assertThat(covered)
-        .isNotEmpty()
-        .allSatisfy(key -> assertThat(registry.entry(key)).as(key).isPresent());
-  }
-
   /** The member default is four task groups plus bank and the quick-access-only resources. */
   @Test
   void theMemberDefaultIsFourTaskGroupsAndBank() {
@@ -173,7 +159,6 @@ class NavigationRegistryTest {
             "/supply/needs",
             "/purchasing/deals",
             "/org-chart",
-            "/promotion/overview",
             "/bank");
   }
 
@@ -205,11 +190,6 @@ class NavigationRegistryTest {
             "/org-chart",
             "/organisation/leitung",
             "/org-unit-bank",
-            "/promotion/overview",
-            "/promotion/my-evaluations",
-            "/promotion/manage",
-            "/promotion/admin/topics",
-            "/promotion/admin/rank-requirements",
             "/bank",
             "/bank/manage",
             "/bank/grants",
