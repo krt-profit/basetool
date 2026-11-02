@@ -528,6 +528,11 @@ order / mission chips, the rest chip, the book-out / Umbuchen and handover deduc
 their hints — renders **whole (no decimals) for a `PIECE` material** and to three decimals only for
 `SCU`.
 
+A mission slice whose mission the caller may not read (the mission detail rule, REQ-MISSION-008)
+carries only `missionId` and `amount`; name and planned start are `null` and the chip shows the
+„unknown mission" label. The per-order linked-stock reads of REQ-ORDERS-029 apply this to every
+caller.
+
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
 `isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)` — the same owner-scoped

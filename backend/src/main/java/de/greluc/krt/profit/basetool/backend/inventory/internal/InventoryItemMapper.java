@@ -106,6 +106,7 @@ public abstract class InventoryItemMapper {
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(inventoryItem))")
   @Mapping(target = "withVersion", ignore = true)
+  @Mapping(target = "withMissionAllocations", ignore = true)
   public abstract InventoryItemDto toDto(InventoryItem inventoryItem);
 
   /**
