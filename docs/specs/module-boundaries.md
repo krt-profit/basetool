@@ -37,8 +37,7 @@ A nested, local or anonymous class belongs to its top-level class, and a generat
 `XMapperImpl` to the `@Mapper` type `XMapper` it implements. The rules are a faithful port of the
 audit's classification (`docs/archive/domain-modularisation-audit-2026-09/scripts/10-backend-domains-classify.py`)
 with the behaviour-free re-homings of plan §7.3 applied (the leadership writes into `orgunit` and
-the Leitung view into `leadership` — the module was named `orgchart` until the org chart was removed
-(ADR-0329) —,
+the Leitung view into `leadership`,
 the access core into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
 `HandleAnonymisation` into `kernel`, `PayoutPreference` into `identity`, the composition root into
 `app`). Changing a class's target module is a reviewed edit of this file. Once a module's package
