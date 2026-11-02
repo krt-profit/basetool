@@ -28,8 +28,12 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOption
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess.PurchasingTabGrants;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess.SupplyTabGrants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -77,6 +81,12 @@ public class MeController {
 
   /** Answers whether the caller holds a job-order assignee entry. */
   private final JobOrderAssigneeLookup jobOrderAssigneeLookup;
+
+  /** Decides the supply tabs the caller may open. */
+  private final SupplyTabAccess supplyTabAccess;
+
+  /** Decides the purchasing tabs the caller may open. */
+  private final PurchasingTabAccess purchasingTabAccess;
 
   /**
    * Returns the org-unit context applied to staffel-scoped queries for this request.
@@ -127,6 +137,8 @@ public class MeController {
    */
   private @NotNull CapabilitiesResponse capabilities() {
     boolean officerHere = requestScopeResolver.canActAsOfficerInActiveContext();
+    SupplyTabGrants supplyTabs = supplyTabAccess.current();
+    PurchasingTabGrants purchasingTabs = purchasingTabAccess.current();
     return new CapabilitiesResponse(
         requestScopeResolver.canAccessBlueprintOverview(),
         requestScopeResolver.canViewJobOrders(),
@@ -143,7 +155,12 @@ public class MeController {
         officerHere,
         officerHere,
         officerHere,
-        accessGateService.canActAsOfficerAnywhere());
+        accessGateService.canActAsOfficerAnywhere(),
+        supplyTabs.incoming(),
+        supplyTabs.stats(),
+        purchasingTabs.partners(),
+        purchasingTabs.delegates(),
+        purchasingTabs.report());
   }
 
   /**
@@ -272,6 +289,19 @@ public class MeController {
    *     active context
    * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
    *     whatever unit is pinned; {@code true} for an admin
+   * @param canViewSupplyIncoming whether „Eingehende Spenden" is offered: the supply surface is on
+   *     and the caller manages, or as an admin reaches, an active unit that accepts donations;
+   *     whatever unit is pinned
+   * @param canViewSupplyStats whether the donation statistics are offered: the supply surface is on
+   *     and the caller belongs to the governing leadership or manages at least one unit; whatever
+   *     unit is pinned
+   * @param canViewPurchasingPartners whether the partners are offered: the purchasing surface is on
+   *     and the caller is an active trade delegate or the governing leadership
+   * @param canViewPurchasingDelegates whether the trade delegates are offered: the purchasing
+   *     surface is on and the caller is the governing leadership
+   * @param canViewPurchasingReport whether the purchasing report is offered: the purchasing surface
+   *     is on and the caller is a delegate, the governing leadership, bank staff or the lead or a
+   *     Logistician of a unit
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -289,7 +319,12 @@ public class MeController {
       boolean canSeeHangarOwnerDetails,
       boolean canManageJobOrders,
       boolean canManageMissionFinance,
-      boolean canActAsOfficerAnywhere) {}
+      boolean canActAsOfficerAnywhere,
+      boolean canViewSupplyIncoming,
+      boolean canViewSupplyStats,
+      boolean canViewPurchasingPartners,
+      boolean canViewPurchasingDelegates,
+      boolean canViewPurchasingReport) {}
 
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.

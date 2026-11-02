@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,11 +38,16 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationServic
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess.PurchasingTabGrants;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess.SupplyTabGrants;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -67,7 +73,69 @@ class MeControllerTest {
 
   @Mock private JobOrderAssigneeLookup jobOrderAssigneeLookup;
 
+  @Mock private SupplyTabAccess supplyTabAccess;
+
+  @Mock private PurchasingTabAccess purchasingTabAccess;
+
   @InjectMocks private MeController controller;
+
+  @BeforeEach
+  void noTabsByDefault() {
+    lenient().when(supplyTabAccess.current()).thenReturn(SupplyTabGrants.NONE);
+    lenient().when(purchasingTabAccess.current()).thenReturn(PurchasingTabGrants.NONE);
+  }
+
+  @Test
+  void getCapabilities_supplyTabFlagsAreTheSupplyModulesAnswer() {
+    when(supplyTabAccess.current()).thenReturn(new SupplyTabGrants(true, false));
+    MeController.CapabilitiesResponse incomingOnly = controller.getCapabilities();
+    assertTrue(incomingOnly.canViewSupplyIncoming());
+    assertFalse(incomingOnly.canViewSupplyStats());
+
+    when(supplyTabAccess.current()).thenReturn(new SupplyTabGrants(false, true));
+    MeController.CapabilitiesResponse statsOnly = controller.getCapabilities();
+    assertFalse(statsOnly.canViewSupplyIncoming());
+    assertTrue(statsOnly.canViewSupplyStats());
+  }
+
+  @Test
+  void getCapabilities_purchasingTabFlagsAreThePurchasingModulesAnswer() {
+    when(purchasingTabAccess.current()).thenReturn(new PurchasingTabGrants(true, false, true));
+    MeController.CapabilitiesResponse delegate = controller.getCapabilities();
+    assertTrue(delegate.canViewPurchasingPartners());
+    assertFalse(delegate.canViewPurchasingDelegates());
+    assertTrue(delegate.canViewPurchasingReport());
+
+    when(purchasingTabAccess.current()).thenReturn(new PurchasingTabGrants(false, true, false));
+    MeController.CapabilitiesResponse governing = controller.getCapabilities();
+    assertFalse(governing.canViewPurchasingPartners());
+    assertTrue(governing.canViewPurchasingDelegates());
+    assertFalse(governing.canViewPurchasingReport());
+  }
+
+  @Test
+  void getCapabilities_noTabWithoutTheirRights() {
+    MeController.CapabilitiesResponse member = controller.getCapabilities();
+
+    assertFalse(member.canViewSupplyIncoming());
+    assertFalse(member.canViewSupplyStats());
+    assertFalse(member.canViewPurchasingPartners());
+    assertFalse(member.canViewPurchasingDelegates());
+    assertFalse(member.canViewPurchasingReport());
+  }
+
+  @Test
+  void getLayout_carriesTheSameTabFlags() {
+    when(supplyTabAccess.current()).thenReturn(new SupplyTabGrants(false, true));
+    when(purchasingTabAccess.current()).thenReturn(new PurchasingTabGrants(false, false, true));
+
+    MeController.CapabilitiesResponse layout =
+        controller.getLayout(null, UUID.randomUUID()).capabilities();
+
+    assertTrue(layout.canViewSupplyStats());
+    assertTrue(layout.canViewPurchasingReport());
+    assertFalse(layout.canViewPurchasingPartners());
+  }
 
   @Test
   void getCapabilities_assignedJobOrdersFlagFollowsTheCallersEntries() {

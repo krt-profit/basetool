@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.supply.web;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.DonationDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.MyDonationStatsDto;
@@ -35,11 +35,11 @@ import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplySettingsDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyStatsDto;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -61,7 +61,6 @@ import org.springframework.web.server.ResponseStatusException;
 @UsesLayoutModel
 @RequestMapping
 @RequiredArgsConstructor
-@Slf4j
 @PreAuthorize("isAuthenticated()")
 public class SupplyPageController {
 
@@ -83,21 +82,18 @@ public class SupplyPageController {
   private final SupplyBackendClient supplyClient;
   private final SupplyFeatureState featureState;
   private final QualityTierCatalog qualityTierCatalog;
-  private final FrontendAuthHelperService authHelper;
+  private final LayoutContextLoader layoutContextLoader;
 
   /**
-   * Decides which of the optional tabs the supply pages show: the incoming donations for the
-   * managers of a receiving unit, the statistics for them and for an admin.
+   * Decides which of the optional tabs the supply pages show, from the backend's tab flags of the
+   * request's layout read.
    *
-   * @return the tabs to show; none while the backend cannot be reached
+   * @param request the current request, which carries the memoised layout read
+   * @return the tabs to show; none after a failed layout read
    */
   @ModelAttribute("supplyTabs")
-  public @NotNull SupplyTabs supplyTabs() {
-    return SectionFallback.load(
-        log,
-        "supply-tabs",
-        () -> SupplyTabs.of(orEmpty(supplyClient.units()), authHelper.isAdmin()),
-        new SupplyTabs(false, false));
+  public @NotNull SupplyTabs supplyTabs(@NotNull HttpServletRequest request) {
+    return SupplyTabs.of(layoutContextLoader.capabilities(request));
   }
 
   /**
@@ -109,17 +105,17 @@ public class SupplyPageController {
   public record SupplyTabs(boolean incoming, boolean stats) {
 
     /**
-     * Derives the tabs from the units the caller can see.
+     * Reads the tabs from the backend's tab flags (REQ-UI-026), so the tab bar, the quick access
+     * and the navigation offer the same tabs.
      *
-     * @param units the supply units as the backend answers them for the caller
-     * @param admin whether the caller is an administrator, who always sees the statistics
-     * @return the incoming tab for a manager of a receiving unit, the statistics for any manager
-     *     and for an administrator
+     * @param capabilities the caller's capability flags, or {@code null} when none were read
+     * @return the incoming tab for a manager of an active receiving unit, the statistics for the
+     *     governing leadership and any unit manager; neither without flags
      */
-    public static @NotNull SupplyTabs of(@NotNull List<SupplyUnitDto> units, boolean admin) {
-      boolean incoming = units.stream().anyMatch(u -> u.canManage() && u.acceptsDonations());
-      boolean managesAny = units.stream().anyMatch(SupplyUnitDto::canManage);
-      return new SupplyTabs(incoming, incoming || managesAny || admin);
+    public static @NotNull SupplyTabs of(@Nullable CapabilitiesResponse capabilities) {
+      return capabilities == null
+          ? new SupplyTabs(false, false)
+          : new SupplyTabs(capabilities.canViewSupplyIncoming(), capabilities.canViewSupplyStats());
     }
   }
 

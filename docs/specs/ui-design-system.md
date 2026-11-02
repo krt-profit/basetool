@@ -1681,13 +1681,25 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
 - **The quick access** (`Strg`/`⌘` + `K` from anywhere, inputs included; the header trigger; the
   phone's search button) is a dialog of the one dialog shape (REQ-UI-013, `#nav-palette`). Its pages
   are the menu's links, the legal links, and sub-pages the menu reaches only as tabs: „Mein Lager",
-  „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and —
-  loaded on the first opening — „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and
-  „Ankauf-Partner", „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members
-  whose tab bar shows them; those five tabs are registry entries (`supply.incoming`,
-  `supply.stats`, `purchasing.partners`, `purchasing.delegates`, `purchasing.report`) and the
-  on-demand answer carries each tab's entry key, so they can be starred, chosen as phone slots and
-  start pages like every other tab. Empty, it offers up to four recently visited pages (`localStorage`
+  „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and
+  „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and „Ankauf-Partner",
+  „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members who may open them.
+  Those five tabs are registry entries (`supply.incoming`, `supply.stats`, `purchasing.partners`,
+  `purchasing.delegates`, `purchasing.report`) rendered into the index like every other tab, so
+  they can be starred, chosen as phone slots and start pages — but only by a member who may open
+  them. Each entry requires its surface switch and its own capability flag of the layout read
+  (ADR-0329):
+
+  | Entry | Capability flag | True when the surface is on and the caller |
+  |---|---|---|
+  | `supply.incoming` | `canViewSupplyIncoming` | manages (lead or Logistician), or as an admin reaches, an active unit that accepts donations |
+  | `supply.stats` | `canViewSupplyStats` | belongs to the governing leadership or manages at least one unit (the gate of the statistics read, REQ-SUP-013) |
+  | `purchasing.partners` | `canViewPurchasingPartners` | is an active trade delegate or the governing leadership |
+  | `purchasing.delegates` | `canViewPurchasingDelegates` | is the governing leadership |
+  | `purchasing.report` | `canViewPurchasingReport` | is a delegate, the governing leadership, bank staff or a unit manager (REQ-PUR-023) |
+
+  The tab bars of „Bedarf & Spenden" and „Ankauf" read the same flags, so the navigation, the tab
+  bars and the quick access offer the same tabs. Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
   anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
@@ -1703,10 +1715,9 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   (`data-nav-keywords`, `palette.keywords.*`) that match like the label.
 - **Rights stay on the server.** The quick access builds its index from links the server rendered
   for this member — the drawer's (`data-nav-group` / `data-nav-icon` on each group) and its own
-  hidden source lists, each under the same condition as the button or tab it mirrors. Sub-pages
-  whose condition needs a backend read come from `GET /quick-access/entries`, which asks each
-  domain's `QuickAccessContributor` and fails closed (ADR-0282). A recently visited page that is no
-  longer offered is not shown.
+  hidden source lists, each under the same condition as the button or tab it mirrors; a tab whose
+  condition needs a backend decision is gated on a capability flag of the layout read (ADR-0329),
+  which fails closed. A recently visited page that is no longer offered is not shown.
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
   safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
   default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
@@ -1744,18 +1755,25 @@ and actions per role, no „Rechtliches" group, nothing of it for a signed-out v
 their filter query; in-place requests and sub-paths are not redirected) ·
 `NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
 `NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
-`QuickAccessControllerTest`, `SupplyQuickAccessContributorTest`,
-`PurchasingQuickAccessContributorTest` (the on-demand sub-pages follow the tabs and fail closed) ·
+`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeControllerTest` (each tab flag
+positive and negative, none while its surface is off) · `MeLayoutSingleTransactionTest` (the tab
+flags add no statement per unit) · `NavigationAdvicePromotionFlagsTest`, `NavigationFlagTest` (the
+flags and their user-wide rule) · `NavigationDataTabGateMvcTest` (the start-page select and the
+favourites offer a tab only with its flag, the quick access indexes exactly the granted tabs, a
+lost one is deleted while its surface is on) · `DtoOpenApiContractTest`,
+`DtoMirrorConsistencyTest` (the capability mirror matches the backend schema) ·
+`NavigationDataTabGateE2eTest` (a plain member is not offered „Bericht" as a start page, a trade
+delegate is) ·
 `:frontend:testSearchJs` (folding and hit ranges) · `NavigationE2eTest` (filter and hand-over,
 `Ctrl+K`, tolerant and search-term matching, the create-mission and administration actions, admin
 mode, the phone tab bar and sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
 `TouchClassLayoutE2eTest` (`main` reserves the tab bar; header, footer and tab bar within the
 chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
 `kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
-`static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`, `shell/web/QuickAccessController.java`,
-`kernel/layout/QuickAccessContributor.java`, `kernel/fragments/nav-entries.html`,
+`static/js/kernel/krt-palette.js`, `static/js/kernel/krt-search.js`,
+`kernel/model/CapabilitiesResponse.java`, `kernel/fragments/nav-entries.html`,
 `navigation/web/NavigationRegistry.java`, `navigation/web/NavigationAdvice.java` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019,
-ADR-0282
+ADR-0282, ADR-0329
 
 #### Amendment (ADR-0297)
 
@@ -2414,6 +2432,8 @@ optimistic-lock version, so an edit in one never 409s another:
   tied to the pinned unit (the Leitung entry) counts as lost user-wide only when the caller holds
   officer reach in no unit (`canActAsOfficerAnywhere`); a right that
   does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
+  five supply and purchasing tabs of REQ-UI-026 are lost when their flag is off while their
+  surface is on; the
   switches of the installation and the page, and a capability read that failed, delete nothing.
   The stored start pages of both modes are checked like every other stored key. Dashboard widgets
   follow the same classification: an instance whose gate (roles and flags) the member lost user-wide
@@ -2469,7 +2489,7 @@ REQ-UI-017, REQ-OBS-011, REQ-SEC-046, REQ-SEC-058, REQ-DATA-021, ADR-0297, ADR-0
 Extends the quick access of REQ-UI-026; its dialog, matching, keyboard and rights rules stay.
 
 **Entity search.** `GET /quick-access/search?q=` asks one `QuickAccessSearchContributor` per type
-(`results(query, limit)`, the sibling seam of `QuickAccessContributor`, ADR-0282) in parallel;
+(`results(query, limit)`, ADR-0297) in parallel;
 each type is scoped by its domain's rules and fails closed on its own. Each contributor reads the
 backend read that backs the page its hits open (missions and operations over every period,
 materials from the visible catalogue, blueprints from the availability overview, ship types from
@@ -2585,7 +2605,7 @@ filtered while their hits and actions stay, a page-contributed action) · `Quick
 `kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
 `static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
 `static/js/kernel/krt-palette.js` (wiring) and its modules `krt-palette-{actions,entity-search,groups,history,index,items,view}.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
-ADR-0282, ADR-0297
+ADR-0297, ADR-0329
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 

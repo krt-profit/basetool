@@ -1311,7 +1311,9 @@ consumer instead of reusing the heaviest projection that happens to contain the 
   transaction, through the same resolvers as `/me/active-org-unit`, `/me/org-units`,
   `/me/capabilities` and `/notifications/unread-count` — so a client may use either shape and gets
   the same answers. It answers all four parts or fails as a whole; ADR-0151's fail-closed handling of
-  the capabilities stays the client's.
+  the capabilities stays the client's. The capabilities include the five supply and purchasing tab
+  flags of REQ-UI-026 (ADR-0329); they read a few rows and add no statement per org
+  unit.
 
 Both serve the web frontend over the internal hop; since the API vhost is gone (ADR-0268) no other
 client reaches them.
@@ -1329,6 +1331,8 @@ client reaches them.
 - [x] The frontend proxies forward to them (`UserProxyControllerTest`).
 - [x] `/me/layout` answers the four parts from the same resolvers (`MeControllerTest`) in exactly one
   transaction, where the separate calls open several (`MeLayoutSingleTransactionTest`).
+- [x] The tab flags cost the same statements for one org unit as for four
+  (`MeLayoutSingleTransactionTest`).
 - [x] The web layout uses `/me/layout` instead of the separate calls — the frontend half of
   BE-PERF-07 / FE-PERF-01, done 2026-09-23 (`LayoutContextLoader`, REQ-FE-020).
 

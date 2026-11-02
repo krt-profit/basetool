@@ -147,9 +147,24 @@ class NavigationCurrentEntryTest {
   @Test
   @DisplayName("the supply and purchasing tabs with a data-dependent audience are favouritable")
   void theRemainingTabsAreStarrable() {
-    NavigationMenu supply = menu(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.SUPPLY));
-    NavigationMenu purchasing = menu(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.PURCHASING));
+    NavigationMenu supply =
+        menu(
+            Set.of("KRT_MEMBER"),
+            Set.of(
+                NavigationFlag.SUPPLY,
+                NavigationFlag.SUPPLY_INCOMING,
+                NavigationFlag.SUPPLY_STATS));
+    NavigationMenu purchasing =
+        menu(
+            Set.of("KRT_MEMBER"),
+            Set.of(
+                NavigationFlag.PURCHASING,
+                NavigationFlag.PURCHASING_PARTNERS,
+                NavigationFlag.PURCHASING_DELEGATES,
+                NavigationFlag.PURCHASING_REPORT));
+    NavigationMenu supplyWithoutRights = menu(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.SUPPLY));
 
+    assertThat(current(supplyWithoutRights, "/supply/stats")).isNull();
     assertThat(current(supply, "/supply/donations/incoming")).isEqualTo("supply.incoming");
     assertThat(current(supply, "/supply/stats")).isEqualTo("supply.stats");
     assertThat(current(purchasing, "/purchasing/partners")).isEqualTo("purchasing.partners");

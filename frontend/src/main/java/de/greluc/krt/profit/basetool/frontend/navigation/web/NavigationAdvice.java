@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
@@ -104,6 +104,11 @@ public class NavigationAdvice {
       addIf(flags, capabilities.isLogisticianOrAbove(), NavigationFlag.LOGISTICIAN_HERE);
       addIf(flags, capabilities.canActAsOfficerAnywhere(), NavigationFlag.OFFICER_ANYWHERE);
       addIf(flags, capabilities.canOpenLeitung(), NavigationFlag.OPEN_LEITUNG);
+      addIf(flags, capabilities.canViewSupplyIncoming(), NavigationFlag.SUPPLY_INCOMING);
+      addIf(flags, capabilities.canViewSupplyStats(), NavigationFlag.SUPPLY_STATS);
+      addIf(flags, capabilities.canViewPurchasingPartners(), NavigationFlag.PURCHASING_PARTNERS);
+      addIf(flags, capabilities.canViewPurchasingDelegates(), NavigationFlag.PURCHASING_DELEGATES);
+      addIf(flags, capabilities.canViewPurchasingReport(), NavigationFlag.PURCHASING_REPORT);
     }
     addIf(flags, Boolean.TRUE.equals(supplyEnabled), NavigationFlag.SUPPLY);
     addIf(flags, Boolean.TRUE.equals(purchasingEnabled), NavigationFlag.PURCHASING);

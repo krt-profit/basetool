@@ -283,11 +283,11 @@ Two binding rules shape every UI change:
   `kernel/fragments/header.html` and `kernel/fragments/sidebar.html`; the drawer is also the phone menu sheet, and
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it and into the
   palette's own source lists, so the server alone decides which pages a member is offered; tabs
-  whose visibility needs a backend read come from domain `QuickAccessContributor`s through
-  `GET /quick-access/entries` on the first opening, and entities from domain
+  whose visibility needs a backend decision are gated on capability flags of the layout read
+  (ADR-0329), and entities come from domain
   `QuickAccessSearchContributor`s through `GET /quick-access/search`, asked in parallel, each scoped
   by the backend list its page uses and failing closed on its own; the term stays a query parameter,
-  never a log line, MDC field or label (REQ-UI-026, REQ-UI-033, ADR-0240, ADR-0282, ADR-0297,
+  never a log line, MDC field or label (REQ-UI-026, REQ-UI-033, ADR-0240, ADR-0297, ADR-0329,
   `NavigationRenderMvcTest`, `NavigationE2eTest`, `QuickAccessSearchE2eTest`). The drawer, the phone tab bar and the quick
   access's own pages and actions are rendered from one entry registry (`navigation.web
   .NavigationRegistry`), every link under its stable entry key (`data-entry-key`), so a change of

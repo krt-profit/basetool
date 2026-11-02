@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,8 @@ public class CapabilityFlagsAdvice {
   /**
    * Resolves the caller's UI capability flags once per request: all role gates on for admins, all
    * off for anonymous callers, otherwise from {@link LayoutContextLoader}. The server switch {@code
-   * canMarkStolen} always comes from the backend, admins included. Fails closed to all off.
+   * canMarkStolen} and the supply and purchasing tab flags always come from the backend, admins
+   * included. Fails closed to all off.
    *
    * @param request the current request, through which the layout context is memoised
    * @return the caller's capability flags; never {@code null}
@@ -56,8 +58,7 @@ public class CapabilityFlagsAdvice {
       return CapabilitiesResponse.NONE;
     }
     if (authHelper.isAdmin()) {
-      return CapabilitiesResponse.admin(
-          layoutContextLoader.load(request).capabilities().canMarkStolen());
+      return CapabilitiesResponse.admin(layoutContextLoader.load(request).capabilities());
     }
     return layoutContextLoader.load(request).capabilities();
   }
@@ -205,64 +206,5 @@ public class CapabilityFlagsAdvice {
   public boolean canManageMissionFinance(
       @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
     return caps != null && caps.canManageMissionFinance();
-  }
-
-  /**
-   * Wire-shape mirror of the backend's {@code MeController.CapabilitiesResponse}.
-   *
-   * @param canSeeBlueprintOverview whether the caller may open the blueprint availability overview
-   * @param canViewJobOrders whether the caller may enter the Job-Order area
-   * @param canViewOwnJobOrders whether the caller may view their own org unit's orders
-   *     (REQ-ORDERS-023)
-   * @param canViewAssignedJobOrders whether the caller holds an assignee entry on at least one
-   *     order (REQ-ORDERS-040)
-   * @param isLogisticianOrAbove whether the caller holds a Logistician grant in the active context:
-   *     in the pinned unit, or in any unit when none is pinned
-   * @param isMissionManagerOrAbove whether the caller holds a Mission Manager grant in the active
-   *     context: in the pinned unit, or in any unit when none is pinned
-   * @param canMarkStolen whether stock may be booked in as, marked or unmarked „gestohlen"
-   *     (REQ-INV-053); a server switch, the same for every caller
-   * @param hasOfficerReach whether the caller holds officer reach in the active context
-   * @param canOpenLeitung whether the Leitung page is offered in the active context
-   * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
-   * @param canManageJobOrders whether the officer job-order writes are offered in the active
-   *     context
-   * @param canManageMissionFinance whether mission finance and owner change are offered in the
-   *     active context
-   * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
-   *     whatever unit is pinned
-   */
-  public record CapabilitiesResponse(
-      boolean canSeeBlueprintOverview,
-      boolean canViewJobOrders,
-      boolean canViewOwnJobOrders,
-      boolean canViewAssignedJobOrders,
-      boolean isLogisticianOrAbove,
-      boolean isMissionManagerOrAbove,
-      boolean canMarkStolen,
-      boolean hasOfficerReach,
-      boolean canOpenLeitung,
-      boolean canSeeHangarOwnerDetails,
-      boolean canManageJobOrders,
-      boolean canManageMissionFinance,
-      boolean canActAsOfficerAnywhere) {
-
-    /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
-    public static final CapabilitiesResponse NONE =
-        new CapabilitiesResponse(
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            false);
-
-    /**
-     * Every role-derived capability on, as an admin passes each gate; the server switch stays the
-     * backend's.
-     *
-     * @param canMarkStolen the backend's „gestohlen" switch
-     * @return the admin's capability flags
-     */
-    public static CapabilitiesResponse admin(boolean canMarkStolen) {
-      return new CapabilitiesResponse(
-          true, true, true, true, true, true, canMarkStolen, true, true, true, true, true, true);
-    }
   }
 }

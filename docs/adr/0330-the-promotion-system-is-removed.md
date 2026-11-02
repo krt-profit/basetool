@@ -1,4 +1,4 @@
-# ADR-0329 — The promotion system is removed
+# ADR-0330 — The promotion system is removed
 
 - **Status:** Accepted
 - **Date:** 2026-11-02

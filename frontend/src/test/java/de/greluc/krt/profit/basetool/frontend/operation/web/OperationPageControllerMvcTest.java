@@ -103,8 +103,7 @@ class OperationPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(
             "/api/v1/me/capabilities",
-            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
-                .CapabilitiesResponse.class))
+            de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse.class))
         .thenReturn(
             de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager());
   }
@@ -365,11 +364,8 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(
             "/api/v1/me/capabilities",
-            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
-                .CapabilitiesResponse.class))
-        .thenReturn(
-            de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice
-                .CapabilitiesResponse.NONE);
+            de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse.class))
+        .thenReturn(de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse.NONE);
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L, null, null, null));
 

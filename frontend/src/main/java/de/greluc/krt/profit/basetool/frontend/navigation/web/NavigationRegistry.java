@@ -29,7 +29,12 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_DELEGATES;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_PARTNERS;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_REPORT;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY_INCOMING;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.SUPPLY_STATS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.EXTERNAL;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.LABEL_WITH_ICON;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationTrait.NOT_INDEXED;
@@ -548,32 +553,32 @@ public class NavigationRegistry {
                 "/supply/donations/incoming",
                 "supply.tab.incoming",
                 "supplyIncoming")
-            .gate(NavigationGate.requires(SUPPLY)),
+            .gate(NavigationGate.requires(SUPPLY, SUPPLY_INCOMING)),
         dataTab("supply.stats", "/supply/stats", "supply.tab.stats", "supplyStats")
-            .gate(NavigationGate.requires(SUPPLY)),
+            .gate(NavigationGate.requires(SUPPLY, SUPPLY_STATS)),
         dataTab(
                 "purchasing.partners",
                 "/purchasing/partners",
                 "purchasing.tab.partners",
                 "purchasingPartners")
-            .gate(NavigationGate.requires(PURCHASING)),
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_PARTNERS)),
         dataTab(
                 "purchasing.delegates",
                 "/purchasing/delegates",
                 "purchasing.tab.delegates",
                 "purchasingDelegates")
-            .gate(NavigationGate.requires(PURCHASING)),
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_DELEGATES)),
         dataTab(
                 "purchasing.report",
                 "/purchasing/report",
                 "purchasing.tab.report",
                 "purchasingReport")
-            .gate(NavigationGate.requires(PURCHASING)));
+            .gate(NavigationGate.requires(PURCHASING, PURCHASING_REPORT)));
   }
 
   /**
-   * A tab of the supply or purchasing page that only some callers see, offered by the on-demand
-   * quick access rather than by the rendered index (ADR-0282).
+   * A tab of the supply or purchasing page that only some callers see; its gate needs the caller's
+   * tab flag of the layout read (REQ-UI-026).
    */
   @NotNull
   private static NavigationEntry dataTab(
@@ -584,7 +589,7 @@ public class NavigationRegistry {
     return of(key, href, "palette.page." + term)
         .tab(tabLabelKey)
         .keywords("palette.keywords." + term)
-        .with(PALETTE_ONLY, NOT_INDEXED);
+        .with(PALETTE_ONLY);
   }
 
   @NotNull
