@@ -1271,7 +1271,7 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   whose holder loses it later stays in the org chart and confers nothing (REQ-ORG-029).
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Where it is read.** The scope kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
+**Where it is read.** The scope kernel answers `OwnerScopeService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. The promotion services and the member-rank range read the reach too, narrowed to the units with promotion enabled (REQ-PROMO-004). A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
 
 **Enforced by:** `OwnerScopeServiceTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
@@ -3834,7 +3834,9 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 tells a lost seat from a pin outside it), `hasOfficerReach`, `canOpenLeitung`,
 `canManagePromotions`, `canSeeHangarOwnerDetails`, `canManageJobOrders` and
 `canManageMissionFinance`, each the answer of `OwnerScopeService#canActAsOfficerInActiveContext()`
-(and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
+(`canManagePromotions` counts only the reached units with promotion enabled, REQ-PROMO-004, and two
+flags beside it, `canManagePromotionsAnywhere` and `canUsePromotionAnywhere`, ignore the pin;
+and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
 the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
 pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
 (fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on

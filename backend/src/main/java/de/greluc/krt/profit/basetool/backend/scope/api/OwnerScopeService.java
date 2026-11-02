@@ -232,7 +232,6 @@ public class OwnerScopeService implements SquadronVisibility {
    * @return the readable org-unit ids, empty without reach, {@code null} for the admin scope
    */
   @Nullable
-  @Override
   public Set<UUID> currentOfficerReadScope() {
     return requestScopeResolver.currentOfficerReadScope();
   }

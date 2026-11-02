@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -226,7 +227,10 @@ class PromotionAccessPolicyVerdictTest {
             resolver, mock(AccessGateService.class), mock(OrgUnitStampingService.class));
     PromotionAccessPolicy policy =
         new PromotionAccessPolicy(
-            ownerScopeService, authHelper, mock(OrgUnitMembershipQueryService.class));
+            ownerScopeService,
+            authHelper,
+            mock(OrgUnitMembershipQueryService.class),
+            mock(PromotionReach.class));
 
     assertThat(policy.isFeatureEnabledForCurrentScope())
         .as("feature flag")

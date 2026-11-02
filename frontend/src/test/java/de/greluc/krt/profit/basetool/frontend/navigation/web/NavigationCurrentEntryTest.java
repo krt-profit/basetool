@@ -106,7 +106,10 @@ class NavigationCurrentEntryTest {
     NavigationEntry missions = registry.starrable("missions.list").orElseThrow();
 
     assertThat(registry.availability(missions, member).name()).isEqualTo("AVAILABLE");
-    assertThat(registry.availability(promotion, member).name()).isEqualTo("CONTEXT");
+    NavigationAccess memberOfAnEnabledUnit =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.PROMOTION_ANYWHERE));
+    assertThat(registry.availability(promotion, memberOfAnEnabledUnit).name()).isEqualTo("CONTEXT");
+    assertThat(registry.availability(promotion, member).name()).isEqualTo("GONE");
     assertThat(registry.availability(orders, member).name()).isEqualTo("GONE");
     assertThat(registry.availability(terms, member).name()).isEqualTo("GONE");
     assertThat(registry.starrable("home.dashboard")).isEmpty();

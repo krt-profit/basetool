@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -59,6 +60,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeController {
 
   private final OwnerScopeService ownerScopeService;
+
+  /** Narrows the promotion capabilities to the units that have promotion enabled. */
+  private final PromotionReach promotionReach;
 
   /** Answers role questions through the configured hierarchy rather than by literal match. */
   private final AuthHelperService authHelperService;
@@ -138,11 +142,13 @@ public class MeController {
         inventoryProperties.stolenMarkingEnabled(),
         officerHere,
         officerHere,
+        promotionReach.canManageInActiveContext(),
         officerHere,
         officerHere,
         officerHere,
-        officerHere,
-        ownerScopeService.canActAsOfficerAnywhere());
+        ownerScopeService.canActAsOfficerAnywhere(),
+        promotionReach.canManageAnywhere(),
+        promotionReach.canUseAnywhere());
   }
 
   /**
@@ -264,7 +270,9 @@ public class MeController {
    * @param hasOfficerReach whether the caller holds officer reach in the active context: in the
    *     pinned unit, or in any unit when none is pinned; {@code true} for an admin (REQ-SEC-047)
    * @param canOpenLeitung whether the Leitung page is offered in the active context
-   * @param canManagePromotions whether promotion management is offered in the active context
+   * @param canManagePromotions whether promotion management is offered in the active context:
+   *     officer reach in the pinned unit, or in any unit when none is pinned, counting only units
+   *     with promotion enabled
    * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
    * @param canManageJobOrders whether the officer job-order writes are offered in the active
    *     context
@@ -272,6 +280,10 @@ public class MeController {
    *     active context
    * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
    *     whatever unit is pinned; {@code true} for an admin
+   * @param canManagePromotionsAnywhere whether the caller manages promotions in at least one unit
+   *     with promotion enabled, whatever unit is pinned; {@code true} for an admin
+   * @param canUsePromotionAnywhere whether the caller belongs to or reaches at least one unit with
+   *     promotion enabled, whatever unit is pinned; {@code true} for an admin
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -290,7 +302,9 @@ public class MeController {
       boolean canSeeHangarOwnerDetails,
       boolean canManageJobOrders,
       boolean canManageMissionFinance,
-      boolean canActAsOfficerAnywhere) {}
+      boolean canActAsOfficerAnywhere,
+      boolean canManagePromotionsAnywhere,
+      boolean canUsePromotionAnywhere) {}
 
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.

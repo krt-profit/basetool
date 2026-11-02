@@ -26,10 +26,13 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -58,6 +65,8 @@ class MemberEvaluationServiceTest {
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private AuditService auditService;
+
+  @Mock private UserService userService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -302,5 +311,27 @@ class MemberEvaluationServiceTest {
     verify(repository).delete(entity);
     verify(auditService)
         .record(eq(AuditEventType.PROMOTION_EVALUATION_DELETED), any(), any(), any(), isNull());
+  }
+
+  @Test
+  void listEvaluatableMembers_queriesOnlyTheManagementScope() {
+    Pageable pageable = PageRequest.of(0, 20);
+    UUID enabledUnit = UUID.randomUUID();
+    Page<User> members = new PageImpl<>(List.of(new User()));
+    when(promotionAccessPolicy.readScope(PromotionReadView.MANAGEMENT))
+        .thenReturn(Optional.of(new PromotionReadScope(Set.of(enabledUnit))));
+    when(userService.findEvaluatableMembers(Set.of(enabledUnit), pageable)).thenReturn(members);
+
+    assertSame(members, service.listEvaluatableMembers(pageable));
+  }
+
+  @Test
+  void listEvaluatableMembers_isEmptyWithoutAManagementScope() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(promotionAccessPolicy.readScope(PromotionReadView.MANAGEMENT))
+        .thenReturn(Optional.empty());
+
+    assertTrue(service.listEvaluatableMembers(pageable).isEmpty());
+    verify(userService, never()).findEvaluatableMembers(any(), any());
   }
 }
