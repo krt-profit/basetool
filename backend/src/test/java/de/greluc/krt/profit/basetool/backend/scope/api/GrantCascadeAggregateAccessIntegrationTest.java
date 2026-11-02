@@ -52,8 +52,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -97,7 +97,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private InventoryAggregationService inventoryAggregationService;
-  @Autowired private RefineryOrderService refineryOrderService;
+  @Autowired private RefineryOrderQueryService refineryOrderQueryService;
   @Autowired private MissionService missionService;
   @Autowired private TransactionTemplate transactionTemplate;
 
@@ -250,7 +250,9 @@ class GrantCascadeAggregateAccessIntegrationTest {
   }
 
   private List<UUID> refineryListIds() {
-    return refineryOrderService.getAllRefineryOrders(PageRequest.of(0, 1000)).stream()
+    return refineryOrderQueryService
+        .getAllRefineryOrders(null, false, null, PageRequest.of(0, 1000))
+        .stream()
         .map(RefineryOrder::getId)
         .toList();
   }

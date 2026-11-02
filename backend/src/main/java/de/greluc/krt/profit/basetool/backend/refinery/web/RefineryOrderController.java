@@ -29,9 +29,11 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPol
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapper;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -72,6 +74,8 @@ public class RefineryOrderController {
       Set.of("startedAt", "endsAt", "durationMinutes", "expenses", "id");
 
   private final RefineryOrderService refineryOrderService;
+  private final RefineryOrderQueryService refineryOrderQueryService;
+  private final RefineryOrderStoreService refineryOrderStoreService;
   private final UserService userService;
   private final RefineryOrderMapper mapper;
   private final RefineryAccessPolicy refineryAccessPolicy;
@@ -105,7 +109,7 @@ public class RefineryOrderController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, LIST_SORT_FIELDS, "startedAt");
     Page<RefineryOrder> p =
-        refineryOrderService.getMyRefineryOrders(
+        refineryOrderQueryService.getMyRefineryOrders(
             userService.getUserIdFromJwt(jwt), status, Boolean.TRUE.equals(ready), q, pageable);
     return PageResponse.of(p.map(mapper::toListDto));
   }
@@ -121,9 +125,9 @@ public class RefineryOrderController {
   @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canSeeRefineryOrder(#id)")
   @Transactional(readOnly = true)
   public RefineryOrderDto getRefineryOrder(@PathVariable @NotNull UUID id) {
-    RefineryOrder order = refineryOrderService.getRefineryOrder(id);
+    RefineryOrder order = refineryOrderQueryService.getRefineryOrder(id);
     return mapper.toDto(
-        order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
+        order, refineryOrderQueryService.getYieldBonusByMaterialForLocation(order.getLocation()));
   }
 
   /**
@@ -140,7 +144,7 @@ public class RefineryOrderController {
   @Transactional(readOnly = true)
   public List<RefineryOrderListDto> getMissionRefineryOrders(
       @AuthenticationPrincipal Jwt jwt, @RequestParam @NotNull UUID missionId) {
-    return refineryOrderService
+    return refineryOrderQueryService
         .getMissionRefineryOrdersForCaller(missionId, userService.getUserIdFromJwt(jwt))
         .stream()
         .map(mapper::toListDto)
@@ -164,7 +168,7 @@ public class RefineryOrderController {
         refineryOrderService.createRefineryOrder(
             userService.getUserIdFromJwt(jwt), mapper.toEntity(request), request.owningOrgUnitId());
     return mapper.toDto(
-        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
+        saved, refineryOrderQueryService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -184,7 +188,7 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull RefineryOrderUpdateRequest request) {
     UUID callerId = userService.getUserIdFromJwt(jwt);
-    RefineryOrder existing = refineryOrderService.getRefineryOrder(id);
+    RefineryOrder existing = refineryOrderQueryService.getRefineryOrder(id);
 
     boolean isLogistician = refineryAccessPolicy.isLogisticianOfOrder(id);
 
@@ -203,7 +207,7 @@ public class RefineryOrderController {
         refineryOrderService.updateRefineryOrder(
             targetUserId, id, mapper.toEntity(request), isLogistician);
     return mapper.toDto(
-        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
+        saved, refineryOrderQueryService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -228,7 +232,7 @@ public class RefineryOrderController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull RefineryOrderStoreDto dto) {
-    refineryOrderService.storeRefineryOrder(
+    refineryOrderStoreService.storeRefineryOrder(
         userService.getUserIdFromJwt(jwt), id, dto, refineryAccessPolicy.isLogisticianOfOrder(id));
   }
 
@@ -259,7 +263,8 @@ public class RefineryOrderController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, LIST_SORT_FIELDS, "startedAt");
     Page<RefineryOrder> p =
-        refineryOrderService.getAllRefineryOrders(status, Boolean.TRUE.equals(ready), q, pageable);
+        refineryOrderQueryService.getAllRefineryOrders(
+            status, Boolean.TRUE.equals(ready), q, pageable);
     return PageResponse.of(p.map(mapper::toListDto));
   }
 
@@ -291,7 +296,7 @@ public class RefineryOrderController {
             sort,
             Set.of("startedAt", "durationMinutes", "expenses", "id"),
             "startedAt");
-    Page<RefineryOrder> p = refineryOrderService.getUserRefineryOrdersScoped(userId, pageable);
+    Page<RefineryOrder> p = refineryOrderQueryService.getUserRefineryOrdersScoped(userId, pageable);
     return PageResponse.of(p.map(mapper::toListDto));
   }
 
@@ -315,7 +320,7 @@ public class RefineryOrderController {
         refineryOrderService.createRefineryOrderOnBehalf(
             userId, mapper.toEntity(request), request.owningOrgUnitId());
     return mapper.toDto(
-        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
+        saved, refineryOrderQueryService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -339,7 +344,7 @@ public class RefineryOrderController {
     RefineryOrder saved =
         refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(request), true);
     return mapper.toDto(
-        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
+        saved, refineryOrderQueryService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /** Logistician-only: cancels a target user's refinery order. */
