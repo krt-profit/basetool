@@ -583,8 +583,8 @@ public class NavigationRegistry {
   }
 
   /**
-   * A tab of the supply or purchasing page that only some callers see, offered by the on-demand
-   * quick access rather than by the rendered index (ADR-0282).
+   * A tab of the supply or purchasing page that only some callers see; its gate needs the caller's
+   * tab flag of the layout read (REQ-UI-026).
    */
   @NotNull
   private static NavigationEntry dataTab(
@@ -595,7 +595,7 @@ public class NavigationRegistry {
     return of(key, href, "palette.page." + term)
         .tab(tabLabelKey)
         .keywords("palette.keywords." + term)
-        .with(PALETTE_ONLY, NOT_INDEXED);
+        .with(PALETTE_ONLY);
   }
 
   @NotNull

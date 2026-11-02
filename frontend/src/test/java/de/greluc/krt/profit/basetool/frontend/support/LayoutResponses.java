@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.support;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.UUID;
@@ -87,6 +87,9 @@ public final class LayoutResponses {
             false,
             false,
             false,
+            false,
+            false,
+            false,
             false),
         0L);
   }
@@ -126,6 +129,9 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        false,
+        false,
+        false,
         false);
   }
 
@@ -138,7 +144,7 @@ public final class LayoutResponses {
   public static CapabilitiesResponse missionManager() {
     return new CapabilitiesResponse(
         false, false, false, false, false, true, false, false, false, false, false, false, false,
-        false, false, false, false, false, false, false, false);
+        false, false, false, false, false, false, false, false, false, false, false);
   }
 
   /**
@@ -166,6 +172,9 @@ public final class LayoutResponses {
         true,
         false,
         canMarkStolen,
+        false,
+        false,
+        false,
         false,
         false,
         false,
@@ -219,7 +228,10 @@ public final class LayoutResponses {
         supplyStats,
         purchasingPartners,
         purchasingDelegates,
-        purchasingReport);
+        purchasingReport,
+        false,
+        false,
+        false);
   }
 
   /**
@@ -272,6 +284,9 @@ public final class LayoutResponses {
         officerHere,
         officerHere,
         officerHere,
+        false,
+        false,
+        false,
         false,
         false,
         false,

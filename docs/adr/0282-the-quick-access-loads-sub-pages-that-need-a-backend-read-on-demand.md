@@ -1,11 +1,11 @@
 # ADR-0282 — The quick access loads sub-pages that need a backend read on demand
 
-- **Status:** Accepted — amended by
+- **Status:** Superseded by
+  [ADR-0329](0329-the-supply-and-purchasing-tabs-are-capability-flags-of-the-layout-read.md): the
+  layout read carries the five tab decisions and the on-demand endpoint is removed. Earlier amended by
   [ADR-0297](0297-the-navigation-is-one-task-grouped-default-with-desktop-modes-a-configurable-tab-bar-and-a-scoped-entity-search.md):
   entity search runs through a query-taking sibling seam, `QuickAccessSearchContributor`, behind
-  `GET /quick-access/search`; the on-demand page entries of this ADR stand. Amended in place
-  (Amendment 1, 2026-11-02): the tab decisions come from five capability flags of the layout
-  read.
+  `GET /quick-access/search`.
 - **Date:** 2026-10-18
 - **Deciders:** @greluc
 - **Related:** spec `REQ-UI-026` ([`ui-design-system.md`](../specs/ui-design-system.md)) ·
@@ -66,38 +66,3 @@ server-rendered into the page.**
   cannot find through the menu.
 - **Cache the tab decisions in the session.** Rejected: unit management and purchasing roles
   change at run time, and a stale cache would offer a page the member can no longer open.
-
-## Amendment 1 (2026-11-02) — the tab decisions are capability flags of the layout read
-
-The navigation of ADR-0297 registers the five tabs as entries (`supply.incoming`, `supply.stats`,
-`purchasing.partners`, `purchasing.delegates`, `purchasing.report`) that can be starred, placed in
-the tab bar and chosen as a start page. Gated by the surface switches alone, they were offered to
-every member, although only some may open them.
-
-**Decision.** `GET /api/v1/me/layout` (and `/me/capabilities`) carries five booleans in its
-capabilities — `canViewSupplyIncoming`, `canViewSupplyStats`, `canViewPurchasingPartners`,
-`canViewPurchasingDelegates`, `canViewPurchasingReport` — each false while its surface is off and
-otherwise decided by the module that owns the page, through its `api` seam (`SupplyTabAccess`,
-`PurchasingTabAccess`) and the same access policy the reads behind the tab enforce:
-
-| Flag | True when |
-|---|---|
-| `canViewSupplyIncoming` | the caller manages (lead or Logistician), or as an admin reaches, an active unit that accepts donations |
-| `canViewSupplyStats` | `SupplyAccessPolicy#canReadStats`: the governing leadership or the manager of at least one unit |
-| `canViewPurchasingPartners` | `PurchasingAccessPolicy#canMaintainPartners`: an active trade delegate or the governing leadership |
-| `canViewPurchasingDelegates` | `PurchasingAccessPolicy#canAppointDelegates`: the governing leadership |
-| `canViewPurchasingReport` | `PurchasingAccessPolicy#canReadReport`: a delegate, the governing leadership, bank staff or a unit manager |
-
-The frontend maps them to the `NavigationFlag`s `SUPPLY_INCOMING`, `SUPPLY_STATS`,
-`PURCHASING_PARTNERS`, `PURCHASING_DELEGATES` and `PURCHASING_REPORT`; each entry requires its
-surface flag and its own flag. The tab bars (`SupplyTabs.of`, `PurchasingTabs.of`) and both
-`QuickAccessContributor`s read the same flags, so the supply and purchasing reads they made for
-this are gone. None of the flags depends on the pinned unit; a flag counts as lost user-wide only
-while its surface is on, so switching a surface off deletes no stored favourite or start page.
-
-**Consequences.** The registry, the tab bars and the quick access decide from one answer and
-cannot disagree. The „Statistik" tab now follows the statistics gate exactly, so the
-Organisationsleitung and the governing Bereichsleitung see it without managing a unit. The layout
-read gains a few small statements, none per unit (`MeLayoutSingleTransactionTest`). The on-demand endpoint stays: the five entries keep
-`NOT_INDEXED`, so retiring `GET /quick-access/entries` in favour of the rendered index is a
-separate change.

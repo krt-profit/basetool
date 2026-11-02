@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;

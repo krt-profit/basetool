@@ -1235,9 +1235,8 @@ navigation (`kernel/fragments/sidebar.html`) shows it; what the screen then *con
 backend gates of §3. The quick access (`Ctrl`/`⌘` + `K`, REQ-UI-026) reads its pages from that
 rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. The member drawer holds ten links in four task groups; the former sibling screens are tabs of them
 (REQ-UI-026), shown under the same condition as before. It also adds „Mein Lager“, „Globales Lager“ and the
-hangar's „Org-Einheit“ tab for every member, the sync-report tabs for `ADMIN`, and — read on demand
-from `GET /quick-access/entries` (`isAuthenticated()`, ADR-0282) — the supply and purchasing tabs
-for the members those pages show them to. Those five tabs („Eingehende Spenden", „Statistik",
+hangar's „Org-Einheit“ tab for every member, the sync-report tabs for `ADMIN`, and the supply and
+purchasing tabs for the members those pages show them to (ADR-0329). Those five tabs („Eingehende Spenden", „Statistik",
 „Partner", „Handelsbeauftragte", „Bericht") are offered — in the tab bar, the quick access, the
 favourites, the phone slots and the start-page select — only when the capability flag of the
 layout read grants them: the incoming donations to the lead or a Logistician of an active unit that

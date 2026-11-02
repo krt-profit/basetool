@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -240,108 +241,5 @@ public class CapabilityFlagsAdvice {
       return true;
     }
     return activeSquadron.isPromotionEnabled();
-  }
-
-  /**
-   * Wire-shape mirror of the backend's {@code MeController.CapabilitiesResponse}.
-   *
-   * @param canSeeBlueprintOverview whether the caller may open the blueprint availability overview
-   * @param canViewJobOrders whether the caller may enter the Job-Order area
-   * @param canViewOwnJobOrders whether the caller may view their own org unit's orders
-   *     (REQ-ORDERS-023)
-   * @param canViewAssignedJobOrders whether the caller holds an assignee entry on at least one
-   *     order (REQ-ORDERS-040)
-   * @param isLogisticianOrAbove whether the caller holds a Logistician grant in the active context:
-   *     in the pinned unit, or in any unit when none is pinned
-   * @param isMissionManagerOrAbove whether the caller holds a Mission Manager grant in the active
-   *     context: in the pinned unit, or in any unit when none is pinned
-   * @param canMarkStolen whether stock may be booked in as, marked or unmarked „gestohlen"
-   *     (REQ-INV-053); a server switch, the same for every caller
-   * @param hasOfficerReach whether the caller holds officer reach in the active context
-   * @param canOpenLeitung whether the Leitung page is offered in the active context
-   * @param canManagePromotions whether promotion management is offered in the active context:
-   *     officer reach in a unit with promotion enabled
-   * @param canSeeHangarOwnerDetails whether hangar owner details are offered in the active context
-   * @param canManageJobOrders whether the officer job-order writes are offered in the active
-   *     context
-   * @param canManageMissionFinance whether mission finance and owner change are offered in the
-   *     active context
-   * @param canActAsOfficerAnywhere whether the caller holds officer reach in at least one unit,
-   *     whatever unit is pinned
-   * @param canManagePromotionsAnywhere whether the caller manages promotions in at least one unit
-   *     with promotion enabled, whatever unit is pinned
-   * @param canUsePromotionAnywhere whether the caller belongs to or reaches at least one unit with
-   *     promotion enabled, whatever unit is pinned
-   * @param canViewSupplyIncoming whether „Eingehende Spenden" is offered: the supply surface is on
-   *     and the caller manages an active unit that accepts donations
-   * @param canViewSupplyStats whether the donation statistics are offered: the supply surface is on
-   *     and the caller belongs to the governing leadership or manages a unit
-   * @param canViewPurchasingPartners whether the purchasing partners are offered: the purchasing
-   *     surface is on and the caller is a trade delegate or the governing leadership
-   * @param canViewPurchasingDelegates whether the trade delegates are offered: the purchasing
-   *     surface is on and the caller is the governing leadership
-   * @param canViewPurchasingReport whether the purchasing report is offered: the purchasing surface
-   *     is on and the caller may read it
-   */
-  public record CapabilitiesResponse(
-      boolean canSeeBlueprintOverview,
-      boolean canViewJobOrders,
-      boolean canViewOwnJobOrders,
-      boolean canViewAssignedJobOrders,
-      boolean isLogisticianOrAbove,
-      boolean isMissionManagerOrAbove,
-      boolean canMarkStolen,
-      boolean hasOfficerReach,
-      boolean canOpenLeitung,
-      boolean canManagePromotions,
-      boolean canSeeHangarOwnerDetails,
-      boolean canManageJobOrders,
-      boolean canManageMissionFinance,
-      boolean canActAsOfficerAnywhere,
-      boolean canManagePromotionsAnywhere,
-      boolean canUsePromotionAnywhere,
-      boolean canViewSupplyIncoming,
-      boolean canViewSupplyStats,
-      boolean canViewPurchasingPartners,
-      boolean canViewPurchasingDelegates,
-      boolean canViewPurchasingReport) {
-
-    /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
-    public static final CapabilitiesResponse NONE =
-        new CapabilitiesResponse(
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false);
-
-    /**
-     * Every role-derived capability on, as an admin passes each gate; the server switch and the tab
-     * flags, which depend on switches and configured units, stay the backend's.
-     *
-     * @param backend the backend's answer for the admin
-     * @return the admin's capability flags
-     */
-    public static CapabilitiesResponse admin(CapabilitiesResponse backend) {
-      return new CapabilitiesResponse(
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          backend.canMarkStolen(),
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          backend.canViewSupplyIncoming(),
-          backend.canViewSupplyStats(),
-          backend.canViewPurchasingPartners(),
-          backend.canViewPurchasingDelegates(),
-          backend.canViewPurchasingReport());
-    }
   }
 }
