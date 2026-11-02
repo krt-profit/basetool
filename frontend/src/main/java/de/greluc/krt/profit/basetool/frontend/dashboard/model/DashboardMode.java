@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 
 /** The two navigation modes, each with its own dashboard (REQ-UI-034). */
+@DtoMirror
 public enum DashboardMode {
 
   /** The member mode. */

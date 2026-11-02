@@ -38,7 +38,7 @@
                     <span class="cell-sub" th:text="#{${type.labelKey() + '.desc'}}">Beschreibung</span>
                 </div>
                 <button type="button" class="btn btn-secondary btn-xs" data-trigger="dashboard-catalogue-add"
-                        th:data-widget-type="${type.name()}" th:data-column="${type.defaultColumn.name()}" th:data-testid="|dashboard-add-${type.slug()}|"
+                        th:data-widget-type="${type.name()}" th:data-column="${type.defaultColumn().name()}" th:data-testid="|dashboard-add-${type.slug()}|"
                         th:attr="aria-label=#{dashboard.catalogue.add(#{${type.labelKey()}})}"
                         th:text="#{dashboard.add}">Hinzufügen</button>
             </li>
@@ -64,28 +64,28 @@
             <div class="form-group" data-option="days">
                 <label class="form-label" for="dashboard-option-days" th:text="#{dashboard.options.days}">Zeitraum</label>
                 <select id="dashboard-option-days" name="days" class="form-control">
-                    <option th:each="days : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).DAY_CHOICES}"
+                    <option th:each="days : ${dashboard.choices().dayChoices()}"
                             th:value="${days}" th:text="#{dashboard.options.days.value(${days})}">7 Tage</option>
                 </select>
             </div>
             <div class="form-group" data-option="range" data-field="days">
                 <label class="form-label" for="dashboard-option-range" th:text="#{dashboard.options.range}">Zeitraum</label>
                 <select id="dashboard-option-range" name="range" class="form-control">
-                    <option th:each="days : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).RANGE_CHOICES}"
+                    <option th:each="days : ${dashboard.choices().rangeChoices()}"
                             th:value="${days}" th:text="#{${'dashboard.options.range.value.' + days}}">7 Tage</option>
                 </select>
             </div>
             <div class="form-group" data-option="rows">
                 <label class="form-label" for="dashboard-option-rows" th:text="#{dashboard.options.rows}">Zeilen</label>
                 <select id="dashboard-option-rows" name="rows" class="form-control">
-                    <option th:each="rows : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).ROW_CHOICES}"
+                    <option th:each="rows : ${dashboard.choices().rowChoices()}"
                             th:value="${rows}" th:text="${rows}">5</option>
                 </select>
             </div>
             <div class="form-group" data-option="status">
                 <label class="form-label" for="dashboard-option-status" th:text="#{dashboard.options.status}">Status</label>
                 <select id="dashboard-option-status" name="status" class="form-control">
-                    <option th:each="status : ${T(de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType).STATUS_CHOICES}"
+                    <option th:each="status : ${dashboard.choices().statusChoices()}"
                             th:value="${status.name()}" th:text="#{${'dashboard.options.status.' + status.key()}}">Ungelesen</option>
                 </select>
             </div>

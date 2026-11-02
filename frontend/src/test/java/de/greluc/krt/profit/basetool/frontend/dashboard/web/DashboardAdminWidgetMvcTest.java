@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.PendingRegistration
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -75,6 +76,7 @@ class DashboardAdminWidgetMvcTest {
 
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.Locale;
@@ -82,6 +83,7 @@ class DashboardRenderMvcTest {
 
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

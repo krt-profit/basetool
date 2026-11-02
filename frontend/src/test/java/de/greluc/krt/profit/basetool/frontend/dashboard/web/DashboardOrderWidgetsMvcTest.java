@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +95,7 @@ class DashboardOrderWidgetsMvcTest {
 
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

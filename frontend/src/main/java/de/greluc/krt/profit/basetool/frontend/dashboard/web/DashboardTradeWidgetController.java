@@ -61,9 +61,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @PreAuthorize("isAuthenticated()")
 public class DashboardTradeWidgetController {
 
-  /** The rows of the bank-requests widget while the member chose none. */
-  private static final int BANK_REQUESTS_DEFAULT_ROWS = 3;
-
   private static final String FRAGMENTS = "dashboard/fragments/trade-widgets :: ";
 
   private static final String BOARD_TAB = "alle";
@@ -82,6 +79,8 @@ public class DashboardTradeWidgetController {
 
   private final OwnOrgUnits ownOrgUnits;
 
+  private final DashboardWidgetOptions options;
+
   /**
    * Renders the open Materialbörse entries, the newest first.
    *
@@ -96,9 +95,8 @@ public class DashboardTradeWidgetController {
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.statusOf(DashboardWidgetType.MARKET, status, DashboardStatus.BOTH);
-    int limit = DashboardWidgetOptions.rows(rows);
+    DashboardStatus resolved = options.status(DashboardWidgetType.MARKET, status);
+    int limit = options.rows(DashboardWidgetType.MARKET, rows);
     BoardFilter filter = new BoardFilter(BOARD_TAB, limit, null, null, BOARD_SORT_NEWEST, null);
     List<MarketWidgetRow> lines = new ArrayList<>();
     long total = 0;
@@ -139,11 +137,9 @@ public class DashboardTradeWidgetController {
       @RequestParam(required = false) @Nullable UUID unit,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.statusOf(
-            DashboardWidgetType.SUPPLY_NEEDS, status, DashboardStatus.ALL_OPEN);
+    DashboardStatus resolved = options.status(DashboardWidgetType.SUPPLY_NEEDS, status);
     UUID scope = unit != null ? unit : DashboardContext.of(model).activeUnitId();
-    int limit = DashboardWidgetOptions.rows(rows);
+    int limit = options.rows(DashboardWidgetType.SUPPLY_NEEDS, rows);
     String coverage = DashboardWidgetOptions.needCoverage(resolved);
     List<NeedDto> needs = new ArrayList<>();
     long total = 0;
@@ -180,18 +176,14 @@ public class DashboardTradeWidgetController {
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.statusOf(
-            DashboardWidgetType.BANK_REQUESTS, status, DashboardStatus.OPEN);
+    DashboardStatus resolved = options.status(DashboardWidgetType.BANK_REQUESTS, status);
     List<BankBookingRequestDto> own = bankClient.ownOrgUnitRequests();
     List<BankBookingRequestDto> matching =
         (own == null ? List.<BankBookingRequestDto>of() : own)
             .stream().filter(request -> matches(resolved, request)).toList();
     model.addAttribute(
         "bankRequestRows",
-        matching.stream()
-            .limit(DashboardWidgetOptions.rows(rows, BANK_REQUESTS_DEFAULT_ROWS))
-            .toList());
+        matching.stream().limit(options.rows(DashboardWidgetType.BANK_REQUESTS, rows)).toList());
     model.addAttribute("bankRequestTotal", matching.size());
     return FRAGMENTS + "bankRequests";
   }

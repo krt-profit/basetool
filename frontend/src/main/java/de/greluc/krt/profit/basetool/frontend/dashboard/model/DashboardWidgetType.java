@@ -19,241 +19,92 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The widgets of the catalogue (REQ-UI-034): the path segment of the widget's own endpoint, its
- * label, its mode, the gate a member has to pass to read its data and the options it offers. A new
- * widget or option is a change to the spec's catalogue table and to the backend's matching enum.
+ * The widget types of the catalogue (REQ-UI-034) with what only the frontend can say: the gate a
+ * member has to pass, which depends on the caller's roles and flags, the endpoint segment and the
+ * message key. Everything else about a type (mode, column, options, defaults, choices) is read from
+ * the backend's catalogue as a {@link DashboardWidgetDescriptor}; the mirror test fails when the
+ * backend names a type that has no constant here.
  */
-@Getter
+@DtoMirror
+@RequiredArgsConstructor
 public enum DashboardWidgetType {
 
   /** The missions of the coming days; the mission list is for members and above. */
-  UPCOMING_DAYS(
-      DashboardMode.MEMBER,
-      DashboardColumn.WIDE,
-      NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.UNIT, DashboardOption.DAYS, DashboardOption.ROWS)),
+  UPCOMING_DAYS(NavigationGate.anyRole(Roles.KRT_MEMBER)),
 
   /** The announcement. */
-  INFORMATION(
-      DashboardMode.MEMBER,
-      DashboardColumn.WIDE,
-      NavigationGate.ALWAYS,
-      EnumSet.noneOf(DashboardOption.class)),
+  INFORMATION(NavigationGate.ALWAYS),
 
   /** The member's favourites. */
-  FAVOURITES(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.ALWAYS,
-      EnumSet.noneOf(DashboardOption.class)),
+  FAVOURITES(NavigationGate.ALWAYS),
 
   /** The member's notifications. */
-  NOTIFICATIONS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.ALWAYS,
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      ordered(DashboardStatus.UNREAD, DashboardStatus.ALL)),
+  NOTIFICATIONS(NavigationGate.ALWAYS),
 
   /** The member's next missions; the mission list is for members and above. */
-  NEXT_MISSION(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.ROWS)),
+  NEXT_MISSION(NavigationGate.anyRole(Roles.KRT_MEMBER)),
 
   /** The readiness of the member's hangar; the hangar is open to every signed-in member. */
-  HANGAR_READINESS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.ALWAYS,
-      EnumSet.noneOf(DashboardOption.class)),
+  HANGAR_READINESS(NavigationGate.ALWAYS),
 
   /** The admin links as tiles. */
-  ADMIN_HUB(
-      DashboardMode.ADMIN,
-      DashboardColumn.WIDE,
-      NavigationGate.anyRole(Roles.ADMIN),
-      EnumSet.noneOf(DashboardOption.class)),
+  ADMIN_HUB(NavigationGate.anyRole(Roles.ADMIN)),
 
   /** The pending deletion requests. */
-  DELETION_REQUESTS(
-      DashboardMode.ADMIN,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.ADMIN),
-      EnumSet.of(DashboardOption.ROWS)),
+  DELETION_REQUESTS(NavigationGate.anyRole(Roles.ADMIN)),
 
   /** The pending Discord registrations. */
-  DISCORD_REGISTRATIONS(
-      DashboardMode.ADMIN,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.ADMIN),
-      EnumSet.of(DashboardOption.ROWS)),
+  DISCORD_REGISTRATIONS(NavigationGate.anyRole(Roles.ADMIN)),
 
   /** The latest sync and import runs. */
-  SYNC_STATUS(
-      DashboardMode.ADMIN,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.ADMIN),
-      EnumSet.of(DashboardOption.RANGE)),
+  SYNC_STATUS(NavigationGate.anyRole(Roles.ADMIN)),
 
   /** The members without accepted terms. */
-  OPEN_TERMS(
-      DashboardMode.ADMIN,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.ADMIN),
-      EnumSet.of(DashboardOption.ROWS)),
+  OPEN_TERMS(NavigationGate.anyRole(Roles.ADMIN)),
 
   /**
    * The orders the member is an assignee of; an assignee entry grants the read whatever the
    * member's roles are (REQ-ORDERS-047).
    */
-  ASSIGNED_ORDERS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.ALWAYS,
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      ordered(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+  ASSIGNED_ORDERS(NavigationGate.ALWAYS),
 
   /** The low minimum stock levels; the Lager is for members and above. */
-  LOW_STOCK(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS)),
+  LOW_STOCK(NavigationGate.anyRole(Roles.KRT_MEMBER)),
 
   /** The viewable org-unit bank accounts; the org-unit bank page is for members and above. */
-  BANK(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.ROWS)),
+  BANK(NavigationGate.anyRole(Roles.KRT_MEMBER)),
 
   /** The orders one of the member's units processes; the member has to enter the order area. */
-  ORDERS_TO_PROCESS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.requires(NavigationFlag.JOB_ORDERS),
-      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
-      ordered(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+  ORDERS_TO_PROCESS(NavigationGate.requires(NavigationFlag.JOB_ORDERS)),
 
   /** The open material demand; the overview is part of the order area. */
-  MATERIAL_DEMAND(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.requires(NavigationFlag.JOB_ORDERS),
-      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS)),
+  MATERIAL_DEMAND(NavigationGate.requires(NavigationFlag.JOB_ORDERS)),
 
   /** The refinery orders that are ready to be stored; the refinery is open to every member. */
-  REFINERY_READY(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.ALWAYS,
-      EnumSet.of(DashboardOption.ROWS)),
+  REFINERY_READY(NavigationGate.ALWAYS),
 
   /** The open Materialbörse entries; the board is for members and above. */
-  MARKET(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      ordered(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
+  MARKET(NavigationGate.anyRole(Roles.KRT_MEMBER)),
 
   /** The open supply needs; the supply surface is for members while it is switched on. */
-  SUPPLY_NEEDS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.KRT_MEMBER).andRequires(NavigationFlag.SUPPLY),
-      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
-      ordered(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
+  SUPPLY_NEEDS(NavigationGate.anyRole(Roles.KRT_MEMBER).andRequires(NavigationFlag.SUPPLY)),
 
   /** The member's own bank requests; the org-unit bank page is for members and above. */
-  BANK_REQUESTS(
-      DashboardMode.MEMBER,
-      DashboardColumn.NARROW,
-      NavigationGate.anyRole(Roles.KRT_MEMBER),
-      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      ordered(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
+  BANK_REQUESTS(NavigationGate.anyRole(Roles.KRT_MEMBER));
 
-  /** The day counts the days option offers. */
-  public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);
-
-  /** The day counts the range option offers. */
-  public static final List<Integer> RANGE_CHOICES = List.of(1, 7, 30);
-
-  /** The row counts the rows option offers. */
-  public static final List<Integer> ROW_CHOICES = List.of(3, 5, 10);
-
-  /** The status filters the status option offers. */
-  public static final List<DashboardStatus> STATUS_CHOICES = List.of(DashboardStatus.values());
-
-  private final DashboardMode mode;
-  private final DashboardColumn defaultColumn;
   private final NavigationGate gate;
-  private final Set<DashboardOption> options;
-  private final Set<DashboardStatus> statuses;
-
-  DashboardWidgetType(
-      DashboardMode mode,
-      DashboardColumn defaultColumn,
-      NavigationGate gate,
-      Set<DashboardOption> options) {
-    this(mode, defaultColumn, gate, options, EnumSet.noneOf(DashboardStatus.class));
-  }
-
-  DashboardWidgetType(
-      DashboardMode mode,
-      DashboardColumn defaultColumn,
-      NavigationGate gate,
-      Set<DashboardOption> options,
-      Set<DashboardStatus> statuses) {
-    this.mode = mode;
-    this.defaultColumn = defaultColumn;
-    this.gate = gate;
-    this.options = options;
-    this.statuses = statuses;
-  }
-
-  /**
-   * The status choices of a widget in the order its options dialog lists them, the default first.
-   *
-   * @param choices the statuses in display order
-   * @return an immutable set that iterates in that order
-   */
-  private static @NotNull Set<DashboardStatus> ordered(@NotNull DashboardStatus... choices) {
-    return Collections.unmodifiableSet(new LinkedHashSet<>(List.of(choices)));
-  }
-
-  /**
-   * The widgets of a mode in the order of the default dashboard, wide column first.
-   *
-   * @param mode the mode
-   * @return the widgets
-   */
-  public static @NotNull List<DashboardWidgetType> ofMode(@NotNull DashboardMode mode) {
-    return Stream.of(values())
-        .filter(type -> type.mode == mode)
-        .sorted(Comparator.comparing(DashboardWidgetType::getDefaultColumn))
-        .toList();
-  }
 
   /**
    * Finds a widget by the segment of its endpoint.
@@ -302,46 +153,5 @@ public enum DashboardWidgetType {
    */
   public boolean permits(@NotNull NavigationAccess access) {
     return gate.permits(access);
-  }
-
-  /**
-   * The options as a space-separated attribute value for the script that edits them.
-   *
-   * @return the lower-case option names in declaration order
-   */
-  public @NotNull String optionsAttribute() {
-    return options.stream()
-        .map(option -> option.name().toLowerCase(Locale.ROOT))
-        .collect(Collectors.joining(" "));
-  }
-
-  /**
-   * The statuses the widget's status option offers as a space-separated attribute value for the
-   * script that edits the options.
-   *
-   * @return the status names in declaration order, empty when the widget has no status option
-   */
-  public @NotNull String statusesAttribute() {
-    return statuses.stream().map(Enum::name).collect(Collectors.joining(" "));
-  }
-
-  /**
-   * Whether the widget's status option offers a status.
-   *
-   * @param status the status
-   * @return {@code true} iff the status is one of the widget's choices
-   */
-  public boolean offersStatus(@NotNull DashboardStatus status) {
-    return statuses.contains(status);
-  }
-
-  /**
-   * Whether the widget offers an option.
-   *
-   * @param option the option
-   * @return {@code true} iff it is offered
-   */
-  public boolean offers(@NotNull DashboardOption option) {
-    return options.contains(option);
   }
 }

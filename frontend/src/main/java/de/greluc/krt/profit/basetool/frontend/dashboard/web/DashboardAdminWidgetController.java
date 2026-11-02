@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.PendingRegistrationDto;
@@ -58,6 +59,8 @@ public class DashboardAdminWidgetController {
   private final IdentityBackendClient identityClient;
   private final SyncStatusAssembler syncStatus;
 
+  private final DashboardWidgetOptions options;
+
   /**
    * Renders the admin links as tiles; the navigation advice puts the links into the model.
    *
@@ -83,7 +86,10 @@ public class DashboardAdminWidgetController {
     List<AdminDeletionRequestDto> requests = orEmpty(identityClient.deletionRequests());
     model.addAttribute("adminTotal", requests.size());
     model.addAttribute(
-        "adminRows", requests.stream().limit(DashboardWidgetOptions.rows(rows)).toList());
+        "adminRows",
+        requests.stream()
+            .limit(options.rows(DashboardWidgetType.DELETION_REQUESTS, rows))
+            .toList());
     return WIDGETS + "deletionRequests";
   }
 
@@ -101,7 +107,10 @@ public class DashboardAdminWidgetController {
     List<PendingRegistrationDto> registrations = orEmpty(identityClient.pendingRegistrations());
     model.addAttribute("adminTotal", registrations.size());
     model.addAttribute(
-        "adminRows", registrations.stream().limit(DashboardWidgetOptions.rows(rows)).toList());
+        "adminRows",
+        registrations.stream()
+            .limit(options.rows(DashboardWidgetType.DISCORD_REGISTRATIONS, rows))
+            .toList());
     return WIDGETS + "discordRegistrations";
   }
 
@@ -117,7 +126,8 @@ public class DashboardAdminWidgetController {
   public String openTerms(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<TermsAcceptanceStatusDto> page =
-        identityClient.termsAcceptances(PENDING, 0, DashboardWidgetOptions.rows(rows));
+        identityClient.termsAcceptances(
+            PENDING, 0, options.rows(DashboardWidgetType.OPEN_TERMS, rows));
     model.addAttribute("adminTotal", PageResponse.totalOf(page));
     model.addAttribute("adminRows", PageResponse.contentOf(page));
     return WIDGETS + "openTerms";
@@ -134,7 +144,7 @@ public class DashboardAdminWidgetController {
   @GetMapping(value = "/sync-status", headers = AJAX)
   public String syncStatus(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer days) {
-    int range = DashboardWidgetOptions.range(days);
+    int range = options.days(DashboardWidgetType.SYNC_STATUS, days);
     model.addAttribute("syncRows", syncStatus.rows(range, Instant.now()));
     model.addAttribute("syncRange", range);
     return WIDGETS + "syncStatus";

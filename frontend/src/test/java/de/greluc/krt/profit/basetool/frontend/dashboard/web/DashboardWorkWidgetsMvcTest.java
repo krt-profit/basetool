@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -86,6 +87,7 @@ class DashboardWorkWidgetsMvcTest {
 
   @BeforeEach
   void setup() {
+    DashboardCatalogueFixture.stub(backendApiClient);
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 

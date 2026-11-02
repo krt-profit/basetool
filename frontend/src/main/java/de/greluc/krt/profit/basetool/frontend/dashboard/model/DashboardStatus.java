@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
 
 /** The status filters a widget instance offers (REQ-UI-034). */
+@DtoMirror
 public enum DashboardStatus {
 
   /** Only unread entries. */

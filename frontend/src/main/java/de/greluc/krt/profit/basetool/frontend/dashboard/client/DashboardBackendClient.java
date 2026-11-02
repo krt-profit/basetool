@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.client;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardCatalogueResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardLayoutRequest;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardOptionsRequest;
@@ -31,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetTyp
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import java.time.Instant;
@@ -133,6 +135,17 @@ public class DashboardBackendClient {
   @Nullable
   public DashboardResponse dashboard(@NotNull DashboardMode mode) {
     return backendApiClient.get(DASHBOARD, DashboardResponse.class, mode.slug());
+  }
+
+  /**
+   * Reads the dashboard widget catalogue from the catalogue cache.
+   *
+   * @return the catalogue, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public DashboardCatalogueResponse catalogue() {
+    return backendApiClient.getCached(
+        CachedCatalog.DASHBOARD_WIDGETS, DashboardCatalogueResponse.class);
   }
 
   /**

@@ -31,7 +31,7 @@
 </div>
 
 <section th:fragment="item(item)" class="card card--flush dash-widget" data-dashboard-item
-         th:with="widget=${item.widget()}, type=${item.widget().type()}, title=${item.widget().type().name() == 'UPCOMING_DAYS'} ? #{dashboard.widget.upcoming-days.title(${item.widget().days()})} : #{${item.widget().type().labelKey()}}"
+         th:with="widget=${item.widget()}, type=${item.descriptor()}, title=${item.descriptor().name() == 'UPCOMING_DAYS'} ? #{dashboard.widget.upcoming-days.title(${item.widget().days()})} : #{${item.descriptor().labelKey()}}"
          th:classappend="${!item.available()} ? 'is-unavailable'"
          th:data-testid="|dashboard-widget-${type.slug()}|"
          th:attr="data-id=${item.key()},data-widget-id=${item.storedId()},data-widget-type=${type.name()},data-widget-slug=${type.slug()},data-column=${widget.column().name()},data-options-version=${widget.optionsVersion()},data-options=${type.optionsAttribute()},data-status-choices=${type.statusesAttribute()},data-unit=${widget.orgUnitId()},data-days=${widget.days()},data-rows=${widget.rows()},data-status=${widget.status()},data-reorder-name=${title},data-available=${item.available()}">
@@ -47,7 +47,7 @@
                     th:attr="aria-label=${widget.column().name() == 'WIDE'} ? #{dashboard.item.moveNarrow(${title})} : #{dashboard.item.moveWide(${title})},title=${widget.column().name() == 'WIDE'} ? #{dashboard.item.moveNarrow(${title})} : #{dashboard.item.moveWide(${title})},data-label-wide=#{dashboard.item.moveWide(${title})},data-label-narrow=#{dashboard.item.moveNarrow(${title})}"
                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg></button>
             <button type="button" class="btn btn-ghost btn-icon" data-trigger="dashboard-options"
-                    data-testid="dashboard-options" th:if="${!type.options.isEmpty()}"
+                    data-testid="dashboard-options" th:if="${!type.options().isEmpty()}"
                     th:attr="aria-label=#{dashboard.item.options(${title})},title=#{dashboard.item.options(${title})}"
                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg></button>
             <button type="button" class="btn btn-ghost btn-icon" data-trigger="dashboard-remove"

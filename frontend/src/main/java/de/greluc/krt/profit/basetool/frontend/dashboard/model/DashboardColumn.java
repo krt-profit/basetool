@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import org.jetbrains.annotations.NotNull;
 
 /** The column of the two-column dashboard a widget instance sits in (REQ-UI-034). */
+@DtoMirror
 public enum DashboardColumn {
 
   /** The wide column, two thirds of the width. */

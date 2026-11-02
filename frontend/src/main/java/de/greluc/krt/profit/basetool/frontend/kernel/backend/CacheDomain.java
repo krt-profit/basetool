@@ -58,6 +58,8 @@ public enum CacheDomain {
   ITEM_CATALOG("itemCatalogue", Duration.ofHours(6)),
   /** The quality-tier catalogue the order pages label and pick tiers from (REQ-ORDERS-036). */
   QUALITY_TIER("qualityTierCatalogue", Duration.ofHours(1)),
+  /** The dashboard widget catalogue, which only changes with a release. */
+  DASHBOARD_WIDGET("dashboardWidgetCatalogue", Duration.ofHours(6)),
   /** Global system settings surfaced on the orders pages (job-order age thresholds). */
   SETTINGS("settingsCatalogue", Duration.ofHours(2));
 

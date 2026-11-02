@@ -60,9 +60,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @PreAuthorize("isAuthenticated()")
 public class DashboardWorkWidgetController {
 
-  /** The rows of the bank widget while the member chose none. */
-  private static final int BANK_DEFAULT_ROWS = 3;
-
   private static final String FRAGMENTS = "dashboard/fragments/work-widgets :: ";
 
   private final JobOrderBackendClient orderClient;
@@ -70,6 +67,8 @@ public class DashboardWorkWidgetController {
   private final StockLevelBackendClient stockLevelClient;
 
   private final OrgUnitBankAccountsBackendClient bankClient;
+
+  private final DashboardWidgetOptions options;
 
   /**
    * Renders the orders the member is an assignee of, by priority.
@@ -85,13 +84,12 @@ public class DashboardWorkWidgetController {
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved =
-        DashboardWidgetOptions.orderStatus(DashboardWidgetType.ASSIGNED_ORDERS, status);
+    DashboardStatus resolved = options.status(DashboardWidgetType.ASSIGNED_ORDERS, status);
     PageResponse<JobOrderDto> page =
         orderClient.orders(
             OrderListScope.ASSIGNED,
             0,
-            DashboardWidgetOptions.rows(rows),
+            options.rows(DashboardWidgetType.ASSIGNED_ORDERS, rows),
             DashboardWidgetOptions.orderStatuses(resolved),
             List.of());
     model.addAttribute("assignedOrders", PageResponse.contentOf(page));
@@ -116,7 +114,8 @@ public class DashboardWorkWidgetController {
     List<StockLevelDto> low = stockLevelClient.lowLevels(unit);
     List<StockLevelDto> levels = low == null ? List.of() : low;
     model.addAttribute(
-        "lowLevels", levels.stream().limit(DashboardWidgetOptions.rows(rows)).toList());
+        "lowLevels",
+        levels.stream().limit(options.rows(DashboardWidgetType.LOW_STOCK, rows)).toList());
     model.addAttribute("lowTotal", levels.size());
     model.addAttribute("lowShowsUnit", unit == null);
     return FRAGMENTS + "lowStock";
@@ -133,7 +132,7 @@ public class DashboardWorkWidgetController {
   @GetMapping(value = "/bank", headers = AJAX)
   public String bank(@NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<OrgUnitBankVisibleAccountDto> page =
-        bankClient.firstPage(DashboardWidgetOptions.rows(rows, BANK_DEFAULT_ROWS));
+        bankClient.firstPage(options.rows(DashboardWidgetType.BANK, rows));
     List<OrgUnitBankVisibleAccountDto> accounts = PageResponse.contentOf(page);
     Map<UUID, BankSparkline.Spark> sparks = new LinkedHashMap<>();
     accounts.forEach(

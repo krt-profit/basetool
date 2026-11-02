@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.A
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
@@ -72,6 +73,8 @@ public class DashboardWidgetController {
 
   private final OwnOrgUnits ownOrgUnits;
 
+  private final DashboardWidgetOptions options;
+
   /**
    * Renders the missions of the coming days.
    *
@@ -88,8 +91,8 @@ public class DashboardWidgetController {
       @RequestParam(required = false) @Nullable UUID unit,
       @RequestParam(required = false) @Nullable Integer days,
       @RequestParam(required = false) @Nullable Integer rows) {
-    int horizonDays = DashboardWidgetOptions.days(days);
-    int limit = DashboardWidgetOptions.rows(rows);
+    int horizonDays = options.days(DashboardWidgetType.UPCOMING_DAYS, days);
+    int limit = options.rows(DashboardWidgetType.UPCOMING_DAYS, rows);
     List<MissionListDto> missions = loadUpcoming(horizonDays, unit);
     model.addAttribute("upcomingTotal", missions.size());
     model.addAttribute("upcomingMissions", missions.stream().limit(limit).toList());
@@ -131,8 +134,9 @@ public class DashboardWidgetController {
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    model.addAttribute("notificationRows", DashboardWidgetOptions.rows(rows));
-    model.addAttribute("notificationStatus", DashboardWidgetOptions.status(status));
+    model.addAttribute("notificationRows", options.rows(DashboardWidgetType.NOTIFICATIONS, rows));
+    model.addAttribute(
+        "notificationStatus", options.status(DashboardWidgetType.NOTIFICATIONS, status));
     return WIDGETS + "notifications";
   }
 
@@ -159,7 +163,8 @@ public class DashboardWidgetController {
   @GetMapping(value = "/next-mission", headers = AJAX)
   public String nextMission(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
-    model.addAttribute("nextMissions", client.nextMissions(DashboardWidgetOptions.rows(rows)));
+    model.addAttribute(
+        "nextMissions", client.nextMissions(options.rows(DashboardWidgetType.NEXT_MISSION, rows)));
     model.addAttribute(
         "myOrgUnitIds", SectionFallback.load(log, "own-org-units", ownOrgUnits::ids, Set.of()));
     return WIDGETS + "nextMission";
