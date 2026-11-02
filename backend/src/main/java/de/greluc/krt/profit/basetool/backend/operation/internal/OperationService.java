@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -85,7 +86,7 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     return operationRepository.findAllScoped(
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
@@ -120,7 +121,7 @@ public class OperationService {
         (status == null || status.isEmpty())
             ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
             : status;
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     return operationRepository.searchOperations(
         LikePatterns.escapeNullable(query),
         start,
@@ -144,7 +145,7 @@ public class OperationService {
    */
   @NotNull
   public List<OperationReferenceDto> findAllReference() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     Instant terminalCutoff =
         OffsetDateTime.now(ZoneOffset.UTC)
             .minusMonths(REFERENCE_TERMINAL_CUTOFF_MONTHS)

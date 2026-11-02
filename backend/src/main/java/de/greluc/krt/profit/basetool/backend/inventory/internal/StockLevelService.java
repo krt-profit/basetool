@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
@@ -95,7 +96,7 @@ public class StockLevelService {
     if (limit != null && limit < 1) {
       throw new BadRequestException("The limit must be at least 1");
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     Stream<StockLevelDto> levels =
         figures
             .toDtos(
@@ -140,7 +141,7 @@ public class StockLevelService {
    */
   @Transactional(readOnly = true)
   public @NotNull List<OrgUnitReferenceDto> maintainableUnits() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<OrgUnit> candidates;
     if (scope.adminAllScope()) {
       candidates = orgUnitRepository.findActiveSquadronsAndSpecialCommands();

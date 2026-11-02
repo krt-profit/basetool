@@ -62,6 +62,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -216,7 +217,9 @@ class JobOrderServiceAssigneeAndListTest {
 
     @BeforeEach
     void stubScope() {
-      lenient().when(ownerScopeService.currentScopePredicate()).thenReturn(adminAllScope);
+      lenient()
+          .when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
+          .thenReturn(adminAllScope);
       lenient().when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     }
 
@@ -389,7 +392,7 @@ class JobOrderServiceAssigneeAndListTest {
       UUID sqA = UUID.randomUUID();
       UUID sqB = UUID.randomUUID();
       Set<UUID> union = Set.of(sqA, sqB);
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, union));
       when(jobOrderRepository.findScopedJobOrders(
               allStatuses,
@@ -428,7 +431,7 @@ class JobOrderServiceAssigneeAndListTest {
       UUID cascaded = UUID.randomUUID();
       Set<UUID> union = Set.of(staffel, sk, cascaded);
       Set<UUID> direct = Set.of(staffel, sk);
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, union));
       when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(direct);
       when(jobOrderRepository.findScopedJobOrders(
@@ -465,8 +468,10 @@ class JobOrderServiceAssigneeAndListTest {
     void toProcess_pinned_forwardsOnlyThePinnedUnit() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       UUID pinned = UUID.randomUUID();
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, pinned, Set.of()));
+      when(ownerScopeService.currentDirectMembershipOrgUnitIds())
+          .thenReturn(Set.of(pinned, UUID.randomUUID()));
       when(jobOrderRepository.findScopedJobOrders(
               allStatuses,
               true,
@@ -482,7 +487,6 @@ class JobOrderServiceAssigneeAndListTest {
 
       queryService.getAllJobOrders(null, null, true, pageable);
 
-      verify(ownerScopeService, never()).currentDirectMembershipOrgUnitIds();
       verify(jobOrderRepository)
           .findScopedJobOrders(
               allStatuses,
@@ -503,7 +507,7 @@ class JobOrderServiceAssigneeAndListTest {
       UUID staffel = UUID.randomUUID();
       UUID sk = UUID.randomUUID();
       Set<UUID> union = Set.of(staffel, sk);
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, union));
       when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(union);
       when(jobOrderRepository.findScopedJobOrders(

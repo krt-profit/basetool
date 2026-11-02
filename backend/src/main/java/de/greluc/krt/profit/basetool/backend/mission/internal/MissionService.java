@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
@@ -130,7 +131,7 @@ public class MissionService implements MissionCommands {
    * @return lightweight reference projection of the picker-visible missions for the caller
    */
   public List<MissionReferenceDto> findAllActiveReference() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     Instant terminalCutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
     return missionRepository.findAllActiveReference(
         scope.adminAllScope(),
@@ -197,7 +198,7 @@ public class MissionService implements MissionCommands {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
     Boolean effectiveIsInternal = isInternal;
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER);
     return missionRepository.searchMissions(
         LikePatterns.escapeNullable(query),
         start,

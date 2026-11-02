@@ -29,14 +29,19 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.LagerFilter;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -48,15 +53,17 @@ import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAutho
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -89,6 +96,9 @@ class GrantCascadeAggregateAccessIntegrationTest {
   @Autowired private LocationRepository locationRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
+  @Autowired private InventoryAggregationService inventoryAggregationService;
+  @Autowired private RefineryOrderService refineryOrderService;
+  @Autowired private MissionService missionService;
   @Autowired private TransactionTemplate transactionTemplate;
 
   private UUID bereichId;
@@ -126,6 +136,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
       mission.setOwningOrgUnit(child);
       mission.setName("Cascade-Mission-" + tag);
       mission.setIsInternal(true);
+      mission.setStatus("PLANNED");
       internalMissionId = missionRepository.save(mission).getId();
 
       Location location = new Location();
@@ -231,6 +242,62 @@ class GrantCascadeAggregateAccessIntegrationTest {
         .isTrue();
   }
 
+  private List<UUID> inventoryListIds() {
+    return inventoryAggregationService
+        .getAllInventory(LagerFilter.NONE, PageRequest.of(0, 1000))
+        .map(InventoryItemDto::id)
+        .getContent();
+  }
+
+  private List<UUID> refineryListIds() {
+    return refineryOrderService.getAllRefineryOrders(PageRequest.of(0, 1000)).stream()
+        .map(RefineryOrder::getId)
+        .toList();
+  }
+
+  private List<UUID> missionPickerIds() {
+    return missionService.findAllActiveReference().stream().map(MissionReferenceDto::id).toList();
+  }
+
+  @Test
+  void aLogisticianGrantOnTheBereichListsTheInventoryRowsAndRefineryOrdersBelow() {
+    assertThat(asCaller(logisticianGrant(bereichId), this::inventoryListIds))
+        .contains(inventoryRowId);
+    assertThat(asCaller(logisticianGrant(bereichId), this::refineryListIds))
+        .contains(refineryOrderId);
+  }
+
+  @Test
+  void aSiblingGrantOrTheWrongRoleListsNeitherRowNorOrder() {
+    assertThat(asCaller(logisticianGrant(siblingId), this::inventoryListIds))
+        .doesNotContain(inventoryRowId);
+    assertThat(asCaller(missionGrant(bereichId), this::inventoryListIds))
+        .doesNotContain(inventoryRowId);
+    assertThat(asCaller(logisticianGrant(siblingId), this::refineryListIds))
+        .doesNotContain(refineryOrderId);
+    assertThat(asCaller(null, this::refineryListIds)).doesNotContain(refineryOrderId);
+  }
+
+  @Test
+  void aPinNarrowsTheListsToTheGrantedPinnedUnit() {
+    assertThat(asCaller(logisticianGrant(bereichId), siblingId, this::inventoryListIds))
+        .doesNotContain(inventoryRowId);
+    assertThat(asCaller(logisticianGrant(bereichId), childId, this::inventoryListIds))
+        .contains(inventoryRowId);
+    assertThat(asCaller(logisticianGrant(bereichId), siblingId, this::refineryListIds))
+        .doesNotContain(refineryOrderId);
+    assertThat(asCaller(logisticianGrant(bereichId), childId, this::refineryListIds))
+        .contains(refineryOrderId);
+  }
+
+  @Test
+  void aMissionManagerGrantOnTheBereichListsTheInternalMissionBelowAndASiblingGrantDoesNot() {
+    assertThat(asCaller(missionGrant(bereichId), this::missionPickerIds))
+        .contains(internalMissionId);
+    assertThat(asCaller(missionGrant(siblingId), this::missionPickerIds))
+        .doesNotContain(internalMissionId);
+  }
+
   private boolean sees(UUID missionId) {
     return missionAccessPolicy.canSeeMission(missionId);
   }
@@ -243,11 +310,11 @@ class GrantCascadeAggregateAccessIntegrationTest {
     return new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitId);
   }
 
-  private boolean asCaller(GrantedAuthority grant, BooleanSupplier check) {
+  private <T> T asCaller(GrantedAuthority grant, Supplier<T> check) {
     return asCaller(grant, null, check);
   }
 
-  private boolean asCaller(GrantedAuthority grant, UUID pin, BooleanSupplier check) {
+  private <T> T asCaller(GrantedAuthority grant, UUID pin, Supplier<T> check) {
     List<GrantedAuthority> authorities = new java.util.ArrayList<>();
     authorities.add(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"));
     if (grant != null) {
@@ -267,7 +334,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
       request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, pin.toString());
     }
     RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-    return transactionTemplate.execute(_ -> check.getAsBoolean());
+    return transactionTemplate.execute(_ -> check.get());
   }
 
   private static String flatRole(GrantedAuthority grant) {

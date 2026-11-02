@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
@@ -90,7 +91,7 @@ public class InventoryAggregationService {
    * @return paged aggregated DTOs (material + total amount + average quality)
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     LowStockSubjects low = stockLevelService.lowSubjects();
     return inventoryItemRepository
         .getAggregatedInventory(
@@ -115,7 +116,7 @@ public class InventoryAggregationService {
    * @return paged aggregated DTOs carrying the game-item reference and the total amount
    */
   public Page<AggregatedInventoryDto> getAggregatedItemInventory(Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     LowStockSubjects low = stockLevelService.lowSubjects();
     return inventoryItemRepository
         .getAggregatedItemInventory(
@@ -141,7 +142,7 @@ public class InventoryAggregationService {
   public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
     Material material =
         Entities.require(materialRepository.findById(materialId), "Material not found");
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findByMaterialAndPersonalFalseScoped(
             material,
@@ -164,7 +165,7 @@ public class InventoryAggregationService {
   public Page<InventoryItemDto> getInventoryByGameItem(UUID gameItemId, Pageable pageable) {
     GameItem gameItem =
         Entities.require(gameItemRepository.findById(gameItemId), "Game item not found");
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findByGameItemAndPersonalFalseScoped(
             gameItem,
@@ -318,7 +319,7 @@ public class InventoryAggregationService {
     if (filter.stolenContradiction()) {
       return List.of();
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findGlobalStacks(
             filter.hasMaterials(),
@@ -471,7 +472,7 @@ public class InventoryAggregationService {
       return List.of();
     }
     ItemAttributeFilter attributes = filter.attributes();
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<InventoryItemStackAggregate> stacks =
         inventoryItemViewRepository.findGlobalItemStacks(
             filter.hasGameItems(),
@@ -728,7 +729,7 @@ public class InventoryAggregationService {
       Boolean stolen,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findGlobalStackEntries(
             materialId,
@@ -800,7 +801,7 @@ public class InventoryAggregationService {
       Boolean stolen,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findGlobalItemStackEntries(
             gameItemId,
@@ -839,7 +840,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getAllInventory(
       @NotNull LagerFilter filter, @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findGlobalByFilters(
             filter.hasMaterials(),
@@ -868,7 +869,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getAllItemInventory(
       @NotNull LagerFilter filter, @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findGlobalItemsByFilters(
             filter.hasGameItems(),

@@ -101,6 +101,18 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentScopePredicateGranting(String)}: the scope
+   * vector widened by the caller's covering grant of {@code roleName}.
+   *
+   * @param roleName the contextual role of the surface; never {@code null}.
+   * @return a never-null scope vector for the list queries of that surface.
+   */
+  @NotNull
+  public ScopePredicate currentScopePredicateGranting(@NotNull String roleName) {
+    return requestScopeResolver.currentScopePredicateGranting(roleName);
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentUnitOverviewScope()}: the hangar unit-overview
    * scope, which widens a non-pinned OL member to the admin-all read (REQ-HANGAR-003 / ADR-0048).
    *

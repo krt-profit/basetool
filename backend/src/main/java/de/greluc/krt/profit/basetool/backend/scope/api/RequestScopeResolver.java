@@ -179,6 +179,35 @@ public class RequestScopeResolver {
   }
 
   /**
+   * The {@link #currentScopePredicate()} widened by the caller's grant of {@code roleName}: a
+   * non-admin's scope also covers the units their Logistician or Mission Manager grant reaches,
+   * cascade included (decision 18, REQ-SEC-005). A pin applies when it lies in the widened set.
+   * Admins and callers without a grant get exactly {@link #currentScopePredicate()}.
+   *
+   * @param roleName the contextual role of the surface, {@link Roles#LOGISTICIAN} or {@link
+   *     Roles#MISSION_MANAGER}; never {@code null}
+   * @return a never-null scope vector for the list queries of that surface
+   */
+  @NotNull
+  public ScopePredicate currentScopePredicateGranting(@NotNull String roleName) {
+    ScopePredicate base = currentScopePredicate();
+    if (base.adminAllScope() || authHelper.isAdmin()) {
+      return base;
+    }
+    Set<UUID> granted = currentGrantedOrgUnitIds(roleName);
+    if (granted.isEmpty()) {
+      return base;
+    }
+    Set<UUID> reach = new LinkedHashSet<>(currentMemberOrgUnitIds());
+    reach.addAll(granted);
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    if (pinned.isPresent() && reach.contains(pinned.get())) {
+      return new ScopePredicate(false, pinned.get(), Set.of());
+    }
+    return new ScopePredicate(false, null, reach);
+  }
+
+  /**
    * Scope for the hangar unit overview (REQ-HANGAR-003): like {@link #currentScopePredicate()},
    * except that an unpinned OL member gets {@code adminAllScope}, including ownerless ships
    * (ADR-0048). Grants no other admin rights.

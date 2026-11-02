@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
@@ -142,7 +143,7 @@ class JobOrderMaterialDemandServiceTest {
    */
   private void givenVisibleOrders(List<JobOrder> orders) {
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))
@@ -314,7 +315,7 @@ class JobOrderMaterialDemandServiceTest {
     UUID activeOrgUnit = UUID.randomUUID();
     Set<UUID> memberships = Set.of(UUID.randomUUID());
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, activeOrgUnit, memberships));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(false), eq(activeOrgUnit), eq(memberships)))
@@ -355,7 +356,7 @@ class JobOrderMaterialDemandServiceTest {
     JobOrder order = materialOrder(skCommand, 5, titanium, QualityTierFixtures.none(), 500.0);
 
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))
@@ -433,7 +434,7 @@ class JobOrderMaterialDemandServiceTest {
     JobOrder order = materialOrder(alpha, 7, stileron, QualityTierFixtures.good(), 0.1);
     order.getMaterials().add(line(stileron, QualityTierFixtures.none(), 2.64));
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))

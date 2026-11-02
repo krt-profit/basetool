@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -172,13 +173,16 @@ public class JobOrderQueryService {
           : assignedOnly(statusesOrAll(statuses), squadronIds, pageable);
     }
     List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
     if (toProcess) {
+      Set<UUID> directUnits = ownerScopeService.currentDirectMembershipOrgUnitIds();
       processingOrgUnitIds =
-          scope.activeOrgUnitId() != null
-              ? Set.of(scope.activeOrgUnitId())
-              : ownerScopeService.currentDirectMembershipOrgUnitIds();
+          scope.activeOrgUnitId() == null
+              ? directUnits
+              : directUnits.contains(scope.activeOrgUnitId())
+                  ? Set.of(scope.activeOrgUnitId())
+                  : Set.of();
       if (processingOrgUnitId != null) {
         processingOrgUnitIds =
             processingOrgUnitIds.contains(processingOrgUnitId)
@@ -286,7 +290,7 @@ public class JobOrderQueryService {
     if (callerId == null) {
       return List.of();
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return jobOrderRepository
         .findVisibleByNumberPrefix(
             numberPrefix,

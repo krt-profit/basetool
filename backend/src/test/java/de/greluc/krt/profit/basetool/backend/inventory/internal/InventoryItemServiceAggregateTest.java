@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
@@ -308,7 +309,7 @@ class InventoryItemServiceAggregateTest {
   /** Stubs the scoped stack query to return no stacks (for the filter-routing verifications). */
   private void stubFindGlobalStacks() {
     lenient()
-        .when(ownerScopeService.currentScopePredicate())
+        .when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     lenient()
         .when(
@@ -333,7 +334,7 @@ class InventoryItemServiceAggregateTest {
   /** Stubs the scoped stack query to return the given per-stack aggregates. */
   private void stubGlobalStacks(InventoryStackAggregate... aggregates) {
     lenient()
-        .when(ownerScopeService.currentScopePredicate())
+        .when(ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(inventoryItemRepository.findGlobalStacks(
             anyBoolean(),

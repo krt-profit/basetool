@@ -284,13 +284,14 @@ public enum DashboardWidgetType {
   }
 
   /**
-   * Whether the member still holds the roles the widget needs, whatever the context says.
+   * Whether the member still holds the roles and rights the widget needs in some context, as the
+   * navigation counts a lost right ({@link NavigationGate#permitsUserWide}).
    *
    * @param access the caller's reachable roles and flags
    * @return {@code true} iff the widget's instances may stay stored
    */
-  public boolean permitsRoles(@NotNull NavigationAccess access) {
-    return gate.permitsRoles(access);
+  public boolean permitsUserWide(@NotNull NavigationAccess access) {
+    return gate.permitsUserWide(access);
   }
 
   /**

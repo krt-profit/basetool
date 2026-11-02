@@ -2415,7 +2415,9 @@ optimistic-lock version, so an edit in one never 409s another:
   only when the caller holds officer reach in no unit (`canActAsOfficerAnywhere`); a right that
   does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
   switches of the installation and the page, and a capability read that failed, delete nothing.
-  The stored start pages of both modes are checked like every other stored key.
+  The stored start pages of both modes are checked like every other stored key. Dashboard widgets
+  follow the same classification: an instance whose gate (roles and flags) the member lost user-wide
+  is deleted (`DashboardWidgetType#permitsUserWide`); unknown rights delete nothing.
 
 **Browser-side state stays in the browser** (REQ-UI-017, ADR-0120): group collapse
 (`krt.sidebar.*`), the recent pages (`krt.recent`) and the „Häufig" ranking (REQ-UI-033).

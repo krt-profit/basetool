@@ -53,7 +53,7 @@ record DashboardContext(
     NavigationAccess access =
         model.getAttribute("navigationAccess") instanceof NavigationAccess known
             ? known
-            : new NavigationAccess(Set.of(), Set.of());
+            : new NavigationAccess(Set.of(), Set.of(), false);
     UUID activeUnitId =
         model.getAttribute("activeSquadronId") instanceof UUID pinned ? pinned : null;
     List<OrgUnitMembershipOptionDto> units =

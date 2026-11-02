@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
@@ -198,7 +199,7 @@ class OperationServiceTest {
   void shouldGetAllOperations() {
     PageRequest pageable = PageRequest.of(0, 10);
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(operationRepository.findAllScoped(true, null, Set.of(), false, null, pageable))
         .thenReturn(page);
@@ -218,7 +219,7 @@ class OperationServiceTest {
       UUID squadronId = UUID.randomUUID();
       List<String> requestedStatus = List.of("PLANNED", "ACTIVE");
 
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
       when(operationRepository.searchOperations(
               "alpha",
@@ -254,7 +255,7 @@ class OperationServiceTest {
     @Test
     void nullStatusList_fallsBackToFullEnumSet() {
       PageRequest pageable = PageRequest.of(0, 20);
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.captor();
       when(operationRepository.searchOperations(
@@ -283,7 +284,7 @@ class OperationServiceTest {
     @Test
     void emptyStatusList_alsoFallsBackToFullEnumSet() {
       PageRequest pageable = PageRequest.of(0, 20);
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.captor();
       when(operationRepository.searchOperations(
@@ -307,7 +308,7 @@ class OperationServiceTest {
     @Test
     void adminAllSquadronsMode_passesNullScopeToRepository() {
       PageRequest pageable = PageRequest.of(0, 20);
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
               any(),
@@ -334,7 +335,7 @@ class OperationServiceTest {
       PageRequest pageable = PageRequest.of(0, 20);
       Instant start = Instant.parse("2026-06-01T00:00:00Z");
       Instant end = Instant.parse("2026-06-30T23:59:00Z");
-      when(ownerScopeService.currentScopePredicate())
+      when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
               any(),

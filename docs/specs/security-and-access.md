@@ -449,7 +449,13 @@ set; a pin outside it covers nothing. Admins are unrestricted. The aggregate acc
 same set: a Logistician grant covering a unit also opens the read and edit of that unit's Lager rows
 and refinery orders and the read of its job orders, and a Mission Manager grant the read of its
 internal missions and operations (`AccessGateService#canSeeSquadronAsGrantee`, `permitsOwnedRow` with
-the role), so the cascade needs no leadership seat to reach a child unit. **Enforced by:**
+the role), so the cascade needs no leadership seat to reach a child unit. The lists read the same set
+(`RequestScopeResolver#currentScopePredicateGranting(role)`: the membership scope plus the granted
+units, a pin narrowing to the pinned unit when it lies in the union): the Lager lists and mission
+inventory, the stock levels and their maintainable units, the refinery order lists and the job-order
+list, number lookup and material demand take the Logistician grant; the mission picker and search
+and the operation lists take the Mission Manager grant. The „nächster Einsatz" banner and the
+upcoming-missions widget stay on the own units (REQ-MISSION-008). **Enforced by:**
 `GrantCascadeTest`, `GrantCascadeAggregateAccessIntegrationTest`, `OrgUnitCascadeServiceTest`,
 `LogisticianPerUnitSurfacesTest`.
 
