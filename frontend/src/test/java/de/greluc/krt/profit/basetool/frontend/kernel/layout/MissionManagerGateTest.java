@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -27,6 +28,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
@@ -84,9 +87,17 @@ class MissionManagerGateTest {
   @Test
   void backendFailure_failsClosed() {
     when(backendApiClient.get(MissionManagerGate.CAPABILITIES_PATH, CapabilitiesResponse.class))
-        .thenThrow(new IllegalStateException("backend down"));
+        .thenThrow(new BackendServiceException("backend down", null, 503));
 
     assertFalse(gate.isGranted());
+  }
+
+  @Test
+  void lostSession_isRethrownNotReadAsRefused() {
+    when(backendApiClient.get(MissionManagerGate.CAPABILITIES_PATH, CapabilitiesResponse.class))
+        .thenThrow(new ReauthenticationRequiredException("session expired", null));
+
+    assertThrows(ReauthenticationRequiredException.class, gate::isGranted);
   }
 
   @Test

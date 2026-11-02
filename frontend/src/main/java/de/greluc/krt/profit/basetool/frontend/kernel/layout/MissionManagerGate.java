@@ -31,8 +31,8 @@ import org.springframework.stereotype.Component;
  * flag decides, never the flat role.
  *
  * <p>Referenced from SpEL as {@code @missionManagerGate}. The answer is read once per request and
- * memoised on it; any failure reads as "not granted". The backend re-checks the owning unit of
- * every write.
+ * memoised on it; a failed backend call reads as "not granted". The backend re-checks the owning
+ * unit of every write.
  */
 @Component(MissionManagerGate.BEAN_NAME)
 public class MissionManagerGate {
