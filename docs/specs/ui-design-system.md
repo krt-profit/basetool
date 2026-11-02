@@ -2416,8 +2416,11 @@ optimistic-lock version, so an edit in one never 409s another:
   entry registry no longer knows, is detected by the frontend while it builds the navigation and
   deleted from every section through the backend, which holds no key-to-permission knowledge.
   Unavailability in the active context deletes nothing. Regaining a role restores nothing. A right
-  tied to the pinned unit (the Leitung and promotion-management entries) counts as lost user-wide
-  only when the caller holds officer reach in no unit (`canActAsOfficerAnywhere`); a right that
+  tied to the pinned unit (the Leitung entry) counts as lost user-wide only when the caller holds
+  officer reach in no unit (`canActAsOfficerAnywhere`); the promotion-management entries only when
+  no unit with promotion enabled is in officer reach (`canManagePromotionsAnywhere`) and the
+  promotion pages for a member when none is among their units or reach (`canUsePromotionAnywhere`,
+  REQ-PROMO-004); a right that
   does not depend on the pin (job orders, blueprint overview) is lost when its flag is off; the
   switches of the installation and the page, and a capability read that failed, delete nothing.
   The stored start pages of both modes are checked like every other stored key. Dashboard widgets
