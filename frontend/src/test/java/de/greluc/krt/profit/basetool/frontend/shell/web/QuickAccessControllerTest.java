@@ -62,8 +62,8 @@ class QuickAccessControllerTest {
 
     assertThat(controller.entries())
         .containsExactly(
-            new QuickAccessItem("/a", "Alpha", "Group", "list", "first one"),
-            new QuickAccessItem("/b", "Beta", "Group", "gear", ""));
+            new QuickAccessItem("/a", "Alpha", "Group", "list", "first one", null),
+            new QuickAccessItem("/b", "Beta", "Group", "gear", "", null));
   }
 
   /** An entry of a hidden page is left out; entries of other pages and of no page stay. */
@@ -75,8 +75,9 @@ class QuickAccessControllerTest {
         new QuickAccessController(
             List.of(() ->
                 List.of(
-                    new QuickAccessEntry("/s", "s.label", "c", "list", "k", "supply.needs"),
-                    new QuickAccessEntry("/p", "p.label", "c", "list", "k", "bank.dashboard"),
+                    QuickAccessEntry.tab("/s", "s.label", "c", "list", "k", "supply.needs", "a.b"),
+                    QuickAccessEntry.tab(
+                        "/p", "p.label", "c", "list", "k", "bank.dashboard", "c.d"),
                     new QuickAccessEntry("/n", "n.label", "c", "list", "k"))),
             messages,
             () -> Set.of("supply.needs"));
@@ -91,5 +92,26 @@ class QuickAccessControllerTest {
         new QuickAccessController(List.of(List::of), new StaticMessageSource(), Set::of);
 
     assertThat(controller.entries()).isEmpty();
+  }
+
+  /** A registered tab carries its entry key to the client; an entry without one carries none. */
+  @Test
+  void carriesTheEntryKeyOfARegisteredTab() {
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    QuickAccessController controller =
+        new QuickAccessController(
+            List.of(() ->
+                List.of(
+                    QuickAccessEntry.tab(
+                        "/s", "s.label", "c", "list", "k", "supply.needs", "supply.stats"),
+                    new QuickAccessEntry("/n", "n.label", "c", "list", "k"))),
+            new StaticMessageSource(),
+            Set::of);
+
+    assertThat(controller.entries())
+        .extracting(QuickAccessItem::href, QuickAccessItem::key)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("/s", "supply.stats"),
+            org.assertj.core.groups.Tuple.tuple("/n", null));
   }
 }

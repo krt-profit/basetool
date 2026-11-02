@@ -56,7 +56,7 @@ class MemberQuickAccessSearchContributorTest {
     assertThat(everybody)
         .extracting(QuickAccessHit::name)
         .containsExactlyInAnyOrder(
-            "Alice", "Eric", "Gustav Freitext", "Dora", "Cara", "Bob", "Fred");
+            "Alice", "Eric", "Gustav Freitext", "Dora", "Cara", "Bob", "Fred", "Hugo", "Ida");
   }
 
   /** A hit highlights the person on the chart and shows the rank held there as its status. */

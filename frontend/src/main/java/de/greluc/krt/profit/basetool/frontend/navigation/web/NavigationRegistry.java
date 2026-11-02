@@ -528,13 +528,56 @@ public class NavigationRegistry {
         of("purchasing.deals", "/purchasing/deals", "nav.section.supply")
             .tab("nav.purchasing.deals")
             .keywords("palette.keywords.purchasing")
-            .gate(NavigationGate.requires(PURCHASING).andExcludes(SUPPLY))
+            .gate(NavigationGate.requires(PURCHASING))
+            .menuUnless(SUPPLY)
             .testId("nav-purchasing-deals"),
         of("supply.donations", "/supply/donations/mine", "nav.supply.mine")
             .keywords("palette.keywords.supplyMine")
             .gate(NavigationGate.requires(SUPPLY))
             .testId("nav-supply-mine")
-            .with(PALETTE_ONLY));
+            .with(PALETTE_ONLY),
+        dataTab(
+                "supply.incoming",
+                "/supply/donations/incoming",
+                "supply.tab.incoming",
+                "supplyIncoming")
+            .gate(NavigationGate.requires(SUPPLY)),
+        dataTab("supply.stats", "/supply/stats", "supply.tab.stats", "supplyStats")
+            .gate(NavigationGate.requires(SUPPLY)),
+        dataTab(
+                "purchasing.partners",
+                "/purchasing/partners",
+                "purchasing.tab.partners",
+                "purchasingPartners")
+            .gate(NavigationGate.requires(PURCHASING)),
+        dataTab(
+                "purchasing.delegates",
+                "/purchasing/delegates",
+                "purchasing.tab.delegates",
+                "purchasingDelegates")
+            .gate(NavigationGate.requires(PURCHASING)),
+        dataTab(
+                "purchasing.report",
+                "/purchasing/report",
+                "purchasing.tab.report",
+                "purchasingReport")
+            .gate(NavigationGate.requires(PURCHASING)));
+  }
+
+  /**
+   * A tab of the supply or purchasing page that only some callers see, offered by the on-demand
+   * quick access rather than by the rendered index (ADR-0282).
+   */
+  @NotNull
+  private static NavigationEntry dataTab(
+      @NotNull String key,
+      @NotNull String href,
+      @NotNull String tabLabelKey,
+      @NotNull String term) {
+    return of(key, href, "palette.page." + term)
+        .tab(tabLabelKey)
+        .keywords("palette.keywords." + term)
+        .with(PALETTE_ONLY, NOT_INDEXED);
   }
 
   @NotNull
@@ -761,7 +804,15 @@ public class NavigationRegistry {
             "orders.demand",
             "blueprints.availability"),
         NavigationPageTabs.of("materials.list", "materials.overview", "materials.profit"),
-        NavigationPageTabs.of("supply.needs", "supply.donations", "purchasing.deals"),
+        NavigationPageTabs.of(
+            "supply.needs",
+            "supply.donations",
+            "supply.incoming",
+            "supply.stats",
+            "purchasing.deals",
+            "purchasing.partners",
+            "purchasing.delegates",
+            "purchasing.report"),
         NavigationPageTabs.of("orgchart.view", "orgunitbank.overview", "organisation.leadership"),
         NavigationPageTabs.of("promotion.overview", "promotion.evaluations", "promotion.manage")
             .covering("promotion.manage", "promotion.topics", "promotion.ranks"),

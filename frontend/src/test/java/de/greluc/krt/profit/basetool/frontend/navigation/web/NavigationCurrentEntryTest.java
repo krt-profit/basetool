@@ -126,4 +126,33 @@ class NavigationCurrentEntryTest {
     assertThat(menu.starrable(registry.entry("home.dashboard").orElseThrow())).isFalse();
     assertThat(menu.starrable(registry.entry("action.handbook").orElseThrow())).isFalse();
   }
+
+  @Test
+  @DisplayName("the Ankauf tab stays a current, favouritable and available entry beside supply")
+  void theMenuDedupDoesNotRemoveTheAnkaufTab() {
+    Set<NavigationFlag> both = Set.of(NavigationFlag.SUPPLY, NavigationFlag.PURCHASING);
+    NavigationMenu menu = menu(Set.of("KRT_MEMBER"), both);
+    NavigationEntry deals = registry.starrable("purchasing.deals").orElseThrow();
+
+    assertThat(current(menu, "/purchasing/deals")).isEqualTo("purchasing.deals");
+    assertThat(menu.starrable(deals)).isTrue();
+    assertThat(
+            registry.availability(deals, new NavigationAccess(Set.of("KRT_MEMBER"), both)).name())
+        .isEqualTo("AVAILABLE");
+  }
+
+  @Test
+  @DisplayName("the supply and purchasing tabs with a data-dependent audience are favouritable")
+  void theRemainingTabsAreStarrable() {
+    NavigationMenu supply = menu(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.SUPPLY));
+    NavigationMenu purchasing = menu(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.PURCHASING));
+
+    assertThat(current(supply, "/supply/donations/incoming")).isEqualTo("supply.incoming");
+    assertThat(current(supply, "/supply/stats")).isEqualTo("supply.stats");
+    assertThat(current(purchasing, "/purchasing/partners")).isEqualTo("purchasing.partners");
+    assertThat(current(purchasing, "/purchasing/delegates")).isEqualTo("purchasing.delegates");
+    assertThat(current(purchasing, "/purchasing/report")).isEqualTo("purchasing.report");
+    assertThat(current(menu(Set.of("KRT_MEMBER"), Set.of()), "/supply/stats")).isNull();
+    assertThat(current(supply, "/purchasing/report")).isNull();
+  }
 }
