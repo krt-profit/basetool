@@ -428,6 +428,20 @@ cannot carry that signal — its traffic never arrives from a public address, an
 names exactly the container-network gateways. A failing run notifies via GitHub's workflow-failure
 e-mail, not Alertmanager.
 
+## Dashboard 07: navigation and quick access
+
+Panels 92 to 96 of `07-basetool-operations.json` watch the navigation and the quick access
+(REQ-UI-032, REQ-UI-033, REQ-OBS-011); `NavigationEndpointsErroring` and `QuickAccessSearchSlow`
+alert on them.
+
+| Panel | Query | Reads as |
+| --- | --- | --- |
+| 92 Navigation preference writes/hour | `basetool_navigation_preference_writes_total` by `section`, `outcome` | Writes of favourites, hidden pages, order, appearance and tab bars; a `conflict` is a stale section version, an `error` a failed write. |
+| 93 Personalised navigation accounts | `basetool_navigation_personalised_accounts` by `section` | Accounts holding an entry in a section. |
+| 94 Navigation endpoints 5xx rate | `http_server_requests_seconds_count` on `/api/v1/navigation/*`, `/navigation/*`, `/dashboard/*` | Server errors of the preference and dashboard routes. |
+| 95 Quick-access searches/hour | `basetool_quick_access_search_total` by `kind`, `outcome` | Entity searches per type; `error` failed closed, `timeout` missed the 2 s cap. |
+| 96 Quick-access search p95 | `http_server_requests_seconds_bucket` on `/quick-access/search` | 95th percentile of the entity search. |
+
 ## Operating procedures
 
 Every command here runs on the host as root unless it says otherwise. The container uid `N` is
