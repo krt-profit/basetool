@@ -134,6 +134,16 @@ class NavigationOrderE2eTest {
     return ((List<?>) page.evaluate(script)).stream().map(String::valueOf).toList();
   }
 
+  /**
+   * Waits until the list that {@code script} reads holds exactly {@code expected}, so a list that
+   * is re-rendered after the control state changed is not compared too early.
+   */
+  private static void awaitKeys(Page page, String script, List<String> expected) {
+    page.waitForFunction(
+        "(expected) => JSON.stringify((" + script.strip() + ")()) === JSON.stringify(expected)",
+        expected);
+  }
+
   private static int orderVersion(Page page) {
     return Integer.parseInt(
         page.locator("[data-favourites-state]").getAttribute("data-order-member-version"));
@@ -275,8 +285,8 @@ class NavigationOrderE2eTest {
 
           assertThat(page.getByTestId("nav-live")).containsText("Standardreihenfolge");
           assertThat(reset).isDisabled();
-          assertEquals(links, keys(page, LINK_KEYS));
-          assertEquals(groups, keys(page, GROUP_KEYS));
+          awaitKeys(page, LINK_KEYS, links);
+          awaitKeys(page, GROUP_KEYS, groups);
         });
   }
 

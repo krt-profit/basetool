@@ -696,6 +696,7 @@ class NavigationE2eTest {
         900,
         "nav-rail-flyouts",
         page -> {
+          page.clock().install();
           try {
             chooseMode(page, "rail");
             E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
@@ -711,7 +712,7 @@ class NavigationE2eTest {
             assertThat(flyout).isVisible();
             assertThat(button).hasAttribute("aria-expanded", "true");
             flyout.locator(".nav-rail-flyout-head").hover();
-            page.waitForTimeout(600);
+            page.clock().runFor(600);
             assertThat(flyout).isVisible();
 
             page.mouse().move(900, 500);
@@ -721,7 +722,7 @@ class NavigationE2eTest {
             button.click();
             assertThat(flyout).isVisible();
             page.mouse().move(900, 500);
-            page.waitForTimeout(600);
+            page.clock().runFor(600);
             assertThat(flyout).isVisible();
             page.locator("[data-testid='page-head'] h1").dispatchEvent("pointerdown");
             assertThat(flyout).isHidden();

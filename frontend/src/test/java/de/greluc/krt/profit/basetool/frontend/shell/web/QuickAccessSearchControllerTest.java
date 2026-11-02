@@ -230,6 +230,7 @@ class QuickAccessSearchControllerTest {
   /** A failing or slow type yields no hits of its own and leaves the others standing. */
   @Test
   void failsClosedPerType() {
+    CountDownLatch neverReleased = new CountDownLatch(1);
     QuickAccessSearchController controller =
         controller(
             contributor(
@@ -241,7 +242,7 @@ class QuickAccessSearchControllerTest {
                 QuickAccessSearchKind.OPERATION,
                 (q, limit) -> {
                   try {
-                    Thread.sleep(TIMEOUT.multipliedBy(5).toMillis());
+                    neverReleased.await();
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                   }
@@ -251,9 +252,13 @@ class QuickAccessSearchControllerTest {
                 QuickAccessSearchKind.MATERIAL,
                 (q, limit) -> List.of(new QuickAccessHit("/materials/1", "steel", null, null))));
 
-    assertThat(controller.search("st", null))
-        .extracting(QuickAccessSearchItem::href)
-        .containsExactly("/materials/1");
+    try {
+      assertThat(controller.search("st", null))
+          .extracting(QuickAccessSearchItem::href)
+          .containsExactly("/materials/1");
+    } finally {
+      neverReleased.countDown();
+    }
     assertThat(count("mission", "error")).isEqualTo(1.0);
     assertThat(count("operation", "timeout")).isEqualTo(1.0);
     assertThat(count("material", "hits")).isEqualTo(1.0);

@@ -391,7 +391,7 @@ class InventoryOperationsE2eTest {
                   + " 'none'; } }");
           page.locator("form[action$='/inventory/input'] button[type='submit']").click();
           assertThat(blankAmount).isFocused();
-          page.waitForTimeout(1_000);
+          E2eSupport.settle(page);
           assertTrue(posts.isEmpty(), "the form must not submit an ambiguous split");
 
           blankAmount.fill("3");
@@ -792,7 +792,7 @@ class InventoryOperationsE2eTest {
           assertThat(page.locator(".notification-toast.error-toast"))
               .containsText((String) page.evaluate("umbuchenI18n.unchanged"));
           assertThat(page.locator("#umbuchenModal")).isVisible();
-          page.waitForTimeout(1_000);
+          E2eSupport.settle(page);
           assertTrue(posts.isEmpty(), "an unchanged target must not reach the backend");
 
           JsonArray stacks = stacksForMaterial(sameLocMatId);
