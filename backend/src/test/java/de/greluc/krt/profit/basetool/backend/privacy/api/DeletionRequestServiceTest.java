@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestedEvent;
@@ -352,7 +351,7 @@ class DeletionRequestServiceTest {
 
     assertEquals(
         1.0,
-        meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).count(),
+        meterRegistry.counter(PrivacyMetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).count(),
         "a swallowed Keycloak delete must bump the counter its alert reads");
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
@@ -380,7 +379,7 @@ class DeletionRequestServiceTest {
     service.execute(REQUEST, false, null);
 
     assertEquals(
-        0.0, meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).count());
+        0.0, meterRegistry.counter(PrivacyMetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).count());
     verify(auditService, never())
         .record(
             eq(AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED), any(), any(), any(), any());

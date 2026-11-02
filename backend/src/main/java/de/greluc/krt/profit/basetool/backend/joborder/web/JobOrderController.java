@@ -20,53 +20,27 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverCreateDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverReportService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMissionAllocationRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
-import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -78,7 +52,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -94,12 +67,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over the job-order aggregate (the request-and-fulfill queue).
+ * REST surface over the job-order aggregate (the request-and-fulfill queue): create, list, read,
+ * update and delete.
  *
  * <p>Reads and mutations are limited to the caller's visibility scope via {@code
  * @ownerScopeService}: SK-responsible orders are public, squadron-responsible orders private to
  * that squadron and admins. Creation needs a login only (ADR-0149); other mutations require
- * LOGISTICIAN or above, delete requires ADMIN.
+ * LOGISTICIAN or above, delete requires ADMIN. Handovers live in {@link
+ * JobOrderHandoverController}, materials and linked stock in {@link JobOrderMaterialController}.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -108,227 +83,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderController {
   private final JobOrderService jobOrderService;
   private final JobOrderQueryService jobOrderQueryService;
-  private final JobOrderMaterialDemandService jobOrderMaterialDemandService;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
-  private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
-  private final JobOrderItemHandoverService jobOrderItemHandoverService;
-  private final JobOrderItemProductionService jobOrderItemProductionService;
-  private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
-  private final JobOrderHandoverService jobOrderHandoverService;
-  private final JobOrderHandoverReportService jobOrderHandoverReportService;
-  private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
-  private final JobOrderMissionAllocationRedactor missionAllocationRedactor;
-
-  /**
-   * Records a materials handover for the job order, unlinking the handed-over items with a single
-   * bulk update after the per-item loop.
-   *
-   * @param id job-order id
-   * @param dto handover create payload (per-item quantities)
-   * @return the persisted handover DTO
-   */
-  @PostMapping("/{id}/handovers")
-  @ResponseStatus(HttpStatus.CREATED)
-  @Operation(
-      summary = "Create a job order handover",
-      description = "Logs a handover of materials for this job order.")
-  @PreAuthorize(
-      "(hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
-  public JobOrderHandoverDto createHandover(
-      @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
-    return jobOrderHandoverService.createHandover(id, dto);
-  }
-
-  /**
-   * Records an item handover for an item order: increments each ordered line's delivered count and
-   * auto-completes the order once every line is fully delivered. Same authorisation as the material
-   * handover (LOGISTICIAN+).
-   *
-   * @param id job-order id
-   * @param dto item-handover payload (per-line delivered quantities)
-   * @return the persisted item-handover DTO
-   */
-  @PostMapping("/{id}/item-handovers")
-  @ResponseStatus(HttpStatus.CREATED)
-  @Operation(
-      summary = "Create an item handover",
-      description = "Logs a handover of produced items for this item order.")
-  @PreAuthorize(
-      "(hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
-  public JobOrderItemHandoverDto createItemHandover(
-      @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
-    return jobOrderItemHandoverService.createItemHandover(id, dto);
-  }
-
-  /**
-   * Books a production run ("Herstellung") against one ordered item line: records the manufactured
-   * units and consumes the linked inventory (REQ-ORDERS-025).
-   *
-   * <p>The consumption plan must exactly cover the per-material demand (422 {@code
-   * PRODUCTION_ALLOCATION}); a stale version gives 409. An optional {@code bookIn} block also books
-   * the produced units in as Lager item stock in the same transaction (REQ-INV-032).
-   *
-   * @param id job-order id
-   * @param itemId ordered item-line id
-   * @param dto production payload (amount, line version, per-entry consumption, optional book-in)
-   * @return the refreshed ordered item-line DTO
-   */
-  @PostMapping("/{id}/items/{itemId}/production")
-  @ResponseStatus(HttpStatus.CREATED)
-  @Operation(
-      summary = "Book production for an item line",
-      description =
-          "Records how many units of an ordered item were manufactured and reduces the linked"
-              + " inventory consumed. The consumption must exactly cover the required material"
-              + " demand. An optional bookIn block additionally books the produced units into the"
-              + " Lager as item stock (location, owner, owning org unit) in the same transaction,"
-              + " by default earmarked for this order; without it the booking behaves exactly as"
-              + " before.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "201", description = "Production booked."),
-    @ApiResponse(
-        responseCode = "400",
-        description =
-            "Not an item order / invalid consumption / invalid book-in (personal combined with the"
-                + " order earmark, or an org-unit picker output that is invalid for the owner)."),
-    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role."),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Order, item line, inventory entry, or book-in owner/location not found."),
-    @ApiResponse(
-        responseCode = "409",
-        description = "Conflict – optimistic locking failure (version mismatch)."),
-    @ApiResponse(
-        responseCode = "422",
-        description = "Amount exceeds remaining-to-manufacture or consumption misses the demand.")
-  })
-  @PreAuthorize(
-      "(hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
-  public JobOrderItemDto bookProduction(
-      @PathVariable UUID id,
-      @PathVariable UUID itemId,
-      @RequestBody @Valid JobOrderItemProductionCreateDto dto) {
-    return jobOrderItemProductionService.bookProduction(id, itemId, dto);
-  }
-
-  /**
-   * Renders a persisted item handover as a downloadable PDF delivery note. The optional {@code
-   * X-User-Time-Zone} header overrides UTC for the document timestamps; an invalid IANA zone is
-   * silently dropped (the service falls back to UTC). Same authorisation as the material report.
-   *
-   * @param jobOrderId job-order id
-   * @param handoverId item-handover id
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
-   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
-   */
-  @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")
-  @Operation(
-      summary = "Download item-handover report PDF",
-      description = "Generates and downloads a PDF delivery note for a persisted item handover.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
-    @ApiResponse(responseCode = "403", description = "Forbidden"),
-    @ApiResponse(responseCode = "404", description = "Job order or item handover not found")
-  })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
-  @Parameter(
-      name = "X-User-Time-Zone",
-      in = ParameterIn.HEADER,
-      required = false,
-      schema = @Schema(type = "string"))
-  public ResponseEntity<byte[]> downloadItemHandoverReport(
-      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, @UserZone ZoneId userZone) {
-    byte[] pdf =
-        jobOrderItemHandoverReportService.generateItemHandoverReport(
-            jobOrderId, handoverId, userZone);
-    String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
-    return PdfResponses.pdfAttachment(pdf, filename);
-  }
-
-  /**
-   * Renders a persisted handover as a downloadable PDF. The optional {@code X-User-Time-Zone}
-   * header overrides UTC for the timestamps in the document; an invalid IANA zone is silently
-   * dropped (the service falls back to UTC) rather than failing the request.
-   *
-   * @param jobOrderId job-order id
-   * @param handoverId handover id
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
-   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
-   */
-  @GetMapping("/{jobOrderId}/handovers/{handoverId}/report")
-  @Operation(
-      summary = "Download handover report PDF",
-      description = "Generates and downloads a PDF handover report for a persisted handover.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
-    @ApiResponse(responseCode = "403", description = "Forbidden"),
-    @ApiResponse(responseCode = "404", description = "Job order or handover not found")
-  })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
-  @Parameter(
-      name = "X-User-Time-Zone",
-      in = ParameterIn.HEADER,
-      required = false,
-      schema = @Schema(type = "string"))
-  public ResponseEntity<byte[]> downloadHandoverReport(
-      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, @UserZone ZoneId userZone) {
-    byte[] pdf =
-        jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, userZone);
-    String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
-    return PdfResponses.pdfAttachment(pdf, filename);
-  }
-
-  /**
-   * Renders a preview PDF from unsaved handover data — used by the create-handover form to show the
-   * document before commit. Nothing is persisted.
-   *
-   * @param jobOrderId job-order id
-   * @param dto unsaved handover data
-   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
-   */
-  @PostMapping("/{jobOrderId}/handovers/report/preview")
-  @Operation(
-      summary = "Preview handover report PDF",
-      description = "Generates a PDF handover report preview from unsaved handover data.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
-    @ApiResponse(responseCode = "400", description = "Invalid request data"),
-    @ApiResponse(responseCode = "403", description = "Forbidden")
-  })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
-  public ResponseEntity<byte[]> previewHandoverReport(
-      @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
-    byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
-    String filename = "uebergabeprotokoll-vorschau.pdf";
-    return PdfResponses.pdfAttachment(pdf, filename);
-  }
 
   /**
    * Creates a new job order; any logged-in member may file one, and its visibility follows {@code
@@ -482,26 +237,6 @@ public class JobOrderController {
   }
 
   /**
-   * Aggregates the outstanding material of every visible {@code OPEN} / {@code IN_PROGRESS} job
-   * order into one row per responsible org unit, material and quality (REQ-ORDERS-034).
-   *
-   * <p>Unpaged, since paging would truncate the sums (ADR-0104).
-   *
-   * @return the aggregated demand, empty when the caller may see no non-terminal order
-   */
-  @GetMapping("/material-demand")
-  @Operation(
-      summary = "Get the cross-order material demand",
-      description =
-          "Returns the material still to be gathered across all open / in-progress job orders"
-              + " visible to the caller, grouped by responsible org unit.")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public MaterialDemandOverviewDto getMaterialDemand() {
-    return jobOrderMaterialDemandService.getMaterialDemandOverview();
-  }
-
-  /**
    * Paged, requester-redacted list of the orders the caller's own org unit(s) requested, the "Meine
    * Auftr&auml;ge" list (REQ-ORDERS-023). Independent of the profit-gated main queue.
    *
@@ -574,118 +309,6 @@ public class JobOrderController {
             ? cleanupJobOrderForRequester(dto)
             : dto.withCanManageAssignees(jobOrderAccessPolicy.canManageAssignees(id));
     return tiered.withAssignees(toPeerShapedAssignees(tiered.assignees()));
-  }
-
-  /**
-   * Shows which members of the order's responsible org unit own the blueprints for the ordered
-   * items. Visible only to members of that unit and admins; empty for {@code MATERIAL} orders.
-   *
-   * @param id job-order id
-   * @return the blueprint-coverage view (required products with owner counts + owning members)
-   */
-  @GetMapping("/{id}/item-blueprint-owners")
-  @Operation(
-      summary = "Get item-order blueprint coverage",
-      description =
-          "Returns which members of the responsible squadron/SK own the blueprints for the"
-              + " order's required items. Members of the responsible org unit only.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Blueprint coverage for the item order."),
-    @ApiResponse(responseCode = "401", description = "Authentication required."),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Caller is not a member of the order's responsible squadron/SK."),
-    @ApiResponse(responseCode = "404", description = "Job order not found.")
-  })
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners(#id)")
-  @Transactional(readOnly = true)
-  public JobOrderItemBlueprintOwnersDto getItemBlueprintOwners(@PathVariable UUID id) {
-    return jobOrderItemBlueprintOwnersService.getBlueprintOwners(id);
-  }
-
-  /**
-   * Returns every inventory item linked to a specific material of a job order. Drives the
-   * per-material drill-down in the order detail view. The owner/location of each item is blanked
-   * for a requesting-side viewer of an SK-public order ({@code canSeeJobOrderInventoryOwners} is
-   * {@code false}, REQ-ORDERS-029 / ADR-0107); mission slices of missions the caller may not read
-   * are anonymised for every viewer.
-   *
-   * @param id job-order id
-   * @param matId material id
-   * @return inventory-item DTOs, owner/location redacted for requesting-side viewers
-   */
-  @GetMapping("/{id}/materials/{matId}/inventory")
-  @Operation(
-      summary = "Get inventory items for a job order material",
-      description = "Returns all inventory items linked to a specific material in a job order.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  @Transactional(readOnly = true)
-  public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
-      @PathVariable UUID id, @PathVariable UUID matId) {
-    return redactLinkedStock(
-        id, jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId));
-  }
-
-  /**
-   * Reports how much of each stock row linked to one material of the order counts toward which
-   * quality bucket, so every row counts exactly once (REQ-ORDERS-037). Carries row ids, tier ids
-   * and amounts only — no owner or location.
-   *
-   * @param id job-order id
-   * @param matId material id
-   * @return one entry per row and bucket, plus an entry without a bucket for stock no bucket
-   *     accepts
-   */
-  @GetMapping("/{id}/materials/{matId}/attribution")
-  @Operation(
-      summary = "Get the quality-bucket attribution of a job order material's linked stock",
-      description =
-          "Returns, per linked inventory row, the amount counted toward each quality bucket.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  @Transactional(readOnly = true)
-  public List<LinkedStockAttributionDto> getStockAttributionForJobOrderMaterial(
-      @PathVariable UUID id, @PathVariable UUID matId) {
-    return jobOrderQueryService.getStockAttributionForJobOrderMaterial(id, matId);
-  }
-
-  /**
-   * Returns the inventory items linked to the order whose material the order does not require —
-   * "orphaned" links surfaced as a warning on the order detail (REQ-ORDERS-019). Such links bind
-   * stock to the order while staying invisible in every material row. The owner/location of each
-   * item is blanked for a requesting-side viewer of an SK-public order ({@code
-   * canSeeJobOrderInventoryOwners} is {@code false}, REQ-ORDERS-029 / ADR-0107).
-   *
-   * @param id job-order id
-   * @return orphaned inventory-item DTOs (empty when every linked item matches a requirement),
-   *     owner/location redacted for requesting-side viewers
-   */
-  @GetMapping("/{id}/allocations/orphaned")
-  @Operation(
-      summary = "Get orphaned linked inventory for a job order",
-      description =
-          "Returns inventory items linked to the order whose material is not among the order's"
-              + " requirements (invisible orphaned links).")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
-  @Transactional(readOnly = true)
-  public List<InventoryItemDto> getOrphanedLinkedInventory(@PathVariable UUID id) {
-    return redactLinkedStock(id, jobOrderQueryService.getOrphanedLinkedInventory(id));
-  }
-
-  /**
-   * Applies the two redactions of an order's linked stock: the mission slices of missions the
-   * caller may not read are anonymised for everyone, owner and location are blanked for a
-   * requesting-side viewer.
-   *
-   * @param id job-order id
-   * @param items the linked-stock rows
-   * @return the redacted rows
-   */
-  private List<InventoryItemDto> redactLinkedStock(UUID id, List<InventoryItemDto> items) {
-    List<InventoryItemDto> missionSafe =
-        missionAllocationRedactor.anonymiseUnreadableMissions(items);
-    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(id)
-        ? missionSafe
-        : inventoryOwnerRedactor.redactInventoryItems(missionSafe);
   }
 
   /**
@@ -926,54 +549,6 @@ public class JobOrderController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteJobOrder(@PathVariable UUID id) {
     jobOrderService.deleteJobOrder(id);
-  }
-
-  /**
-   * Removes a material from the order and atomically unlinks every inventory item that pointed at
-   * it.
-   *
-   * @param jobOrderId job-order id
-   * @param materialId material id
-   */
-  @DeleteMapping("/{jobOrderId}/materials/{materialId}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(
-      summary = "Unlink a material from a job order",
-      description =
-          "Removes the link between a material and a job order, and unlinks all associated"
-              + " inventory items.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "Material successfully unlinked"),
-    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
-    @ApiResponse(responseCode = "404", description = "Job order or material not found")
-  })
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
-  public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
-    jobOrderService.unlinkMaterial(jobOrderId, materialId);
-  }
-
-  /**
-   * Removes a single inventory item from the order — sets {@code jobOrderId=null} via Hibernate
-   * dirty-checking (no bulk update, so the surrounding aggregate stays managed).
-   *
-   * @param id job-order id
-   * @param inventoryItemId inventory-item id
-   */
-  @DeleteMapping("/{id}/allocations/{inventoryItemId}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(
-      summary = "Unlink a single inventory item from a job order",
-      description =
-          "Removes the link between a single inventory item and a job order by setting jobOrderId"
-              + " to null. Uses Hibernate dirty-checking (no bulk update).")
-  @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "Inventory item successfully unlinked"),
-    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
-    @ApiResponse(responseCode = "404", description = "Job order or inventory item not found")
-  })
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
-  public void unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId) {
-    jobOrderService.unlinkInventoryItem(id, inventoryItemId);
   }
 
   /**

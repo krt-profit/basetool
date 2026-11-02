@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
@@ -65,7 +66,7 @@ class NotificationRetentionTaskTest {
 
   private double deleted(String kind) {
     return meterRegistry
-        .counter(MetricNames.NOTIFICATION_RETENTION_DELETED, MetricNames.TAG_KIND, kind)
+        .counter(NotificationMetricNames.NOTIFICATION_RETENTION_DELETED, MetricNames.TAG_KIND, kind)
         .count();
   }
 

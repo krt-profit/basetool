@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.BudgetPeriod;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PaymentModel;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.RiskClassCode;
@@ -669,7 +670,7 @@ class PurchasingTrancheServiceTest {
 
   private double counter(TrancheKind kind, String outcome) {
     return meterRegistry
-        .get(MetricNames.PURCHASING_TRANCHES)
+        .get(PurchasingMetricNames.PURCHASING_TRANCHES)
         .tag(MetricNames.TAG_KIND, kind.name())
         .tag(MetricNames.TAG_OUTCOME, outcome)
         .counter()

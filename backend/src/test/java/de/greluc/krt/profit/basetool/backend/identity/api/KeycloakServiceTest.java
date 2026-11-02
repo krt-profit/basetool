@@ -34,7 +34,6 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Timer;
@@ -171,7 +170,8 @@ class KeycloakServiceTest {
           new KeycloakService(properties, observedBuilder(), sslBundles, meterRegistry);
 
       assertTrue(service.fetchUsers(List.of(), Set.of()).isEmpty());
-      assertEquals(1.0, meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count());
+      assertEquals(
+          1.0, meterRegistry.counter(IdentityMetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count());
     } finally {
       server.shutdown();
     }
@@ -631,7 +631,7 @@ class KeycloakServiceTest {
           "a 403 on the realm-role listing must skip the run, not persist degraded roles");
       assertEquals(
           1.0,
-          meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count(),
+          meterRegistry.counter(IdentityMetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count(),
           "the swallowed authorization failure must still increment the fetch-failure counter");
     } finally {
       server.shutdown();
@@ -1364,7 +1364,7 @@ class KeycloakServiceTest {
           "an index that matched nothing must skip the run, not write a role-strip for everyone");
       assertEquals(
           1.0,
-          meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count(),
+          meterRegistry.counter(IdentityMetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count(),
           "the aborted run must be visible as a fetch failure, not as a quiet success");
     } finally {
       server.shutdown();

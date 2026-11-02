@@ -27,11 +27,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -102,7 +102,7 @@ class ActingMemberFilterAbsentHeaderTest {
    * @return the summed refusal count
    */
   private double refusals() {
-    return meterRegistry.find(MetricNames.ON_BEHALF_OF_REFUSED).counters().stream()
+    return meterRegistry.find(ExchangeMetricNames.ON_BEHALF_OF_REFUSED).counters().stream()
         .mapToDouble(counter -> counter.count())
         .sum();
   }

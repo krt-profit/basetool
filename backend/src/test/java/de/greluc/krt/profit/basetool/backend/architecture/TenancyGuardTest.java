@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderMaterialController;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -361,10 +362,10 @@ class TenancyGuardTest {
               new HandlerKey(JobOrderController.class, "updateItemJobOrderAsRequester"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
-              new HandlerKey(JobOrderController.class, "unlinkMaterial"),
+              new HandlerKey(JobOrderMaterialController.class, "unlinkMaterial"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
-              new HandlerKey(JobOrderController.class, "unlinkInventoryItem"),
+              new HandlerKey(JobOrderMaterialController.class, "unlinkInventoryItem"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
               new HandlerKey(MissionFinanceEntryController.class, "updateFinanceEntry"),

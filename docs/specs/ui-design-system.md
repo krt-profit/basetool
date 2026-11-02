@@ -2597,7 +2597,7 @@ filtered while their hits and actions stay, a page-contributed action) · `Quick
 `shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
 `kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
 `static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
-`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
+`static/js/kernel/krt-palette.js` (wiring) and its modules `krt-palette-{actions,entity-search,groups,history,index,items,view}.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
 ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard

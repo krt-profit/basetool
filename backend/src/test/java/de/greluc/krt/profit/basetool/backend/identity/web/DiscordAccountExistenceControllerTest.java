@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceRequest;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceResponse;
 import de.greluc.krt.profit.basetool.backend.identity.internal.DiscordAccountExistenceService;
@@ -66,7 +67,7 @@ class DiscordAccountExistenceControllerTest {
   private double precheckCount(String outcome) {
     var counter =
         meterRegistry
-            .find(MetricNames.DISCORD_PRECHECK)
+            .find(IdentityMetricNames.DISCORD_PRECHECK)
             .tag(MetricNames.TAG_OUTCOME, outcome)
             .counter();
     return counter == null ? 0.0 : counter.count();
@@ -81,7 +82,7 @@ class DiscordAccountExistenceControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     verifyNoInteractions(accountExistenceService);
-    assertThat(precheckCount(MetricNames.DISCORD_PRECHECK_DISABLED)).isEqualTo(1.0);
+    assertThat(precheckCount(IdentityMetricNames.DISCORD_PRECHECK_DISABLED)).isEqualTo(1.0);
   }
 
   @Test
@@ -93,7 +94,7 @@ class DiscordAccountExistenceControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     verifyNoInteractions(accountExistenceService);
-    assertThat(precheckCount(MetricNames.DISCORD_PRECHECK_UNAUTHORIZED)).isEqualTo(1.0);
+    assertThat(precheckCount(IdentityMetricNames.DISCORD_PRECHECK_UNAUTHORIZED)).isEqualTo(1.0);
   }
 
   @Test
@@ -119,7 +120,7 @@ class DiscordAccountExistenceControllerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().exists()).isTrue();
-    assertThat(precheckCount(MetricNames.DISCORD_PRECHECK_OK)).isEqualTo(1.0);
+    assertThat(precheckCount(IdentityMetricNames.DISCORD_PRECHECK_OK)).isEqualTo(1.0);
   }
 
   @Test

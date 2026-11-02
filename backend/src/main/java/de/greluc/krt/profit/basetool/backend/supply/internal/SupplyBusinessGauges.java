@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyMetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -46,9 +46,9 @@ public class SupplyBusinessGauges implements BusinessGaugeSource {
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
-    BusinessGauges.countGauge(registry, MetricNames.SUPPLY_NEEDS_OPEN, needsOpen);
+    BusinessGauges.countGauge(registry, SupplyMetricNames.SUPPLY_NEEDS_OPEN, needsOpen);
     BusinessGauges.countGauge(
-        registry, MetricNames.SUPPLY_DONATIONS_PLEDGED_OPEN, donationsPledged);
+        registry, SupplyMetricNames.SUPPLY_DONATIONS_PLEDGED_OPEN, donationsPledged);
   }
 
   @Override

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
+import de.greluc.krt.profit.basetool.backend.app.api.AppMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
@@ -124,7 +125,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
 
   /**
    * Distinct subjects refused with {@code NO_ROLE} in a rolling window, published as {@link
-   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}. The refusal rate cannot answer the question the alert
+   * AppMetricNames#NO_ROLE_REFUSED_SUBJECTS}. The refusal rate cannot answer the question the alert
    * asks - see that constant.
    */
   private final RefusedSubjectWindow noRoleRefusedSubjects;

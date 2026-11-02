@@ -392,7 +392,7 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 (`deleteReadOlderThan`, `deleteUnreadOlderThan`), `BackendPropertiesValidationTest` (the bounds) ·
 **Code:** `notification/internal/NotificationRetentionTask`, `notification/internal/NotificationRetentionProperties`,
 `notification/api/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
-`platform/api/ScheduledJob#NOTIFICATION_RETENTION`, `platform/api/MetricNames#NOTIFICATION_RETENTION_DELETED`
+`platform/api/ScheduledJob#NOTIFICATION_RETENTION`, `notification/api/NotificationMetricNames#NOTIFICATION_RETENTION_DELETED`
 
 ### REQ-NOTIF-021 — The `notification` event says what arrived *(superseded)*
 

@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -353,7 +354,8 @@ class ExchangeOrgStockControllerTest {
         .andExpect(jsonPath("$.nextCursor").value(org.hamcrest.Matchers.startsWith("f1.")));
     assertThat(
             meterRegistry
-                .counter(MetricNames.EXCHANGE_ORG_STOCK_PAGES, MetricNames.TAG_CLIENT_ID, client)
+                .counter(
+                    ExchangeMetricNames.EXCHANGE_ORG_STOCK_PAGES, MetricNames.TAG_CLIENT_ID, client)
                 .count())
         .as("one page counted per answer")
         .isEqualTo(2.0);
@@ -493,7 +495,8 @@ class ExchangeOrgStockControllerTest {
         .andExpect(jsonPath("$.code").value("CURSOR_EXPIRED"));
     assertThat(
             meterRegistry
-                .counter(MetricNames.EXCHANGE_ORG_STOCK_PAGES, MetricNames.TAG_CLIENT_ID, client)
+                .counter(
+                    ExchangeMetricNames.EXCHANGE_ORG_STOCK_PAGES, MetricNames.TAG_CLIENT_ID, client)
                 .count())
         .isEqualTo(2.0);
   }

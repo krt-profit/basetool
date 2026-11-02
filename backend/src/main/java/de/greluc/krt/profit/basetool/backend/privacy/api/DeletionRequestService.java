@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestedEvent;
@@ -287,7 +286,7 @@ public class DeletionRequestService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void recordKeycloakDeleteFailure(
       @NotNull UUID requestId, @NotNull UUID userId, @NotNull RuntimeException failure) {
-    meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).increment();
+    meterRegistry.counter(PrivacyMetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).increment();
     auditRecorder.record(
         AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED,
         userId,

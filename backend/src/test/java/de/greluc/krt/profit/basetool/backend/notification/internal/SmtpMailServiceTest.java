@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.MailMessage;
 import de.greluc.krt.profit.basetool.backend.notification.api.MailProperties;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -65,7 +66,8 @@ class SmtpMailServiceTest {
    * @return the counter value, or {@code 0.0} when no matching series exists
    */
   private double mailCount(String outcome) {
-    var counter = registry.find(MetricNames.MAIL).tag(MetricNames.TAG_OUTCOME, outcome).counter();
+    var counter =
+        registry.find(NotificationMetricNames.MAIL).tag(MetricNames.TAG_OUTCOME, outcome).counter();
     return counter == null ? 0.0 : counter.count();
   }
 
@@ -83,7 +85,7 @@ class SmtpMailServiceTest {
 
     verify(senderProvider, never()).getIfAvailable();
     verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
-    assertThat(mailCount(MetricNames.MAIL_DROPPED_DISABLED)).isEqualTo(1.0);
+    assertThat(mailCount(NotificationMetricNames.MAIL_DROPPED_DISABLED)).isEqualTo(1.0);
   }
 
   @Test
@@ -94,7 +96,7 @@ class SmtpMailServiceTest {
 
     verify(senderProvider, never()).getIfAvailable();
     verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
-    assertThat(mailCount(MetricNames.MAIL_DROPPED_NO_HOST)).isEqualTo(1.0);
+    assertThat(mailCount(NotificationMetricNames.MAIL_DROPPED_NO_HOST)).isEqualTo(1.0);
   }
 
   @Test
@@ -105,7 +107,7 @@ class SmtpMailServiceTest {
     service.send(MSG);
 
     verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
-    assertThat(mailCount(MetricNames.MAIL_DROPPED_NO_SENDER)).isEqualTo(1.0);
+    assertThat(mailCount(NotificationMetricNames.MAIL_DROPPED_NO_SENDER)).isEqualTo(1.0);
   }
 
   @Test
@@ -122,7 +124,7 @@ class SmtpMailServiceTest {
     assertThat(mail.getTo()).containsExactly("dest@example.test");
     assertThat(mail.getSubject()).isEqualTo("Subject");
     assertThat(mail.getText()).isEqualTo("Body");
-    assertThat(mailCount(MetricNames.MAIL_SENT)).isEqualTo(1.0);
+    assertThat(mailCount(NotificationMetricNames.MAIL_SENT)).isEqualTo(1.0);
   }
 
   @Test
@@ -136,6 +138,6 @@ class SmtpMailServiceTest {
     service.send(MSG);
 
     verify(javaMailSender).send(any(SimpleMailMessage.class));
-    assertThat(mailCount(MetricNames.MAIL_FAILED)).isEqualTo(1.0);
+    assertThat(mailCount(NotificationMetricNames.MAIL_FAILED)).isEqualTo(1.0);
   }
 }

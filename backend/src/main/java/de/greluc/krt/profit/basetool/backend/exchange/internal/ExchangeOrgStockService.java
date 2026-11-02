@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeEarmarkedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockEntryDto;
@@ -123,7 +124,10 @@ public class ExchangeOrgStockService {
               : feed(caller, pools, position.position(), size);
     }
     meterRegistry
-        .counter(MetricNames.EXCHANGE_ORG_STOCK_PAGES, MetricNames.TAG_CLIENT_ID, caller.clientId())
+        .counter(
+            ExchangeMetricNames.EXCHANGE_ORG_STOCK_PAGES,
+            MetricNames.TAG_CLIENT_ID,
+            caller.clientId())
         .increment();
     return page;
   }

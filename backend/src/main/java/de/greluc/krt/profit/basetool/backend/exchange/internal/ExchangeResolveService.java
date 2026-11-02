@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialNameCanonical
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
@@ -525,7 +526,7 @@ public class ExchangeResolveService {
   @NotNull
   private Counter counter(@NotNull ExchangeCatalogKind kind, @NotNull Status status) {
     return meterRegistry.counter(
-        MetricNames.EXCHANGE_RESOLVE_REFS,
+        ExchangeMetricNames.EXCHANGE_RESOLVE_REFS,
         MetricNames.TAG_KIND,
         kind.name().toLowerCase(Locale.ROOT),
         MetricNames.TAG_STATUS,

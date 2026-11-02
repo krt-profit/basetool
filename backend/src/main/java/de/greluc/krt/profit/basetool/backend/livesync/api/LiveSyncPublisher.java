@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -69,8 +68,8 @@ public class LiveSyncPublisher {
     }
     meterRegistry
         .counter(
-            MetricNames.LIVESYNC_PUBLISH_ACCEPTED,
-            MetricNames.TAG_TOPIC_CLASS,
+            LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED,
+            LivesyncMetricNames.TAG_TOPIC_CLASS,
             topic.topicClass().metricLabel())
         .increment();
   }

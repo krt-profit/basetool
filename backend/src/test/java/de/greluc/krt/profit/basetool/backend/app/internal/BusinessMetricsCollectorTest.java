@@ -23,18 +23,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankMetricNames;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.internal.IdentityBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMetricNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.materialexchange.api.MaterialExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus;
@@ -46,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestStatus;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PrivacyMetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.DeletionRequestBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
@@ -122,17 +128,22 @@ class BusinessMetricsCollectorTest {
 
     collector.refresh();
 
-    assertThat(gauge(MetricNames.REGISTRATION_PENDING)).isEqualTo(3.0d);
-    assertThat(gauge(MetricNames.REGISTRATION_PENDING_OLDEST_AGE)).isGreaterThanOrEqualTo(119.0d);
-    assertThat(gauge(MetricNames.BANK_BOOKING_REQUEST_PENDING)).isEqualTo(4.0d);
-    assertThat(statusGauge(MetricNames.JOB_ORDER_OPEN, JobOrderStatus.OPEN.name())).isEqualTo(5.0d);
-    assertThat(statusGauge(MetricNames.JOB_ORDER_OPEN, JobOrderStatus.IN_PROGRESS.name()))
+    assertThat(gauge(IdentityMetricNames.REGISTRATION_PENDING)).isEqualTo(3.0d);
+    assertThat(gauge(IdentityMetricNames.REGISTRATION_PENDING_OLDEST_AGE))
+        .isGreaterThanOrEqualTo(119.0d);
+    assertThat(gauge(BankMetricNames.BANK_BOOKING_REQUEST_PENDING)).isEqualTo(4.0d);
+    assertThat(statusGauge(JobOrderMetricNames.JOB_ORDER_OPEN, JobOrderStatus.OPEN.name()))
+        .isEqualTo(5.0d);
+    assertThat(statusGauge(JobOrderMetricNames.JOB_ORDER_OPEN, JobOrderStatus.IN_PROGRESS.name()))
         .isEqualTo(2.0d);
-    assertThat(statusGauge(MetricNames.P4K_IMPORT_JOB_PENDING, P4kImportJobStatus.PENDING.name()))
+    assertThat(
+            statusGauge(
+                CatalogueMetricNames.P4K_IMPORT_JOB_PENDING, P4kImportJobStatus.PENDING.name()))
         .isEqualTo(1.0d);
     assertThat(
             statusGauge(
-                MetricNames.MATERIAL_EXCHANGE_ACTIVE, MaterialExchangeOfferStatus.ACTIVE.name()))
+                MaterialExchangeMetricNames.MATERIAL_EXCHANGE_ACTIVE,
+                MaterialExchangeOfferStatus.ACTIVE.name()))
         .isEqualTo(7.0d);
   }
 
@@ -140,13 +151,14 @@ class BusinessMetricsCollectorTest {
   void refresh_reportsZeroForEmptyQueuesAndAges() {
     collector.refresh();
 
-    assertThat(gauge(MetricNames.REGISTRATION_PENDING)).isEqualTo(0.0d);
-    assertThat(gauge(MetricNames.BANK_BOOKING_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
-    assertThat(statusGauge(MetricNames.JOB_ORDER_OPEN, JobOrderStatus.OPEN.name())).isEqualTo(0.0d);
-    assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isEqualTo(0.0d);
-    assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isEqualTo(0.0d);
-    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING)).isEqualTo(0.0d);
-    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
+    assertThat(gauge(IdentityMetricNames.REGISTRATION_PENDING)).isEqualTo(0.0d);
+    assertThat(gauge(BankMetricNames.BANK_BOOKING_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
+    assertThat(statusGauge(JobOrderMetricNames.JOB_ORDER_OPEN, JobOrderStatus.OPEN.name()))
+        .isEqualTo(0.0d);
+    assertThat(gauge(IdentityMetricNames.USERS_PENDING_DELETION)).isEqualTo(0.0d);
+    assertThat(gauge(IdentityMetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isEqualTo(0.0d);
+    assertThat(gauge(PrivacyMetricNames.DELETION_REQUEST_PENDING)).isEqualTo(0.0d);
+    assertThat(gauge(PrivacyMetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
   }
 
   @Test
@@ -157,8 +169,9 @@ class BusinessMetricsCollectorTest {
 
     collector.refresh();
 
-    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING)).isEqualTo(1.0d);
-    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isGreaterThan(1209600.0d);
+    assertThat(gauge(PrivacyMetricNames.DELETION_REQUEST_PENDING)).isEqualTo(1.0d);
+    assertThat(gauge(PrivacyMetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE))
+        .isGreaterThan(1209600.0d);
   }
 
   @Test
@@ -169,8 +182,9 @@ class BusinessMetricsCollectorTest {
 
     collector.refresh();
 
-    assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isEqualTo(2.0d);
-    assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isGreaterThan(604800.0d);
+    assertThat(gauge(IdentityMetricNames.USERS_PENDING_DELETION)).isEqualTo(2.0d);
+    assertThat(gauge(IdentityMetricNames.USERS_PENDING_DELETION_OLDEST_AGE))
+        .isGreaterThan(604800.0d);
   }
 
   @Test

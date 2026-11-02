@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeNotices;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -88,7 +88,9 @@ public class ExchangeRegistryService {
   void registerChangeCounters() {
     for (ExchangeRegistryAction action : ExchangeRegistryAction.values()) {
       meterRegistry.counter(
-          MetricNames.EXCHANGE_REGISTRY_CHANGES, MetricNames.TAG_ACTION, action.getTag());
+          ExchangeMetricNames.EXCHANGE_REGISTRY_CHANGES,
+          ExchangeMetricNames.TAG_ACTION,
+          action.getTag());
     }
   }
 
@@ -482,7 +484,9 @@ public class ExchangeRegistryService {
             knownExchangeClients.invalidate();
             meterRegistry
                 .counter(
-                    MetricNames.EXCHANGE_REGISTRY_CHANGES, MetricNames.TAG_ACTION, action.getTag())
+                    ExchangeMetricNames.EXCHANGE_REGISTRY_CHANGES,
+                    ExchangeMetricNames.TAG_ACTION,
+                    action.getTag())
                 .increment();
             log.info("Exchange registry changed: {}", action.getTag());
           }

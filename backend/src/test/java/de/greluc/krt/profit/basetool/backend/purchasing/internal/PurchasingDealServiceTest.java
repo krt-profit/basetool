@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerContact;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerKind;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PaymentModel;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.RiskClassCode;
@@ -321,7 +322,7 @@ class PurchasingDealServiceTest {
 
   private double counted(String event) {
     return meterRegistry
-        .get(MetricNames.PURCHASING_DEALS)
+        .get(PurchasingMetricNames.PURCHASING_DEALS)
         .tag(MetricNames.TAG_EVENT, event)
         .counter()
         .count();

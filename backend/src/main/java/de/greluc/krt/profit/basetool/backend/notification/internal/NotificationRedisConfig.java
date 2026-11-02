@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import de.greluc.krt.profit.basetool.backend.notification.api.RedisNotificationFanout;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -122,8 +122,11 @@ public class NotificationRedisConfig {
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
-    Gauge.builder(MetricNames.REDIS_FANOUT_SUBSCRIBED, container, c -> c.isListening() ? 1d : 0d)
-        .tag(MetricNames.TAG_FANOUT, MetricNames.FANOUT_NOTIFICATIONS)
+    Gauge.builder(
+            NotificationMetricNames.REDIS_FANOUT_SUBSCRIBED,
+            container,
+            c -> c.isListening() ? 1d : 0d)
+        .tag(NotificationMetricNames.TAG_FANOUT, NotificationMetricNames.FANOUT_NOTIFICATIONS)
         .description("1 while this instance is subscribed to the notification fan-out channel")
         .register(meterRegistry);
     return container;

@@ -3042,28 +3042,20 @@
         color: var(--color-gray-2-text);
     }
 
-    .nav-star:hover:not(:disabled),
-    .nav-star[aria-pressed='true'] {
-        border-color: var(--color-primary);
-        color: var(--color-primary);
-    }
-
-    .nav-star:disabled {
-        cursor: not-allowed;
-        opacity: 0.4;
-    }
-
     .nav-start-page {
         flex: none;
         font-size: var(--fs-xs);
     }
 
+    .nav-star:hover:not(:disabled),
+    .nav-star[aria-pressed='true'],
     .nav-start-page:hover:not(:disabled),
     .nav-start-page[aria-pressed='true'] {
         border-color: var(--color-primary);
         color: var(--color-primary);
     }
 
+    .nav-star:disabled,
     .nav-start-page:disabled {
         cursor: not-allowed;
         opacity: 0.4;

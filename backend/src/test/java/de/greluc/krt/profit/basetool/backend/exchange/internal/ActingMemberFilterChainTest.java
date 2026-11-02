@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
@@ -72,7 +73,7 @@ class ActingMemberFilterChainTest {
   private double refusals(String reason) {
     Counter counter =
         meterRegistry
-            .find(MetricNames.ON_BEHALF_OF_REFUSED)
+            .find(ExchangeMetricNames.ON_BEHALF_OF_REFUSED)
             .tag(MetricNames.TAG_REASON, reason)
             .counter();
     return counter == null ? 0d : counter.count();
@@ -94,7 +95,7 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void refusesAnOnBehalfOfHeaderFromAnOrdinaryMember() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
 
     mockMvc
         .perform(
@@ -106,13 +107,13 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_NOT_A_GATEWAY)).isEqualTo(before + 1);
   }
 
   /** The gateway may not use the header on an endpoint outside the exchange routes (ADR-0129). */
   @Test
   void refusesTheHeaderOnAnEndpointItIsNotBoundTo() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
 
     mockMvc
         .perform(
@@ -125,13 +126,13 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 1);
   }
 
   /** A member with no local account is refused, not created. */
   @Test
   void refusesAMemberWithNoLocalAccount() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
 
     mockMvc
         .perform(
@@ -146,7 +147,7 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE)).isEqualTo(before + 1);
   }
 
   /**
@@ -155,8 +156,8 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void countsAnAnonymousProbeOnAnUnboundPathAsOutOfBoundsNotAsAMissingCaller() throws Exception {
-    double bound = refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
-    double caller = refusals(MetricNames.ON_BEHALF_OF_NO_CALLER);
+    double bound = refusals(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+    double caller = refusals(ExchangeMetricNames.ON_BEHALF_OF_NO_CALLER);
 
     mockMvc
         .perform(
@@ -167,14 +168,14 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(bound + 1);
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(caller);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(bound + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(caller);
   }
 
   /** On a bound endpoint, a header with no authenticated caller is still refused and counted. */
   @Test
   void stillRefusesAHeaderWithNoAuthenticatedCallerOnABoundPath() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_NO_CALLER);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_NO_CALLER);
 
     mockMvc
         .perform(
@@ -185,13 +186,13 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(before + 1);
   }
 
   /** A malformed subject never reaches the persistence layer. */
   @Test
   void refusesAMalformedSubject() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_MALFORMED);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_MALFORMED);
 
     mockMvc
         .perform(
@@ -206,7 +207,7 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_MALFORMED)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_MALFORMED)).isEqualTo(before + 1);
   }
 
   /**
@@ -236,7 +237,7 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void refusesAnExchangeClientHeaderFromABrowserSession() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER);
 
     mockMvc
         .perform(
@@ -246,13 +247,14 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER))
+        .isEqualTo(before + 1);
   }
 
   /** The app naming capabilities is refused the same way, on any path (REQ-XCH-010). */
   @Test
   void refusesAnExchangeCapabilitiesHeaderFromTheApp() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER);
 
     mockMvc
         .perform(
@@ -261,7 +263,8 @@ class ActingMemberFilterChainTest {
                 .header(ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER, "exchange.stock.write"))
         .andExpect(status().isForbidden());
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER)).isEqualTo(before + 1);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER))
+        .isEqualTo(before + 1);
   }
 
   /**
@@ -270,7 +273,7 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void refusesTheGatewayOnTheFormerIngestEndpoint() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
 
     mockMvc
         .perform(
@@ -293,13 +296,13 @@ class ActingMemberFilterChainTest {
                 .content("{}"))
         .andExpect(status().isForbidden());
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 2);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 2);
   }
 
   /** An exchange call from the gateway must name a well-formed client. */
   @Test
   void refusesAnExchangeCallWithoutAValidClient() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID);
 
     mockMvc
         .perform(
@@ -317,13 +320,14 @@ class ActingMemberFilterChainTest {
                 .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, "Verse Kit"))
         .andExpect(status().isForbidden());
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID)).isEqualTo(before + 2);
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID))
+        .isEqualTo(before + 2);
   }
 
   /** An exchange call with a valid client must also name a well-formed installation key. */
   @Test
   void refusesAnExchangeCallWithoutAValidInstallationKey() throws Exception {
-    double before = refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID);
+    double before = refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID);
 
     mockMvc
         .perform(
@@ -344,15 +348,16 @@ class ActingMemberFilterChainTest {
                 .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, "not a thumbprint"))
         .andExpect(status().isForbidden());
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID))
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID))
         .isEqualTo(before + 2);
   }
 
   /** With both relay headers malformed the client is checked, and counted, first. */
   @Test
   void countsAnInvalidClientBeforeAnInvalidInstallationKey() throws Exception {
-    double clientBefore = refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID);
-    double installationBefore = refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID);
+    double clientBefore = refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID);
+    double installationBefore =
+        refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID);
 
     mockMvc
         .perform(
@@ -364,9 +369,9 @@ class ActingMemberFilterChainTest {
                 .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, "not a thumbprint"))
         .andExpect(status().isForbidden());
 
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID))
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID))
         .isEqualTo(clientBefore + 1);
-    assertThat(refusals(MetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID))
+    assertThat(refusals(ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID))
         .isEqualTo(installationBefore);
   }
 }

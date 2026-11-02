@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeInstallationConnectedEvent;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -97,7 +98,9 @@ public class ExchangeInstallationService {
       if (touched.getInserted()) {
         meterRegistry
             .counter(
-                MetricNames.EXCHANGE_INSTALLATIONS_CREATED, MetricNames.TAG_CLIENT_ID, clientId)
+                ExchangeMetricNames.EXCHANGE_INSTALLATIONS_CREATED,
+                MetricNames.TAG_CLIENT_ID,
+                clientId)
             .increment();
         String clientName =
             clientRepository
