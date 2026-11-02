@@ -227,9 +227,10 @@ The full rules: [`docs/agents/git-and-commits.md`](docs/agents/git-and-commits.m
 - **No destructive Git command without explicit user instruction** (`reset --hard`, `clean -fd`,
   any force push, rebasing shared branches, `branch -D`, `tag -d`, `stash drop`, anything that
   rewrites or discards history).
-- **Worktrees and temporary files live outside the checkout** — on the owner's workstation under
-  `D:\Coding\claude-worktrees\basetool\<name>`, never in the repository or next to it, not in
-  `%TEMP%` or `/tmp`. Clean up what you created.
+- **Worktrees and temporary files live outside the checkout**, on the owner's workstation in each
+  agent's own folder: worktrees under `D:\Coding\Agents\Worktrees\<agent>\basetool\<name>`,
+  temporary files under `D:\Coding\Agents\Temp\<agent>\<task>` (`<agent>` = `claude`, `codex`, …).
+  Never in the repository or next to it, not in `%TEMP%` or `/tmp`. Clean up what you created.
 - **Every commit is signed off with `git commit -s`** (`-S -s` when GPG-signing). Never hand-write
   the `Signed-off-by:` trailer: `-s` derives it from the git identity
   `Lucas Greuloch (greluc) <lucas.greuloch@gmail.com>`. The retired `pm.me` address must not appear
