@@ -74,6 +74,76 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
   List<UUID> findRecentRunIds(@Param("source") SyncSourceSystem sourceSystem, Pageable pageable);
 
   /**
+   * Returns when each run finished, for the runs whose newest event lies at or after {@code since}.
+   * Bounded by the retention of the newest runs per source.
+   *
+   * @param since the inclusive start of the range
+   * @return one entry per run that finished inside the range
+   */
+  @Query(
+      """
+      SELECT r.sourceSystem AS sourceSystem, r.runId AS runId, MAX(r.ranAt) AS finishedAt
+      FROM ExternalSyncReport r GROUP BY r.sourceSystem, r.runId
+      HAVING MAX(r.ranAt) >= :since
+      """)
+  List<RunFinish> findRunFinishesSince(@Param("since") Instant since);
+
+  /**
+   * Returns, per source, the time of its newest recorded event.
+   *
+   * @return one entry per source that has any event
+   */
+  @Query(
+      """
+      SELECT r.sourceSystem AS sourceSystem, MAX(r.ranAt) AS finishedAt
+      FROM ExternalSyncReport r GROUP BY r.sourceSystem
+      """)
+  List<SourceFinish> findLatestFinishPerSource();
+
+  /** The newest event of one source. */
+  interface SourceFinish {
+
+    /**
+     * The source that ran.
+     *
+     * @return the source system
+     */
+    SyncSourceSystem getSourceSystem();
+
+    /**
+     * The time of the source's newest event.
+     *
+     * @return when the source last ran
+     */
+    Instant getFinishedAt();
+  }
+
+  /** When one run finished: the time of its newest event. */
+  interface RunFinish {
+
+    /**
+     * The source that ran.
+     *
+     * @return the source system
+     */
+    SyncSourceSystem getSourceSystem();
+
+    /**
+     * The run's id.
+     *
+     * @return the run id
+     */
+    UUID getRunId();
+
+    /**
+     * The time of the run's newest event.
+     *
+     * @return when the run finished
+     */
+    Instant getFinishedAt();
+  }
+
+  /**
    * Deletes every event of a source whose {@code run_id} is not in the keep set. Callers must pass
    * a non-empty keep set.
    *

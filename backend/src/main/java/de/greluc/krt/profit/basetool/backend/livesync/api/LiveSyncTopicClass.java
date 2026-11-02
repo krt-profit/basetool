@@ -58,12 +58,24 @@ public enum LiveSyncTopicClass {
   BLUEPRINTS_OWN("blueprints", true, "blueprints_own"),
 
   /** Global Materialbörse room; the backend pokes {@code board} when a book-out changed offers. */
-  MATERIALBOARD("materialboard", false, "materialboard");
+  MATERIALBOARD("materialboard", false, "materialboard"),
+
+  /**
+   * Global admin dashboard room: the backend pokes the section of the widget whose state changed;
+   * only administrators may listen (REQ-UI-034).
+   */
+  ADMIN_DASHBOARD("admin-dashboard", false, "admin_dashboard");
 
   private static final Set<String> INVENTORY_ALL_SECTIONS = Set.of("stock", "stock-levels");
   private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
   private static final Set<String> BLUEPRINTS_OWN_SECTIONS = Set.of("list");
   private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board");
+  private static final Set<String> ADMIN_DASHBOARD_SECTIONS =
+      Set.of(
+          AdminDashboardLiveSync.DELETION_REQUESTS,
+          AdminDashboardLiveSync.DISCORD_REGISTRATIONS,
+          AdminDashboardLiveSync.TERMS,
+          AdminDashboardLiveSync.SYNC_STATUS);
 
   private final @NotNull String prefix;
   private final boolean perResource;
@@ -101,6 +113,7 @@ public enum LiveSyncTopicClass {
       case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
+      case ADMIN_DASHBOARD -> ADMIN_DASHBOARD_SECTIONS;
     };
   }
 

@@ -286,6 +286,22 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
+   * Global admin dashboard room with one section per admin widget: {@code deletion-requests},
+   * {@code discord-registrations}, {@code terms} and {@code sync-status}; authorized locally by
+   * {@code ROLE_ADMIN} ({@link #requiredAnyRole}). The backend publishes into it (REQ-UI-034).
+   */
+  ADMIN_DASHBOARD(
+      "admin-dashboard",
+      false,
+      Set.of("deletion-requests", "discord-registrations", "terms", "sync-status"),
+      false,
+      "admin_dashboard",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.ADMIN))),
+
+  /**
    * Global supply room for {@code /supply/needs}, {@code /supply/donations/mine} and the statistics
    * with the sections {@code needs}, {@code mine} and {@code stats}, authorized by the socket's
    * authentication alone.

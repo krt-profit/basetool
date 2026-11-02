@@ -24,9 +24,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,8 @@ import org.springframework.data.domain.Pageable;
 class SyncReportServiceTest {
 
   @Mock private ExternalSyncReportRepository repository;
+
+  @Mock private AdminDashboardLiveSync adminDashboardLiveSync;
 
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
@@ -187,5 +192,82 @@ class SyncReportServiceTest {
 
     verify(repository).findBySourceSystemOrderByRanAtDesc(eq(SyncSourceSystem.SCWIKI), any());
     verify(repository, never()).findAllByOrderByRanAtDesc(any());
+  }
+
+  @Test
+  void runSummaries_countsEachRunOnceAndListsEverySource() {
+    Instant now = Instant.parse("2026-11-02T12:00:00Z");
+    UUID firstUexRun = UUID.randomUUID();
+    UUID secondUexRun = UUID.randomUUID();
+    when(repository.findRunFinishesSince(now.minus(Duration.ofDays(7))))
+        .thenReturn(
+            List.of(
+                finish(SyncSourceSystem.UEX, firstUexRun, now.minus(Duration.ofDays(3))),
+                finish(SyncSourceSystem.UEX, secondUexRun, now.minus(Duration.ofHours(2)))));
+    when(repository.findLatestFinishPerSource())
+        .thenReturn(
+            List.of(
+                latest(SyncSourceSystem.UEX, now.minus(Duration.ofHours(2))),
+                latest(SyncSourceSystem.P4K, now.minus(Duration.ofDays(20)))));
+
+    List<SyncRunSummaryDto> summaries = service.runSummaries(7, now);
+
+    assertEquals(
+        List.of(
+            new SyncRunSummaryDto("UEX", 2, now.minus(Duration.ofHours(2))),
+            new SyncRunSummaryDto("SCWIKI", 0, null),
+            new SyncRunSummaryDto("P4K", 0, now.minus(Duration.ofDays(20)))),
+        summaries);
+  }
+
+  @Test
+  void runSummaries_rejectsNonPositiveRangeWithoutTouchingRepository() {
+    assertThrows(IllegalArgumentException.class, () -> service.runSummaries(0, Instant.now()));
+
+    verify(repository, never()).findRunFinishesSince(any());
+  }
+
+  @Test
+  void pruneRuns_announcesTheFinishedRunToTheAdminDashboard() {
+    when(repository.findRecentRunIds(any(), any(Pageable.class))).thenReturn(List.of());
+
+    service.pruneRuns(SyncSourceSystem.UEX);
+
+    verify(adminDashboardLiveSync).syncStatusChanged();
+  }
+
+  private static ExternalSyncReportRepository.SourceFinish latest(
+      SyncSourceSystem source, Instant finishedAt) {
+    return new ExternalSyncReportRepository.SourceFinish() {
+      @Override
+      public SyncSourceSystem getSourceSystem() {
+        return source;
+      }
+
+      @Override
+      public Instant getFinishedAt() {
+        return finishedAt;
+      }
+    };
+  }
+
+  private static ExternalSyncReportRepository.RunFinish finish(
+      SyncSourceSystem source, UUID runId, Instant finishedAt) {
+    return new ExternalSyncReportRepository.RunFinish() {
+      @Override
+      public SyncSourceSystem getSourceSystem() {
+        return source;
+      }
+
+      @Override
+      public UUID getRunId() {
+        return runId;
+      }
+
+      @Override
+      public Instant getFinishedAt() {
+        return finishedAt;
+      }
+    };
   }
 }

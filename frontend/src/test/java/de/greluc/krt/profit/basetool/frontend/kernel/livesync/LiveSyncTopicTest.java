@@ -155,6 +155,22 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsTheGlobalAdminDashboardTopic_gatedByTheAdminRole() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("admin-dashboard");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.ADMIN_DASHBOARD);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(LiveSyncTopic.parse("admin-dashboard:" + UUID.randomUUID())).isNull();
+    assertThat(LiveSyncTopicClass.ADMIN_DASHBOARD.requiredAnyRole()).containsExactly("ROLE_ADMIN");
+    assertThat(LiveSyncTopicClass.ADMIN_DASHBOARD.authProbePath()).isNull();
+    assertThat(LiveSyncTopicClass.ADMIN_DASHBOARD.presenceEnabled()).isFalse();
+    assertThat(LiveSyncTopicClass.ADMIN_DASHBOARD.allowedSections())
+        .containsExactlyInAnyOrder(
+            "deletion-requests", "discord-registrations", "terms", "sync-status");
+  }
+
+  @Test
   void membersTopic_isTheOnlyNewClassGatedByALocalAdminRoleCheck() {
     assertThat(LiveSyncTopicClass.MEMBERS.requiredAnyRole()).containsExactly("ROLE_ADMIN");
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.requiredAnyRole()).isNull();

@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayl
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -65,6 +66,7 @@ class P4kImportJobServiceTest {
 
   @Mock private P4kImportJobRepository jobRepository;
   @Mock private P4kImportJobPayloadRepository payloadRepository;
+  @Mock private AdminDashboardLiveSync adminDashboardLiveSync;
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private P4kImportJobService service;
@@ -228,6 +230,7 @@ class P4kImportJobServiceTest {
     assertEquals(
         1.0, terminalCount(MetricNames.OUTCOME_SUCCEEDED, P4kImportJobKind.PREVIEW.name()));
     assertEquals(0.0, terminalCount(MetricNames.OUTCOME_FAILED, P4kImportJobKind.PREVIEW.name()));
+    verify(adminDashboardLiveSync).syncStatusChanged();
   }
 
   @Test
@@ -245,6 +248,7 @@ class P4kImportJobServiceTest {
     assertEquals(1.0, terminalCount(MetricNames.OUTCOME_FAILED, P4kImportJobKind.PREVIEW.name()));
     assertEquals(
         0.0, terminalCount(MetricNames.OUTCOME_SUCCEEDED, P4kImportJobKind.PREVIEW.name()));
+    verify(adminDashboardLiveSync).syncStatusChanged();
   }
 
   @Test

@@ -19,12 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -40,7 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
  * paged, to the admin sync-report pages.
  *
  * <p>A sync run calls {@link #beginRun()}, logs its findings, then {@link #pruneRuns} to keep the
- * last {@link #RUNS_TO_KEEP} runs per source. Write methods join the caller's transaction.
+ * last {@link #RUNS_TO_KEEP} runs per source and announce the finished run. Write methods join the
+ * caller's transaction.
  */
 @Slf4j
 @Service
@@ -52,6 +57,7 @@ public class SyncReportService {
 
   private final ExternalSyncReportRepository repository;
   private final MeterRegistry meterRegistry;
+  private final AdminDashboardLiveSync adminDashboardLiveSync;
 
   /**
    * Starts a new sync cycle and returns its {@code run_id}. Every event logged for this cycle
@@ -200,12 +206,14 @@ public class SyncReportService {
 
   /**
    * Deletes every event of {@code source} whose run is older than the newest {@link #RUNS_TO_KEEP}
-   * runs; a no-op when fewer runs exist. Joins the caller's transaction or opens one.
+   * runs; a no-op when fewer runs exist. Joins the caller's transaction or opens one. Closes the
+   * run: the open admin dashboards hear of it once the transaction commits.
    *
    * @param source the catalogue whose old runs should be pruned
    */
   @Transactional
   public void pruneRuns(SyncSourceSystem source) {
+    adminDashboardLiveSync.syncStatusChanged();
     List<UUID> keptRunIds = repository.findRecentRunIds(source, PageRequest.of(0, RUNS_TO_KEEP));
     if (keptRunIds.isEmpty()) {
       return;
@@ -263,5 +271,39 @@ public class SyncReportService {
       return repository.findAllByOrderByRanAtDesc(pageable);
     }
     return repository.findBySourceSystemOrderByRanAtDesc(source, pageable);
+  }
+
+  /**
+   * Counts, per source, the runs that finished at or after {@code now} minus {@code days}, next to
+   * when each source last ran at all. A run finishes with its newest event, so each run is counted
+   * once. Only runs still retained (the newest {@link #RUNS_TO_KEEP} per source) are visible.
+   *
+   * @param days the length of the range in days; at least 1
+   * @param now the instant the range ends at
+   * @return one summary per source system, in declaration order, with zero runs where none ran
+   * @throws IllegalArgumentException if {@code days} is less than 1
+   */
+  @Transactional(readOnly = true)
+  public @NotNull List<SyncRunSummaryDto> runSummaries(int days, @NotNull Instant now) {
+    if (days < 1) {
+      throw new IllegalArgumentException("days must be at least 1, was " + days);
+    }
+    Map<SyncSourceSystem, Long> runsInRange =
+        repository.findRunFinishesSince(now.minus(Duration.ofDays(days))).stream()
+            .collect(
+                Collectors.groupingBy(
+                    ExternalSyncReportRepository.RunFinish::getSourceSystem,
+                    Collectors.counting()));
+    Map<SyncSourceSystem, Instant> lastRun =
+        repository.findLatestFinishPerSource().stream()
+            .collect(
+                Collectors.toMap(
+                    ExternalSyncReportRepository.SourceFinish::getSourceSystem,
+                    ExternalSyncReportRepository.SourceFinish::getFinishedAt));
+    return Arrays.stream(SyncSourceSystem.values())
+        .map(source ->
+            new SyncRunSummaryDto(
+                source.name(), runsInRange.getOrDefault(source, 0L), lastRun.get(source)))
+        .toList();
   }
 }
