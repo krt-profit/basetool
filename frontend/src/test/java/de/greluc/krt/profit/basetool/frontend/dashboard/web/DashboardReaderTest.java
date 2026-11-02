@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetRes
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.Set;
@@ -219,10 +220,24 @@ class DashboardReaderTest {
             DashboardWidgetType.HANGAR_READINESS,
             DashboardWidgetType.ASSIGNED_ORDERS,
             DashboardWidgetType.LOW_STOCK,
-            DashboardWidgetType.BANK);
+            DashboardWidgetType.BANK,
+            DashboardWidgetType.REFINERY_READY);
     assertThat(read(GUEST, null, List.of()).catalogue())
         .doesNotContain(DashboardWidgetType.UPCOMING_DAYS)
         .contains(DashboardWidgetType.INFORMATION);
+  }
+
+  @Test
+  @DisplayName("the order widgets are offered only to a caller with access to the order area")
+  void offersTheOrderWidgetsByTheOrderFlags() {
+    when(client.dashboard(DashboardMode.MEMBER)).thenReturn(stored(false));
+    NavigationAccess queue =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.JOB_ORDERS));
+
+    assertThat(read(queue, null, List.of()).catalogue())
+        .contains(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
+    assertThat(read(MEMBER, null, List.of()).catalogue())
+        .doesNotContain(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
   }
 
   @Test

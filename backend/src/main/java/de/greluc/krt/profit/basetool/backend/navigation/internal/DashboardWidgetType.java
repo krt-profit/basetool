@@ -148,7 +148,32 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 3, null));
+      new DashboardOptions(null, null, 3, null)),
+
+  /** The orders one of the member's units processes, by priority. */
+  ORDERS_TO_PROCESS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
+      new DashboardOptions(null, null, 5, DashboardStatus.OPEN_ACTIVE),
+      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+
+  /** The open material demand across the visible orders, the largest gap first. */
+  MATERIAL_DEMAND(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null)),
+
+  /** The refinery orders that are ready to be stored. */
+  REFINERY_READY(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      false,
+      EnumSet.of(DashboardOption.ROWS),
+      new DashboardOptions(null, null, 5, null));
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */
   public static final Set<Integer> DAY_CHOICES = Set.of(3, 7, 14);

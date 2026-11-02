@@ -1307,8 +1307,12 @@ export for somebody who cannot sign in included (REQ-SEC-058) — and of the adm
 where the surviving account's choices win (REQ-SEC-046). A dashboard widget renders only for a
 user who may read its data: „Nächste Tage“, „Nächster Einsatz“, „Bestand niedrig“ and „Bank“
 need the member role (the mission list, the Lager and the org-unit bank are for members and above),
-the others every signed-in user („Ich bearbeite“ lists only the orders the caller is an assignee
-of, REQ-ORDERS-047); losing the role deletes the widget's instances on the next load, and the admin mode's dashboard is
+„Aufträge zu bearbeiten“ and „Materialbedarf“ the access to the order area, the others every
+signed-in user („Ich
+bearbeite“ lists only the orders the caller is an assignee of, REQ-ORDERS-047; „Raffinerie: fertig“
+lists the ready refinery orders in the caller's unit scope). The order widgets read per unit:
+„Aufträge zu bearbeiten“ shows the orders of the units the caller belongs to, narrowed to one of
+them by the unit option, and never another unit's; losing the role deletes the widget's instances on the next load, and the admin mode's dashboard is
 for `ADMIN` only (REQ-UI-034). „Bank“ lists the accounts the caller may see by the bank's own
 rules, and „Nächster Einsatz“ shows an internal mission only to members of its unit (REQ-MISSION-031,
 REQ-MISSION-008).

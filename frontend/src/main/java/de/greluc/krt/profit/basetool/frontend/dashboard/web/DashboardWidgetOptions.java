@@ -94,23 +94,25 @@ final class DashboardWidgetOptions {
   }
 
   /**
-   * The status filter of the assigned-orders widget.
+   * The status filter of an order widget.
    *
+   * @param type the order widget
    * @param requested the requested status, or {@code null}
    * @return the requested status when the widget offers it, else {@link
    *     DashboardStatus#OPEN_ACTIVE}
    */
-  static @NotNull DashboardStatus orderStatus(@Nullable DashboardStatus requested) {
-    return requested != null && DashboardWidgetType.ASSIGNED_ORDERS.offersStatus(requested)
+  static @NotNull DashboardStatus orderStatus(
+      @NotNull DashboardWidgetType type, @Nullable DashboardStatus requested) {
+    return requested != null && type.offersStatus(requested)
         ? requested
         : DashboardStatus.OPEN_ACTIVE;
   }
 
   /**
-   * The order statuses an assigned-orders status filter reads.
+   * The order statuses an order widget's status filter reads.
    *
    * @param status the status filter of the widget, as {@link #orderStatus} resolved it
-   * @return the backend order status names
+   * @return the backend order status names, never empty
    */
   static @NotNull List<String> orderStatuses(@NotNull DashboardStatus status) {
     return switch (status) {

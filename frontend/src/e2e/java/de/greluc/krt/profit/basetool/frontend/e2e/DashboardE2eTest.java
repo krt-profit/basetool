@@ -27,6 +27,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Route;
 import com.microsoft.playwright.options.BoundingBox;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -380,6 +381,65 @@ class DashboardE2eTest {
           assertThat(page.getByTestId("dashboard-widget-assigned-orders"))
               .hasAttribute("data-status", "IN_PROGRESS");
           assertThat(page.getByTestId("dashboard-widget-bank")).hasCount(1);
+        });
+  }
+
+  /**
+   * The order and refinery widgets load their own bodies and offer their own options; a refused or
+   * failing widget shows its own error state with its own test id while the others keep working.
+   */
+  @Test
+  void theOrderWidgetsLoadAndEachFailsOnItsOwn() {
+    run(
+        adminState,
+        1440,
+        "dashboard-order-widgets",
+        page -> {
+          page.route(
+              "**/dashboard/widgets/refinery-ready*",
+              route -> route.fulfill(new Route.FulfillOptions().setStatus(503)));
+          page.route(
+              "**/dashboard/widgets/assigned-orders*",
+              route -> route.fulfill(new Route.FulfillOptions().setStatus(403)));
+          E2eSupport.navigate(page, STACK.baseUrl() + "/");
+
+          page.getByTestId("dashboard-customise").click();
+          for (String slug :
+              new String[] {
+                "orders-to-process",
+                "material-demand",
+                "refinery-ready",
+                "assigned-orders",
+                "low-stock"
+              }) {
+            page.getByTestId("dashboard-add").click();
+            page.getByTestId("dashboard-add-" + slug).click();
+            assertThat(page.getByTestId("dashboard-widget-" + slug)).hasCount(1);
+          }
+
+          assertThat(page.getByTestId("dashboard-refinery-ready-error")).isVisible();
+          assertThat(page.getByTestId("dashboard-assigned-orders-error")).isVisible();
+          assertThat(page.getByTestId("dashboard-refinery-ready-retry")).isVisible();
+          for (String loaded : new String[] {"orders-to-process", "material-demand", "low-stock"}) {
+            assertThat(
+                    page.getByTestId("dashboard-widget-" + loaded).locator("[data-widget-content]"))
+                .isVisible();
+          }
+          assertThat(
+                  page.getByTestId("dashboard-widget-orders-to-process")
+                      .locator("[data-testid='dashboard-orders-to-process-count']"))
+              .isVisible();
+
+          page.getByTestId("dashboard-widget-orders-to-process")
+              .getByTestId("dashboard-options")
+              .click();
+          assertThat(page.locator("#dashboard-option-status option:not([hidden])")).hasCount(3);
+          page.locator("#dashboard-option-status").selectOption("IN_PROGRESS");
+          page.getByTestId("dashboard-options-save").click();
+          assertThat(page.getByTestId("dashboard-widget-orders-to-process"))
+              .hasAttribute("data-status", "IN_PROGRESS");
+
+          page.evaluate(RESET_DASHBOARD);
         });
   }
 

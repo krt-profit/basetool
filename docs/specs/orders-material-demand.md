@@ -139,8 +139,19 @@ subset of the whitelist, to re-read the per-order need figures of its allocation
 the orders load in one query with both requirement branches eager-fetched, the linked stock through
 one batched index, and the claims through the batched per-order claim lookup (REQ-DATA-003).
 
+**Summary read.** `GET /api/v1/orders/material-demand/summary` (`orgUnitId`, `limit` 1–50, default 5)
+serves the „Materialbedarf" widget of REQ-UI-034 so that it does not carry the whole overview. It is
+scoped exactly like the overview — it is folded from it — and returns the number of buckets whose
+`Offen` is greater than 0 (`openBuckets`, all rows counted) plus the first `limit` of them in the
+overview's order, each with its material, quality tier, `Offen` and responsible unit. `orgUnitId`
+keeps one responsible unit and never widens the scope; a unit without demand gives an empty
+summary. Like the overview it is read-only and audit-free. **Enforced by:**
+`MaterialDemandSummaryServiceTest`, `JobOrderBackendClientTest`, `DashboardOrderWidgetsMvcTest`.
+
 **Acceptance**
 
+- [ ] The summary counts only buckets with an outstanding amount, cuts the rows to `limit` without
+  cutting the count, and keeps one responsible unit when `orgUnitId` is given.
 - [ ] `/orders/material-demand` lists, per responsible org unit, one row per `(material, quality)`
   bucket aggregated over that unit's `OPEN` + `IN_PROGRESS` orders, with Bedarf / Bestand /
   Eintragungen / Offen unit-formatted per `quantityType`.

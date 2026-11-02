@@ -2586,11 +2586,11 @@ ADR-0282, ADR-0297
 > default, the framework (two columns, up/down, column switch, remove, catalogue and options
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
-> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Ich
-> bearbeite, Bestand niedrig, Bank, Information (with the inline editor for administrators),
-> Favoriten and Benachrichtigungen, with the options of the matrix below, the admin
-> dashboard with its five widgets and the start page per mode. Not built yet (planned): the
-> catalogue widgets Aufträge zu bearbeiten, Meine Aufträge, Materialbedarf, Raffinerie: fertig,
+> one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Aufträge zu
+> bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig,
+> Bank, Information (with the inline editor for administrators), Favoriten and
+> Benachrichtigungen, with the options of the matrix below, the admin dashboard with its five
+> widgets and the start page per mode. Not built yet (planned): the catalogue widgets
 > Materialbörse, Bedarf & Spenden and Meine Bankanträge with their options.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
@@ -2625,7 +2625,6 @@ unit.
 | Member | Nächster Einsatz | the next missions of the user's units and the ones the user is signed up for, merged, soonest first (REQ-MISSION-031) | rows |
 | Member | Hangar-Bereitschaft | readiness of the user's hangar | — |
 | Member | Aufträge zu bearbeiten | orders the user's unit processes | unit; status **Offen + In Bearbeitung** / Offen / In Bearbeitung; rows |
-| Member | Meine Aufträge | orders the user requested | status **Laufend** / Abgeschlossen / Alle; rows |
 | Member | Ich bearbeite | orders the user is an assignee of, by priority (REQ-ORDERS-047) | status as „Aufträge zu bearbeiten"; rows |
 | Member | Materialbedarf | open material demand | unit; rows |
 | Member | Raffinerie: fertig | finished refinery jobs | rows |
@@ -2645,7 +2644,10 @@ unit.
 
 A widget with a list links „Alle anzeigen" to its page or tab („Ich bearbeite" to that segment,
 „Bestand niedrig" to „Mindestbestände", „Bank" to `/org-unit-bank`). Widgets carry no action
-buttons. „Bank" has no unit option — its set ignores the context, only its order uses it — and is
+buttons. „Aufträge zu bearbeiten" links to the „Zu bearbeiten" segment of the orders,
+„Materialbedarf" to the material demand and „Raffinerie: fertig" to the „Abholbereit" segment of
+the refinery. „Aufträge zu bearbeiten" and „Materialbedarf" appear in the catalogue for a caller
+with access to the order area. „Bank" has no unit option — its set ignores the context, only its order uses it — and is
 not part of the default. A new option is a change to this table.
 
 **Availability.**
@@ -2657,7 +2659,16 @@ not part of the default. A new option is a change to this table.
 **Data and freshness.** Widgets read the existing endpoints (a page total serves as a count) and
 new summary reads where a list would otherwise be loaded whole (hangar readiness, next mission)
 or data is new (REQ-ORDERS-040 `assignedToMe`, REQ-INV-068, REQ-BANK-064). Each widget loads and
-fails on its own, never blocking the page. A widget whose area has a live-sync topic updates live
+fails on its own, never blocking the page: a refused (`403`) or failed read replaces the body with
+an error state and a retry button, carrying the test ids `dashboard-<widget>-error` and
+`dashboard-<widget>-retry`. „Aufträge zu bearbeiten" reads `GET /orders?toProcess=true` (with
+`orgUnitId` for a unit pinned in the widget, which only narrows the caller's processing units),
+„Raffinerie: fertig" the ready segment of
+`GET /refinery-orders/all` (REQ-REFINERY-019), each with the row count as page size and the page
+total as count; „Materialbedarf" reads the new summary `GET /orders/material-demand/summary`
+(`orgUnitId`, `limit`; the count of open buckets and the first rows, REQ-ORDERS-034) instead of the
+whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich bearbeite" (section
+`queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig". A widget whose area has a live-sync topic updates live
 (REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
 reload at once when the tab becomes visible again.
 
@@ -2713,6 +2724,9 @@ instances, the empty and error states, deletion on role loss, the hint, the cata
 Hangar-Bereitschaft: the rows and their rows option, the counts, the empty states, the member's hangar room),
 `DashboardWorkWidgetsMvcTest` (Ich bearbeite, Bestand niedrig and Bank: the read per option, the
 page total as count, the rows, the unit label, the target bar and trend, the empty states),
+`DashboardOrderWidgetsMvcTest` (Aufträge zu bearbeiten, Materialbedarf and
+Raffinerie: fertig: the read per option, the count, the rows, the unit label, the empty states, the
+refused read), `JobOrderBackendClientTest` (the processing-unit and summary reads),
 `DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
 widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
 `NavigationLegacyRedirectMvcTest` (`/admin/announcement`), `StartPageRedirectMvcTest` (the start
@@ -2726,7 +2740,7 @@ in place, `/start`, the select, the 409 hint),
 (the two work reads), `AdminDashboardE2eTest` (the admin default, edit mode and range on the
 admin board, the removal of the announcement), `DashboardE2eTest` (edit mode, catalogue and
 options, restore, the summary and work
-widgets, an option change after a reorder, phone single column, the 10-minute poll on visibility,
+widgets, the order widgets with their per-widget error states, an option change after a reorder, phone single column, the 10-minute poll on visibility,
 the hint, deletion on role loss), the export
 and merge tests of REQ-SEC-058 and REQ-SEC-046 ·
 **Related:** REQ-UI-018,

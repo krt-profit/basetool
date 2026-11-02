@@ -311,7 +311,10 @@ full queue), `canViewOwnJobOrders` and `canViewAssignedJobOrders` (at least one 
   settings). The caller's units are the pinned org unit when one is active, otherwise the caller's
   direct memberships (no leadership cascade). The parameter is AND-ed with the tenancy scope
   *without* the assignee grant, so it only narrows and never widens; a caller with no such unit gets
-  an empty page. The squadron filter is hidden and no squadron parameter is sent.
+  an empty page. The squadron filter is hidden and no squadron parameter is sent. The optional
+  `orgUnitId` parameter (with `toProcess`; the „Aufträge zu bearbeiten" widget of REQ-UI-034 sends
+  it for a pinned unit) keeps one of those units: a unit that is none of the caller's processing
+  units gives an empty page, never a wider one.
 - `ASSIGNED` („Ich bearbeite") reads `/api/v1/orders?assignedToMe=true` with the status filter: the
   orders on which the caller holds a `JobOrderAssignee` entry, with the full progress column. The
   entry is the visibility grant itself, so the read needs no profit access and never shows an order
@@ -353,7 +356,8 @@ new or removed assignment in place.
 `JobOrderQueryServiceAssignedToMeTest`, `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
 `JobOrderScopeQueryIntegrationTest` (`processingFilter_*`, `assigneeGrant_inAllNotInToProcess`,
 `assignedToMe_*`), `JobOrderAssigneeGrantIntegrationTest` (`assignedToMe*`, capability flag),
-`JobOrderToProcessMvcTest`, `MeControllerTest` (`canViewAssignedJobOrders`),
+`JobOrderToProcessMvcTest` (`*OrgUnitId*`), `JobOrderControllerTest`
+(`getAllJobOrders_forwardsTheProcessingOrgUnit`), `MeControllerTest` (`canViewAssignedJobOrders`),
 `CapabilityFlagsAdviceTest` · **Code:** `JobOrderPageController.viewOrders`, `OrderListScope`,
 `joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders` /

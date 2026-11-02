@@ -105,6 +105,35 @@ class JobOrderBackendClientTest {
   }
 
   @Test
+  void processingOrdersCarryTheOptionalUnit() {
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
+
+    client.ordersToProcess(null, 5, List.of("OPEN", "IN_PROGRESS"));
+    client.ordersToProcess(SQUADRON, 3, List.of("OPEN"));
+
+    backend.expect(
+        "GET",
+        "/api/v1/orders?page=0&size=5&sort=priority,asc&status=OPEN,IN_PROGRESS&toProcess=true");
+    backend.expect(
+        "GET",
+        "/api/v1/orders?page=0&size=3&sort=priority,asc&status=OPEN&toProcess=true&orgUnitId="
+            + SQUADRON);
+  }
+
+  @Test
+  void materialDemandSummaryCarriesTheLimitAndTheOptionalUnit() {
+    backend.answerJson("{\"openBuckets\":0,\"rows\":[]}");
+    backend.answerJson("{\"openBuckets\":0,\"rows\":[]}");
+
+    client.materialDemandSummary(null, 5);
+    client.materialDemandSummary(SQUADRON, 10);
+
+    backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=5");
+    backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=10&orgUnitId=" + SQUADRON);
+  }
+
+  @Test
   void orderReads() {
     backend.answerJson("{}");
     backend.answerJson("{}");

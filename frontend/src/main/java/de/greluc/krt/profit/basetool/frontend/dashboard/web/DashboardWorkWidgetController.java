@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankAccountsBac
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankVisibleAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.web.BankSparkline;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.StockLevelBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.StockLevelDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
@@ -82,7 +83,8 @@ public class DashboardWorkWidgetController {
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
       @RequestParam(required = false) @Nullable DashboardStatus status) {
-    DashboardStatus resolved = DashboardWidgetOptions.orderStatus(status);
+    DashboardStatus resolved =
+        DashboardWidgetOptions.orderStatus(DashboardWidgetType.ASSIGNED_ORDERS, status);
     PageResponse<JobOrderDto> page =
         orderClient.orders(
             OrderListScope.ASSIGNED,

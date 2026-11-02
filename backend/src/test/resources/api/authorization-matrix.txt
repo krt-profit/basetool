@@ -368,6 +368,7 @@ GET /api/v1/orders/by-number | JobOrderNumberLookupController#findByNumber | pre
 POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/lookup | JobOrderController#lookupJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/material-demand | JobOrderController#getMaterialDemand | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/material-demand/summary | JobOrderMaterialDemandSummaryController#summary | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/requested | JobOrderController#getRequestedJobOrders | pre=isAuthenticated() and @ownerScopeService.canViewOwnJobOrders() | url=anyRequest -> authenticated
 GET /api/v1/orders/settings | JobOrderSettingsController#settings | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id} | JobOrderController#deleteJobOrder | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
