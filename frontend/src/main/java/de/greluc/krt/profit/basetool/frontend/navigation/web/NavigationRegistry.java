@@ -863,12 +863,12 @@ public class NavigationRegistry {
             .with(EXTERNAL),
         of("action.language.de", "?lang=de", "palette.action.langDe")
             .keywords("palette.keywords.language")
-            .icon("swap")
+            .icon(ICON_SWAP)
             .testId("palette-action-lang-de")
             .gate(NavigationGate.excludes(LANGUAGE_DE)),
         of("action.language.en", "?lang=en", "palette.action.langEn")
             .keywords("palette.keywords.language")
-            .icon("swap")
+            .icon(ICON_SWAP)
             .testId("palette-action-lang-en")
             .gate(NavigationGate.excludes(LANGUAGE_EN)));
   }

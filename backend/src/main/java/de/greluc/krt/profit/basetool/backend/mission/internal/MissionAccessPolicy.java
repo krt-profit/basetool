@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionScope;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.Collection;
@@ -130,7 +131,7 @@ public class MissionAccessPolicy implements MissionVisibility {
    * @param missionId the mission to inspect; never {@code null}
    * @return {@code true} iff the caller may manage the mission as Mission Manager
    */
-  public boolean canEditMission(@NotNull UUID missionId) {
+  public boolean holdsMissionManagerGrantFor(@NotNull UUID missionId) {
     return missionRepository
         .findByIdForAuthorization(missionId)
         .map(this::holdsMissionManagerGrant)
@@ -377,8 +378,7 @@ public class MissionAccessPolicy implements MissionVisibility {
 
   /** Whether the caller holds the Mission Manager grant for the unit that owns {@code mission}. */
   private boolean holdsMissionManagerGrant(@NotNull Mission mission) {
-    return ownerScopeService.canManageMissionsOf(
-        mission.getOwningOrgUnit() == null ? null : mission.getOwningOrgUnit().getId());
+    return ownerScopeService.canManageMissionsOf(OrgUnit.idOf(mission.getOwningOrgUnit()));
   }
 
   /**
@@ -386,8 +386,7 @@ public class MissionAccessPolicy implements MissionVisibility {
    * mission is reserved to admins.
    */
   private boolean hasOfficerReachInOwningUnit(@NotNull Mission mission) {
-    return ownerScopeService.canActAsOfficerInOwner(
-        mission.getOwningOrgUnit() == null ? null : mission.getOwningOrgUnit().getId());
+    return ownerScopeService.canActAsOfficerInOwner(OrgUnit.idOf(mission.getOwningOrgUnit()));
   }
 
   private boolean canSeeMissionChain(@NotNull Mission mission) {

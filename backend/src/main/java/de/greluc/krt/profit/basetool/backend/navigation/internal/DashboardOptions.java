@@ -39,4 +39,55 @@ public record DashboardOptions(
 
   /** The options of a widget type that offers none. */
   public static final DashboardOptions NONE = new DashboardOptions(null, null, null, null);
+
+  /** The number of days a widget with the days or range option shows by default. */
+  public static final int DEFAULT_DAYS = 7;
+
+  /** The number of rows a widget with the rows option shows by default. */
+  public static final int DEFAULT_ROWS = 5;
+
+  /** The number of rows the bank widgets show by default. */
+  public static final int DEFAULT_BANK_ROWS = 3;
+
+  /**
+   * Options that carry only a number of days.
+   *
+   * @param days the number of days
+   * @return the options
+   */
+  public static DashboardOptions ofDays(int days) {
+    return new DashboardOptions(null, days, null, null);
+  }
+
+  /**
+   * Options that carry a number of days and a number of rows.
+   *
+   * @param days the number of days
+   * @param rows the number of rows
+   * @return the options
+   */
+  public static DashboardOptions ofDaysAndRows(int days, int rows) {
+    return new DashboardOptions(null, days, rows, null);
+  }
+
+  /**
+   * Options that carry only a number of rows.
+   *
+   * @param rows the number of rows
+   * @return the options
+   */
+  public static DashboardOptions ofRows(int rows) {
+    return new DashboardOptions(null, null, rows, null);
+  }
+
+  /**
+   * Options that carry a number of rows and a status.
+   *
+   * @param rows the number of rows
+   * @param status the status filter
+   * @return the options
+   */
+  public static DashboardOptions ofRowsAndStatus(int rows, DashboardStatus status) {
+    return new DashboardOptions(null, null, rows, status);
+  }
 }

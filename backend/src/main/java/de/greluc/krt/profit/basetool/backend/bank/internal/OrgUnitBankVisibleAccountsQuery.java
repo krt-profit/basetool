@@ -25,8 +25,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -112,6 +114,19 @@ public class OrgUnitBankVisibleAccountsQuery {
   }
 
   /**
+   * Reads one field of an org unit that may be absent.
+   *
+   * @param orgUnit the org unit, or {@code null}
+   * @param field the field accessor
+   * @param <T> the field type
+   * @return the field value, or {@code null} when there is no org unit
+   */
+  private static <T> @Nullable T fieldOf(
+      @Nullable OrgUnit orgUnit, @NotNull Function<OrgUnit, T> field) {
+    return orgUnit == null ? null : field.apply(orgUnit);
+  }
+
+  /**
    * Projects an account and its figures into the response record.
    *
    * @param account the account
@@ -130,10 +145,10 @@ public class OrgUnitBankVisibleAccountsQuery {
         account.getAccountNo(),
         account.getName(),
         account.getType(),
-        orgUnit == null ? null : orgUnit.getId(),
-        orgUnit == null ? null : orgUnit.getName(),
-        orgUnit == null ? null : orgUnit.getShorthand(),
-        orgUnit == null ? null : orgUnit.getKind(),
+        OrgUnit.idOf(orgUnit),
+        fieldOf(orgUnit, OrgUnit::getName),
+        fieldOf(orgUnit, OrgUnit::getShorthand),
+        fieldOf(orgUnit, OrgUnit::getKind),
         balance,
         account.getBalanceTarget(),
         delta,
