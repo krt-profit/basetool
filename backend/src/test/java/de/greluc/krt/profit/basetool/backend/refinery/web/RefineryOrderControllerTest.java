@@ -269,7 +269,8 @@ class RefineryOrderControllerTest {
       RefineryOrderListDto dto = mock(RefineryOrderListDto.class);
       when(queryService.getMissionRefineryOrdersForCaller(missionId, CALLER_ID))
           .thenReturn(List.of(order));
-      when(mapper.toListDto(order)).thenReturn(dto);
+      when(refineryAccessPolicy.canEditRefineryOrder(order)).thenReturn(true);
+      when(mapper.toListDto(order, true)).thenReturn(dto);
 
       assertEquals(List.of(dto), controller.getMissionRefineryOrders(jwt, missionId));
     }

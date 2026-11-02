@@ -109,11 +109,15 @@ public interface RefineryOrderMapper {
   /**
    * Maps a {@link RefineryOrder} to its slim list-row DTO, with the same profit computation and the
    * owning org unit as {@code owningSquadron}.
+   *
+   * @param entity the order to project
+   * @param canEdit whether the caller may edit the order, resolved by the caller of the mapper
+   * @return the list-row DTO
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
-  @Mapping(target = "mission", source = "missionId")
-  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  RefineryOrderListDto toListDto(RefineryOrder entity);
+  @Mapping(target = "mission", source = "entity.missionId")
+  @Mapping(target = "owningSquadron", source = "entity.owningOrgUnit")
+  RefineryOrderListDto toListDto(RefineryOrder entity, boolean canEdit);
 
   /**
    * Builds a new {@link RefineryOrder} entity from a create request. Id, version, status, owner and

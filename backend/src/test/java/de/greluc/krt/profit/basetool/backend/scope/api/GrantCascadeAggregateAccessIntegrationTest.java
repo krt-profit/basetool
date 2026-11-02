@@ -288,8 +288,9 @@ class GrantCascadeAggregateAccessIntegrationTest {
                     logisticianGrant(bereichId),
                     () -> refineryOrderController.getUserRefineryOrders(childMemberId, 0, 50, null))
                 .content())
-        .extracting(RefineryOrderListDto::id)
-        .contains(refineryOrderId);
+        .filteredOn(row -> row.id().equals(refineryOrderId))
+        .extracting(RefineryOrderListDto::canEdit)
+        .containsExactly(true);
     assertThatThrownBy(() ->
             asCaller(
                 logisticianGrant(siblingId),

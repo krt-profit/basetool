@@ -111,7 +111,7 @@ public class RefineryOrderController {
     Page<RefineryOrder> p =
         refineryOrderQueryService.getMyRefineryOrders(
             userService.getUserIdFromJwt(jwt), status, Boolean.TRUE.equals(ready), q, pageable);
-    return PageResponse.of(p.map(mapper::toListDto));
+    return PageResponse.of(p.map(this::toListDto));
   }
 
   /**
@@ -147,7 +147,7 @@ public class RefineryOrderController {
     return refineryOrderQueryService
         .getMissionRefineryOrdersForCaller(missionId, userService.getUserIdFromJwt(jwt))
         .stream()
-        .map(mapper::toListDto)
+        .map(this::toListDto)
         .toList();
   }
 
@@ -265,7 +265,7 @@ public class RefineryOrderController {
     Page<RefineryOrder> p =
         refineryOrderQueryService.getAllRefineryOrders(
             status, Boolean.TRUE.equals(ready), q, pageable);
-    return PageResponse.of(p.map(mapper::toListDto));
+    return PageResponse.of(p.map(this::toListDto));
   }
 
   /**
@@ -297,7 +297,7 @@ public class RefineryOrderController {
             Set.of("startedAt", "durationMinutes", "expenses", "id"),
             "startedAt");
     Page<RefineryOrder> p = refineryOrderQueryService.getUserRefineryOrdersScoped(userId, pageable);
-    return PageResponse.of(p.map(mapper::toListDto));
+    return PageResponse.of(p.map(this::toListDto));
   }
 
   /**
@@ -357,5 +357,15 @@ public class RefineryOrderController {
   public void deleteUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
     refineryOrderService.deleteRefineryOrder(userId, orderId, true);
+  }
+
+  /**
+   * Maps an order to its list row with the caller's edit right.
+   *
+   * @param order the order to project
+   * @return the list-row DTO
+   */
+  private RefineryOrderListDto toListDto(RefineryOrder order) {
+    return mapper.toListDto(order, refineryAccessPolicy.canEditRefineryOrder(order));
   }
 }

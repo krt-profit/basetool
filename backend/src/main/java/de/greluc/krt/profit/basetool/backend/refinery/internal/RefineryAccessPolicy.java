@@ -90,12 +90,19 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may edit the order
    */
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
-    return refineryOrderRepository
-        .findById(orderId)
-        .map(o ->
-            ownerScopeService.permitsOwnedRow(
-                o.getOwner(), o.getOwningOrgUnit(), true, Roles.LOGISTICIAN))
-        .orElse(false);
+    return refineryOrderRepository.findById(orderId).map(this::canEditRefineryOrder).orElse(false);
+  }
+
+  /**
+   * Entity overload of {@link #canEditRefineryOrder(UUID)} for callers that already hold the order,
+   * such as the list rows.
+   *
+   * @param order the refinery order to inspect; never {@code null}
+   * @return {@code true} iff the caller may edit the order
+   */
+  public boolean canEditRefineryOrder(@NotNull RefineryOrder order) {
+    return ownerScopeService.permitsOwnedRow(
+        order.getOwner(), order.getOwningOrgUnit(), true, Roles.LOGISTICIAN);
   }
 
   /**
