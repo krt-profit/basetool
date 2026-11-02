@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
@@ -108,7 +109,7 @@ class BankAuditServiceTest {
     assertEquals(
         1.0,
         meterRegistry
-            .get(MetricNames.BANK_AUDIT_EVENTS)
+            .get(BankMetricNames.BANK_AUDIT_EVENTS)
             .tag(MetricNames.TAG_EVENT_TYPE, BankAuditEventType.DEPOSIT_BOOKED.name())
             .counter()
             .count(),

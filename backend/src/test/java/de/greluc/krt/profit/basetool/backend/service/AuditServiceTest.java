@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditMetricNames;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
@@ -182,8 +183,8 @@ class AuditServiceTest {
     assertEquals(
         1.0d,
         meterRegistry
-            .get(MetricNames.AUDIT_EVENTS)
-            .tag(MetricNames.TAG_DOMAIN, AuditDomain.INVENTORY.name())
+            .get(AuditMetricNames.AUDIT_EVENTS)
+            .tag(AuditMetricNames.TAG_DOMAIN, AuditDomain.INVENTORY.name())
             .counter()
             .count());
   }

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
@@ -67,10 +68,10 @@ public class JobOrderIntegrityTask {
   @PostConstruct
   void registerViolationGauges() {
     Gauge.builder(
-            MetricNames.JOB_ORDER_INTEGRITY_VIOLATIONS,
+            JobOrderMetricNames.JOB_ORDER_INTEGRITY_VIOLATIONS,
             blueprintDriftGauge,
             AtomicInteger::doubleValue)
-        .tag(MetricNames.TAG_CATEGORY, MetricNames.CATEGORY_ITEM_LINE_BLUEPRINT_DRIFT)
+        .tag(MetricNames.TAG_CATEGORY, JobOrderMetricNames.CATEGORY_ITEM_LINE_BLUEPRINT_DRIFT)
         .description(
             "Job-order integrity violations by category; > 0 means an ordered-item line no longer"
                 + " matches its blueprint.")

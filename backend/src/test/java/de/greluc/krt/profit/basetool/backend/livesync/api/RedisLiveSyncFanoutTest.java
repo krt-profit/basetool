@@ -93,8 +93,8 @@ class RedisLiveSyncFanoutTest {
     assertThat(
             meterRegistry
                 .counter(
-                    MetricNames.LIVESYNC_REDIS_PUBLISHED,
-                    MetricNames.TAG_TOPIC_CLASS,
+                    LivesyncMetricNames.LIVESYNC_REDIS_PUBLISHED,
+                    LivesyncMetricNames.TAG_TOPIC_CLASS,
                     LiveSyncTopicClass.MATERIALBOARD.metricLabel())
                 .count())
         .isEqualTo(1.0);
@@ -112,7 +112,9 @@ class RedisLiveSyncFanoutTest {
     assertThat(
             meterRegistry
                 .counter(
-                    MetricNames.LIVESYNC_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_PUBLISH)
+                    LivesyncMetricNames.LIVESYNC_REDIS_ERRORS,
+                    MetricNames.TAG_OP,
+                    MetricNames.OP_PUBLISH)
                 .count())
         .isEqualTo(1.0);
   }

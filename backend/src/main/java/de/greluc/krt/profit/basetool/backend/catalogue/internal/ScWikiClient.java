@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiRow;
@@ -89,8 +90,9 @@ public class ScWikiClient {
 
   /**
    * Micrometer registry for the swallowed-fetch-error counter ({@link
-   * MetricNames#EXTERNAL_FETCH_ERRORS}). Injected so a network or parse failure — which the fetch
-   * helpers below map to {@code null} / empty — still leaves a metric trail (REQ-OBS-011).
+   * CatalogueMetricNames#EXTERNAL_FETCH_ERRORS}). Injected so a network or parse failure — which
+   * the fetch helpers below map to {@code null} / empty — still leaves a metric trail
+   * (REQ-OBS-011).
    */
   private final MeterRegistry meterRegistry;
 
@@ -124,24 +126,25 @@ public class ScWikiClient {
   }
 
   /**
-   * Records a transport, decode or status failure on {@link MetricNames#EXTERNAL_FETCH_ERRORS} with
-   * {@link MetricNames#REASON_FETCH}, at most once per fetch (REQ-OBS-011).
+   * Records a transport, decode or status failure on {@link
+   * CatalogueMetricNames#EXTERNAL_FETCH_ERRORS} with {@link CatalogueMetricNames#REASON_FETCH}, at
+   * most once per fetch (REQ-OBS-011).
    *
    * @param latch the current fetch's latch; only the first call through it records
    */
   private void recordFetchErrorOnce(FetchErrorLatch latch) {
-    recordOnce(latch, MetricNames.REASON_FETCH);
+    recordOnce(latch, CatalogueMetricNames.REASON_FETCH);
   }
 
   /**
-   * Records an incomplete page-walk census on {@link MetricNames#EXTERNAL_FETCH_ERRORS} with {@link
-   * MetricNames#REASON_CENSUS}, at most once per fetch and not at all after a fetch failure the
-   * same walk already recorded (REQ-OBS-011).
+   * Records an incomplete page-walk census on {@link CatalogueMetricNames#EXTERNAL_FETCH_ERRORS}
+   * with {@link CatalogueMetricNames#REASON_CENSUS}, at most once per fetch and not at all after a
+   * fetch failure the same walk already recorded (REQ-OBS-011).
    *
    * @param latch the current fetch's latch; only the first call through it records
    */
   private void recordCensusIncompleteOnce(FetchErrorLatch latch) {
-    recordOnce(latch, MetricNames.REASON_CENSUS);
+    recordOnce(latch, CatalogueMetricNames.REASON_CENSUS);
   }
 
   /**
@@ -156,9 +159,9 @@ public class ScWikiClient {
     }
     meterRegistry
         .counter(
-            MetricNames.EXTERNAL_FETCH_ERRORS,
-            MetricNames.TAG_SOURCE,
-            MetricNames.SOURCE_SCWIKI,
+            CatalogueMetricNames.EXTERNAL_FETCH_ERRORS,
+            CatalogueMetricNames.TAG_SOURCE,
+            CatalogueMetricNames.SOURCE_SCWIKI,
             MetricNames.TAG_REASON,
             reason)
         .increment();
@@ -732,9 +735,9 @@ public class ScWikiClient {
   }
 
   /**
-   * One-shot claim for a single fetch's {@link MetricNames#EXTERNAL_FETCH_ERRORS} increment,
-   * created per {@link #fetchAllPagesResult} walk or {@link #fetchOne} call. Not thread-safe;
-   * confined to the thread driving its fetch.
+   * One-shot claim for a single fetch's {@link CatalogueMetricNames#EXTERNAL_FETCH_ERRORS}
+   * increment, created per {@link #fetchAllPagesResult} walk or {@link #fetchOne} call. Not
+   * thread-safe; confined to the thread driving its fetch.
    */
   private static final class FetchErrorLatch {
 

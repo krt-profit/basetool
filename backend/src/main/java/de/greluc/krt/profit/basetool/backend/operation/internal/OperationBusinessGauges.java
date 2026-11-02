@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import de.greluc.krt.profit.basetool.backend.operation.api.OperationMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -45,10 +45,17 @@ public class OperationBusinessGauges implements BusinessGaugeSource {
   @Override
   public void register(@NotNull MeterRegistry registry) {
     BusinessGauges.countGauge(
-        registry, MetricNames.OPERATION_OPEN, operationPlanned, OperationStatus.PLANNED.name());
+        registry,
+        OperationMetricNames.OPERATION_OPEN,
+        operationPlanned,
+        OperationStatus.PLANNED.name());
     BusinessGauges.countGauge(
-        registry, MetricNames.OPERATION_OPEN, operationActive, OperationStatus.ACTIVE.name());
-    BusinessGauges.ageGauge(registry, MetricNames.OPERATION_OPEN_OLDEST_AGE, operationOldestAge);
+        registry,
+        OperationMetricNames.OPERATION_OPEN,
+        operationActive,
+        OperationStatus.ACTIVE.name());
+    BusinessGauges.ageGauge(
+        registry, OperationMetricNames.OPERATION_OPEN_OLDEST_AGE, operationOldestAge);
   }
 
   @Override

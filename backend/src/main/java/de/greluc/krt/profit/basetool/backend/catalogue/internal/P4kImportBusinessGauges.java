@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -48,15 +48,16 @@ public class P4kImportBusinessGauges implements BusinessGaugeSource {
   public void register(@NotNull MeterRegistry registry) {
     BusinessGauges.countGauge(
         registry,
-        MetricNames.P4K_IMPORT_JOB_PENDING,
+        CatalogueMetricNames.P4K_IMPORT_JOB_PENDING,
         p4kPending,
         P4kImportJobStatus.PENDING.name());
     BusinessGauges.countGauge(
         registry,
-        MetricNames.P4K_IMPORT_JOB_PENDING,
+        CatalogueMetricNames.P4K_IMPORT_JOB_PENDING,
         p4kRunning,
         P4kImportJobStatus.RUNNING.name());
-    BusinessGauges.ageGauge(registry, MetricNames.P4K_IMPORT_JOB_PENDING_OLDEST_AGE, p4kOldestAge);
+    BusinessGauges.ageGauge(
+        registry, CatalogueMetricNames.P4K_IMPORT_JOB_PENDING_OLDEST_AGE, p4kOldestAge);
   }
 
   @Override

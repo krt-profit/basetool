@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DeliveryStatus;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.RejectReason;
@@ -624,7 +625,7 @@ class PurchasingDeliveryServiceTest {
 
   private double counter(String event) {
     return meterRegistry
-        .counter(MetricNames.PURCHASING_DEALS, MetricNames.TAG_EVENT, event)
+        .counter(PurchasingMetricNames.PURCHASING_DEALS, MetricNames.TAG_EVENT, event)
         .count();
   }
 }

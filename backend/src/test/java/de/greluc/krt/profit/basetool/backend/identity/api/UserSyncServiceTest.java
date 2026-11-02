@@ -34,7 +34,6 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Collections;
@@ -156,7 +155,9 @@ class UserSyncServiceTest {
     userSyncService.syncFromKeycloak();
 
     assertEquals(
-        1.0, meterRegistry.counter(MetricNames.USER_SYNC_FAILURES).count(), "failures counted");
+        1.0,
+        meterRegistry.counter(IdentityMetricNames.USER_SYNC_FAILURES).count(),
+        "failures counted");
   }
 
   /**

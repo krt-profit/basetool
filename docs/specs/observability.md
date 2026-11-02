@@ -1249,11 +1249,12 @@ logs. All of them obey REQ-OBS-006: **only bounded, enumerable labels** (applica
 fixed local literal set) — never a username, `sub`, IP, id, path, URI or amount — and bank
 figures are exposed as **counts only**, never balances or transaction amounts.
 
-**Mechanics.** Meter names live in a per-module `MetricNames` constants holder (package `metrics`
-in the backend and frontend, `observability` in the ingest; the single source of truth for names,
-tag keys and the non-enum label values). The backend
-`metrics` package is a dependency leaf (Micrometer only) so `service` / `task` / `filter` /
-`exception` reuse it without a package cycle (ADR-0047). Scheduled-job health flows through the
+**Mechanics.** Meter names live in constants holders, the single source of truth for names, tag
+keys and the non-enum label values. In the backend `platform.api.MetricNames` holds the names and
+tag values several modules share or the platform owns; every other name sits in the owning module's
+`<Module>MetricNames` in its `api` package (`BankMetricNames`, `ExchangeMetricNames`, …), so a module
+adds a metric without touching the platform. The frontend (package `metrics`) and the ingest
+(`observability`) each have their own `MetricNames`. Scheduled-job health flows through the
 shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`, `SupplyBusinessGauges`),
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.

@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestStatus;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PrivacyMetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -46,9 +46,9 @@ public class DeletionRequestBusinessGauges implements BusinessGaugeSource {
   @Override
   public void register(@NotNull MeterRegistry registry) {
     BusinessGauges.countGauge(
-        registry, MetricNames.DELETION_REQUEST_PENDING, deletionRequestPending);
+        registry, PrivacyMetricNames.DELETION_REQUEST_PENDING, deletionRequestPending);
     BusinessGauges.ageGauge(
-        registry, MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE, deletionRequestOldestAge);
+        registry, PrivacyMetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE, deletionRequestOldestAge);
   }
 
   @Override

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.notification.internal;
 import de.greluc.krt.profit.basetool.backend.notification.api.MailMessage;
 import de.greluc.krt.profit.basetool.backend.notification.api.MailProperties;
 import de.greluc.krt.profit.basetool.backend.notification.api.MailService;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -77,14 +78,14 @@ public class SmtpMailService implements MailService {
     if (!mailProperties.enabled()) {
       log.debug(
           "Mail disabled (app.mail.enabled=false); dropping '{}' message.", message.subject());
-      recordOutcome(MetricNames.MAIL_DROPPED_DISABLED);
+      recordOutcome(NotificationMetricNames.MAIL_DROPPED_DISABLED);
       return;
     }
     if (!StringUtils.hasText(smtpHost)) {
       log.debug(
           "No SMTP host configured (spring.mail.host blank); dropping '{}' message.",
           message.subject());
-      recordOutcome(MetricNames.MAIL_DROPPED_NO_HOST);
+      recordOutcome(NotificationMetricNames.MAIL_DROPPED_NO_HOST);
       return;
     }
     JavaMailSender sender = mailSenderProvider.getIfAvailable();
@@ -92,7 +93,7 @@ public class SmtpMailService implements MailService {
       log.warn(
           "SMTP host is set but no JavaMailSender bean is available; dropping '{}' message.",
           message.subject());
-      recordOutcome(MetricNames.MAIL_DROPPED_NO_SENDER);
+      recordOutcome(NotificationMetricNames.MAIL_DROPPED_NO_SENDER);
       return;
     }
     try {
@@ -103,10 +104,10 @@ public class SmtpMailService implements MailService {
       mail.setText(message.body());
       sender.send(mail);
       log.info("Sent '{}' mail to one recipient.", message.subject());
-      recordOutcome(MetricNames.MAIL_SENT);
+      recordOutcome(NotificationMetricNames.MAIL_SENT);
     } catch (MailException e) {
       log.error("Failed to send '{}' mail.", message.subject(), e);
-      recordOutcome(MetricNames.MAIL_FAILED);
+      recordOutcome(NotificationMetricNames.MAIL_FAILED);
     }
   }
 
@@ -117,7 +118,9 @@ public class SmtpMailService implements MailService {
    * @param outcome one of the {@code MAIL_*} bounded outcome values in {@link MetricNames}
    */
   private void recordOutcome(@NotNull String outcome) {
-    meterRegistry.counter(MetricNames.MAIL, MetricNames.TAG_OUTCOME, outcome).increment();
+    meterRegistry
+        .counter(NotificationMetricNames.MAIL, MetricNames.TAG_OUTCOME, outcome)
+        .increment();
   }
 
   /**

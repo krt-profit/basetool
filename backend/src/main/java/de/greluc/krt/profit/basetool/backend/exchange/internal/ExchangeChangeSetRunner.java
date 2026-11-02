@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Execution;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Outcome;
@@ -123,10 +124,10 @@ public class ExchangeChangeSetRunner {
       @NotNull ExchangeCaller caller, @NotNull ExchangeResource resource, @NotNull String outcome) {
     meterRegistry
         .counter(
-            MetricNames.EXCHANGE_WRITES,
+            ExchangeMetricNames.EXCHANGE_WRITES,
             MetricNames.TAG_CLIENT_ID,
             caller.clientId(),
-            MetricNames.TAG_RESOURCE,
+            ExchangeMetricNames.TAG_RESOURCE,
             resource.name().toLowerCase(Locale.ROOT),
             MetricNames.TAG_OUTCOME,
             outcome)

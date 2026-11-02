@@ -4638,7 +4638,7 @@ covers the path, so the annotation is the only gate; `GameItemControllerTest` ev
 `BackendApiClientProblemJsonTest` (the refusal is not a backend-call failure) ·
 `norole_block_subjects_test.yml` (the alert counts subjects) ·
 **Code:** `CustomJwtGrantedAuthoritiesConverter#assembleFor`, `Roles.NO_ROLE_MARKER`,
-`PendingApprovalAccessFilter`, `MetricNames.NO_ROLE_REFUSED_SUBJECTS`, `UserReconciliationService`,
+`PendingApprovalAccessFilter`, `AppMetricNames.NO_ROLE_REFUSED_SUBJECTS`, `UserReconciliationService`,
 `KeycloakService#fetchDefaultRoleGrants`,
 `NotificationRuleService#validateSelector`, `frontend/…/kernel/security/BackendRoleSyncFilter`,
 `V239__drop_guest_role_and_guest_edit_token.sql` · **ADR:**

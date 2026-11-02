@@ -25,6 +25,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
@@ -325,15 +326,15 @@ class ScWikiClientTest {
     assertEquals(
         1.0,
         meterRegistry
-            .get(MetricNames.EXTERNAL_FETCH_ERRORS)
-            .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+            .get(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS)
+            .tag(CatalogueMetricNames.TAG_SOURCE, CatalogueMetricNames.SOURCE_SCWIKI)
             .counter()
             .count(),
         "a swallowed SC Wiki fetch error must increment"
             + " basetool_external_fetch_errors_total{source=scwiki}");
     assertEquals(
         0.0,
-        fetchErrorCount(MetricNames.REASON_CENSUS),
+        fetchErrorCount(CatalogueMetricNames.REASON_CENSUS),
         "a transport failure is a fetch error, never a census finding");
   }
 
@@ -357,11 +358,11 @@ class ScWikiClientTest {
             + " basetool_external_fetch_errors_total{source=scwiki}");
     assertEquals(
         1.0,
-        fetchErrorCount(MetricNames.REASON_CENSUS),
+        fetchErrorCount(CatalogueMetricNames.REASON_CENSUS),
         "an incomplete census is recorded under reason=census");
     assertEquals(
         0.0,
-        fetchErrorCount(MetricNames.REASON_FETCH),
+        fetchErrorCount(CatalogueMetricNames.REASON_FETCH),
         "an incomplete census must not feed the reason=fetch series ExternalFetchErrors watches");
   }
 
@@ -549,7 +550,7 @@ class ScWikiClientTest {
         "a dropped page and the row-count shortfall it causes are one failed fetch, not two");
     assertEquals(
         0.0,
-        fetchErrorCount(MetricNames.REASON_CENSUS),
+        fetchErrorCount(CatalogueMetricNames.REASON_CENSUS),
         "the shortfall caused by a dropped page is already a fetch error and adds no census count");
   }
 
@@ -693,8 +694,8 @@ class ScWikiClientTest {
 
   private double fetchErrorCount() {
     return meterRegistry
-        .find(MetricNames.EXTERNAL_FETCH_ERRORS)
-        .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+        .find(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS)
+        .tag(CatalogueMetricNames.TAG_SOURCE, CatalogueMetricNames.SOURCE_SCWIKI)
         .counters()
         .stream()
         .mapToDouble(io.micrometer.core.instrument.Counter::count)
@@ -703,8 +704,8 @@ class ScWikiClientTest {
 
   private double fetchErrorCount(String reason) {
     return meterRegistry
-        .find(MetricNames.EXTERNAL_FETCH_ERRORS)
-        .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+        .find(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS)
+        .tag(CatalogueMetricNames.TAG_SOURCE, CatalogueMetricNames.SOURCE_SCWIKI)
         .tag(MetricNames.TAG_REASON, reason)
         .counters()
         .stream()

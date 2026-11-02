@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
@@ -276,10 +277,10 @@ public class ExchangeUndoService {
   private @NotNull Counter counter(
       @NotNull String clientId, @NotNull ExchangeResource resource, @NotNull String outcome) {
     return meterRegistry.counter(
-        MetricNames.EXCHANGE_UNDO,
+        ExchangeMetricNames.EXCHANGE_UNDO,
         MetricNames.TAG_CLIENT_ID,
         clientId,
-        MetricNames.TAG_RESOURCE,
+        ExchangeMetricNames.TAG_RESOURCE,
         resource.name().toLowerCase(Locale.ROOT),
         MetricNames.TAG_OUTCOME,
         outcome);

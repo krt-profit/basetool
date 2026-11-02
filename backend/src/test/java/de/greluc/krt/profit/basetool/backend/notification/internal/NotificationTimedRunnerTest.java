@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -132,7 +133,7 @@ class NotificationTimedRunnerTest {
 
   private double produced(String kind) {
     return meterRegistry
-        .counter(MetricNames.NOTIFICATION_TIMED_PRODUCED, MetricNames.TAG_KIND, kind)
+        .counter(NotificationMetricNames.NOTIFICATION_TIMED_PRODUCED, MetricNames.TAG_KIND, kind)
         .count();
   }
 

@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RedisJsonFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
@@ -77,7 +76,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
             meterRegistry,
             channel,
             instanceId,
-            MetricNames.SSE_REDIS_ERRORS,
+            NotificationMetricNames.SSE_REDIS_ERRORS,
             "Notification");
   }
 
@@ -97,7 +96,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
     notificationStreamService.publish(recipientUserIds);
     transport.publish(
         root -> writePayload(root, recipientUserIds),
-        () -> meterRegistry.counter(MetricNames.SSE_REDIS_PUBLISHED).increment());
+        () -> meterRegistry.counter(NotificationMetricNames.SSE_REDIS_PUBLISHED).increment());
   }
 
   /**
@@ -150,6 +149,6 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
       return;
     }
     notificationStreamService.publish(recipients);
-    meterRegistry.counter(MetricNames.SSE_REDIS_CONSUMED).increment();
+    meterRegistry.counter(NotificationMetricNames.SSE_REDIS_CONSUMED).increment();
   }
 }

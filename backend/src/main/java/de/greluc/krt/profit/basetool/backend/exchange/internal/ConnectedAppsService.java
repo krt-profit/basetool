@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRevocationRow;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -82,9 +83,10 @@ public class ConnectedAppsService {
   /** Registers the disconnect counter for both kinds at zero. */
   @PostConstruct
   void registerDisconnectCounters() {
-    meterRegistry.counter(MetricNames.EXCHANGE_DISCONNECTS, MetricNames.TAG_KIND, KIND_CLIENT);
     meterRegistry.counter(
-        MetricNames.EXCHANGE_DISCONNECTS, MetricNames.TAG_KIND, KIND_INSTALLATION);
+        ExchangeMetricNames.EXCHANGE_DISCONNECTS, MetricNames.TAG_KIND, KIND_CLIENT);
+    meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_DISCONNECTS, MetricNames.TAG_KIND, KIND_INSTALLATION);
   }
 
   /**
@@ -285,6 +287,8 @@ public class ConnectedAppsService {
    * @param kind {@code client} or {@code installation}
    */
   private void count(@NotNull String kind) {
-    meterRegistry.counter(MetricNames.EXCHANGE_DISCONNECTS, MetricNames.TAG_KIND, kind).increment();
+    meterRegistry
+        .counter(ExchangeMetricNames.EXCHANGE_DISCONNECTS, MetricNames.TAG_KIND, kind)
+        .increment();
   }
 }

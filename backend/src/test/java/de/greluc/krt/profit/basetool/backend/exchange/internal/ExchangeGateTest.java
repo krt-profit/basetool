@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
@@ -326,7 +327,7 @@ class ExchangeGateTest {
    */
   private double refused(@NotNull String reason) {
     return meterRegistry
-        .counter(MetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason)
+        .counter(ExchangeMetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason)
         .count();
   }
 

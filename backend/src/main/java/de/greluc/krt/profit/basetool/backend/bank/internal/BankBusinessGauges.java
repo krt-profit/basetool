@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
@@ -44,9 +44,9 @@ public class BankBusinessGauges implements BusinessGaugeSource {
   @Override
   public void register(@NotNull MeterRegistry registry) {
     BusinessGauges.countGauge(
-        registry, MetricNames.BANK_BOOKING_REQUEST_PENDING, bankRequestPending);
+        registry, BankMetricNames.BANK_BOOKING_REQUEST_PENDING, bankRequestPending);
     BusinessGauges.ageGauge(
-        registry, MetricNames.BANK_BOOKING_REQUEST_PENDING_OLDEST_AGE, bankRequestOldestAge);
+        registry, BankMetricNames.BANK_BOOKING_REQUEST_PENDING_OLDEST_AGE, bankRequestOldestAge);
   }
 
   @Override

@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -117,7 +117,9 @@ public class NotificationCreationService {
     byType.forEach((type, count) ->
         meterRegistry
             .counter(
-                MetricNames.NOTIFICATION_CREATED, MetricNames.TAG_NOTIFICATION_TYPE, type.name())
+                NotificationMetricNames.NOTIFICATION_CREATED,
+                NotificationMetricNames.TAG_NOTIFICATION_TYPE,
+                type.name())
             .increment(count));
   }
 

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -98,8 +99,10 @@ public class ExchangeDepartureService {
   /** Registers the departure counter for both outcomes at zero. */
   @PostConstruct
   void registerDepartureCounters() {
-    meterRegistry.counter(MetricNames.EXCHANGE_DEPARTURES, MetricNames.TAG_OUTCOME, OUTCOME_DONE);
-    meterRegistry.counter(MetricNames.EXCHANGE_DEPARTURES, MetricNames.TAG_OUTCOME, OUTCOME_FAILED);
+    meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_DEPARTURES, MetricNames.TAG_OUTCOME, OUTCOME_DONE);
+    meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_DEPARTURES, MetricNames.TAG_OUTCOME, OUTCOME_FAILED);
   }
 
   /**
@@ -147,7 +150,7 @@ public class ExchangeDepartureService {
                         .with("complete", !incomplete))));
     meterRegistry
         .counter(
-            MetricNames.EXCHANGE_DEPARTURES,
+            ExchangeMetricNames.EXCHANGE_DEPARTURES,
             MetricNames.TAG_OUTCOME,
             failed ? OUTCOME_FAILED : OUTCOME_DONE)
         .increment();

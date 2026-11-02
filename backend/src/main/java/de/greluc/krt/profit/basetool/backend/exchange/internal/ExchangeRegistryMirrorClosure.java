@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
@@ -101,12 +102,12 @@ public class ExchangeRegistryMirrorClosure {
     }
     try {
       if (close()) {
-        count(MetricNames.OUTCOME_WRITTEN);
+        count(ExchangeMetricNames.OUTCOME_WRITTEN);
         log.warn(
             "Exchange registry mirroring is off; the document left under {} was switched off",
             properties.key());
       } else {
-        count(MetricNames.OUTCOME_UNCHANGED);
+        count(ExchangeMetricNames.OUTCOME_UNCHANGED);
       }
     } catch (RuntimeException e) {
       count(MetricNames.OUTCOME_FAILED);
@@ -144,8 +145,8 @@ public class ExchangeRegistryMirrorClosure {
   private void count(@NotNull String outcome) {
     meterRegistry
         .counter(
-            MetricNames.EXCHANGE_MIRROR_WRITES,
-            MetricNames.TAG_PHASE,
+            ExchangeMetricNames.EXCHANGE_MIRROR_WRITES,
+            ExchangeMetricNames.TAG_PHASE,
             ExchangeMirrorPhase.SWITCHED_OFF.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome)

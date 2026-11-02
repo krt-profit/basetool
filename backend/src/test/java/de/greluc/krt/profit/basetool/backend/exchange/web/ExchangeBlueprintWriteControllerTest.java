@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprint
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -175,8 +177,9 @@ class ExchangeBlueprintWriteControllerTest {
                 member))
         .containsExactlyInAnyOrder("BLUEPRINT_ADDED:" + client, "BLUEPRINT_REMOVED:" + client);
     assertThat(frames("blueprints_own")).isEqualTo(framesBefore + 1);
-    assertThat(clientCount(MetricNames.EXCHANGE_WRITES, "outcome", "applied")).isEqualTo(2);
-    assertThat(clientCount(MetricNames.EXCHANGE_REMOVALS, "resource", "blueprint")).isEqualTo(1);
+    assertThat(clientCount(ExchangeMetricNames.EXCHANGE_WRITES, "outcome", "applied")).isEqualTo(2);
+    assertThat(clientCount(ExchangeMetricNames.EXCHANGE_REMOVALS, "resource", "blueprint"))
+        .isEqualTo(1);
     List<ExchangeJournalEntry> journal =
         journalRepository.findAllByUserIdOrderByRecordedAtAsc(member);
     assertThat(journal)
@@ -416,8 +419,8 @@ class ExchangeBlueprintWriteControllerTest {
   private double frames(@NotNull String topicClass) {
     io.micrometer.core.instrument.Counter counter =
         meterRegistry
-            .find(MetricNames.LIVESYNC_PUBLISH_ACCEPTED)
-            .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .find(LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED)
+            .tag(LivesyncMetricNames.TAG_TOPIC_CLASS, topicClass)
             .counter();
     return counter == null ? 0 : counter.count();
   }

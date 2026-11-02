@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.EnumMap;
@@ -55,11 +55,13 @@ public class PurchasingBusinessGauges implements BusinessGaugeSource {
       AtomicLong holder = new AtomicLong();
       byStatus.put(status, holder);
       BusinessGauges.countGauge(
-          registry, MetricNames.PURCHASING_DEALS_BY_STATUS, holder, status.name());
+          registry, PurchasingMetricNames.PURCHASING_DEALS_BY_STATUS, holder, status.name());
     }
-    BusinessGauges.countGauge(registry, MetricNames.PURCHASING_SETTLEMENTS_OVERDUE, overdue);
-    BusinessGauges.countGauge(registry, MetricNames.PURCHASING_PAUSED, paused);
-    BusinessGauges.countGauge(registry, MetricNames.PURCHASING_DELEGATES_ACTIVE, delegates);
+    BusinessGauges.countGauge(
+        registry, PurchasingMetricNames.PURCHASING_SETTLEMENTS_OVERDUE, overdue);
+    BusinessGauges.countGauge(registry, PurchasingMetricNames.PURCHASING_PAUSED, paused);
+    BusinessGauges.countGauge(
+        registry, PurchasingMetricNames.PURCHASING_DELEGATES_ACTIVE, delegates);
   }
 
   @Override

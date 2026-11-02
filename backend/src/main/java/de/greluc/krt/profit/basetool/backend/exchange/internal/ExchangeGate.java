@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -99,7 +100,8 @@ public class ExchangeGate {
           REASON_CLIENT_REVOKED,
           REASON_REVOCATIONS_UNREADABLE
         }) {
-      meterRegistry.counter(MetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason);
+      meterRegistry.counter(
+          ExchangeMetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason);
     }
   }
 
@@ -316,7 +318,7 @@ public class ExchangeGate {
    */
   private void count(@NotNull String reason) {
     meterRegistry
-        .counter(MetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason)
+        .counter(ExchangeMetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason)
         .increment();
   }
 }

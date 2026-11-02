@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerKind;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PaymentModel;
+import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingMetricNames;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.RiskClassCode;
@@ -606,6 +607,8 @@ public class PurchasingDealService {
   }
 
   private void count(@NotNull String event) {
-    meterRegistry.counter(MetricNames.PURCHASING_DEALS, MetricNames.TAG_EVENT, event).increment();
+    meterRegistry
+        .counter(PurchasingMetricNames.PURCHASING_DEALS, MetricNames.TAG_EVENT, event)
+        .increment();
   }
 }

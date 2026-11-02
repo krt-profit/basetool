@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
@@ -97,7 +98,7 @@ public class NotificationRetentionTask {
    * instant; a failure in one does not skip the other and is rethrown afterwards.
    *
    * @return the total number of notifications deleted this run; each half is also counted under
-   *     {@link MetricNames#NOTIFICATION_RETENTION_DELETED}
+   *     {@link NotificationMetricNames#NOTIFICATION_RETENTION_DELETED}
    */
   private int purgeExpired() {
     log.info(
@@ -139,7 +140,8 @@ public class NotificationRetentionTask {
     try {
       int deleted = half.getAsInt();
       meterRegistry
-          .counter(MetricNames.NOTIFICATION_RETENTION_DELETED, MetricNames.TAG_KIND, kind)
+          .counter(
+              NotificationMetricNames.NOTIFICATION_RETENTION_DELETED, MetricNames.TAG_KIND, kind)
           .increment(deleted);
       return deleted;
     } catch (RuntimeException e) {
