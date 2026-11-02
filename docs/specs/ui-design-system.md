@@ -2325,6 +2325,10 @@ server-side migration.
   mode; the cap is shared.
 - A favourite unavailable in the active context stays stored, keeps its place and counts towards
   the cap; it renders greyed with „In <Einheit> nicht verfügbar".
+- **The favourites are an ordered list.** Within the „Favoriten" group they are reordered like the
+  groups and links of „Order" below (buttons, Alt+↑/↓, focus kept, live announcement); a move
+  writes the favourites in place under their own version, and Alt+1…9 (REQ-UI-035) and the icon
+  rail follow the order the member chose.
 
 **Hiding.**
 
@@ -2337,7 +2341,8 @@ server-side migration.
   it, hiding a favourite removes the favourite — one request that writes both sections and checks
   both versions. A favourited tab of a hidden page stays (it has its own key).
 
-**Order.** Groups among themselves and links within their group; a link never changes group.
+**Order.** Groups among themselves and links within their group — and the favourites within their
+group; a link never changes group.
 Stored per mode, only for the keys the user moved. The controls are those of REQ-UI-031 (buttons,
 Alt+↑/↓, focus kept, live announcement); drag is only an extra.
 

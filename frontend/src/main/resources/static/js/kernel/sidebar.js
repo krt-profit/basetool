@@ -19,7 +19,11 @@
 
 import { krtChrome } from '/js/kernel/krt-chrome.js';
 import { krtSearchFold } from '/js/kernel/krt-search.js';
-import { NAV_EDIT_EVENT, NAV_RENDERED_EVENT } from '/js/kernel/nav-preferences.js';
+import {
+    enterAdminViaStartPage,
+    NAV_EDIT_EVENT,
+    NAV_RENDERED_EVENT,
+} from '/js/kernel/nav-preferences.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const phone = window.matchMedia('(max-width: 768px)');
@@ -546,12 +550,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sidebarEl) {
         sidebarEl.querySelectorAll('.nav-admin-entry, .nav-admin-back').forEach((btn) => {
             btn.addEventListener('click', () => {
-                if (!adminMode && btn.classList.contains('nav-admin-entry')) {
-                    const appearance = document.querySelector('[data-appearance-state]');
-                    if (appearance instanceof HTMLElement && appearance.dataset.startAdmin) {
-                        window.location.assign('/start?mode=admin');
-                        return;
-                    }
+                if (
+                    !adminMode &&
+                    btn.classList.contains('nav-admin-entry') &&
+                    enterAdminViaStartPage()
+                ) {
+                    return;
                 }
                 setAdminMode(!adminMode);
                 const list = document.getElementById('nav-list');

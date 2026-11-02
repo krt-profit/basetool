@@ -70,20 +70,25 @@
     </div>
 </th:block>
 
+<th:block th:fragment="modeItems(mode)" th:with="groups=${mode == 'admin'} ? ${navigation.admin()} : ${navigation.main()}">
+    <th:block th:replace="~{kernel/fragments/nav-rail :: favourites(${mode})}" />
+    <th:block th:each="item : ${groups}" th:unless="${item.links().isEmpty()}">
+        <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
+    </th:block>
+    <th:block th:replace="~{kernel/fragments/nav-rail :: more(${mode})}" />
+</th:block>
+
+<th:block th:fragment="swapModes">
+    <div class="nav-rail-mode" data-nav-rail-mode="main"><th:block th:replace="~{kernel/fragments/nav-rail :: modeItems('member')}" /></div>
+    <div class="nav-rail-mode" data-nav-rail-mode="admin" th:unless="${navigation.admin().isEmpty()}"><th:block th:replace="~{kernel/fragments/nav-rail :: modeItems('admin')}" /></div>
+</th:block>
+
 <nav th:fragment="rail" id="nav-rail" class="nav-rail" th:aria-label="#{nav.rail.aria}" sec:authorize="isAuthenticated()">
     <div class="nav-rail-mode" data-nav-rail-mode="main">
-        <th:block th:replace="~{kernel/fragments/nav-rail :: favourites('member')}" />
-        <th:block th:each="item : ${navigation.main()}" th:unless="${item.links().isEmpty()}">
-            <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
-        </th:block>
-        <th:block th:replace="~{kernel/fragments/nav-rail :: more('member')}" />
+        <th:block th:replace="~{kernel/fragments/nav-rail :: modeItems('member')}" />
     </div>
     <div class="nav-rail-mode" data-nav-rail-mode="admin" hidden th:unless="${navigation.admin().isEmpty()}">
-        <th:block th:replace="~{kernel/fragments/nav-rail :: favourites('admin')}" />
-        <th:block th:each="item : ${navigation.admin()}" th:unless="${item.links().isEmpty()}">
-            <th:block th:replace="~{kernel/fragments/nav-rail :: item(${item.group().key()}, #{${item.group().labelKey()}}, ${item.group().icon()}, ${item.links()})}" />
-        </th:block>
-        <th:block th:replace="~{kernel/fragments/nav-rail :: more('admin')}" />
+        <th:block th:replace="~{kernel/fragments/nav-rail :: modeItems('admin')}" />
     </div>
     <span class="nav-rail-grow"></span>
     <button type="button" class="nav-rail-btn" data-testid="nav-rail-admin" aria-pressed="false"

@@ -860,6 +860,22 @@ val testReorderJs =
     outputs.upToDateWhen { false }
   }
 
+val testFavouriteOrderJs =
+  tasks.register<NodeTask>("testFavouriteOrderJs") {
+    group = "verification"
+    description =
+      "Regression tests for the merge of a reordered favourites group into the stored favourites."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/nav-favourite-order.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/nav-favourite-order.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/nav-favourite-order.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testShortcutsJs =
   tasks.register<NodeTask>("testShortcutsJs") {
     group = "verification"
@@ -1069,6 +1085,7 @@ tasks.named("check").configure {
     testTableSort,
     testReorderJs,
     testShortcutsJs,
+    testFavouriteOrderJs,
     testSearchJs,
     testNumberFormatJs,
     testNotificationBellLabelJs,

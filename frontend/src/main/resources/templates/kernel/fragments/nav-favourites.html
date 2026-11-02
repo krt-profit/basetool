@@ -26,7 +26,8 @@
             <span class="nav-group-label" th:text="#{nav.favourites.title}">Favoriten</span>
         </div>
         <div class="nav-group-links">
-            <div class="nav-row" th:each="item : ${items}" th:data-entry-key="${item.entry().key()}">
+            <div class="nav-row" th:each="item, position : ${items}" th:data-entry-key="${item.entry().key()}"
+                 th:data-reorder-name="#{__${item.entry().labelKey()}__}">
                 <a th:if="${item.available()}" class="nav-link" data-nav-skip="true"
                    th:href="@{${item.entry().href()}}" th:data-entry-key="${item.entry().key()}"
                    th:data-testid="|nav-favourite-${item.entry().key()}|"
@@ -41,6 +42,7 @@
                 </span>
                 <div class="nav-edit-controls" data-nav-edit-controls th:if="${navigationFavourites.loaded()}">
                     <th:block th:replace="~{kernel/fragments/nav-favourites :: star(${item.entry()}, true)}" />
+                    <th:block th:replace="~{kernel/fragments/components :: reorderControls(#{__${item.entry().labelKey()}__}, ${position.first}, ${position.last})}" />
                 </div>
             </div>
             <div class="nav-edit-controls nav-edit-reset" data-nav-edit-controls>

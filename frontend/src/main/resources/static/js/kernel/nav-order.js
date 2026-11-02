@@ -21,10 +21,13 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtReorder } from '/js/kernel/krt-reorder.js';
+import { mergeFavouriteOrder } from '/js/kernel/nav-favourite-order.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import {
     announce,
+    favouriteKeys,
     focusFirst,
+    NAV_FAVOURITES_ORDER_EVENT,
     NAV_RENDERED_EVENT,
     reloadMenu,
     stateElement,
@@ -32,6 +35,7 @@ import {
 } from '/js/kernel/nav-preferences.js';
 
 const ORDER_URL = '/navigation/order';
+const FAVOURITES_URL = '/navigation/favourites';
 
 /** Scope of the stored order that holds a mode's groups; every other scope is a group key. */
 const GROUPS_SCOPE = 'groups';
@@ -176,6 +180,60 @@ function attachLinks(links) {
     });
 }
 
+/**
+ * Saves the order of one mode's favourites and, on success, takes over the version the server
+ * returned and tells the rail and the shortcut hints. A failed save puts the lists back as the
+ * server has them.
+ *
+ * @param {string[]} moved the mode's favourites in their new order
+ * @returns {Promise<boolean>} whether the server accepted the order
+ */
+async function saveFavourites(moved) {
+    const state = stateElement();
+    if (!state) {
+        return false;
+    }
+    const keys = mergeFavouriteOrder(favouriteKeys(state), moved);
+    const result = await krtFetch.write({
+        method: 'PUT',
+        url: FAVOURITES_URL,
+        payload: () => ({ keys, version: versionOf(state.dataset, 'version') }),
+        serialize: WRITE_LOCK,
+        toast: false,
+        errorMessage: state.dataset.error,
+        onError: (status) => conflict(state, status),
+    });
+    if (!result.ok) {
+        if (result.status !== 409) {
+            await reloadMenu();
+        }
+        focusFirst([TOGGLE_SELECTOR]);
+        return false;
+    }
+    state.dataset.version = String(result.body?.version ?? state.dataset.version);
+    state.dataset.keys = keys.join(' ');
+    document.dispatchEvent(new CustomEvent(NAV_FAVOURITES_ORDER_EVENT, { detail: { keys } }));
+    return true;
+}
+
+/**
+ * Makes the favourites of one mode movable within the Favoriten group.
+ *
+ * @param {HTMLElement} block the mode's `.nav-favourites` element
+ */
+function attachFavourites(block) {
+    if (attached.has(block)) {
+        return;
+    }
+    attached.add(block);
+    krtReorder.attach({
+        container: block,
+        itemSelector: ROW_SELECTOR,
+        liveRegion: document.querySelector('[data-nav-live]'),
+        persist: ({ rows }) => saveFavourites(rows.map((row) => row.dataset.entryKey || '')),
+    });
+}
+
 /** Attaches the handlers to every list of the navigation that has none yet. */
 function attachAll() {
     document
@@ -184,6 +242,9 @@ function attachAll() {
     document
         .querySelectorAll(`#sidebar ${LINKS_SELECTOR}`)
         .forEach((links) => links instanceof HTMLElement && attachLinks(links));
+    document
+        .querySelectorAll('#sidebar .nav-favourites[data-favourites-mode]')
+        .forEach((block) => block instanceof HTMLElement && attachFavourites(block));
     groupLists.forEach((handle) => handle.syncBounds());
 }
 
