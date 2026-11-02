@@ -97,6 +97,7 @@
               th:attr="data-version=${adminAnnouncement != null ? adminAnnouncement.version : null},data-error=#{dashboard.info.error}">
             <label class="form-label" th:text="#{dashboard.info.label}">Text</label>
             <textarea class="announcement-text" name="content" rows="8" data-testid="dashboard-info-text"
+                      th:aria-label="#{dashboard.info.label}"
                       th:text="${adminAnnouncement != null ? adminAnnouncement.content : ''}"></textarea>
             <div class="split">
                 <button type="submit" class="btn btn-xs" data-testid="dashboard-info-save" th:text="#{dashboard.save}">Speichern</button>
