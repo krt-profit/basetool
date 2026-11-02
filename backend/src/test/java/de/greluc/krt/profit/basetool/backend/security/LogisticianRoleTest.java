@@ -179,6 +179,7 @@ class LogisticianRoleTest {
             .header("alg", "none")
             .claim("sub", userId.toString())
             .claim("preferred_username", "sk_lead_user")
+            .claim("realm_access", java.util.Map.of("roles", java.util.List.of("KRT Member")))
             .build();
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
