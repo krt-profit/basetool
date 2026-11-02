@@ -1,0 +1,149 @@
+name: NVD Feed Refresh
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'build.gradle.kts'
+      - 'gradle/libs.versions.toml'
+      - '.github/workflows/nvd-feed-refresh.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/nvd-feed-refresh.yml'
+
+concurrency:
+  group: nvd-feed-refresh-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  refresh:
+    name: Refresh the NVD feed
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    timeout-minutes: 75
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Compute the cache key
+        id: key
+        env:
+          KEY: nvd-feed-v2-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: echo "key=${KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the previous NVD feed
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: ${{ steps.key.outputs.key }}
+          restore-keys: |
+            nvd-feed-v2-${{ runner.os }}-
+
+      - name: Run dependencyCheckUpdate
+        timeout-minutes: 65
+        env:
+          ORG_GRADLE_PROJECT_nvdApiKey: ${{ secrets.NVD_API_KEY }}
+          ATTEMPTS: '3'
+          ATTEMPT_MINUTES: '20'
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            if timeout --kill-after=60s "${ATTEMPT_MINUTES}m" \
+                ./gradlew dependencyCheckUpdate --no-parallel --stacktrace; then
+              date -u +%s > ~/.gradle/dependency-check-data/refreshed-at
+              echo "NVD feed refreshed in attempt ${attempt} of ${ATTEMPTS}." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::warning::dependencyCheckUpdate attempt ${attempt} of ${ATTEMPTS} failed or ran past ${ATTEMPT_MINUTES} minutes"
+            if [ "$attempt" -lt "$ATTEMPTS" ]; then
+              sleep 60
+            fi
+          done
+          echo "::error::dependencyCheckUpdate failed ${ATTEMPTS} times; the cached NVD feed was not replaced"
+          exit 1
+
+      - name: Save the NVD feed
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: ${{ steps.key.outputs.key }}
+
+  prune:
+    name: Delete superseded NVD feeds
+    needs: refresh
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    timeout-minutes: 5
+
+    steps:
+      - name: Delete every NVD feed on main but the one just saved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP: ${{ needs.refresh.outputs.key }}
+        run: |
+          set -euo pipefail
+          caches="$(gh cache list --key nvd-feed- --ref refs/heads/main --limit 100 --json id,key,sizeInBytes)"
+          if ! jq -e --arg keep "$KEEP" 'any(.[]; .key == $keep)' <<<"$caches" > /dev/null; then
+            echo "::error::the cache ${KEEP} is not listed on main; nothing is deleted"
+            exit 1
+          fi
+          count=0
+          while IFS=$'\t' read -r id size key; do
+            [ -n "$id" ] || continue
+            if gh cache delete "$id"; then
+              echo "delete $key  ($((size / 1048576)) MiB)"
+              count=$((count + 1))
+            else
+              echo "::warning::could not delete cache $id ($key)"
+            fi
+          done < <(jq -r --arg keep "$KEEP" '.[] | select(.key != $keep) | [.id, .sizeInBytes, .key] | @tsv' <<<"$caches")
+          echo "Kept ${KEEP}, deleted ${count} superseded NVD feeds." | tee -a "$GITHUB_STEP_SUMMARY"
+
+  report:
+    name: Report a failed scheduled refresh
+    needs: [refresh, prune]
+    if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/report-failed-run
+
+      - name: Open or update the failed-refresh issue
+        uses: ./.github/actions/report-failed-run
+        with:
+          title: Daily NVD feed refresh failed
+          message: >-
+            The daily NVD feed refresh did not replace the cached feed. The dependency scan keeps using
+            the last saved feed and fails once that feed is older than seven days. Check the
+            `dependencyCheckUpdate` step log: a stalled or failed download from nvd.nist.gov retries
+            three times. Re-run with Actions, NVD Feed Refresh, Run workflow on `main`.
+          token: ${{ github.token }}

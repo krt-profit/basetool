@@ -60,6 +60,8 @@ tasks.register("generateTermsVersion") {
 
 dependencyCheck {
   failBuildOnCVSS = 7.0f
+  autoUpdate =
+    providers.gradleProperty("dependencyCheckAutoUpdate").map(String::toBoolean).orElse(true)
   formats = listOf("HTML", "SARIF")
   outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
   suppressionFile = rootProject.file("config/owasp/dependency-check-suppressions.xml").absolutePath

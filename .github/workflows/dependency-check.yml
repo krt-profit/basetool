@@ -15,6 +15,8 @@ on:
       - 'gradle/wrapper/gradle-wrapper.properties'
       - 'config/owasp/dependency-check-suppressions.xml'
       - 'gradle/verification-metadata.xml'
+      - '.github/workflows/dependency-check.yml'
+      - '.github/actions/report-failed-run/**'
   pull_request:
     branches: [main]
     paths:
@@ -26,6 +28,8 @@ on:
       - 'gradle/wrapper/gradle-wrapper.properties'
       - 'config/owasp/dependency-check-suppressions.xml'
       - 'gradle/verification-metadata.xml'
+      - '.github/workflows/dependency-check.yml'
+      - '.github/actions/report-failed-run/**'
 
 concurrency:
   group: dep-check-${{ github.ref }}
@@ -41,7 +45,7 @@ jobs:
       contents: read
       security-events: write
       issues: write
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -55,30 +59,40 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Compute ISO week (cache rotation key)
-        id: cache-key
-        shell: bash
-        run: echo "week=$(date -u +'%G-W%V')" >> "$GITHUB_OUTPUT"
-
-      - name: Restore NVD feed
+      - name: Restore the NVD feed
         id: nvd-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.gradle/dependency-check-data
-          key: nvd-feed-v1-${{ runner.os }}-${{ steps.cache-key.outputs.week }}
+          key: nvd-feed-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            nvd-feed-v1-${{ runner.os }}-
+            nvd-feed-v2-${{ runner.os }}-
+
+      - name: Check the NVD feed is present and current
+        env:
+          MATCHED_KEY: ${{ steps.nvd-cache.outputs.cache-matched-key }}
+          MAX_AGE_HOURS: '168'
+          WARN_AGE_HOURS: '48'
+        run: |
+          set -euo pipefail
+          stamp=~/.gradle/dependency-check-data/refreshed-at
+          if [ -z "$MATCHED_KEY" ] || [ ! -f "$stamp" ]; then
+            echo "::error title=No NVD feed cached::No nvd-feed-v2 cache was restored. This scan never downloads the NVD itself; run Actions, NVD Feed Refresh, Run workflow on main, then re-run this job."
+            exit 1
+          fi
+          age_hours=$(( ($(date -u +%s) - $(cat "$stamp")) / 3600 ))
+          echo "NVD feed ${MATCHED_KEY}, refreshed ${age_hours} h ago." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$age_hours" -ge "$MAX_AGE_HOURS" ]; then
+            echo "::error title=NVD feed outdated::The cached NVD feed is ${age_hours} h old (limit ${MAX_AGE_HOURS} h); the daily NVD Feed Refresh has not succeeded since. Fix that workflow, then re-run this job."
+            exit 1
+          fi
+          if [ "$age_hours" -ge "$WARN_AGE_HOURS" ]; then
+            echo "::warning title=NVD feed aging::The cached NVD feed is ${age_hours} h old; check the NVD Feed Refresh workflow."
+          fi
 
       - name: Run dependencyCheckAggregate
-        timeout-minutes: 30
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          if [ -n "$NVD_API_KEY" ]; then
-            ./gradlew dependencyCheckAggregate --no-parallel --stacktrace -PnvdApiKey="$NVD_API_KEY"
-          else
-            ./gradlew dependencyCheckAggregate --no-parallel --stacktrace
-          fi
+        timeout-minutes: 15
+        run: ./gradlew dependencyCheckAggregate --no-parallel --stacktrace -PdependencyCheckAutoUpdate=false
 
       - name: Check SARIF report exists
         id: sarif
@@ -108,37 +122,13 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Save NVD feed
-        if: >-
-          always() && steps.sarif.outputs.exists == 'true' &&
-          github.event_name != 'pull_request' &&
-          steps.nvd-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ~/.gradle/dependency-check-data
-          key: nvd-feed-v1-${{ runner.os }}-${{ steps.cache-key.outputs.week }}
-
       - name: Open or update the failed-scan issue
         if: (failure() || cancelled()) && github.event_name == 'schedule'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          HAS_SARIF: ${{ steps.sarif.outputs.exists }}
-        run: |
-          set -euo pipefail
-          title="Weekly OWASP Dependency-Check failed"
-          if [ "$HAS_SARIF" = "true" ]; then
-            what="The scan **finished** and failed the \`failBuildOnCVSS = 7.0\` gate: at least one dependency carries a CVE at CVSS >= 7. The SARIF is in the Security tab (category \`owasp-dependency-check\`) and the HTML report is in the run's artifact. Fix with an upgrade, or a documented, dated suppression in \`config/owasp/dependency-check-suppressions.xml\`."
-          else
-            what="The scan produced **no verdict** (no SARIF): it failed or ran out of time before finishing. Check the NVD step's log. A cold rebuild from the NVD JSON 2.0 data feeds takes about 7 minutes; if the log stops after \"Checking for updates and analyzing dependencies\", a feed download from nvd.nist.gov stalled or failed."
-          fi
-          body="$(printf '%s\n\n%s\n\nRun: %s\n' "$(date -u +%Y-%m-%d)" "$what" "$RUN_URL")"
-          number="$(gh issue list --repo "$REPO" --state open --search "\"${title}\" in:title" \
-                      --json number,title --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --repo "$REPO" --body "$body"
-            echo "commented on #${number}"
-          else
-            gh issue create --repo "$REPO" --title "$title" --label SEC --body "$body"
-          fi
+        uses: ./.github/actions/report-failed-run
+        with:
+          title: Weekly OWASP Dependency-Check failed
+          message: >-
+            ${{ steps.sarif.outputs.exists == 'true'
+            && 'The scan **finished** and failed the `failBuildOnCVSS = 7.0` gate: at least one dependency carries a CVE at CVSS >= 7. The SARIF is in the Security tab (category `owasp-dependency-check`) and the HTML report is in the run artifact. Fix with an upgrade, or a documented, dated suppression in `config/owasp/dependency-check-suppressions.xml`.'
+            || 'The scan produced **no verdict** (no SARIF). If the step that checks the NVD feed failed, the cached feed is missing or older than seven days: the daily NVD Feed Refresh workflow has not saved one, see its latest run and its own failure issue. Otherwise read the `dependencyCheckAggregate` step log; the scan reads only the cached feed and never downloads the NVD.' }}
+          token: ${{ github.token }}
