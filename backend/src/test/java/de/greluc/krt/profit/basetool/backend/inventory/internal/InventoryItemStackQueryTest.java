@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -33,8 +34,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Runs every group-on-read stack query against an empty PostgreSQL table to verify that the JPQL
- * parses and executes on the real dialect (REQ-INV-002).
+ * Runs every group-on-read stack query against PostgreSQL to verify that the JPQL parses and
+ * executes on the real dialect (REQ-INV-002).
  */
 @SpringBootTest
 class InventoryItemStackQueryTest {
@@ -45,16 +46,19 @@ class InventoryItemStackQueryTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
 
-  /** The four new stack queries must execute against Postgres (empty table -&gt; empty results). */
+  /**
+   * The four new stack queries must execute against Postgres (scoped queries on random ids return
+   * nothing; the unscoped global query only has to run).
+   */
   @Test
   void stackQueriesExecuteAgainstPostgres() {
     Pageable firstPage = PageRequest.of(0, 20);
 
-    assertThat(
+    assertThatCode(() ->
             inventoryItemRepository.findGlobalStacks(
                 false, null, false, null, null, false, null, false, null, true, null, Set.of(),
                 false, false))
-        .isEmpty();
+        .doesNotThrowAnyException();
     assertThat(
             inventoryItemRepository.findUserStacks(
                 UUID.randomUUID(),

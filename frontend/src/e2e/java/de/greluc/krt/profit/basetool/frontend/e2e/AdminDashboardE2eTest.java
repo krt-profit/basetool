@@ -128,6 +128,8 @@ class AdminDashboardE2eTest {
           assertThat(page.getByTestId("admin-hub")).isVisible();
           assertThat(page.getByTestId("admin-sync-uex")).isVisible();
           assertThat(page.getByTestId("admin-sync-p4k")).isVisible();
+          assertThat(page.getByTestId("admin-sync-runs-uex")).isVisible();
+          assertThat(page.getByTestId("admin-sync-runs-p4k")).isVisible();
         });
   }
 

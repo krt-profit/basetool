@@ -104,9 +104,17 @@ class DashboardSupplyNeedsE2eTest {
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), ADMIN, ADMIN_PASSWORD);
   }
 
-  /** Releases the browser and the Playwright driver process. */
+  /**
+   * Drops the second Staffel again so later suites see the administrator in one unit, then releases
+   * the browser.
+   */
   @AfterAll
   static void tearDown() {
+    if (STACK.managesStack() && otherUnitId != null) {
+      BackendSeeder seeder = new BackendSeeder();
+      seeder.assignStaffelMembership(
+          ADMIN, ADMIN_PASSWORD, seeder.getUserId(ADMIN, ADMIN_PASSWORD), IRIDIUM_ID, false, false);
+    }
     if (browser != null) {
       browser.close();
     }
