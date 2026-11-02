@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepo
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -133,7 +134,10 @@ class PromotionFeatureFlagServiceGateTest {
             mock(OrgUnitStampingService.class));
     policy =
         new PromotionAccessPolicy(
-            ownerScopeService, authHelper, mock(OrgUnitMembershipQueryService.class));
+            ownerScopeService,
+            authHelper,
+            mock(OrgUnitMembershipQueryService.class),
+            mock(PromotionReach.class));
   }
 
   @Test

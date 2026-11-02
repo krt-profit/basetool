@@ -683,6 +683,7 @@ GET /v3/api-docs.yaml | OpenApiWebMvcResource#openapiYaml | pre=none | url=/v3/a
 [service-gates]
 MemberEvaluationService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MemberEvaluationService#listAll(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+MemberEvaluationService#listEvaluatableMembers(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MemberEvaluationService#upsert(3) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
 MissionFinanceEntryService#deleteEntry(2) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
 MissionFinanceEntryService#updateEntry(3) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)

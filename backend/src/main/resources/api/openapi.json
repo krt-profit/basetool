@@ -83900,6 +83900,9 @@
           "canManagePromotions" : {
             "type" : "boolean"
           },
+          "canManagePromotionsAnywhere" : {
+            "type" : "boolean"
+          },
           "canMarkStolen" : {
             "type" : "boolean"
           },
@@ -83910,6 +83913,9 @@
             "type" : "boolean"
           },
           "canSeeHangarOwnerDetails" : {
+            "type" : "boolean"
+          },
+          "canUsePromotionAnywhere" : {
             "type" : "boolean"
           },
           "canViewAssignedJobOrders" : {
