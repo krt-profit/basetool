@@ -1808,6 +1808,9 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   without a reload (REQ-FE-001). The aggregated Lager (`GET /inventory/aggregated` and
   `GET /inventory/all/grouped`, in the material and in the item catalog) marks a material or game
   item with a „niedrig" badge (`lowStock`) while one of its levels is low in the caller's scope.
+  The badge is computed from the pool fill alone, with the same result as the full list: the
+  requested amounts, and with them the open orders and needs, are not read for it
+  (`StockLevelLowSubjectsTest`).
 - **Shortcuts.** For a Logistician of the unit a low row offers „Bedarf anlegen" and „Auftrag
   anlegen", both prefilled with the material or item, the tier and the shortfall. „Auftrag anlegen"
   opens the normal job-order form with the unit as requesting unit; the responsible unit is chosen
