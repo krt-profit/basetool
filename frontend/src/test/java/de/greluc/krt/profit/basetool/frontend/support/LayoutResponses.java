@@ -80,6 +80,8 @@ public final class LayoutResponses {
             false,
             false,
             false,
+            false,
+            false,
             false),
         0L);
   }
@@ -112,6 +114,8 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        false,
+        false,
         false);
   }
 
@@ -124,7 +128,7 @@ public final class LayoutResponses {
   public static CapabilitiesResponse missionManager() {
     return new CapabilitiesResponse(
         false, false, false, false, false, true, false, false, false, false, false, false, false,
-        false);
+        false, false, false);
   }
 
   /**
@@ -152,6 +156,8 @@ public final class LayoutResponses {
         true,
         false,
         canMarkStolen,
+        false,
+        false,
         false,
         false,
         false,
@@ -202,6 +208,8 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        officerHere,
+        officerHere,
         officerHere,
         officerHere,
         officerHere,
