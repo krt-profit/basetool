@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [v1.22.0](https://github.com/krt-profit/basetool/releases/tag/v1.22.0) - 2026-11-02
+
+### Added
+
+- **Einsätze: Alle ein- und auschecken.** Einsatz-Manager sehen auf dem Crew-Board eines laufenden Einsatzes „Alle einchecken“ und „Alle auschecken“; bereits gesetzte Ankunfts- und Endzeiten bleiben unverändert.
+
+### Changed
+
+- **Schnellzugriff: Ankauf- und Spenden-Tabs sofort da.** „Eingehende Spenden“, „Statistik“, „Partner“, „Handelsbeauftragte“ und „Bericht“ stehen im Schnellzugriff (`Strg`/`⌘` + `K`) ab dem ersten Tastendruck, statt nach dem ersten Öffnen nachgeladen zu werden.
+
+### Removed
+
+- **Beförderungssystem.** Die Seiten des Beförderungssystems (Übersicht, meine Bewertungen,
+  Verwaltung, Themen und Rangvoraussetzungen), ihre Menüeinträge, der Bereich „Beförderung“ im
+  Audit-Log und der Schalter pro Staffel entfallen.
+
+- **Bewertungen werden gelöscht.** Beim Update werden alle gespeicherten Bewertungen, Themen,
+  Rangvoraussetzungen und Beförderungs-Audit-Einträge ohne Export entfernt.
+
+- **Organigramm.** Die Seite `/org-chart` samt Editor ist entfernt; Führungsränge vergibst du wie bisher auf der Seite „Leitung“. Im Menü *Staffel* steht jetzt die Org-Einheits-Bank, „Leitung“ ist ihr Reiter.
+
+- **Schnellzugriff.** Die Suche nach Org-Einheiten und Mitgliedern (Präfixe `@`, `mitglied:`, `einheit:`) entfällt, weil sie auf das Organigramm führte.
+
+- **Grand Admiral ohne Account.** Den Freitext-Grand-Admiral gibt es nicht mehr; Grand Admiral wird nur ein OL-Mitglied mit Account (Seite „Leitung“). Backend: `GET /api/v1/leadership` ersetzt `GET /api/v1/org-chart/leadership`.
+
+### Fixed
+
+- **Navigation: Ankauf- und Spenden-Tabs nur mit Berechtigung.** „Eingehende Spenden“, „Statistik“, „Partner“, „Handelsbeauftragte“ und „Bericht“ werden als Favorit, Tab-Leisten-Platz und Startseite nur noch angeboten, wenn du die Seite öffnen darfst; ein gespeicherter Eintrag ohne Berechtigung wird entfernt.
+
 ## [v1.21.0](https://github.com/krt-profit/basetool/releases/tag/v1.21.0) - 2026-11-02
 
 ### Added
