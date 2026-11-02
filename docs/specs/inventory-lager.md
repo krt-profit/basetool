@@ -1755,7 +1755,9 @@ hold.
   the same material or game item at the level's tier or above. It is **shown only**: it never counts
   as stock and never ends a low state.
 - **Inactive tier.** A level whose tier was deactivated keeps its floor, is flagged „Stufe inaktiv"
-  and stays until a Logistician changes it.
+  and stays until a Logistician changes it. Its edit dialog still offers that tier, selected and
+  marked „Stufe inaktiv", so a change of minimum or target keeps the floor; the tier is not offered
+  to a new level.
 
 **Acceptance**
 
