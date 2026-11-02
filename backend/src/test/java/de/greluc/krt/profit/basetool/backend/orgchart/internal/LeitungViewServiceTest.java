@@ -98,6 +98,7 @@ class LeitungViewServiceTest {
   void setUp() {
     auth = org.mockito.Mockito.mock(Authentication.class);
     lenient().when(ownerScopeService.narrowToPin(any())).thenAnswer(inv -> inv.getArgument(0));
+    lenient().when(authHelperService.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
   }
 
   private OrgUnit ol() {

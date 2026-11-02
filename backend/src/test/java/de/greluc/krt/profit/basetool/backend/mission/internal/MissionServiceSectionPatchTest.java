@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
@@ -108,7 +109,8 @@ class MissionServiceSectionPatchTest {
             null,
             auditService,
             null,
-            mock(MissionNotificationPublisher.class));
+            mock(MissionNotificationPublisher.class),
+            mock(MissionVisibility.class));
     missionId = UUID.randomUUID();
     existing = new Mission();
     existing.setId(missionId);

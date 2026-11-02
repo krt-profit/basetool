@@ -135,17 +135,21 @@ class RedisNotificationFanoutTest {
   }
 
   private double publishedCount() {
-    var counter = registry.find(MetricNames.SSE_REDIS_PUBLISHED).counter();
+    var counter = registry.find(NotificationMetricNames.SSE_REDIS_PUBLISHED).counter();
     return counter == null ? 0.0 : counter.count();
   }
 
   private double consumedCount() {
-    var counter = registry.find(MetricNames.SSE_REDIS_CONSUMED).counter();
+    var counter = registry.find(NotificationMetricNames.SSE_REDIS_CONSUMED).counter();
     return counter == null ? 0.0 : counter.count();
   }
 
   private double errorCount(String op) {
-    var counter = registry.find(MetricNames.SSE_REDIS_ERRORS).tag(MetricNames.TAG_OP, op).counter();
+    var counter =
+        registry
+            .find(NotificationMetricNames.SSE_REDIS_ERRORS)
+            .tag(MetricNames.TAG_OP, op)
+            .counter();
     return counter == null ? 0.0 : counter.count();
   }
 }

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -97,10 +98,10 @@ public class ExchangeJournalService {
   private void countAfterCommit(@NotNull String clientId, @NotNull ExchangeResource resource) {
     Counter counter =
         meterRegistry.counter(
-            MetricNames.EXCHANGE_REMOVALS,
+            ExchangeMetricNames.EXCHANGE_REMOVALS,
             MetricNames.TAG_CLIENT_ID,
             clientId,
-            MetricNames.TAG_RESOURCE,
+            ExchangeMetricNames.TAG_RESOURCE,
             resource.name().toLowerCase(Locale.ROOT));
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
       counter.increment();

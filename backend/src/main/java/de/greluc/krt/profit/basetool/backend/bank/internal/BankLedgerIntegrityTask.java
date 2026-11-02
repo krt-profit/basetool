@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
@@ -69,17 +70,17 @@ public class BankLedgerIntegrityTask {
   void registerViolationGauges() {
     for (String category :
         new String[] {
-          MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE,
-          MetricNames.CATEGORY_UNBALANCED_TRANSFER,
-          MetricNames.CATEGORY_UNBALANCED_HOLDER_MOVEMENT,
-          MetricNames.CATEGORY_BROKEN_REVERSAL,
-          MetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL,
-          MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT
+          BankMetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE,
+          BankMetricNames.CATEGORY_UNBALANCED_TRANSFER,
+          BankMetricNames.CATEGORY_UNBALANCED_HOLDER_MOVEMENT,
+          BankMetricNames.CATEGORY_BROKEN_REVERSAL,
+          BankMetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL,
+          BankMetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT
         }) {
       AtomicInteger holder = new AtomicInteger(0);
       violationGauges.put(category, holder);
       Gauge.builder(
-              MetricNames.BANK_LEDGER_INTEGRITY_VIOLATIONS, holder, AtomicInteger::doubleValue)
+              BankMetricNames.BANK_LEDGER_INTEGRITY_VIOLATIONS, holder, AtomicInteger::doubleValue)
           .tag(MetricNames.TAG_CATEGORY, category)
           .description("Bank ledger-integrity violations by category; > 0 means the ledger broke.")
           .register(meterRegistry);
@@ -113,16 +114,16 @@ public class BankLedgerIntegrityTask {
    * @param report the fresh integrity report whose per-invariant list sizes become the gauge values
    */
   private void updateViolationGauges(@NotNull BankLedgerIntegrityService.IntegrityReport report) {
-    violationGauge(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)
+    violationGauge(BankMetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)
         .set(report.negativeAccountBalances().size());
-    violationGauge(MetricNames.CATEGORY_UNBALANCED_TRANSFER)
+    violationGauge(BankMetricNames.CATEGORY_UNBALANCED_TRANSFER)
         .set(report.unbalancedTransfers().size());
-    violationGauge(MetricNames.CATEGORY_UNBALANCED_HOLDER_MOVEMENT)
+    violationGauge(BankMetricNames.CATEGORY_UNBALANCED_HOLDER_MOVEMENT)
         .set(report.unbalancedHolderMovements().size());
-    violationGauge(MetricNames.CATEGORY_BROKEN_REVERSAL).set(report.brokenReversals().size());
-    violationGauge(MetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL)
+    violationGauge(BankMetricNames.CATEGORY_BROKEN_REVERSAL).set(report.brokenReversals().size());
+    violationGauge(BankMetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL)
         .set(report.brokenHolderReversals().size());
-    violationGauge(MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)
+    violationGauge(BankMetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)
         .set(report.transactionsWithoutAudit().size());
   }
 

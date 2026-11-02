@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyMetricNames;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import de.greluc.krt.profit.basetool.backend.supply.api.events.SupplyNotices;
@@ -532,7 +533,7 @@ public class SupplyNeedService {
   }
 
   private void count(@NotNull String event) {
-    meterRegistry.counter(MetricNames.SUPPLY_NEEDS, MetricNames.TAG_EVENT, event).increment();
+    meterRegistry.counter(SupplyMetricNames.SUPPLY_NEEDS, MetricNames.TAG_EVENT, event).increment();
   }
 
   private static @NotNull Specification<SupplyNeed> fetchCatalogue() {

@@ -2597,7 +2597,7 @@ filtered while their hits and actions stay, a page-contributed action) · `Quick
 `shell/web/QuickAccessSearchMetrics.java`, `kernel/layout/QuickAccessSearchContributor.java`,
 `kernel/layout/QuickAccessSearchKind.java`, `static/js/kernel/krt-search.js`,
 `static/js/kernel/krt-frequent.js`, `static/js/kernel/krt-palette-personalise.js`,
-`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
+`static/js/kernel/krt-palette.js` (wiring) and its modules `krt-palette-{actions,entity-search,groups,history,index,items,view}.js` · **Related:** REQ-UI-026, REQ-UI-032, REQ-SEC-007, REQ-OBS-011,
 ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
@@ -2764,6 +2764,9 @@ default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI
   can be a favourite; it turns into „Startseite entfernen" on the chosen page. A write is
   `PUT /api/v1/navigation/preferences/appearance/start-page/{mode}` with the appearance version,
   which it bumps, so it conflicts with „Darstellung" writes and with nothing else.
+- **Profile select.** The select per mode lists the pages in `optgroup`s headed by their navigation
+  group, so equal labels in different groups stay apart; two pages of one group that share a label
+  show their tab label instead (e.g. „Meine Aufträge", „Zugewiesene Aufträge" beside „Aufträge").
 - A start page whose key the member may no longer see user-wide is deleted on the next load
   (REQ-UI-032).
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -87,11 +88,13 @@ public class ExchangeRegistryMirrorSync {
     for (ExchangeMirrorPhase phase : ExchangeMirrorPhase.values()) {
       for (String outcome :
           new String[] {
-            MetricNames.OUTCOME_WRITTEN, MetricNames.OUTCOME_UNCHANGED, MetricNames.OUTCOME_FAILED
+            ExchangeMetricNames.OUTCOME_WRITTEN,
+            ExchangeMetricNames.OUTCOME_UNCHANGED,
+            MetricNames.OUTCOME_FAILED
           }) {
         meterRegistry.counter(
-            MetricNames.EXCHANGE_MIRROR_WRITES,
-            MetricNames.TAG_PHASE,
+            ExchangeMetricNames.EXCHANGE_MIRROR_WRITES,
+            ExchangeMetricNames.TAG_PHASE,
             phase.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome);
@@ -168,7 +171,7 @@ public class ExchangeRegistryMirrorSync {
         mirror.write(
             ExchangeRegistrySnapshot.restrictiveMerge(before, after),
             settingsRepository.nextRevision());
-        count(ExchangeMirrorPhase.PRE_COMMIT, MetricNames.OUTCOME_WRITTEN);
+        count(ExchangeMirrorPhase.PRE_COMMIT, ExchangeMetricNames.OUTCOME_WRITTEN);
       } catch (RuntimeException e) {
         count(ExchangeMirrorPhase.PRE_COMMIT, MetricNames.OUTCOME_FAILED);
         throw new ExternalServiceException("The exchange registry mirror could not be written", e);
@@ -231,7 +234,9 @@ public class ExchangeRegistryMirrorSync {
             return true;
           });
       boolean wrote = Boolean.TRUE.equals(written);
-      count(phase, wrote ? MetricNames.OUTCOME_WRITTEN : MetricNames.OUTCOME_UNCHANGED);
+      count(
+          phase,
+          wrote ? ExchangeMetricNames.OUTCOME_WRITTEN : ExchangeMetricNames.OUTCOME_UNCHANGED);
       return wrote;
     } catch (RuntimeException e) {
       count(phase, MetricNames.OUTCOME_FAILED);
@@ -248,8 +253,8 @@ public class ExchangeRegistryMirrorSync {
   private void count(@NotNull ExchangeMirrorPhase phase, @NotNull String outcome) {
     meterRegistry
         .counter(
-            MetricNames.EXCHANGE_MIRROR_WRITES,
-            MetricNames.TAG_PHASE,
+            ExchangeMetricNames.EXCHANGE_MIRROR_WRITES,
+            ExchangeMetricNames.TAG_PHASE,
             phase.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome)

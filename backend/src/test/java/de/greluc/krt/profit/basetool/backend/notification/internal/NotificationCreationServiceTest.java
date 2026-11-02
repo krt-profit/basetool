@@ -35,12 +35,12 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestN
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
@@ -115,8 +115,8 @@ class NotificationCreationServiceTest {
     assertThat(
             meterRegistry
                 .counter(
-                    MetricNames.NOTIFICATION_CREATED,
-                    MetricNames.TAG_NOTIFICATION_TYPE,
+                    NotificationMetricNames.NOTIFICATION_CREATED,
+                    NotificationMetricNames.TAG_NOTIFICATION_TYPE,
                     NotificationType.JOB_ORDER_CREATED.name())
                 .count())
         .isEqualTo(2);

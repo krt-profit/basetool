@@ -21,6 +21,21 @@ package de.greluc.krt.profit.basetool.backend.mission.api;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Mission Reference payload. */
-public record MissionReferenceDto(UUID id, String name, String status, Instant plannedStartTime) {}
+/**
+ * Data transfer record carrying Mission Reference payload; name and planned start are {@code null}
+ * for a mission the caller may not read.
+ */
+public record MissionReferenceDto(
+    UUID id, @Nullable String name, String status, @Nullable Instant plannedStartTime) {
+
+  /**
+   * Returns this reference reduced to its id and status, for a mission the caller may not read.
+   *
+   * @return the reference without name and planned start
+   */
+  public MissionReferenceDto withoutDetails() {
+    return new MissionReferenceDto(id, null, status, null);
+  }
+}

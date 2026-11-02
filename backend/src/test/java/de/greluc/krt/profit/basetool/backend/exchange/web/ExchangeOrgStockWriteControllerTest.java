@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -1832,11 +1833,11 @@ class ExchangeOrgStockWriteControllerTest {
   private double writes(@NotNull String outcome) {
     Counter counter =
         meterRegistry
-            .find(MetricNames.EXCHANGE_WRITES)
+            .find(ExchangeMetricNames.EXCHANGE_WRITES)
             .tags(
                 MetricNames.TAG_CLIENT_ID,
                 client,
-                MetricNames.TAG_RESOURCE,
+                ExchangeMetricNames.TAG_RESOURCE,
                 "org_stock",
                 MetricNames.TAG_OUTCOME,
                 outcome)

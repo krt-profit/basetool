@@ -385,15 +385,21 @@ public class RequestScopeResolver {
 
   /**
    * Whether the caller may open the org-unit blueprint availability overview: admins and holders of
-   * an oversight seat (see {@link #isOversightSeat(OrgUnitMembership)}).
+   * an oversight seat (see {@link #isOversightSeat(OrgUnitMembership)}) who hold {@code KRT
+   * Member}.
    *
-   * @return {@code true} iff the caller is an admin or holds at least one oversight seat.
+   * @return {@code true} iff the caller is an admin or holds at least one oversight seat
    */
   public boolean canAccessBlueprintOverview() {
     if (authHelper.isAdmin()) {
       return true;
     }
-    return currentCallerMemberships().stream().anyMatch(RequestScopeResolver::isOversightSeat);
+    return holdsKrtMember()
+        && currentCallerMemberships().stream().anyMatch(RequestScopeResolver::isOversightSeat);
+  }
+
+  private boolean holdsKrtMember() {
+    return authHelper.hasReachableRole(Roles.authority(Roles.KRT_MEMBER));
   }
 
   /**
@@ -446,7 +452,7 @@ public class RequestScopeResolver {
    */
   @NotNull
   private Set<UUID> currentOversightOrgUnitIds() {
-    return seatReach(currentCallerMemberships());
+    return holdsKrtMember() ? seatReach(currentCallerMemberships()) : Set.of();
   }
 
   /**
@@ -463,7 +469,7 @@ public class RequestScopeResolver {
         request,
         CACHE_KEY_OFFICER_ORG_UNIT_IDS,
         () ->
-            authHelper.hasReachableRole(Roles.authority(Roles.KRT_MEMBER))
+            holdsKrtMember()
                 ? Collections.unmodifiableSet(seatReach(currentCallerMemberships()))
                 : Set.of());
   }

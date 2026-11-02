@@ -82,7 +82,7 @@ public class NotificationStreamService {
   public NotificationStreamService(@NotNull MeterRegistry meterRegistry) {
     this.meterRegistry = meterRegistry;
     Gauge.builder(
-            MetricNames.SSE_CONNECTIONS,
+            NotificationMetricNames.SSE_CONNECTIONS,
             emittersBySub,
             map -> map.values().stream().mapToInt(Queue::size).sum())
         .description("Live SSE subscriber connections summed across all recipients.")
@@ -115,7 +115,7 @@ public class NotificationStreamService {
           return q;
         });
     for (SseEmitter old : evicted) {
-      meterRegistry.counter(MetricNames.SSE_EMITTERS_EVICTED).increment();
+      meterRegistry.counter(NotificationMetricNames.SSE_EMITTERS_EVICTED).increment();
       log.debug(
           "Evicting oldest SSE emitter for recipient {}: per-recipient cap {} reached",
           recipientUserId,
@@ -131,7 +131,7 @@ public class NotificationStreamService {
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));
     } catch (IOException | RuntimeException e) {
-      recordSendFailure(MetricNames.SSE_EVENT_CONNECTED, recipientUserId, e);
+      recordSendFailure(NotificationMetricNames.SSE_EVENT_CONNECTED, recipientUserId, e);
       remove(recipientUserId, emitter);
     }
     return emitter;
@@ -153,7 +153,7 @@ public class NotificationStreamService {
         try {
           emitter.send(SseEmitter.event().name("notification").data(PUSH_PAYLOAD));
         } catch (IOException | RuntimeException e) {
-          recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION, recipientUserId, e);
+          recordSendFailure(NotificationMetricNames.SSE_EVENT_NOTIFICATION, recipientUserId, e);
           remove(recipientUserId, emitter);
         }
       }
@@ -171,7 +171,7 @@ public class NotificationStreamService {
           try {
             emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
           } catch (IOException | RuntimeException e) {
-            recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT, recipientUserId, e);
+            recordSendFailure(NotificationMetricNames.SSE_EVENT_HEARTBEAT, recipientUserId, e);
             remove(recipientUserId, emitter);
           }
         }));
@@ -200,7 +200,7 @@ public class NotificationStreamService {
       @NotNull String event, @NotNull UUID recipientUserId, @NotNull Throwable cause) {
     meterRegistry
         .counter(
-            MetricNames.SSE_SEND_FAILURES,
+            NotificationMetricNames.SSE_SEND_FAILURES,
             MetricNames.TAG_EVENT,
             event,
             MetricNames.TAG_CAUSE,

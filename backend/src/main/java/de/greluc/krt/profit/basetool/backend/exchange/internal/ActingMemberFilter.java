@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemCode;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
@@ -171,7 +172,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
             request,
             response,
             "exchange relay header without an acting member",
-            MetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER);
+            ExchangeMetricNames.ON_BEHALF_OF_FORGED_EXCHANGE_HEADER);
         return;
       }
       filterChain.doFilter(request, response);
@@ -183,7 +184,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           request,
           response,
           "endpoint does not accept an on-behalf-of header",
-          MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+          ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
       return;
     }
 
@@ -193,7 +194,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           request,
           response,
           "an on-behalf-of header requires an authenticated caller",
-          MetricNames.ON_BEHALF_OF_NO_CALLER);
+          ExchangeMetricNames.ON_BEHALF_OF_NO_CALLER);
       return;
     }
     if (!gatewayProperties.isGatewayClient(jwtCaller.getToken().getClaimAsString("azp"))) {
@@ -201,7 +202,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           request,
           response,
           "caller is not a configured gateway",
-          MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
+          ExchangeMetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
       return;
     }
     RelayRefusal relayRefusal = relayRefusal(exchangeClient, installationKey);
@@ -214,7 +215,11 @@ public class ActingMemberFilter extends OncePerRequestFilter {
     try {
       member = UUID.fromString(onBehalfOf);
     } catch (IllegalArgumentException malformed) {
-      refuse(request, response, "named subject is not a UUID", MetricNames.ON_BEHALF_OF_MALFORMED);
+      refuse(
+          request,
+          response,
+          "named subject is not a UUID",
+          ExchangeMetricNames.ON_BEHALF_OF_MALFORMED);
       return;
     }
 
@@ -227,7 +232,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           request,
           response,
           "named member is not usable",
-          MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
+          ExchangeMetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
       return;
     }
 
@@ -356,7 +361,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
     String correlationId = UUID.randomUUID().toString();
     log.warn("Refused an on-behalf-of request: {} [correlationId={}]", detail, correlationId);
     meterRegistry
-        .counter(MetricNames.ON_BEHALF_OF_REFUSED, MetricNames.TAG_REASON, metricReason)
+        .counter(ExchangeMetricNames.ON_BEHALF_OF_REFUSED, MetricNames.TAG_REASON, metricReason)
         .increment();
 
     Locale locale = request.getLocale();
@@ -405,12 +410,12 @@ public class ActingMemberFilter extends OncePerRequestFilter {
     /** The client header is missing or not a registry client id. */
     CLIENT_INVALID(
         "exchange request without a valid client",
-        MetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID),
+        ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_CLIENT_INVALID),
 
     /** The installation header is missing or not a DPoP key thumbprint. */
     INSTALLATION_INVALID(
         "exchange request without a valid installation key",
-        MetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID);
+        ExchangeMetricNames.ON_BEHALF_OF_EXCHANGE_INSTALLATION_INVALID);
 
     /** The developer-facing reason, free of caller-supplied text. */
     private final String detail;

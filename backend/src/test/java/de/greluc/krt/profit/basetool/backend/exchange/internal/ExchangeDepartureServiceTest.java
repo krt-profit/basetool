@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -200,7 +201,7 @@ class ExchangeDepartureServiceTest {
    */
   private double count(@NotNull String outcome) {
     return meterRegistry
-        .counter(MetricNames.EXCHANGE_DEPARTURES, MetricNames.TAG_OUTCOME, outcome)
+        .counter(ExchangeMetricNames.EXCHANGE_DEPARTURES, MetricNames.TAG_OUTCOME, outcome)
         .count();
   }
 }

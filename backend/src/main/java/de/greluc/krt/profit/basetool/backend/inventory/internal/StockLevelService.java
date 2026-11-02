@@ -22,13 +22,12 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAllocation.Fill;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -42,10 +41,12 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -96,16 +97,7 @@ public class StockLevelService {
     if (limit != null && limit < 1) {
       throw new BadRequestException("The limit must be at least 1");
     }
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    Stream<StockLevelDto> levels =
-        figures
-            .toDtos(
-                stockLevelRepository.findVisible(
-                    scope.adminAllScope(),
-                    scope.activeOrgUnitId(),
-                    scope.memberOrgUnitIds(),
-                    orgUnitId))
-            .stream();
+    Stream<StockLevelDto> levels = figures.toDtos(visibleLevels(orgUnitId)).stream();
     if (lowOnly) {
       levels = levels.filter(StockLevelDto::low).sorted(BY_FILL_RATIO);
     }
@@ -114,24 +106,39 @@ public class StockLevelService {
 
   /**
    * Lists the materials and game items with at least one low level in the caller's Lager scope, for
-   * the „niedrig" marker of the aggregated Lager.
+   * the „niedrig" marker of the aggregated Lager. Computes only the pool fill; the requested
+   * amounts, which the marker ignores, are not read.
    *
    * @return the material ids and the game item ids
    */
   @Transactional(readOnly = true)
   public @NotNull LowStockSubjects lowSubjects() {
-    List<StockLevelDto> low = list(null, true, null);
+    List<StockLevel> levels = visibleLevels(null);
+    Map<UUID, Fill> fills = figures.fillsOf(levels);
+    List<StockLevel> low =
+        levels.stream()
+            .filter(level -> Objects.requireNonNull(fills.get(level.getId())).low())
+            .toList();
     return new LowStockSubjects(
-        low.stream()
-            .map(StockLevelDto::material)
-            .filter(Objects::nonNull)
-            .map(MaterialReferenceDto::id)
-            .collect(Collectors.toUnmodifiableSet()),
-        low.stream()
-            .map(StockLevelDto::gameItem)
-            .filter(Objects::nonNull)
-            .map(GameItemReferenceDto::id)
-            .collect(Collectors.toUnmodifiableSet()));
+        subjectIds(low, StockLevel::getMaterial, Material::getId),
+        subjectIds(low, StockLevel::getGameItem, GameItem::getId));
+  }
+
+  private @NotNull List<StockLevel> visibleLevels(@Nullable UUID orgUnitId) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    return stockLevelRepository.findVisible(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), orgUnitId);
+  }
+
+  private static <T> @NotNull Set<UUID> subjectIds(
+      @NotNull List<StockLevel> levels,
+      @NotNull Function<StockLevel, T> subject,
+      @NotNull Function<T, UUID> id) {
+    return levels.stream()
+        .map(subject)
+        .filter(Objects::nonNull)
+        .map(id)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**

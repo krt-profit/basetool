@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeAccountCheckResult;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -87,6 +88,6 @@ public class ExchangeAccountCheckService {
    */
   private @NotNull Counter counter(@NotNull ExchangeAccountCheckResult result) {
     return meterRegistry.counter(
-        MetricNames.EXCHANGE_ACCOUNT_CHECKS, MetricNames.TAG_OUTCOME, result.getValue());
+        ExchangeMetricNames.EXCHANGE_ACCOUNT_CHECKS, MetricNames.TAG_OUTCOME, result.getValue());
   }
 }

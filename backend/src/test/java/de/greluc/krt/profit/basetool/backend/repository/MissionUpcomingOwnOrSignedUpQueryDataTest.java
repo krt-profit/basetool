@@ -110,18 +110,18 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     assertThat(rows).extracting(Mission::getId).containsExactly(planned);
   }
 
-  /** A signed-up internal mission of a unit the caller cannot see stays out. */
+  /** A signed-up mission is a candidate whatever its unit; the service filters by visibility. */
   @Test
-  void aSignedUpInternalMissionOfAnInvisibleUnitStaysOut() {
+  void aSignedUpInternalMissionOfAnotherUnitIsACandidate() {
     User member = newUser();
     OrgUnit mine = newSquadron();
     OrgUnit foreign = newSquadron();
-    UUID hidden = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
-    signUp(hidden, member);
+    UUID signedUp = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
+    signUp(signedUp, member);
 
     List<Mission> rows = upcoming(member, false, false, null, Set.of(mine.getId()), 10);
 
-    assertThat(rows).isEmpty();
+    assertThat(rows).extracting(Mission::getId).containsExactly(signedUp);
   }
 
   /** The pin narrows the own-unit part to the pinned unit; the sign-ups stay. */
@@ -180,19 +180,6 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
     assertThat(rows).extracting(Mission::getId).contains(publicMission).doesNotContain(internal);
   }
 
-  /** A unitless member's sign-up on a foreign internal mission does not surface it. */
-  @Test
-  void aUnitlessMembersSignUpOnAForeignInternalMissionStaysOut() {
-    User member = newUser();
-    OrgUnit foreign = newSquadron();
-    UUID internal = saveMission(foreign, "2099-02-01T00:00:00Z", "PLANNED", true);
-    signUp(internal, member);
-
-    List<Mission> rows = upcoming(member, false, true, null, Set.of(), 50);
-
-    assertThat(rows).extracting(Mission::getId).doesNotContain(internal);
-  }
-
   private List<Mission> upcoming(
       User member,
       boolean orgWide,
@@ -205,11 +192,9 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
         STATUSES,
         orgWide,
         publicOnly,
-        orgWide,
         pin,
         memberUnits,
         member.getId(),
-        true,
         PageRequest.of(0, limit));
   }
 

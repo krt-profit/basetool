@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
@@ -82,7 +83,7 @@ class P4kImportJobServiceTest {
   private double terminalCount(String outcome, String kind) {
     var counter =
         meterRegistry
-            .find(MetricNames.P4K_IMPORT_JOBS)
+            .find(CatalogueMetricNames.P4K_IMPORT_JOBS)
             .tags(MetricNames.TAG_OUTCOME, outcome, MetricNames.TAG_KIND, kind)
             .counter();
     return counter == null ? 0.0 : counter.count();

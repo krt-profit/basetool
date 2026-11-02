@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +54,9 @@ public class UserSyncService {
   private final UserReconciliationService userReconciliationService;
   private final UserSyncFollowUp userSyncFollowUp;
 
-  /** Records {@link MetricNames#USER_SYNC_FAILURES} for per-user reconciliation failures. */
+  /**
+   * Records {@link IdentityMetricNames#USER_SYNC_FAILURES} for per-user reconciliation failures.
+   */
   private final MeterRegistry meterRegistry;
 
   /**
@@ -87,7 +88,7 @@ public class UserSyncService {
         count++;
       } catch (Exception e) {
         failed++;
-        meterRegistry.counter(MetricNames.USER_SYNC_FAILURES).increment();
+        meterRegistry.counter(IdentityMetricNames.USER_SYNC_FAILURES).increment();
         log.error("Failed to sync user {}", user.id(), e);
       }
     }

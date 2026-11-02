@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Effects;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Execution;
@@ -78,7 +79,7 @@ class ExchangeChangeSetRunnerTest {
     assertThat(result.applied()).isEqualTo(2);
     assertThat(result.unchanged()).isEqualTo(2);
     assertThat(result.notApplied()).isEqualTo(2);
-    assertThat(registry.find(MetricNames.EXCHANGE_WRITES).counters()).isEmpty();
+    assertThat(registry.find(ExchangeMetricNames.EXCHANGE_WRITES).counters()).isEmpty();
     assertThat(adapter.ran).containsExactly("apply", "apply", "unchanged", "refuse");
     assertThat(adapter.announced).isFalse();
   }
@@ -93,7 +94,7 @@ class ExchangeChangeSetRunnerTest {
         .isInstanceOf(ExchangeProblemException.class);
 
     assertThat(count(resource, "held")).isEqualTo(1.0);
-    assertThat(registry.find(MetricNames.EXCHANGE_WRITES).counters()).hasSize(1);
+    assertThat(registry.find(ExchangeMetricNames.EXCHANGE_WRITES).counters()).hasSize(1);
     assertThat(adapter.started).isFalse();
   }
 
@@ -143,11 +144,11 @@ class ExchangeChangeSetRunnerTest {
   private double count(ExchangeResource resource, String outcome) {
     Counter counter =
         registry
-            .find(MetricNames.EXCHANGE_WRITES)
+            .find(ExchangeMetricNames.EXCHANGE_WRITES)
             .tags(
                 MetricNames.TAG_CLIENT_ID,
                 CALLER.clientId(),
-                MetricNames.TAG_RESOURCE,
+                ExchangeMetricNames.TAG_RESOURCE,
                 resource.name().toLowerCase(java.util.Locale.ROOT),
                 MetricNames.TAG_OUTCOME,
                 outcome)

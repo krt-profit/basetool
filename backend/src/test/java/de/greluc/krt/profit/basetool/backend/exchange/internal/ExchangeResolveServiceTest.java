@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
@@ -418,7 +419,7 @@ class ExchangeResolveServiceTest {
    */
   private double count(@NotNull String kind, @NotNull String status) {
     return meterRegistry
-        .get(MetricNames.EXCHANGE_RESOLVE_REFS)
+        .get(ExchangeMetricNames.EXCHANGE_RESOLVE_REFS)
         .tag(MetricNames.TAG_KIND, kind)
         .tag(MetricNames.TAG_STATUS, status)
         .counter()

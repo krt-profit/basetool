@@ -29,37 +29,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMissionAllocationRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandGroupDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -71,45 +53,19 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-Mockito unit tests for {@link JobOrderController}.
- *
- * <ul>
- *   <li>{@link JobOrderController#downloadHandoverReport}: an invalid {@code X-User-Time-Zone} is
- *       dropped, and the PDF headers are pinned.
- *   <li>{@link JobOrderController#getAllJobOrders}: an empty status filter reaches the service as
- *       {@code null}, and sort tokens pass through.
- *   <li>{@link JobOrderController#createJobOrder}: never consults the JWT or role helpers.
- * </ul>
+ * Pure-Mockito unit tests for the queue, read, update and delete endpoints of {@link
+ * JobOrderController}.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
   @Mock private JobOrderQueryService jobOrderQueryService;
-  @Mock private JobOrderMaterialDemandService jobOrderMaterialDemandService;
-  @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
-  @Mock private JobOrderHandoverService jobOrderHandoverService;
-  @Mock private JobOrderItemProductionService jobOrderItemProductionService;
-  @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
-  @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
-  @Mock private JobOrderMissionAllocationRedactor missionAllocationRedactor;
 
   @InjectMocks private JobOrderController controller;
-
-  private static Jwt jwt(String sub) {
-    return Jwt.withTokenValue("token")
-        .header("alg", "RS256")
-        .subject(sub)
-        .claim("sub", sub)
-        .build();
-  }
 
   private static JobOrderDto jobOrderDto(UUID id) {
     return new JobOrderDto(
@@ -146,19 +102,6 @@ class JobOrderControllerTest {
 
     assertThat(result).isSameAs(created);
     verifyNoInteractions(jobOrderAccessPolicy);
-  }
-
-  @Test
-  void getItemBlueprintOwners_delegatesToServiceAndReturnsResult() {
-    UUID id = UUID.randomUUID();
-    JobOrderItemBlueprintOwnersDto coverage =
-        new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
-    when(jobOrderItemBlueprintOwnersService.getBlueprintOwners(id)).thenReturn(coverage);
-
-    JobOrderItemBlueprintOwnersDto result = controller.getItemBlueprintOwners(id);
-
-    assertThat(result).isSameAs(coverage);
-    verify(jobOrderItemBlueprintOwnersService).getBlueprintOwners(id);
   }
 
   @Test
@@ -300,21 +243,6 @@ class JobOrderControllerTest {
   }
 
   @Test
-  void getMaterialDemand_returnsTheAggregatedOverviewUnchanged() {
-    MaterialDemandOverviewDto overview =
-        new MaterialDemandOverviewDto(
-            List.of(
-                new MaterialDemandGroupDto(
-                    new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "ALP"), List.of())));
-    when(jobOrderMaterialDemandService.getMaterialDemandOverview()).thenReturn(overview);
-
-    MaterialDemandOverviewDto result = controller.getMaterialDemand();
-
-    assertThat(result).isSameAs(overview);
-    verify(jobOrderMaterialDemandService).getMaterialDemandOverview();
-  }
-
-  @Test
   void lookupJobOrders_delegatesToServiceReferenceQuery() {
     JobOrderReferenceDto ref =
         new JobOrderReferenceDto(
@@ -429,81 +357,6 @@ class JobOrderControllerTest {
     verify(jobOrderAccessPolicy, never()).canSeeJobOrder(any(UUID.class));
   }
 
-  private static InventoryItemDto sampleInventoryItem() {
-    return new InventoryItemDto(
-        UUID.randomUUID(),
-        null,
-        null,
-        null,
-        null,
-        750,
-        5.0,
-        false,
-        false,
-        java.util.List.of(),
-        0.0,
-        java.util.List.of(),
-        0.0,
-        null,
-        null,
-        1L,
-        null,
-        null);
-  }
-
-  @Test
-  void getInventoryItemsForJobOrderMaterial_responsibleSideViewer_delegatesUnredacted() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-    InventoryItemDto inv = sampleInventoryItem();
-    when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
-        .thenReturn(List.of(inv));
-    when(missionAllocationRedactor.anonymiseUnreadableMissions(List.of(inv)))
-        .thenReturn(List.of(inv));
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
-
-    List<InventoryItemDto> result =
-        controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
-
-    assertThat(result).containsExactly(inv);
-    verify(inventoryOwnerRedactor, never()).redactInventoryItems(any());
-  }
-
-  @Test
-  void getInventoryItemsForJobOrderMaterial_requestingSideViewer_redactsOwners() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-    List<InventoryItemDto> raw = List.of(sampleInventoryItem());
-    List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
-    when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
-        .thenReturn(raw);
-    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(raw);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
-    when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
-
-    List<InventoryItemDto> result =
-        controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
-
-    assertThat(result).isSameAs(redacted);
-    verify(inventoryOwnerRedactor).redactInventoryItems(raw);
-  }
-
-  @Test
-  void getOrphanedLinkedInventory_requestingSideViewer_redactsOwners() {
-    UUID jobOrderId = UUID.randomUUID();
-    List<InventoryItemDto> raw = List.of(sampleInventoryItem());
-    List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
-    when(jobOrderQueryService.getOrphanedLinkedInventory(jobOrderId)).thenReturn(raw);
-    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(raw);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
-    when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
-
-    List<InventoryItemDto> result = controller.getOrphanedLinkedInventory(jobOrderId);
-
-    assertThat(result).isSameAs(redacted);
-    verify(inventoryOwnerRedactor).redactInventoryItems(raw);
-  }
-
   @Test
   void updateJobOrderStatus_forwardsBodyVersionToService() {
     UUID id = UUID.randomUUID();
@@ -561,128 +414,5 @@ class JobOrderControllerTest {
     controller.deleteJobOrder(id);
 
     verify(jobOrderService).deleteJobOrder(id);
-  }
-
-  @Test
-  void unlinkMaterial_delegatesBothPathParameters() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-
-    controller.unlinkMaterial(jobOrderId, materialId);
-
-    verify(jobOrderService).unlinkMaterial(jobOrderId, materialId);
-  }
-
-  @Test
-  void unlinkInventoryItem_delegatesBothPathParameters() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID inventoryItemId = UUID.randomUUID();
-
-    controller.unlinkInventoryItem(jobOrderId, inventoryItemId);
-
-    verify(jobOrderService).unlinkInventoryItem(jobOrderId, inventoryItemId);
-  }
-
-  @Test
-  void createHandover_delegatesToHandoverServiceWithBody() {
-    UUID jobOrderId = UUID.randomUUID();
-    JobOrderHandoverCreateDto dto =
-        new JobOrderHandoverCreateDto(
-            Instant.parse("2026-05-01T12:00:00Z"), "alice", "DAS KARTELL", List.of());
-    JobOrderHandoverDto persisted =
-        new JobOrderHandoverDto(
-            UUID.randomUUID(),
-            jobOrderId,
-            dto.handoverTime(),
-            "alice",
-            "DAS KARTELL",
-            null,
-            null,
-            List.of(),
-            1L);
-    when(jobOrderHandoverService.createHandover(jobOrderId, dto)).thenReturn(persisted);
-
-    JobOrderHandoverDto result = controller.createHandover(jobOrderId, dto);
-
-    assertThat(result).isSameAs(persisted);
-    verify(jobOrderHandoverService).createHandover(jobOrderId, dto);
-  }
-
-  @Test
-  void bookProduction_delegatesToService() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID itemId = UUID.randomUUID();
-    JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(
-            3,
-            7L,
-            List.of(),
-            List.of(),
-            new JobOrderItemProductionCreateDto.BookInDto(
-                UUID.randomUUID(), null, null, false, true));
-    JobOrderItemDto persisted =
-        new JobOrderItemDto(itemId, null, null, 5, 3, 0, null, List.of(), false, 8L);
-    when(jobOrderItemProductionService.bookProduction(jobOrderId, itemId, dto))
-        .thenReturn(persisted);
-
-    JobOrderItemDto result = controller.bookProduction(jobOrderId, itemId, dto);
-
-    assertThat(result).isSameAs(persisted);
-    verify(jobOrderItemProductionService).bookProduction(jobOrderId, itemId, dto);
-  }
-
-  @Test
-  void downloadHandoverReport_validTimeZone_passedToService() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID handoverId = UUID.randomUUID();
-    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    when(jobOrderHandoverReportService.generateHandoverReport(
-            eq(jobOrderId), eq(handoverId), eq(java.time.ZoneId.of("Europe/Berlin"))))
-        .thenReturn(pdf);
-
-    ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(
-            jobOrderId, handoverId, java.time.ZoneId.of("Europe/Berlin"));
-
-    assertThat(response.getStatusCode().value()).isEqualTo(200);
-    assertThat(response.getBody()).isSameAs(pdf);
-    HttpHeaders headers = response.getHeaders();
-    assertThat(headers.getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
-    assertThat(headers.getContentDisposition().getFilename())
-        .isEqualTo("uebergabeprotokoll-" + jobOrderId + ".pdf");
-  }
-
-  @Test
-  void downloadHandoverReport_nullTimeZoneHeader_passedAsNull() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID handoverId = UUID.randomUUID();
-    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
-        .thenReturn(pdf);
-
-    ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(jobOrderId, handoverId, null);
-
-    assertThat(response.getStatusCode().value()).isEqualTo(200);
-    verify(jobOrderHandoverReportService).generateHandoverReport(jobOrderId, handoverId, null);
-  }
-
-  @Test
-  void previewHandoverReport_returnsPdfWithPreviewFilename() {
-    UUID jobOrderId = UUID.randomUUID();
-    HandoverReportPreviewRequestDto dto =
-        new HandoverReportPreviewRequestDto(
-            "#42", LocalDateTime.of(2026, 5, 1, 12, 0), "alice", List.of());
-    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    when(jobOrderHandoverReportService.generateHandoverReportPreview(dto)).thenReturn(pdf);
-
-    ResponseEntity<byte[]> response = controller.previewHandoverReport(jobOrderId, dto);
-
-    assertThat(response.getStatusCode().value()).isEqualTo(200);
-    assertThat(response.getBody()).isSameAs(pdf);
-    HttpHeaders headers = response.getHeaders();
-    assertThat(headers.getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
-    assertThat(headers.getContentDisposition().getFilename())
-        .isEqualTo("uebergabeprotokoll-vorschau.pdf");
   }
 }

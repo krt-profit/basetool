@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupMapper;
@@ -141,14 +142,16 @@ public class LeitungViewService {
 
   /**
    * The org units a non-admin caller leads: every unit they hold a leadership rank on, plus the
-   * cascade of an area rank (the Bereich's Staffeln and SKs) or an OL membership (every unit).
+   * cascade of an area rank (the Bereich's Staffeln and SKs) or an OL membership (every unit); none
+   * unless the caller holds {@code KRT Member} (REQ-SEC-015).
    *
    * @param callerId the caller's account id, or {@code null} for an unidentifiable caller.
    * @return the visible org-unit ids; empty for a caller without a leadership rank.
    */
   @NotNull
   private Set<UUID> visibleOrgUnitIds(@Nullable UUID callerId) {
-    if (callerId == null) {
+    if (callerId == null
+        || !authHelperService.hasReachableRole(Roles.authority(Roles.KRT_MEMBER))) {
       return Set.of();
     }
     List<OrgUnitMembership> leaderships =

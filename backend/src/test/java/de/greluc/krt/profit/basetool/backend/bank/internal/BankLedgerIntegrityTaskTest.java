@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankMetricNames;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerIntegrityService.IntegrityReport;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
@@ -71,9 +72,9 @@ class BankLedgerIntegrityTaskTest {
 
     task.runIntegrityCheck();
 
-    assertThat(gauge(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)).isEqualTo(2.0d);
-    assertThat(gauge(MetricNames.CATEGORY_UNBALANCED_TRANSFER)).isEqualTo(1.0d);
-    assertThat(gauge(MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)).isEqualTo(0.0d);
+    assertThat(gauge(BankMetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)).isEqualTo(2.0d);
+    assertThat(gauge(BankMetricNames.CATEGORY_UNBALANCED_TRANSFER)).isEqualTo(1.0d);
+    assertThat(gauge(BankMetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)).isEqualTo(0.0d);
     assertThat(
             registry
                 .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
@@ -89,13 +90,13 @@ class BankLedgerIntegrityTaskTest {
 
   @Test
   void registerViolationGauges_startsEveryCategoryAtZeroBeforeAnySweep() {
-    assertThat(gauge(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)).isEqualTo(0.0d);
-    assertThat(gauge(MetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL)).isEqualTo(0.0d);
+    assertThat(gauge(BankMetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)).isEqualTo(0.0d);
+    assertThat(gauge(BankMetricNames.CATEGORY_BROKEN_HOLDER_REVERSAL)).isEqualTo(0.0d);
   }
 
   private double gauge(String category) {
     return registry
-        .get(MetricNames.BANK_LEDGER_INTEGRITY_VIOLATIONS)
+        .get(BankMetricNames.BANK_LEDGER_INTEGRITY_VIOLATIONS)
         .tag(MetricNames.TAG_CATEGORY, category)
         .gauge()
         .value();

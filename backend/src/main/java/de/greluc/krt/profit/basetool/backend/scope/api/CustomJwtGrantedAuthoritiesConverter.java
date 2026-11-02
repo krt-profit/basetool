@@ -85,6 +85,10 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   private static final long RETRY_BACKOFF_MILLIS = 50L;
 
+  /** The authority a seat needs its holder to carry before it confers anything (ADR-0300). */
+  private static final GrantedAuthority KRT_MEMBER_AUTHORITY =
+      new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER));
+
   /** Upper bound on distinct cached {@code (sub, session, azp, claims)} entries. */
   private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
 
@@ -365,9 +369,10 @@ public class CustomJwtGrantedAuthoritiesConverter
    *
    * <ul>
    *   <li>flat {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} from the union of all
-   *       memberships;
+   *       memberships; a rank confers them, and the cascade below applies, only while the holder
+   *       holds {@code KRT Member}, whereas the explicit flags always apply;
    *   <li>a contextual {@code LOGISTICIAN} for each membership's own org unit where {@link
-   *       OrgUnitMembership#isLogisticianOfOwnUnit()} holds, and a contextual {@code
+   *       OrgUnitMembership#isLogisticianOfOwnUnit(boolean)} holds, and a contextual {@code
    *       MISSION_MANAGER} per flag or own-unit officer rank;
    *   <li>contextual authorities for the org units a leadership membership reaches downward, via
    *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)} (REQ-ORG-015).
@@ -385,10 +390,12 @@ public class CustomJwtGrantedAuthoritiesConverter
       return;
     }
 
+    boolean seatsConfer = authorities.contains(KRT_MEMBER_AUTHORITY);
     boolean anyLogistician =
-        memberships.stream().anyMatch(OrgUnitMembership::isLogisticianOfOwnUnit);
+        memberships.stream().anyMatch(m -> m.isLogisticianOfOwnUnit(seatsConfer));
     boolean anyMissionManager =
-        memberships.stream().anyMatch(m -> m.isMissionManager() || confersFlatOfficerRole(m));
+        memberships.stream()
+            .anyMatch(m -> m.isMissionManager() || (seatsConfer && confersFlatOfficerRole(m)));
 
     if (anyLogistician) {
       authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
@@ -400,17 +407,19 @@ public class CustomJwtGrantedAuthoritiesConverter
     Set<GrantedAuthority> contextual = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
       UUID orgUnitId = m.getId().getOrgUnitId();
-      if (m.isLogisticianOfOwnUnit()) {
+      if (m.isLogisticianOfOwnUnit(seatsConfer)) {
         contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId));
       }
-      if (m.isMissionManager() || m.getRole().confersOwnUnitOfficerReach()) {
+      if (m.isMissionManager() || (seatsConfer && m.getRole().confersOwnUnitOfficerReach())) {
         contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", orgUnitId));
       }
     }
 
-    for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
-      contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
-      contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
+    if (seatsConfer) {
+      for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
+        contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
+        contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
+      }
     }
     authorities.addAll(contextual);
   }

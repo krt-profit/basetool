@@ -31,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
@@ -158,7 +159,8 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(scWikiClient).fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any());
-    assertEquals(42.0, meterRegistry.get(MetricNames.CATALOGUE_ITEMS_WITH_STATS).gauge().value());
+    assertEquals(
+        42.0, meterRegistry.get(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS).gauge().value());
   }
 
   @Test
@@ -198,9 +200,9 @@ class ScWikiItemSyncServiceBackfillTest {
     assertEquals(9000, written, "an all-304 backfill must report the live item count, not 0");
     verify(gameItemRepository, never()).save(any());
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_NOT_MODIFIED));
-    assertEquals(0.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
-    assertEquals(0.0, sweepSkips(MetricNames.SWEEP_SKIP_NO_ROWS));
+    assertEquals(1.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_NOT_MODIFIED));
+    assertEquals(0.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_INCOMPLETE));
+    assertEquals(0.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_NO_ROWS));
   }
 
   @Test
@@ -362,7 +364,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
-    assertNull(meterRegistry.find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
+    assertNull(meterRegistry.find(CatalogueMetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
   }
 
   @Test
@@ -379,7 +381,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+    assertEquals(1.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_INCOMPLETE));
   }
 
   @Test
@@ -406,7 +408,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
-    assertNull(meterRegistry.find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
+    assertNull(meterRegistry.find(CatalogueMetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
   }
 
   @Test
@@ -432,7 +434,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+    assertEquals(1.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_INCOMPLETE));
   }
 
   @Test
@@ -450,7 +452,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+    assertEquals(1.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_INCOMPLETE));
   }
 
   /**
@@ -461,8 +463,8 @@ class ScWikiItemSyncServiceBackfillTest {
    */
   private double sweepSkips(String reason) {
     return meterRegistry
-        .find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED)
-        .tag(MetricNames.TAG_SWEEP, MetricNames.SWEEP_ITEM)
+        .find(CatalogueMetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED)
+        .tag(CatalogueMetricNames.TAG_SWEEP, CatalogueMetricNames.SWEEP_ITEM)
         .tag(MetricNames.TAG_REASON, reason)
         .counters()
         .stream()

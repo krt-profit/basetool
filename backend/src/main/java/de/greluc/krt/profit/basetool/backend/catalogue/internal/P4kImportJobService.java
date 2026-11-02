@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
@@ -309,7 +310,7 @@ public class P4kImportJobService {
   private void recordTerminalOutcome(@NotNull P4kImportJob job, @NotNull String outcome) {
     meterRegistry
         .counter(
-            MetricNames.P4K_IMPORT_JOBS,
+            CatalogueMetricNames.P4K_IMPORT_JOBS,
             MetricNames.TAG_OUTCOME,
             outcome,
             MetricNames.TAG_KIND,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
@@ -113,8 +114,9 @@ public class UexClient {
 
   /**
    * Micrometer registry for the swallowed-fetch-error counter ({@link
-   * MetricNames#EXTERNAL_FETCH_ERRORS}). Injected so a transient-or-sustained upstream failure —
-   * which {@link #fetchList} maps to an empty list — still leaves a metric trail (REQ-OBS-011).
+   * CatalogueMetricNames#EXTERNAL_FETCH_ERRORS}). Injected so a transient-or-sustained upstream
+   * failure — which {@link #fetchList} maps to an empty list — still leaves a metric trail
+   * (REQ-OBS-011).
    */
   private final MeterRegistry meterRegistry;
 
@@ -401,7 +403,7 @@ public class UexClient {
    *
    * <p>A {@code 304} is logged at INFO and yields an unchanged result; a {@code 2xx} stores the new
    * ETag and goes through {@link #unwrapEnvelope}; any error is logged at WARN, counted on {@link
-   * MetricNames#EXTERNAL_FETCH_ERRORS} and yields empty rows.
+   * CatalogueMetricNames#EXTERNAL_FETCH_ERRORS} and yields empty rows.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
    * @param endpoint UEX endpoint path; also the ETag cache key
@@ -453,8 +455,8 @@ public class UexClient {
    * (REQ-OBS-001).
    *
    * <p>A non-{@code ok} {@code status} logs at WARN and increments {@link
-   * MetricNames#EXTERNAL_FETCH_ERRORS} but still returns the rows; an absent {@code data} or a
-   * blank status is not treated as an anomaly.
+   * CatalogueMetricNames#EXTERNAL_FETCH_ERRORS} but still returns the rows; an absent {@code data}
+   * or a blank status is not treated as an anomaly.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
    * @param body the decoded envelope
@@ -492,19 +494,19 @@ public class UexClient {
   }
 
   /**
-   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code uex} source. Called from
-   * every branch that swallows an upstream transport, decode or envelope failure into an empty /
-   * short list, so a sustained UEX problem is visible even though the sync services treat the
-   * payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   * Increments {@link CatalogueMetricNames#EXTERNAL_FETCH_ERRORS} for the {@code uex} source.
+   * Called from every branch that swallows an upstream transport, decode or envelope failure into
+   * an empty / short list, so a sustained UEX problem is visible even though the sync services
+   * treat the payload as a skip and the scheduled job still records a success (REQ-OBS-011).
    */
   private void recordFetchError() {
     meterRegistry
         .counter(
-            MetricNames.EXTERNAL_FETCH_ERRORS,
-            MetricNames.TAG_SOURCE,
-            MetricNames.SOURCE_UEX,
+            CatalogueMetricNames.EXTERNAL_FETCH_ERRORS,
+            CatalogueMetricNames.TAG_SOURCE,
+            CatalogueMetricNames.SOURCE_UEX,
             MetricNames.TAG_REASON,
-            MetricNames.REASON_FETCH)
+            CatalogueMetricNames.REASON_FETCH)
         .increment();
   }
 

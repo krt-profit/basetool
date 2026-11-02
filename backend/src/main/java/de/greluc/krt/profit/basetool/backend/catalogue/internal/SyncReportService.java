@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -81,8 +82,8 @@ public class SyncReportService {
   private void countSyncEvent(@NotNull SyncSourceSystem source, @NotNull SyncEventType eventType) {
     meterRegistry
         .counter(
-            MetricNames.SYNC_EVENTS,
-            MetricNames.TAG_SOURCE,
+            CatalogueMetricNames.SYNC_EVENTS,
+            CatalogueMetricNames.TAG_SOURCE,
             source.name(),
             MetricNames.TAG_EVENT_TYPE,
             eventType.name())

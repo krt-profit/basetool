@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -86,9 +87,9 @@ class SyncReportServiceTest {
     assertEquals(
         1.0d,
         meterRegistry
-            .get(MetricNames.SYNC_EVENTS)
+            .get(CatalogueMetricNames.SYNC_EVENTS)
             .tags(
-                MetricNames.TAG_SOURCE,
+                CatalogueMetricNames.TAG_SOURCE,
                 SyncSourceSystem.SCWIKI.name(),
                 MetricNames.TAG_EVENT_TYPE,
                 SyncEventType.CREATED_WIKI_ONLY.name())

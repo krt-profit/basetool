@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
@@ -82,7 +83,7 @@ class ActingMemberFilterPathMatchingTest {
    * @return the single {@code reason} tag observed on the refusal counter
    */
   private String refusalReason() {
-    return meterRegistry.find(MetricNames.ON_BEHALF_OF_REFUSED).counters().stream()
+    return meterRegistry.find(ExchangeMetricNames.ON_BEHALF_OF_REFUSED).counters().stream()
         .filter(counter -> counter.count() > 0)
         .map(counter -> counter.getId().getTag(MetricNames.TAG_REASON))
         .findFirst()
@@ -117,7 +118,7 @@ class ActingMemberFilterPathMatchingTest {
 
     filter().doFilter(gatewayRequest("/%61pi/v1/missions"), response, chain);
 
-    assertThat(refusalReason()).isEqualTo(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+    assertThat(refusalReason()).isEqualTo(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
     assertThat(response.getStatus()).isEqualTo(403);
     verify(chain, never()).doFilter(any(), any());
     verify(authorities, never()).exchangeAuthoritiesFor(any(), any());
@@ -202,7 +203,7 @@ class ActingMemberFilterPathMatchingTest {
             response,
             chain);
 
-    assertThat(refusalReason()).isEqualTo(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+    assertThat(refusalReason()).isEqualTo(ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
     verify(chain, never()).doFilter(any(), any());
   }
 
@@ -229,8 +230,8 @@ class ActingMemberFilterPathMatchingTest {
     }
     assertThat(
             meterRegistry
-                .get(MetricNames.ON_BEHALF_OF_REFUSED)
-                .tag(MetricNames.TAG_REASON, MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)
+                .get(ExchangeMetricNames.ON_BEHALF_OF_REFUSED)
+                .tag(MetricNames.TAG_REASON, ExchangeMetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)
                 .counter()
                 .count())
         .isEqualTo(2.0d);

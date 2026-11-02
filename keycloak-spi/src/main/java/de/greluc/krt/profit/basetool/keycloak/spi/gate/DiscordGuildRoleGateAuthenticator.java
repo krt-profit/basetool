@@ -38,6 +38,7 @@ import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.sessions.AuthenticationSessionModel;
 
 /**
  * First-broker-login authenticator that gates a new Discord user on guild membership and on the
@@ -51,6 +52,8 @@ import org.keycloak.models.UserModel;
  *       confident match renders {@code discordAccountAlreadyExists}; skipped when unconfigured,
  *       uncertain or while an existing account is linking Discord.
  * </ol>
+ *
+ * <p>Every denial drops the brokered Discord context, so a retry in the same browser starts over.
  *
  * <p>Logs only the coarse decision, never tokens, names, e-mails or Discord ids.
  */
@@ -164,9 +167,21 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
     return existence == BackendAccountChecker.Result.EXISTS;
   }
 
+  /**
+   * Ends the first-broker-login with the given error page and drops the brokered Discord context
+   * from the authentication session, so the next Discord login in the same browser starts a fresh
+   * first-broker-login instead of resuming this denied one.
+   *
+   * @param context the authentication flow context
+   * @param messageKey the login-theme message key of the error page
+   */
   private void deny(@NotNull AuthenticationFlowContext context, @NotNull String messageKey) {
     Response challenge =
         context.form().setError(messageKey).createErrorPage(Response.Status.FORBIDDEN);
+    AuthenticationSessionModel authSession = context.getAuthenticationSession();
+    if (authSession != null) {
+      authSession.removeAuthNote(AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE);
+    }
     context.failure(AuthenticationFlowError.ACCESS_DENIED, challenge);
   }
 

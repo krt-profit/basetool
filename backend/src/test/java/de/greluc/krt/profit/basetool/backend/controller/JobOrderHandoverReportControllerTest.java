@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPre
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
-import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderHandoverController;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -57,7 +57,7 @@ class JobOrderHandoverReportControllerTest {
 
   @Mock private RoleHierarchy roleHierarchy;
 
-  @InjectMocks private JobOrderController controller;
+  @InjectMocks private JobOrderHandoverController controller;
 
   @Test
   void downloadHandoverReport_shouldReturnPdfResponse_whenHandoverExists() {

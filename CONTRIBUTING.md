@@ -280,8 +280,8 @@ there is no "rerun until it passes" allowance.
 build runs with the cache switched on and strict: `gradle.properties` sets
 `org.gradle.configuration-cache=true` for local builds too, and CI passes
 `--configuration-cache` as well. `--no-configuration-cache` turns it off for one
-run; a task a plugin marks incompatible (the OWASP `dependencyCheckAggregate`)
-makes Gradle skip the cache for that run on its own. The image builds in
+run; a task its plugin marks incompatible makes Gradle skip the cache for that
+run on its own. The image builds in
 `docker/app/Dockerfile` and `docker/sandbox/keycloak/Dockerfile` pass
 `--no-configuration-cache`: their context has no git checkout, and the
 frontend's `git describe` version probe is a cache problem there. The usual mistakes are a task
@@ -372,16 +372,6 @@ entry does no harm).
   `./gradlew --write-verification-metadata sha256 <the failing task>` on the
   machine that fails, compare each added SHA against the file on Maven Central
   (its published `.sha1` must match too), and commit the additions.
-- **`dependencyCheckAggregate` resolves more than `help build` does.** The OWASP
-  plugin fetches the POM of every dependency it scans through a detached
-  configuration, so a PR that touches any `build.gradle.kts` (which runs
-  `dependency-check.yml`) failed on 23 POMs nothing else ever resolved — Keycloak's
-  OpenTelemetry, Jackson 2 and webauthn4j among them — from 2026-09-23 (#2034).
-  Regenerate them without downloading the NVD feed:
-  `./gradlew --no-parallel --write-verification-metadata sha256 -PdependencyCheckAutoUpdate=false dependencyCheckAggregate`.
-  Without a local NVD dataset the task then fails with *Analysis failed*; the
-  resolution before it, which is what the writer needs, has already run. Check
-  the additions against Maven Central as above.
 - **Dependabot** only manages GitHub Actions, Docker images and the frontend's
   npm packages here, none of which Gradle resolves. A compose image bump is
   completed on its branch by `dependabot-compose.yml`, which commits the
@@ -409,7 +399,9 @@ signer identity, image pins, dashboards, log masking, ansible-lint, …),
 the Keycloak issuer). Every check is a step named `<check> / …` and runs
 even when an earlier one failed, so the job log lists every finding.
 Further PR checks run alongside (some only when their paths are
-touched) and are expected to pass:
+touched) and are expected to pass: *Dependency review*
+([`dependency-submission.yml`](.github/workflows/dependency-submission.yml), on every PR),
+[`vulnerability-scan.yml`](.github/workflows/vulnerability-scan.yml),
 [`deploy-script.yml`](.github/workflows/deploy-script.yml) and
 [`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
 [`cache-janitor.yml`](.github/workflows/cache-janitor.yml) is housekeeping,
@@ -419,12 +411,12 @@ every Gradle cache on `main` but the newest `gradle-home-` entry per job family
 and the extracted bundles it was saved or restored with
 ([`prune_gradle_caches.py`](.github/scripts/prune_gradle_caches.py); anything
 touched in the last two hours stays, for runs in flight) and a closed PR's caches —
-so the repository stays under GitHub's 10 GB cache cap and the NVD dataset the
-dependency scan needs is not evicted. It warns in the run when the total is
+so the repository stays under GitHub's 10 GB cache cap and the Gradle caches
+are not evicted. It warns in the run when the total is
 still above 8 GiB afterwards. [`dependency-submission.yml`](.github/workflows/dependency-submission.yml)
-is housekeeping too: on every push to `main` it submits the resolved Gradle
-dependency graph, so GitHub's dependency graph and Dependabot alerts see the
-Java dependencies at all.
+submits the resolved Gradle dependency graph on every push to `main`, so
+GitHub's dependency graph and Dependabot alerts see the Java dependencies at
+all, and on every pull request, where *Dependency review* compares against it.
 
 Tools a workflow installs outside Gradle are pinned by hash too: Python
 packages come from `--require-hashes` requirement files in
@@ -473,53 +465,33 @@ BOM lists exactly the module's resolved runtime classpath (REQ-OPS-025). CI
 runs the four SBOM tasks on every PR for that check; the regenerated files
 are not committed there.
 
-CodeQL additionally runs weekly, and the OWASP
-[dependency check](.github/workflows/dependency-check.yml) runs weekly
-and on every PR that touches the build files, the version catalog or its
-suppression file; if your change introduces a new security finding,
-expect to address it before merge. In CI the scan never downloads the NVD
-(REQ-OPS-054, ADR-0324): the
-[NVD feed refresh](.github/workflows/nvd-feed-refresh.yml) runs
-`dependencyCheckUpdate` daily, on a `main` push that touches the root build
-script or the catalog and on demand, retries a stalled download three times,
-saves the dataset as a new `nvd-feed-v2-` cache with a `refreshed-at` stamp and
-deletes the older ones. The scan restores the newest of them, runs with
-`-PdependencyCheckAutoUpdate=false`, and fails within seconds when no feed is
-cached or the cached one is older than seven days — re-run the refresh
-(*Actions → NVD Feed Refresh → Run workflow*), then the scan. A failed daily
-refresh opens the issue *Daily NVD feed refresh failed*.
+CodeQL additionally runs weekly. Dependencies are checked against the
+GitHub Advisory Database, not the NVD (REQ-OPS-054, ADR-0325):
 
-Locally the property defaults to `true`, so the scan updates its own dataset.
-The feed comes from the NVD's official JSON 2.0 data feeds (`nvd.datafeedUrl`
-in the root `build.gradle.kts`,
-`https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz`), not from
-the paginated NVD API, so it needs no API key:
-`./gradlew dependencyCheckAggregate --no-parallel` builds the dataset from
-nothing in about seven minutes into `~/.gradle/dependency-check-data/11.0`
-and re-uses it for a week (`nvd.validForHours = 168`). Setting
-`dependencyCheck { data { directory = … } }` has no effect in plugin 13.0.0 —
-the task pins its own default — so point a scratch run elsewhere on the
-task itself (`tasks.dependencyCheckAggregate { data.directory = … }`).
+- **Every PR** runs *Dependency review* in the
+  [Dependency Graph workflow](.github/workflows/dependency-submission.yml): it
+  submits the PR's resolved Gradle graph, then fails when the PR adds a
+  dependency with a HIGH or CRITICAL advisory, in any scope.
+- **Every `main` push, weekly and on PRs that touch the build files, the
+  catalog or a lockfile**, the
+  [Vulnerability Scan](.github/workflows/vulnerability-scan.yml) builds the
+  four CycloneDX SBOMs and runs Trivy over them and over the npm lockfiles
+  (dev dependencies included). A HIGH or CRITICAL finding with a fixed version
+  fails its `Scan (<target>)` job; outside PRs the SARIF goes to the Security
+  tab under `trivy-deps-<target>`. A failed weekly scan opens the issue
+  *Weekly vulnerability scan failed*.
+- **Dependabot alerts** report a new advisory against `main` between scans.
 
-<a id="owasp-suppressions"></a>**OWASP suppressions expire, and renewing one is a review.** Every
-entry in [`config/owasp/dependency-check-suppressions.xml`](config/owasp/dependency-check-suppressions.xml)
-carries `until="YYYY-MM-DDZ"`; from that day on it stops applying and the weekly scan turns red on
-the finding again, by design — and most entries share one date, so they come due together. Do not
-move the dates blindly. Per entry:
+If your change introduces a finding, expect to address it before merge.
 
-1. Read the finding the entry covered — from the red weekly run, or locally with
-   `./gradlew dependencyCheckAggregate --no-parallel` after moving that entry's `until` into the past.
-2. Re-check its `notes` against today's facts: the CVE record and its CPE, and the version the
-   build resolves now (`./gradlew :<module>:dependencyInsight --dependency <artifact>
-   --configuration runtimeClasspath`). A CPE confusion must still be one; a "fixed in" version must
-   still be on every classpath.
-3. Still a false positive: move `until` about three months ahead (never more than six) and bring
-   the `notes` up to date. No longer one: delete the entry and fix the dependency instead.
-4. Renew in one PR (`chore(security): renew OWASP suppressions`) that names each CVE and why it
-   still does not apply; the dependency-check workflow runs on it because it touches the file.
-
-A new suppression has the same shape: a `packageUrl` regex narrowed to the artifact, the CVE (or
-CPE), `notes` saying why it is a false positive, and an `until` no more than six months out.
+<a id="trivy-ignores"></a>**Accepted findings expire, and renewing one is a review.** An
+advisory that does not apply goes into [`.github/trivy/ignore.yaml`](.github/trivy/ignore.yaml)
+with its `id`, `purls` (or `paths`) narrowed to the affected package, a `statement` saying why it
+does not apply, and an `expired_at` no more than six months out; from that day on the scan fails on
+the finding again. To renew one, re-check the advisory and the version the build resolves now
+(`./gradlew :<module>:dependencyInsight --dependency <artifact> --configuration runtimeClasspath`),
+then move `expired_at` and bring the `statement` up to date in one PR that names each advisory. No
+longer applicable: delete the entry and fix the dependency instead.
 
 ### Review and merge
 

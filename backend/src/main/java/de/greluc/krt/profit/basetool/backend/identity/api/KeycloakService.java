@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -184,7 +183,7 @@ public class KeycloakService {
 
     } catch (Exception e) {
       logFetchFailure(e);
-      meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).increment();
+      meterRegistry.counter(IdentityMetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).increment();
       return Collections.emptyList();
     }
   }

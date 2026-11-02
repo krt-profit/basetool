@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
@@ -310,10 +311,10 @@ public class ExchangeMassChangeService {
   private @NotNull Counter counter(@NotNull String clientId, @NotNull ExchangeResource resource) {
     String tag = resource.metricTag();
     return meterRegistry.counter(
-        MetricNames.EXCHANGE_MASS_CHANGES_CONFIRMED,
+        ExchangeMetricNames.EXCHANGE_MASS_CHANGES_CONFIRMED,
         MetricNames.TAG_CLIENT_ID,
         clientId,
-        MetricNames.TAG_RESOURCE,
+        ExchangeMetricNames.TAG_RESOURCE,
         tag);
   }
 }

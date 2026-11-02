@@ -164,6 +164,14 @@ second time for the nickname. All Discord calls of the provider JAR share one `H
 
 - [x] The gate makes exactly one Discord call per first login; the precheck's nickname comes from
   that call's member object (`DiscordGuildRoleGateAuthenticatorTest`).
+- [x] A denial (this gate or REQ-SEC-022) drops the brokered Discord context
+  (`AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE`) from the authentication session, so a retry
+  in the same browser starts a fresh first-broker-login. Otherwise Keycloak detects a *nested first
+  broker flow* on the retry and bounces the user back to the login page until the session expires
+  — which also strands a member who has just been given the role (`DiscordGuildRoleGateAuthenticatorTest`).
+- [x] The denial page (`discordMembershipDenied`, krt-theme DE/EN) says the Basetool is open only to
+  verified members, that this also holds for connecting another application (an exchange client's
+  device login, REQ-XCH-005), and that a member who has just been given the role signs in again.
 
 **Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `kernel/fragments/sidebar.html`, `kernel/fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
 

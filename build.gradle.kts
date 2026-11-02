@@ -2,7 +2,6 @@ buildscript {
   dependencies {
     constraints {
       classpath(libs.plexus.utils)
-      classpath(libs.jsoup)
       classpath(libs.jackson2.plugins.databind)
     }
   }
@@ -11,7 +10,6 @@ buildscript {
 plugins {
   id("idea")
   id("base")
-  alias(libs.plugins.owasp.dependencycheck)
   id("basetool.repository-format-conventions")
 }
 
@@ -55,25 +53,5 @@ tasks.register("generateTermsVersion") {
     target.parentFile.mkdirs()
     target.writeText("basetool.terms.version=" + version + "\n", Charsets.UTF_8)
     logger.lifecycle("Terms-of-Use version: $version -> $targetForLog")
-  }
-}
-
-dependencyCheck {
-  failBuildOnCVSS = 7.0f
-  autoUpdate =
-    providers.gradleProperty("dependencyCheckAutoUpdate").map(String::toBoolean).orElse(true)
-  formats = listOf("HTML", "SARIF")
-  outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
-  suppressionFile = rootProject.file("config/owasp/dependency-check-suppressions.xml").absolutePath
-  setConnectionTimeout(java.time.Duration.ofSeconds(30))
-  setReadTimeout(java.time.Duration.ofSeconds(120))
-  nvd.validForHours = 168
-  nvd.datafeedUrl = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz"
-  val resolvedNvdApiKey = (project.findProperty("nvdApiKey") as String?)?.takeIf { it.isNotBlank() }
-  if (resolvedNvdApiKey != null) {
-    nvd.apiKey = resolvedNvdApiKey
-    nvd.delay = 0
-  } else {
-    nvd.delay = 16000
   }
 }

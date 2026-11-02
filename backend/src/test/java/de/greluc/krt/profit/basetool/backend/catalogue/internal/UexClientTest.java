@@ -25,11 +25,11 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexStarSystemDto;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Timer;
@@ -141,8 +141,8 @@ class UexClientTest {
     assertEquals(
         1.0,
         meterRegistry
-            .get(MetricNames.EXTERNAL_FETCH_ERRORS)
-            .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+            .get(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS)
+            .tag(CatalogueMetricNames.TAG_SOURCE, CatalogueMetricNames.SOURCE_UEX)
             .counter()
             .count());
   }
@@ -188,8 +188,8 @@ class UexClientTest {
     assertEquals(
         1.0,
         meterRegistry
-            .get(MetricNames.EXTERNAL_FETCH_ERRORS)
-            .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+            .get(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS)
+            .tag(CatalogueMetricNames.TAG_SOURCE, CatalogueMetricNames.SOURCE_UEX)
             .counter()
             .count(),
         "a swallowed UEX fetch error must increment"
@@ -638,8 +638,8 @@ class UexClientTest {
    */
   private double fetchErrorCount() {
     return meterRegistry
-        .find(MetricNames.EXTERNAL_FETCH_ERRORS)
-        .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+        .find(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS)
+        .tag(CatalogueMetricNames.TAG_SOURCE, CatalogueMetricNames.SOURCE_UEX)
         .counters()
         .stream()
         .mapToDouble(io.micrometer.core.instrument.Counter::count)

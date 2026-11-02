@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeInstallationConnectedEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
@@ -114,7 +115,7 @@ class ExchangeInstallationServiceTest {
   private double created(@NotNull String clientId) {
     Counter counter =
         meterRegistry
-            .find(MetricNames.EXCHANGE_INSTALLATIONS_CREATED)
+            .find(ExchangeMetricNames.EXCHANGE_INSTALLATIONS_CREATED)
             .tag(MetricNames.TAG_CLIENT_ID, clientId)
             .counter();
     return counter == null ? 0 : counter.count();

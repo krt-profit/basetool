@@ -82,6 +82,7 @@ class BlueprintAccessPolicyDifferentialTest {
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
       when(authHelper.hasReachableRole(any())).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
 
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);

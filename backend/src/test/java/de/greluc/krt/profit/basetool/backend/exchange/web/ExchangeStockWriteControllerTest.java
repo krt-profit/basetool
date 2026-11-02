@@ -38,8 +38,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -937,8 +937,8 @@ class ExchangeStockWriteControllerTest {
   private double frames(@NotNull String topicClass) {
     io.micrometer.core.instrument.Counter counter =
         meterRegistry
-            .find(MetricNames.LIVESYNC_PUBLISH_ACCEPTED)
-            .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .find(LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED)
+            .tag(LivesyncMetricNames.TAG_TOPIC_CLASS, topicClass)
             .counter();
     return counter == null ? 0 : counter.count();
   }
