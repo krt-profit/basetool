@@ -23,7 +23,8 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtReorder } from '/js/kernel/krt-reorder.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { loadAll, stopPolling } from '/js/dashboard/dashboard-widgets.js';
+import { readBoard, shouldSwapBoard } from '/js/dashboard/board-sync.js';
+import { POLL_INTERVAL_MS, loadAll, stopPolling } from '/js/dashboard/dashboard-widgets.js';
 
 const BOARD_ID = 'dashboard-board';
 const WRITE_LOCK = 'dashboard-layout';
@@ -157,12 +158,30 @@ function applyStored(stored) {
 export async function reloadBoard() {
     const element = board();
     if (!element) return;
+    const fresh = await fetchBoard();
+    if (fresh) swapBoard(element, fresh);
+}
+
+/**
+ * Reads the saved board from the server.
+ *
+ * @returns {Promise<HTMLElement | null>} the fresh board element, or null when the read failed
+ */
+async function fetchBoard() {
     const response = await krtFetch.get(`/dashboard/${mode()}/board`, {
         accept: 'text/html',
     });
-    if (!response || !response.ok) return;
-    const fresh = krtFetch.parseTrustedDocument(await response.text()).getElementById(BOARD_ID);
-    if (!fresh) return;
+    if (!response || !response.ok) return null;
+    return krtFetch.parseTrustedDocument(await response.text()).getElementById(BOARD_ID);
+}
+
+/**
+ * Replaces the board's state and content by a freshly read board; every instance loads again.
+ *
+ * @param {HTMLElement} element the board on the page
+ * @param {HTMLElement} fresh the board the server answered
+ */
+function swapBoard(element, fresh) {
     stopPolling();
     Object.keys(fresh.dataset).forEach((key) => {
         element.dataset[key] = fresh.dataset[key];
@@ -170,6 +189,78 @@ export async function reloadBoard() {
     krtFetch.setTrustedHtml(element, fresh.innerHTML);
     attachReorder();
     loadAll();
+}
+
+/** @type {number} the local writes in flight, which a board reconcile must not overtake */
+let writesInFlight = 0;
+
+/**
+ * Runs a local write and counts it while it is in flight.
+ *
+ * @template T
+ * @param {() => Promise<T>} task the write
+ * @returns {Promise<T>} the write's result
+ */
+async function tracked(task) {
+    writesInFlight += 1;
+    try {
+        return await task();
+    } finally {
+        writesInFlight -= 1;
+    }
+}
+
+/**
+ * Whether a reconcile may touch the board now.
+ *
+ * @param {HTMLElement} element the board
+ * @returns {boolean} false while the member customises it, a write runs or the tab is hidden
+ */
+function canReconcile(element) {
+    return (
+        !element.classList.contains('is-editing') &&
+        writesInFlight === 0 &&
+        document.visibilityState === 'visible'
+    );
+}
+
+/**
+ * Adopts what another window saved: reads the saved board and swaps it in place when its version,
+ * instances or options differ. A board the member is customising, a write in flight and a hidden
+ * tab leave the page untouched; the next poll tries again.
+ *
+ * @returns {Promise<void>} settles when the board was compared and, if needed, swapped
+ */
+export async function reconcileBoard() {
+    const element = board();
+    if (!element || !canReconcile(element)) return;
+    const fresh = await fetchBoard();
+    if (!fresh || !canReconcile(element)) return;
+    const swap = shouldSwapBoard({
+        current: readBoard(element),
+        fresh: readBoard(fresh),
+        editing: false,
+        writing: false,
+        visible: true,
+    });
+    if (swap) swapBoard(element, fresh);
+}
+
+/** @type {number | null} the board poll's interval id */
+let boardPoll = null;
+
+/**
+ * Re-reads the saved board every poll interval and when the tab becomes visible, so another
+ * window's added, moved, removed or re-optioned instance arrives without a reload (REQ-UI-032).
+ */
+function startBoardPoll() {
+    if (boardPoll !== null) return;
+    boardPoll = window.setInterval(() => {
+        reconcileBoard();
+    }, POLL_INTERVAL_MS);
+    document.addEventListener('visibilitychange', () => {
+        reconcileBoard();
+    });
 }
 
 /**
@@ -191,23 +282,25 @@ function conflict() {
 async function writeLayout(extra = []) {
     const element = board();
     if (!element) return false;
-    const result = await krtFetch.write({
-        method: 'PUT',
-        url: `/dashboard/${mode()}/layout`,
-        payload: () => ({
-            widgets: [...layoutItems(), ...extra],
-            version: versionOf(element.dataset, 'version'),
+    const result = await tracked(() =>
+        krtFetch.write({
+            method: 'PUT',
+            url: `/dashboard/${mode()}/layout`,
+            payload: () => ({
+                widgets: [...layoutItems(), ...extra],
+                version: versionOf(element.dataset, 'version'),
+            }),
+            serialize: WRITE_LOCK,
+            toast: false,
+            errorMessage: element.dataset.saveError,
+            onError: (status) => {
+                if (status !== 409) return false;
+                conflict();
+                return true;
+            },
+            onSuccess: applyStored,
         }),
-        serialize: WRITE_LOCK,
-        toast: false,
-        errorMessage: element.dataset.saveError,
-        onError: (status) => {
-            if (status !== 409) return false;
-            conflict();
-            return true;
-        },
-        onSuccess: applyStored,
-    });
+    );
     if (!result.ok && result.status !== 409) {
         await reloadBoard();
     }
@@ -369,25 +462,27 @@ async function saveOptions(form) {
     if (!item.dataset.widgetId && !(await writeLayout())) return;
     const days = optionValue(form, 'days') ?? optionValue(form, 'range');
     const rows = optionValue(form, 'rows');
-    const result = await krtFetch.write({
-        method: 'PUT',
-        url: `/dashboard/${mode()}/widgets/${item.dataset.widgetId}/options`,
-        payload: () => ({
-            orgUnitId: optionValue(form, 'unit'),
-            days: days === null ? null : Number(days),
-            rows: rows === null ? null : Number(rows),
-            status: optionValue(form, 'status'),
-            version: versionOf(item.dataset, 'optionsVersion'),
+    const result = await tracked(() =>
+        krtFetch.write({
+            method: 'PUT',
+            url: `/dashboard/${mode()}/widgets/${item.dataset.widgetId}/options`,
+            payload: () => ({
+                orgUnitId: optionValue(form, 'unit'),
+                days: days === null ? null : Number(days),
+                rows: rows === null ? null : Number(rows),
+                status: optionValue(form, 'status'),
+                version: versionOf(item.dataset, 'optionsVersion'),
+            }),
+            toast: false,
+            errorMessage: board()?.dataset.saveError,
+            onError: (status) => {
+                if (status !== 409 && status !== 404) return false;
+                krtModal.close(OPTIONS_MODAL);
+                conflict();
+                return true;
+            },
         }),
-        toast: false,
-        errorMessage: board()?.dataset.saveError,
-        onError: (status) => {
-            if (status !== 409 && status !== 404) return false;
-            krtModal.close(OPTIONS_MODAL);
-            conflict();
-            return true;
-        },
-    });
+    );
     if (!result.ok) return;
     krtModal.close(OPTIONS_MODAL);
     await reloadBoard();
@@ -397,19 +492,22 @@ async function saveOptions(form) {
 async function resetToDefault() {
     const element = board();
     if (!element) return;
-    const result = await krtFetch.write({
-        method: 'DELETE',
-        url: () => `/dashboard/${mode()}?version=${versionOf(element.dataset, 'version') ?? ''}`,
-        toast: false,
-        serialize: WRITE_LOCK,
-        errorMessage: element.dataset.saveError,
-        onError: (status) => {
-            if (status !== 409) return false;
-            krtModal.close(RESET_MODAL);
-            conflict();
-            return true;
-        },
-    });
+    const result = await tracked(() =>
+        krtFetch.write({
+            method: 'DELETE',
+            url: () =>
+                `/dashboard/${mode()}?version=${versionOf(element.dataset, 'version') ?? ''}`,
+            toast: false,
+            serialize: WRITE_LOCK,
+            errorMessage: element.dataset.saveError,
+            onError: (status) => {
+                if (status !== 409) return false;
+                krtModal.close(RESET_MODAL);
+                conflict();
+                return true;
+            },
+        }),
+    );
     if (!result.ok) return;
     krtModal.close(RESET_MODAL);
     await reloadBoard();
@@ -421,6 +519,7 @@ async function resetToDefault() {
 export function initDashboardEdit() {
     if (!board()) return;
     attachReorder();
+    startBoardPoll();
     krtEvents.on('click', 'dashboard-customise', toggleEditing);
     krtEvents.on('click', 'dashboard-move-column', moveColumn);
     krtEvents.on('click', 'dashboard-remove', removeItem);
