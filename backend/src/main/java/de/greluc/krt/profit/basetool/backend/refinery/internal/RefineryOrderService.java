@@ -263,8 +263,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   }
 
   /**
-   * Paged list of the orders in the caller's org-unit scope under the list filters
-   * (REQ-REFINERY-019).
+   * Paged list of the in-scope orders under the list filters (REQ-REFINERY-019).
    *
    * @param statuses optional status filter; {@code null} or empty means every status
    * @param readyOnly {@code true} to keep only orders whose end is unknown or has passed
