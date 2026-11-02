@@ -77,7 +77,8 @@ class MissionServicePayoutTest {
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
     assertNotNull(updatedParticipant.getStartTime(), "Start time should be set");
     verify(missionRepository, never()).save(any(Mission.class));
-    verify(missionParticipantRepository).saveAndFlush(p);
+    verify(missionParticipantRepository).save(p);
+    verify(missionParticipantRepository).flush();
   }
 
   @Test
@@ -128,7 +129,8 @@ class MissionServicePayoutTest {
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
     assertNotNull(updatedParticipant.getEndTime(), "End time should be set");
     verify(missionRepository, never()).save(any(Mission.class));
-    verify(missionParticipantRepository).saveAndFlush(p);
+    verify(missionParticipantRepository).save(p);
+    verify(missionParticipantRepository).flush();
   }
 
   @Test
@@ -181,7 +183,8 @@ class MissionServicePayoutTest {
         updated.getEndTime(),
         "late check-out must clamp end time to the mission's actual end time, not now()");
     verify(missionRepository, never()).save(any(Mission.class));
-    verify(missionParticipantRepository).saveAndFlush(p);
+    verify(missionParticipantRepository).save(p);
+    verify(missionParticipantRepository).flush();
   }
 
   @Test
@@ -209,6 +212,7 @@ class MissionServicePayoutTest {
         updated.getEndTime(),
         "end time must never be set before the participant's own start time");
     verify(missionRepository, never()).save(any(Mission.class));
-    verify(missionParticipantRepository).saveAndFlush(p);
+    verify(missionParticipantRepository).save(p);
+    verify(missionParticipantRepository).flush();
   }
 }
