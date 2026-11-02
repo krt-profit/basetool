@@ -357,21 +357,23 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Lists the current caller's own booking requests, newest first (REQ-BANK-022). Per-user
-   * isolation: it reads strictly the caller's {@code sub}, so it can never surface a foreign
-   * request.
+   * Pages the current caller's own booking requests in the given states (REQ-BANK-022). Per-user
+   * isolation: it reads strictly the caller's {@code sub}, never a foreign request.
    *
-   * @return the caller's requests; never {@code null}, empty when unauthenticated or none exist
+   * @param statuses the lifecycle states to include (any-of)
+   * @param pageable page, size and sort
+   * @return the page; empty when unauthenticated or none exist
    */
   @NotNull
-  public List<BankBookingRequestDto> listForCurrentRequester() {
+  public Page<BankBookingRequestDto> pageForCurrentRequester(
+      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
     return authHelperService
         .currentUserId()
         .map(sub ->
-            requestRepository.findByRequestedByOrderByCreatedAtDesc(sub).stream()
-                .map(this::toDto)
-                .toList())
-        .orElseGet(List::of);
+            requestRepository
+                .findByRequestedByAndStatusIn(sub, statuses, pageable)
+                .map(this::toDto))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   /**
