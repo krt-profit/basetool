@@ -432,8 +432,7 @@ public class CustomJwtGrantedAuthoritiesConverter
    * @param seatsConfer whether the holder holds {@code KRT Member}
    * @return {@code true} iff the flag is set, or the rank confers it and {@code seatsConfer}
    */
-  private static boolean isLogisticianOfOwnUnit(
-      @NonNull OrgUnitMembership m, boolean seatsConfer) {
+  private static boolean isLogisticianOfOwnUnit(@NonNull OrgUnitMembership m, boolean seatsConfer) {
     return m.isLogistician() || (seatsConfer && confersFlatOfficerRole(m));
   }
 
