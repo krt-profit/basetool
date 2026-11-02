@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
@@ -80,7 +82,7 @@ public class DashboardWidgetController {
    * @return the {@code upcomingDays} fragment
    */
   @NotNull
-  @GetMapping(value = "/upcoming-days", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/upcoming-days", headers = AJAX)
   public String upcomingDays(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -104,7 +106,7 @@ public class DashboardWidgetController {
    * @return the {@code information} fragment
    */
   @NotNull
-  @GetMapping(value = "/information", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/information", headers = AJAX)
   public String information(@NotNull Model model) {
     AnnouncementDto announcement = client.announcement();
     model.addAttribute("announcement", announcement);
@@ -124,7 +126,7 @@ public class DashboardWidgetController {
    * @return the {@code notifications} fragment
    */
   @NotNull
-  @GetMapping(value = "/notifications", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/notifications", headers = AJAX)
   public String notifications(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
@@ -140,7 +142,7 @@ public class DashboardWidgetController {
    * @return the {@code favourites} fragment
    */
   @NotNull
-  @GetMapping(value = "/favourites", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/favourites", headers = AJAX)
   public String favourites() {
     return WIDGETS + "favourites";
   }
@@ -154,7 +156,7 @@ public class DashboardWidgetController {
    * @return the {@code nextMission} fragment
    */
   @NotNull
-  @GetMapping(value = "/next-mission", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/next-mission", headers = AJAX)
   public String nextMission(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     model.addAttribute("nextMissions", client.nextMissions(DashboardWidgetOptions.rows(rows)));
@@ -172,7 +174,7 @@ public class DashboardWidgetController {
    * @return the {@code hangarReadiness} fragment
    */
   @NotNull
-  @GetMapping(value = "/hangar-readiness", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/hangar-readiness", headers = AJAX)
   public String hangarReadiness(
       @NotNull Model model, @AuthenticationPrincipal @Nullable OidcUser principal) {
     ShipReadinessDto readiness = client.hangarReadiness();
@@ -189,7 +191,7 @@ public class DashboardWidgetController {
     Instant now = Instant.now();
     PageResponse<MissionListDto> page =
         client.upcomingMissions(now, now.plus(days, ChronoUnit.DAYS), unit);
-    return page == null || page.content() == null ? List.of() : page.content();
+    return PageResponse.contentOf(page);
   }
 
   private boolean isUnread(@Nullable AnnouncementDto announcement) {

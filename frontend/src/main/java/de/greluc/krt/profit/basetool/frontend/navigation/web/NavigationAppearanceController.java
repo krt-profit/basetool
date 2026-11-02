@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
@@ -64,7 +65,7 @@ public class NavigationAppearanceController {
    *     VALIDATION} for an incomplete payload, or the relayed backend {@code problem+json}, a
    *     {@code 409} for a stale version included
    */
-  @PutMapping(headers = "X-Requested-With=XMLHttpRequest")
+  @PutMapping(headers = AJAX)
   public ResponseEntity<Object> replace(@RequestBody @Nullable AppearanceUpdateRequest request) {
     if (request == null
         || request.desktopMode() == null
@@ -81,7 +82,7 @@ public class NavigationAppearanceController {
    *
    * @return {@code 200} with the stored appearance and its version, or the relayed backend problem
    */
-  @GetMapping(headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(headers = AJAX)
   public ResponseEntity<Object> read() {
     return relay(
         log,

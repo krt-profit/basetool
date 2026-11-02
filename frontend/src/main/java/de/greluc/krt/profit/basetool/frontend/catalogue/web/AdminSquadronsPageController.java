@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -279,7 +280,7 @@ public class AdminSquadronsPageController {
    *     on a conflict / failure
    */
   @ResponseBody
-  @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(headers = AJAX)
   public ResponseEntity<Object> createSquadronAjax(
       @Valid @ModelAttribute("squadronForm") SquadronForm form, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
@@ -301,7 +302,7 @@ public class AdminSquadronsPageController {
    *     on a conflict / failure
    */
   @ResponseBody
-  @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(value = "/{id}/update", headers = AJAX)
   public ResponseEntity<Object> updateSquadronAjax(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("squadronForm") SquadronForm form,
@@ -330,7 +331,7 @@ public class AdminSquadronsPageController {
    * @return {@code 200} on success, the relayed backend status on a conflict / failure
    */
   @ResponseBody
-  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(value = "/{id}/delete", headers = AJAX)
   public ResponseEntity<Object> deleteSquadronAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(() -> catalogueClient.deleteSquadron(id));
   }
@@ -342,7 +343,7 @@ public class AdminSquadronsPageController {
    * @return {@code 200} on success, the relayed backend status on failure
    */
   @ResponseBody
-  @PostMapping(value = "/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(value = "/{id}/activate", headers = AJAX)
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateSquadronAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(() -> catalogueClient.activateSquadron(id));

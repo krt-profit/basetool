@@ -201,14 +201,18 @@ public class NotificationPageController {
   }
 
   /**
-   * Returns the most recent notifications for the bell dropdown as JSON.
+   * Returns the most recent notifications for the bell dropdown and the dashboard widget as JSON.
    *
+   * @param unread whether only unread notifications are listed, filtered before the limit
+   * @param limit how many to list; the bell's default when absent
    * @return the localized notification view DTOs
    */
   @ResponseBody
   @GetMapping(value = "/recent", headers = "X-Requested-With=XMLHttpRequest")
-  public List<NotificationViewDto> recent() {
-    return loadView(DROPDOWN_LIMIT);
+  public List<NotificationViewDto> recent(
+      @RequestParam(defaultValue = "false") boolean unread,
+      @RequestParam(defaultValue = "" + DROPDOWN_LIMIT) int limit) {
+    return loadView(limit, unread);
   }
 
   /**
@@ -357,8 +361,9 @@ public class NotificationPageController {
     }
   }
 
-  private List<NotificationViewDto> loadView(int limit) {
-    List<NotificationDto> dtos = notificationClient.recent(limit);
+  private List<NotificationViewDto> loadView(int limit, boolean unread) {
+    List<NotificationDto> dtos =
+        unread ? notificationClient.recentUnread(limit) : notificationClient.recent(limit);
     if (dtos == null) {
       return List.of();
     }

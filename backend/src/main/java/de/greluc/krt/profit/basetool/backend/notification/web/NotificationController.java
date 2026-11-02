@@ -138,6 +138,7 @@ public class NotificationController {
    * Returns the caller's most recent notifications for the bell dropdown.
    *
    * @param limit maximum number of entries (optional; clamped server-side)
+   * @param unreadOnly whether only unread notifications are listed, filtered before the limit
    * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the most-recent-first list of notifications
    */
@@ -149,8 +150,9 @@ public class NotificationController {
   })
   public List<NotificationDto> recent(
       @RequestParam(required = false, defaultValue = "10") int limit,
+      @RequestParam(required = false, defaultValue = "false") boolean unreadOnly,
       @CurrentUserId UUID recipientUserId) {
-    return service.listRecentOwn(recipientUserId, limit);
+    return service.listRecentOwn(recipientUserId, limit, unreadOnly);
   }
 
   /**

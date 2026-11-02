@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
@@ -89,7 +91,7 @@ public class DashboardTradeWidgetController {
    * @return the {@code market} fragment
    */
   @NotNull
-  @GetMapping(value = "/market", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/market", headers = AJAX)
   public String market(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
@@ -131,7 +133,7 @@ public class DashboardTradeWidgetController {
    * @return the {@code supplyNeeds} fragment
    */
   @NotNull
-  @GetMapping(value = "/supply-needs", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/supply-needs", headers = AJAX)
   public String supplyNeeds(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -147,10 +149,8 @@ public class DashboardTradeWidgetController {
     long total = 0;
     for (UUID read : scope != null ? Set.of(scope) : ownOrgUnits.ids()) {
       PageResponse<NeedDto> page = supplyClient.needs(read, NEED_OPEN, coverage, 0, limit);
-      if (page != null) {
-        needs.addAll(page.content());
-        total += page.totalElements();
-      }
+      needs.addAll(PageResponse.contentOf(page));
+      total += PageResponse.totalOf(page);
     }
     model.addAttribute(
         "needRows",
@@ -175,7 +175,7 @@ public class DashboardTradeWidgetController {
    * @return the {@code bankRequests} fragment
    */
   @NotNull
-  @GetMapping(value = "/bank-requests", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/bank-requests", headers = AJAX)
   public String bankRequests(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,

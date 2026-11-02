@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { NAV_SHORTCUTS_EVENT, NAV_START_PAGE_EVENT } from '/js/kernel/nav-preferences.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
@@ -99,7 +100,7 @@ function write(input, change) {
         payload: () => ({
             desktopMode: (change.desktopMode ?? state.dataset.mode ?? 'drawer').toUpperCase(),
             shortcutsEnabled: change.shortcutsEnabled ?? state.dataset.shortcuts === 'true',
-            version: Number(state.dataset.version || '0'),
+            version: versionOf(state.dataset, 'version'),
         }),
         serialize: WRITE_LOCK,
         submitter: input,

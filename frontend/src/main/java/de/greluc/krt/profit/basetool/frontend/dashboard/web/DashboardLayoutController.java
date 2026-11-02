@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardLayoutRequest;
@@ -69,7 +70,7 @@ public class DashboardLayoutController {
    *     with code {@code VALIDATION} for an incomplete payload, or the relayed backend {@code
    *     problem+json}
    */
-  @PutMapping(value = "/layout", headers = "X-Requested-With=XMLHttpRequest")
+  @PutMapping(value = "/layout", headers = AJAX)
   public ResponseEntity<Object> replaceLayout(
       @PathVariable String mode, @RequestBody @Nullable DashboardLayoutRequest request) {
     if (request == null || request.widgets() == null || request.version() == null) {
@@ -94,7 +95,7 @@ public class DashboardLayoutController {
    *     code {@code VALIDATION} for an incomplete payload, or the relayed backend {@code
    *     problem+json}
    */
-  @PutMapping(value = "/widgets/{widgetId}/options", headers = "X-Requested-With=XMLHttpRequest")
+  @PutMapping(value = "/widgets/{widgetId}/options", headers = AJAX)
   public ResponseEntity<Object> replaceOptions(
       @PathVariable String mode,
       @PathVariable UUID widgetId,
@@ -119,7 +120,7 @@ public class DashboardLayoutController {
    * @return {@code 200} with the default dashboard, {@code 404} for an unknown mode, or the relayed
    *     backend {@code problem+json}
    */
-  @DeleteMapping(headers = "X-Requested-With=XMLHttpRequest")
+  @DeleteMapping(headers = AJAX)
   public ResponseEntity<Object> reset(@PathVariable String mode, @RequestParam long version) {
     return withMode(
         mode,

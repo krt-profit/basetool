@@ -262,6 +262,48 @@ class NavigationFavouritesMvcTest {
   }
 
   @Test
+  @DisplayName(
+      "each favourite carries reorder controls, the first without up and the last without down")
+  void rendersTheReorderControls() throws Exception {
+    stored(2, "refinery.orders", "operations.list");
+
+    String favourites = favouritesBlock(page(member()));
+
+    assertThat(favourites)
+        .contains("data-reorder-name=")
+        .contains("data-reorder-move=\"up\"")
+        .contains("data-reorder-move=\"down\"");
+    assertThat(countOf(favourites, "data-reorder-move=\"up\"")).isEqualTo(2);
+    assertThat(countOf(favourites, "aria-disabled=\"true\"")).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("the swap fragment carries the rail's lists so the rail refreshes in place")
+  void theSwapFragmentCarriesTheRail() throws Exception {
+    stored(7, "refinery.orders");
+
+    String html =
+        mockMvc
+            .perform(
+                get("/navigation/menu").with(member()).header("X-Requested-With", "XMLHttpRequest"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("data-nav-rail-mode=\"main\"").contains("nav-rail-flyout-favourites");
+  }
+
+  private static String favouritesBlock(String html) {
+    int start = html.indexOf("data-testid=\"nav-favourites\"");
+    int end = html.indexOf("</section>", start);
+    return html.substring(start, end);
+  }
+
+  private static int countOf(String text, String needle) {
+    return text.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
+  }
+
+  @Test
   @DisplayName("the swap fragment is only for background reads")
   void swapFragmentNeedsTheBackgroundMarker() throws Exception {
     stored(0);

@@ -152,7 +152,7 @@ class NavigationShortcutsE2eTest {
 
           page.keyboard().press("Alt+Numpad1");
           page.keyboard().press("1");
-          page.waitForTimeout(300);
+          E2eSupport.settle(page);
 
           assertTrue(page.url().endsWith("/missions"), page.url());
         });
@@ -198,7 +198,7 @@ class NavigationShortcutsE2eTest {
           assertThat(page.locator("#nav-palette")).isVisible();
 
           page.keyboard().press("Alt+Digit1");
-          page.waitForTimeout(300);
+          E2eSupport.settle(page);
 
           assertTrue(page.url().endsWith("/missions"), page.url());
           assertThat(page.getByText("Auf Platz")).hasCount(0);
@@ -218,7 +218,7 @@ class NavigationShortcutsE2eTest {
               .hasAttribute("aria-keyshortcuts", "Alt+0");
 
           page.keyboard().press("Alt+Digit0");
-          page.waitForTimeout(300);
+          E2eSupport.settle(page);
 
           assertTrue(page.url().endsWith("/admin/audit-log"), page.url());
         });
@@ -249,7 +249,7 @@ class NavigationShortcutsE2eTest {
               .not()
               .hasAttribute("aria-keyshortcuts", "Alt+1");
           page.keyboard().press("Alt+Digit1");
-          page.waitForTimeout(300);
+          E2eSupport.settle(page);
           assertTrue(page.url().endsWith("/profile"), page.url());
 
           page.reload();

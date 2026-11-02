@@ -49,6 +49,15 @@ class NotificationBackendClientTest {
   }
 
   @Test
+  void recentUnreadFiltersBeforeTheLimit() {
+    backend.answerJson("[]");
+
+    assertThat(client.recentUnread(50)).isEmpty();
+
+    backend.expect("GET", "/api/v1/notifications/recent?limit=50&unreadOnly=true");
+  }
+
+  @Test
   void inbox() {
     backend.answerJson("[]");
     backend.answerJson(

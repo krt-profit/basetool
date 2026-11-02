@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,7 +42,7 @@ public class NavigationMenuFragmentController {
    * @return the {@code kernel/fragments/nav-entries} swap fragment
    */
   @NotNull
-  @GetMapping(value = "/navigation/menu", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/navigation/menu", headers = AJAX)
   public String fragment() {
     return "kernel/fragments/nav-entries :: swap";
   }

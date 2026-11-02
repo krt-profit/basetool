@@ -566,7 +566,7 @@ caller below `Member` on this surface: an account whose realm roles map to nothi
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
-³ A Mission-Manager grant counts only for the unit that owns the mission (`canEditMission`); an
+³ A Mission-Manager grant counts only for the unit that owns the mission (`holdsMissionManagerGrantFor`); an
 ownerless mission needs a grant in an Organisationsleitung or Bereich unit. An
 Officer's owner change needs officer reach in the mission's owning unit (`canChangeOwner`,
 REQ-SEC-065). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII

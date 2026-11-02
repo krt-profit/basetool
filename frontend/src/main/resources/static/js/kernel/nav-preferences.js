@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
@@ -37,6 +38,9 @@ export const NAV_SHORTCUTS_EVENT = 'krt:nav-shortcuts-changed';
 
 /** Fired on the document when a start page of „Darstellung“ changed. */
 export const NAV_START_PAGE_EVENT = 'krt:nav-start-page-changed';
+
+/** Fired on the document after the favourites were reordered; `detail.keys` is the new order. */
+export const NAV_FAVOURITES_ORDER_EVENT = 'krt:nav-favourites-reordered';
 
 /** Fired on the document when „Anpassen“ turns on or off. */
 export const NAV_EDIT_EVENT = 'krt:nav-edit-changed';
@@ -174,6 +178,20 @@ export function hideChange(favourites, hidden, key) {
 }
 
 /**
+ * Opens the administration through `/start?mode=admin` when an administration start page is set.
+ *
+ * @returns {boolean} whether the browser is on its way to the start page
+ */
+export function enterAdminViaStartPage() {
+    const appearance = document.querySelector('[data-appearance-state]');
+    if (appearance instanceof HTMLElement && appearance.dataset.startAdmin) {
+        window.location.assign('/start?mode=admin');
+        return true;
+    }
+    return false;
+}
+
+/**
  * Swaps both modes' lists and the preference state for the server's current rendering and tells
  * the rest of the page.
  *
@@ -190,6 +208,13 @@ export async function reloadMenu() {
         const fresh = doc.querySelector(`.nav-mode[data-nav-mode="${mode}"]`);
         krtFetch.setTrustedHtml(container, fresh ? fresh.innerHTML : '');
     });
+    document
+        .querySelectorAll('#nav-rail .nav-rail-mode[data-nav-rail-mode]')
+        .forEach((container) => {
+            const mode = container.getAttribute('data-nav-rail-mode');
+            const fresh = doc.querySelector(`.nav-rail-mode[data-nav-rail-mode="${mode}"]`);
+            krtFetch.setTrustedHtml(container, fresh ? fresh.innerHTML : '');
+        });
     const pages = document.querySelector('.palette-source-pages');
     const freshPages = doc.querySelector('.palette-source-pages');
     if (pages && freshPages) {
@@ -240,8 +265,8 @@ export function writePreferences(compute, options = {}) {
             hiddenChanged: change.hidden !== undefined,
         };
     };
-    const favouritesVersion = () => Number(state.dataset.version || '0');
-    const hiddenVersion = () => Number(state.dataset.hiddenVersion || '0');
+    const favouritesVersion = () => versionOf(state.dataset, 'version');
+    const hiddenVersion = () => versionOf(state.dataset, 'hiddenVersion');
     krtFetch.write({
         method: 'PUT',
         url: () => {

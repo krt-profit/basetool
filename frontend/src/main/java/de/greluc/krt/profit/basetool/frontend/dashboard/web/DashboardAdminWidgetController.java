@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.PendingRegistrationDto;
@@ -62,7 +64,7 @@ public class DashboardAdminWidgetController {
    * @return the {@code adminHub} fragment
    */
   @NotNull
-  @GetMapping(value = "/admin-hub", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/admin-hub", headers = AJAX)
   public String adminHub() {
     return WIDGETS + "adminHub";
   }
@@ -75,7 +77,7 @@ public class DashboardAdminWidgetController {
    * @return the {@code deletionRequests} fragment
    */
   @NotNull
-  @GetMapping(value = "/deletion-requests", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/deletion-requests", headers = AJAX)
   public String deletionRequests(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     List<AdminDeletionRequestDto> requests = orEmpty(identityClient.deletionRequests());
@@ -93,7 +95,7 @@ public class DashboardAdminWidgetController {
    * @return the {@code discordRegistrations} fragment
    */
   @NotNull
-  @GetMapping(value = "/discord-registrations", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/discord-registrations", headers = AJAX)
   public String discordRegistrations(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     List<PendingRegistrationDto> registrations = orEmpty(identityClient.pendingRegistrations());
@@ -111,14 +113,13 @@ public class DashboardAdminWidgetController {
    * @return the {@code openTerms} fragment
    */
   @NotNull
-  @GetMapping(value = "/open-terms", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/open-terms", headers = AJAX)
   public String openTerms(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<TermsAcceptanceStatusDto> page =
         identityClient.termsAcceptances(PENDING, 0, DashboardWidgetOptions.rows(rows));
-    model.addAttribute("adminTotal", page == null ? 0L : page.totalElements());
-    model.addAttribute(
-        "adminRows", page == null || page.content() == null ? List.of() : page.content());
+    model.addAttribute("adminTotal", PageResponse.totalOf(page));
+    model.addAttribute("adminRows", PageResponse.contentOf(page));
     return WIDGETS + "openTerms";
   }
 
@@ -130,7 +131,7 @@ public class DashboardAdminWidgetController {
    * @return the {@code syncStatus} fragment
    */
   @NotNull
-  @GetMapping(value = "/sync-status", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/sync-status", headers = AJAX)
   public String syncStatus(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer days) {
     int range = DashboardWidgetOptions.range(days);

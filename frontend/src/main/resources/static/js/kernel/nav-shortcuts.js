@@ -29,7 +29,11 @@ import {
     keyLabel,
     shortcutSlot,
 } from '/js/kernel/krt-shortcuts.js';
-import { NAV_RENDERED_EVENT, NAV_SHORTCUTS_EVENT } from '/js/kernel/nav-preferences.js';
+import {
+    NAV_FAVOURITES_ORDER_EVENT,
+    NAV_RENDERED_EVENT,
+    NAV_SHORTCUTS_EVENT,
+} from '/js/kernel/nav-preferences.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 const STATE_SELECTOR = '[data-appearance-state]';
@@ -202,7 +206,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     syncHints();
     document.addEventListener('keydown', onKeydown);
-    [NAV_RENDERED_EVENT, 'krt:nav-admin-mode', NAV_SHORTCUTS_EVENT].forEach((name) => {
+    [
+        NAV_RENDERED_EVENT,
+        NAV_FAVOURITES_ORDER_EVENT,
+        'krt:nav-admin-mode',
+        NAV_SHORTCUTS_EVENT,
+    ].forEach((name) => {
         document.addEventListener(name, syncHints);
     });
 });

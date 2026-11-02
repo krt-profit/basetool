@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankAccountsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankVisibleAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.web.BankSparkline;
@@ -78,7 +80,7 @@ public class DashboardWorkWidgetController {
    * @return the {@code assignedOrders} fragment
    */
   @NotNull
-  @GetMapping(value = "/assigned-orders", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/assigned-orders", headers = AJAX)
   public String assignedOrders(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable Integer rows,
@@ -92,8 +94,8 @@ public class DashboardWorkWidgetController {
             DashboardWidgetOptions.rows(rows),
             DashboardWidgetOptions.orderStatuses(resolved),
             List.of());
-    model.addAttribute("assignedOrders", page == null ? List.of() : page.content());
-    model.addAttribute("assignedTotal", page == null ? 0L : page.totalElements());
+    model.addAttribute("assignedOrders", PageResponse.contentOf(page));
+    model.addAttribute("assignedTotal", PageResponse.totalOf(page));
     return FRAGMENTS + "assignedOrders";
   }
 
@@ -106,7 +108,7 @@ public class DashboardWorkWidgetController {
    * @return the {@code lowStock} fragment
    */
   @NotNull
-  @GetMapping(value = "/low-stock", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/low-stock", headers = AJAX)
   public String lowStock(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -128,17 +130,17 @@ public class DashboardWorkWidgetController {
    * @return the {@code bank} fragment
    */
   @NotNull
-  @GetMapping(value = "/bank", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/bank", headers = AJAX)
   public String bank(@NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<OrgUnitBankVisibleAccountDto> page =
         bankClient.firstPage(DashboardWidgetOptions.rows(rows, BANK_DEFAULT_ROWS));
-    List<OrgUnitBankVisibleAccountDto> accounts = page == null ? List.of() : page.content();
+    List<OrgUnitBankVisibleAccountDto> accounts = PageResponse.contentOf(page);
     Map<UUID, BankSparkline.Spark> sparks = new LinkedHashMap<>();
     accounts.forEach(
         account -> sparks.put(account.accountId(), BankSparkline.of(account.sparkline())));
     model.addAttribute("bankAccounts", accounts);
     model.addAttribute("bankSparks", sparks);
-    model.addAttribute("bankTotal", page == null ? 0L : page.totalElements());
+    model.addAttribute("bankTotal", PageResponse.totalOf(page));
     return FRAGMENTS + "bank";
   }
 }

@@ -232,12 +232,13 @@ class NavigationTabBarE2eTest {
         memberState,
         "tabbar-longpress",
         page -> {
+          page.clock().install();
           E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
           String url = page.url();
           BoundingBox box = slot(page, 1).boundingBox();
           page.mouse().move(box.x + box.width / 2, box.y + box.height / 2);
           page.mouse().down();
-          page.waitForTimeout(LONG_PRESS_WAIT_MS);
+          page.clock().runFor((long) LONG_PRESS_WAIT_MS);
           page.mouse().up();
 
           Locator picker = page.locator(".tabbar-picker[data-tabbar-mode='member']");

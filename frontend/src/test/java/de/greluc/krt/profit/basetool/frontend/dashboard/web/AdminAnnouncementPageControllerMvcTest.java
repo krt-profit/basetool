@@ -87,6 +87,19 @@ class AdminAnnouncementPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void updateAjax_withoutContent_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/announcement/update")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void deleteAjax_withHeader_returns200() throws Exception {
     when(backendApiClient.delete(eq("/api/v1/announcements/current"), eq(Void.class)))
         .thenReturn(null);

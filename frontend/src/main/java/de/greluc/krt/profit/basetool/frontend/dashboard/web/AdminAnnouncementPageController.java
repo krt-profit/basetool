@@ -20,16 +20,15 @@
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,8 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The in-place writes of the announcement's inline editor in the Information widget (REQ-UI-034):
- * save and remove, both with the optimistic-lock version. The former editor page redirects to the
- * dashboard.
+ * save and remove, both with the optimistic-lock version.
  */
 @RestController
 @RequestMapping("/admin/announcement")
@@ -56,30 +54,23 @@ public class AdminAnnouncementPageController {
    * Saves the announcement. Returns the bumped version so the page can update its hidden input;
    * backend errors are relayed as {@code application/problem+json}.
    *
-   * @param request JSON body with {@code content} (required) and optional {@code version}
-   * @return {@code 200 {"version": <n>}} on success, the relayed backend status on
+   * @param form the Markdown {@code content} (required) and the optional {@code version}
+   * @return {@code 200} with the new version on success, the relayed backend status on
    *     conflict/failure, {@code 400} when {@code content} is missing, {@code 500} on an unexpected
    *     error
    */
-  @PostMapping(value = "/update", headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(value = "/update", headers = AJAX)
   public ResponseEntity<Object> updateAnnouncementAjax(
-      @NotNull @RequestBody Map<String, Object> request) {
-    Object contentValue = request.get("content");
-    if (!(contentValue instanceof String content)) {
-      return ResponseEntity.badRequest().build();
-    }
-    Object versionValue = request.get("version");
-    Long version = versionValue instanceof Number number ? number.longValue() : null;
+      @Valid @RequestBody AnnouncementUpdateForm form) {
     return relay(
         log,
         "update announcement (ajax)",
         () -> {
-          dashboardClient.saveAnnouncement(new AnnouncementRequest(content, version));
+          dashboardClient.saveAnnouncement(new AnnouncementRequest(form.content(), form.version()));
 
           AnnouncementDto updated = dashboardClient.adminAnnouncement();
-          Map<String, Object> result = new LinkedHashMap<>();
-          result.put("version", updated != null ? updated.version() : null);
-          return ResponseEntity.ok(result);
+          return ResponseEntity.ok(
+              new AnnouncementVersionResponse(updated != null ? updated.version() : null));
         });
   }
 
@@ -89,7 +80,7 @@ public class AdminAnnouncementPageController {
    * @return {@code 200} on success, the relayed backend status on failure, {@code 500} on an
    *     unexpected error
    */
-  @PostMapping(value = "/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(value = "/delete", headers = AJAX)
   public ResponseEntity<Object> deleteAnnouncementAjax() {
     return relay(
         log,

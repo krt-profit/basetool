@@ -19,7 +19,12 @@
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
-import { NAV_EDIT_EVENT } from '/js/kernel/nav-preferences.js';
+import {
+    enterAdminViaStartPage,
+    NAV_EDIT_EVENT,
+    NAV_FAVOURITES_ORDER_EVENT,
+    NAV_RENDERED_EVENT,
+} from '/js/kernel/nav-preferences.js';
 
 const HOVER_OPEN_MS = 200;
 const HOVER_CLOSE_MS = 300;
@@ -35,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!rail) {
         return;
     }
-    const items = Array.from(rail.querySelectorAll('.nav-rail-item'));
+    const railItems = () => Array.from(rail.querySelectorAll('.nav-rail-item'));
     const adminButton = rail.querySelector('[data-testid="nav-rail-admin"]');
 
     /** @type {Element | null} */
@@ -122,7 +127,16 @@ document.addEventListener('DOMContentLoaded', () => {
         pinned = pin;
     };
 
-    items.forEach((item) => {
+    const bindItems = () => {
+        railItems().forEach(bindItem);
+    };
+
+    /**
+     * Wires the click, hover and focus behaviour of one rail item.
+     *
+     * @param {Element} item the `.nav-rail-item`
+     */
+    const bindItem = (item) => {
         const { button } = partsOf(item);
         if (!button) {
             return;
@@ -168,7 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 close(false);
             }
         });
-    });
+    };
+    bindItems();
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && openItem && !event.defaultPrevented) {
@@ -237,23 +252,58 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     if (adminButton) {
         adminButton.addEventListener('click', () => {
-            if (krtChrome.nav) krtChrome.nav.setAdminMode(!krtChrome.nav.isAdminMode());
+            if (!krtChrome.nav) return;
+            if (!krtChrome.nav.isAdminMode() && enterAdminViaStartPage()) return;
+            krtChrome.nav.setAdminMode(!krtChrome.nav.isAdminMode());
         });
     }
     document.addEventListener('krt:nav-admin-mode', syncAdminMode);
     syncAdminMode();
 
-    const currentGroup = document.querySelector('#sidebar .nav-group.is-active');
-    const currentKey = currentGroup ? currentGroup.getAttribute('data-group-key') : null;
-    rail.querySelectorAll('.nav-rail-btn[data-group-key]').forEach((button) => {
-        button.classList.toggle(
-            'is-current',
-            currentKey !== null && button.getAttribute('data-group-key') === currentKey,
+    /** Marks the rail icon of the current group and the current page's link in the flyouts. */
+    const markCurrent = () => {
+        const currentGroup = document.querySelector('#sidebar .nav-group.is-active');
+        const currentKey = currentGroup ? currentGroup.getAttribute('data-group-key') : null;
+        rail.querySelectorAll('.nav-rail-btn[data-group-key]').forEach((button) => {
+            button.classList.toggle(
+                'is-current',
+                currentKey !== null && button.getAttribute('data-group-key') === currentKey,
+            );
+        });
+        document.querySelectorAll('#sidebar a.is-active[data-entry-key]').forEach((link) => {
+            const key = link.getAttribute('data-entry-key');
+            const twin = rail.querySelector(`.nav-rail-flyout a[data-entry-key="${key}"]`);
+            if (twin) twin.setAttribute('aria-current', 'page');
+        });
+    };
+    markCurrent();
+
+    /**
+     * Puts the rail's favourite links into the order the member chose.
+     *
+     * @param {string[]} keys the favourites in their new order
+     */
+    const orderFavourites = (keys) => {
+        rail.querySelectorAll('[data-rail-key="favourites"] .nav-rail-flyout-links').forEach(
+            (links) => {
+                const rank = (/** @type {Element} */ link) => {
+                    const index = keys.indexOf(link.getAttribute('data-entry-key') ?? '');
+                    return index === -1 ? keys.length : index;
+                };
+                Array.from(links.children)
+                    .sort((a, b) => rank(a) - rank(b))
+                    .forEach((link) => links.append(link));
+            },
         );
+    };
+    document.addEventListener(NAV_FAVOURITES_ORDER_EVENT, (event) => {
+        orderFavourites(/** @type {CustomEvent} */ (event).detail?.keys ?? []);
     });
-    document.querySelectorAll('#sidebar a.is-active[data-entry-key]').forEach((link) => {
-        const key = link.getAttribute('data-entry-key');
-        const twin = rail.querySelector(`.nav-rail-flyout a[data-entry-key="${key}"]`);
-        if (twin) twin.setAttribute('aria-current', 'page');
+
+    /** The swapped lists replace the rail items, so the behaviour is wired to the new ones. */
+    document.addEventListener(NAV_RENDERED_EVENT, () => {
+        close(false);
+        bindItems();
+        markCurrent();
     });
 });

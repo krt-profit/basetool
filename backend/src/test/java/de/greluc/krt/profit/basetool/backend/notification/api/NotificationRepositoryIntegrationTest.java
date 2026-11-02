@@ -99,6 +99,21 @@ class NotificationRepositoryIntegrationTest {
     });
   }
 
+  @Test
+  void unreadQueryReachesPastTenNewerReadNotifications() {
+    UUID recipient = UUID.randomUUID();
+    Notification unread = save(recipient, false, null);
+    for (int i = 0; i < 10; i++) {
+      save(recipient, true, Instant.now());
+    }
+
+    assertThat(
+            repository.findByRecipientUserIdAndReadFalseOrderByCreatedAtDesc(
+                recipient, org.springframework.data.domain.PageRequest.of(0, 5)))
+        .extracting(Notification::getId)
+        .containsExactly(unread.getId());
+  }
+
   private Notification save(
       UUID recipient, NotificationType type, String entityType, UUID entityId) {
     return transactionTemplate.execute(status -> {

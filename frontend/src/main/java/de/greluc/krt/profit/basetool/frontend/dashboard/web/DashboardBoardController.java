@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardMode;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardView;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
@@ -51,7 +53,7 @@ public class DashboardBoardController {
    * @throws ResponseStatusException with {@code 404} for an unknown mode
    */
   @NotNull
-  @GetMapping(value = "/dashboard/{mode}/board", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/dashboard/{mode}/board", headers = AJAX)
   public String board(@PathVariable String mode, @NotNull Model model) {
     Optional<DashboardMode> resolved = DashboardMode.fromSlug(mode);
     if (resolved.isEmpty()) {

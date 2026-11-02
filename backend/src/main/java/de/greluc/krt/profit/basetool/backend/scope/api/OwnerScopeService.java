@@ -297,7 +297,7 @@ public class OwnerScopeService implements SquadronVisibility {
    * @throws AccessDeniedException when the caller is no Logistician of {@code orgUnit}
    */
   public void requireLogisticianInOwner(@Nullable OrgUnit orgUnit) {
-    if (!canActAsLogisticianInOwner(orgUnit == null ? null : orgUnit.getId())) {
+    if (!canActAsLogisticianInOwner(OrgUnit.idOf(orgUnit))) {
       throw new AccessDeniedException("Access denied: not a Logistician of the target's org unit");
     }
   }

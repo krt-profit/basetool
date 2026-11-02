@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.PAGE_ONLY;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +30,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Redirects the former Lager list pages {@code /inventory/my} and {@code /inventory/all} to the
+ * Redirects the bookmarked Lager list paths {@code /inventory/my} and {@code /inventory/all} to the
  * Lager tab with the option selected, keeping the filter query, so bookmarks and notification links
  * keep working (REQ-UI-026).
  *
@@ -40,10 +42,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @PreAuthorize("isAuthenticated()")
 public class LegacyStorageRedirectController {
 
-  private static final String PAGE_ONLY = "!X-Requested-With";
-
   /**
-   * The former personal list, now the „Mein Lager" option of the Lager tab.
+   * Sends the personal list path to the „Mein Lager" option of the Lager tab.
    *
    * @param request the request whose filter query is kept
    * @return a redirect to the Lager tab with the personal list selected
@@ -55,7 +55,7 @@ public class LegacyStorageRedirectController {
   }
 
   /**
-   * The former global list, now the „Globales Lager" option of the Lager tab.
+   * Sends the global list path to the „Globales Lager" option of the Lager tab.
    *
    * @param request the request whose filter query is kept
    * @return a redirect to the Lager tab with the global list selected

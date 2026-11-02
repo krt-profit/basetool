@@ -28,14 +28,16 @@ import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * One widget instance of a dashboard layout: its type, column, position and options (REQ-UI-034).
- * The option version is bumped by a conditional {@code UPDATE}, so an option change never collides
- * with a layout change.
+ * The option version is bumped by a conditional {@code UPDATE}, and only the changed columns are
+ * written, so an option change and a layout change never overwrite each other.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "navigation_dashboard_widget")
 @Getter
 @NoArgsConstructor

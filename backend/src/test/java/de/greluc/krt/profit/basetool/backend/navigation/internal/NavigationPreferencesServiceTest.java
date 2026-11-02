@@ -101,6 +101,29 @@ class NavigationPreferencesServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "moving one favourite stores the same set in the new order and a stale move is refused")
+  void movingAFavouriteKeepsTheSetAndChecksTheVersion() {
+    UUID owner = member();
+    service.replaceFavourites(
+        owner, favourites(0, "orders.demand", "missions.list", "bank.accounts"));
+
+    FavouritesResponse moved =
+        service.replaceFavourites(
+            owner, favourites(1, "orders.demand", "bank.accounts", "missions.list"));
+
+    assertThat(moved.keys()).containsExactly("orders.demand", "bank.accounts", "missions.list");
+    assertThat(service.read(owner).favourites().keys())
+        .containsExactly("orders.demand", "bank.accounts", "missions.list");
+    assertThatThrownBy(() ->
+            service.replaceFavourites(
+                owner, favourites(1, "missions.list", "orders.demand", "bank.accounts")))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThat(service.read(owner).favourites().keys())
+        .containsExactly("orders.demand", "bank.accounts", "missions.list");
+  }
+
+  @Test
   @DisplayName("a stale version is rejected, counted as a conflict and changes nothing")
   void rejectsAStaleVersion() {
     UUID owner = member();

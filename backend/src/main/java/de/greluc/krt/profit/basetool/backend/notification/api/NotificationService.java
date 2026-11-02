@@ -76,15 +76,19 @@ public class NotificationService {
    *
    * @param recipientUserId Keycloak {@code sub} of the caller
    * @param limit maximum number of entries, clamped to 1–50
+   * @param unreadOnly whether only unread notifications count, applied before the limit
    * @return the most-recent-first list of DTOs
    */
-  public List<NotificationDto> listRecentOwn(@NotNull UUID recipientUserId, int limit) {
-    int capped = Math.clamp(limit, 1, 50);
-    return notificationRepository
-        .findByRecipientUserIdOrderByCreatedAtDesc(recipientUserId, PageRequest.of(0, capped))
-        .stream()
-        .map(mapper::toDto)
-        .toList();
+  public List<NotificationDto> listRecentOwn(
+      @NotNull UUID recipientUserId, int limit, boolean unreadOnly) {
+    PageRequest cap = PageRequest.of(0, Math.clamp(limit, 1, 50));
+    List<Notification> recent =
+        unreadOnly
+            ? notificationRepository.findByRecipientUserIdAndReadFalseOrderByCreatedAtDesc(
+                recipientUserId, cap)
+            : notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(
+                recipientUserId, cap);
+    return recent.stream().map(mapper::toDto).toList();
   }
 
   /**

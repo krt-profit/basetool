@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeCandidateDto;
 import java.util.List;
@@ -54,7 +56,7 @@ public class JobOrderAssigneeCandidateProxyController {
    * @return the candidates, never {@code null}; a backend failure is answered by the global handler
    */
   @NotNull
-  @GetMapping(value = "/{id}/assignee-candidates", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/{id}/assignee-candidates", headers = AJAX)
   public List<JobOrderAssigneeCandidateDto> assigneeCandidates(
       @PathVariable UUID id, @RequestParam(required = false) @Nullable String query) {
     List<JobOrderAssigneeCandidateDto> candidates =

@@ -621,7 +621,7 @@ class DashboardE2eTest {
           int upcomingAtLoad = upcoming.get();
 
           page.clock().runFor(11L * 60 * 1000);
-          page.waitForTimeout(500);
+          E2eSupport.settle(page);
 
           assertEquals(infoAtLoad + 1, information.get(), "information polled once");
           assertEquals(upcomingAtLoad, upcoming.get(), "the live widget does not poll");
@@ -630,7 +630,7 @@ class DashboardE2eTest {
               "() => Object.defineProperty(document, 'visibilityState',"
                   + " { get: () => 'hidden', configurable: true })");
           page.clock().runFor(11L * 60 * 1000);
-          page.waitForTimeout(500);
+          E2eSupport.settle(page);
 
           assertEquals(infoAtLoad + 1, information.get(), "a hidden tab does not poll");
         });

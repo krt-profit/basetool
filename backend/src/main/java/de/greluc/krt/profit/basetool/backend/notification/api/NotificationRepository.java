@@ -62,6 +62,17 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       UUID recipientUserId, Pageable pageable);
 
   /**
+   * Returns a recipient's most recent unread notifications first, capped by the {@link Pageable}
+   * size; the read ones never count against the cap.
+   *
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @param pageable page request supplying the cap (size) and offset
+   * @return the most-recent-first list of unread notifications
+   */
+  List<Notification> findByRecipientUserIdAndReadFalseOrderByCreatedAtDesc(
+      UUID recipientUserId, Pageable pageable);
+
+  /**
    * Returns one notification only if it belongs to the caller. The empty result is deliberately
    * indistinguishable from "unknown id" so a caller cannot probe foreign ids.
    *

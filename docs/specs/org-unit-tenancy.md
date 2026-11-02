@@ -720,7 +720,7 @@ served by `MissionService.updateOwningOrgUnit` and recorded as the audited
    unknown target id is a 400; a disallowed target is a 403.
 
 **Re-scoping semantics.** Re-homing **retroactively** changes who may see/edit the mission via the
-existing `owningOrgUnit` + `is_internal` gates (REQ-ORG-003 and the `canSeeMission` / `canEditMission`
+existing `owningOrgUnit` + `is_internal` gates (REQ-ORG-003 and the `canSeeMission` / `holdsMissionManagerGrantFor`
 matrix) — there is no frozen create-time ACL. Moving `NULL → org` *narrows* a public-leadership
 mission to that org (plus the `is_internal = false` cross-staffel escape); `org → NULL` *widens* it to
 the public/members default; `org A → org B` re-points the scope. `is_internal` is **orthogonal** and

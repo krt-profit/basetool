@@ -60,10 +60,8 @@ class SyncStatusAssembler {
 
   private SyncStatusRow syncRow(SyncSource source, Instant since) {
     PageResponse<SyncReportDto> page = catalogue.syncReportPage(0, source.name());
-    Instant last =
-        page == null || page.content() == null || page.content().isEmpty()
-            ? null
-            : page.content().getFirst().ranAt();
+    List<SyncReportDto> reports = PageResponse.contentOf(page);
+    Instant last = reports.isEmpty() ? null : reports.getFirst().ranAt();
     return new SyncStatusRow(source, last, null, last != null && !last.isBefore(since));
   }
 

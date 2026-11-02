@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
+
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
@@ -73,7 +75,7 @@ public class DashboardOrderWidgetController {
    * @return the {@code ordersToProcess} fragment
    */
   @NotNull
-  @GetMapping(value = "/orders-to-process", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/orders-to-process", headers = AJAX)
   public String ordersToProcess(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -100,7 +102,7 @@ public class DashboardOrderWidgetController {
    * @return the {@code materialDemand} fragment
    */
   @NotNull
-  @GetMapping(value = "/material-demand", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/material-demand", headers = AJAX)
   public String materialDemand(
       @NotNull Model model,
       @RequestParam(required = false) @Nullable UUID unit,
@@ -121,7 +123,7 @@ public class DashboardOrderWidgetController {
    * @return the {@code refineryReady} fragment
    */
   @NotNull
-  @GetMapping(value = "/refinery-ready", headers = "X-Requested-With=XMLHttpRequest")
+  @GetMapping(value = "/refinery-ready", headers = AJAX)
   public String refineryReady(
       @NotNull Model model, @RequestParam(required = false) @Nullable Integer rows) {
     PageResponse<RefineryOrderListDto> page =
@@ -133,8 +135,8 @@ public class DashboardOrderWidgetController {
             REFINERY_SORT,
             0,
             DashboardWidgetOptions.rows(rows));
-    model.addAttribute("readyOrders", page == null ? List.of() : page.content());
-    model.addAttribute("readyTotal", page == null ? 0L : page.totalElements());
+    model.addAttribute("readyOrders", PageResponse.contentOf(page));
+    model.addAttribute("readyTotal", PageResponse.totalOf(page));
     return FRAGMENTS + "refineryReady";
   }
 
@@ -143,7 +145,7 @@ public class DashboardOrderWidgetController {
       @Nullable PageResponse<JobOrderDto> page,
       @NotNull String ordersAttribute,
       @NotNull String totalAttribute) {
-    model.addAttribute(ordersAttribute, page == null ? List.of() : page.content());
-    model.addAttribute(totalAttribute, page == null ? 0L : page.totalElements());
+    model.addAttribute(ordersAttribute, PageResponse.contentOf(page));
+    model.addAttribute(totalAttribute, PageResponse.totalOf(page));
   }
 }

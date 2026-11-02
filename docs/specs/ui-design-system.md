@@ -2325,6 +2325,10 @@ server-side migration.
   mode; the cap is shared.
 - A favourite unavailable in the active context stays stored, keeps its place and counts towards
   the cap; it renders greyed with „In <Einheit> nicht verfügbar".
+- **The favourites are an ordered list.** Within the „Favoriten" group they are reordered like the
+  groups and links of „Order" below (buttons, Alt+↑/↓, focus kept, live announcement); a move
+  writes the favourites in place under their own version, and Alt+1…9 (REQ-UI-035) and the icon
+  rail follow the order the member chose.
 
 **Hiding.**
 
@@ -2337,7 +2341,8 @@ server-side migration.
   it, hiding a favourite removes the favourite — one request that writes both sections and checks
   both versions. A favourited tab of a hidden page stays (it has its own key).
 
-**Order.** Groups among themselves and links within their group; a link never changes group.
+**Order.** Groups among themselves and links within their group — and the favourites within their
+group; a link never changes group.
 Stored per mode, only for the keys the user moved. The controls are those of REQ-UI-031 (buttons,
 Alt+↑/↓, focus kept, live announcement); drag is only an extra.
 
@@ -2667,9 +2672,12 @@ an error state and a retry button, carrying the test ids `dashboard-<widget>-err
 total as count; „Materialbedarf" reads the new summary `GET /orders/material-demand/summary`
 (`orgUnitId`, `limit`; the count of open buckets and the first rows, REQ-ORDERS-034) instead of the
 whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich bearbeite" (section
-`queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig". A widget whose area has a live-sync topic updates live
-(REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
-reload at once when the tab becomes visible again.
+`queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig", the inventory room („stock" and „stock-levels") „Bestand
+niedrig". A widget whose area has a live-sync topic updates live (REQ-FE-015); the others poll every
+10 minutes, only while the tab is visible, staggered, and reload at once when the tab becomes
+visible again. „Raffinerie: fertig" also reloads every minute while the tab is visible, because
+readiness changes when an order's end time passes without any mutation. „Benachrichtigungen" filters
+„Ungelesen" before the row limit, so older unread notifications show even when the newest are read.
 
 **Trade widgets.** Read-only and not audited. „Materialbörse" merges the offer and the wanted
 board, newest first, and counts both page totals. „Bedarf & Spenden" reads the open needs

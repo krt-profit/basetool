@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { versionOf } from '/js/kernel/dataset-version.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -158,7 +159,6 @@ export async function reloadBoard() {
     if (!element) return;
     const response = await krtFetch.get(`/dashboard/${mode()}/board`, {
         accept: 'text/html',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
     });
     if (!response || !response.ok) return;
     const fresh = krtFetch.parseTrustedDocument(await response.text()).getElementById(BOARD_ID);
@@ -196,7 +196,7 @@ async function writeLayout(extra = []) {
         url: `/dashboard/${mode()}/layout`,
         payload: () => ({
             widgets: [...layoutItems(), ...extra],
-            version: Number(element.dataset.version || '0'),
+            version: versionOf(element.dataset, 'version'),
         }),
         serialize: WRITE_LOCK,
         toast: false,
@@ -377,7 +377,7 @@ async function saveOptions(form) {
             days: days === null ? null : Number(days),
             rows: rows === null ? null : Number(rows),
             status: optionValue(form, 'status'),
-            version: Number(item.dataset.optionsVersion || '0'),
+            version: versionOf(item.dataset, 'optionsVersion'),
         }),
         toast: false,
         errorMessage: board()?.dataset.saveError,
@@ -399,7 +399,7 @@ async function resetToDefault() {
     if (!element) return;
     const result = await krtFetch.write({
         method: 'DELETE',
-        url: () => `/dashboard/${mode()}?version=${element.dataset.version || '0'}`,
+        url: () => `/dashboard/${mode()}?version=${versionOf(element.dataset, 'version') ?? ''}`,
         toast: false,
         serialize: WRITE_LOCK,
         errorMessage: element.dataset.saveError,

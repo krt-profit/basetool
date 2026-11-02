@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
+import static de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptions.DEFAULT_BANK_ROWS;
+import static de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptions.DEFAULT_DAYS;
+import static de.greluc.krt.profit.basetool.backend.navigation.internal.DashboardOptions.DEFAULT_ROWS;
+
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -42,7 +46,7 @@ public enum DashboardWidgetType {
       DashboardColumn.WIDE,
       true,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.DAYS, DashboardOption.ROWS),
-      new DashboardOptions(null, 7, 5, null)),
+      DashboardOptions.ofDaysAndRows(DEFAULT_DAYS, DEFAULT_ROWS)),
 
   /** The announcement. */
   INFORMATION(
@@ -66,7 +70,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.UNREAD),
+      DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.UNREAD),
       EnumSet.of(DashboardStatus.UNREAD, DashboardStatus.ALL)),
 
   /** The member's next missions: those of the own units and those the member is signed up for. */
@@ -75,7 +79,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The readiness of the member's hangar. */
   HANGAR_READINESS(
@@ -99,7 +103,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The pending Discord registrations. */
   DISCORD_REGISTRATIONS(
@@ -107,7 +111,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The latest sync and import runs. */
   SYNC_STATUS(
@@ -115,7 +119,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.RANGE),
-      new DashboardOptions(null, 7, null, null)),
+      DashboardOptions.ofDays(DEFAULT_DAYS)),
 
   /** The members without accepted terms. */
   OPEN_TERMS(
@@ -123,7 +127,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       true,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The orders the member is an assignee of, by priority. */
   ASSIGNED_ORDERS(
@@ -131,7 +135,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.OPEN_ACTIVE),
+      DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.OPEN_ACTIVE),
       EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
   /** The minimum stock levels that are low, emptiest first. */
@@ -140,7 +144,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The balances of the org-unit bank accounts the member may view. */
   BANK(
@@ -148,7 +152,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 3, null)),
+      DashboardOptions.ofRows(DEFAULT_BANK_ROWS)),
 
   /** The orders one of the member's units processes, by priority. */
   ORDERS_TO_PROCESS(
@@ -156,7 +160,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.OPEN_ACTIVE),
+      DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.OPEN_ACTIVE),
       EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
   /** The open material demand across the visible orders, the largest gap first. */
@@ -165,7 +169,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The refinery orders that are ready to be stored. */
   REFINERY_READY(
@@ -173,7 +177,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS),
-      new DashboardOptions(null, null, 5, null)),
+      DashboardOptions.ofRows(DEFAULT_ROWS)),
 
   /** The open Materialbörse entries: offers, wanted-listings or both. */
   MARKET(
@@ -181,7 +185,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.BOTH),
+      DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.BOTH),
       EnumSet.of(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
 
   /** The open supply needs, optionally the uncovered or partly covered ones. */
@@ -190,7 +194,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 5, DashboardStatus.ALL_OPEN),
+      DashboardOptions.ofRowsAndStatus(DEFAULT_ROWS, DashboardStatus.ALL_OPEN),
       EnumSet.of(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
 
   /** The member's own bank requests: pending, decided or all. */
@@ -199,7 +203,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       false,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      new DashboardOptions(null, null, 3, DashboardStatus.OPEN),
+      DashboardOptions.ofRowsAndStatus(DEFAULT_BANK_ROWS, DashboardStatus.OPEN),
       EnumSet.of(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
 
   /** The day counts a widget with the {@link DashboardOption#DAYS} option accepts. */

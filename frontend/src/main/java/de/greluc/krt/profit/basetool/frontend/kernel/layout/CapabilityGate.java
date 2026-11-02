@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,8 +30,8 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Answers one pin-aware capability flag of the backend for the current request: an admin passes
- * without a call, the answer is read once and memoised on the request, and any failure reads as
- * "not granted".
+ * without a call, the answer is read once and memoised on the request, and a failed backend call
+ * reads as "not granted" while a lost session is rethrown.
  *
  * <p>The shared core of the SpEL gate beans ({@link MissionManagerGate}, {@link LogisticianGate}).
  */
@@ -87,14 +89,16 @@ final class CapabilityGate {
   /**
    * Reads the flag from the backend.
    *
-   * @return the backend's answer, or {@code false} on an empty answer or a failure
+   * @return the backend's answer, or {@code false} on an empty answer or a failed backend call
    */
   private boolean fetch() {
     try {
       CapabilitiesResponse capabilities =
           backendApiClient.get(CAPABILITIES_PATH, CapabilitiesResponse.class);
       return capabilities != null && flag.test(capabilities);
-    } catch (Exception ex) {
+    } catch (ReauthenticationRequiredException e) {
+      throw e;
+    } catch (BackendServiceException ex) {
       log.debug("Failed to resolve the capability flag {}", requestAttribute, ex);
       return false;
     }

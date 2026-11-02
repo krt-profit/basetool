@@ -40,7 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>A section write bumps the section's counter with a conditional {@code UPDATE} first, which
  * both rejects a stale version and locks the member's root row until the commit, so two racing
  * writers of one section serialise and a write of another section is never blocked by its version.
- * A page is never both a favourite and hidden: every write refuses a result in which it is.
+ * A page is never both a favourite and hidden: every write refuses a result in which it is,
+ * checking the opposite section only after the lock, on a fresh read.
  */
 @Service
 @RequiredArgsConstructor
@@ -152,11 +153,11 @@ public class NavigationPreferencesWriter {
       @NotNull UUID userId, @NotNull List<String> keys, long expectedVersion) {
     requireDistinct(keys);
     repository.insertIfAbsent(userId);
-    requireDisjoint(keys, repository.findById(userId).orElseThrow().getHidden());
     if (repository.bumpFavouritesVersionIfMatches(userId, expectedVersion) == 0) {
       throw stale(userId);
     }
     NavigationPreferences preferences = repository.findById(userId).orElseThrow();
+    requireDisjoint(keys, preferences.getHidden());
     preferences.replaceFavourites(keys);
     repository.saveAndFlush(preferences);
     return favouritesOf(preferences);
@@ -177,11 +178,11 @@ public class NavigationPreferencesWriter {
       @NotNull UUID userId, @NotNull List<String> keys, long expectedVersion) {
     requireDistinct(keys);
     repository.insertIfAbsent(userId);
-    requireDisjoint(keys, repository.findById(userId).orElseThrow().getFavourites());
     if (repository.bumpHiddenVersionIfMatches(userId, expectedVersion) == 0) {
       throw stale(userId);
     }
     NavigationPreferences preferences = repository.findById(userId).orElseThrow();
+    requireDisjoint(keys, preferences.getFavourites());
     preferences.replaceHidden(keys);
     repository.saveAndFlush(preferences);
     return toResponse(preferences).hidden();
