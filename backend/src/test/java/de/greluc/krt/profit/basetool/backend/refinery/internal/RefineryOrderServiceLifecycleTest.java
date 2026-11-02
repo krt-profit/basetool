@@ -60,6 +60,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.HashSet;
@@ -97,6 +98,7 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
 
   @Mock private AuditService auditService;
 
@@ -203,7 +205,7 @@ class RefineryOrderServiceLifecycleTest {
       Squadron unitB = new Squadron();
       unitB.setId(UUID.randomUUID());
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
           .thenReturn(unitB);
       doThrow(new AccessDeniedException("no"))
           .when(ownerScopeService)
@@ -220,7 +222,8 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void onBehalf_ownerlessStampForANonAdmin_isRefused() {
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, null)).thenReturn(null);
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, null))
+          .thenReturn(null);
       doThrow(new AccessDeniedException("no"))
           .when(ownerScopeService)
           .requireLogisticianInOwner(null);
@@ -240,7 +243,7 @@ class RefineryOrderServiceLifecycleTest {
       city.setHasRefineryTerminal(true);
       cityLoc.setCity(city);
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, unitA.getId()))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, unitA.getId()))
           .thenReturn(unitA);
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1028,7 +1031,7 @@ class RefineryOrderServiceLifecycleTest {
       de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
           new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       resolved.setId(pickedOrgUnitId);
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
           .thenReturn(resolved);
 
       Location loc = new Location();

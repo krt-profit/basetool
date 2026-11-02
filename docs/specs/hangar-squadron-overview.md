@@ -82,7 +82,7 @@ them).
 ### REQ-HANGAR-003 — Unit overview spans every unit the caller can see, OL sees all ships
 
 The unit overview selects its scope through the dedicated
-`OwnerScopeService#currentUnitOverviewScope()` (not the bare `currentScopePredicate()`), so that —
+`RequestScopeResolver#currentUnitOverviewScope()` (not the bare `currentScopePredicate()`), so that —
 with **no single unit pinned** — it shows ships across **all** the units the caller can see, not a
 single Staffel:
 
@@ -118,8 +118,8 @@ these scopes like a ship created in the web.
   list / `can*` gate still routes OL through `currentScopePredicate()`.
 - [ ] With a single unit pinned, every caller (incl. OL) sees only the pinned unit's ships.
 
-**Enforced by:** `OwnerScopeServiceTest` (`CurrentUnitOverviewScopeTests`), `HangarServiceTest` ·
-**Code:** `OwnerScopeService#currentUnitOverviewScope`, `HangarService#getSquadronOverview`,
+**Enforced by:** `ScopeKernelTest` (`CurrentUnitOverviewScopeTests`), `HangarServiceTest` ·
+**Code:** `RequestScopeResolver#currentUnitOverviewScope`, `HangarService#getSquadronOverview`,
 `ShipRepository#countShipsByType` · **ADR:**
 [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) · amends
 [REQ-ORG-015](org-unit-tenancy.md) · **Issues:** —

@@ -35,7 +35,7 @@ measures below are accordingly proportionate rather than exhaustive.
   build if an endpoint is added without a gate.
 - **Per-subject isolation.** Personal aggregates are scoped to the caller's own subject in the
   service layer, not in the UI.
-- **Org-unit tenancy.** Squadron-scoped data is filtered through `OwnerScopeService`, with
+- **Org-unit tenancy.** Squadron-scoped data is filtered through the scope kernel (`RequestScopeResolver`, `AccessGateService`), with
   ArchUnit guards against an endpoint that forgets the scope
   ([`org-unit-tenancy.md`](../specs/org-unit-tenancy.md)).
 - **Field-level redaction.** Members below the relevant role have sensitive fields stripped in the

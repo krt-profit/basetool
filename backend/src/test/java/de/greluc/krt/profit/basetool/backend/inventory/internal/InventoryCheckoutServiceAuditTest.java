@@ -40,7 +40,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Optional;
 import java.util.Set;
@@ -69,7 +69,7 @@ class InventoryCheckoutServiceAuditTest {
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
 
@@ -140,7 +140,7 @@ class InventoryCheckoutServiceAuditTest {
   @Test
   void deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount() {
     ScopePredicate scope = new ScopePredicate(true, null, Set.of());
-    when(ownerScopeService.currentScopePredicate()).thenReturn(scope);
+    when(requestScopeResolver.currentScopePredicate()).thenReturn(scope);
     when(inventoryItemRepository.deleteAllNonPersonal(true, null, Set.of())).thenReturn(42);
 
     int removed = service.deleteAllGlobalInventory();

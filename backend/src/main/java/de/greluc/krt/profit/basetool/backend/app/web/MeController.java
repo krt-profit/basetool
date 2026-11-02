@@ -28,8 +28,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOption
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -59,7 +60,8 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class MeController {
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
 
   /** Narrows the promotion capabilities to the units that have promotion enabled. */
   private final PromotionReach promotionReach;
@@ -101,7 +103,7 @@ public class MeController {
    * @return current effective org-unit context
    */
   private @NotNull ActiveOrgUnitResponse activeOrgUnit() {
-    return new ActiveOrgUnitResponse(ownerScopeService.currentOrgUnitId().orElse(null));
+    return new ActiveOrgUnitResponse(requestScopeResolver.currentOrgUnitId().orElse(null));
   }
 
   /**
@@ -128,16 +130,16 @@ public class MeController {
    * @return the caller's UI capability flags
    */
   private @NotNull CapabilitiesResponse capabilities() {
-    boolean officerHere = ownerScopeService.canActAsOfficerInActiveContext();
+    boolean officerHere = requestScopeResolver.canActAsOfficerInActiveContext();
     return new CapabilitiesResponse(
-        ownerScopeService.canAccessBlueprintOverview(),
-        ownerScopeService.canViewJobOrders(),
-        ownerScopeService.canViewOwnJobOrders(),
+        requestScopeResolver.canAccessBlueprintOverview(),
+        requestScopeResolver.canViewJobOrders(),
+        requestScopeResolver.canViewOwnJobOrders(),
         holdsAssigneeEntry(),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)),
-        ownerScopeService.canActAsLogisticianInActiveContext(),
-        ownerScopeService.canActAsMissionManagerInActiveContext(),
+        accessGateService.canActAsLogisticianInActiveContext(),
+        requestScopeResolver.canActAsMissionManagerInActiveContext(),
         authHelperService.isAdmin(),
         inventoryProperties.stolenMarkingEnabled(),
         officerHere,
@@ -146,7 +148,7 @@ public class MeController {
         officerHere,
         officerHere,
         officerHere,
-        ownerScopeService.canActAsOfficerAnywhere(),
+        accessGateService.canActAsOfficerAnywhere(),
         promotionReach.canManageAnywhere(),
         promotionReach.canUseAnywhere());
   }

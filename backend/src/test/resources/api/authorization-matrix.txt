@@ -353,7 +353,7 @@ GET /api/v1/notifications/unread-count | NotificationController#unreadCount | pr
 DELETE /api/v1/notifications/{id} | NotificationController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/notifications/{id}/read | NotificationController#markRead | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/operations | OperationController#getAllOperations | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/operations | OperationController#createOperation | pre=@ownerScopeService.canActAsMissionManagerInActiveContext() | url=anyRequest -> authenticated
+POST /api/v1/operations | OperationController#createOperation | pre=@requestScopeResolver.canActAsMissionManagerInActiveContext() | url=anyRequest -> authenticated
 GET /api/v1/operations/lookup | OperationController#lookupOperations | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/operations/search | OperationController#searchOperations | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/operations/{id} | OperationController#deleteOperation | pre=hasRole('ADMIN') and @operationAccessPolicy.canEditOperation(#id) | url=anyRequest -> authenticated
@@ -371,7 +371,7 @@ POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthen
 GET /api/v1/orders/lookup | JobOrderController#lookupJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/material-demand | JobOrderMaterialController#getMaterialDemand | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/material-demand/summary | JobOrderMaterialDemandSummaryController#summary | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/orders/requested | JobOrderController#getRequestedJobOrders | pre=isAuthenticated() and @ownerScopeService.canViewOwnJobOrders() | url=anyRequest -> authenticated
+GET /api/v1/orders/requested | JobOrderController#getRequestedJobOrders | pre=isAuthenticated() and @requestScopeResolver.canViewOwnJobOrders() | url=anyRequest -> authenticated
 GET /api/v1/orders/settings | JobOrderSettingsController#settings | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id} | JobOrderController#deleteJobOrder | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{id} | JobOrderController#getJobOrderById | pre=isAuthenticated() and (@jobOrderAccessPolicy.canSeeJobOrder(#id) or @jobOrderAccessPolicy.canSeeJobOrderAsRequester(#id)) | url=anyRequest -> authenticated
@@ -397,8 +397,8 @@ PUT /api/v1/orders/{id}/requested | JobOrderController#updateJobOrderAsRequester
 PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#getClaimBuckets | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
-POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders() | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{jobOrderId}/claims/{claimId} | MaterialClaimController#withdrawClaim | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders() | url=anyRequest -> authenticated
+POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{jobOrderId}/claims/{claimId} | MaterialClaimController#withdrawClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
 POST /api/v1/orders/{jobOrderId}/handovers/report/preview | JobOrderHandoverController#previewHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report | JobOrderHandoverController#downloadHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report | JobOrderHandoverController#downloadItemHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
@@ -479,9 +479,9 @@ GET /api/v1/promotion/categories/{id} | PromotionCategoryController#get | pre=is
 PUT /api/v1/promotion/categories/{id} | PromotionCategoryController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/eligibility/my | PromotionEligibilityController#myEligibility | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/eligibility/my/by-ranks | PromotionEligibilityController#myEligibilityForRanks | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/eligibility/user/{userId} | PromotionEligibilityController#eligibilityForUser | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
+GET /api/v1/promotion/eligibility/user/{userId} | PromotionEligibilityController#eligibilityForUser | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
 GET /api/v1/promotion/evaluations/all | MemberEvaluationController#listAll | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/promotion/evaluations/members | MemberEvaluationController#listEvaluatableMembers | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
+GET /api/v1/promotion/evaluations/members | MemberEvaluationController#listEvaluatableMembers | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere() | url=anyRequest -> authenticated
 GET /api/v1/promotion/evaluations/my | MemberEvaluationController#listMy | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/evaluations/my/paged | MemberEvaluationController#listMyPaged | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/promotion/evaluations/user/{userId}/category/{categoryId} | MemberEvaluationController#upsert | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -683,22 +683,22 @@ GET /v3/api-docs | OpenApiWebMvcResource#openapiJson | pre=none | url=/v3/api-do
 GET /v3/api-docs.yaml | OpenApiWebMvcResource#openapiYaml | pre=none | url=/v3/api-docs* -> hasAnyAuthority(ROLE_ADMIN)
 
 [service-gates]
-MemberEvaluationService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-MemberEvaluationService#listAll(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-MemberEvaluationService#listEvaluatableMembers(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-MemberEvaluationService#upsert(3) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+MemberEvaluationService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+MemberEvaluationService#listAll(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+MemberEvaluationService#listEvaluatableMembers(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+MemberEvaluationService#upsert(3) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
 MissionFinanceEntryService#deleteEntry(2) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
 MissionFinanceEntryService#updateEntry(3) | pre=@missionAccessPolicy.canEditFinanceEntry(#entryId, authentication)
-PromotionCategoryService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionCategoryService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionCategoryService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionEligibilityService#evaluateAllForUserAsAdmin(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionLevelContentService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionLevelContentService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionLevelContentService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionTopicService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionTopicService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-PromotionTopicService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-RankRequirementService#create(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-RankRequirementService#delete(1) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
-RankRequirementService#update(2) | pre=hasRole('ADMIN') or @ownerScopeService.canActAsOfficerAnywhere()
+PromotionCategoryService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionCategoryService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionCategoryService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionEligibilityService#evaluateAllForUserAsAdmin(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionLevelContentService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionLevelContentService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionLevelContentService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionTopicService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionTopicService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+PromotionTopicService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+RankRequirementService#create(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+RankRequirementService#delete(1) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()
+RankRequirementService#update(2) | pre=hasRole('ADMIN') or @accessGateService.canActAsOfficerAnywhere()

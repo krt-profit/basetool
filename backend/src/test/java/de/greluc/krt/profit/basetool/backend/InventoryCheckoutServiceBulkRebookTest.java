@@ -59,7 +59,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepo
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -88,7 +88,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private StockOfferLookup stockOfferLookup;
   @Mock private InventoryItemMapper inventoryItemMapper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
 
@@ -280,7 +280,8 @@ class InventoryCheckoutServiceBulkRebookTest {
     when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
     OrgUnit pool = new Squadron();
     pool.setId(UUID.randomUUID());
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(pool);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(any(), any()))
+        .thenReturn(pool);
 
     checkoutService.bulkRebook(toLocation(List.of(item.getId()), there.getId()), OWNER_ID);
 
@@ -375,7 +376,8 @@ class InventoryCheckoutServiceBulkRebookTest {
     given(personalRow);
     OrgUnit pool = new Squadron();
     pool.setId(UUID.randomUUID());
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(pool);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(any(), any()))
+        .thenReturn(pool);
 
     BulkRebookResultDto result =
         checkoutService.bulkRebook(

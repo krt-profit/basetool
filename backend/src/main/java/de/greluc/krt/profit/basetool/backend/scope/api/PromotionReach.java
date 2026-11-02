@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PromotionReach {
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelper;
   private final OrgUnitRepository orgUnitRepository;
 
@@ -56,7 +56,7 @@ public class PromotionReach {
    */
   @Nullable
   public Set<UUID> currentManagementScope() {
-    Set<UUID> readScope = ownerScopeService.currentOfficerReadScope();
+    Set<UUID> readScope = requestScopeResolver.currentOfficerReadScope();
     return readScope == null || authHelper.isAdmin() ? readScope : promotionEnabledAmong(readScope);
   }
 
@@ -69,7 +69,7 @@ public class PromotionReach {
   public boolean canManageInActiveContext() {
     return authHelper.isAdmin()
         || !promotionEnabledAmong(
-                ownerScopeService.narrowToPin(ownerScopeService.currentOfficerOrgUnitIds()))
+                requestScopeResolver.narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds()))
             .isEmpty();
   }
 
@@ -80,7 +80,7 @@ public class PromotionReach {
    */
   public boolean canManageAnywhere() {
     return authHelper.isAdmin()
-        || !promotionEnabledAmong(ownerScopeService.currentOfficerOrgUnitIds()).isEmpty();
+        || !promotionEnabledAmong(requestScopeResolver.currentOfficerOrgUnitIds()).isEmpty();
   }
 
   /**
@@ -93,8 +93,8 @@ public class PromotionReach {
     if (authHelper.isAdmin()) {
       return true;
     }
-    Set<UUID> units = new HashSet<>(ownerScopeService.currentMemberOrgUnitIds());
-    units.addAll(ownerScopeService.currentOfficerOrgUnitIds());
+    Set<UUID> units = new HashSet<>(requestScopeResolver.currentMemberOrgUnitIds());
+    units.addAll(requestScopeResolver.currentOfficerOrgUnitIds());
     return !promotionEnabledAmong(units).isEmpty();
   }
 

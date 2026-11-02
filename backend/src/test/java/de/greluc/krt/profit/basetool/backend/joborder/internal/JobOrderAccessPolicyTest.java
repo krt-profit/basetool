@@ -32,7 +32,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +52,8 @@ class JobOrderAccessPolicyTest {
 
   private final UUID foreignUnitId = UUID.randomUUID();
 
-  private OwnerScopeService ownerScopeService;
+  private RequestScopeResolver requestScopeResolver;
+  private AccessGateService accessGateService;
 
   private AuthHelperService authHelper;
 
@@ -63,17 +65,19 @@ class JobOrderAccessPolicyTest {
 
   @BeforeEach
   void setUp() {
-    ownerScopeService = mock(OwnerScopeService.class);
+    requestScopeResolver = mock(RequestScopeResolver.class);
+    accessGateService = mock(AccessGateService.class);
     authHelper = mock(AuthHelperService.class);
     jobOrderRepository = mock(JobOrderRepository.class);
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
-    when(ownerScopeService.canSeeSquadron(any())).thenReturn(false);
-    when(ownerScopeService.canEditSquadron(any())).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+    when(accessGateService.canSeeSquadron(any())).thenReturn(false);
+    when(accessGateService.canEditSquadron(any())).thenReturn(false);
     when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
     when(authHelper.isLogisticianOrAbove()).thenReturn(true);
     policy =
         new JobOrderAccessPolicy(
-            ownerScopeService,
+            requestScopeResolver,
+            accessGateService,
             authHelper,
             jobOrderRepository,
             mock(JobOrderHandoverRepository.class),
@@ -154,18 +158,18 @@ class JobOrderAccessPolicyTest {
 
   @Test
   void canManageAssignees_aLogisticianOfTheOrdersUnitMayManage() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(accessGateService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(true);
 
     assertThat(policy.canManageAssignees(order.getId())).isTrue();
   }
 
   @Test
   void canManageAssignees_aLogisticianOfAnotherUnitWhoIsAMemberOfTheOrdersUnitMayNot() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.canSeeSquadronAsGrantee(foreignUnitId, Roles.LOGISTICIAN))
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(accessGateService.canSeeSquadronAsGrantee(foreignUnitId, Roles.LOGISTICIAN))
         .thenReturn(true);
-    when(ownerScopeService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(false);
+    when(accessGateService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(false);
 
     assertThat(policy.canSeeJobOrder(order.getId())).isTrue();
     assertThat(policy.canManageAssignees(order.getId())).isFalse();
@@ -173,8 +177,8 @@ class JobOrderAccessPolicyTest {
 
   @Test
   void canManageAssignees_aMemberInTheEditScopeWithoutTheRoleMayNot() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.canEditSquadron(foreignUnitId)).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(accessGateService.canEditSquadron(foreignUnitId)).thenReturn(true);
 
     assertThat(policy.canManageAssignees(order.getId())).isFalse();
   }

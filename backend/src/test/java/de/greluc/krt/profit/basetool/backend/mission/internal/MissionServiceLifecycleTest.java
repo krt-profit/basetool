@@ -47,7 +47,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.HashSet;
 import java.util.Optional;
@@ -77,7 +78,8 @@ class MissionServiceLifecycleTest {
   @Mock private OperationSummaryProvider operationSummaryProvider;
   @Mock private MissionDeletionObserver missionDeletionObserver;
   @Mock private UserService userService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private AuthHelperService authHelperService;
 
   @Mock private AuditService auditService;
@@ -97,7 +99,8 @@ class MissionServiceLifecycleTest {
             operationSummaryProvider,
             missionDeletionObserver,
             userService,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             authHelperService,
             auditService,
             null,
@@ -334,7 +337,7 @@ class MissionServiceLifecycleTest {
 
   @Test
   void findAllActiveReference_delegatesToRepository() {
-    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
             eq(true),
@@ -365,7 +368,7 @@ class MissionServiceLifecycleTest {
   @Test
   void findAllActiveReference_passesCurrentSquadronIdToRepository() {
     java.util.UUID squadronId = java.util.UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, squadronId, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
             eq(false),

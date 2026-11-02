@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +41,7 @@ public class StockLevelAccessPolicy {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "stockLevelAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final StockLevelRepository stockLevelRepository;
 
   /**
@@ -51,7 +51,7 @@ public class StockLevelAccessPolicy {
    * @return {@code true} iff the caller may create, change and delete the unit's levels
    */
   public boolean canMaintainStockLevelsOf(@NotNull UUID orgUnitId) {
-    return ownerScopeService.hasRoleInOrgUnit(orgUnitId, Roles.LOGISTICIAN);
+    return accessGateService.hasRoleInOrgUnit(orgUnitId, Roles.LOGISTICIAN);
   }
 
   /**

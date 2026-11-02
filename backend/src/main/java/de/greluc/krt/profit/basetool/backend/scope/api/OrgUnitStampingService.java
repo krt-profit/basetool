@@ -41,9 +41,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Create-time owner stamping behind {@link OwnerScopeService}: resolves the {@link OrgUnit} a new
- * aggregate is stamped on and validates an explicit owning-org-unit reassignment (REQ-ORG-018).
- * Read-only; the caller persists the stamped entity in its own transaction.
+ * Create-time owner stamping of the scope kernel: resolves the {@link OrgUnit} a new aggregate is
+ * stamped on and validates an explicit owning-org-unit reassignment (REQ-ORG-018). Read-only; the
+ * caller persists the stamped entity in its own transaction.
  */
 @Service
 @RequiredArgsConstructor

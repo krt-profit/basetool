@@ -54,11 +54,11 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link ScopePredicate} scope vectors, the caller's memberships and oversight reach, memoised per
  * request.
  *
- * <p>{@link AccessGateService} and {@link OrgUnitStampingService} build on it; {@link
- * OwnerScopeService} is the facade the {@code @PreAuthorize} expressions call. Read-only
+ * <p>{@link AccessGateService} and {@link OrgUnitStampingService} build on it;
+ * {@code @PreAuthorize} expressions call it as the {@code requestScopeResolver} bean. Read-only
  * transactional.
  */
-@Service
+@Service("requestScopeResolver")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RequestScopeResolver {

@@ -116,7 +116,7 @@ class MassAssignmentGuardTest {
           .importPackages("de.greluc.krt.profit.basetool.guardfixture.massassignment");
 
   private static final String STAMP =
-      "create-time stamp, resolved by OwnerScopeService.resolveOrgUnitForPickerOutput"
+      "create-time stamp, resolved by OrgUnitStampingService.resolveOrgUnitForPickerOutput"
           + " (REQ-ORG-004)";
 
   private static final String MOVE_TARGET =
@@ -124,7 +124,8 @@ class MassAssignmentGuardTest {
           + " the caller";
 
   private static final String REBOOK_TARGET =
-      "stamp of the rebooked stock, resolved by OwnerScopeService.resolveOrgUnitForPickerOutput";
+      "stamp of the rebooked stock, resolved by"
+          + " OrgUnitStampingService.resolveOrgUnitForPickerOutput";
 
   private static final String JOB_ORDER_UNITS =
       "processing and customer unit, validated by JobOrderOrgUnitResolver (REQ-ORG-003)";
@@ -328,8 +329,8 @@ class MassAssignmentGuardTest {
               Map.of(
                   "orgUnitId",
                   "the new unit of the caller's own ship, which"
-                      + " OwnerScopeService.resolveOwnerMembershipTarget requires to be a direct"
-                      + " membership of the owner (REQ-HANGAR-009)",
+                      + " OrgUnitStampingService.resolveOwnerMembershipTarget requires to be a"
+                      + " direct membership of the owner (REQ-HANGAR-009)",
                   "owningOrgUnitVersion",
                   "the unit counter the caller last saw, checked by the conditional update"
                       + " (ADR-0258)")),
@@ -338,8 +339,8 @@ class MassAssignmentGuardTest {
               Map.of(
                   "orgUnitId",
                   "the new unit of a selection of the caller's own ships, which"
-                      + " OwnerScopeService.resolveOwnerMembershipTarget requires to be a direct"
-                      + " membership of the owner (REQ-HANGAR-010)")),
+                      + " OrgUnitStampingService.resolveOwnerMembershipTarget requires to be a"
+                      + " direct membership of the owner (REQ-HANGAR-010)")),
           Map.entry(
               ExchangeShipChangeSet.Op.class,
               Map.of(

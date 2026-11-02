@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,7 +46,7 @@ class PromotionTopicServiceTest {
 
   @Mock private PromotionTopicMapper mapper;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private AuditService auditService;
@@ -113,7 +113,7 @@ class PromotionTopicServiceTest {
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
     squadron.setShorthand("ALP");
-    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
+    when(requestScopeResolver.currentSquadron()).thenReturn(Optional.of(squadron));
     when(mapper.toEntity(request)).thenReturn(entity);
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
@@ -138,7 +138,7 @@ class PromotionTopicServiceTest {
         new PromotionTopicWriteRequest("Grundlagen", null, 0, null);
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
-    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
+    when(requestScopeResolver.currentSquadron()).thenReturn(Optional.of(squadron));
     doThrow(new AccessDeniedException("no reach"))
         .when(promotionAccessPolicy)
         .assertOfficerIn(squadron.getId());

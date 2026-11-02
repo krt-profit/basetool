@@ -33,7 +33,7 @@ only permitted if it passes **both**:
    a concrete role. Evaluated *first*.
 2. **Method-level `@PreAuthorize`** on controller/service — the inner gate.
    Refined via Spring Security SpEL, often with the beans
-   `@ownerScopeService`, `@missionAccessPolicy`, `@specialCommandSecurityService`,
+   `@requestScopeResolver`, `@accessGateService`, `@missionAccessPolicy`, `@specialCommandSecurityService`,
    `@orgRoleManagementSecurityService`, `@bankSecurityService` and `@authHelperService`.
 
 The frontend adds a third, coarser gate of its own — the `@PreAuthorize` on its page and proxy
@@ -285,7 +285,7 @@ promotes these into two authority surfaces:
   `hasRole('LOGISTICIAN')` gates keep working.
 - **Contextual** `ROLE_LOGISTICIAN@<orgUnitId>` per (membership, flag) pair — so
   that the per-OrgUnit scoping at the `@PreAuthorize` call site
-  (`@ownerScopeService.canEdit…`) can be resolved without a service roundtrip.
+  (`@accessGateService.canEdit…`) can be resolved without a service roundtrip.
 
 **The grants cascade** like officer reach (REQ-SEC-005): a Logistician or Mission-Manager grant —
 flag or rank — in a **Bereich** covers the Bereich and the Staffeln and Spezialkommandos below it, a
@@ -368,7 +368,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 
 > Logistician/Mission-Manager are **add-on flags** on a Member: they inherit
 > all Member rights and add their flag-specific capability, **scoped to
-> their OrgUnit(s)** (`@ownerScopeService.canEdit…`). Officer ⊇ Log.+MM of the
+> their OrgUnit(s)** (`@accessGateService.canEdit…`). Officer ⊇ Log.+MM of the
 > **own Staffel**; Admin ⊇ everything, cross-Staffel.
 
 ### 3.1 Auth / Context
@@ -674,7 +674,7 @@ is **Staffel-scoped throughout**: every Staffel runs its own system
 (topic areas, categories, level contents, rank prerequisites, evaluations) and
 sees exclusively its own data. Read **and** write access are filtered in the
 service layer via the active Staffel context
-(`OwnerScopeService.currentSquadronId()` for lists/eligibility,
+(`RequestScopeResolver.currentSquadronId()` for lists/eligibility,
 `canSeeSquadron` for detail reads, officer reach `canActAsOfficerIn(topic.owningSquadron.id)` for
 maintenance and evaluations, REQ-SEC-015).
 
@@ -741,7 +741,7 @@ lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
 
 Ranks are appointed by rank, not by role: to grant rank R you must hold a strictly higher one, so
 nobody promotes themselves. The verdict is `@orgRoleManagementSecurityService` and reads only the
-caller's own membership ranks — never the admin pin, contextual authorities or `OwnerScopeService`
+caller's own membership ranks — never the admin pin, contextual authorities or the org-unit scope services
 (ArchUnit `delegatedRoleAuthoriserMustNotConsultOwnerScope`); Admin short-circuits at each
 `@PreAuthorize` (`hasRole('ADMIN') or …`). The parent Bereich is always read from the target unit's
 persisted `parent` edge. Every appointment is audited in „Rollen & Mitglieder" (REQ-AUDIT-001) and
@@ -831,7 +831,7 @@ app-managed **grant rows** per (employee, account)
 (`bank_account_grant`: row = read right; flags = deposit / withdraw /
 transfer). **Bank staffing is entirely independent of
 OrgUnit memberships** (REQ-BANK-008): `BankSecurityService` evaluates
-exclusively bank roles + grants — `OwnerScopeService`, contextual
+exclusively bank roles + grants — the org-unit scope services, contextual
 roles and the admin pin have no influence whatsoever, in either direction.
 Columns here: **Member** = any org role without a bank role · **Bank Empl.** =
 `Bank Employee` (with grants) · **Bank Mgmt.** = `Bank Management`.
@@ -881,7 +881,7 @@ Epic #666 adds **a single, narrowly scoped** org-unit capability, **without**
 softening the independence from REQ-BANK-008: `BankSecurityService` and the
 ledger stay 100 % OrgUnit-blind. The entire OrgUnit logic lives in exactly
 one seam deliberately **not** named with `Bank`, `OrgUnitBankAccessService`
-(ADR-0020), which is the only one allowed to connect `OwnerScopeService` and the bank
+(ADR-0020), which is the only one allowed to connect the org-unit scope services and the bank
 (ArchUnit-pinned). This surface lies at `/api/v1/bank/org-units/**`, beside the
 bank-employee one, and needs **no** bank role. „Off./Lead" =
 officer of one's own Staffel or lead of one's own Spezialkommando (oversight scope
@@ -1091,9 +1091,9 @@ requester and can neither grant nor confirm a tranche.
 ## 4. Multi-OrgUnit visibility (scoping)
 
 Read and write paths are filtered through
-[`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java)
-(formerly `SquadronScopeService`; today a facade over `RequestScopeResolver`, `AccessGateService`
-and `OrgUnitStampingService` covering every org-unit kind). Baseline rule: non-admins view the union
+[`RequestScopeResolver`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/RequestScopeResolver.java)
+and [`AccessGateService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/AccessGateService.java), with create-time stamping in
+`OrgUnitStampingService`, covering every org-unit kind. Baseline rule: non-admins view the union
 of their memberships (widened by the leadership cascade of §4.1); admins without an active pin view
 everything, with a pin the same restrictive view as a Member.
 
@@ -1131,7 +1131,7 @@ everything, with a pin the same restrictive view as a Member.
   the members of the org units the caller **oversees** — officers all of their
   Staffeln, SK-Leads their SK(s), a Staffel rank its Staffel, a Bereichsleitung its Bereich and
   everything below it, an OL member every unit, admins all of them or the pinned one
-  (`OwnerScopeService.currentOversightScope()`, narrower than the
+  (`RequestScopeResolver.currentOversightScope()`, narrower than the
   membership union of the normal lists). Owners are delivered only as a
   display name, never as sub/email.
 
@@ -1219,7 +1219,7 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    `readEndpointsMustDeclareAnAuthorisationAnnotation`,
    `writeEndpointsMustDeclareAnAuthorisationAnnotation`); `permitAll()` appears only on the four
    public endpoints (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`); Staffel-scoped services
-   must inject `OwnerScopeService` / `AuthHelperService` and their writes gate on it; peer-readable
+   must inject a scope-kernel service / `AuthHelperService` and their writes gate on it; peer-readable
    mission endpoints must redact PII; the bank never consults org-unit scope outside the one seam;
    controllers never return JPA entities. A new violation breaks the build (`./gradlew test`).
 

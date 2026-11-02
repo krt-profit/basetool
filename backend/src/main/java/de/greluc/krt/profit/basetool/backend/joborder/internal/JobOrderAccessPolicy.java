@@ -27,7 +27,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -56,7 +57,8 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "jobOrderAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
@@ -94,14 +96,14 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
    * @return {@code true} iff the order is in the caller's read scope
    */
   public boolean canSeeJobOrderInScope(@NotNull JobOrder order) {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return false;
     }
     OrgUnit responsible = order.getResponsibleOrgUnit();
     if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
       return true;
     }
-    return ownerScopeService.canSeeSquadronAsGrantee(responsible.getId(), Roles.LOGISTICIAN);
+    return accessGateService.canSeeSquadronAsGrantee(responsible.getId(), Roles.LOGISTICIAN);
   }
 
   /**
@@ -115,7 +117,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
     return jobOrderRepository
         .findById(jobOrderId)
         .map(JobOrder::getResponsibleOrgUnit)
-        .map(responsible -> ownerScopeService.canSeeSquadron(responsible.getId()))
+        .map(responsible -> accessGateService.canSeeSquadron(responsible.getId()))
         .orElse(false);
   }
 
@@ -130,7 +132,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
     return jobOrderRepository
         .findById(jobOrderId)
         .map(JobOrder::getResponsibleOrgUnit)
-        .map(responsible -> ownerScopeService.canSeeSquadron(responsible.getId()))
+        .map(responsible -> accessGateService.canSeeSquadron(responsible.getId()))
         .orElse(false);
   }
 
@@ -226,17 +228,18 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
    * The Logistician edit gate: a grant in the responsible unit, an order without one is admin's.
    */
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return false;
     }
     OrgUnit responsible = order.getResponsibleOrgUnit();
-    return ownerScopeService.canActAsLogisticianInOwner(
+    return accessGateService.canActAsLogisticianInOwner(
         responsible == null ? null : responsible.getId());
   }
 
   private boolean isOrderRequesterRow(@NotNull JobOrder order) {
     OrgUnit requesting = order.getRequestingOrgUnit();
-    return requesting != null && ownerScopeService.currentUserIsMemberOfOrgUnit(requesting.getId());
+    return requesting != null
+        && requestScopeResolver.currentUserIsMemberOfOrgUnit(requesting.getId());
   }
 
   private boolean orderHasAnyDelivery(@NotNull UUID jobOrderId) {

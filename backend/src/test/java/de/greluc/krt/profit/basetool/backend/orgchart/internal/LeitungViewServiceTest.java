@@ -49,7 +49,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -79,7 +79,7 @@ class LeitungViewServiceTest {
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private KommandoGroupRepository kommandoGroupRepository;
   @Mock private OrgUnitCascadeService cascadeService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
 
   @Spy private KommandoGroupMapper kommandoGroupMapper = new KommandoGroupMapperImpl();
 
@@ -97,7 +97,7 @@ class LeitungViewServiceTest {
   @BeforeEach
   void setUp() {
     auth = org.mockito.Mockito.mock(Authentication.class);
-    lenient().when(ownerScopeService.narrowToPin(any())).thenAnswer(inv -> inv.getArgument(0));
+    lenient().when(requestScopeResolver.narrowToPin(any())).thenAnswer(inv -> inv.getArgument(0));
     lenient().when(authHelperService.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
   }
 
@@ -289,7 +289,7 @@ class LeitungViewServiceTest {
         Set.of(),
         seat(squadronId, MembershipRole.STAFFELLEITER),
         seat(skId, MembershipRole.SK_LEAD));
-    when(ownerScopeService.narrowToPin(any())).thenReturn(Set.of(squadronId));
+    when(requestScopeResolver.narrowToPin(any())).thenReturn(Set.of(squadronId));
     when(roleSecurity.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, auth))
         .thenReturn(false);
     when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
@@ -307,7 +307,7 @@ class LeitungViewServiceTest {
   void pinnedToAUnitWithoutReach_listsNothing() {
     allUnitsExist();
     callerHolds(Set.of(), seat(squadronId, MembershipRole.STAFFELLEITER));
-    when(ownerScopeService.narrowToPin(any())).thenReturn(Set.of());
+    when(requestScopeResolver.narrowToPin(any())).thenReturn(Set.of());
 
     LeitungViewDto view = service.buildView(auth);
 

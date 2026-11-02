@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -70,7 +70,7 @@ public class ExchangeOrgStockTargets {
   private final MissionRepository missionRepository;
 
   /** The web's job-order gate, evaluated for the acting member. */
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   private final Clock clock = Clock.systemUTC();
 
@@ -100,7 +100,7 @@ public class ExchangeOrgStockTargets {
    */
   private @NotNull List<ExchangeOrgStockTargetsDto.JobOrder> jobOrders(
       @NotNull UUID unit, @NotNull UUID catalogueId, boolean material) {
-    if (!ownerScopeService.canViewJobOrders()) {
+    if (!requestScopeResolver.canViewJobOrders()) {
       return List.of();
     }
     return jobOrderRepository.findAllActiveWithMaterials().stream()

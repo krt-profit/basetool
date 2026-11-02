@@ -55,7 +55,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventT
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -101,7 +101,7 @@ class RefineryOrderStoreServiceTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private RefineryYieldRepository refineryYieldRepository;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private BookInPolicy bookInPolicy;
 
   @Mock private AuditService auditService;
@@ -471,7 +471,7 @@ class RefineryOrderStoreServiceTest {
       de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
           new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       resolved.setId(OWNING_OU_ID);
-      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID))
+      when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID))
           .thenReturn(resolved);
 
       RefineryOrderStoreItemDto dto =
@@ -480,7 +480,7 @@ class RefineryOrderStoreServiceTest {
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(dto)), false);
 
-      verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID);
+      verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID);
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository, times(1)).save(captor.capture());
       assertSame(resolved, captor.getValue().getOwningOrgUnit());
@@ -496,7 +496,7 @@ class RefineryOrderStoreServiceTest {
           new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))),
           false);
 
-      verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, null);
+      verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(owner, null);
     }
   }
 

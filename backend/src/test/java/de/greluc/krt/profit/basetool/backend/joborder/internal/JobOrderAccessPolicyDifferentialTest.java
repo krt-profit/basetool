@@ -39,8 +39,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -288,18 +286,12 @@ class JobOrderAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      OwnerScopeService ownerScopeService =
-          new OwnerScopeService(
-              resolver,
-              accessGateService,
-              new OrgUnitStampingService(
-                  resolver, accessGateService, authHelper, memberships, orgUnits));
       scopeHub =
           new ScopeHubJobOrderGates(
               accessGateService, resolver, repository, handovers, itemHandovers);
       policy =
           new JobOrderAccessPolicy(
-              ownerScopeService, authHelper, repository, handovers, itemHandovers);
+              resolver, accessGateService, authHelper, repository, handovers, itemHandovers);
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link OrgUnitContextualAuthority} — the SPEZIALKOMMANDO_PLAN.md §6.1 contextual
  * GrantedAuthority subtype. Pins the string-form contract that {@code @PreAuthorize} SpEL matches
- * against, plus equality semantics that the {@code OwnerScopeService.hasRoleInOrgUnit} matcher
+ * against, plus equality semantics that the {@code AccessGateService.hasRoleInOrgUnit} matcher
  * relies on.
  */
 class OrgUnitContextualAuthorityTest {

@@ -47,7 +47,8 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventT
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedLifecycleObserver;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriority;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
@@ -221,11 +222,15 @@ class SupplyNeedServiceTest {
 
   @Test
   void leadRaisesNeedAsLogistician() {
-    OwnerScopeService ownerScopeService = org.mockito.Mockito.mock(OwnerScopeService.class);
-    when(ownerScopeService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
+    AccessGateService accessGateService = org.mockito.Mockito.mock(AccessGateService.class);
+    when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
     SupplyAccessPolicy realPolicy =
         new SupplyAccessPolicy(
-            ownerScopeService, authHelperService, settingsService, org.mockito.Mockito.mock());
+            org.mockito.Mockito.mock(RequestScopeResolver.class),
+            accessGateService,
+            authHelperService,
+            settingsService,
+            org.mockito.Mockito.mock());
     SupplyNeedService leadService =
         new SupplyNeedService(
             needRepository,
@@ -251,7 +256,7 @@ class SupplyNeedServiceTest {
 
     leadService.create(createRequest(material.getId(), null, 3.0, false, null));
 
-    verify(ownerScopeService).hasRoleInOrgUnit(UNIT, "LOGISTICIAN");
+    verify(accessGateService).hasRoleInOrgUnit(UNIT, "LOGISTICIAN");
     verify(needRepository).save(any(SupplyNeed.class));
   }
 

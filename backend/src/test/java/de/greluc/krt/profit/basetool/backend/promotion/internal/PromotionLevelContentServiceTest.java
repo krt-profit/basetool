@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -48,7 +48,7 @@ class PromotionLevelContentServiceTest {
 
   @Mock private PromotionLevelContentMapper mapper;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AccessGateService accessGateService;
   @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private AuditService auditService;
@@ -119,7 +119,7 @@ class PromotionLevelContentServiceTest {
             .description("Kann fliegen")
             .build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
-    when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
+    when(accessGateService.canSeeSquadron(squadronId)).thenReturn(false);
 
     assertThrows(AccessDeniedException.class, () -> service.get(id));
   }

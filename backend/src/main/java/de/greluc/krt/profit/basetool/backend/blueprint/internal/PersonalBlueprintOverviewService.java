@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepo
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -66,7 +66,7 @@ public class PersonalBlueprintOverviewService {
   /** Default sort field applied when the request supplies none. */
   public static final String DEFAULT_SORT_FIELD = "productName";
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
@@ -139,7 +139,7 @@ public class PersonalBlueprintOverviewService {
     if (productKeys.isEmpty()) {
       return List.of();
     }
-    ScopePredicate scope = ownerScopeService.currentOversightScope();
+    ScopePredicate scope = requestScopeResolver.currentOversightScope();
     boolean adminAll = scope.adminAllScope();
     List<PersonalBlueprint> owned;
     Set<UUID> memberSubs;
@@ -202,7 +202,7 @@ public class PersonalBlueprintOverviewService {
    */
   @NotNull
   private Set<UUID> inScopeOwnerUserIds() {
-    ScopePredicate scope = ownerScopeService.currentOversightScope();
+    ScopePredicate scope = requestScopeResolver.currentOversightScope();
     if (scope.adminAllScope()) {
       return personalBlueprintRepository.findAllDistinctOwnerUserIds();
     }

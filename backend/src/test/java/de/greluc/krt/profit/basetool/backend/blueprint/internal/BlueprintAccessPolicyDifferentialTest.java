@@ -34,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.List;
@@ -105,18 +103,14 @@ class BlueprintAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               new MockHttpServletRequest());
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      OwnerScopeService hub =
-          new OwnerScopeService(
-              resolver,
-              accessGateService,
-              new OrgUnitStampingService(
-                  resolver, accessGateService, authHelper, memberships, orgUnits));
-      BlueprintAccessPolicy policy = new BlueprintAccessPolicy(hub);
+      BlueprintAccessPolicy policy = new BlueprintAccessPolicy(resolver);
 
       boolean restated =
           caller.admin() || (caller.seat() != null && caller.seat().confersOwnLevelOversight());
       boolean now = policy.canAccessBlueprintOverview();
-      assertThat(hub.canAccessBlueprintOverview()).as("hub for %s", caller.name()).isEqualTo(now);
+      assertThat(resolver.canAccessBlueprintOverview())
+          .as("hub for %s", caller.name())
+          .isEqualTo(now);
       assertThat(now).as("policy for %s", caller.name()).isEqualTo(restated);
       granted += now ? 1 : 0;
     }

@@ -598,7 +598,7 @@ loaded — writes the changed sections one after another, each with the version 
 returned, stops at the first failure (the failed and later sections stay marked changed), and
 copies the new version into all four forms. A `<noscript>` button per section keeps the plain form
 post (REQ-SEC-072). The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the
-org-unit re-scopes every list, count and entity on the page through `OwnerScopeService`, so the
+org-unit re-scopes every list, count and entity on the page through the scope kernel (`RequestScopeResolver`, `AccessGateService`), so the
 existing controlled full navigation (`POST /me/active-org-unit` → `_referer` redirect) is the correct
 UX — an "in-place" swap would amount to re-rendering the whole page anyway (REQ-ORG-\*).
 

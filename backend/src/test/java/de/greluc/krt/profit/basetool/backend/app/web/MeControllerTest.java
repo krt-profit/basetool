@@ -37,8 +37,9 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationServic
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,7 +53,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class MeControllerTest {
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private AccessGateService accessGateService;
 
   @Mock private PromotionReach promotionReach;
 
@@ -86,9 +88,9 @@ class MeControllerTest {
     UUID callerId = UUID.randomUUID();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
     when(jobOrderAssigneeLookup.holdsAnyEntry(callerId)).thenReturn(true);
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
-    when(ownerScopeService.canViewOwnJobOrders()).thenReturn(false);
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewOwnJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(false);
 
     MeController.CapabilitiesResponse response = controller.getCapabilities();
 
@@ -108,45 +110,45 @@ class MeControllerTest {
   @Test
   void getActiveOrgUnit_present_returnsUuid() {
     UUID active = UUID.randomUUID();
-    when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.of(active));
+    when(requestScopeResolver.currentOrgUnitId()).thenReturn(Optional.of(active));
 
     MeController.ActiveOrgUnitResponse response = controller.getActiveOrgUnit();
 
     assertEquals(active, response.orgUnitId());
-    verify(ownerScopeService).currentOrgUnitId();
+    verify(requestScopeResolver).currentOrgUnitId();
   }
 
   @Test
   void getActiveOrgUnit_empty_returnsNull() {
-    when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentOrgUnitId()).thenReturn(Optional.empty());
 
     assertNull(controller.getActiveOrgUnit().orgUnitId());
   }
 
   @Test
   void getCapabilities_logisticianFlagFollowsTheGrantInTheActiveContext() {
-    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(true);
+    when(accessGateService.canActAsLogisticianInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isLogisticianOrAbove());
   }
 
   @Test
   void getCapabilities_logisticianFlagIsFalseWithoutAGrantInTheActiveContext() {
-    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(false);
+    when(accessGateService.canActAsLogisticianInActiveContext()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().isLogisticianOrAbove());
   }
 
   @Test
   void getCapabilities_missionManagerFlagFollowsTheGrantInTheActiveContext() {
-    when(ownerScopeService.canActAsMissionManagerInActiveContext()).thenReturn(true);
+    when(requestScopeResolver.canActAsMissionManagerInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isMissionManagerOrAbove());
   }
 
   @Test
   void getCapabilities_missionManagerFlagIsFalseWithoutAGrantInTheActiveContext() {
-    when(ownerScopeService.canActAsMissionManagerInActiveContext()).thenReturn(false);
+    when(requestScopeResolver.canActAsMissionManagerInActiveContext()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().isMissionManagerOrAbove());
   }
@@ -170,7 +172,7 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_officerFlagsFollowTheReachInTheActiveContext() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(true);
     when(promotionReach.canManageInActiveContext()).thenReturn(true);
 
     MeController.CapabilitiesResponse response = controller.getCapabilities();
@@ -185,7 +187,7 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_officerFlagsOffWithoutReachInTheActiveContext() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(false);
 
     MeController.CapabilitiesResponse response = controller.getCapabilities();
 
@@ -199,8 +201,8 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_officerAnywhereIgnoresThePin() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(false);
-    when(ownerScopeService.canActAsOfficerAnywhere()).thenReturn(true);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(false);
+    when(accessGateService.canActAsOfficerAnywhere()).thenReturn(true);
 
     MeController.CapabilitiesResponse response = controller.getCapabilities();
 
@@ -210,8 +212,8 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_promotionManagementCountsOnlyUnitsWithPromotionEnabled() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
-    when(ownerScopeService.canActAsOfficerAnywhere()).thenReturn(true);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(true);
+    when(accessGateService.canActAsOfficerAnywhere()).thenReturn(true);
     when(promotionReach.canManageInActiveContext()).thenReturn(false);
     when(promotionReach.canManageAnywhere()).thenReturn(false);
     when(promotionReach.canUseAnywhere()).thenReturn(false);
@@ -240,7 +242,7 @@ class MeControllerTest {
 
   @Test
   void getLayout_carriesTheSameOfficerFlags() {
-    when(ownerScopeService.canActAsOfficerInActiveContext()).thenReturn(true);
+    when(requestScopeResolver.canActAsOfficerInActiveContext()).thenReturn(true);
 
     assertTrue(controller.getLayout(null, UUID.randomUUID()).capabilities().hasOfficerReach());
   }
@@ -271,30 +273,30 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_reflectsBlueprintOverviewAccess_true() {
-    when(ownerScopeService.canAccessBlueprintOverview()).thenReturn(true);
+    when(requestScopeResolver.canAccessBlueprintOverview()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().canSeeBlueprintOverview());
-    verify(ownerScopeService).canAccessBlueprintOverview();
+    verify(requestScopeResolver).canAccessBlueprintOverview();
   }
 
   @Test
   void getCapabilities_reflectsBlueprintOverviewAccess_false() {
-    when(ownerScopeService.canAccessBlueprintOverview()).thenReturn(false);
+    when(requestScopeResolver.canAccessBlueprintOverview()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().canSeeBlueprintOverview());
   }
 
   @Test
   void getCapabilities_reflectsJobOrderViewAccess_true() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().canViewJobOrders());
-    verify(ownerScopeService).canViewJobOrders();
+    verify(requestScopeResolver).canViewJobOrders();
   }
 
   @Test
   void getCapabilities_reflectsJobOrderViewAccess_false() {
-    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().canViewJobOrders());
   }
@@ -345,10 +347,10 @@ class MeControllerTest {
     UUID active = UUID.randomUUID();
     UUID callerId = UUID.randomUUID();
     List<OrgUnitMembershipOptionDto> catalogue = List.of();
-    when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.of(active));
+    when(requestScopeResolver.currentOrgUnitId()).thenReturn(Optional.of(active));
     when(authHelperService.isAdmin()).thenReturn(true);
     when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
-    when(ownerScopeService.canActAsLogisticianInActiveContext()).thenReturn(true);
+    when(accessGateService.canActAsLogisticianInActiveContext()).thenReturn(true);
     when(notificationService.unreadCount(callerId)).thenReturn(7L);
 
     MeController.LayoutResponse layout = controller.getLayout(null, callerId);

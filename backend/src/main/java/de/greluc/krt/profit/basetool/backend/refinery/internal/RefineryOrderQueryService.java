@@ -30,7 +30,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldReposito
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -65,7 +66,8 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
   private final RefineryOrderRepository refineryOrderRepository;
   private final LocationRepository locationRepository;
   private final RefineryYieldRepository refineryYieldRepository;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
 
   /**
    * Owner-scoped paged list under the list filters (REQ-REFINERY-019).
@@ -128,7 +130,7 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
    */
   public Page<RefineryOrder> getUserRefineryOrdersScoped(
       @NotNull UUID targetUserId, @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentLogisticianScope();
+    ScopePredicate scope = accessGateService.currentLogisticianScope();
     return refineryOrderRepository.findByOwnerIdScoped(
         targetUserId,
         scope.adminAllScope(),
@@ -205,7 +207,7 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
   public List<RefineryOrder> getMissionRefineryOrdersForCaller(
       @NotNull UUID missionId, @NotNull UUID userId) {
     Map<UUID, RefineryOrder> byId = new LinkedHashMap<>();
-    ScopePredicate scope = ownerScopeService.currentLogisticianScope();
+    ScopePredicate scope = accessGateService.currentLogisticianScope();
     if (scope.adminAllScope()
         || scope.activeOrgUnitId() != null
         || !scope.memberOrgUnitIds().isEmpty()) {
@@ -234,7 +236,7 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
       boolean readyOnly,
       @Nullable String query,
       @NotNull Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return refineryOrderRepository.findFilteredScoped(
         statusesOrAll(statuses),
         readyOnly,

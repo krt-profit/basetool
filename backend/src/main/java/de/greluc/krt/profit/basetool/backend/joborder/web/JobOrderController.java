@@ -252,7 +252,7 @@ public class JobOrderController {
       description =
           "Returns a paginated list of the orders the caller's own org unit(s) requested"
               + " (Auftraggeber view), redacted (no Bearbeiter / no materials summary).")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canViewOwnJobOrders()")
+  @PreAuthorize("isAuthenticated() and @requestScopeResolver.canViewOwnJobOrders()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getRequestedJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,

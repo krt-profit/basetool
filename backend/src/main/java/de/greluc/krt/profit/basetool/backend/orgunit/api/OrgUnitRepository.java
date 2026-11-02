@@ -36,7 +36,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
    * Counts how many of the given org units are flagged {@code is_profit_eligible}; drives {@code
-   * OwnerScopeService.canViewJobOrders()}.
+   * RequestScopeResolver.canViewJobOrders()}.
    *
    * @param ids the org-unit ids to inspect (the caller's membership ids); must be non-empty.
    * @return the number of those ids whose org unit is profit-eligible; {@code 0} when none.

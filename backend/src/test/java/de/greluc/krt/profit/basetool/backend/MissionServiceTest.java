@@ -44,6 +44,8 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionReque
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -70,7 +72,8 @@ class MissionServiceTest {
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
-  @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
 
   @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserService userService;
 
@@ -94,7 +97,8 @@ class MissionServiceTest {
             null,
             null,
             userService,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             authHelperService,
             auditService,
             null,
@@ -108,7 +112,7 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE"))))
@@ -126,7 +130,7 @@ class MissionServiceTest {
 
   @Test
   void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE"))))
@@ -145,7 +149,7 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.findNextPublicMission(any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.of(head));
@@ -167,7 +171,7 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
     when(missionRepository.findNextScopedMission(
             any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any()))
@@ -193,7 +197,7 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pin, Set.of()));
     when(missionRepository.findNextScopedMission(
             any(), eq(List.of("PLANNED", "ACTIVE")), eq(pin), eq(Set.of()), any()))
@@ -211,7 +215,7 @@ class MissionServiceTest {
   @Test
   void getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch() {
     UUID orgA = UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
     when(missionRepository.findNextScopedMission(
             any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any()))
@@ -228,7 +232,7 @@ class MissionServiceTest {
     UUID orgA = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     Mission upcoming = new Mission();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
@@ -253,7 +257,7 @@ class MissionServiceTest {
   @Test
   void getUpcomingOwnAndSignedUp_pinned_passesTheActiveOrgUnit() {
     UUID pin = UUID.randomUUID();
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pin, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
@@ -275,7 +279,7 @@ class MissionServiceTest {
 
   @Test
   void getUpcomingOwnAndSignedUp_adminAllScope_spansTheOrganisation() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
@@ -292,7 +296,7 @@ class MissionServiceTest {
 
   @Test
   void getUpcomingOwnAndSignedUp_unitlessMember_isLimitedToPublicMissions() {
-    when(ownerScopeService.currentScopePredicate())
+    when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
@@ -315,7 +319,7 @@ class MissionServiceTest {
     List<String> status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
     Pageable pageable = PageRequest.of(0, 10);
-    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
             query, start, end, status, null, null, null, false, null, Set.of(), false, pageable))
@@ -334,7 +338,7 @@ class MissionServiceTest {
     UUID unit = UUID.randomUUID();
     List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
             null, null, null, allFour, null, null, unit, false, null, Set.of(), false, pageable))
@@ -355,7 +359,7 @@ class MissionServiceTest {
   void searchMissions_nullEmptyAndExplicitFourStatuses_reachTheRepositoryIdentically() {
     List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentScopePredicateGranting(Roles.MISSION_MANAGER))
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
             null, null, null, allFour, null, null, null, false, null, Set.of(), false, pageable))
@@ -422,7 +426,8 @@ class MissionServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(home);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(home);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -441,7 +446,8 @@ class MissionServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(null);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -470,7 +476,8 @@ class MissionServiceTest {
     User caller = new User();
     caller.setId(UUID.randomUUID());
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+        .thenReturn(null);
 
     assertThrows(
         de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -488,7 +495,7 @@ class MissionServiceTest {
     scopeSquadron.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.empty());
-    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.of(scopeSquadron));
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.of(scopeSquadron));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -508,7 +515,7 @@ class MissionServiceTest {
     picked.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, picked.getId()))
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, picked.getId()))
         .thenReturn(picked);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 

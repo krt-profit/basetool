@@ -45,7 +45,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -279,7 +279,7 @@ class ExchangeAdminActingMemberTest {
         .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, client)
         .header(ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER, capability)
         .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, KEY)
-        .header(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER, Squadron.IRIDIUM_ID.toString());
+        .header(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, Squadron.IRIDIUM_ID.toString());
   }
 
   /**

@@ -46,7 +46,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -110,7 +111,8 @@ public class InventoryCheckoutService {
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
   private final InventoryItemMapper inventoryItemMapper;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
 
@@ -380,7 +382,7 @@ public class InventoryCheckoutService {
     final OrgUnit targetOwningOrgUnit =
         targetPool != null
             ? targetPool
-            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+            : orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
                 targetUser, dto.targetOwningOrgUnitId());
 
     InventoryItem newItem =
@@ -647,7 +649,7 @@ public class InventoryCheckoutService {
     final OrgUnit targetOwningOrgUnit =
         targetPersonal
             ? item.getOwningOrgUnit()
-            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+            : orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
                 item.getUser(), dto.targetOwningOrgUnitId());
 
     final boolean merge = Boolean.TRUE.equals(dto.mergeStock());
@@ -835,7 +837,7 @@ public class InventoryCheckoutService {
    */
   @Transactional
   public int deleteAllGlobalInventory() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
     log.info(
         "Bulk delete of global inventory requested (adminAll={}, active={}, members={})",
         scope.adminAllScope(),
@@ -1034,7 +1036,7 @@ public class InventoryCheckoutService {
                 "Target location not found");
 
     final OrgUnit targetOwningOrgUnit =
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
             targetUser != null ? targetUser : owner, request.targetOwningOrgUnitId());
 
     int rebooked = 0;
@@ -1215,7 +1217,7 @@ public class InventoryCheckoutService {
     final OrgUnit sharedTargetOrgUnit =
         targetPersonal || movable.isEmpty()
             ? null
-            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+            : orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
                 movable.getFirst().getUser(), request.targetOwningOrgUnitId());
 
     for (InventoryItem item : movable) {

@@ -79,7 +79,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPol
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyDonation;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeed;
@@ -113,7 +113,7 @@ class TenancyGuardTest {
   /** The scope services whose SpEL bean names and {@code can*} methods count as a scope gate. */
   private static final Set<Class<?>> SCOPE_GATE_TYPES =
       Set.of(
-          OwnerScopeService.class,
+          RequestScopeResolver.class,
           AccessGateService.class,
           OperationAccessPolicy.class,
           RefineryAccessPolicy.class,
@@ -509,7 +509,7 @@ class TenancyGuardTest {
     SpelScopeGate gate = new SpelScopeGate(SCOPE_GATE_TYPES);
 
     assertThat(gate.isScopeGated("hasRole('ADMIN')")).isTrue();
-    assertThat(gate.isScopeGated("hasRole('OFFICER') and @ownerScopeService.canEditShip(#id)"))
+    assertThat(gate.isScopeGated("hasRole('OFFICER') and @accessGateService.canEditShip(#id)"))
         .isTrue();
     assertThat(
             gate.isScopeGated(
@@ -519,7 +519,7 @@ class TenancyGuardTest {
         .isTrue();
     assertThat(gate.isScopeGated("isAuthenticated()")).isFalse();
     assertThat(gate.isScopeGated("hasRole('ADMIN') or isAuthenticated()")).isFalse();
-    assertThat(gate.isScopeGated("isAuthenticated() or @ownerScopeService.canEditShip(#id)"))
+    assertThat(gate.isScopeGated("isAuthenticated() or @accessGateService.canEditShip(#id)"))
         .isFalse();
     assertThat(gate.isScopeGated("@bankSecurityService.canSee(#id, authentication)")).isFalse();
     assertThat(gate.isScopeGated("hasAnyRole('ADMIN', 'OFFICER')")).isFalse();

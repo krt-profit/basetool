@@ -51,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolv
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -96,7 +95,6 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
-  private OwnerScopeService ownerScopeService;
   private PromotionAccessPolicy policy;
 
   private static Squadron squadron(UUID id, boolean enabled) {
@@ -127,14 +125,10 @@ class PromotionFeatureFlagServiceGateTest {
             mock(OrgUnitCascadeService.class),
             staffelMembershipResolver,
             request);
-    ownerScopeService =
-        new OwnerScopeService(
-            requestScopeResolver,
-            mock(AccessGateService.class),
-            mock(OrgUnitStampingService.class));
     policy =
         new PromotionAccessPolicy(
-            ownerScopeService,
+            requestScopeResolver,
+            mock(AccessGateService.class),
             authHelper,
             mock(OrgUnitMembershipQueryService.class),
             mock(PromotionReach.class));
@@ -254,11 +248,15 @@ class PromotionFeatureFlagServiceGateTest {
   void topicList_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
         new PromotionTopicService(
-            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+            topicRepository,
+            mapper,
+            mock(AccessGateService.class),
+            mock(RequestScopeResolver.class),
+            policyStub,
+            mock(AuditService.class));
     when(policyStub.readScope(PromotionReadView.MEMBER)).thenReturn(Optional.empty());
     Pageable pageable = PageRequest.of(0, 20);
 
@@ -273,11 +271,15 @@ class PromotionFeatureFlagServiceGateTest {
   void topicListAll_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
         new PromotionTopicService(
-            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+            topicRepository,
+            mapper,
+            mock(AccessGateService.class),
+            mock(RequestScopeResolver.class),
+            policyStub,
+            mock(AuditService.class));
     when(policyStub.readScope(PromotionReadView.MEMBER)).thenReturn(Optional.empty());
 
     assertTrue(service.listAll(PromotionReadView.MEMBER).isEmpty());
@@ -289,11 +291,15 @@ class PromotionFeatureFlagServiceGateTest {
   void topicCreate_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
         new PromotionTopicService(
-            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+            topicRepository,
+            mapper,
+            mock(AccessGateService.class),
+            mock(RequestScopeResolver.class),
+            policyStub,
+            mock(AuditService.class));
     doThrow(new AccessDeniedException("disabled")).when(policyStub).assertFeatureEnabled();
 
     assertThrows(
@@ -307,11 +313,15 @@ class PromotionFeatureFlagServiceGateTest {
   void topicUpdate_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
         new PromotionTopicService(
-            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+            topicRepository,
+            mapper,
+            mock(AccessGateService.class),
+            mock(RequestScopeResolver.class),
+            policyStub,
+            mock(AuditService.class));
     doThrow(new AccessDeniedException("disabled")).when(policyStub).assertFeatureEnabled();
 
     assertThrows(
@@ -327,11 +337,15 @@ class PromotionFeatureFlagServiceGateTest {
   void topicDelete_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
         new PromotionTopicService(
-            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+            topicRepository,
+            mapper,
+            mock(AccessGateService.class),
+            mock(RequestScopeResolver.class),
+            policyStub,
+            mock(AuditService.class));
     doThrow(new AccessDeniedException("disabled")).when(policyStub).assertFeatureEnabled();
 
     assertThrows(AccessDeniedException.class, () -> service.delete(UUID.randomUUID()));

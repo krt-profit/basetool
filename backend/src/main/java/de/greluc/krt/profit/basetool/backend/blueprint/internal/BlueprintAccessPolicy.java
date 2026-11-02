@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +38,7 @@ public class BlueprintAccessPolicy {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "blueprintAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /**
    * Checks whether the caller may open the org-unit blueprint availability overview: admins,
@@ -47,6 +47,6 @@ public class BlueprintAccessPolicy {
    * @return {@code true} iff the caller may open the overview
    */
   public boolean canAccessBlueprintOverview() {
-    return ownerScopeService.canAccessBlueprintOverview();
+    return requestScopeResolver.canAccessBlueprintOverview();
   }
 }

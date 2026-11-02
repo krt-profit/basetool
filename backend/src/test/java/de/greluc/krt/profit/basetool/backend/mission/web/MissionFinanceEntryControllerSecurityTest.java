@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -72,7 +71,6 @@ class MissionFinanceEntryControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionFinanceEntryService financeEntryService;
-  @MockitoBean private OwnerScopeService ownerScopeService;
 
   @MockitoBean private MissionAccessPolicy missionAccessPolicy;
 

@@ -443,7 +443,7 @@ The layers are acyclic and guarded (ADR-0047); the business domains are not. The
 technical layer, 1,383 of its 1,389 types are `public`, and 21 of its 23 non-kernel domains form one
 strongly connected component: 1,565 cross-domain class edges, 206 of them a service using another
 domain's repository. Lager rows are created by three foreign domains, GDPR deletion and merge
-touch fourteen, and the access hubs (`OwnerScopeService`, `AccessGateService`) decide for nine.
+touch fourteen, and the access hubs (`RequestScopeResolver`, `AccessGateService`) decide for nine.
 
 **Cost.** No domain can be changed, tested or reasoned about alone; any class can bypass another
 domain's rules through its repository, and a second write path into an aggregate (the exchange's

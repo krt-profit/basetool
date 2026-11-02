@@ -201,7 +201,10 @@ import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -620,9 +623,18 @@ class ArchitectureTest {
           PersonalBlueprintOverviewService.class,
           OrgUnitBankAccessService.class);
 
+  /** The org-unit scope services of the scope kernel; callers use them directly. */
+  private static final List<Class<?>> ORG_UNIT_SCOPE_TYPES =
+      List.of(
+          OwnerScopeService.class,
+          RequestScopeResolver.class,
+          AccessGateService.class,
+          OrgUnitStampingService.class);
+
   /** The scope guards a staffel-scoped service injects. */
   static final Set<Class<?>> SCOPE_GUARDS =
-      Set.of(AuthHelperService.class, OwnerScopeService.class);
+      Stream.concat(Stream.of(AuthHelperService.class), ORG_UNIT_SCOPE_TYPES.stream())
+          .collect(Collectors.toUnmodifiableSet());
 
   /** The handler methods that may declare {@code @PreAuthorize("permitAll()")} (REQ-SEC-052). */
   static final Set<Method> PERMIT_ALL_ALLOWED_METHODS =
@@ -1171,7 +1183,7 @@ class ArchitectureTest {
   void exchangeServicesNeverUseAdminGatesOrTheAdminScope() {
     DescribedPredicate<JavaClass> selection = EXCHANGE_NON_WEB;
     assertClassFloor("exchangeServicesNeverUseAdminGatesOrTheAdminScope", selection, 160);
-    exchangeServicesNeverUseAdminGatesRule(selection, OwnerScopeService.class).check(CLASSES);
+    exchangeServicesNeverUseAdminGatesRule(selection, RequestScopeResolver.class).check(CLASSES);
   }
 
   static ArchRule exchangeServicesNeverUseAdminGatesRule(
@@ -1466,8 +1478,8 @@ class ArchitectureTest {
   }
 
   /**
-   * Staffel-scoped aggregate services must inject {@code AuthHelperService} or {@code
-   * OwnerScopeService}, so their data cannot leak across org units.
+   * Staffel-scoped aggregate services must inject {@code AuthHelperService} or an org-unit scope
+   * service, so their data cannot leak across org units.
    */
   @Test
   void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
@@ -1849,13 +1861,15 @@ class ArchitectureTest {
   }
 
   /**
-   * No bank class may use {@code OwnerScopeService}; bank authorization depends only on the bank
+   * No bank class may use an org-unit scope service; bank authorization depends only on the bank
    * roles and grants (REQ-BANK-008).
    */
   @Test
   void bankClassesMustNotConsultOrgUnitScope() {
     assertClassFloor("bankClassesMustNotConsultOrgUnitScope", BANK_DOMAIN, 121);
-    bankClassesMustNotConsultOrgUnitScopeRule(OwnerScopeService.class, ROOT_PACKAGE).check(CLASSES);
+    for (Class<?> scopeType : ORG_UNIT_SCOPE_TYPES) {
+      bankClassesMustNotConsultOrgUnitScopeRule(scopeType, ROOT_PACKAGE).check(CLASSES);
+    }
   }
 
   static ArchRule bankClassesMustNotConsultOrgUnitScopeRule(
@@ -1935,7 +1949,7 @@ class ArchitectureTest {
   }
 
   /**
-   * {@code OrgRoleManagementSecurityService} must not depend on {@code OwnerScopeService}, so
+   * {@code OrgRoleManagementSecurityService} must not depend on an org-unit scope service, so
    * delegated appointment verdicts use only the caller's own membership ranks and the hierarchy
    * (REQ-ROLE-004).
    */
@@ -1945,23 +1959,28 @@ class ArchitectureTest {
         "delegatedRoleAuthoriserMustNotConsultOwnerScope",
         classesIn(Set.of(OrgRoleManagementSecurityService.class)),
         1);
-    mustNotDependOnRule(OrgRoleManagementSecurityService.class, OwnerScopeService.class)
-        .because(
-            "the delegated appointment verdict must read only the caller's own membership ranks +"
-                + " the persisted hierarchy, never the admin-pin / admin-all / cascading scope that"
-                + " OwnerScopeService carries (epic #800, REQ-ROLE-004 no-self-promotion / no-admin"
-                + " invariant)")
-        .check(CLASSES);
+    for (Class<?> scopeType : ORG_UNIT_SCOPE_TYPES) {
+      mustNotDependOnRule(OrgRoleManagementSecurityService.class, scopeType)
+          .because(
+              "the delegated appointment verdict must read only the caller's own membership ranks"
+                  + " + the persisted hierarchy, never the admin-pin / admin-all / cascading scope"
+                  + " the org-unit scope services carry (epic #800, REQ-ROLE-004 no-self-promotion"
+                  + " / no-admin invariant)")
+          .check(CLASSES);
+    }
   }
 
   /**
-   * Only {@code OrgUnitBankAccessService} may couple {@code OwnerScopeService} with the
+   * Only {@code OrgUnitBankAccessService} may couple an org-unit scope service with the
    * bank-account repository (ADR-0020, ADR-0028), keeping the rest of the bank org-unit-blind.
    */
   @Test
   void orgUnitAwareBankSeamIsContainedToOneClass() {
     DescribedPredicate<JavaClass> selection =
-        bridgesOrgUnitScopeAndTheBank(OwnerScopeService.class, BANK_DOMAIN);
+        ORG_UNIT_SCOPE_TYPES.stream()
+            .map(scopeType -> bridgesOrgUnitScopeAndTheBank(scopeType, BANK_DOMAIN))
+            .reduce((left, right) -> left.or(right))
+            .orElseThrow();
     assertClassFloor("orgUnitAwareBankSeamIsContainedToOneClass", selection, 1);
     orgUnitAwareBankSeamRule(selection, OrgUnitBankAccessService.class).check(CLASSES);
   }

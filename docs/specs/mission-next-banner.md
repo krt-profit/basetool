@@ -75,7 +75,7 @@ The next-mission lookup is restricted to missions **owned by the viewer's effect
 the viewer has any:
 
 - The effective scope is the same vector the scoped mission lists use
-  (`OwnerScopeService#currentScopePredicate()`): a plain member's own Staffel/Spezialkommando
+  (`RequestScopeResolver#currentScopePredicate()`): a plain member's own Staffel/Spezialkommando
   membership(s); a Bereichsleitung/OL leader's **cascade-expanded** reach (their Bereich + its
   Staffeln/SKs, or — for the Organisationsleitung — every org unit), per
   [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-015; or, when an active org unit is pinned and
@@ -139,7 +139,7 @@ the viewer has any:
 `#requireOwningOrgUnitForInternal`, `OperationFinanceService`, `MissionVisibility`,
 migration `V329__constrain_internal_mission_to_owning_org_unit.sql`,
 `MissionRepository#findNextScopedMission` + `#findNextPublicMission`,
-`OwnerScopeService#currentScopePredicate` (scope vector + leadership cascade).
+`RequestScopeResolver#currentScopePredicate` (scope vector + leadership cascade).
 
 ### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)
 

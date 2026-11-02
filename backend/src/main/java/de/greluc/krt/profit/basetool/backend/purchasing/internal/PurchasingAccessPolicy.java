@@ -22,7 +22,8 @@ package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -51,7 +52,8 @@ public class PurchasingAccessPolicy {
   /** The contextual role that stands for the lead or a Logistician of a unit. */
   static final String UNIT_MANAGER_ROLE = "LOGISTICIAN";
 
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
+  private final AccessGateService accessGateService;
   private final AuthHelperService authHelperService;
   private final PurchasingSettingsService settingsService;
   private final PurchasingDelegateRepository delegateRepository;
@@ -83,12 +85,12 @@ public class PurchasingAccessPolicy {
    * @return {@code true} for the governing leadership
    */
   public boolean isGoverningLeadership() {
-    if (authHelperService.isAdmin() || ownerScopeService.currentUserIsOlMember()) {
+    if (authHelperService.isAdmin() || requestScopeResolver.currentUserIsOlMember()) {
       return true;
     }
     for (UUID area : settingsService.governingAreaIds()) {
-      if (ownerScopeService.currentUserHoldsRoleOnOrgUnit(area, MembershipRole.BEREICHSLEITER)
-          || ownerScopeService.currentUserHoldsRoleOnOrgUnit(
+      if (requestScopeResolver.currentUserHoldsRoleOnOrgUnit(area, MembershipRole.BEREICHSLEITER)
+          || requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
               area, MembershipRole.BEREICHSKOORDINATOR)) {
         return true;
       }
@@ -126,7 +128,7 @@ public class PurchasingAccessPolicy {
    * @return {@code true} when the caller manages the unit's side of a deal
    */
   public boolean canManageUnit(@NotNull UUID orgUnitId) {
-    return ownerScopeService.hasRoleInOrgUnit(orgUnitId, UNIT_MANAGER_ROLE);
+    return accessGateService.hasRoleInOrgUnit(orgUnitId, UNIT_MANAGER_ROLE);
   }
 
   /**
@@ -137,7 +139,7 @@ public class PurchasingAccessPolicy {
    */
   @NotNull
   public Set<UUID> managedUnitIds() {
-    return ownerScopeService.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE);
+    return requestScopeResolver.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE);
   }
 
   /**
@@ -280,7 +282,7 @@ public class PurchasingAccessPolicy {
    * @return {@code true} for the unit's lead
    */
   public boolean leadsUnit(@NotNull UUID orgUnitId) {
-    return ownerScopeService.canActAsOfficerIn(orgUnitId)
-        || ownerScopeService.hasRoleInOrgUnit(orgUnitId, "LEAD");
+    return accessGateService.canActAsOfficerIn(orgUnitId)
+        || accessGateService.hasRoleInOrgUnit(orgUnitId, "LEAD");
   }
 }

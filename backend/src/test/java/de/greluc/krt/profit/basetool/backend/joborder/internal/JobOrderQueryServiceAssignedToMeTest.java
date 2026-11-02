@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,7 +56,7 @@ class JobOrderQueryServiceAssignedToMeTest {
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private AuthHelperService authHelper;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderStockProjectionService jobOrderStockProjectionService;
 
   @InjectMocks private JobOrderQueryService queryService;
@@ -73,7 +73,7 @@ class JobOrderQueryServiceAssignedToMeTest {
     Page<JobOrderDto> result = queryService.getAssignedJobOrders(null, PAGEABLE);
 
     assertThat(result).isSameAs(mapped);
-    verifyNoInteractions(ownerScopeService);
+    verifyNoInteractions(requestScopeResolver);
   }
 
   @Test

@@ -400,7 +400,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("@ownerScopeService.canActAsMissionManagerInActiveContext()")
+  @PreAuthorize("@requestScopeResolver.canActAsMissionManagerInActiveContext()")
   @Operation(
       summary = "Create a new operation",
       description =

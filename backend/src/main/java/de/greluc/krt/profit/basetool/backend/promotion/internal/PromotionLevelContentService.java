@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -53,7 +53,7 @@ public class PromotionLevelContentService {
   private final PromotionLevelContentRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final PromotionLevelContentMapper mapper;
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
@@ -216,7 +216,7 @@ public class PromotionLevelContentService {
         || category.getTopic().getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canSeeSquadron(category.getTopic().getOwningSquadron().getId())) {
+    if (!accessGateService.canSeeSquadron(category.getTopic().getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not match this level content's owning squadron");
     }

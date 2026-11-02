@@ -35,7 +35,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -73,7 +73,7 @@ public class LeitungViewService {
   private final KommandoGroupRepository kommandoGroupRepository;
   private final KommandoGroupMapper kommandoGroupMapper;
   private final OrgUnitCascadeService cascadeService;
-  private final OwnerScopeService ownerScopeService;
+  private final RequestScopeResolver requestScopeResolver;
 
   /**
    * Builds the caller's Leitung view: the OL(s), Bereiche, Staffeln and Spezialkommandos they lead
@@ -89,7 +89,7 @@ public class LeitungViewService {
     boolean admin = authHelperService.isAdmin();
     UUID callerId = authHelperService.currentUserId().orElse(null);
     Set<UUID> visible =
-        admin ? Set.of() : ownerScopeService.narrowToPin(visibleOrgUnitIds(callerId));
+        admin ? Set.of() : requestScopeResolver.narrowToPin(visibleOrgUnitIds(callerId));
 
     List<LeitungUnitDto> ols = new ArrayList<>();
     for (OrgUnit ol : sortedByName(orgUnitRepository.findActiveOrganisationsleitung())) {

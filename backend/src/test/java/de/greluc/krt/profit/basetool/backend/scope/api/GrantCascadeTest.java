@@ -72,7 +72,8 @@ class GrantCascadeTest {
   /** The real gate chain for one caller over the org tree. */
   private static final class Chain {
 
-    final OwnerScopeService scope;
+    final RequestScopeResolver requestScopeResolver;
+    final AccessGateService accessGateService;
 
     Chain(String role, Set<UUID> grants, boolean admin, UUID pin) {
       AuthHelperService authHelper = mock(AuthHelperService.class);
@@ -117,11 +118,8 @@ class GrantCascadeTest {
               new OrgUnitCascadeService(orgUnits),
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      scope =
-          new OwnerScopeService(
-              resolver,
-              new AccessGateService(resolver, authHelper),
-              mock(OrgUnitStampingService.class));
+      requestScopeResolver = resolver;
+      accessGateService = new AccessGateService(resolver, authHelper);
     }
   }
 
@@ -134,7 +132,7 @@ class GrantCascadeTest {
   void aBereichGrantCoversTheBereichItsStaffelnAndItsSpezialkommandosOnly(String role) {
     Chain chain = new Chain(role, Set.of(BEREICH_X), false, null);
 
-    assertThat(unitsWhere(unit -> chain.scope.hasRoleInOrgUnit(unit, role)))
+    assertThat(unitsWhere(unit -> chain.accessGateService.hasRoleInOrgUnit(unit, role)))
         .containsExactlyInAnyOrder(BEREICH_X, STAFFEL_X1, SK_X2);
   }
 
@@ -143,7 +141,7 @@ class GrantCascadeTest {
   void anOrganisationsleitungGrantCoversEveryUnit(String role) {
     Chain chain = new Chain(role, Set.of(OL), false, null);
 
-    assertThat(unitsWhere(unit -> chain.scope.hasRoleInOrgUnit(unit, role)))
+    assertThat(unitsWhere(unit -> chain.accessGateService.hasRoleInOrgUnit(unit, role)))
         .containsExactlyInAnyOrderElementsOf(ALL);
   }
 
@@ -152,7 +150,7 @@ class GrantCascadeTest {
   void aStaffelGrantCoversThatStaffelOnly(String role) {
     Chain chain = new Chain(role, Set.of(STAFFEL_X1), false, null);
 
-    assertThat(unitsWhere(unit -> chain.scope.hasRoleInOrgUnit(unit, role)))
+    assertThat(unitsWhere(unit -> chain.accessGateService.hasRoleInOrgUnit(unit, role)))
         .containsExactly(STAFFEL_X1);
   }
 
@@ -160,18 +158,20 @@ class GrantCascadeTest {
   void aGrantOfTheOtherRoleCoversNothing() {
     Chain chain = new Chain(Roles.MISSION_MANAGER, Set.of(OL), false, null);
 
-    assertThat(unitsWhere(unit -> chain.scope.hasRoleInOrgUnit(unit, Roles.LOGISTICIAN))).isEmpty();
+    assertThat(
+            unitsWhere(unit -> chain.accessGateService.hasRoleInOrgUnit(unit, Roles.LOGISTICIAN)))
+        .isEmpty();
   }
 
   @Test
   void theLogisticianGateAndListScopeFollowTheCascadeUnpinned() {
     Chain chain = new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, null);
 
-    assertThat(unitsWhere(chain.scope::canActAsLogisticianIn))
+    assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn))
         .containsExactlyInAnyOrder(BEREICH_X, STAFFEL_X1, SK_X2);
-    assertThat(chain.scope.currentLogisticianOrgUnitIds())
+    assertThat(chain.accessGateService.currentLogisticianOrgUnitIds())
         .containsExactlyInAnyOrder(BEREICH_X, STAFFEL_X1, SK_X2);
-    assertThat(chain.scope.currentLogisticianScope().memberOrgUnitIds())
+    assertThat(chain.accessGateService.currentLogisticianScope().memberOrgUnitIds())
         .containsExactlyInAnyOrder(BEREICH_X, STAFFEL_X1, SK_X2);
   }
 
@@ -179,31 +179,31 @@ class GrantCascadeTest {
   void pinnedToAUnitBelowTheGrantTheLogisticianActsThereOnly() {
     Chain chain = new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, SK_X2);
 
-    assertThat(unitsWhere(chain.scope::canActAsLogisticianIn)).containsExactly(SK_X2);
-    assertThat(chain.scope.currentLogisticianOrgUnitIds()).containsExactly(SK_X2);
+    assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn)).containsExactly(SK_X2);
+    assertThat(chain.accessGateService.currentLogisticianOrgUnitIds()).containsExactly(SK_X2);
   }
 
   @Test
   void pinnedOutsideTheGrantTheLogisticianActsNowhere() {
     Chain chain = new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, STAFFEL_Y1);
 
-    assertThat(unitsWhere(chain.scope::canActAsLogisticianIn)).isEmpty();
-    assertThat(chain.scope.currentLogisticianOrgUnitIds()).isEmpty();
+    assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn)).isEmpty();
+    assertThat(chain.accessGateService.currentLogisticianOrgUnitIds()).isEmpty();
   }
 
   @Test
   void theMissionManagerFlagFollowsThePinThroughTheCascade() {
     assertThat(
             new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, STAFFEL_X1)
-                .scope.canActAsMissionManagerInActiveContext())
+                .requestScopeResolver.canActAsMissionManagerInActiveContext())
         .isTrue();
     assertThat(
             new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, STAFFEL_Y1)
-                .scope.canActAsMissionManagerInActiveContext())
+                .requestScopeResolver.canActAsMissionManagerInActiveContext())
         .isFalse();
     assertThat(
             new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, null)
-                .scope.canActAsMissionManagerInActiveContext())
+                .requestScopeResolver.canActAsMissionManagerInActiveContext())
         .isTrue();
   }
 
@@ -212,17 +212,18 @@ class GrantCascadeTest {
     Chain bereich = new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, null);
     Chain staffel = new Chain(Roles.MISSION_MANAGER, Set.of(STAFFEL_X1), false, null);
 
-    assertThat(bereich.scope.canManageMissionsOf(SK_X2)).isTrue();
-    assertThat(bereich.scope.canManageMissionsOf(STAFFEL_Y1)).isFalse();
-    assertThat(bereich.scope.canManageMissionsOf(null)).isTrue();
-    assertThat(staffel.scope.canManageMissionsOf(null)).isFalse();
+    assertThat(bereich.accessGateService.canManageMissionsOf(SK_X2)).isTrue();
+    assertThat(bereich.accessGateService.canManageMissionsOf(STAFFEL_Y1)).isFalse();
+    assertThat(bereich.accessGateService.canManageMissionsOf(null)).isTrue();
+    assertThat(staffel.accessGateService.canManageMissionsOf(null)).isFalse();
   }
 
   @Test
   void anAdminPassesEveryUnitWithoutAnyGrant() {
     Chain chain = new Chain(Roles.LOGISTICIAN, Set.of(), true, null);
 
-    assertThat(unitsWhere(unit -> chain.scope.hasRoleInOrgUnit(unit, Roles.LOGISTICIAN)))
+    assertThat(
+            unitsWhere(unit -> chain.accessGateService.hasRoleInOrgUnit(unit, Roles.LOGISTICIAN)))
         .containsExactlyInAnyOrderElementsOf(ALL);
   }
 }

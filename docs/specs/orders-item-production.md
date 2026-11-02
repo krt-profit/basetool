@@ -520,7 +520,7 @@ is deliberately kept uniform rather than widening the picker gate to `… or can
 - [ ] The redacted inline item stock / Itemsammelübersicht / material-collection page render `—`
   for owner/location.
 
-**Enforced by:** `OwnerScopeServiceTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
+**Enforced by:** `ScopeKernelTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
 SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorTest` (the three
 redaction passes blank owner/location, keep the rest, null-safe),
 `JobOrderMissionAllocationRedactorTest` + `JobOrderLinkedStockMissionAllocationIntegrationTest` (the

@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +49,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "inventoryAccessPolicy";
 
-  private final OwnerScopeService ownerScopeService;
+  private final AccessGateService accessGateService;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserAccessPolicy userAccessPolicy;
 
@@ -64,7 +64,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
     return inventoryItemRepository
         .findById(itemId)
         .map(i ->
-            ownerScopeService.permitsOwnedRow(
+            accessGateService.permitsOwnedRow(
                 i.getUser(), i.getOwningOrgUnit(), false, Roles.LOGISTICIAN))
         .orElse(false);
   }
@@ -80,7 +80,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
     return inventoryItemRepository
         .findById(itemId)
         .map(i ->
-            ownerScopeService.permitsOwnedRow(
+            accessGateService.permitsOwnedRow(
                 i.getUser(), i.getOwningOrgUnit(), true, Roles.LOGISTICIAN))
         .orElse(false);
   }
@@ -97,7 +97,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
   public boolean isLogisticianOfItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> ownerScopeService.canActAsLogisticianInOwner(owningUnitId(i)))
+        .map(i -> accessGateService.canActAsLogisticianInOwner(owningUnitId(i)))
         .orElse(false);
   }
 

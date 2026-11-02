@@ -45,7 +45,8 @@ import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialE
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +78,8 @@ class InventoryItemServiceVersionFlushTest {
   @Mock private MaterialMapper materialMapper;
 
   @Mock private AuditService auditService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
 
@@ -97,7 +99,8 @@ class InventoryItemServiceVersionFlushTest {
             new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             auditService,
             eventPublisher);
     inventoryItemService =
@@ -109,7 +112,8 @@ class InventoryItemServiceVersionFlushTest {
             locationRepository,
             earmarkTargets,
             inventoryItemMapper,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             null,
             new InventoryStockCommands(null, null, null, null, null, null, null, null),
             null,

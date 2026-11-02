@@ -91,7 +91,7 @@ class ShipScopeParityTest {
                 .map(Ship::getId)
                 .collect(Collectors.toSet()),
         (wired, id) ->
-            new HangarAccessPolicy(wired.ownerScopeService(), shipRepository).canSeeShip(id));
+            new HangarAccessPolicy(wired.resolver(), wired.gate(), shipRepository).canSeeShip(id));
   }
 
   private static ScopeParityCallers.Row row(String name, Ship ship, boolean exact) {

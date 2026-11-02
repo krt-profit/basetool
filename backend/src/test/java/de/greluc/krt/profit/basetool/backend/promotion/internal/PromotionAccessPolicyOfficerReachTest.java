@@ -26,8 +26,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.PromotionReach;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,8 @@ class PromotionAccessPolicyOfficerReachTest {
   private static final UUID OTHER_SQUADRON = UUID.randomUUID();
   private static final UUID MEMBER = UUID.randomUUID();
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private AccessGateService accessGateService;
   @Mock private AuthHelperService authHelper;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private PromotionReach promotionReach;
@@ -57,7 +59,7 @@ class PromotionAccessPolicyOfficerReachTest {
 
   @Test
   void assertOfficerIn_passesWithReachInTheOwningSquadron() {
-    when(ownerScopeService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
     when(promotionReach.isEnabled(SQUADRON)).thenReturn(true);
 
     assertThatCode(() -> policy.assertOfficerIn(SQUADRON)).doesNotThrowAnyException();
@@ -65,7 +67,7 @@ class PromotionAccessPolicyOfficerReachTest {
 
   @Test
   void assertOfficerIn_refusesWithoutReachInTheOwningSquadron() {
-    when(ownerScopeService.canActAsOfficerIn(SQUADRON)).thenReturn(false);
+    when(accessGateService.canActAsOfficerIn(SQUADRON)).thenReturn(false);
 
     assertThatThrownBy(() -> policy.assertOfficerIn(SQUADRON))
         .isInstanceOf(AccessDeniedException.class);
@@ -73,7 +75,7 @@ class PromotionAccessPolicyOfficerReachTest {
 
   @Test
   void assertOfficerIn_refusesAnOfficerOfASquadronWithPromotionOff() {
-    when(ownerScopeService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
     when(promotionReach.isEnabled(SQUADRON)).thenReturn(false);
 
     assertThatThrownBy(() -> policy.assertOfficerIn(SQUADRON))
@@ -82,7 +84,7 @@ class PromotionAccessPolicyOfficerReachTest {
 
   @Test
   void assertOfficerIn_passesAnAdminForASquadronWithPromotionOff() {
-    when(ownerScopeService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(true);
 
     assertThatCode(() -> policy.assertOfficerIn(SQUADRON)).doesNotThrowAnyException();
@@ -94,7 +96,7 @@ class PromotionAccessPolicyOfficerReachTest {
     when(authHelper.isAdmin()).thenReturn(true);
 
     assertThatCode(() -> policy.assertOfficerOverMember(MEMBER)).doesNotThrowAnyException();
-    verifyNoInteractions(orgUnitMembershipQueryService, ownerScopeService);
+    verifyNoInteractions(orgUnitMembershipQueryService, requestScopeResolver, accessGateService);
   }
 
   @Test
@@ -102,8 +104,8 @@ class PromotionAccessPolicyOfficerReachTest {
     when(authHelper.isAdmin()).thenReturn(false);
     when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(MEMBER))
         .thenReturn(List.of(OTHER_SQUADRON, SQUADRON));
-    when(ownerScopeService.canActAsOfficerIn(OTHER_SQUADRON)).thenReturn(false);
-    when(ownerScopeService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(OTHER_SQUADRON)).thenReturn(false);
+    when(accessGateService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
     when(promotionReach.isEnabled(SQUADRON)).thenReturn(true);
 
     assertThatCode(() -> policy.assertOfficerOverMember(MEMBER)).doesNotThrowAnyException();
@@ -114,7 +116,7 @@ class PromotionAccessPolicyOfficerReachTest {
     when(authHelper.isAdmin()).thenReturn(false);
     when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(MEMBER))
         .thenReturn(List.of(OTHER_SQUADRON));
-    when(ownerScopeService.canActAsOfficerIn(OTHER_SQUADRON)).thenReturn(false);
+    when(accessGateService.canActAsOfficerIn(OTHER_SQUADRON)).thenReturn(false);
 
     assertThatThrownBy(() -> policy.assertOfficerOverMember(MEMBER))
         .isInstanceOf(AccessDeniedException.class);
@@ -125,7 +127,7 @@ class PromotionAccessPolicyOfficerReachTest {
     when(authHelper.isAdmin()).thenReturn(false);
     when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(MEMBER))
         .thenReturn(List.of(SQUADRON));
-    when(ownerScopeService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(SQUADRON)).thenReturn(true);
     when(promotionReach.isEnabled(SQUADRON)).thenReturn(false);
 
     assertThatThrownBy(() -> policy.assertOfficerOverMember(MEMBER))

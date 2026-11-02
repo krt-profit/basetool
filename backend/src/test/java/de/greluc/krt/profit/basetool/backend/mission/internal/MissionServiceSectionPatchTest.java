@@ -47,7 +47,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -82,7 +83,8 @@ class MissionServiceSectionPatchTest {
 
   @Mock private UserRepository userRepository;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RequestScopeResolver requestScopeResolver;
+  @Mock private OrgUnitStampingService orgUnitStampingService;
 
   @Mock private AuditService auditService;
 
@@ -104,7 +106,8 @@ class MissionServiceSectionPatchTest {
             null,
             null,
             null,
-            ownerScopeService,
+            requestScopeResolver,
+            orgUnitStampingService,
             null,
             auditService,
             null,
@@ -300,7 +303,7 @@ class MissionServiceSectionPatchTest {
     existing.setIsInternal(true);
     existing.setOwningOrgUnitVersion(0L);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(ownerScopeService.resolveReassignTargetOrgUnit(null)).thenReturn(null);
+    when(orgUnitStampingService.resolveReassignTargetOrgUnit(null)).thenReturn(null);
 
     assertThrows(
         BadRequestException.class, () -> missionService.updateOwningOrgUnit(missionId, null, 0L));
@@ -440,7 +443,7 @@ class MissionServiceSectionPatchTest {
     when(target.getId()).thenReturn(targetId);
     existing.setOwningOrgUnitVersion(2L);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(ownerScopeService.resolveReassignTargetOrgUnit(targetId)).thenReturn(target);
+    when(orgUnitStampingService.resolveReassignTargetOrgUnit(targetId)).thenReturn(target);
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Mission result = missionService.updateOwningOrgUnit(missionId, targetId, 2L);
@@ -463,7 +466,7 @@ class MissionServiceSectionPatchTest {
     existing.setOwningOrgUnit(previous);
     existing.setOwningOrgUnitVersion(0L);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(ownerScopeService.resolveReassignTargetOrgUnit(null)).thenReturn(null);
+    when(orgUnitStampingService.resolveReassignTargetOrgUnit(null)).thenReturn(null);
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Mission result = missionService.updateOwningOrgUnit(missionId, null, 0L);
@@ -496,7 +499,7 @@ class MissionServiceSectionPatchTest {
     UUID targetId = UUID.randomUUID();
     existing.setOwningOrgUnitVersion(0L);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(ownerScopeService.resolveReassignTargetOrgUnit(targetId))
+    when(orgUnitStampingService.resolveReassignTargetOrgUnit(targetId))
         .thenThrow(new AccessDeniedException("not assignable"));
 
     assertThrows(
