@@ -1,6 +1,6 @@
 # ADR-0299 — The home page is a personalisable widget dashboard
 
-- **Status:** Accepted — partially implemented: the member and the admin dashboard with their framework, the start page, and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Aufträge zu bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig, Bank, Information, Favoriten and Benachrichtigungen. Not built yet: Materialbörse, Bedarf & Spenden and Meine Bankanträge.
+- **Status:** Accepted — shipped: the member and the admin dashboard with their framework, the start page, and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Aufträge zu bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig, Bank, Materialbörse, Bedarf & Spenden, Meine Bankanträge, Information, Favoriten and Benachrichtigungen.
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-034, REQ-UI-032) ·

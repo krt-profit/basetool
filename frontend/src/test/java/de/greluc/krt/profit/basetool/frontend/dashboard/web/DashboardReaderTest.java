@@ -221,9 +221,14 @@ class DashboardReaderTest {
             DashboardWidgetType.ASSIGNED_ORDERS,
             DashboardWidgetType.LOW_STOCK,
             DashboardWidgetType.BANK,
-            DashboardWidgetType.REFINERY_READY);
+            DashboardWidgetType.REFINERY_READY,
+            DashboardWidgetType.MARKET,
+            DashboardWidgetType.BANK_REQUESTS);
     assertThat(read(GUEST, null, List.of()).catalogue())
-        .doesNotContain(DashboardWidgetType.UPCOMING_DAYS)
+        .doesNotContain(
+            DashboardWidgetType.UPCOMING_DAYS,
+            DashboardWidgetType.MARKET,
+            DashboardWidgetType.BANK_REQUESTS)
         .contains(DashboardWidgetType.INFORMATION);
   }
 
@@ -238,6 +243,33 @@ class DashboardReaderTest {
         .contains(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
     assertThat(read(MEMBER, null, List.of()).catalogue())
         .doesNotContain(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
+  }
+
+  @Test
+  @DisplayName("the needs widget is offered only while the supply surface is on")
+  void offersTheNeedsWidgetOnlyWhileSupplyIsOn() {
+    when(client.dashboard(DashboardMode.MEMBER)).thenReturn(stored(false));
+    NavigationAccess supplyOn =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.SUPPLY));
+
+    assertThat(read(supplyOn, null, List.of()).catalogue())
+        .contains(DashboardWidgetType.SUPPLY_NEEDS);
+    assertThat(read(MEMBER, null, List.of()).catalogue())
+        .doesNotContain(DashboardWidgetType.SUPPLY_NEEDS);
+  }
+
+  @Test
+  @DisplayName("a stored needs widget stays but greys out while the supply surface is off")
+  void greysOutAStoredNeedsWidgetWhileSupplyIsOff() {
+    when(client.dashboard(DashboardMode.MEMBER))
+        .thenReturn(
+            stored(true, widget(DashboardWidgetType.SUPPLY_NEEDS, DashboardColumn.NARROW, null)));
+
+    DashboardView view = read(MEMBER, null, List.of());
+
+    assertThat(view.narrow()).hasSize(1);
+    assertThat(view.narrow().getFirst().available()).isFalse();
+    verify(client, never()).pruneDashboard(any(), any());
   }
 
   @Test

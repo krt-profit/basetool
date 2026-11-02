@@ -38,7 +38,28 @@ public enum DashboardStatus {
   OPEN,
 
   /** Orders that are in progress. */
-  IN_PROGRESS;
+  IN_PROGRESS,
+
+  /** Market offers and wanted-listings together. */
+  BOTH,
+
+  /** Market offers only. */
+  OFFERS,
+
+  /** Market wanted-listings only. */
+  REQUESTS,
+
+  /** Every open supply need. */
+  ALL_OPEN,
+
+  /** Open supply needs nothing has been credited to. */
+  UNCOVERED,
+
+  /** Open supply needs that are covered in part. */
+  PARTIAL,
+
+  /** Bank requests that have reached a final state. */
+  DECIDED;
 
   /**
    * The key suffix of the status label in the message bundles.

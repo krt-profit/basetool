@@ -444,6 +444,63 @@ class DashboardE2eTest {
   }
 
   /**
+   * The catalogue adds the Materialbörse and the bank-requests widgets; each loads its own body,
+   * and the status options offer only their own choices.
+   */
+  @Test
+  void theTradeWidgetsLoadTheirBodiesAndOfferTheirOptions() {
+    run(
+        memberState,
+        1440,
+        "dashboard-trade-widgets",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/");
+          assertThat(page.getByTestId("dashboard-widget-market")).hasCount(0);
+          assertThat(page.getByTestId("dashboard-widget-bank-requests")).hasCount(0);
+
+          page.getByTestId("dashboard-customise").click();
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-market").click();
+          assertThat(page.getByTestId("dashboard-widget-market")).hasCount(1);
+          page.getByTestId("dashboard-add").click();
+          page.getByTestId("dashboard-add-bank-requests").click();
+
+          assertThat(
+                  page.getByTestId("dashboard-widget-market")
+                      .locator(
+                          "[data-testid='dashboard-market-row'],"
+                              + " [data-testid='dashboard-market-empty']")
+                      .first())
+              .isVisible();
+          assertThat(
+                  page.getByTestId("dashboard-widget-bank-requests")
+                      .locator(
+                          "[data-testid='dashboard-bank-requests-row'],"
+                              + " [data-testid='dashboard-bank-requests-empty']")
+                      .first())
+              .isVisible();
+          assertThat(page.getByTestId("dashboard-widget-bank-requests"))
+              .hasAttribute("data-rows", "3");
+          assertThat(page.getByTestId("dashboard-widget-market"))
+              .hasAttribute("data-status", "BOTH");
+
+          page.getByTestId("dashboard-widget-market").getByTestId("dashboard-options").click();
+          assertThat(page.locator("#dashboard-option-status option:not([hidden])")).hasCount(3);
+          assertThat(page.locator("#dashboard-option-status option:not([hidden])").first())
+              .hasAttribute("value", "BOTH");
+          page.locator("#dashboard-option-status").selectOption("REQUESTS");
+          page.getByTestId("dashboard-options-save").click();
+
+          assertThat(page.getByTestId("dashboard-widget-market"))
+              .hasAttribute("data-status", "REQUESTS");
+          page.reload();
+          assertThat(page.getByTestId("dashboard-widget-market"))
+              .hasAttribute("data-status", "REQUESTS");
+          assertThat(page.getByTestId("dashboard-widget-bank-requests")).hasCount(1);
+        });
+  }
+
+  /**
    * An option change after a reorder is saved without a conflict: the two versions are separate.
    */
   @Test

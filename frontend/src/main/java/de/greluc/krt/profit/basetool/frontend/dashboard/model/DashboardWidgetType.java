@@ -23,8 +23,10 @@ import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationGate;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -69,7 +71,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      EnumSet.of(DashboardStatus.UNREAD, DashboardStatus.ALL)),
+      ordered(DashboardStatus.UNREAD, DashboardStatus.ALL)),
 
   /** The member's next missions; the mission list is for members and above. */
   NEXT_MISSION(
@@ -129,7 +131,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
       EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
-      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+      ordered(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
   /** The low minimum stock levels; the Lager is for members and above. */
   LOW_STOCK(
@@ -151,7 +153,7 @@ public enum DashboardWidgetType {
       DashboardColumn.NARROW,
       NavigationGate.requires(NavigationFlag.JOB_ORDERS),
       EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
-      EnumSet.of(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
+      ordered(DashboardStatus.OPEN_ACTIVE, DashboardStatus.OPEN, DashboardStatus.IN_PROGRESS)),
 
   /** The open material demand; the overview is part of the order area. */
   MATERIAL_DEMAND(
@@ -165,7 +167,31 @@ public enum DashboardWidgetType {
       DashboardMode.MEMBER,
       DashboardColumn.NARROW,
       NavigationGate.ALWAYS,
-      EnumSet.of(DashboardOption.ROWS));
+      EnumSet.of(DashboardOption.ROWS)),
+
+  /** The open Materialbörse entries; the board is for members and above. */
+  MARKET(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      ordered(DashboardStatus.BOTH, DashboardStatus.OFFERS, DashboardStatus.REQUESTS)),
+
+  /** The open supply needs; the supply surface is for members while it is switched on. */
+  SUPPLY_NEEDS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER).andRequires(NavigationFlag.SUPPLY),
+      EnumSet.of(DashboardOption.UNIT, DashboardOption.ROWS, DashboardOption.STATUS),
+      ordered(DashboardStatus.ALL_OPEN, DashboardStatus.UNCOVERED, DashboardStatus.PARTIAL)),
+
+  /** The member's own bank requests; the org-unit bank page is for members and above. */
+  BANK_REQUESTS(
+      DashboardMode.MEMBER,
+      DashboardColumn.NARROW,
+      NavigationGate.anyRole(Roles.KRT_MEMBER),
+      EnumSet.of(DashboardOption.ROWS, DashboardOption.STATUS),
+      ordered(DashboardStatus.OPEN, DashboardStatus.DECIDED, DashboardStatus.ALL));
 
   /** The day counts the days option offers. */
   public static final List<Integer> DAY_CHOICES = List.of(3, 7, 14);
@@ -204,6 +230,16 @@ public enum DashboardWidgetType {
     this.gate = gate;
     this.options = options;
     this.statuses = statuses;
+  }
+
+  /**
+   * The status choices of a widget in the order its options dialog lists them, the default first.
+   *
+   * @param choices the statuses in display order
+   * @return an immutable set that iterates in that order
+   */
+  private static @NotNull Set<DashboardStatus> ordered(@NotNull DashboardStatus... choices) {
+    return Collections.unmodifiableSet(new LinkedHashSet<>(List.of(choices)));
   }
 
   /**

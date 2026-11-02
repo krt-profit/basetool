@@ -1305,17 +1305,19 @@ Favourites, hidden entries, order, tab bar, „Darstellung“, the dashboard and
 admin reset, and the preferences are not audited. They are part of the data export — the admin
 export for somebody who cannot sign in included (REQ-SEC-058) — and of the admin account merge,
 where the surviving account's choices win (REQ-SEC-046). A dashboard widget renders only for a
-user who may read its data: „Nächste Tage“, „Nächster Einsatz“, „Bestand niedrig“ and „Bank“
-need the member role (the mission list, the Lager and the org-unit bank are for members and above),
+user who may read its data: „Nächste Tage“, „Nächster Einsatz“, „Bestand niedrig“, „Bank“,
+„Materialbörse“, „Bedarf & Spenden“ (also only while the supply surface is on) and „Meine
+Bankanträge“ need the member role (the mission list, the Lager, the org-unit bank, the
+Materialbörse and the supply needs are for members and above),
 „Aufträge zu bearbeiten“ and „Materialbedarf“ the access to the order area, the others every
-signed-in user („Ich
-bearbeite“ lists only the orders the caller is an assignee of, REQ-ORDERS-047; „Raffinerie: fertig“
-lists the ready refinery orders in the caller's unit scope). The order widgets read per unit:
+signed-in user („Ich bearbeite“ lists only the orders the caller is an assignee of, REQ-ORDERS-047;
+„Raffinerie: fertig“ lists the ready refinery orders in the caller's unit scope). The order widgets read per unit:
 „Aufträge zu bearbeiten“ shows the orders of the units the caller belongs to, narrowed to one of
 them by the unit option, and never another unit's; losing the role deletes the widget's instances on the next load, and the admin mode's dashboard is
 for `ADMIN` only (REQ-UI-034). „Bank“ lists the accounts the caller may see by the bank's own
 rules, and „Nächster Einsatz“ shows an internal mission only to members of its unit (REQ-MISSION-031,
-REQ-MISSION-008).
+REQ-MISSION-008). „Meine Bankanträge“ lists only the caller's own requests (REQ-BANK-022); the
+widgets read, they raise no audit event.
 
 The endpoints `GET /api/v1/navigation/preferences`, `PUT /api/v1/navigation/preferences/favourites`,
 `PUT .../hidden`, `PUT .../favourites-and-hidden`, `PUT .../order/{mode}/{scope}`,

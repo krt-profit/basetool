@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="market" data-widget-content data-testid="dashboard-market">
+    <ul th:if="${not #lists.isEmpty(marketRows)}" class="dash-links">
+        <li th:each="row : ${marketRows}">
+            <a class="dash-link" data-testid="dashboard-market-row"
+               th:href="@{/materialboerse(view=${row.offer() ? 'offers' : 'requests'},selected=${row.id()})}">
+                <span class="cell-title">
+                    <span th:text="${row.name()}">Quantanium</span>
+                    <span th:if="${row.offer()}" class="chip" th:text="#{dashboard.market.offer}">Angebot</span>
+                    <span th:unless="${row.offer()}" class="chip chip--muted" th:text="#{dashboard.market.request}">Gesuch</span>
+                </span>
+                <span class="cell-sub">
+                    <span th:if="${row.quality() != null and row.offer()}" th:text="'Q ' + ${row.quality()}">Q 920</span>
+                    <span th:if="${row.quality() != null and !row.offer()}" th:text="#{dashboard.market.minQuality(${row.quality()})}">ab Q 600</span>
+                    <th:block th:if="${row.quality() != null}"> · </th:block>
+                    <span th:if="${row.pieces()}"
+                          th:text="${#numbers.formatInteger(row.quantity(), 1, 'DEFAULT')} + ' ' + #{material.quantity.piece}">3 Stück</span>
+                    <span th:unless="${row.pieces()}"
+                          th:text="${#numbers.formatDecimal(row.quantity(), 1, 'DEFAULT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">12,500 SCU</span>
+                </span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(marketRows)}" class="home-notifs__empty" data-testid="dashboard-market-empty"
+       th:text="#{dashboard.market.empty}">Zurzeit gibt es keine offenen Einträge.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="dashboard-market-count" th:text="${marketTotal}">12</span>
+        <a class="home-card-link"
+           th:href="${marketRequestsOnly} ? @{/materialboerse(view='requests')} : @{/materialboerse}"
+           th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="supplyNeeds" data-widget-content data-testid="dashboard-supply-needs">
+    <ul th:if="${not #lists.isEmpty(needRows)}" class="dash-links">
+        <li th:each="need : ${needRows}">
+            <a class="dash-link" data-testid="dashboard-supply-needs-row"
+               th:href="${needScope != null} ? @{/supply/needs(orgUnitId=${needScope})} : @{/supply/needs}">
+                <span class="cell-title">
+                    <span th:text="${need.material() != null ? need.material().name() : need.gameItem().name()}">Quantanium</span>
+                    <span th:if="${needShowsUnit}" class="chip" data-testid="dashboard-supply-needs-unit"
+                          th:title="${need.orgUnitName()}" th:text="${need.orgUnitShorthand() != null ? need.orgUnitShorthand() : need.orgUnitName()}">ALF</span>
+                </span>
+                <span class="dash-meter">
+                    <span class="meter" aria-hidden="true">
+                        <i class="meter__fill--warning" th:attr="data-krtm-width=${need.fulfilledPercent()}"></i>
+                    </span>
+                    <span class="cell-sub" th:text="#{dashboard.supplyNeeds.covered(${need.fulfilledPercent()})}">40 % gedeckt</span>
+                </span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(needRows)}" class="home-notifs__empty" data-testid="dashboard-supply-needs-empty"
+       th:text="#{dashboard.supplyNeeds.empty}">Zurzeit gibt es keinen offenen Bedarf.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="dashboard-supply-needs-count" th:text="${needTotal}">9</span>
+        <a class="home-card-link"
+           th:href="${needScope != null} ? @{/supply/needs(orgUnitId=${needScope})} : @{/supply/needs}"
+           th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+<div th:fragment="bankRequests" data-widget-content data-testid="dashboard-bank-requests">
+    <ul th:if="${not #lists.isEmpty(bankRequestRows)}" class="dash-links">
+        <li th:each="request : ${bankRequestRows}">
+            <a class="dash-link" data-testid="dashboard-bank-requests-row" th:href="@{/org-unit-bank}">
+                <span class="cell-title">
+                    <span th:text="#{'bank.request.type.' + ${request.type()}}">Einzahlung</span>
+                    <span class="chip"
+                          th:classappend="${request.status() == 'PENDING'} ? ' chip--warning' : (${request.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
+                          th:text="#{'bank.request.status.' + ${request.status()}}">Ausstehend</span>
+                </span>
+                <span class="cell-sub">
+                    <span th:text="${#numbers.formatInteger(@moneyFormat.round(request.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
+                    · <span th:text="${request.accountName()}">ALF Betriebskonto</span>
+                </span>
+            </a>
+        </li>
+    </ul>
+    <p th:if="${#lists.isEmpty(bankRequestRows)}" class="home-notifs__empty" data-testid="dashboard-bank-requests-empty"
+       th:text="#{dashboard.bankRequests.empty}">Keine Anträge.</p>
+    <div class="home-card-foot dash-widget__foot">
+        <span class="count-badge count-badge--sm" data-testid="dashboard-bank-requests-count" th:text="${bankRequestTotal}">2</span>
+        <a class="home-card-link" th:href="@{/org-unit-bank}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+    </div>
+</div>
+
+</body>
+</html>

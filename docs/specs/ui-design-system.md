@@ -17,7 +17,7 @@
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
 > ADR-0297, ADR-0298, ADR-0299 and ADR-0323 (REQ-UI-026 amendment, REQ-UI-032, REQ-UI-033,
-> REQ-UI-035 shipped; REQ-UI-034 partially shipped) ·
+> REQ-UI-034, REQ-UI-035 shipped) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -2582,16 +2582,15 @@ ADR-0282, ADR-0297
 
 ### REQ-UI-034 — The home page is a personalisable widget dashboard
 
-> **Status: partially shipped** (ADR-0299, map #2800). Shipped: the member dashboard with its
+> **Status: shipped** (ADR-0299, map #2800): the member dashboard with its
 > default, the framework (two columns, up/down, column switch, remove, catalogue and options
 > dialogs, „Standard wiederherstellen", the cap of 12, the layout version per mode and the option
 > version per instance, the deletion on role loss, live update or the ten-minute poll, the
 > one-time hint) and the widgets Nächste Tage, Nächster Einsatz, Hangar-Bereitschaft, Aufträge zu
-> bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig,
-> Bank, Information (with the inline editor for administrators), Favoriten and
-> Benachrichtigungen, with the options of the matrix below, the admin dashboard with its five
-> widgets and the start page per mode. Not built yet (planned): the catalogue widgets
-> Materialbörse, Bedarf & Spenden and Meine Bankanträge with their options.
+> bearbeiten, Ich bearbeite, Materialbedarf, Raffinerie: fertig, Bestand niedrig, Bank,
+> Materialbörse, Bedarf & Spenden, Meine Bankanträge, Information (with the inline editor for
+> administrators), Favoriten and Benachrichtigungen, with the options of the matrix below, the
+> admin dashboard with its five widgets and the start page per mode.
 
 The home page is a dashboard of widgets the user composes, in member and admin mode, each with its
 own layout. The logo always leads to the dashboard of the current mode. The Fan Kit band of
@@ -2672,6 +2671,18 @@ whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich be
 (REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
 reload at once when the tab becomes visible again.
 
+**Trade widgets.** Read-only and not audited. „Materialbörse" merges the offer and the wanted
+board, newest first, and counts both page totals. „Bedarf & Spenden" reads the open needs
+(REQ-SUP-006) and counts the page total; „Ungedeckt" is an open need nothing is credited to,
+„Teilweise gedeckt" one that is credited in part (the `coverage` filter of the needs list);
+a chosen or pinned unit shows that unit's needs, no pin the union of the member's own units' open
+needs, each row labelled with its unit; it is offered only while the supply surface is on
+(REQ-SUP-001). „Meine
+Bankanträge" lists the caller's own requests (REQ-BANK-022) only; „Offen" is pending,
+„Entschieden" every request that has reached a final state. The live-sync rooms are `materialboard`
+(`board`, `requests`), `supply-needs` (`needs`, `stats`) and `orgunit-bank` (`orgUnitBank`). A
+failed load shows the instance's error state with the test id `dashboard-<slug>-error`.
+
 **Store.** In the `navigation` module, owner-only and not audited, like REQ-UI-032: the layout
 (instances, column, order) is one section per mode with its own version, and the options of each
 instance carry their own version, so an option change never collides with a reorder. Conflicts and
@@ -2727,6 +2738,9 @@ page total as count, the rows, the unit label, the target bar and trend, the emp
 `DashboardOrderWidgetsMvcTest` (Aufträge zu bearbeiten, Materialbedarf and
 Raffinerie: fertig: the read per option, the count, the rows, the unit label, the empty states, the
 refused read), `JobOrderBackendClientTest` (the processing-unit and summary reads),
+`DashboardTradeWidgetsMvcTest` (Materialbörse, Bedarf & Spenden and Meine Bankanträge: the read
+per option, the merged boards, the coverage and status filters, the counts, the unit label, the
+empty states), `NeedCoverageDataTest` (the uncovered and partly covered needs),
 `DashboardAdminWidgetMvcTest` (the rows, counts, empty states and the admin gate of the admin
 widgets), `AdminNavigationRenderMvcTest` (the admin board and the hub widget),
 `NavigationLegacyRedirectMvcTest` (`/admin/announcement`), `StartPageRedirectMvcTest` (the start

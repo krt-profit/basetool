@@ -103,9 +103,7 @@ final class DashboardWidgetOptions {
    */
   static @NotNull DashboardStatus orderStatus(
       @NotNull DashboardWidgetType type, @Nullable DashboardStatus requested) {
-    return requested != null && type.offersStatus(requested)
-        ? requested
-        : DashboardStatus.OPEN_ACTIVE;
+    return statusOf(type, requested, DashboardStatus.OPEN_ACTIVE);
   }
 
   /**
@@ -115,11 +113,40 @@ final class DashboardWidgetOptions {
    * @return the backend order status names, never empty
    */
   static @NotNull List<String> orderStatuses(@NotNull DashboardStatus status) {
-    return switch (status) {
-      case OPEN -> List.of(ORDER_OPEN);
-      case IN_PROGRESS -> List.of(ORDER_IN_PROGRESS);
-      case OPEN_ACTIVE, UNREAD, ALL -> List.of(ORDER_OPEN, ORDER_IN_PROGRESS);
-    };
+    if (status == DashboardStatus.OPEN) {
+      return List.of(ORDER_OPEN);
+    }
+    return status == DashboardStatus.IN_PROGRESS
+        ? List.of(ORDER_IN_PROGRESS)
+        : List.of(ORDER_OPEN, ORDER_IN_PROGRESS);
+  }
+
+  /**
+   * The coverage a supply-needs status filter asks the backend for.
+   *
+   * @param status the status filter of the widget
+   * @return {@code UNCOVERED} or {@code PARTIAL}, or {@code null} for every open need
+   */
+  static @Nullable String needCoverage(@NotNull DashboardStatus status) {
+    if (status == DashboardStatus.UNCOVERED || status == DashboardStatus.PARTIAL) {
+      return status.name();
+    }
+    return null;
+  }
+
+  /**
+   * The status filter of a widget whose choices are the statuses its type offers.
+   *
+   * @param type the widget type
+   * @param requested the requested status, or {@code null}
+   * @param fallback the type's default status
+   * @return the requested status when the type offers it, else {@code fallback}
+   */
+  static @NotNull DashboardStatus statusOf(
+      @NotNull DashboardWidgetType type,
+      @Nullable DashboardStatus requested,
+      @NotNull DashboardStatus fallback) {
+    return requested != null && type.offersStatus(requested) ? requested : fallback;
   }
 
   /**

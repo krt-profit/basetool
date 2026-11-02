@@ -44,7 +44,9 @@ const LIVE_ROOMS = {
         demand: ['MATERIAL_DEMAND'],
     },
     inventory: { 'stock-levels': ['LOW_STOCK'] },
-    'orgunit-bank': { orgUnitBank: ['BANK'] },
+    'orgunit-bank': { orgUnitBank: ['BANK', 'BANK_REQUESTS'] },
+    materialboard: { board: ['MARKET'], requests: ['MARKET'] },
+    'supply-needs': { needs: ['SUPPLY_NEEDS'], stats: ['SUPPLY_NEEDS'] },
     refinery: { queue: ['REFINERY_READY'] },
 };
 

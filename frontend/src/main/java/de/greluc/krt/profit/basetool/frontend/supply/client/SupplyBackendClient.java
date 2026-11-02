@@ -114,6 +114,27 @@ public class SupplyBackendClient {
   @Nullable
   public PageResponse<NeedDto> needs(
       @Nullable UUID orgUnitId, @Nullable String status, int page, int size) {
+    return needs(orgUnitId, status, null, page, size);
+  }
+
+  /**
+   * Reads one page of the needs the caller may see, narrowed to a coverage.
+   *
+   * @param orgUnitId only this raising unit, or {@code null}
+   * @param status only this state, or {@code null} for the visible ones
+   * @param coverage {@code UNCOVERED} or {@code PARTIAL} for the open needs of that coverage, or
+   *     {@code null} for any
+   * @param page zero-based page index
+   * @param size page size
+   * @return the page, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public PageResponse<NeedDto> needs(
+      @Nullable UUID orgUnitId,
+      @Nullable String status,
+      @Nullable String coverage,
+      int page,
+      int size) {
     StringBuilder template =
         new StringBuilder("/api/v1/supply/needs?page={page}&size={size}&sort=createdAt,desc");
     List<Object> variables = new ArrayList<>(List.of(page, size));
@@ -124,6 +145,10 @@ public class SupplyBackendClient {
     if (status != null && !status.isBlank()) {
       template.append("&status={status}");
       variables.add(status);
+    }
+    if (coverage != null && !coverage.isBlank()) {
+      template.append("&coverage={coverage}");
+      variables.add(coverage);
     }
     return backendApiClient.get(template.toString(), NEED_PAGE, variables.toArray());
   }

@@ -106,6 +106,7 @@ public class SupplyNeedService {
    * @param statuses only these states, or empty for the visible ones
    * @param purchasable only purchasable ({@code true}) or non-purchasable needs, or {@code null}
    * @param materialId only this material, or {@code null}
+   * @param coverage only the open needs of this coverage, or {@code null}
    * @param pageable page, size and sort
    * @return one page of needs
    */
@@ -115,11 +116,15 @@ public class SupplyNeedService {
       @NotNull Set<NeedStatus> statuses,
       @Nullable Boolean purchasable,
       @Nullable UUID materialId,
+      @Nullable NeedCoverage coverage,
       @NotNull Pageable pageable) {
     settingsService.requireEnabled();
     final boolean seesAll = accessPolicy.isAdmin() || accessPolicy.isGoverningLeadership();
     final Set<UUID> managed = accessPolicy.managedUnitIds();
     Specification<SupplyNeed> spec = fetchCatalogue();
+    if (coverage != null) {
+      spec = spec.and(coverage.specification());
+    }
     if (orgUnitId != null) {
       spec = spec.and((root, query, cb) -> cb.equal(root.get("orgUnitId"), orgUnitId));
     }
