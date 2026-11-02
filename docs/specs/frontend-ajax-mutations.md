@@ -320,7 +320,7 @@ On a successful write whose response carries a `version`, `krtFetch` writes that
 target container **and every descendant `[data-version]`**, so the user's next action on the same
 aggregate sends the fresh version and does not 409. When propagation cannot be made complete in
 place, the handler reloads deliberately (the conflict-confirm path) rather than leaving a stale
-version. This is the client half of the `@Version` rules in `CLAUDE.md`.
+version. This is the client half of the `@Version` rules in `AGENTS.md`.
 
 **Backend obligation.** The contract above only holds if the mutation response carries the
 _post-write_ version. A service (or class-`@Transactional` controller) that maps the response DTO
@@ -331,7 +331,7 @@ increment is otherwise deferred to commit — _after_ the DTO is mapped — so t
 (e.g. `Mission.coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion`), which is
 already current in the DTO regardless of flush timing, nor to writes whose handler re-renders the
 fragment from a fresh server `GET` (the re-swap re-reads the committed version). See the
-optimistic-locking rules in `CLAUDE.md`. (A 2026-06 area audit added
+optimistic-locking rules in `AGENTS.md`. (A 2026-06 area audit added
 `JobOrderService.updateJobOrder` to the `saveAndFlush` set — its edit-modal version writeback
 otherwise 409s the next consecutive order edit. A 2026-07 audit added the participant write path —
 `MissionParticipantService.updateParticipantAttributes` / `checkIn` / `checkOut` — for the same
@@ -1307,7 +1307,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `refinery` (global)      | queue                                                                                                                         | no            | authenticated (the `/refinery-orders` list gate; the `onlyMine` filter is applied per viewer)         |
 | `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
 | `exchange-clients` (global) | registry, undoRuns (the admin bulk undo runs, REQ-XCH-034)                                                                    | no            | `ROLE_ADMIN` (local check — the `/admin/exchange-clients` class-level page gate)                      |
-| `admin-dashboard` (global) | deletion-requests, discord-registrations, terms, sync-status (the admin dashboard widgets, REQ-UI-034, ADR-0327)               | no            | `ROLE_ADMIN` (local check; the backend publishes it after the commit)                                 |
+| `admin-dashboard` (global) | deletion-requests, discord-registrations, terms, sync-status (the admin dashboard widgets, REQ-UI-034, ADR-0328)               | no            | `ROLE_ADMIN` (local check; the backend publishes it after the commit)                                 |
 | `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
 | `hangar:{userId}`        | ships                                                                                                                         | no            | the member whose id it is, or `ROLE_ADMIN` for the admin member hangar (local check against the socket's subject and authorities, fails closed) |
 | `hangar-unit:{orgUnitId}` | ships (the unit tab with a pinned unit, ADR-0260)                                                                            | no            | `GET /api/v1/hangar/units/{id}/overview-access` (the unit-overview scope, REQ-HANGAR-003)             |

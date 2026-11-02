@@ -519,8 +519,8 @@ class MaterialRequestServiceTest {
 
   /**
    * A concurrent duplicate signal (the inner transaction throws a unique-constraint violation) is
-   * swallowed by the orchestrator as an idempotent success — never a 500 (CLAUDE.md find-or-create
-   * rule).
+   * swallowed by the orchestrator as an idempotent success — never a 500 (the find-or-create rule
+   * of docs/agents/backend-concurrency.md).
    */
   @Test
   void signalFulfillment_concurrentDuplicate_isIdempotent() {

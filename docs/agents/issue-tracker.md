@@ -4,7 +4,7 @@ Issues and specs live as GitHub issues of `krt-profit/basetool`. Use the `gh` CL
 
 ## Conventions
 
-- **Language**: titles, bodies and comments are English (the Git section of `CLAUDE.md` applies to issues too).
+- **Language**: titles, bodies and comments are English ([`git-and-commits.md`](git-and-commits.md) applies to issues too).
 - **Create an issue**: write the body to a file and run `gh issue create --title "..." --body-file <file>`. No heredocs for bodies.
 - **Read an issue**: `gh issue view <number> --comments`.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with `--label` / `--state` filters as needed.
@@ -16,7 +16,7 @@ Issues and specs live as GitHub issues of `krt-profit/basetool`. Use the `gh` CL
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
 
-PRs the agent opens are assigned to `greluc` and labelled per the Git section of `CLAUDE.md`.
+PRs the agent opens are assigned to `greluc` and labelled per [`git-and-commits.md`](git-and-commits.md).
 
 ## When a skill says "publish to the issue tracker"
 

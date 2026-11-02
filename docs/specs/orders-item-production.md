@@ -572,7 +572,7 @@ beyond `manufacturedAmount − deliveredAmount`). The delivery ceiling stays gat
   `clampOfferedAmountToStock`; a **depleted** row's offer is cascade-removed with the row (V210 `ON
   DELETE CASCADE`), so it needs no clamp. This is the item-delivery decrement site of REQ-MARKET-013.
 
-**Concurrency (CLAUDE.md landmines).** The flow issues **no** `@Modifying(clearAutomatically = true)`
+**Concurrency (AGENTS.md landmines).** The flow issues **no** `@Modifying(clearAutomatically = true)`
 bulk update, so the persistence context is never detached: the consumed game-item rows are
 mutated/deleted while managed (none of them part of the `JobOrder` aggregate), the still-managed order
 drives the completion check, and completion runs through `completeJobOrderWithinTransaction` — a single

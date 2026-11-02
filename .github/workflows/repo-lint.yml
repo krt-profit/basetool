@@ -286,6 +286,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: scripts/check-adr-registry.sh
 
+      - name: agent-instructions / Self-test the size and skill-stub checker
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-agent-instructions.py --selftest
+
+      - name: agent-instructions / Check the AGENTS.md sizes and the skill stubs
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-agent-instructions.py
+
       - name: monitoring-image-pins / Self-test the image-pin checker
         if: ${{ !cancelled() }}
         run: bash scripts/check-monitoring-image-pins.test.sh

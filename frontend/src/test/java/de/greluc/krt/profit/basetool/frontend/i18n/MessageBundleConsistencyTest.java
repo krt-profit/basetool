@@ -56,7 +56,7 @@ class MessageBundleConsistencyTest {
   private static final Path DEFAULT = Path.of("src/main/resources/messages.properties");
 
   /**
-   * The seven German umlaut characters that CLAUDE.md requires to be written as {@code \\uXXXX}
+   * The seven German umlaut characters that AGENTS.md requires to be written as {@code \\uXXXX}
    * escapes inside {@code .properties} files. Declared as Java unicode escapes so this source file
    * itself stays pure ASCII.
    */
@@ -79,7 +79,7 @@ class MessageBundleConsistencyTest {
 
   /**
    * Asserts the German bundle contains no literal umlaut characters, enforcing the {@code \\uXXXX}
-   * escaping rule from CLAUDE.md. Offending lines are reported with their 1-based line number.
+   * escaping rule from AGENTS.md. Offending lines are reported with their 1-based line number.
    *
    * @throws IOException if the German bundle cannot be read from disk
    */

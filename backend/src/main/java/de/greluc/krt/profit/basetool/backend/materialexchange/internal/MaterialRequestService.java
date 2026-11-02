@@ -104,8 +104,9 @@ public class MaterialRequestService {
   /**
    * Self-reference used only to run {@link #signalFulfillmentInNewTransaction(UUID, UUID)} in a
    * fresh transaction through the Spring proxy, so a concurrent duplicate-signal race surfaces as a
-   * {@link DataIntegrityViolationException} the non-transactional orchestrator can catch (CLAUDE.md
-   * find-or-create rule) instead of poisoning the caller's transaction.
+   * {@link DataIntegrityViolationException} the non-transactional orchestrator can catch (the
+   * find-or-create rule of docs/agents/backend-concurrency.md) instead of poisoning the caller's
+   * transaction.
    */
   private final ObjectProvider<MaterialRequestService> selfProvider;
 

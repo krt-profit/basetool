@@ -1,4 +1,4 @@
-# ADR-0327 — The admin dashboard widgets listen to one backend-published admin room
+# ADR-0328 — The admin dashboard widgets listen to one backend-published admin room
 
 - **Status:** Accepted
 - **Date:** 2026-11-02

@@ -35,7 +35,7 @@ this file is the **written, binding** contract that ships with the repo. Where t
 disagree, the skill wins and this file is corrected in the same PR.
 
 > New UI/visual decisions are recorded in an ADR and reflected here and in the design
-> skill — see the governance rules in `CLAUDE.md`.
+> skill — see the governance rules in `AGENTS.md`.
 
 **Supported browsers — "Baseline 2025".** The UI targets at least **Chrome 122, Firefox 131 and
 Safari / iOS 18.4** (owner decision D-16, [ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)).
@@ -2699,7 +2699,7 @@ total as count; „Materialbedarf" reads the new summary `GET /orders/material-d
 (`orgUnitId`, `limit`; the count of open buckets and the first rows, REQ-ORDERS-034) instead of the
 whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich bearbeite" (section
 `queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig", the inventory room („stock" and „stock-levels") „Bestand
-niedrig". The four admin widgets follow the admin room `admin-dashboard` (REQ-FE-015, ADR-0327), which only
+niedrig". The four admin widgets follow the admin room `admin-dashboard` (REQ-FE-015, ADR-0328), which only
 administrators may join and the backend publishes after the commit: section `deletion-requests`
 (filed, declined or resolved request), `discord-registrations` (filed or decided registration),
 `terms` (accepted terms, a decided registration, a start of the backend) and `sync-status` (a
