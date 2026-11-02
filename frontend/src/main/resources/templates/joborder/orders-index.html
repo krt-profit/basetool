@@ -146,7 +146,7 @@
                         <button type="button" class="btn btn-ghost btn-xs ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
                             <span class="toggle-icon" aria-hidden="true">&#9654;</span>
                             <span th:text="#{orders.index.materials}">Materialien</span>
-                            <span class="text-muted" th:text="'(' + ${matCount} + ')'">(0)</span>
+                            <span class="ord-materials-count" th:text="'(' + ${matCount} + ')'">(0)</span>
                         </button>
                         <div class="ord-materials-body" hidden th:data-order-materials="${order.id}">
                         <table th:if="${order.type != 'ITEM'}" class="data-table data-table--compact orders-materials-table">

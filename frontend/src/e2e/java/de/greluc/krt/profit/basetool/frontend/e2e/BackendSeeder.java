@@ -1222,6 +1222,28 @@ public final class BackendSeeder {
   }
 
   /**
+   * Leaves {@code recipient} with one unread {@code JOB_ORDER_CREATED} notification: the recipient
+   * is mirrored into the backend, then {@code creator} files a job order for the IRIDIUM squadron.
+   *
+   * @param recipient the Keycloak username of the user to notify (an admin)
+   * @param recipientPassword the recipient's Keycloak password
+   * @param creator the Keycloak username of the user who creates the order
+   * @param creatorPassword the creator's Keycloak password
+   * @param materialName the name of the job-order material to create for the order
+   */
+  public void seedUnreadNotification(
+      String recipient,
+      String recipientPassword,
+      String creator,
+      String creatorPassword,
+      String materialName) {
+    getUserId(recipient, recipientPassword);
+    String materialId = ensureJobOrderMaterial(recipient, recipientPassword, materialName);
+    createJobOrder(
+        creator, creatorPassword, IRIDIUM_SQUADRON_ID, materialName, materialId, 650, 100.0);
+  }
+
+  /**
    * Creates a job order with distinct responsible and requesting org units (REQ-ORDERS-023).
    *
    * @param username the Keycloak username of the (admin) test user
