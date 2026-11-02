@@ -63,7 +63,7 @@ class OrgUnitBankPathCutTest {
    * Operations of the controller that are not in the cut map because they never had an old path.
    */
   private static final Set<String> NOT_IN_THE_CUT_MAP =
-      Set.of("GET " + NEW_PREFIX + "/accounts/visible");
+      Set.of("GET " + NEW_PREFIX + "/accounts/visible", "GET " + NEW_PREFIX + "/requests/page");
 
   /** One wave-4 line of the map: verb, old path, new path, whether the operation is frozen. */
   private record Moved(String verb, String oldPath, String newPath, boolean frozen) {}
