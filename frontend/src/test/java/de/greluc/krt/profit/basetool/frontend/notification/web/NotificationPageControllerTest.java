@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -112,6 +113,19 @@ class NotificationPageControllerTest {
     verify(backendApiClient).get(anyString(), anyTypeRef(), pageArg.capture(), sizeArg.capture());
     assertEquals(0, pageArg.getValue());
     assertEquals(50, sizeArg.getValue());
+  }
+
+  @Test
+  void recent_unread_readsTheUnreadEndpointWithTheLimit() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    NotificationPageController controller = controllerWith(backendApiClient);
+
+    controller.recent(true, 50);
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/notifications/recent?limit={limit}&unreadOnly=true"), anyTypeRef(), eq(50));
   }
 
   @Test

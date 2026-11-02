@@ -156,7 +156,7 @@ class NotificationServiceTest {
     when(repository.findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), any(Pageable.class)))
         .thenReturn(java.util.List.of());
 
-    service.listRecentOwn(RECIPIENT, 1000);
+    service.listRecentOwn(RECIPIENT, 1000, false);
 
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
     verify(repository).findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
@@ -164,11 +164,25 @@ class NotificationServiceTest {
   }
 
   @Test
+  void listRecentOwnUnreadOnlyReadsTheUnreadQuery() {
+    when(repository.findByRecipientUserIdAndReadFalseOrderByCreatedAtDesc(
+            eq(RECIPIENT), any(Pageable.class)))
+        .thenReturn(java.util.List.of());
+
+    service.listRecentOwn(RECIPIENT, 5, true);
+
+    ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+    verify(repository)
+        .findByRecipientUserIdAndReadFalseOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
+    assertEquals(5, captor.getValue().getPageSize());
+  }
+
+  @Test
   void listRecentOwnClampsNonPositiveLimitToOne() {
     when(repository.findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), any(Pageable.class)))
         .thenReturn(java.util.List.of());
 
-    service.listRecentOwn(RECIPIENT, 0);
+    service.listRecentOwn(RECIPIENT, 0, false);
 
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
     verify(repository).findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());

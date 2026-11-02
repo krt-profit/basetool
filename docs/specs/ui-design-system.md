@@ -2667,9 +2667,12 @@ an error state and a retry button, carrying the test ids `dashboard-<widget>-err
 total as count; „Materialbedarf" reads the new summary `GET /orders/material-demand/summary`
 (`orgUnitId`, `limit`; the count of open buckets and the first rows, REQ-ORDERS-034) instead of the
 whole overview. The order room updates „Aufträge zu bearbeiten" and „Ich bearbeite" (section
-`queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig". A widget whose area has a live-sync topic updates live
-(REQ-FE-015); the others poll every 10 minutes, only while the tab is visible, staggered, and
-reload at once when the tab becomes visible again.
+`queue`) and „Materialbedarf" (section `demand`), the refinery room „Raffinerie: fertig", the inventory room („stock" and „stock-levels") „Bestand
+niedrig". A widget whose area has a live-sync topic updates live (REQ-FE-015); the others poll every
+10 minutes, only while the tab is visible, staggered, and reload at once when the tab becomes
+visible again. „Raffinerie: fertig" also reloads every minute while the tab is visible, because
+readiness changes when an order's end time passes without any mutation. „Benachrichtigungen" filters
+„Ungelesen" before the row limit, so older unread notifications show even when the newest are read.
 
 **Trade widgets.** Read-only and not audited. „Materialbörse" merges the offer and the wanted
 board, newest first, and counts both page totals. „Bedarf & Spenden" reads the open needs

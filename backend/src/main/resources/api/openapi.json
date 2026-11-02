@@ -41508,6 +41508,14 @@
             "format" : "int32",
             "default" : 10
           }
+        }, {
+          "in" : "query",
+          "name" : "unreadOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
         } ],
         "responses" : {
           "200" : {

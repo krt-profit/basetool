@@ -26,6 +26,9 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 /** How often a widget without a live topic reloads while the tab is visible (REQ-UI-034). */
 const POLL_INTERVAL_MS = 10 * 60 * 1000;
 
+/** How often a clock-driven widget reloads while the tab is visible. */
+const CLOCK_INTERVAL_MS = 60 * 1000;
+
 /** The delay between the first polls of two widgets, so they do not reload together. */
 const POLL_STAGGER_MS = 1500;
 
@@ -43,7 +46,7 @@ const LIVE_ROOMS = {
         queue: ['ASSIGNED_ORDERS', 'ORDERS_TO_PROCESS'],
         demand: ['MATERIAL_DEMAND'],
     },
-    inventory: { 'stock-levels': ['LOW_STOCK'] },
+    inventory: { stock: ['LOW_STOCK'], 'stock-levels': ['LOW_STOCK'] },
     'orgunit-bank': { orgUnitBank: ['BANK', 'BANK_REQUESTS'] },
     materialboard: { board: ['MARKET'], requests: ['MARKET'] },
     'supply-needs': { needs: ['SUPPLY_NEEDS'], stats: ['SUPPLY_NEEDS'] },
@@ -59,11 +62,29 @@ const LIVE_TYPES = new Set([
     ...Object.values(LIVE_ROOMS).flatMap((sections) => Object.values(sections).flat()),
 ]);
 
+/** The widget types whose content changes with the clock, so they reload besides their live channel. */
+const CLOCK_TYPES = new Set(['REFINERY_READY']);
+
+/**
+ * Whether an instance of a type reloads on a timer: every type without a live channel, and the
+ * clock-driven ones besides their channel.
+ *
+ * @param {string | undefined} type the widget type name
+ * @returns {boolean} whether the type is polled
+ */
+function isPolled(type) {
+    const name = type ?? '';
+    return !LIVE_TYPES.has(name) || CLOCK_TYPES.has(name);
+}
+
 /** The options a widget request carries, as the item's data attributes name them. */
 const OPTION_PARAMS = ['unit', 'days', 'rows', 'status'];
 
 /** The document event the notification stream raises for every new notification. */
 const NOTIFICATION_EVENT = 'krt:notification';
+
+/** How many notifications a notifications instance reads; the unread filter applies before it. */
+const NOTIFICATION_FETCH_LIMIT = 50;
 
 /** The confirmation dialog of the announcement's removal. */
 const INFO_DELETE_MODAL = 'dashboard-info-delete-modal';
@@ -178,7 +199,10 @@ function renderNotifications(content, items) {
  * @param {HTMLElement} content the instance's body content
  */
 async function fillNotifications(content) {
-    const items = await krtFetch.getJson('/notifications/recent');
+    const unread = content.dataset.notificationStatus === 'UNREAD';
+    const query = new URLSearchParams({ limit: String(NOTIFICATION_FETCH_LIMIT) });
+    if (unread) query.set('unread', 'true');
+    const items = await krtFetch.getJson(`/notifications/recent?${query.toString()}`);
     renderNotifications(content, Array.isArray(items) ? items : []);
 }
 
@@ -310,20 +334,30 @@ export function stopPolling() {
 }
 
 /**
- * Polls every instance without a live channel every ten minutes while the tab is visible, the
- * first polls staggered.
+ * The poll interval of a widget type.
+ *
+ * @param {string | undefined} type the widget type name
+ * @returns {number} the interval in milliseconds
+ */
+function pollInterval(type) {
+    return CLOCK_TYPES.has(type ?? '') ? CLOCK_INTERVAL_MS : POLL_INTERVAL_MS;
+}
+
+/**
+ * Polls every instance without a live channel every ten minutes, and the clock-driven ones every
+ * minute, while the tab is visible; the first polls are staggered.
  */
 export function startPolling() {
     stopPolling();
     dashboardItems()
-        .filter((item) => !LIVE_TYPES.has(item.dataset.widgetType ?? ''))
+        .filter((item) => isPolled(item.dataset.widgetType))
         .forEach((item, index) => {
             const first = window.setTimeout(
                 () => {
                     timers.delete(first);
                     const interval = window.setInterval(() => {
                         if (document.visibilityState === 'visible') loadWidget(item);
-                    }, POLL_INTERVAL_MS);
+                    }, pollInterval(item.dataset.widgetType));
                     timers.add(interval);
                 },
                 (index % POLL_STAGGER_SLOTS) * POLL_STAGGER_MS,
@@ -367,7 +401,7 @@ export function wireLiveUpdates() {
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible') return;
         dashboardItems()
-            .filter((item) => !LIVE_TYPES.has(item.dataset.widgetType ?? ''))
+            .filter((item) => isPolled(item.dataset.widgetType))
             .forEach((item) => {
                 loadWidget(item);
             });
