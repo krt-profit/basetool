@@ -27,10 +27,12 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncReport;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.web.SyncReportController;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
@@ -119,5 +121,36 @@ class SyncReportControllerTest {
         .andExpect(status().isOk());
 
     verify(syncReportService).deleteOlderThan(eq(SyncSourceSystem.UEX), eq(30));
+  }
+
+  @Test
+  void runSummaries_forbiddenForNonAdmin() throws Exception {
+    mockMvc
+        .perform(
+            get(BASE + "/runs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void runSummaries_allowedForAdmin_relaysTheRangeAndClampsIt() throws Exception {
+    when(syncReportService.runSummaries(eq(30), any()))
+        .thenReturn(List.of(new SyncRunSummaryDto("UEX", 4, null)));
+    when(syncReportService.runSummaries(eq(365), any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(
+            get(BASE + "/runs?days=30")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].sourceSystem").value("UEX"))
+        .andExpect(jsonPath("$[0].runs").value(4));
+    mockMvc
+        .perform(
+            get(BASE + "/runs?days=100000")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+
+    verify(syncReportService).runSummaries(eq(365), any());
   }
 }

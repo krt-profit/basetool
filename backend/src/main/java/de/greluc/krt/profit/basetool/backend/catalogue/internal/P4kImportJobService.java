@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -65,6 +66,7 @@ public class P4kImportJobService {
   private final P4kImportJobRepository jobRepository;
   private final P4kImportJobPayloadRepository payloadRepository;
   private final MeterRegistry meterRegistry;
+  private final AdminDashboardLiveSync adminDashboardLiveSync;
 
   /**
    * Enqueues a new {@link P4kImportJobKind#PREVIEW PREVIEW} job in state {@link
@@ -300,7 +302,7 @@ public class P4kImportJobService {
 
   /**
    * Increments {@code basetool_p4k_import_jobs_total} for a job that reached a terminal state,
-   * tagged by {@code outcome} and job {@code kind}.
+   * tagged by {@code outcome} and job {@code kind}, and tells the open admin dashboards.
    *
    * @param job the job that reached its terminal state (source of the bounded {@code kind} tag)
    * @param outcome {@link MetricNames#OUTCOME_SUCCEEDED} or {@link MetricNames#OUTCOME_FAILED}
@@ -314,6 +316,7 @@ public class P4kImportJobService {
             MetricNames.TAG_KIND,
             job.getKind().name())
         .increment();
+    adminDashboardLiveSync.syncStatusChanged();
   }
 
   /**

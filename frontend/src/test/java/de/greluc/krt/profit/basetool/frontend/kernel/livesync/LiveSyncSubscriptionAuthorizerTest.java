@@ -116,6 +116,22 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
+  void theAdminDashboardRoomAdmitsOnlyAnAdminWithoutAskingTheBackend() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("admin-dashboard");
+
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_ADMIN"), null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(
+            authorizer.authorize(
+                topic, TOKEN, PIN, Set.of("ROLE_OFFICER", "ROLE_KRT_MEMBER"), null))
+        .isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of(), null)).isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, null, null))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
   void aUnitHangarRoomAsksTheUnitOverviewGate() throws Exception {
     UUID unit = UUID.randomUUID();
     LiveSyncTopic topic = LiveSyncTopic.parse("hangar-unit:" + unit);

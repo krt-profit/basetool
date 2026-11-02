@@ -1307,6 +1307,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `refinery` (global)      | queue                                                                                                                         | no            | authenticated (the `/refinery-orders` list gate; the `onlyMine` filter is applied per viewer)         |
 | `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
 | `exchange-clients` (global) | registry, undoRuns (the admin bulk undo runs, REQ-XCH-034)                                                                    | no            | `ROLE_ADMIN` (local check — the `/admin/exchange-clients` class-level page gate)                      |
+| `admin-dashboard` (global) | deletion-requests, discord-registrations, terms, sync-status (the admin dashboard widgets, REQ-UI-034, ADR-0328)               | no            | `ROLE_ADMIN` (local check; the backend publishes it after the commit)                                 |
 | `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
 | `hangar:{userId}`        | ships                                                                                                                         | no            | the member whose id it is, or `ROLE_ADMIN` for the admin member hangar (local check against the socket's subject and authorities, fails closed) |
 | `hangar-unit:{orgUnitId}` | ships (the unit tab with a pinned unit, ADR-0260)                                                                            | no            | `GET /api/v1/hangar/units/{id}/overview-access` (the unit-overview scope, REQ-HANGAR-003)             |
@@ -1529,7 +1530,7 @@ subscribe-deny `reason`, and for the same reason: drift here fails silently.
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
 accounts / ≥200 concurrent, ADR-0094): detail-topic receivers keep the 400 ms jittered coalesce
 window; **every global-room receiver (`orders`, `bank`, `orgunit-bank`, `materialboard`, `inventory`,
-`missions`, `refinery`, `members`, `org-structure`, `exchange-clients`) uses 1500 ms** so a change seen by
+`missions`, `refinery`, `members`, `org-structure`, `exchange-clients`, `admin-dashboard`) uses 1500 ms** so a change seen by
 up to ~200 viewers spreads its fragment re-fetch herd instead of spiking. Peer-driven re-fetches
 always preserve the **peer's own** query state (filters, paging, view toggles — the page-URL getter
 is late-bound per viewer); only the acting client's own refresh may deliberately reset paging.

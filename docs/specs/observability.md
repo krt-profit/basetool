@@ -2274,7 +2274,7 @@ counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` la
 `materialboard`, `inventory_all`, since #1235 `missions_list`, `refinery_queue`, `members_roster`,
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
 `hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
-ADR-0260), and
+ADR-0260, and the admin dashboard room `admin_dashboard`, ADR-0328), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 Both drop signals are **alerted** since #1238, on a threshold measured rather than guessed: read on

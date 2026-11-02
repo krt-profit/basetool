@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
+import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -79,6 +80,7 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   private final TermsAcceptanceRepository termsAcceptanceRepository;
   private final TermsVersionProvider termsVersionProvider;
   private final MeterRegistry meterRegistry;
+  private final AdminDashboardLiveSync adminDashboardLiveSync;
 
   /** How long a cached positive verdict may outlive the read that produced it. */
   private static final Duration CACHE_TTL = Duration.ofMinutes(30);
@@ -153,6 +155,7 @@ public class TermsAcceptanceService implements TermsConsentCheck {
       return false;
     }
     cacheAfterCommit(userId);
+    adminDashboardLiveSync.termsChanged();
     meterRegistry.counter(IdentityMetricNames.TERMS_ACCEPTANCES).increment();
     log.info("Terms of Use accepted, version {}", currentVersion());
     return true;

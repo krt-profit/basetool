@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
-import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.SyncReportBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
@@ -56,7 +56,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminSyncReportsPageController {
 
   /** Reads and purges the sync reports. */
-  private final CatalogueBackendClient catalogueClient;
+  private final SyncReportBackendClient syncReportClient;
 
   /**
    * Combined view across both catalogues.
@@ -128,7 +128,7 @@ public class AdminSyncReportsPageController {
       return "redirect:" + redirect;
     }
     try {
-      SyncReportPurgeResultDto result = catalogueClient.purgeSyncReports(canonicalSource, days);
+      SyncReportPurgeResultDto result = syncReportClient.purgeSyncReports(canonicalSource, days);
       redirectAttributes.addFlashAttribute("deletedCount", result == null ? 0 : result.deleted());
     } catch (Exception e) {
       log.error("Failed to delete old sync reports (source={}, days={})", source, days, e);
@@ -155,7 +155,7 @@ public class AdminSyncReportsPageController {
       return ResponseEntity.badRequest().build();
     }
     String canonicalSource = canonicalSource(source);
-    SyncReportPurgeResultDto result = catalogueClient.purgeSyncReports(canonicalSource, days);
+    SyncReportPurgeResultDto result = syncReportClient.purgeSyncReports(canonicalSource, days);
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("deleted", result == null ? 0 : result.deleted());
     return ResponseEntity.ok(body);
@@ -235,7 +235,7 @@ public class AdminSyncReportsPageController {
    * @param model Thymeleaf model to fill
    */
   private void addEvents(@Nullable String source, int page, @NotNull Model model) {
-    PageResponse<SyncReportDto> events = catalogueClient.syncReportPage(page, source);
+    PageResponse<SyncReportDto> events = syncReportClient.syncReportPage(page, source);
     if (events != null) {
       model.addAttribute("events", events.content() == null ? List.of() : events.content());
       model.addAttribute("currentPage", events.page());

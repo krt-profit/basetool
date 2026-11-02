@@ -23,11 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.SyncReportBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportJobDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.SyncSource;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.SyncStatusRow;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,8 +37,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests of {@link SyncStatusAssembler}: the newest run per source, the range test and the
- * import job's timestamp and status (REQ-UI-034).
+ * Unit tests of {@link SyncStatusAssembler}: the run counts and last run per source, and the import
+ * job's timestamp, status and range test (REQ-UI-034).
  */
 @ExtendWith(MockitoExtension.class)
 class SyncStatusAssemblerTest {
@@ -46,20 +46,13 @@ class SyncStatusAssemblerTest {
   private static final Instant NOW = Instant.parse("2026-11-02T12:00:00Z");
 
   @Mock private CatalogueBackendClient catalogue;
+  @Mock private SyncReportBackendClient syncReports;
 
   private SyncStatusAssembler assembler;
 
   @BeforeEach
   void setUp() {
-    assembler = new SyncStatusAssembler(catalogue);
-  }
-
-  private static PageResponse<SyncReportDto> reports(Instant... ranAt) {
-    List<SyncReportDto> content =
-        java.util.Arrays.stream(ranAt)
-            .map(at -> new SyncReportDto(null, null, at, null, null, null, null, null, null, null))
-            .toList();
-    return new PageResponse<>(content, 0, 20, content.size(), 1, List.of());
+    assembler = new SyncStatusAssembler(catalogue, syncReports);
   }
 
   private static P4kImportJobDto job(String status, String createdAt, String finishedAt) {
@@ -67,9 +60,15 @@ class SyncStatusAssemblerTest {
         null, null, status, false, null, null, null, null, null, createdAt, null, finishedAt);
   }
 
+  private static List<SyncRunSummaryDto> summaries(long uex, Instant uexLast, long p4k) {
+    return List.of(
+        new SyncRunSummaryDto("UEX", uex, uexLast),
+        new SyncRunSummaryDto("SCWIKI", 0, null),
+        new SyncRunSummaryDto("P4K", p4k, null));
+  }
+
   private void noRuns() {
-    when(catalogue.syncReportPage(0, "UEX")).thenReturn(reports());
-    when(catalogue.syncReportPage(0, "SCWIKI")).thenReturn(reports());
+    when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, null, 0));
     when(catalogue.p4kImportJobs()).thenReturn(List.of());
   }
 
@@ -83,7 +82,7 @@ class SyncStatusAssemblerTest {
   }
 
   @Test
-  void aSourceThatNeverRanHasNoTimeNoStatusAndIsOutOfRange() {
+  void aSourceThatNeverRanHasNoTimeNoStatusNoRunsAndIsOutOfRange() {
     noRuns();
 
     assertThat(assembler.rows(7, NOW))
@@ -91,58 +90,51 @@ class SyncStatusAssemblerTest {
           assertThat(row.lastRunAt()).isNull();
           assertThat(row.status()).isNull();
           assertThat(row.inRange()).isFalse();
+          assertThat(row.runs()).isZero();
         });
   }
 
   @Test
-  void aSyncRowTakesTheNewestReportAndIsInRangeWhenItIsNotOlderThanTheRange() {
-    Instant newest = NOW.minusSeconds(3600);
-    when(catalogue.syncReportPage(0, "UEX")).thenReturn(reports(newest, NOW.minusSeconds(7200)));
-    when(catalogue.syncReportPage(0, "SCWIKI")).thenReturn(reports());
+  void aSyncRowCarriesTheRunsOfTheRangeAndIsInRangeWhenItHasAny() {
+    Instant last = NOW.minusSeconds(3600);
+    when(syncReports.syncRunSummaries(1)).thenReturn(summaries(4, last, 0));
     when(catalogue.p4kImportJobs()).thenReturn(List.of());
 
     SyncStatusRow uex = assembler.rows(1, NOW).getFirst();
 
-    assertThat(uex.lastRunAt()).isEqualTo(newest);
+    assertThat(uex.runs()).isEqualTo(4);
+    assertThat(uex.lastRunAt()).isEqualTo(last);
     assertThat(uex.status()).isNull();
     assertThat(uex.inRange()).isTrue();
   }
 
   @Test
-  void aReportOlderThanTheRangeIsOutOfRange() {
-    Instant old = NOW.minusSeconds(8 * 86_400L);
-    when(catalogue.syncReportPage(0, "UEX")).thenReturn(reports(old));
-    when(catalogue.syncReportPage(0, "SCWIKI")).thenReturn(reports());
+  void aSyncWhoseLastRunLiesOutsideTheRangeKeepsItsTimeAndIsOutOfRange() {
+    Instant old = NOW.minusSeconds(20 * 86_400L);
+    when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, old, 0));
     when(catalogue.p4kImportJobs()).thenReturn(List.of());
 
     SyncStatusRow uex = assembler.rows(7, NOW).getFirst();
 
     assertThat(uex.lastRunAt()).isEqualTo(old);
+    assertThat(uex.runs()).isZero();
     assertThat(uex.inRange()).isFalse();
   }
 
   @Test
-  void aReportExactlyAtTheStartOfTheRangeIsInRange() {
-    Instant boundary = NOW.minusSeconds(7 * 86_400L);
-    when(catalogue.syncReportPage(0, "UEX")).thenReturn(reports(boundary));
-    when(catalogue.syncReportPage(0, "SCWIKI")).thenReturn(reports());
+  void anAbsentSummaryListCountsAsNoRun() {
+    when(syncReports.syncRunSummaries(7)).thenReturn(null);
     when(catalogue.p4kImportJobs()).thenReturn(List.of());
 
-    assertThat(assembler.rows(7, NOW).getFirst().inRange()).isTrue();
+    SyncStatusRow uex = assembler.rows(7, NOW).getFirst();
+
+    assertThat(uex.lastRunAt()).isNull();
+    assertThat(uex.runs()).isZero();
   }
 
   @Test
-  void anAbsentReportPageCountsAsNoRun() {
-    when(catalogue.syncReportPage(0, "UEX")).thenReturn(null);
-    when(catalogue.syncReportPage(0, "SCWIKI")).thenReturn(reports());
-    when(catalogue.p4kImportJobs()).thenReturn(List.of());
-
-    assertThat(assembler.rows(7, NOW).getFirst().lastRunAt()).isNull();
-  }
-
-  @Test
-  void theImportRowUsesTheNewestJobFinishTimeAndItsStatus() {
-    noRunsForSyncs();
+  void theImportRowUsesTheNewestJobFinishTimeItsStatusAndTheRunCount() {
+    when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, null, 2));
     when(catalogue.p4kImportJobs())
         .thenReturn(
             List.of(
@@ -154,11 +146,21 @@ class SyncStatusAssemblerTest {
     assertThat(p4k.lastRunAt()).isEqualTo(Instant.parse("2026-11-02T10:00:00Z"));
     assertThat(p4k.status()).isEqualTo("SUCCEEDED");
     assertThat(p4k.inRange()).isTrue();
+    assertThat(p4k.runs()).isEqualTo(2);
+  }
+
+  @Test
+  void anImportJobExactlyAtTheStartOfTheRangeIsInRange() {
+    when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, null, 0));
+    when(catalogue.p4kImportJobs())
+        .thenReturn(List.of(job("SUCCEEDED", "2026-10-26T11:00:00Z", "2026-10-26T12:00:00Z")));
+
+    assertThat(assembler.rows(7, NOW).getLast().inRange()).isTrue();
   }
 
   @Test
   void anUnfinishedImportFallsBackToItsCreationTime() {
-    noRunsForSyncs();
+    when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, null, 0));
     when(catalogue.p4kImportJobs())
         .thenReturn(List.of(job("RUNNING", "2026-11-02T11:00:00Z", null)));
 
@@ -170,7 +172,7 @@ class SyncStatusAssemblerTest {
 
   @Test
   void anAbsentJobListCountsAsNoImport() {
-    noRunsForSyncs();
+    when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, null, 0));
     when(catalogue.p4kImportJobs()).thenReturn(null);
 
     SyncStatusRow p4k = assembler.rows(7, NOW).getLast();
@@ -178,10 +180,5 @@ class SyncStatusAssemblerTest {
     assertThat(p4k.lastRunAt()).isNull();
     assertThat(p4k.status()).isNull();
     assertThat(p4k.inRange()).isFalse();
-  }
-
-  private void noRunsForSyncs() {
-    when(catalogue.syncReportPage(0, "UEX")).thenReturn(reports());
-    when(catalogue.syncReportPage(0, "SCWIKI")).thenReturn(reports());
   }
 }

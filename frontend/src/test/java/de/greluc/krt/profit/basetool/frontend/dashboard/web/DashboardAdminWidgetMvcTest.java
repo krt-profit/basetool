@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportJobDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsAcceptanceStatusDto;
@@ -64,6 +65,7 @@ import org.springframework.web.context.WebApplicationContext;
 class DashboardAdminWidgetMvcTest {
 
   private static final String BASE = "/dashboard/widgets/";
+  private static final String RUNS_URI = "/api/v1/catalog/admin/sync-reports/runs?days={days}";
   private static final String JOBS_URI = "/api/v1/catalog/admin/import/p4k/jobs";
 
   @Autowired private WebApplicationContext context;
@@ -180,20 +182,19 @@ class DashboardAdminWidgetMvcTest {
         .contains("href=\"/admin/terms\"");
   }
 
-  /** The sync status marks a run inside the range and one outside it, and shows the import. */
+  /**
+   * The sync status counts the runs of the range, marks a source outside it, and shows the import.
+   */
   @Test
-  void syncStatusMarksRunsAgainstTheRange() throws Exception {
+  void syncStatusCountsTheRunsOfTheRange() throws Exception {
     Instant recent = Instant.now().minus(2, ChronoUnit.HOURS);
     Instant old = Instant.now().minus(20, ChronoUnit.DAYS);
-    when(backendApiClient.get(startsWith("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
-        .thenAnswer(call ->
-            new PageResponse<>(
-                List.of(report(call.getArgument(0, String.class).contains("UEX") ? recent : old)),
-                0,
-                100,
-                1,
-                1,
-                List.of()));
+    when(backendApiClient.get(eq(RUNS_URI), anyTypeRef(), eq(7)))
+        .thenReturn(
+            List.of(
+                new SyncRunSummaryDto("UEX", 3, recent),
+                new SyncRunSummaryDto("SCWIKI", 0, old),
+                new SyncRunSummaryDto("P4K", 1, recent)));
     when(backendApiClient.get(eq(JOBS_URI), anyTypeRef()))
         .thenReturn(List.of(job("FAILED", recent)));
 
@@ -203,6 +204,9 @@ class DashboardAdminWidgetMvcTest {
         .contains("data-testid=\"admin-sync-uex\"")
         .contains("data-testid=\"admin-sync-scwiki\"")
         .contains("data-testid=\"admin-sync-p4k\"")
+        .containsPattern("data-testid=\"admin-sync-runs-uex\"[^>]*>3 Läufe im Zeitraum<")
+        .containsPattern("data-testid=\"admin-sync-runs-scwiki\"[^>]*>0 Läufe im Zeitraum<")
+        .containsPattern("data-testid=\"admin-sync-runs-p4k\"[^>]*>1 Lauf im Zeitraum<")
         .contains("Fehlgeschlagen")
         .contains("vor mehr als 7 Tagen")
         .contains("href=\"/admin/sync-reports\"");
@@ -211,8 +215,12 @@ class DashboardAdminWidgetMvcTest {
   /** A sync that never ran says so. */
   @Test
   void aSyncThatNeverRanSaysSo() throws Exception {
-    when(backendApiClient.get(startsWith("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
-        .thenReturn(new PageResponse<SyncReportDto>(List.of(), 0, 100, 0, 0, List.of()));
+    when(backendApiClient.get(eq(RUNS_URI), anyTypeRef(), any(Object[].class)))
+        .thenReturn(
+            List.of(
+                new SyncRunSummaryDto("UEX", 0, null),
+                new SyncRunSummaryDto("SCWIKI", 0, null),
+                new SyncRunSummaryDto("P4K", 0, null)));
     when(backendApiClient.get(eq(JOBS_URI), anyTypeRef())).thenReturn(List.of());
 
     assertThat(render("sync-status")).contains("Noch kein Lauf");
@@ -235,20 +243,6 @@ class DashboardAdminWidgetMvcTest {
                   .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
           .andExpect(status().isForbidden());
     }
-  }
-
-  private static SyncReportDto report(Instant ranAt) {
-    return new SyncReportDto(
-        UUID.randomUUID(),
-        UUID.randomUUID(),
-        ranAt,
-        "UEX",
-        "ADDED",
-        "Material",
-        null,
-        null,
-        null,
-        "");
   }
 
   private static P4kImportJobDto job(String status, Instant finished) {
