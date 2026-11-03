@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.navigation.internal;
 
+import com.google.errorprone.annotations.Immutable;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
  * @param rows the number of rows shown
  * @param status the status filter
  */
+@Immutable
 public record DashboardOptions(
     @Nullable UUID orgUnitId,
     @Nullable Integer days,

@@ -332,7 +332,7 @@ class NavigationDesktopModesMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"desktopMode\":\"PINNED\",\"version\":3}"))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().isUnprocessableContent())
         .andExpect(jsonPath("$.code").value("VALIDATION"));
   }
 

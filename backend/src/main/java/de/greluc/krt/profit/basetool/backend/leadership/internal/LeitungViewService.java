@@ -207,7 +207,7 @@ public class LeitungViewService {
         members,
         groups,
         orgUnit instanceof Organisationsleitung ol ? ol.getGrandAdmiralUserId() : null,
-        bereich == null || bereich == orgUnit ? null : bereich.getName(),
+        bereich == null || orgUnit.getKind() == OrgUnitKind.BEREICH ? null : bereich.getName(),
         bereich == null ? null : bereich.getDepartment());
   }
 

@@ -82,7 +82,7 @@ public enum AuditDomain {
   CONNECTED_APPS,
 
   /**
-   * Material supply (Bedarf & Spenden): the needs of the raising units, the members' material
+   * Material supply (Bedarf &amp; Spenden): the needs of the raising units, the members' material
    * donations and the unit settings. The subject is the need or the donation with its catalogue
    * entry as label; the donor is the target.
    */

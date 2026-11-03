@@ -25,9 +25,8 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * The one mapping from a failed SSE emitter write onto the bounded {@code cause} tag of {@code
- * basetool_sse_send_failures_total}, shared by the notification stream ({@link
- * NotificationStreamService}) and the live-sync stream ({@link LiveSyncStreamService}) so the two
- * can never tag the same failure differently.
+ * basetool_sse_send_failures_total}, used by the notification stream ({@link
+ * NotificationStreamService}).
  */
 public final class SseSendFailureCause {
 

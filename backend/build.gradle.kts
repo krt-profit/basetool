@@ -46,6 +46,8 @@ dependencies {
   implementation(libs.flyway.postgresql)
 
   implementation(libs.openpdf.core)
+  implementation(libs.guava)
+  compileOnly(libs.errorprone.annotations)
   compileOnly(libs.spring.modulith.api)
   annotationProcessor(libs.lombok.mapstruct.binding)
 

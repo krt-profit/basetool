@@ -49,7 +49,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.util.UriUtils;
 
 /**
  * Syncs UEX items into {@code game_item}, walking {@code /items?id_category=<n>} for every
@@ -177,11 +176,10 @@ public class UexItemSyncService {
       }
     }
 
-    String reportLabel = UriUtils.decode("UEX item sync", "UTF-8");
     log.info(
-        "Finished {}: {} categories visited, {} items upserted ({} new, {} updated), {} shared-uuid"
-            + " sibling(s) kept external_uuid null, {} reassigned UEX id(s) rebound by UUID",
-        reportLabel,
+        "Finished UEX item sync: {} categories visited, {} items upserted ({} new, {} updated), {}"
+            + " shared-uuid sibling(s) kept external_uuid null, {} reassigned UEX id(s) rebound by"
+            + " UUID",
         categoriesProcessed,
         itemsProcessed,
         itemsCreated,

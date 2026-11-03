@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -89,22 +90,19 @@ class GrantCascadeTest {
 
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
       when(orgUnits.findOrganisationsleitungIdsAmong(anyCollection()))
-          .thenAnswer(call ->
-              ((java.util.Collection<UUID>) call.getArgument(0))
-                  .stream().filter(OL::equals).toList());
+          .thenAnswer(
+              call -> call.<Collection<UUID>>getArgument(0).stream().filter(OL::equals).toList());
       when(orgUnits.findAllOrgUnitIds()).thenReturn(ALL);
       when(orgUnits.findChildOrgUnitIdsIn(anyCollection()))
           .thenAnswer(call ->
-              ((java.util.Collection<UUID>) call.getArgument(0))
-                  .stream()
-                      .flatMap(parent -> CHILDREN.getOrDefault(parent, List.of()).stream())
-                      .toList());
+              call.<Collection<UUID>>getArgument(0).stream()
+                  .flatMap(parent -> CHILDREN.getOrDefault(parent, List.of()).stream())
+                  .toList());
       when(orgUnits.findLeadershipOrgUnitIdsAmong(anyCollection()))
           .thenAnswer(call ->
-              ((java.util.Collection<UUID>) call.getArgument(0))
-                  .stream()
-                      .filter(id -> id.equals(OL) || id.equals(BEREICH_X) || id.equals(BEREICH_Y))
-                      .toList());
+              call.<Collection<UUID>>getArgument(0).stream()
+                  .filter(id -> id.equals(OL) || id.equals(BEREICH_X) || id.equals(BEREICH_Y))
+                  .toList());
 
       MockHttpServletRequest request = new MockHttpServletRequest();
       if (pin != null) {
