@@ -1655,6 +1655,11 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   notification bell, which sits in the header's flex row instead of `position: fixed`. The admin
   chip shows on `/admin/**` pages as before. The seven pages without the app shell (error pages,
   pending approval, terms acceptance) keep their own header.
+- **The header never scrolls away.** It is `position: sticky; top: 0` on every page and every
+  device class. No stylesheet makes `html` or `body` a scroll container (`overflow` `hidden`, `auto`
+  or `scroll`), because the header would then stick to a box that never scrolls; a page that must
+  stop horizontal overflow uses `overflow-x: clip`. Sticky content below the header stops at
+  `--krt-header-height`.
 - **The drawer (≥ 769 px)** is a 320 px overlay in three zones; only the middle one scrolls:
   - *Head* — logo, `appTitle`, close.
   - *Context* — the active-org-unit switcher (only with more than one org unit) and the menu filter.
@@ -1755,6 +1760,7 @@ and actions per role, no „Rechtliches" group, nothing of it for a signed-out v
 `NavigationLegacyRedirectMvcTest` (the former Lager list URLs redirect to the Lager tab with the option and
 their filter query; in-place requests and sub-paths are not redirected) ·
 `NavigationRegistryTest` (key format, unique entry and group keys, tab candidates registered) ·
+`StickyHeaderTest` (the header is sticky at the top; no `html` / `body` scroll container) ·
 `NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeControllerTest` (each tab flag
 positive and negative, none while its surface is off) · `MeLayoutSingleTransactionTest` (the tab
