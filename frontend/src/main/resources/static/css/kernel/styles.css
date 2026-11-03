@@ -1246,23 +1246,6 @@
         font-size: 0.75rem;
     }
 
-    .krt-footer-fansite {
-        flex-basis: 100%;
-        margin: 0;
-        color: var(--color-gray-1);
-        font-size: var(--fs-sm);
-        line-height: 1.4;
-    }
-
-    .krt-footer-fansite a {
-        margin-left: var(--space-2);
-        color: var(--color-gray-1);
-    }
-
-    .krt-footer-fansite a:hover {
-        color: var(--color-primary);
-    }
-
     @media (width <= 768px) {
         :where(:has(> :where(button, [role='button'], summary, a, input, select, textarea))) {
             flex-wrap: wrap;
@@ -4243,15 +4226,6 @@
 
         .nav-legal-version {
             color: var(--color-gray-1);
-        }
-
-        .nav-legal-fansite {
-            flex-basis: 100%;
-            padding-top: var(--space-2);
-            color: var(--color-gray-1);
-            font-size: var(--fs-sm);
-            font-weight: var(--fw-regular);
-            line-height: 1.4;
         }
 
         .nav-admin-entry {

@@ -43,7 +43,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Pins the Star Citizen Fan Kit compliance (REQ-UI-018): the band on the home page, the FAQ fan
- * site notice with the official site link in the footer, and no CIG artwork outside the Fan Kit.
+ * site notice with the official site link on the public home page, and no CIG artwork outside the
+ * Fan Kit.
  */
 @SpringBootTest
 class FanKitComplianceMvcTest {
@@ -123,23 +124,6 @@ class FanKitComplianceMvcTest {
         .perform(get("/"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("class=\"krt-landing-notice\"")))
-        .andExpect(content().string(containsString(REQUIRED_FANSITE_NOTICE)))
-        .andExpect(content().string(containsString(OFFICIAL_SITE_LINK)));
-  }
-
-  /**
-   * The global footer carries the fan site notice and the official site link on every page.
-   *
-   * @param path a page rendered through the shared layout.
-   * @throws Exception when the request fails.
-   */
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"/", "/privacy", "/impressum"})
-  void footer_ShouldCarryFanSiteNoticeAndOfficialSiteLink(String path) throws Exception {
-    mockMvc
-        .perform(get(path))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("class=\"krt-footer-fansite\"")))
         .andExpect(content().string(containsString(REQUIRED_FANSITE_NOTICE)))
         .andExpect(content().string(containsString(OFFICIAL_SITE_LINK)));
   }
