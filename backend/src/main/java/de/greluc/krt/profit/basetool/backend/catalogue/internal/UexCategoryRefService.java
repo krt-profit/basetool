@@ -66,10 +66,6 @@ public class UexCategoryRefService {
   public List<UexCategory> syncCategories() {
     log.info("Starting synchronization of UEX categories...");
     UexClient.FetchResult<UexCategoryDto> fetched = uexClient.getCategories();
-    if (fetched.notModified()) {
-      log.info("UEX category catalogue unchanged since the last sync (304) — nothing to import.");
-      return chunkWriter.inNewTransaction(repository::findAll);
-    }
     List<UexCategoryDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No categories received from UEX API. Aborting synchronization.");

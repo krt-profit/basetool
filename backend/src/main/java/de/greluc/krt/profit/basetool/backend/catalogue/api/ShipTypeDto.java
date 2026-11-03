@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /** Data transfer record carrying Ship Type payload. */
@@ -27,5 +28,5 @@ public record ShipTypeDto(
     String name,
     ManufacturerDto manufacturer,
     String description,
-    Integer scu,
+    BigDecimal scu,
     boolean hidden) {}

@@ -81,9 +81,7 @@ public class UexCommodityService {
     UexClient.FetchResult<UexCommodityDto> commodityFetch = uexClient.getCommodities();
     List<UexCommodityDto> commodities = commodityFetch.data();
 
-    if (commodityFetch.notModified()) {
-      log.info("UEX commodity catalogue unchanged since the last sync (304) — nothing to import.");
-    } else if (!commodities.isEmpty()) {
+    if (!commodities.isEmpty()) {
       SyncChunkWriter.Outcome<Integer> outcome =
           chunkWriter.write(
               commodities,
@@ -106,11 +104,6 @@ public class UexCommodityService {
 
     log.info("Starting synchronization of UEX commodity prices...");
     UexClient.FetchResult<UexCommodityPriceDto> priceFetch = uexClient.getCommoditiesPricesAll();
-    if (priceFetch.notModified()) {
-      log.info(
-          "UEX commodity price matrix unchanged since the last sync (304) — nothing to import.");
-      return;
-    }
     List<UexCommodityPriceDto> dtos = priceFetch.data();
 
     if (dtos.isEmpty()) {

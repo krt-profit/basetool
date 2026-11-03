@@ -358,7 +358,7 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   was deleted".
 - **UEX fetch completeness** (`UexClient` / `UexItemSyncService`) — the client's `FetchResult` now
   also carries `complete`, and the item sync `WARN`s once per run when any per-category fetch came
-  back incomplete (failed, non-`ok` envelope, or `304`) and the `uex_deleted` sweep therefore stood
+  back incomplete (failed or non-`ok` envelope) and the `uex_deleted` sweep therefore stood
   down. No new meter: the failure branch already increments
   `basetool_external_fetch_errors_total{source="uex"}`, so a category that keeps failing shows up in
   `ExternalFetchErrors` while the WARN names which run lost its orphan detection (REQ-DATA-014).
@@ -367,10 +367,9 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   `null` or when `status` is present and not `ok` (the rows are still returned). A blank/absent
   `status` is deliberately **not** an anomaly — no code ever read the field, so it cannot be asserted
   that all ~20 endpoints populate it.
-- **UEX `304 Not Modified`** — raised from `DEBUG` to `INFO`, both in `UexClient` and at each sync
-  service, which now logs `unchanged (304) — nothing to import.` and returns **before** any upsert or
-  sweep. An unchanged catalogue is the normal healthy outcome of a nightly run and must be readable
-  without raising a level mid-incident; the volume is bounded by the schedule, not by callers.
+- **UEX requests are unconditional** — UEX serves neither `ETag` nor `Last-Modified`, so
+  `UexClient` sends plain GETs and every run imports the full payload; there is no `304` outcome to
+  log.
 - **Role-sync summary** (`UserReconciliationService.logRoleSyncSummary`, `UserSyncService`) — one
   aggregate `INFO` per run (roles mapped, Guest fallbacks, dropped role names, accounts newly flagged
   as departed), escalating to `WARN` past a threshold (more than 3 Guest demotions, more than 10
@@ -1452,14 +1451,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   then false-fired continuously (the 2026-07-15…17 storm; UEX was upserting ~7499 rows/run).
   `executions_total{outcome="success"}` shares the items counter's lazy-registration + per-restart-reset
   behaviour, so it cancels the false `0` while still climbing on a genuine outage; same robust shape as
-  `UserSyncZeroItems`. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
-  `UexClient` and `ScWikiClient` both do conditional GETs, so when the whole catalogue is unchanged
-  every category/endpoint returns `304 Not Modified` and the run upserts nothing — a healthy no-op
-  indistinguishable from an empty-200 outage by the raw upsert tally alone. To stop that false
-  `SyncZeroItems` firing, `UexItemSyncService` reports the live catalogue size
-  (`GameItemRepository.countLiveUexItems()`) instead of `0` when nothing was upserted but at least
-  one category was served from the `304` cache, and each `scwiki_sync` step likewise reports its
-  live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
+  `UserSyncZeroItems`. **Unchanged-catalogue carve-out (`scwiki_sync`, #1182):**
+  `ScWikiClient` does conditional GETs, so when the whole catalogue is unchanged every endpoint
+  returns `304 Not Modified` and the run upserts nothing — a healthy no-op indistinguishable from an
+  empty-200 outage by the raw upsert tally alone. To stop that false `SyncZeroItems` firing, each
+  `scwiki_sync` step reports its live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
   `countLiveScwikiShipTypes` / `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` /
   `countLiveScwikiItems` for the other steps) on an all-`304` fetch; a genuine empty-200 (no `304`
   at all) still reports `0` and correctly trips the alert. The same success-with-zero-work idea

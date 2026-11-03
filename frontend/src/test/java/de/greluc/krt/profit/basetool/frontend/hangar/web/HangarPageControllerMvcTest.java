@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
@@ -78,7 +79,8 @@ class HangarPageControllerMvcTest {
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", null, "Titan", 0, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", null, "Titan", new BigDecimal("0"), false);
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(shipType), 0, 10, 1, 1, List.of());
 
@@ -125,7 +127,8 @@ class HangarPageControllerMvcTest {
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", new BigDecimal("0"), false);
     ShipDto ship =
         new ShipDto(
             UUID.randomUUID(),
@@ -161,7 +164,8 @@ class HangarPageControllerMvcTest {
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", new BigDecimal("0"), false);
     ShipDto ship =
         new ShipDto(
             UUID.randomUUID(),
@@ -200,7 +204,8 @@ class HangarPageControllerMvcTest {
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", new BigDecimal("0"), false);
     ShipDto ship =
         new ShipDto(
             UUID.randomUUID(),
@@ -246,7 +251,8 @@ class HangarPageControllerMvcTest {
         new ManufacturerDto(
             UUID.randomUUID(), "Drake Interplanetary", "DRAK", null, null, null, false);
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", manufacturer, null, 0, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Cutlass Black", manufacturer, null, new BigDecimal("0"), false);
     SquadronShipOverviewDto overview = new SquadronShipOverviewDto(shipType, 3L, 1L, List.of());
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(overview), 0, 50, 12, 1, List.of());
@@ -283,7 +289,7 @@ class HangarPageControllerMvcTest {
   @WithMockUser
   void viewSquadron_FragmentResults_RendersOnlyTheTreeFragment() throws Exception {
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 0, false);
+        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, new BigDecimal("0"), false);
     SquadronShipOverviewDto overview = new SquadronShipOverviewDto(shipType, 3L, 1L, List.of());
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(overview), 0, 50, 1, 1, List.of());

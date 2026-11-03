@@ -1429,6 +1429,48 @@ item and stat (`BlueprintStatProperty`), the base value in the stat's unit, uniq
 `BlueprintStatProperty`, `GameItemStat`, `GameItemStatRepository`, `ScWikiItemStatExtractor`,
 `GameItemStatWriter`, `ScWikiItemSyncService`, V311
 
+### REQ-DATA-028 — a UEX item id that moved to another item follows the UUID
+
+UEX documents its item `id` as one that "may change during website updates". The item sync still
+resolves by `uex_item_id` first, because UEX also serves wrong UUIDs on correct ids (copied items
+inherited another item's in-game code until UEX added a duplicate check). An id match is
+overridden only when both signals agree that the id moved:
+
+- the row holding the incoming `uex_item_id` stores a **different** `external_uuid`, **and**
+- another `game_item` row already stores the incoming UUID.
+
+Such an item is held back until every category has been fetched. If its UUID occurs exactly once in
+the run, the sync clears `uex_item_id` on the old row in its own transaction (the column is
+`UNIQUE`) and then upserts the item, which now resolves by UUID; two swapped ids therefore end on the
+right rows. If the UUID occurs more than once in the run, it is ambiguous and the id match stands.
+The run summary reports the number of released ids as `idsReassigned`.
+
+**Acceptance**
+
+- [x] Two items whose UEX ids are swapped keep their rows; each row ends with its new id.
+- [x] A UUID served twice in one run never moves an id.
+- [x] An id whose row stores another UUID that no row knows yet keeps its row and its stored UUID.
+
+**Enforced by:** `UexItemSyncServiceTest` · **Code:** `UexItemSyncService`,
+`GameItemRepository.findExternalUuidRefs`
+
+### REQ-DATA-029 — a ship type's cargo capacity keeps its fraction
+
+UEX serves cargo capacities below one SCU for small vehicles (0.8 SCU on the ATLS variants).
+`ship_type.scu` is `NUMERIC(10, 3)` and the whole path — `UexVehicleDto`, `ShipType`, `ShipTypeDto`
+and its frontend mirror — carries a `BigDecimal`, so no capacity is truncated to an integer. The
+profit calculation multiplies by the exact capacity, and the ship picker prints it without trailing
+zeros.
+
+**Acceptance**
+
+- [x] A UEX payload with `"scu": 0.8` decodes to 0.8.
+- [x] The ship picker of the profit calculation lists a ship with a fractional capacity.
+
+**Enforced by:** `UexClientTest`, `ProfitCalculationServiceTest`,
+`ProfitCalculationPageControllerMvcTest` · **Code:** `UexVehicleDto`, `ShipType`, `ShipTypeDto`,
+`ProfitCalculationService`, V334
+
 ### REQ-DATA-030 — UEX price averages, container sizes and terminal services are stored typed
 
 The UEX sync stores these fields of UEX API 2.0, inside the key sets of REQ-DATA-015:

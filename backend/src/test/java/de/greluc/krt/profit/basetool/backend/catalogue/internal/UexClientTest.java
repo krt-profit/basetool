@@ -30,12 +30,14 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodity
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexStarSystemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexVehicleDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -359,104 +361,38 @@ class UexClientTest {
   }
 
   @Test
-  void firstCall_sendsNoIfNoneMatch_andRemembersResponseEtag() throws Exception {
+  void repeatedCalls_sendNoConditionalHeader_evenWhenTheResponseCarriesAnEtag() throws Exception {
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"abc-123\""));
-    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"abc-123\""));
-
-    client.getCommodities();
-    List<UexCommodityDto> second = client.getCommodities().data();
-
-    RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
-    assertNotNull(first);
-    assertNull(
-        first.getHeader("If-None-Match"),
-        "first call must not send If-None-Match (nothing stored yet)");
-
-    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
-    assertNotNull(secondReq);
-    assertEquals(
-        "\"abc-123\"",
-        secondReq.getHeader("If-None-Match"),
-        "second call must replay the ETag from the first response");
-    assertTrue(second.isEmpty(), "304 response must surface as an empty list");
-  }
-
-  @Test
-  void notModifiedResponse_returnsEmptyListWithoutDecodingBody() {
-    server.enqueue(new MockResponse().setResponseCode(304));
-
-    List<UexCommodityDto> result = client.getCommodities().data();
-
-    assertNotNull(result);
-    assertTrue(result.isEmpty(), "304 Not Modified must yield an empty list");
-  }
-
-  @Test
-  void updatedEtagOnNewResponse_replacesPreviouslyStoredEtag() throws Exception {
-    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"v1\""));
-    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"v2\""));
-    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"v2\""));
-
-    client.getCommodities();
-    client.getCommodities();
-    client.getCommodities();
-
-    server.takeRequest(1, TimeUnit.SECONDS);
-    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("\"v1\"", secondReq.getHeader("If-None-Match"));
-    RecordedRequest thirdReq = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals(
-        "\"v2\"",
-        thirdReq.getHeader("If-None-Match"),
-        "third call must use the v2 ETag from the second response");
-  }
-
-  @Test
-  void etagStorage_isPerEndpoint_starSystemsEtagDoesNotLeakIntoCommodities() throws Exception {
-    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"star-sys-1\""));
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}"));
 
-    client.getStarSystems();
+    client.getCommodities();
     client.getCommodities();
 
     server.takeRequest(1, TimeUnit.SECONDS);
-    RecordedRequest commoditiesReq = server.takeRequest(1, TimeUnit.SECONDS);
+    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(secondReq);
     assertNull(
-        commoditiesReq.getHeader("If-None-Match"),
-        "/commodities must not receive the /star_systems ETag");
+        secondReq.getHeader("If-None-Match"),
+        "UEX serves no ETag, so the client never sends a conditional request");
   }
 
   @Test
-  void serverErrorClearsNoStoredEtag_andLeavesCachedValueIntact() throws Exception {
-    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"keep-me\""));
-    server.enqueue(new MockResponse().setResponseCode(500));
-    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"keep-me\""));
-
-    client.getCommodities();
-    List<UexCommodityDto> midError = client.getCommodities().data();
-    List<UexCommodityDto> thirdCall = client.getCommodities().data();
-
-    assertTrue(midError.isEmpty(), "5xx must still surface as empty list");
-    assertTrue(thirdCall.isEmpty(), "subsequent 304 also yields empty list");
-
-    server.takeRequest(1, TimeUnit.SECONDS);
-    server.takeRequest(1, TimeUnit.SECONDS);
-    RecordedRequest thirdReq = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals(
-        "\"keep-me\"",
-        thirdReq.getHeader("If-None-Match"),
-        "a server error in between must not clear the stored ETag (it was not invalidated)");
-  }
-
-  @Test
-  void getItemsForCategory_freshResponse_returnsDataFlaggedModified() throws Exception {
+  void getVehicles_keepsAFractionalCargoCapacity() {
     server.enqueue(
-        jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":42,\"name\":\"Helmet\"}]}")
-            .setHeader("ETag", "\"cat3-v1\""));
+        jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":1,\"name\":\"ATLS GEO\",\"scu\":0.8}]}"));
+
+    List<UexVehicleDto> rows = client.getVehicles().data();
+
+    assertEquals(new BigDecimal("0.8"), rows.get(0).scu(), "0.8 SCU must not truncate to 0");
+  }
+
+  @Test
+  void getItemsForCategory_freshResponse_returnsCompleteData() throws Exception {
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":42,\"name\":\"Helmet\"}]}"));
 
     UexClient.FetchResult<UexItemDto> result = client.getItemsForCategory(3);
 
-    assertFalse(result.notModified(), "a fresh 200 must not be flagged notModified");
+    assertTrue(result.complete(), "a healthy 200 is a complete answer");
     assertEquals(1, result.data().size());
     assertEquals(42, result.data().get(0).id());
 
@@ -466,33 +402,12 @@ class UexClientTest {
   }
 
   @Test
-  void getItemsForCategory_unchanged304_returnsEmptyDataFlaggedNotModified() throws Exception {
-    server.enqueue(
-        jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":42,\"name\":\"Helmet\"}]}")
-            .setHeader("ETag", "\"cat3-v1\""));
-    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"cat3-v1\""));
-
-    client.getItemsForCategory(3);
-    UexClient.FetchResult<UexItemDto> second = client.getItemsForCategory(3);
-
-    assertTrue(second.notModified(), "a 304 must be flagged notModified");
-    assertTrue(second.data().isEmpty(), "a 304 carries no rows");
-
-    server.takeRequest(1, TimeUnit.SECONDS);
-    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals(
-        "\"cat3-v1\"",
-        secondReq.getHeader("If-None-Match"),
-        "the per-category item feed must still send If-None-Match (conditional GET stays on)");
-  }
-
-  @Test
-  void getItemsForCategory_empty200_returnsEmptyDataFlaggedModified() {
+  void getItemsForCategory_empty200_returnsEmptyCompleteData() {
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}"));
 
     UexClient.FetchResult<UexItemDto> result = client.getItemsForCategory(7);
 
-    assertFalse(result.notModified(), "an empty-200 must not be mistaken for an unchanged 304");
+    assertTrue(result.complete(), "an empty 200 is a usable answer");
     assertTrue(result.data().isEmpty());
   }
 
@@ -533,8 +448,7 @@ class UexClientTest {
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null,\"message\":\"\"}"));
     UexClient.FetchResult<UexCommodityDto> result = client.getCommodities();
     assertTrue(result.data().isEmpty(), "absent data still reads as zero rows");
-    assertFalse(
-        result.notModified(), "an empty 200 is not a 304 — the caller must not treat it as cached");
+    assertTrue(result.complete(), "an empty result set is a usable answer");
   }
 
   @Test
@@ -586,26 +500,6 @@ class UexClientTest {
         events.stream().noneMatch(e -> e.getLevel() == Level.WARN),
         "an absent status must not warn: " + messages(events));
     assertEquals(0.0, fetchErrorCount(), "an absent status is not a fetch error");
-  }
-
-  @Test
-  void notModified_isLoggedAtInfoNotDebug() {
-    List<ILoggingEvent> events =
-        captureUexLog(
-            () -> {
-              server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"e1\""));
-              server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"e1\""));
-              client.getCommodities();
-            },
-            client::getCommodities);
-
-    ILoggingEvent unchanged =
-        events.stream()
-            .filter(e -> e.getFormattedMessage().contains("304 Not Modified"))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("no 304 line: " + messages(events)));
-    assertEquals(Level.INFO, unchanged.getLevel(), "an unchanged feed is healthy — INFO, not WARN");
-    assertEquals(0.0, fetchErrorCount(), "a 304 is not a fetch error");
   }
 
   /**

@@ -69,6 +69,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.web.ShipTypeController;
 import de.greluc.krt.profit.basetool.backend.catalogue.web.StarSystemController;
 import de.greluc.krt.profit.basetool.backend.catalogue.web.TerminalController;
 import jakarta.persistence.EntityManagerFactory;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -373,7 +374,7 @@ class CatalogueCachedReadsTest {
                 "/name",
                 "Cat Hull " + tag,
                 "/scu",
-                42,
+                42.0,
                 "/hidden",
                 false,
                 "/manufacturer/id",
@@ -752,7 +753,7 @@ class CatalogueCachedReadsTest {
     manufacturerId = manufacturerRepository.save(manufacturer).getId();
     ShipType shipType = new ShipType();
     shipType.setName("Cat Hull " + tag);
-    shipType.setScu(42);
+    shipType.setScu(new BigDecimal("42"));
     shipType.setManufacturer(manufacturer);
     shipTypeId = shipTypeRepository.save(shipType).getId();
     cleanup.push(() -> manufacturerRepository.deleteById(manufacturerId));
