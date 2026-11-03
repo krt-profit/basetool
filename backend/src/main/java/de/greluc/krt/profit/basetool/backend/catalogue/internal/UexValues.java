@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -87,8 +87,13 @@ public final class UexValues {
     if (!StringUtils.hasText(sizes)) {
       return null;
     }
+    String[] parts = sizes.split(",", -1);
+    List<Integer> parsed = new ArrayList<>(parts.length);
     try {
-      return Arrays.stream(sizes.split(",", -1)).map(String::trim).map(Integer::valueOf).toList();
+      for (String part : parts) {
+        parsed.add(Integer.parseInt(part.trim()));
+      }
+      return List.copyOf(parsed);
     } catch (NumberFormatException _) {
       log.debug("Non-numeric UEX container_sizes value '{}' — leaving it null", sizes);
       return null;
