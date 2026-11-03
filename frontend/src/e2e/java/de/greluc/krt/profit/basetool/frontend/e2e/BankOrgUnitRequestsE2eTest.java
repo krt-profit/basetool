@@ -106,9 +106,10 @@ class BankOrgUnitRequestsE2eTest {
 
   /**
    * F1: an officer sees their org unit's balance card on the slim page; a plain member reaches the
-   * same member-or-above page and sees its nav entry, but — overseeing and granted no account — no
-   * balance card. The account-responsibility feature opened the page to every member (REQ-BANK-038,
-   * read-only drill-in); only the balance card itself stays scoped to oversight/grants.
+   * same member-or-above page, but — overseeing and granted no account — sees its empty state and
+   * no balance card. The account-responsibility feature opened the page to every member
+   * (REQ-BANK-038, read-only drill-in); only the balance card itself stays scoped to
+   * oversight/grants.
    */
   @Test
   void officerSeesOrgUnitBalanceAndPlainMemberDoesNot() {
@@ -133,8 +134,8 @@ class BankOrgUnitRequestsE2eTest {
       try {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
-        page.waitForLoadState();
-        assertThat(page.locator("[data-testid='page-tab-orgunitbank.overview']")).isVisible();
+        assertThat(page.locator("[data-testid='org-unit-bank-empty']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-member");
