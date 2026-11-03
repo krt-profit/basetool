@@ -1,6 +1,7 @@
 # ADR-0296 — Every page carries the fan site notice of the CIG FAQ
 
-- **Status:** Accepted
+- **Status:** Accepted — decision 2 superseded by
+  [ADR-0332](0332-the-fan-site-notice-lives-on-the-home-page-not-on-every-page.md)
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-018)

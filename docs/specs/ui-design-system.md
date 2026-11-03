@@ -1193,13 +1193,14 @@ Binding details:
 - **The home page stays publicly reachable** (`/` is permitAll in `SecurityConfig`), so the notice
   is visible without a login. Gating `/` behind authentication would forfeit this placement and
   require moving the band back to an always-visible navigation area.
-- **The FAQ fan site notice is on every page** ([ADR-0296](../adr/0296-every-page-carries-the-fan-site-notice-of-the-cig-faq.md)).
-  `fankit.fansite` quotes the FAQ verbatim, English in every bundle, and renders with a link to
-  `https://robertsspaceindustries.com/` in the footer's full-width `.krt-footer-fansite` row and, on
-  the phone where the tab bar hides the footer, in the drawer's `.nav-legal` group. The public home
-  page shows it in the greeting as well. It is never smaller than the other notices (`--fs-sm`).
-  Checked against the FAQ revision of 2026-09-02, which writes "fan site" as two words and has no
-  trademark sentence.
+- **The FAQ fan site notice is on the public home page**
+  ([ADR-0296](../adr/0296-every-page-carries-the-fan-site-notice-of-the-cig-faq.md),
+  [ADR-0332](../adr/0332-the-fan-site-notice-lives-on-the-home-page-not-on-every-page.md)).
+  `fankit.fansite` quotes the FAQ verbatim, English in every bundle, and renders in the greeting of
+  `dashboard/landing.html` with a link to `https://robertsspaceindustries.com/`. It is not part of
+  the global footer or the drawer, so the fixed footer stays one row. It is never smaller than the
+  other notices (`--fs-sm`). Checked against the FAQ revision of 2026-09-02, which writes "fan site"
+  as two words and has no trademark sentence.
 - **The band links the official site** (`.krt-fankit-official`) as its fourth element.
 - **No CIG artwork outside the Fan Kit ships.** Manufacturer logos, the Star Citizen logo or any
   other CIG artwork appear only as unmodified Fan Kit files and only where a page uses them;
@@ -1230,16 +1231,14 @@ Binding details:
 - [x] The two notices keep their **differing** ® spacing, and 2(g) keeps `Ltd..`.
 - [ ] Both notices render at ≥ 10 pt with an AA-clearing contrast on their surface.
 - [ ] No page carries the logo without both notices.
-- [x] An anonymous `GET /` renders the FAQ fan site notice and a link to robertsspaceindustries.com;
-  the footer of every layout page carries both.
+- [x] An anonymous `GET /` renders the FAQ fan site notice and a link to robertsspaceindustries.com.
 - [x] `fankit.fansite` is byte-identical in the DE, EN and default bundles.
 - [x] No manufacturer logo or other non-Fan-Kit CIG artwork ships under `META-INF/resources/images/`.
 
 **Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines, the
 Fankit Agreement and the Fankit and Fandom FAQ ·
 **Code:** `shell/fragments/fankit.html`, `dashboard/index.html`, `dashboard/landing.html`,
-`kernel/fragments/footer.html`, `kernel/fragments/sidebar.html`, `.krt-fankit-*`,
-`.krt-footer-fansite` and `.nav-legal-fansite` in `styles.css`, `fankit.*` in the three message
+`.krt-fankit-*` and `.krt-landing-notice` in the stylesheets, `fankit.*` in the three message
 bundles · **Related:** REQ-UI-009.
 
 ### REQ-UI-019 — The app wears the Basetool mark; the org mark stays on org surfaces

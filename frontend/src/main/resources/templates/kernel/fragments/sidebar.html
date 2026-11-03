@@ -106,7 +106,6 @@
                     <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, null, null, false)}" />
                 </th:block>
                 <span class="nav-legal-version" th:text="#{app.version.display(${appVersion})}">v0.0.1</span>
-                <span class="nav-legal-fansite" th:text="#{fankit.fansite}">This is an unofficial Star Citizen fan site, not affiliated with the Cloud Imperium group of companies. All content on this site not authored by its host or users are property of their respective owners.</span>
                 <th:block th:each="entry : ${navigation.fanKit().links()}">
                     <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, null, null, false)}" />
                 </th:block>
