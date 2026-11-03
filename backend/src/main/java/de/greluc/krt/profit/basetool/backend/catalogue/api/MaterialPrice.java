@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -31,12 +32,15 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.Nullable;
 
 /** Material Price JPA entity. */
@@ -70,6 +74,25 @@ public class MaterialPrice extends AbstractEntity<UUID> {
   private Integer scuBuy;
   private Integer scuSell;
   private Integer scuSellStock;
+
+  /** UEX's running average of {@link #priceBuy}, in aUEC per SCU. */
+  @Nullable private BigDecimal priceBuyAvg;
+
+  /** UEX's running average of {@link #priceSell}, in aUEC per SCU. */
+  @Nullable private BigDecimal priceSellAvg;
+
+  @Nullable private Integer scuBuyAvg;
+  @Nullable private Integer scuSellAvg;
+  @Nullable private Integer scuSellStockAvg;
+
+  /**
+   * SCU container sizes the terminal handles for this commodity, in UEX order; {@code null} when
+   * UEX lists none.
+   */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(name = "container_sizes", columnDefinition = "integer[]")
+  @Nullable
+  private List<Integer> containerSizes;
 
   private Boolean statusBuy;
   private Boolean statusSell;

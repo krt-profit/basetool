@@ -384,6 +384,12 @@ class UexCommodityServiceTest {
             100,
             50,
             0,
+            new BigDecimal("98.50"),
+            new BigDecimal("110.25"),
+            90,
+            45,
+            12,
+            "1,2,4,8",
             0,
             1,
             1700000100L);
@@ -410,6 +416,12 @@ class UexCommodityServiceTest {
     assertEquals(Boolean.FALSE, cap.getValue().getStatusBuy(), "0 maps to false");
     assertEquals(Boolean.TRUE, cap.getValue().getStatusSell(), "1 maps to true");
     assertEquals(Instant.ofEpochSecond(1700000100L), cap.getValue().getDateModified());
+    assertEquals(new BigDecimal("98.50"), cap.getValue().getPriceBuyAvg());
+    assertEquals(new BigDecimal("110.25"), cap.getValue().getPriceSellAvg());
+    assertEquals(90, cap.getValue().getScuBuyAvg());
+    assertEquals(45, cap.getValue().getScuSellAvg());
+    assertEquals(12, cap.getValue().getScuSellStockAvg());
+    assertEquals(List.of(1, 2, 4, 8), cap.getValue().getContainerSizes());
     verify(materialRepository, never()).findByIdCommodity(any());
     verify(terminalRepository, never()).findByIdTerminal(any());
     verify(materialPriceRepository, never()).findByMaterialIdAndTerminalId(any(), any());
@@ -419,7 +431,24 @@ class UexCommodityServiceTest {
   void priceSync_skipsRow_whenTerminalUnknown() {
     UexCommodityPriceDto orphan =
         new UexCommodityPriceDto(
-            1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
+            1,
+            "X",
+            9999,
+            "Unknown",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            1L);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(orphan)));
@@ -436,10 +465,44 @@ class UexCommodityServiceTest {
   void priceSync_skipsRow_whenIdCommodityOrIdTerminalMissing() {
     UexCommodityPriceDto noCommodity =
         new UexCommodityPriceDto(
-            null, "X", 1, "T", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 0L);
+            null,
+            "X",
+            1,
+            "T",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0L);
     UexCommodityPriceDto noTerminal =
         new UexCommodityPriceDto(
-            1, "X", null, "T", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 0L);
+            1,
+            "X",
+            null,
+            "T",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0L);
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(noCommodity, noTerminal)));
 
@@ -457,7 +520,24 @@ class UexCommodityServiceTest {
 
     UexCommodityPriceDto payload =
         new UexCommodityPriceDto(
-            123, "NewStuff", 7, "Terminal", BigDecimal.TEN, BigDecimal.TEN, 1, 1, 1, 1, 1, 1L);
+            123,
+            "NewStuff",
+            7,
+            "Terminal",
+            BigDecimal.TEN,
+            BigDecimal.TEN,
+            1,
+            1,
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            1,
+            1L);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(payload)));
@@ -495,10 +575,44 @@ class UexCommodityServiceTest {
   void priceSync_isolatesAFailingRow_andTheOtherRowStillCommits() {
     UexCommodityPriceDto bad =
         new UexCommodityPriceDto(
-            1, "A", 1, "T1", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
+            1,
+            "A",
+            1,
+            "T1",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            1L);
     UexCommodityPriceDto good =
         new UexCommodityPriceDto(
-            2, "B", 2, "T2", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
+            2,
+            "B",
+            2,
+            "T2",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            1L);
     UUID m1 = UUID.randomUUID();
     UUID m2 = UUID.randomUUID();
     Material badMaterial = new Material();
@@ -536,7 +650,24 @@ class UexCommodityServiceTest {
 
     UexCommodityPriceDto dto =
         new UexCommodityPriceDto(
-            1, "Gold", 1, "T1", new BigDecimal("10"), new BigDecimal("20"), 1, 1, 1, 1, 1, 1L);
+            1,
+            "Gold",
+            1,
+            "T1",
+            new BigDecimal("10"),
+            new BigDecimal("20"),
+            1,
+            1,
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            1,
+            1L);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(dto)));
@@ -563,7 +694,24 @@ class UexCommodityServiceTest {
   void priceSync_skipsStaleCleanup_whenEveryRowFailsAndSeenSetIsEmpty() {
     UexCommodityPriceDto orphan =
         new UexCommodityPriceDto(
-            1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
+            1,
+            "X",
+            9999,
+            "Unknown",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            1L);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(orphan)));

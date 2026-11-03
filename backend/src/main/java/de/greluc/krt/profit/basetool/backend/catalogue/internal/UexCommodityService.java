@@ -335,6 +335,12 @@ public class UexCommodityService {
       price.setScuBuy(dto.scuBuy());
       price.setScuSell(dto.scuSell());
       price.setScuSellStock(dto.scuSellStock());
+      price.setPriceBuyAvg(dto.priceBuyAvg());
+      price.setPriceSellAvg(dto.priceSellAvg());
+      price.setScuBuyAvg(dto.scuBuyAvg());
+      price.setScuSellAvg(dto.scuSellAvg());
+      price.setScuSellStockAvg(dto.scuSellStockAvg());
+      price.setContainerSizes(UexValues.parseContainerSizes(dto.containerSizes()));
       price.setStatusBuy(dto.isStatusBuy());
       price.setStatusSell(dto.isStatusSell());
       price.setDateModified(dto.getParsedDateModified());

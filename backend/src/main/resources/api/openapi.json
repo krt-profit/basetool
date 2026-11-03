@@ -84000,6 +84000,13 @@
       "MaterialPriceDto" : {
         "type" : "object",
         "properties" : {
+          "containerSizes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
@@ -84007,14 +84014,32 @@
           "priceBuy" : {
             "type" : "number"
           },
+          "priceBuyAvg" : {
+            "type" : "number"
+          },
           "priceSell" : {
+            "type" : "number"
+          },
+          "priceSellAvg" : {
             "type" : "number"
           },
           "scuBuy" : {
             "type" : "integer",
             "format" : "int32"
           },
+          "scuBuyAvg" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "scuSell" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "scuSellAvg" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "scuSellStockAvg" : {
             "type" : "integer",
             "format" : "int32"
           },
@@ -90906,6 +90931,9 @@
           "cityName" : {
             "type" : "string"
           },
+          "gameVersion" : {
+            "type" : "string"
+          },
           "hasLoadingDock" : {
             "type" : "boolean"
           },
@@ -90924,6 +90952,19 @@
           },
           "isAutoLoadOverridden" : {
             "type" : "boolean"
+          },
+          "isRefinery" : {
+            "type" : "boolean"
+          },
+          "isRefuel" : {
+            "type" : "boolean"
+          },
+          "isRepair" : {
+            "type" : "boolean"
+          },
+          "maxContainerSize" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "name" : {
             "type" : "string"

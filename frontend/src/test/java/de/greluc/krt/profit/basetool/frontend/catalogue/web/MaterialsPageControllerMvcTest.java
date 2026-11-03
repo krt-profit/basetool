@@ -356,6 +356,57 @@ class MaterialsPageControllerMvcTest {
     assertThat(unknownCell).contains("md-price--none").doesNotContain("<time");
   }
 
+  /**
+   * A row shows UEX's average sale price below the price, the SCU averages as the price cell's
+   * tooltip and the container range with the full list as its tooltip; a row without them shows
+   * neither.
+   */
+  @Test
+  @WithMockUser
+  void getMaterialDetail_showsTheUexAveragesAndContainerSizes() throws Exception {
+    UUID id = UUID.randomUUID();
+    stubDetail(
+        material(id, null, false, false),
+        List.of(
+            new MaterialPriceDto(
+                UUID.randomUUID(),
+                "Area18 TDD",
+                null,
+                new BigDecimal("3800"),
+                null,
+                null,
+                false,
+                true,
+                null,
+                new BigDecimal("3750"),
+                null,
+                120,
+                40,
+                List.of(1, 2, 4, 8, 16, 24, 32),
+                null),
+            price("Plain Post", null, new BigDecimal("70"))));
+
+    String html =
+        mockMvc
+            .perform(get("/materials/" + id).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(">Container (SCU)</th>")
+        .contains("title=\"Ø Nachfrage 120 SCU · Ø Bestand 40 SCU\"")
+        .contains("class=\"cell-sub md-price-avg\">Ø 3.750<")
+        .contains("title=\"1, 2, 4, 8, 16, 24, 32\"")
+        .containsPattern("data-testid=\"material-price-containers\"[^>]*>1–32<");
+    String plainRow = html.substring(html.indexOf("data-terminal=\"Plain Post\""));
+    plainRow = plainRow.substring(0, plainRow.indexOf("</tr>"));
+    assertThat(plainRow)
+        .doesNotContain("md-price-avg")
+        .containsPattern("data-testid=\"material-price-containers\"[^>]*>–<");
+  }
+
   /** A material without prices shows the empty state instead of a table. */
   @Test
   @WithMockUser
@@ -414,6 +465,11 @@ class MaterialsPageControllerMvcTest {
                         true,
                         false,
                         Instant.now().minus(Duration.ofMinutes(14)),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
                         false)),
                 0,
                 10000,
@@ -532,7 +588,21 @@ class MaterialsPageControllerMvcTest {
   private static MaterialPriceDto price(
       String terminal, BigDecimal buy, BigDecimal sell, Instant uexUpdatedAt) {
     return new MaterialPriceDto(
-        UUID.randomUUID(), terminal, buy, sell, 100, 200, true, true, uexUpdatedAt);
+        UUID.randomUUID(),
+        terminal,
+        buy,
+        sell,
+        100,
+        200,
+        true,
+        true,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        uexUpdatedAt);
   }
 
   /**
