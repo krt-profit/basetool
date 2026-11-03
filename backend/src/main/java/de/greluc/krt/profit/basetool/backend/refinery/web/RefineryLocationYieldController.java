@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.Map;
@@ -42,8 +43,7 @@ public class RefineryLocationYieldController {
 
   /**
    * Returns the UEX-derived refinery yield bonus/malus per input material for a refinery location,
-   * as a {@code materialId → percent} map (positive = bonus, negative = malus, {@code 0} =
-   * baseline).
+   * with its 7- and 30-day averages, keyed by material id (REQ-REFINERY-026).
    *
    * <p>An unknown or {@code null} location returns an empty map, not 404.
    *
@@ -53,10 +53,13 @@ public class RefineryLocationYieldController {
   @GetMapping
   @Operation(
       summary = "Get refinery yields of a location",
-      description = "Returns the yield bonus or malus per input material at the given location.")
+      description =
+          "Returns the yield bonus or malus per input material at the given location, with its"
+              + " 7- and 30-day averages.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
-  public Map<UUID, Integer> getYieldsForLocation(@PathVariable @NotNull UUID locationId) {
+  public Map<UUID, RefineryYieldBonusDto> getYieldsForLocation(
+      @PathVariable @NotNull UUID locationId) {
     return refineryOrderQueryService.getYieldBonusByMaterialForLocationId(locationId);
   }
 }

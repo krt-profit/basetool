@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -383,7 +384,14 @@ class RefineryOrderMapperTest {
     goods.add(g2);
     order.setGoods(goods);
 
-    RefineryOrderDto dto = mapper.toDto(order, Map.of(matA, 5, matB, -3));
+    RefineryOrderDto dto =
+        mapper.toDto(
+            order,
+            Map.of(
+                matA,
+                new RefineryYieldBonusDto(5, 4, 3),
+                matB,
+                new RefineryYieldBonusDto(-3, null, null)));
 
     assertNotNull(dto);
     assertNotNull(dto.goods());
@@ -409,7 +417,8 @@ class RefineryOrderMapperTest {
     goods.add(g);
     order.setGoods(goods);
 
-    RefineryOrderDto dto = mapper.toDto(order, Map.of(UUID.randomUUID(), 5));
+    RefineryOrderDto dto =
+        mapper.toDto(order, Map.of(UUID.randomUUID(), new RefineryYieldBonusDto(5, null, null)));
 
     assertNotNull(dto);
     assertEquals(1, dto.goods().size());
@@ -438,7 +447,8 @@ class RefineryOrderMapperTest {
 
   @Test
   void toDtoWithYieldMap_nullEntity_returnsNull() {
-    assertNull(mapper.toDto(null, Map.of(UUID.randomUUID(), 5)));
+    assertNull(
+        mapper.toDto(null, Map.of(UUID.randomUUID(), new RefineryYieldBonusDto(5, null, null))));
   }
 
   private static Material newRawMaterial(UUID id, String name) {

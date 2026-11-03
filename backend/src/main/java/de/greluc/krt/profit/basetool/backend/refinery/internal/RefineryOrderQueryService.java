@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldReposito
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -260,14 +261,15 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
   }
 
   /**
-   * Returns the UEX yield bonus in percent per material for the refinery at {@code location};
-   * negative values are a malus, and an empty map means no known yield data.
+   * Returns the UEX yield bonus per material for the refinery at {@code location}, with its 7- and
+   * 30-day averages (REQ-REFINERY-026); an empty map means no known yield data.
    *
    * @param location the order's chosen location, may be {@code null}
    * @return map keyed by material UUID, never {@code null}
    */
   @NotNull
-  public Map<UUID, Integer> getYieldBonusByMaterialForLocation(Location location) {
+  public Map<UUID, RefineryYieldBonusDto> getYieldBonusByMaterialForLocation(
+      @Nullable Location location) {
     if (location == null) {
       return Map.of();
     }
@@ -277,12 +279,15 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
     if (cityName == null && stationName == null) {
       return Map.of();
     }
-    Map<UUID, Integer> result = new HashMap<>();
+    Map<UUID, RefineryYieldBonusDto> result = new HashMap<>();
     for (RefineryYield yield : refineryYieldRepository.findAllForLocation(cityName, stationName)) {
       if (yield.getMaterial() == null || yield.getMaterial().getId() == null) {
         continue;
       }
-      result.putIfAbsent(yield.getMaterial().getId(), yield.getYieldBonus());
+      result.putIfAbsent(
+          yield.getMaterial().getId(),
+          new RefineryYieldBonusDto(
+              yield.getYieldBonus(), yield.getYieldBonusWeek(), yield.getYieldBonusMonth()));
     }
     return result;
   }
@@ -295,7 +300,7 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
    * @param locationId target location id; may be {@code null}
    * @return per-material yield bonus map for the location, never {@code null}
    */
-  public Map<UUID, Integer> getYieldBonusByMaterialForLocationId(UUID locationId) {
+  public Map<UUID, RefineryYieldBonusDto> getYieldBonusByMaterialForLocationId(UUID locationId) {
     if (locationId == null) {
       return Map.of();
     }

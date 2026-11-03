@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexRefineryYieldDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
@@ -356,6 +357,24 @@ class UexClientTest {
   @Test
   void getRefineriesYields_hitsCorrectEndpoint() throws Exception {
     assertHitsEndpoint(client::getRefineriesYields, "/refineries_yields");
+  }
+
+  @Test
+  void getRefineriesYields_bindsTheWeekAndMonthAverages() {
+    server.enqueue(
+        jsonOk(
+            """
+            {"status":"ok","data":[
+              {"id": 7, "id_commodity": 1, "id_terminal": 42,
+               "value": 5, "value_week": 4, "value_month": -2},
+              {"id": 8, "id_commodity": 2, "id_terminal": 42, "value": 3}
+            ]}
+            """));
+
+    List<UexRefineryYieldDto> yields = client.getRefineriesYields();
+
+    assertEquals(new UexRefineryYieldDto(7, 1, 42, 5, 4, -2), yields.get(0));
+    assertEquals(new UexRefineryYieldDto(8, 2, 42, 3, null, null), yields.get(1));
   }
 
   @Test

@@ -405,12 +405,16 @@ declare const MATERIAL_ENTRY_TITLE_LABEL: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MATERIAL_REMOVE_LABEL: string;
 /**
- * The order's refinery yield map, `materialId -> bonusPercent` with numeric values; declared in
- * refinery-orders-create.html.
+ * The order's refinery yield map, `materialId -> yield bonus with its 7- and 30-day averages`;
+ * declared in refinery-orders-create.html.
  */
-declare const MATERIAL_YIELD_BONUSES: Record<string, number>;
+declare const MATERIAL_YIELD_BONUSES: Record<string, KrtRefineryYieldBonus>;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MATERIAL_YIELD_BONUS_HELP: string;
+/** The 7-day average tooltip line, `{0}` the signed percent (refinery-orders-create.html). */
+declare const MATERIAL_YIELD_BONUS_WEEK: string;
+/** The 30-day average tooltip line, `{0}` the signed percent (refinery-orders-create.html). */
+declare const MATERIAL_YIELD_BONUS_MONTH: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const RATING_LEVELS: KrtI18nDict;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */

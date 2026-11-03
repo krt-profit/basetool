@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,10 +75,11 @@ public interface RefineryOrderMapper {
    * each good whose input material is in the map; others stay {@code null}.
    *
    * @param entity the refinery order, may be {@code null}
-   * @param yieldByMaterialId per-material yield bonus in percent
+   * @param yieldByMaterialId per-material yield bonus
    * @return the enriched DTO, or {@code null} when {@code entity} is {@code null}
    */
-  default RefineryOrderDto toDto(RefineryOrder entity, Map<UUID, Integer> yieldByMaterialId) {
+  default RefineryOrderDto toDto(
+      RefineryOrder entity, Map<UUID, RefineryYieldBonusDto> yieldByMaterialId) {
     RefineryOrderDto base = toDto(entity);
     if (base == null
         || base.goods() == null
@@ -193,11 +195,11 @@ public interface RefineryOrderMapper {
    * misses or {@code inputMaterial} is null. Records are immutable, hence the copy.
    */
   private static RefineryGoodDto applyYield(
-      RefineryGoodDto good, Map<UUID, Integer> yieldByMaterialId) {
+      RefineryGoodDto good, Map<UUID, RefineryYieldBonusDto> yieldByMaterialId) {
     if (good == null || good.inputMaterial() == null || good.inputMaterial().id() == null) {
       return good;
     }
-    Integer bonus = yieldByMaterialId.get(good.inputMaterial().id());
+    RefineryYieldBonusDto bonus = yieldByMaterialId.get(good.inputMaterial().id());
     if (bonus == null) {
       return good;
     }
@@ -208,6 +210,6 @@ public interface RefineryOrderMapper {
         good.outputMaterial(),
         good.outputQuantity(),
         good.quality(),
-        bonus);
+        bonus.percent());
   }
 }

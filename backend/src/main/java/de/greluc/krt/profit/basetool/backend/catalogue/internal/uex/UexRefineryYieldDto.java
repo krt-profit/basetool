@@ -22,11 +22,20 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal.uex;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Inbound JSON record for UEX Corp's refinery-yield endpoint. Maps a refining method to the
- * commodity output at a given refinery terminal; consumed by {@code UexRefinerySyncService}.
+ * Inbound JSON record for UEX Corp's refinery-yield endpoint: the yield bonus in percent of one
+ * commodity at one refinery terminal; consumed by {@code UexRefinerySyncService}.
+ *
+ * @param id the UEX row id
+ * @param idCommodity the UEX commodity id
+ * @param idTerminal the UEX terminal id
+ * @param value the current yield bonus in percent
+ * @param valueWeek the average yield bonus of the last 7 days in percent, or {@code null}
+ * @param valueMonth the average yield bonus of the last 30 days in percent, or {@code null}
  */
 public record UexRefineryYieldDto(
     Integer id,
     @JsonProperty("id_commodity") Integer idCommodity,
     @JsonProperty("id_terminal") Integer idTerminal,
-    Integer value) {}
+    Integer value,
+    @JsonProperty("value_week") Integer valueWeek,
+    @JsonProperty("value_month") Integer valueMonth) {}

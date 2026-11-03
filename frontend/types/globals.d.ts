@@ -558,24 +558,37 @@ interface KrtTermsGateApi {
  */
 type KrtRefineryControl = HTMLInputElement | HTMLSelectElement;
 
+/** The UEX yield bonus of one material at the chosen refinery, with its 7- and 30-day averages. */
+type KrtRefineryYieldBonus = ApiDto<'RefineryYieldBonusDto'>;
+
+/** The yield badge's tooltip texts; the two average lines carry a `{0}` for the signed percent. */
+interface KrtRefineryYieldTexts {
+    /** The tooltip's first line, explaining the badge. */
+    help: string;
+    /** The 7-day average line. */
+    weekAverage: string;
+    /** The 30-day average line. */
+    monthAverage: string;
+}
+
 /**
  * The material-row yield-badge manager installed by `refinery-yield-badge.js` for both
- * refinery-order forms. Holds the current refinery's `{materialId -> bonusPercent}` map in memory.
+ * refinery-order forms. Holds the current refinery's `{materialId -> yield bonus}` map in memory.
  */
 interface KrtRefineryYieldApi {
     /**
-     * Replaces the yield map and the badge tooltip text; a nullish map means no UEX data and
+     * Replaces the yield map and the badge tooltip texts; a nullish map means no UEX data and
      * collapses every badge.
      */
     init(
-        initialMap: Record<string, number> | null | undefined,
-        helpText: string | null | undefined,
+        initialMap: Record<string, KrtRefineryYieldBonus> | null | undefined,
+        texts: Partial<KrtRefineryYieldTexts> | null | undefined,
     ): void;
     /**
      * Sets, updates or removes the badge on material row `rowIndex`. A nullish `bonus` removes it;
-     * 0 renders a neutral "0%" badge.
+     * 0 renders a neutral "0%" badge; the tooltip lists the averages UEX knows.
      */
-    setBadge(rowIndex: string | number, bonus: number | null | undefined): void;
+    setBadge(rowIndex: string | number, bonus: KrtRefineryYieldBonus | null | undefined): void;
     /**
      * Re-renders the badge of the row owning `control`, identified by its trailing `_<n>` id
      * suffix; a control without one is ignored.

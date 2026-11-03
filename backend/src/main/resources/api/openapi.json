@@ -25820,7 +25820,7 @@
     },
     "/api/v1/locations/{locationId}/refinery-yields" : {
       "get" : {
-        "description" : "Returns the yield bonus or malus per input material at the given location.",
+        "description" : "Returns the yield bonus or malus per input material at the given location, with its 7- and 30-day averages.",
         "operationId" : "getYieldsForLocation",
         "parameters" : [ {
           "in" : "path",
@@ -25838,8 +25838,7 @@
                 "schema" : {
                   "type" : "object",
                   "additionalProperties" : {
-                    "type" : "integer",
-                    "format" : "int32"
+                    "$ref" : "#/components/schemas/RefineryYieldBonusDto"
                   }
                 }
               }
@@ -89541,6 +89540,23 @@
         "properties" : {
           "roundingMode" : {
             "type" : "string"
+          }
+        }
+      },
+      "RefineryYieldBonusDto" : {
+        "type" : "object",
+        "properties" : {
+          "monthAveragePercent" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "percent" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "weekAveragePercent" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

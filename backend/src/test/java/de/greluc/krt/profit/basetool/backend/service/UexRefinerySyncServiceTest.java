@@ -192,7 +192,7 @@ class UexRefinerySyncServiceTest {
     terminal.setId(terminalId);
     terminal.setIdTerminal(42);
 
-    UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5);
+    UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5, null, null);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(payload));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
@@ -210,6 +210,8 @@ class UexRefinerySyncServiceTest {
     assertSame(material, saved.getMaterial());
     assertSame(terminal, saved.getTerminal());
     assertEquals(5, saved.getYieldBonus());
+    assertNull(saved.getYieldBonusWeek());
+    assertNull(saved.getYieldBonusMonth());
   }
 
   @Test
@@ -231,7 +233,7 @@ class UexRefinerySyncServiceTest {
     existing.setYieldBonus(0);
     existing.setVersion(2L);
 
-    UexRefineryYieldDto fresh = new UexRefineryYieldDto(100, 1, 42, 7);
+    UexRefineryYieldDto fresh = new UexRefineryYieldDto(100, 1, 42, 7, 6, -2);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(fresh));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
@@ -252,13 +254,15 @@ class UexRefinerySyncServiceTest {
     assertEquals(existingYieldId, cap.getValue().getId());
     assertEquals(2L, cap.getValue().getVersion());
     assertEquals(7, cap.getValue().getYieldBonus());
+    assertEquals(6, cap.getValue().getYieldBonusWeek());
+    assertEquals(-2, cap.getValue().getYieldBonusMonth());
   }
 
   @Test
   void syncRefineryYields_skipsRowWithMissingIdentifiers() {
-    UexRefineryYieldDto noCommodity = new UexRefineryYieldDto(1, null, 42, 5);
-    UexRefineryYieldDto noTerminal = new UexRefineryYieldDto(2, 1, null, 5);
-    UexRefineryYieldDto noValue = new UexRefineryYieldDto(3, 1, 42, null);
+    UexRefineryYieldDto noCommodity = new UexRefineryYieldDto(1, null, 42, 5, null, null);
+    UexRefineryYieldDto noTerminal = new UexRefineryYieldDto(2, 1, null, 5, null, null);
+    UexRefineryYieldDto noValue = new UexRefineryYieldDto(3, 1, 42, null, null, null);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(noCommodity, noTerminal, noValue));
 
@@ -271,7 +275,7 @@ class UexRefinerySyncServiceTest {
 
   @Test
   void syncRefineryYields_skipsRow_whenMaterialUnknown() {
-    UexRefineryYieldDto orphan = new UexRefineryYieldDto(1, 999, 42, 5);
+    UexRefineryYieldDto orphan = new UexRefineryYieldDto(1, 999, 42, 5, null, null);
     when(uexClient.getRefineriesYields()).thenReturn(List.of(orphan));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of());
     when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of());
@@ -288,7 +292,7 @@ class UexRefinerySyncServiceTest {
     material.setId(UUID.randomUUID());
     material.setIdCommodity(1);
 
-    UexRefineryYieldDto orphan = new UexRefineryYieldDto(1, 1, 9999, 5);
+    UexRefineryYieldDto orphan = new UexRefineryYieldDto(1, 1, 9999, 5, null, null);
     when(uexClient.getRefineriesYields()).thenReturn(List.of(orphan));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
     lenient().when(materialRepository.getReferenceById(material.getId())).thenReturn(material);
@@ -311,9 +315,9 @@ class UexRefinerySyncServiceTest {
     terminal.setId(terminalId);
     terminal.setIdTerminal(42);
 
-    UexRefineryYieldDto good = new UexRefineryYieldDto(1, 1, 42, 5);
-    UexRefineryYieldDto orphan = new UexRefineryYieldDto(2, 1, 999, 5);
-    UexRefineryYieldDto skipped = new UexRefineryYieldDto(3, 1, 42, null);
+    UexRefineryYieldDto good = new UexRefineryYieldDto(1, 1, 42, 5, null, null);
+    UexRefineryYieldDto orphan = new UexRefineryYieldDto(2, 1, 999, 5, null, null);
+    UexRefineryYieldDto skipped = new UexRefineryYieldDto(3, 1, 42, null, null, null);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(good, orphan, skipped));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
@@ -367,7 +371,7 @@ class UexRefinerySyncServiceTest {
     terminal.setId(terminalId);
     terminal.setIdTerminal(42);
 
-    UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5);
+    UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5, null, null);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(payload));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
