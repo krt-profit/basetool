@@ -8899,6 +8899,9 @@
     }
 
     .nav-rail-item--avatar .nav-rail-flyout {
+        width: max-content;
+        min-width: 280px;
+        max-width: calc(100vw - var(--krt-nav-width, 64px));
         top: auto;
         bottom: var(--krt-footer-height, 5rem);
         max-height: calc(100dvh - var(--krt-header-height, 83px) - var(--krt-footer-height, 5rem));
@@ -8932,6 +8935,11 @@
     .nav-rail-mode-switch {
         padding: var(--space-3) 0;
         border-top: var(--border-hairline);
+    }
+
+    /* The org-unit select fills the flyout but must not widen it with a long option label. */
+    .nav-rail-switcher {
+        contain: inline-size;
     }
 
     .nav-rail-user-foot {
