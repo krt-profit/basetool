@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Spring Data repository for Moon. */
 public interface MoonRepository extends JpaRepository<Moon, UUID> {
@@ -30,4 +33,13 @@ public interface MoonRepository extends JpaRepository<Moon, UUID> {
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Moon> findByName(String name);
+
+  /**
+   * Reads every Moon's (idMoon, local id) pair in one query, for the lookup map the commodity
+   * location sync resolves UEX ids against (REQ-DATA-031).
+   *
+   * @return one row per Moon that carries a UEX id
+   */
+  @Query("SELECT e.idMoon AS uexId, e.id AS id FROM Moon e WHERE e.idMoon IS NOT NULL")
+  List<UexKeyRef> findUexRefs();
 }

@@ -34,6 +34,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Refinery Yield JPA entity. */
 @Entity
@@ -61,4 +62,10 @@ public class RefineryYield extends AbstractEntity<UUID> {
 
   @Column(nullable = false)
   private Integer yieldBonus;
+
+  /** UEX average of the yield bonus over the last 7 days in percent; {@code null} when unknown. */
+  @Nullable private Integer yieldBonusWeek;
+
+  /** UEX average of the yield bonus over the last 30 days in percent; {@code null} when unknown. */
+  @Nullable private Integer yieldBonusMonth;
 }

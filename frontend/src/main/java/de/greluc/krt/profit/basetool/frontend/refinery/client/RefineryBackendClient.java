@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDt
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryYieldBonusDto;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -59,8 +60,8 @@ public class RefineryBackendClient {
   private static final ParameterizedTypeReference<PageResponse<RefineryOrderListDto>>
       REFINERY_ORDER_LIST_PAGE = new ParameterizedTypeReference<>() {};
 
-  private static final ParameterizedTypeReference<Map<String, Integer>> STRING_INTEGER_MAP =
-      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<Map<String, RefineryYieldBonusDto>>
+      YIELD_BONUS_MAP = new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<MaterialDto>> MATERIAL_PAGE =
       new ParameterizedTypeReference<>() {};
@@ -207,15 +208,15 @@ public class RefineryBackendClient {
   }
 
   /**
-   * Reads the UEX yield bonus per material of a refinery location.
+   * Reads the UEX yield bonus per material of a refinery location, with its 7- and 30-day averages.
    *
    * @param locationId the refinery location
-   * @return percent by material id, or {@code null} when the backend sent no body
+   * @return the yield bonus by material id, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Integer> yields(@NotNull UUID locationId) {
+  public Map<String, RefineryYieldBonusDto> yields(@NotNull UUID locationId) {
     return backendApiClient.get(
-        "/api/v1/locations/{id}/refinery-yields", STRING_INTEGER_MAP, locationId);
+        "/api/v1/locations/{id}/refinery-yields", YIELD_BONUS_MAP, locationId);
   }
 
   /**

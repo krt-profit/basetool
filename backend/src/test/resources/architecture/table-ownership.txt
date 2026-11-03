@@ -68,6 +68,7 @@ material_exchange_offer materialexchange
 material_exchange_request materialexchange
 material_exchange_request_interest materialexchange
 material_external_alias catalogue
+material_occurrence catalogue
 material_price catalogue
 member_blueprint_sharing blueprint
 member_payout_setting mission

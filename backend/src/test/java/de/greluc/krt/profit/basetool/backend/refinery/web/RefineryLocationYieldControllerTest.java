@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import java.util.Map;
 import java.util.UUID;
@@ -43,10 +44,15 @@ class RefineryLocationYieldControllerTest {
   @Test
   void getYieldsForLocation_delegatesToService_andReturnsTheMap() {
     UUID locationId = UUID.randomUUID();
-    Map<UUID, Integer> expected = Map.of(UUID.randomUUID(), 5, UUID.randomUUID(), -3);
+    Map<UUID, RefineryYieldBonusDto> expected =
+        Map.of(
+            UUID.randomUUID(),
+            new RefineryYieldBonusDto(5, 4, 3),
+            UUID.randomUUID(),
+            new RefineryYieldBonusDto(-3, null, null));
     when(service.getYieldBonusByMaterialForLocationId(locationId)).thenReturn(expected);
 
-    Map<UUID, Integer> result = controller.getYieldsForLocation(locationId);
+    Map<UUID, RefineryYieldBonusDto> result = controller.getYieldsForLocation(locationId);
 
     assertThat(result).isSameAs(expected);
     verify(service).getYieldBonusByMaterialForLocationId(locationId);

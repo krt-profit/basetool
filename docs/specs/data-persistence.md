@@ -1097,7 +1097,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 120 tables. Its machine-readable copy is
+The ownership map, 121 tables. Its machine-readable copy is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1107,7 +1107,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 38 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `catalogue` | 39 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1502,6 +1502,45 @@ The UEX sync stores these fields of UEX API 2.0, inside the key sets of REQ-DATA
 `UexUniverseSyncServiceTest`, `MaterialMatrixQueryDataTest`, `MaterialTerminalPricesTest`,
 `MaterialsPageControllerMvcTest`, `AdminUexPageControllerMvcTest` · **Code:** `MaterialPrice`,
 `Terminal`, `UexCommodityService`, `UexUniverseSyncService`, `MaterialTerminalPrices`, V335
+
+### REQ-DATA-031 — a material's UEX locations are a join to the location tables, replaced on every complete commodity sync
+
+UEX `GET /commodities` names where a commodity can be found in five comma-separated id lists:
+`ids_star_systems`, `ids_planets`, `ids_moons`, `ids_orbits` and `ids_poi`. The backend stores them
+as `material_occurrence` rows, never as the CSV string: one row per material and location, a foreign
+key to exactly one of `star_system`, `planet`, `moon`, `orbit` or `poi` (a check constraint holds
+it), unique per material and location.
+
+- **Source.** `UexCommodityService` hands every non-empty commodity catalogue to
+  `UexCommodityOccurrenceSync` after the commodity upsert, which runs after the universe sync, so
+  the material and the location ids resolve. An empty catalogue changes nothing.
+- **Replace.** For each commodity of the catalogue whose material resolves, the stored set becomes
+  exactly the listed locations: rows still listed stay, rows no longer listed are deleted, new ones
+  are inserted, in chunk transactions (REQ-DATA-005). An absent or blank list means no location of
+  that kind. A material the catalogue does not carry keeps its rows.
+- **Unknown ids.** A listed id with no local location row, and a non-numeric entry, is skipped; the
+  run's log line counts the skipped ids.
+- **Read.** `GET /api/v1/materials/{id}/occurrences` (any signed-in user) lists the material's
+  locations by kind (star system, planet, moon, orbit, point of interest), then by name, each with
+  its star system and the body it belongs to; an unknown material yields an empty list. No page
+  shows them yet.
+- **Deletion.** Deleting a material or a location deletes its rows (`ON DELETE CASCADE`).
+- **Monitoring.** The phase runs inside the UEX sync job and is covered by its job metrics and
+  alerts; it adds no metric of its own.
+
+**Acceptance**
+
+- [x] Listed locations with a local row are inserted, unknown ids skipped; a location no longer
+  listed is deleted, one still listed is kept; empty lists clear the set.
+- [x] A commodity without a local material touches nothing; an empty catalogue does not run the
+  phase.
+- [x] The schema rejects a row with no location, with two locations, and a repeated location.
+- [x] The read lists each kind with its star system and parent body, ordered by kind and name.
+
+**Enforced by:** `UexCommodityOccurrenceSyncTest`, `MaterialOccurrenceRepositoryTest`,
+`MaterialOccurrenceServiceTest`, `UexValuesTest`, `UexCommodityServiceTest` · **Code:**
+`MaterialOccurrence`, `MaterialOccurrenceRepository`, `UexCommodityOccurrenceSync`,
+`MaterialOccurrenceService`, `MaterialController#getMaterialOccurrences`, V337
 
 ## Out of scope
 

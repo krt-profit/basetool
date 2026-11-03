@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldReposito
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -417,7 +418,7 @@ class RefineryOrderQueryServiceTest {
       naked.setId(UUID.randomUUID());
       naked.setName("Custom");
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocation(naked);
+      Map<UUID, RefineryYieldBonusDto> result = service.getYieldBonusByMaterialForLocation(naked);
 
       assertTrue(result.isEmpty());
     }
@@ -434,6 +435,8 @@ class RefineryOrderQueryServiceTest {
       RefineryYield y1 = new RefineryYield();
       y1.setMaterial(a);
       y1.setYieldBonus(5);
+      y1.setYieldBonusWeek(4);
+      y1.setYieldBonusMonth(3);
       RefineryYield y2 = new RefineryYield();
       y2.setMaterial(b);
       y2.setYieldBonus(-3);
@@ -448,11 +451,11 @@ class RefineryOrderQueryServiceTest {
       when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
           .thenReturn(List.of(y1, y2));
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocation(loc);
+      Map<UUID, RefineryYieldBonusDto> result = service.getYieldBonusByMaterialForLocation(loc);
 
       assertEquals(2, result.size());
-      assertEquals(5, result.get(matA));
-      assertEquals(-3, result.get(matB));
+      assertEquals(new RefineryYieldBonusDto(5, 4, 3), result.get(matA));
+      assertEquals(new RefineryYieldBonusDto(-3, null, null), result.get(matB));
     }
 
     @Test
@@ -475,10 +478,10 @@ class RefineryOrderQueryServiceTest {
       when(refineryYieldRepository.findAllForLocation(eq(null), eq("ARC-L1 Wide Forest Station")))
           .thenReturn(List.of(y));
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocation(loc);
+      Map<UUID, RefineryYieldBonusDto> result = service.getYieldBonusByMaterialForLocation(loc);
 
       assertEquals(1, result.size());
-      assertEquals(2, result.get(matA));
+      assertEquals(2, result.get(matA).percent());
     }
 
     @Test
@@ -501,10 +504,10 @@ class RefineryOrderQueryServiceTest {
       when(refineryYieldRepository.findAllForLocation(eq(null), eq("CRU-L1")))
           .thenReturn(List.of(y));
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocation(loc);
+      Map<UUID, RefineryYieldBonusDto> result = service.getYieldBonusByMaterialForLocation(loc);
 
       assertTrue(result.containsKey(matA));
-      assertEquals(0, result.get(matA));
+      assertEquals(0, result.get(matA).percent());
     }
 
     @Test
@@ -517,7 +520,8 @@ class RefineryOrderQueryServiceTest {
       UUID missing = UUID.randomUUID();
       when(locationRepository.findById(missing)).thenReturn(Optional.empty());
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocationId(missing);
+      Map<UUID, RefineryYieldBonusDto> result =
+          service.getYieldBonusByMaterialForLocationId(missing);
 
       assertTrue(result.isEmpty());
     }
@@ -544,10 +548,10 @@ class RefineryOrderQueryServiceTest {
       when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
           .thenReturn(List.of(y));
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocationId(locId);
+      Map<UUID, RefineryYieldBonusDto> result = service.getYieldBonusByMaterialForLocationId(locId);
 
       assertEquals(1, result.size());
-      assertEquals(7, result.get(matA));
+      assertEquals(7, result.get(matA).percent());
     }
 
     @Test
@@ -566,7 +570,7 @@ class RefineryOrderQueryServiceTest {
       when(refineryYieldRepository.findAllForLocation(eq("Area18"), eq(null)))
           .thenReturn(List.of(orphan));
 
-      Map<UUID, Integer> result = service.getYieldBonusByMaterialForLocation(loc);
+      Map<UUID, RefineryYieldBonusDto> result = service.getYieldBonusByMaterialForLocation(loc);
 
       assertTrue(result.isEmpty());
     }

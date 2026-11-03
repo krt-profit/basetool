@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRep
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityOccurrenceSync;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
@@ -64,6 +65,8 @@ class UexCommodityServiceTest {
   @Mock private MaterialPriceRepository materialPriceRepository;
 
   @Mock private TerminalRepository terminalRepository;
+
+  @Mock private UexCommodityOccurrenceSync occurrenceSync;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
   @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
@@ -352,6 +355,20 @@ class UexCommodityServiceTest {
     verify(uexClient).getCommodities();
     verify(uexClient).getCommoditiesPricesAll();
     verify(materialRepository, never()).save(any());
+    verifyNoInteractions(occurrenceSync);
+  }
+
+  @Test
+  void commoditySync_replacesTheLocationsOfTheFetchedCatalogue() {
+    List<UexCommodityDto> catalogue = List.of(commodity(1, "Agricium (Ore)", 0, 1));
+    when(uexClient.getCommodities()).thenReturn(fetched(catalogue));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Agricium (Ore)")).thenReturn(Optional.empty());
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    verify(occurrenceSync).replaceAll(catalogue);
   }
 
   @Test
@@ -768,6 +785,11 @@ class UexCommodityServiceTest {
         0,
         0,
         0,
-        0);
+        0,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 }

@@ -54,4 +54,9 @@ public record UexCommodityDto(
     @JsonProperty("is_inert") Integer isInert,
     @JsonProperty("is_explosive") Integer isExplosive,
     @JsonProperty("is_buggy") Integer isBuggy,
-    @JsonProperty("is_fuel") Integer isFuel) {}
+    @JsonProperty("is_fuel") Integer isFuel,
+    @JsonProperty("ids_star_systems") String idsStarSystems,
+    @JsonProperty("ids_planets") String idsPlanets,
+    @JsonProperty("ids_moons") String idsMoons,
+    @JsonProperty("ids_orbits") String idsOrbits,
+    @JsonProperty("ids_poi") String idsPoi) {}

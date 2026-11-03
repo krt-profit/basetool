@@ -52,7 +52,8 @@ import org.springframework.transaction.annotation.Transactional;
  * catalogue lacks are created, unknown terminals are skipped. Rows are written through {@link
  * SyncChunkWriter} with no transaction held across HTTP calls. Price rows UEX no longer lists are
  * cleared via {@link MaterialPriceRepository#clearPricesByIds} unless nothing was written; an empty
- * or unchanged feed leaves local data untouched.
+ * or unchanged feed leaves local data untouched. A non-empty catalogue also replaces each listed
+ * material's locations through {@link UexCommodityOccurrenceSync} (REQ-DATA-031).
  */
 @Slf4j
 @Service
@@ -67,6 +68,9 @@ public class UexCommodityService {
   private final MaterialRepository materialRepository;
   private final MaterialPriceRepository materialPriceRepository;
   private final TerminalRepository terminalRepository;
+
+  /** Replaces each material's UEX location set after the catalogue upsert (REQ-DATA-031). */
+  private final UexCommodityOccurrenceSync occurrenceSync;
 
   /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
@@ -98,6 +102,7 @@ public class UexCommodityService {
           "Finished commodities synchronization. Processed {} items ({} failed).",
           outcome.results().size(),
           outcome.failedRows());
+      occurrenceSync.replaceAll(commodities);
     } else {
       log.warn("No commodities received from UEX API.");
     }

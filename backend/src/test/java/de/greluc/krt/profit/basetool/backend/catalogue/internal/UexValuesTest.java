@@ -21,15 +21,19 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues.CrewRange;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link UexValues#parseCrew(String)} over the crew-string shapes of the UEX {@code
- * /vehicles} payload and malformed input (REQ-DATA-015, ADR-0148).
+ * /vehicles} payload and malformed input (REQ-DATA-015, ADR-0148), and for {@link
+ * UexValues#parseIdList(String)} over the {@code ids_*} lists of {@code /commodities}
+ * (REQ-DATA-031).
  */
 class UexValuesTest {
 
@@ -68,6 +72,22 @@ class UexValuesTest {
   @DisplayName("bounds past the second are ignored rather than failing the whole value")
   void extraBounds_areIgnored() {
     assertEquals(new CrewRange(2, 5), UexValues.parseCrew("2,5,9"));
+  }
+
+  @Test
+  @DisplayName("an id list keeps its order and drops repeats")
+  void idList_keepsOrderWithoutRepeats() {
+    assertEquals(List.of(18, 25, 73, 75), List.copyOf(UexValues.parseIdList("18,25,73,75")));
+    assertEquals(List.of(4, 2), List.copyOf(UexValues.parseIdList(" 4 , 2 ,4")));
+  }
+
+  @Test
+  @DisplayName("blank and non-numeric id entries are skipped, an absent list is empty")
+  void idList_skipsUnparseableEntries() {
+    assertEquals(Set.of(7), UexValues.parseIdList("7,,x, "));
+    for (String raw : new String[] {null, "", "  ", ","}) {
+      assertTrue(UexValues.parseIdList(raw).isEmpty(), "ids for '" + raw + "'");
+    }
   }
 
   @Test

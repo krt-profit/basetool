@@ -1,34 +1,69 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-/** @type {{ yieldByMaterialId: Record<string, number>, helpText: string }} */
+/** @type {{ yieldByMaterialId: Record<string, KrtRefineryYieldBonus>, texts: KrtRefineryYieldTexts }} */
 const state = {
     yieldByMaterialId: {},
-    helpText: '',
+    texts: { help: '', weekAverage: '', monthAverage: '' },
 };
 
 /**
- * Replaces the in-memory yield map and help text with the server-rendered initial state.
+ * Replaces the in-memory yield map and tooltip texts with the server-rendered initial state.
  *
- * @param {Record<string, number> | null | undefined} initialMap the bonus percent per material id
- * @param {string | null | undefined} helpText the badge tooltip text
+ * @param {Record<string, KrtRefineryYieldBonus> | null | undefined} initialMap the yield bonus per
+ *     material id
+ * @param {Partial<KrtRefineryYieldTexts> | null | undefined} texts the badge tooltip texts
  */
-function init(initialMap, helpText) {
+function init(initialMap, texts) {
     state.yieldByMaterialId = initialMap || {};
-    state.helpText = helpText || '';
+    state.texts = {
+        help: (texts && texts.help) || '',
+        weekAverage: (texts && texts.weekAverage) || '',
+        monthAverage: (texts && texts.monthAverage) || '',
+    };
 }
 
 /**
- * Sets, updates or removes the yield-bonus badge of a row; a null or undefined bonus
+ * Formats a percent value the way the badge shows it: a leading `+` on a bonus, none on a malus.
+ *
+ * @param {number} percent the percent value
+ * @returns {string} the signed percent text
+ */
+function formatPercent(percent) {
+    return percent > 0 ? `+${percent}%` : `${percent}%`;
+}
+
+/**
+ * Builds the badge tooltip: the help text, then one line per average UEX knows.
+ *
+ * @param {KrtRefineryYieldBonus} bonus the material's yield bonus
+ * @returns {string} the tooltip text, lines separated by `\n`
+ */
+function tooltipFor(bonus) {
+    const lines = [state.texts.help];
+    if (bonus.weekAveragePercent !== undefined && bonus.weekAveragePercent !== null) {
+        lines.push(state.texts.weekAverage.replace('{0}', formatPercent(bonus.weekAveragePercent)));
+    }
+    if (bonus.monthAveragePercent !== undefined && bonus.monthAveragePercent !== null) {
+        lines.push(
+            state.texts.monthAverage.replace('{0}', formatPercent(bonus.monthAveragePercent)),
+        );
+    }
+    return lines.filter((line) => line).join('\n');
+}
+
+/**
+ * Sets, updates or removes the yield-bonus badge of a row; a bonus without a current percent
  * removes it.
  *
  * @param {string | number} rowIndex the material row's index
- * @param {number | null | undefined} bonus the bonus percent
+ * @param {KrtRefineryYieldBonus | null | undefined} bonus the yield bonus with its averages
  */
 function setBadge(rowIndex, bonus) {
     const label = document.querySelector(`label[for="outputQuantity_${rowIndex}"]`);
     if (!label) return;
-    let badge = label.querySelector(`#yieldBonus_${rowIndex}`);
-    if (bonus === undefined || bonus === null) {
+    let badge = /** @type {HTMLElement | null} */ (label.querySelector(`#yieldBonus_${rowIndex}`));
+    const percent = bonus ? bonus.percent : undefined;
+    if (!bonus || percent === undefined || percent === null) {
         if (badge) badge.remove();
         return;
     }
@@ -36,20 +71,18 @@ function setBadge(rowIndex, bonus) {
         badge = document.createElement('span');
         badge.id = `yieldBonus_${rowIndex}`;
         badge.className = 'yield-bonus-badge';
-        /** @type {HTMLElement} */ (badge).title = state.helpText;
         label.appendChild(badge);
     }
+    badge.title = tooltipFor(bonus);
     badge.classList.remove('yield-positive', 'yield-negative', 'yield-zero');
-    if (bonus > 0) {
+    if (percent > 0) {
         badge.classList.add('yield-positive');
-        badge.textContent = `+${bonus}%`;
-    } else if (bonus < 0) {
+    } else if (percent < 0) {
         badge.classList.add('yield-negative');
-        badge.textContent = `${bonus}%`;
     } else {
         badge.classList.add('yield-zero');
-        badge.textContent = '0%';
     }
+    badge.textContent = formatPercent(percent);
 }
 
 /**
@@ -95,7 +128,9 @@ function onLocationChange(selectElement) {
             return {};
         })
         .then((map) => {
-            state.yieldByMaterialId = map || {};
+            state.yieldByMaterialId = /** @type {Record<string, KrtRefineryYieldBonus>} */ (
+                map || {}
+            );
             refreshAll();
         });
 }

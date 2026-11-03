@@ -273,6 +273,26 @@ included.
 `RefineryOrderWriteController.goodsOf`, `refinery-orders-create.html`, `refinery-orders-details.html`,
 `refinery-orders-index.html`
 
+### REQ-REFINERY-026 — The yield badge shows the UEX 7- and 30-day averages
+
+The refinery yield sync stores, per terminal and commodity, the current UEX yield bonus (`value` of
+`GET /refineries_yields`) and its 7- and 30-day averages (`value_week`, `value_month`) in
+`refinery_yield.yield_bonus`, `yield_bonus_week` and `yield_bonus_month`; an average UEX does not
+send is stored as `NULL`. `GET /api/v1/locations/{locationId}/refinery-yields` returns, per input
+material id, a `RefineryYieldBonusDto` with `percent`, `weekAveragePercent` and
+`monthAveragePercent` (the averages `null` when unknown). The order's goods keep carrying the
+current value alone as `yieldBonusPercent`.
+
+On the create and edit forms the yield badge of a material row keeps showing the current bonus; its
+tooltip lists, below the help text, one line per known average (`Ø 7 Tage: +4%`,
+`Ø 30 Tage: +3%`) in the badge's sign format. A changed refinery or material re-renders the badge
+and its tooltip in place (REQ-FE-001).
+
+**Enforced by:** `UexClientTest`, `UexRefinerySyncServiceTest`, `RefineryOrderQueryServiceTest`,
+`RefineryLocationYieldControllerTest`, `RefineryOrderMapperTest`, `RefineryBackendClientTest` ·
+**Code:** `UexRefineryYieldDto`, `UexRefinerySyncService`, `RefineryYield`,
+`RefineryYieldBonusDto`, `RefineryOrderQueryService`, `refinery-yield-badge.js`
+
 ## Out of scope
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered
