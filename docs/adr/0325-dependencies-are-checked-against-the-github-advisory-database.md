@@ -38,7 +38,9 @@ Package URL and needs no local dataset, and retire the OWASP Dependency-Check.
    Gradle and GitHub documentation give for build-time graphs). It fails when the pull request adds
    a dependency with a HIGH or CRITICAL advisory in any scope, the counterpart of the old
    `failBuildOnCVSS = 7.0`. npm lockfiles are in the graph without a submission. A fork pull
-   request, which gets no write token, is reviewed on its manifests alone.
+   request, which gets no write token, is reviewed on its manifests alone. The workflow also
+   triggers on `merge_group`, where both jobs skip so that the required check reports as passed in
+   the merge queue.
 2. **Trivy scans the SBOMs.** `vulnerability-scan.yml` runs on every `main` push, weekly, on demand
    and on pull requests that touch the build files, the catalog or a lockfile. It builds the four
    CycloneDX SBOMs from the resolved runtime classpaths (REQ-OPS-025) and runs Trivy over each and
