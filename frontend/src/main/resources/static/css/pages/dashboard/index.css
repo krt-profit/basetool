@@ -89,8 +89,21 @@
         gap: var(--space-1);
     }
 
+    .dash-widget__head {
+        flex-wrap: wrap;
+    }
+
+    .dash-widget__head .home-card-title {
+        min-width: 0;
+        overflow-wrap: break-word;
+    }
+
     .dash-board.is-editing .dash-widget__edit {
         display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        max-width: 100%;
+        margin-left: auto;
     }
 
     .dash-board.is-editing .dash-widget__edit .krt-reorder {
