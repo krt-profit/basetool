@@ -479,7 +479,8 @@ GitHub Advisory Database, not the NVD (REQ-OPS-054, ADR-0325):
 - **Every PR** runs *Dependency review* in the
   [Dependency Graph workflow](.github/workflows/dependency-submission.yml): it
   submits the PR's resolved Gradle graph, then fails when the PR adds a
-  dependency with a HIGH or CRITICAL advisory, in any scope.
+  dependency with a HIGH or CRITICAL advisory, in any scope. In the merge
+  queue both jobs skip, which reports the required check as passed.
 - **Every `main` push, weekly and on PRs that touch the build files, the
   catalog or a lockfile**, the
   [Vulnerability Scan](.github/workflows/vulnerability-scan.yml) builds the
