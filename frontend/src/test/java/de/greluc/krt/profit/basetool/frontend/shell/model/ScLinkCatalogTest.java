@@ -97,7 +97,11 @@ class ScLinkCatalogTest {
   void theOrganisationSectionHoldsTheOrgSitesAndTheConnectedDesktopTools() {
     assertThat(ScLinkCategory.ORGANISATION.links())
         .containsExactly(
-            ScLink.DAS_KARTELL, ScLink.KRT_OPSEC, ScLink.SC_EXTRACTOR, ScLink.VERSEKIT);
+            ScLink.DAS_KARTELL,
+            ScLink.KRT_OPSEC,
+            ScLink.SC_EXTRACTOR,
+            ScLink.VERSEKIT,
+            ScLink.TALLYLINE);
     assertThat(ScLink.SC_EXTRACTOR.displayHost()).isEqualTo("github.com");
   }
 

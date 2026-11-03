@@ -42,6 +42,11 @@ public enum ScLink {
       "basetool-sc-extractor.svg",
       ScLinkCategory.ORGANISATION),
   VERSEKIT("versekit", "https://versekit.xharig.com/", "versekit.png", ScLinkCategory.ORGANISATION),
+  TALLYLINE(
+      "tallyline",
+      "https://github.com/tallyline-sc/tallyline",
+      "tallyline.svg",
+      ScLinkCategory.ORGANISATION),
   RSI("rsi", "https://robertsspaceindustries.com/", "rsi.png", ScLinkCategory.OFFICIAL),
   COMM_LINK(
       "commLink",

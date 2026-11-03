@@ -1596,10 +1596,10 @@ them in one place so nobody has to collect the addresses from Discord.
   in the footer (REQ-UI-026) and from the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
-- **What.** Forty-one links in six sections, in this order:
+- **What.** Forty-two links in six sections, in this order:
   - **Organisation** — das-kartell.org, krt-opsec.de, the Basetool SC Extractor
-    (github.com/krt-profit/basetool-sc-extractor), versekit.xharig.com — the org's sites and the
-    desktop tools that connect to the Basetool
+    (github.com/krt-profit/basetool-sc-extractor), versekit.xharig.com, Tallyline
+    (github.com/tallyline-sc/tallyline) — the org's sites and the members' desktop tools
   - **Offizielles** / Official — robertsspaceindustries.com, its Spectrum community
     (`/spectrum/community/SC`), the roadmap, issue-council, status and public-telemetry
     pages, the ship matrix, the loaner ship matrix (support article), the ARK starmap, the
@@ -1622,9 +1622,9 @@ them in one place so nobody has to collect the addresses from Discord.
   in a new tab with `rel="noopener noreferrer"`, and says so to screen readers. A closing line states
   that the sites are run by third parties and their names and logos belong to them.
 - **Logos are local copies.** Each site's favicon or touch icon is stored under
-  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, six sites as
+  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, seven sites as
   SVG; sites of one operator may share a logo file. The CSP's `img-src 'self' data:` forbids hotlinking, and a hotlinked logo would
-  also send every member's address to forty-one third parties on each visit. A shipped SVG carries no
+  also send every member's address to forty-two third parties on each visit. A shipped SVG carries no
   script, event handler, `foreignObject` or external reference.
 - **The catalogue is code.** `ScLink` (key, address, logo, section) and `ScLinkCategory` are enums;
   names and descriptions are i18n keys `scLinks.link.<key>.name` / `.description`. Changing the list
