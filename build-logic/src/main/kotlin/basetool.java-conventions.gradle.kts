@@ -20,6 +20,10 @@ listOf("compileOnly", "testCompileOnly").forEach {
   dependencies.add(it, catalog.requiredLibrary("jetbrains-annotations"))
 }
 
+val guavaFloor = dependencies.constraints.create(catalog.requiredLibrary("guava").get())
+
+configurations.configureEach { if (isCanBeDeclared) dependencyConstraints.add(guavaFloor) }
+
 val mockitoAgent =
   configurations.register("mockitoAgent") {
     isCanBeConsumed = false
