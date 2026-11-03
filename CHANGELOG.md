@@ -2,6 +2,62 @@
 
 ## [Unreleased]
 
+## [v1.22.1](https://github.com/krt-profit/basetool/releases/tag/v1.22.1) - 2026-11-03
+
+### Added
+
+- **Raffinerie.** Der Tooltip des Ertragsbonus-Badges im Auftragsformular zeigt jetzt auch den
+  UEX-Durchschnitt der letzten 7 und 30 Tage. Der UEX-Sync speichert dafür zwei neue Werte je
+  Raffinerie und Material (Migration V336).
+
+- **Materialdetails.** Die Terminal-Tabelle zeigt unter Verkaufs- und Einkaufspreis den
+  UEX-Durchschnittspreis, als Tooltip die durchschnittlichen SCU-Mengen und in der neuen Spalte
+  „Container (SCU)“ die Containergrößen, die das Terminal für die Ware annimmt.
+
+- **UEX-Daten (Admin).** Die Terminal-Tabellen zeigen die größte Containergröße, die Dienste vor
+  Ort (Raffinerie, Tanken, Reparatur) und die Spielversion, auf der die UEX-Daten des Terminals
+  beruhen.
+
+- **Materialien.** Der UEX-Abgleich speichert jetzt, wo ein Material vorkommt (Sternensystem,
+  Planet, Mond, Orbit, POI), und liefert die Fundorte über `GET /api/v1/materials/{id}/occurrences`
+  aus. Angezeigt werden sie noch nicht.
+
+### Changed
+
+- **Schmalere Fußleiste.** Der Fan-Site-Hinweis von CIG steht nicht mehr in der Fußleiste und im
+  Handy-Menü, sondern nur noch auf der Startseite; die Fußleiste ist damit wieder einzeilig
+  (REQ-UI-018, ADR-0332).
+
+- Dashboard: Im Dialog „Widget hinzufügen" steht jedes Widget jetzt als eigene abgesetzte Karte mit fettem Titel und gedämpfter Beschreibung, damit die Einträge klar voneinander zu unterscheiden sind.
+
+- **UEX-Sync.** Die UEX-API wird unter ihrer neuen Adresse `api.uexcorp.uk` abgefragt.
+
+### Fixed
+
+- **Kartellbank.** Die Kennzahlen-Karten im Dashboard haben wieder Abstand zur Tab-Leiste, wie auf
+  den übrigen Seiten.
+
+- Startseite: Im Anpassen-Modus ragen die Bedienknöpfe schmaler Widgets nicht mehr aus ihrer Box heraus; sie brechen bei Platzmangel in eine eigene Zeile um.
+
+- **Navigation (Leiste).** Das Konto-Menü ist breit genug für die Umschaltung Schublade / Leiste /
+  Angeheftet; sie lässt sich ohne seitliches Scrollen bedienen.
+
+- Dialog forms (e.g. Mindestbestand) show each label above a full-width field instead of ragged inline label/field pairs; the Mindestbestand dialog uses the wide dialog size.
+
+- Dashboard: the widget headings no longer cover the opened navigation-rail menu, and they no longer stick or take the page header's bar styling; the page-header rules now apply only to the page header.
+
+- Kopfleiste: Bleibt jetzt auch auf der Missionsseite beim Scrollen oben stehen, wie auf allen anderen Seiten; der Missionskopf rastet direkt darunter ein.
+
+- **Schiffsdaten.** Kleine Fahrzeuge mit weniger als 1 SCU Laderaum (z. B. ATLS GEO mit 0,8 SCU) werden nicht mehr auf 0 SCU abgerundet und erscheinen jetzt in der Profitrechnung.
+
+- **UEX-Sync.** Vergibt UEX die ID eines Gegenstands neu, bleibt der Gegenstand über seine UUID mit dem richtigen Eintrag verbunden, statt die Daten eines anderen Gegenstands zu übernehmen.
+
+### Security
+
+- **Abhängigkeiten.** OpenTelemetry auf 1.67.0 angehoben (CPU-Last durch manipulierte
+  `tracestate`-Header, CVE-2026-118259) und Guava im Build auf 33.7.2 festgelegt
+  (GHSA-xxph-c9ww-hj94).
+
 ## [v1.22.0](https://github.com/krt-profit/basetool/releases/tag/v1.22.0) - 2026-11-02
 
 ### Added
