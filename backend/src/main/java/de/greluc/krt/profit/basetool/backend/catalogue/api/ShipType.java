@@ -30,6 +30,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -68,7 +69,9 @@ public class ShipType extends AbstractEntity<UUID> {
   @Nullable
   private Manufacturer manufacturer;
 
-  private Integer scu;
+  /** Cargo capacity in SCU; fractional for small vehicles (UEX serves e.g. 0.8). */
+  @Column(precision = 10, scale = 3)
+  private BigDecimal scu;
 
   private boolean hidden = false;
 

@@ -90240,8 +90240,7 @@
             "type" : "string"
           },
           "scu" : {
-            "type" : "integer",
-            "format" : "int32"
+            "type" : "number"
           }
         }
       },

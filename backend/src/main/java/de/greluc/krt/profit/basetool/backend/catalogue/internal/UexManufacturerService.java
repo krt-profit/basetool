@@ -88,10 +88,6 @@ public class UexManufacturerService {
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");
     UexClient.FetchResult<UexCompanyDto> fetched = uexClient.getCompanies();
-    if (fetched.notModified()) {
-      log.info("UEX company catalogue unchanged since the last sync (304) — nothing to import.");
-      return;
-    }
     List<UexCompanyDto> companies = fetched.data();
     if (companies.isEmpty()) {
       log.warn("No companies received from UEX API. Aborting synchronization.");

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /** Data transfer record carrying Ship Type payload. */
@@ -29,5 +30,5 @@ public record ShipTypeDto(
     String name,
     ManufacturerDto manufacturer,
     String description,
-    Integer scu,
+    BigDecimal scu,
     boolean hidden) {}

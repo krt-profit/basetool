@@ -85,10 +85,6 @@ public class UexVehicleService {
   public void syncVehicles() {
     log.info("Starting synchronization of UEX vehicles (ships)...");
     UexClient.FetchResult<UexVehicleDto> fetched = uexClient.getVehicles();
-    if (fetched.notModified()) {
-      log.info("UEX vehicle catalogue unchanged since the last sync (304) — nothing to import.");
-      return;
-    }
     List<UexVehicleDto> vehicles = fetched.data();
     if (vehicles.isEmpty()) {
       log.warn("No vehicles received from UEX API. Aborting synchronization.");

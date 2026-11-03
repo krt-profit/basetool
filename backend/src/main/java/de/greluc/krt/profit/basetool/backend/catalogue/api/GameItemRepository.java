@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -53,13 +55,35 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   Optional<GameItem> findByUexItemId(Integer uexItemId);
 
   /**
-   * Counts the live UEX-sourced game items; reported as the sync's item count when UEX answers
-   * {@code 304 Not Modified}.
+   * Lists every stored {@code external_uuid} with the row's UEX item id, for the item sync's
+   * detection of UEX ids that moved to another item.
    *
-   * @return the number of non-soft-deleted UEX-sourced {@code game_item} rows
+   * @return one ref per {@code game_item} row with an {@code external_uuid}
    */
-  @Query("SELECT COUNT(g) FROM GameItem g WHERE g.uexItemId IS NOT NULL AND g.uexDeletedAt IS NULL")
-  long countLiveUexItems();
+  @Query(
+      "SELECT g.uexItemId AS uexItemId, g.externalUuid AS externalUuid FROM GameItem g"
+          + " WHERE g.externalUuid IS NOT NULL")
+  List<ExternalUuidRef> findExternalUuidRefs();
+
+  /** A {@code game_item} row's {@code external_uuid} and, when it has one, its UEX item id. */
+  interface ExternalUuidRef {
+
+    /**
+     * The row's UEX item id.
+     *
+     * @return the UEX item id, or {@code null} for a row not bound to UEX
+     */
+    @Nullable
+    Integer getUexItemId();
+
+    /**
+     * The row's cross-source UUID.
+     *
+     * @return the external UUID; never {@code null}, the query filters on it
+     */
+    @NotNull
+    UUID getExternalUuid();
+  }
 
   /**
    * Finds game items by {@code class_name}, ignoring case; the column is not unique, so callers

@@ -81,7 +81,7 @@ public class ProfitCalculationService {
             .findById(shipId)
             .orElseThrow(() -> new IllegalArgumentException("ShipType not found: " + shipId));
 
-    int shipScu = ship.getScu() != null ? ship.getScu() : 0;
+    BigDecimal shipScu = ship.getScu() != null ? ship.getScu() : BigDecimal.ZERO;
     boolean isHullC =
         ship.getName() != null && ship.getName().toLowerCase(Locale.ROOT).contains("hull c");
 
@@ -139,8 +139,10 @@ public class ProfitCalculationService {
                     .multiply(BigDecimal.valueOf(100))
                     .divide(minBuy, 4, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
-        BigDecimal fullLoadCost = minBuy.multiply(BigDecimal.valueOf(shipScu));
-        BigDecimal maxProfitFullLoad = profitPerScu.multiply(BigDecimal.valueOf(shipScu));
+        BigDecimal fullLoadCost =
+            minBuy.multiply(shipScu).setScale(minBuy.scale(), RoundingMode.HALF_UP);
+        BigDecimal maxProfitFullLoad =
+            profitPerScu.multiply(shipScu).setScale(profitPerScu.scale(), RoundingMode.HALF_UP);
 
         results.add(
             new ProfitCalculationDto(
