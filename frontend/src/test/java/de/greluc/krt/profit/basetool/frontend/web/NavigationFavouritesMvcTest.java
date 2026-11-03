@@ -344,7 +344,7 @@ class NavigationFavouritesMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"keys\":[\"missions.list\"]}"))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().isUnprocessableContent())
         .andExpect(jsonPath("$.code").value("VALIDATION"));
   }
 

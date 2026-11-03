@@ -523,7 +523,6 @@ public class OrgUnitBankSettingsService {
    * @param roleCode the role code to validate
    * @throws BadRequestException when the role code is not a valid bucket for this account
    */
-  @NotNull
   private static void requireValidRoleBucket(
       @NotNull BankAccount account, @NotNull String roleCode) {
     if (!availableRoleCodes(account).contains(roleCode)) {

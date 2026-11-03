@@ -467,15 +467,16 @@ public class ScWikiItemSyncService {
             self.getObject()
                 .upsertBackfillItemWithinTransaction(
                     dto, pass.kind(), ctx.runId, ctx.now, resolvedManufacturer, reconcileUexId);
-        if (outcome == BackfillOutcome.CREATED) {
-          ctx.created++;
-        } else if (outcome == BackfillOutcome.LINKED) {
-          ctx.linked++;
-        } else if (outcome == BackfillOutcome.RECONCILED) {
-          ctx.reconciled++;
-          ctx.markConsumed(reconcileUexId);
-        } else if (outcome == BackfillOutcome.SKIPPED) {
-          ctx.skipped++;
+        switch (outcome) {
+          case CREATED -> ctx.created++;
+          case LINKED -> ctx.linked++;
+          case RECONCILED -> {
+            ctx.reconciled++;
+            ctx.markConsumed(reconcileUexId);
+          }
+          case SKIPPED -> ctx.skipped++;
+          case UPDATED -> {}
+          case null -> throw new NullPointerException("backfill outcome");
         }
       } catch (OptimisticLockingFailureException _) {
         ctx.deferred++;
