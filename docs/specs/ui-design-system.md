@@ -1893,7 +1893,8 @@ stored mode is kept.
   Kartellbank for bank staff — in admin mode Favoriten and the three admin groups — and „Mehr"
   (dots) below them only while a page is hidden. The foot holds the admin-mode icon (shield; only
   with the role) and the avatar, whose flyout holds the personal panel, the user row and the
-  org-unit switcher. The rail has no menu filter; `Strg K` covers it.
+  org-unit switcher; that flyout is at least as wide as its navigation-mode switch, so all three
+  modes show without horizontal scrolling. The rail has no menu filter; `Strg K` covers it.
 - **Flyouts** are disclosures (`<button aria-expanded aria-controls>`), neither dialogs nor ARIA
   menus. They open on hover after about 200 ms and on click, Enter or Space; a hover-opened flyout
   stays while hovered, closes about 300 ms after the pointer leaves, and closes on Escape with focus
