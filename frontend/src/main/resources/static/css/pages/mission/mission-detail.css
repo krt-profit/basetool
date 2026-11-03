@@ -64,7 +64,7 @@
     html,
     body {
         margin: 0;
-        overflow-x: hidden;
+        overflow-x: clip;
     }
     .page-wrapper {
         width: 100%;
@@ -76,7 +76,7 @@
     }
     .mission-head-sticky {
         position: sticky;
-        top: 0;
+        top: var(--krt-header-height, 0);
         z-index: var(--z-sticky-head);
         background-color: var(--surface-canvas);
     }
