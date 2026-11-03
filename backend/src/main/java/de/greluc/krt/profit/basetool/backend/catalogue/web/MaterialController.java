@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPriceOverview
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
@@ -73,6 +75,7 @@ public class MaterialController {
 
   private final MaterialService materialService;
   private final MaterialMapper materialMapper;
+  private final MaterialOccurrenceService materialOccurrenceService;
 
   /**
    * Pages the material list, visible materials only unless {@code includeHidden} is set.
@@ -278,6 +281,18 @@ public class MaterialController {
   @GetMapping("/{id}/terminals")
   public List<MaterialSellingTerminalDto> getMaterialTerminals(@PathVariable @NotNull UUID id) {
     return materialService.getMaterialTerminals(id);
+  }
+
+  /**
+   * Locations where UEX says the material can be found, ordered by kind and then by name
+   * (REQ-DATA-031).
+   *
+   * @param id material id
+   * @return the occurrences; empty for a material without any and for an unknown id
+   */
+  @GetMapping("/{id}/occurrences")
+  public List<MaterialOccurrenceDto> getMaterialOccurrences(@PathVariable @NotNull UUID id) {
+    return materialOccurrenceService.getOccurrences(id);
   }
 
   /**

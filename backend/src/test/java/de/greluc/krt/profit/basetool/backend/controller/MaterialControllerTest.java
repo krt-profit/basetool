@@ -32,6 +32,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
 import de.greluc.krt.profit.basetool.backend.catalogue.web.MaterialController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -52,7 +55,21 @@ class MaterialControllerTest {
 
   @Mock private MaterialMapper materialMapper;
 
+  @Mock private MaterialOccurrenceService materialOccurrenceService;
+
   @InjectMocks private MaterialController materialController;
+
+  @Test
+  void getMaterialOccurrences_returnsTheServiceList() {
+    UUID id = UUID.randomUUID();
+    List<MaterialOccurrenceDto> occurrences =
+        List.of(
+            new MaterialOccurrenceDto(
+                UUID.randomUUID(), MaterialOccurrenceKind.MOON, "Aberdeen", "Stanton", "Hurston"));
+    when(materialOccurrenceService.getOccurrences(id)).thenReturn(occurrences);
+
+    assertEquals(occurrences, materialController.getMaterialOccurrences(id));
+  }
 
   @Test
   void getJobOrderMaterials_ShouldReturnOnlyJobOrderMaterials() {

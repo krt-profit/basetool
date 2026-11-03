@@ -19,10 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.util.StringUtils;
 
 /**
@@ -70,6 +75,35 @@ public final class UexValues {
       log.debug("Non-numeric UEX crew value '{}' — leaving crew_min / crew_max null", crew);
       return CrewRange.UNKNOWN;
     }
+  }
+
+  /**
+   * Splits a UEX id list ({@code "18,25,73,75"}) into its ids, in order and without repeats.
+   *
+   * <p>Blank or non-numeric entries are skipped; an absent or blank list yields no ids.
+   *
+   * @param csv the raw comma-separated value, or {@code null}
+   * @return the parsed ids
+   */
+  @NotNull
+  @UnmodifiableView
+  public static Set<Integer> parseIdList(@Nullable String csv) {
+    if (!StringUtils.hasText(csv)) {
+      return Set.of();
+    }
+    Set<Integer> ids = new LinkedHashSet<>();
+    for (String part : csv.split(",", -1)) {
+      String trimmed = part.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      try {
+        ids.add(Integer.parseInt(trimmed));
+      } catch (NumberFormatException _) {
+        log.debug("Skipping non-numeric UEX id '{}' in list '{}'", trimmed, csv);
+      }
+    }
+    return Collections.unmodifiableSet(ids);
   }
 
   /**

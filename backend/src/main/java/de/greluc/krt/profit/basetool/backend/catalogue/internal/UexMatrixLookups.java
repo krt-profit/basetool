@@ -128,7 +128,7 @@ public final class UexMatrixLookups {
    * @return a mutable map from UEX id to local id
    */
   @NotNull
-  private static Map<Integer, UUID> byUexId(@NotNull List<UexKeyRef> refs) {
+  static Map<Integer, UUID> byUexId(@NotNull List<UexKeyRef> refs) {
     Map<Integer, UUID> map = new HashMap<>();
     for (UexKeyRef ref : refs) {
       map.putIfAbsent(ref.getUexId(), ref.getId());
