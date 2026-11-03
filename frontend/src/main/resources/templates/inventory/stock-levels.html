@@ -99,7 +99,7 @@
     </div>
 
     <th:block th:if="${!#lists.isEmpty(maintainableUnits)}">
-    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='stock-level-modal', titleKey='inventory.stockLevels.modal.title', titleId='stock-level-modal-title', body=~{::stock-level-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='stock-level-modal', titleKey='inventory.stockLevels.modal.title', titleId='stock-level-modal-title', variant='krt-modal--wide', body=~{::stock-level-modal-body})}">
         <th:block th:ref="stock-level-modal-body">
             <form id="stock-level-form" class="no-track" novalidate>
                 <div class="krt-modal-body">

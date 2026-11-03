@@ -2,7 +2,7 @@
 
 @layer page {
     .bank-totals {
-        margin-bottom: var(--space-4);
+        margin-block: var(--space-4);
     }
 
     .bank-list-panel .bank-acc-grid {

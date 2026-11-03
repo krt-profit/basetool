@@ -94,10 +94,11 @@ import tools.jackson.databind.json.JsonMapper;
  * the client got back.
  *
  * <p>Only these volatile values are normalised, each to a named placeholder: the DPoP key's
- * thumbprint, the token's connection time, the correlation id, the DPoP nonce, the idempotency key
- * and the trace context. The backend stub answers with the published fixtures. The goldens are the
- * baseline a re-package of the gateway must keep; on a difference the observed answer is written
- * under {@code build/exchange-golden/} for review.
+ * thumbprint, the token's connection time, the correlation id, the DPoP nonce and the idempotency
+ * key. Tracing is off in the test profile, so the relay carries no trace context (its propagation
+ * is {@code MonitoringTracingPropagationTest}'s). The backend stub answers with the published
+ * fixtures. The goldens are the baseline a re-package of the gateway must keep; on a difference the
+ * observed answer is written under {@code build/exchange-golden/} for review.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeGoldenAnswerTest {
@@ -560,7 +561,6 @@ class ExchangeGoldenAnswerTest {
       out = out.replace(nonce, "<dpop-nonce>");
     }
     out = out.replaceAll("(?m)^(idempotency-key): test-[0-9a-f-]{36}$", "$1: <idempotency-key>");
-    out = out.replaceAll("(?m)^(traceparent|tracestate|b3): .*$", "$1: <trace>");
     out =
         out.replaceAll(
             "(?m)^(ratelimit: limit=\\d+), remaining=\\d+, reset=\\d+$",

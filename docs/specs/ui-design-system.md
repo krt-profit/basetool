@@ -426,6 +426,10 @@ prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt
 material/item pickers and the refinery store sheet. A dialog that needs a width none of these gives
 is a signal to revisit its content, not to add a per-page `max-width`.
 
+**A dialog's form fields stack.** Inside `.krt-modal-body` every `.form-group` that is not a
+`.check-row` puts its label on its own line above a full-width control; the kernel owns this rule,
+so a page never restates it.
+
 **The head's parts are styled.** `.krt-modal-close` carries the
 `.close-sidebar-btn` treatment (its already-approved sibling — same job, an ✕ that dismisses a
 surface), squared and floored to 44 px in the touch block, with `flex-shrink: 0` so a long German
@@ -1189,13 +1193,14 @@ Binding details:
 - **The home page stays publicly reachable** (`/` is permitAll in `SecurityConfig`), so the notice
   is visible without a login. Gating `/` behind authentication would forfeit this placement and
   require moving the band back to an always-visible navigation area.
-- **The FAQ fan site notice is on every page** ([ADR-0296](../adr/0296-every-page-carries-the-fan-site-notice-of-the-cig-faq.md)).
-  `fankit.fansite` quotes the FAQ verbatim, English in every bundle, and renders with a link to
-  `https://robertsspaceindustries.com/` in the footer's full-width `.krt-footer-fansite` row and, on
-  the phone where the tab bar hides the footer, in the drawer's `.nav-legal` group. The public home
-  page shows it in the greeting as well. It is never smaller than the other notices (`--fs-sm`).
-  Checked against the FAQ revision of 2026-09-02, which writes "fan site" as two words and has no
-  trademark sentence.
+- **The FAQ fan site notice is on the public home page**
+  ([ADR-0296](../adr/0296-every-page-carries-the-fan-site-notice-of-the-cig-faq.md),
+  [ADR-0332](../adr/0332-the-fan-site-notice-lives-on-the-home-page-not-on-every-page.md)).
+  `fankit.fansite` quotes the FAQ verbatim, English in every bundle, and renders in the greeting of
+  `dashboard/landing.html` with a link to `https://robertsspaceindustries.com/`. It is not part of
+  the global footer or the drawer, so the fixed footer stays one row. It is never smaller than the
+  other notices (`--fs-sm`). Checked against the FAQ revision of 2026-09-02, which writes "fan site"
+  as two words and has no trademark sentence.
 - **The band links the official site** (`.krt-fankit-official`) as its fourth element.
 - **No CIG artwork outside the Fan Kit ships.** Manufacturer logos, the Star Citizen logo or any
   other CIG artwork appear only as unmodified Fan Kit files and only where a page uses them;
@@ -1226,16 +1231,14 @@ Binding details:
 - [x] The two notices keep their **differing** ® spacing, and 2(g) keeps `Ltd..`.
 - [ ] Both notices render at ≥ 10 pt with an AA-clearing contrast on their surface.
 - [ ] No page carries the logo without both notices.
-- [x] An anonymous `GET /` renders the FAQ fan site notice and a link to robertsspaceindustries.com;
-  the footer of every layout page carries both.
+- [x] An anonymous `GET /` renders the FAQ fan site notice and a link to robertsspaceindustries.com.
 - [x] `fankit.fansite` is byte-identical in the DE, EN and default bundles.
 - [x] No manufacturer logo or other non-Fan-Kit CIG artwork ships under `META-INF/resources/images/`.
 
 **Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines, the
 Fankit Agreement and the Fankit and Fandom FAQ ·
 **Code:** `shell/fragments/fankit.html`, `dashboard/index.html`, `dashboard/landing.html`,
-`kernel/fragments/footer.html`, `kernel/fragments/sidebar.html`, `.krt-fankit-*`,
-`.krt-footer-fansite` and `.nav-legal-fansite` in `styles.css`, `fankit.*` in the three message
+`.krt-fankit-*` and `.krt-landing-notice` in the stylesheets, `fankit.*` in the three message
 bundles · **Related:** REQ-UI-009.
 
 ### REQ-UI-019 — The app wears the Basetool mark; the org mark stays on org surfaces
@@ -1899,7 +1902,8 @@ stored mode is kept.
   Kartellbank for bank staff — in admin mode Favoriten and the three admin groups — and „Mehr"
   (dots) below them only while a page is hidden. The foot holds the admin-mode icon (shield; only
   with the role) and the avatar, whose flyout holds the personal panel, the user row and the
-  org-unit switcher. The rail has no menu filter; `Strg K` covers it.
+  org-unit switcher; that flyout is at least as wide as its navigation-mode switch, so all three
+  modes show without horizontal scrolling. The rail has no menu filter; `Strg K` covers it.
 - **Flyouts** are disclosures (`<button aria-expanded aria-controls>`), neither dialogs nor ARIA
   menus. They open on hover after about 200 ms and on click, Enter or Space; a hover-opened flyout
   stays while hovered, closes about 300 ms after the pointer leaves, and closes on Escape with focus
@@ -2739,7 +2743,8 @@ the absence of a live push follow REQ-UI-032. The dashboards are part of the dat
 dashboards — layout and instance options — are the target account's.
 
 **Editing.** „Anpassen" in the page head: per instance up/down (REQ-UI-031), column switch, remove
-and an options dialog; a catalogue dialog adds; „Standard wiederherstellen" restores the mode's
+and an options dialog; a catalogue dialog adds, each entry a separate bordered card with a bold
+title, a muted description and its add button; „Standard wiederherstellen" restores the mode's
 default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI-032.
 
 **Start page.**

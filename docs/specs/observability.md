@@ -1055,10 +1055,9 @@ Tracing on the OTel SDK) behind a hard master gate:
   `management.tracing.export.otlp.enabled` (the OTLP exporter bean is not even instantiated).
   Disabled therefore means: no span is ever recorded to or exported anywhere, no OTLP
   connection attempts, no exporter errors — dev/test/e2e and a prod host without the
-  monitoring stack are unaffected. (Boot's ungated bridge fallback may still mint in-process
-  span contexts; they are attached to no processor/exporter and vanish on end. The per-request
-  ids this puts into the MDC are dangling but harmless — the `correlationId` remains the
-  primary correlation key.) Boot 4 note, verified against the 4.1.0 module bytecode: these two
+  monitoring stack are unaffected. (With no span processor the OpenTelemetry SDK hands out
+  no-op tracers, so no span context is minted: outbound calls carry no `traceparent`, the MDC's
+  trace and span ids stay empty, and the `correlationId` is the only correlation key.) Boot 4 note, verified against the 4.1.0 module bytecode: these two
   flags are the ones the auto-configuration actually honours; the legacy
   `management.tracing.enabled` is consumed by nothing, and an endpoint-only gate is likewise
   not possible — with the starter on the classpath, tracing would otherwise be active by

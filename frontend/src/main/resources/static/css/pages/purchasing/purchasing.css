@@ -4,18 +4,6 @@
     .purchasing-tabs {
         margin-bottom: var(--space-4);
     }
-    .krt-modal-body .form-group > label {
-        display: block;
-        margin-bottom: var(--space-2);
-        font-weight: var(--fw-bold);
-        font-size: var(--fs-sm);
-    }
-    .krt-modal-body
-        .form-group
-        > :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
-        width: 100%;
-        box-sizing: border-box;
-    }
     .purchasing-actions {
         display: flex;
         flex-wrap: wrap;

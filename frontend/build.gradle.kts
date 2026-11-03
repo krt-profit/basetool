@@ -11,6 +11,7 @@ buildscript {
       classpath(libs.handlebars)
       classpath(libs.jackson2.plugins.databind)
       classpath(libs.jackson3.databind)
+      classpath(libs.guava)
     }
   }
 }

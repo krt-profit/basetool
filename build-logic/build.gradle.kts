@@ -23,5 +23,6 @@ dependencies {
     implementation(libs.commons.lang3)
     implementation(libs.jackson2.plugins.databind)
     implementation(libs.jackson3.databind)
+    implementation(libs.guava)
   }
 }

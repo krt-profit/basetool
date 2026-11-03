@@ -319,7 +319,7 @@
         color: var(--color-bg-black);
     }
 
-    header {
+    body > header {
         background-color: var(--surface-bar);
         border-bottom: var(--border-heading);
         padding: calc(var(--space-4) + env(safe-area-inset-top)) 1.25rem var(--space-4)
@@ -334,7 +334,7 @@
         min-width: 0;
     }
 
-    body.admin-mode header {
+    body.admin-mode > header {
         border-bottom-color: var(--color-accent-dark);
     }
 
@@ -354,7 +354,7 @@
         letter-spacing: 0.15em;
     }
 
-    body:not(.admin-mode) header .admin-mode-chip {
+    body:not(.admin-mode) > header .admin-mode-chip {
         display: none;
     }
 
@@ -1244,23 +1244,6 @@
         font-family: var(--font-mono);
         font-variant-numeric: tabular-nums;
         font-size: 0.75rem;
-    }
-
-    .krt-footer-fansite {
-        flex-basis: 100%;
-        margin: 0;
-        color: var(--color-gray-1);
-        font-size: var(--fs-sm);
-        line-height: 1.4;
-    }
-
-    .krt-footer-fansite a {
-        margin-left: var(--space-2);
-        color: var(--color-gray-1);
-    }
-
-    .krt-footer-fansite a:hover {
-        color: var(--color-primary);
     }
 
     @media (width <= 768px) {
@@ -3866,7 +3849,7 @@
     @media (width <= 768px) {
         body:has(.mobile-tabbar) .hamburger-btn,
         body:has(.mobile-tabbar) .notification-bell,
-        header .admin-mode-chip,
+        body > header .admin-mode-chip,
         .palette-trigger {
             display: none;
         }
@@ -4243,15 +4226,6 @@
 
         .nav-legal-version {
             color: var(--color-gray-1);
-        }
-
-        .nav-legal-fansite {
-            flex-basis: 100%;
-            padding-top: var(--space-2);
-            color: var(--color-gray-1);
-            font-size: var(--fs-sm);
-            font-weight: var(--fw-regular);
-            line-height: 1.4;
         }
 
         .nav-admin-entry {
@@ -5495,7 +5469,7 @@
     }
 
     @media (width <= 1024px) {
-        header {
+        body > header {
             padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-6) var(--space-3);
         }
 
@@ -5640,7 +5614,7 @@
     }
 
     @media (width <= 768px) {
-        header {
+        body > header {
             display: flex;
             align-items: center;
             height: calc(56px + env(safe-area-inset-top));
@@ -6588,6 +6562,18 @@
         padding: 14px 16px;
         min-height: 0;
         overflow-y: auto;
+    }
+    .krt-modal-body .form-group:not(.check-row) > label {
+        display: block;
+        margin-bottom: var(--space-2);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-sm);
+    }
+    .krt-modal-body
+        .form-group
+        > :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+        width: 100%;
+        box-sizing: border-box;
     }
     .krt-modal-close {
         background: none;
@@ -8887,6 +8873,9 @@
     }
 
     .nav-rail-item--avatar .nav-rail-flyout {
+        width: max-content;
+        min-width: 280px;
+        max-width: calc(100vw - var(--krt-nav-width, 64px));
         top: auto;
         bottom: var(--krt-footer-height, 5rem);
         max-height: calc(100dvh - var(--krt-header-height, 83px) - var(--krt-footer-height, 5rem));
@@ -8920,6 +8909,11 @@
     .nav-rail-mode-switch {
         padding: var(--space-3) 0;
         border-top: var(--border-hairline);
+    }
+
+    /* The org-unit select fills the flyout but must not widen it with a long option label. */
+    .nav-rail-switcher {
+        contain: inline-size;
     }
 
     .nav-rail-user-foot {
