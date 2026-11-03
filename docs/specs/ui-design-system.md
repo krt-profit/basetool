@@ -2733,7 +2733,8 @@ the absence of a live push follow REQ-UI-032. The dashboards are part of the dat
 dashboards — layout and instance options — are the target account's.
 
 **Editing.** „Anpassen" in the page head: per instance up/down (REQ-UI-031), column switch, remove
-and an options dialog; a catalogue dialog adds; „Standard wiederherstellen" restores the mode's
+and an options dialog; a catalogue dialog adds, each entry a separate bordered card with a bold
+title, a muted description and its add button; „Standard wiederherstellen" restores the mode's
 default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI-032.
 
 **Start page.**
