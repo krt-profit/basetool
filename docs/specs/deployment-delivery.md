@@ -3405,7 +3405,9 @@ which identifies packages by Package URL and needs no local dataset (ADR-0325).
   (`actions/dependency-review-action`) fails when the pull request adds a dependency with a HIGH or
   CRITICAL advisory in the `runtime`, `development` or `unknown` scope. On a push to `main` the
   workflow submits the graph that Dependabot alerts and the next review compare against. A pull
-  request from a fork skips the submission and is reviewed on its manifests.
+  request from a fork skips the submission and is reviewed on its manifests. In the merge queue
+  (`merge_group`) both jobs skip, so the required *Dependency review* check reports as passed: the
+  pull request's own review has already judged the dependencies it adds.
 - **The full scan.** `vulnerability-scan.yml` runs on every push to `main`, weekly, on
   `workflow_dispatch`, and on pull requests that touch the Gradle build files, the catalog, the
   verification metadata, an npm lockfile or the scan's own files. It builds the CycloneDX SBOMs of
