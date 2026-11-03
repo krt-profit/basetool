@@ -230,6 +230,11 @@ class ProfitCalculationPageControllerMvcTest {
         true,
         false,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
         false);
   }
 }

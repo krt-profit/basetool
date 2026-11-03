@@ -107,15 +107,7 @@
                            th:text="#{admin.uex.empty.terminals}">Keine Terminals erfasst.</p>
                         <div th:if="${!cityNode.terminals.isEmpty()}" class="table-responsive">
                             <table class="data-table terminal-table">
-                                <thead>
-                                    <tr>
-                                        <th th:text="#{admin.terminal.name}">Name</th>
-                                        <th th:text="#{admin.terminal.nickname}">Nickname</th>
-                                        <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
-                                        <th th:text="#{admin.uex.flag.column.autoLoad}">Autoload</th>
-                                        <th th:text="#{general.action}">Aktion</th>
-                                    </tr>
-                                </thead>
+                                <thead th:replace="~{catalogue/fragments/admin-uex :: terminalHead}"></thead>
                                 <tbody>
                                     <th:block th:each="term : ${cityNode.terminals}">
                                         <tr th:replace="~{catalogue/fragments/admin-uex :: terminalRow(term=${term})}"></tr>
@@ -168,15 +160,7 @@
                            th:text="#{admin.uex.empty.terminals}">Keine Terminals erfasst.</p>
                         <div th:if="${!stationNode.terminals.isEmpty()}" class="table-responsive">
                             <table class="data-table terminal-table">
-                                <thead>
-                                    <tr>
-                                        <th th:text="#{admin.terminal.name}">Name</th>
-                                        <th th:text="#{admin.terminal.nickname}">Nickname</th>
-                                        <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
-                                        <th th:text="#{admin.uex.flag.column.autoLoad}">Autoload</th>
-                                        <th th:text="#{general.action}">Aktion</th>
-                                    </tr>
-                                </thead>
+                                <thead th:replace="~{catalogue/fragments/admin-uex :: terminalHead}"></thead>
                                 <tbody>
                                     <th:block th:each="term : ${stationNode.terminals}">
                                         <tr th:replace="~{catalogue/fragments/admin-uex :: terminalRow(term=${term})}"></tr>
@@ -276,15 +260,7 @@
                     </h3>
                     <div class="table-responsive">
                         <table class="data-table terminal-table">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{admin.terminal.name}">Name</th>
-                                    <th th:text="#{admin.terminal.nickname}">Nickname</th>
-                                    <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
-                                    <th th:text="#{admin.uex.flag.column.autoLoad}">Autoload</th>
-                                    <th th:text="#{general.action}">Aktion</th>
-                                </tr>
-                            </thead>
+                            <thead th:replace="~{catalogue/fragments/admin-uex :: terminalHead}"></thead>
                             <tbody>
                                 <th:block th:each="term : ${system.orphanTerminals}">
                                     <tr th:replace="~{catalogue/fragments/admin-uex :: terminalRow(term=${term})}"></tr>

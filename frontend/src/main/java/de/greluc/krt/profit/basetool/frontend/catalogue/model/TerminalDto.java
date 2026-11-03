@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code TerminalDto}.
@@ -46,6 +48,12 @@ import java.util.UUID;
  * @param uexIsAutoLoad raw {@code isAutoLoad} value from the latest UEX sync, or {@code null}
  *     before the first sync
  * @param uexSyncedAt UTC instant of the last UEX sweep that touched the terminal, or {@code null}
+ * @param maxContainerSize largest SCU container the terminal handles, or {@code null} before the
+ *     first sync
+ * @param isRefinery UEX's claim that the location offers refining, or {@code null}
+ * @param isRefuel UEX's claim that the location offers refuelling, or {@code null}
+ * @param isRepair UEX's claim that the location offers repairs, or {@code null}
+ * @param gameVersion game version UEX last confirmed the terminal's data against, or {@code null}
  * @param hidden whether the terminal is hidden from regular dropdowns / lists
  */
 @DtoMirror
@@ -64,4 +72,41 @@ public record TerminalDto(
     Boolean uexHasLoadingDock,
     Boolean uexIsAutoLoad,
     Instant uexSyncedAt,
-    boolean hidden) {}
+    @Nullable Integer maxContainerSize,
+    @Nullable Boolean isRefinery,
+    @Nullable Boolean isRefuel,
+    @Nullable Boolean isRepair,
+    @Nullable String gameVersion,
+    boolean hidden) {
+
+  /**
+   * Copies this terminal with another hidden flag, the body the visibility toggle sends.
+   *
+   * @param newHidden the hidden flag of the copy
+   * @return the copy
+   */
+  @NotNull
+  public TerminalDto withHidden(boolean newHidden) {
+    return new TerminalDto(
+        id,
+        name,
+        nickname,
+        starSystemName,
+        planetName,
+        cityName,
+        spaceStationName,
+        hasLoadingDock,
+        isAutoLoad,
+        hasLoadingDockOverridden,
+        isAutoLoadOverridden,
+        uexHasLoadingDock,
+        uexIsAutoLoad,
+        uexSyncedAt,
+        maxContainerSize,
+        isRefinery,
+        isRefuel,
+        isRepair,
+        gameVersion,
+        newHidden);
+  }
+}

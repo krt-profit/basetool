@@ -214,6 +214,74 @@ class MaterialTerminalPricesTest {
   }
 
   /**
+   * A row carries UEX's positive averages formatted like its prices, drops zero averages as "no
+   * data", and shows its container sizes as a range with the full list beside it.
+   */
+  @Test
+  void rows_carryTheUexAveragesAndContainerSizes() {
+    MaterialPriceDto averaged =
+        new MaterialPriceDto(
+            UUID.randomUUID(),
+            "Area18 TDD",
+            null,
+            new BigDecimal("3800"),
+            null,
+            null,
+            false,
+            true,
+            BigDecimal.ZERO,
+            new BigDecimal("3750.5"),
+            0,
+            120,
+            40,
+            List.of(1, 2, 4, 8, 16, 24, 32),
+            null);
+
+    MaterialTerminalPrices.Row row =
+        MaterialTerminalPrices.rows(List.of(averaged), List.of(), NOW).getFirst();
+
+    assertThat(row.averages().sellText()).isEqualTo("3.750,5");
+    assertThat(row.averages().buyText()).isNull();
+    assertThat(row.averages().scuBuy()).isNull();
+    assertThat(row.averages().scuSell()).isEqualTo(120);
+    assertThat(row.averages().scuSellStock()).isEqualTo(40);
+    assertThat(row.containerRangeText()).isEqualTo("1–32");
+    assertThat(row.containerListText()).isEqualTo("1, 2, 4, 8, 16, 24, 32");
+  }
+
+  /** A row without container sizes shows a dash and no list; a single size is not a range. */
+  @Test
+  void containerText_handlesNoneAndASingleSize() {
+    MaterialTerminalPrices.Row none =
+        MaterialTerminalPrices.rows(List.of(price("None", null, "90")), List.of(), NOW).getFirst();
+    MaterialPriceDto single =
+        new MaterialPriceDto(
+            UUID.randomUUID(),
+            "Single",
+            null,
+            new BigDecimal("90"),
+            null,
+            null,
+            false,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(32),
+            null);
+
+    assertThat(none.containerRangeText()).isEqualTo("–");
+    assertThat(none.containerListText()).isNull();
+    assertThat(
+            MaterialTerminalPrices.rows(List.of(single), List.of(), NOW)
+                .getFirst()
+                .containerRangeText())
+        .isEqualTo("32");
+  }
+
+  /**
    * One price of a terminal.
    *
    * @param terminal the terminal
@@ -245,6 +313,12 @@ class MaterialTerminalPricesTest {
         null,
         true,
         true,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         uexUpdatedAt);
   }
 

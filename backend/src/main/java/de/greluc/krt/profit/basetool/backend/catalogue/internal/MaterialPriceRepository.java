@@ -99,7 +99,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       """
           SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto(
               p.id, t.name, p.priceBuy, p.priceSell, p.scuBuy, p.scuSell, p.statusBuy, p.statusSell,
-              p.dateModified
+              p.priceBuyAvg, p.priceSellAvg, p.scuBuyAvg, p.scuSellAvg, p.scuSellStockAvg,
+              p.containerSizes, p.dateModified
           )
           FROM MaterialPrice p
           JOIN p.terminal t

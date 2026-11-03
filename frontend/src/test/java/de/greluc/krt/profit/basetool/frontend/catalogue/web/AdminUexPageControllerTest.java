@@ -429,6 +429,11 @@ class AdminUexPageControllerTest {
         null,
         null,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
         false);
   }
 
@@ -454,6 +459,11 @@ class AdminUexPageControllerTest {
         null,
         null,
         syncedAt,
+        null,
+        null,
+        null,
+        null,
+        null,
         false);
   }
 

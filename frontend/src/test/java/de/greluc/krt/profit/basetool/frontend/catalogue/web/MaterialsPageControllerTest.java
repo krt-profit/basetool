@@ -151,6 +151,12 @@ class MaterialsPageControllerTest {
             200,
             true,
             true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             null);
     PageResponse<MaterialPriceDto> pageResponse =
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, Collections.emptyList());
@@ -212,6 +218,11 @@ class MaterialsPageControllerTest {
                         true,
                         false,
                         Instant.parse("2020-01-01T00:00:00Z"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
                         false)),
                 0,
                 10000,

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,6 +37,13 @@ import org.jetbrains.annotations.Nullable;
  * @param scuSell the SCU the terminal buys
  * @param statusBuy whether the terminal currently sells the material
  * @param statusSell whether the terminal currently buys the material
+ * @param priceBuyAvg UEX's average purchase price per SCU, or {@code null}
+ * @param priceSellAvg UEX's average sale price per SCU, or {@code null}
+ * @param scuBuyAvg UEX's average SCU on sale, or {@code null}
+ * @param scuSellAvg UEX's average SCU the terminal buys, or {@code null}
+ * @param scuSellStockAvg UEX's average SCU of the terminal's sell stock, or {@code null}
+ * @param containerSizes SCU container sizes the terminal handles for the material, or {@code null}
+ *     when UEX lists none
  * @param uexUpdatedAt when UEX last updated this terminal's price, or {@code null} when unknown
  */
 @DtoMirror
@@ -48,4 +56,10 @@ public record MaterialPriceDto(
     Integer scuSell,
     Boolean statusBuy,
     Boolean statusSell,
+    @Nullable BigDecimal priceBuyAvg,
+    @Nullable BigDecimal priceSellAvg,
+    @Nullable Integer scuBuyAvg,
+    @Nullable Integer scuSellAvg,
+    @Nullable Integer scuSellStockAvg,
+    @Nullable List<Integer> containerSizes,
     @Nullable Instant uexUpdatedAt) {}

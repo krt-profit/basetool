@@ -38,6 +38,15 @@
         color: var(--color-white);
     }
 
+    .md-terminals .md-price-avg {
+        font-weight: var(--fw-regular);
+    }
+
+    .md-terminals td.md-containers {
+        color: var(--color-gray-1);
+        white-space: nowrap;
+    }
+
     .md-terminals td.md-uex-age {
         white-space: nowrap;
     }

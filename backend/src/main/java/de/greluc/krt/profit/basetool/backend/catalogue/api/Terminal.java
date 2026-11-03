@@ -111,6 +111,23 @@ public class Terminal extends AbstractEntity<UUID> {
   @Nullable private Boolean isAutoLoad;
   private Boolean hidden = false;
 
+  /** Largest SCU container the terminal's cargo deck handles; {@code null} until synced. */
+  @Nullable private Integer maxContainerSize;
+
+  /**
+   * UEX's claim that the terminal's location offers refining, set on terminals of every {@link
+   * #type}; whether the terminal itself is a refinery kiosk stays {@link #TYPE_REFINERY}.
+   */
+  @Nullable private Boolean isRefinery;
+
+  @Nullable private Boolean isRefuel;
+  @Nullable private Boolean isRepair;
+
+  /** Star Citizen version UEX last confirmed this terminal's data against, e.g. {@code 4.3.1}. */
+  @Column(name = "game_version", length = 32)
+  @Nullable
+  private String gameVersion;
+
   /**
    * If {@code true}, the UEX sync skips writing {@link #hasLoadingDock} from the upstream feed. Set
    * by admins/officers when UEX reports the wrong value; cleared by the same UI to hand control
