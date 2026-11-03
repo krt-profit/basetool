@@ -115,7 +115,7 @@ public class MissionService implements MissionCommands {
 
   /**
    * Always throws; listing missions must go through {@link #searchMissions(String, Instant,
-   * Instant, List, Boolean, UUID, Pageable)} so visibility scoping applies.
+   * Instant, List, Boolean, UUID, UUID, Pageable)} so visibility scoping applies.
    *
    * @param pageable unused
    * @return never; always throws
