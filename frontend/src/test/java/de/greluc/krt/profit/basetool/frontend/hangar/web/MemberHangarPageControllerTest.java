@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -105,7 +106,7 @@ class MemberHangarPageControllerTest {
             "Cutlass Black",
             new ManufacturerDto(UUID.randomUUID(), "Drake", "DRAK", null, null, null, false),
             "Cutlass",
-            0,
+            new BigDecimal("0"),
             false);
     ShipDto ship =
         new ShipDto(SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L, null, null);

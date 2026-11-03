@@ -63,7 +63,7 @@ class ProfitCalculationServiceTest {
     ShipType ship = new ShipType();
     ship.setId(shipId);
     ship.setName("C2 Hercules");
-    ship.setScu(696);
+    ship.setScu(new BigDecimal("696"));
 
     Material m1 = new Material();
     m1.setId(UUID.randomUUID());
@@ -121,6 +121,21 @@ class ProfitCalculationServiceTest {
         IllegalArgumentException.class,
         () -> profitCalculationService.calculateProfit(shipId, null));
     verify(materialPriceRepository, never()).findAllAutoLoadPrices();
+  }
+
+  @Test
+  void shouldUseTheExactFractionalCapacity_atThePriceScale() {
+    UUID shipId = UUID.randomUUID();
+    ShipType ship = newShip(shipId, "ATLS GEO", null);
+    ship.setScu(new BigDecimal("0.800"));
+    MaterialPrice price = newPrice(newMaterial("Quantanium"), newTerminal(true), 10, 20);
+    when(shipTypeRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(materialPriceRepository.findAllAutoLoadPrices()).thenReturn(List.of(price));
+
+    ProfitCalculationDto row = profitCalculationService.calculateProfit(shipId, null).get(0);
+
+    assertEquals(new BigDecimal("8"), row.fullLoadCost(), "10 aUEC × 0.8 SCU at the price's scale");
+    assertEquals(new BigDecimal("8"), row.maxProfitFullLoad());
   }
 
   @Test
@@ -542,7 +557,7 @@ class ProfitCalculationServiceTest {
     ShipType s = new ShipType();
     s.setId(id);
     s.setName(name);
-    s.setScu(scu);
+    s.setScu(scu == null ? null : BigDecimal.valueOf(scu));
     return s;
   }
 

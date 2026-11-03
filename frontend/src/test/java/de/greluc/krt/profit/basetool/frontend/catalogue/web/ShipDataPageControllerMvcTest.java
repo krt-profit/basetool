@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -90,7 +91,8 @@ class ShipDataPageControllerMvcTest {
             "Mil-style",
             false);
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 8, true);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", new BigDecimal("8"), true);
     List<ManufacturerDto> manufacturers = empty ? List.of() : List.of(manufacturer);
     List<ShipTypeDto> shipTypes = empty ? List.of() : List.of(shipType);
     PageResponse<ManufacturerDto> manufacturersPage =
@@ -210,7 +212,8 @@ class ShipDataPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void theShipTypesArePaginatedServerSide() throws Exception {
     stubCatalogue(false);
-    ShipTypeDto cutlass = new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 3, false);
+    ShipTypeDto cutlass =
+        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, new BigDecimal("3"), false);
     when(backendApiClient.get(
             eq(LIST_TEMPLATE + "&query={query}"), anyTypeRef(), eq(0), eq(25), eq("Cut")))
         .thenReturn(new PageResponse<>(List.of(cutlass), 0, 25, 281, 12, List.of()));

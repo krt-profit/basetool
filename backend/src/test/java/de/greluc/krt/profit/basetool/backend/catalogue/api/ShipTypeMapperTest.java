@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
@@ -43,14 +44,14 @@ class ShipTypeMapperTest {
     type.setId(UUID.randomUUID());
     type.setName("Carrack");
     type.setManufacturer(mfr);
-    type.setScu(456);
+    type.setScu(new BigDecimal("456"));
 
     ShipTypeDto dto = mapper.toDto(type);
 
     assertNotNull(dto);
     assertEquals(type.getId(), dto.id());
     assertEquals("Carrack", dto.name());
-    assertEquals(456, dto.scu());
+    assertEquals(new BigDecimal("456"), dto.scu());
     assertNotNull(dto.manufacturer());
     assertEquals("Anvil", dto.manufacturer().name());
   }

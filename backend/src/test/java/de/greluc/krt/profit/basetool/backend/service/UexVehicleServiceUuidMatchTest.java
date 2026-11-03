@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexVehicleService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexVehicleDto;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -222,7 +223,7 @@ class UexVehicleServiceUuidMatchTest {
             "Crusader A2 Hercules Starlifter",
             "a2-hercules",
             "Crusader Industries",
-            120,
+            new BigDecimal("120"),
             "8",
             5_000_000.0,
             123.4,
@@ -344,7 +345,7 @@ class UexVehicleServiceUuidMatchTest {
         name + " Full",
         name.toLowerCase().replace(' ', '-'),
         "Origin Jumpworks",
-        50,
+        new BigDecimal("50"),
         "1",
         100_000.0,
         10.0,

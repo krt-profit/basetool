@@ -83,7 +83,9 @@ public class ProfitCalculationPageController {
 
     List<ShipTypeDto> shipTypes =
         (shipTypesPage != null && shipTypesPage.content() != null)
-            ? shipTypesPage.content().stream().filter(s -> s.scu() != null && s.scu() > 0).toList()
+            ? shipTypesPage.content().stream()
+                .filter(s -> s.scu() != null && s.scu().signum() > 0)
+                .toList()
             : List.of();
 
     model.addAttribute("shipTypes", shipTypes);

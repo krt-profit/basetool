@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -67,7 +68,8 @@ class ProfitCalculationPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void showProfitCalculationPage_ShouldSetDefaultShipId_WhenC2IsPresent() throws Exception {
     UUID c2Id = UUID.randomUUID();
-    ShipTypeDto c2 = new ShipTypeDto(c2Id, "C2 Hercules Starlifter", null, "C2", 696, false);
+    ShipTypeDto c2 =
+        new ShipTypeDto(c2Id, "C2 Hercules Starlifter", null, "C2", new BigDecimal("696"), false);
     PageResponse<ShipTypeDto> shipTypes = new PageResponse<>(List.of(c2), 0, 10, 1, 1, List.of());
 
     PageResponse<TerminalDto> terminals =
@@ -91,7 +93,8 @@ class ProfitCalculationPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void showProfitCalculationPage_ShouldNotSetDefaultShipId_WhenC2IsMissing() throws Exception {
     ShipTypeDto titan =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", null, "Titan", 8, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", null, "Titan", new BigDecimal("8"), false);
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(titan), 0, 10, 1, 1, List.of());
 
@@ -118,9 +121,11 @@ class ProfitCalculationPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void showProfitCalculationPage_rendersTheCalculatorPattern() throws Exception {
     ShipTypeDto hullC =
-        new ShipTypeDto(UUID.randomUUID(), "MISC Hull C", null, "Hull C", 4608, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "MISC Hull C", null, "Hull C", new BigDecimal("4608"), false);
     ShipTypeDto titan =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", null, "Titan", 8, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Avenger Titan", null, "Titan", new BigDecimal("8"), false);
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(hullC, titan), 0, 10, 2, 1, List.of()));
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
@@ -160,8 +165,10 @@ class ProfitCalculationPageControllerMvcTest {
   void showProfitCalculationPage_ShouldFilterShipsWithZeroScu() throws Exception {
     UUID titanId = UUID.randomUUID();
     ShipTypeDto gladius =
-        new ShipTypeDto(UUID.randomUUID(), "Aegis Gladius", null, "Gladius", 0, false);
-    ShipTypeDto titan = new ShipTypeDto(titanId, "Avenger Titan", null, "Titan", 8, false);
+        new ShipTypeDto(
+            UUID.randomUUID(), "Aegis Gladius", null, "Gladius", new BigDecimal("0"), false);
+    ShipTypeDto titan =
+        new ShipTypeDto(titanId, "Avenger Titan", null, "Titan", new BigDecimal("8"), false);
     ShipTypeDto noScu = new ShipTypeDto(UUID.randomUUID(), "No SCU", null, "No SCU", null, false);
 
     PageResponse<ShipTypeDto> shipTypes =
@@ -178,6 +185,28 @@ class ProfitCalculationPageControllerMvcTest {
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("shipTypes", List.of(titan)));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void showProfitCalculationPage_listsAFractionalCapacityWithoutTrailingZeros() throws Exception {
+    ShipTypeDto atls =
+        new ShipTypeDto(
+            UUID.randomUUID(), "ATLS GEO", null, "ATLS", new BigDecimal("0.800"), false);
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(atls), 0, 10, 1, 1, List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 10, 0, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/materials/profit-calculation"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("ATLS GEO · 0.8 SCU");
   }
 
   /**

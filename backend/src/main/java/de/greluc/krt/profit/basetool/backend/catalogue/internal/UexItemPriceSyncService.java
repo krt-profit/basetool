@@ -78,10 +78,6 @@ public class UexItemPriceSyncService {
 
     log.info("Starting synchronization of UEX item prices...");
     UexClient.FetchResult<UexItemPriceDto> fetched = uexClient.getItemPrices();
-    if (fetched.notModified()) {
-      log.info("UEX item-price matrix unchanged since the last sync (304) — nothing to import.");
-      return;
-    }
     List<UexItemPriceDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No item prices received from UEX API. Aborting synchronization (no stale sweep).");

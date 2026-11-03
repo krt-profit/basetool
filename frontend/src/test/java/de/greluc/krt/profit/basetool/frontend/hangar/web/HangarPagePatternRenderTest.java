@@ -104,7 +104,7 @@ class HangarPagePatternRenderTest {
   private static @NotNull ShipTypeDto type(@NotNull String name, @NotNull String maker) {
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), maker, "MK", null, null, null, false);
-    return new ShipTypeDto(UUID.randomUUID(), name, manufacturer, name, 0, false);
+    return new ShipTypeDto(UUID.randomUUID(), name, manufacturer, name, new BigDecimal("0"), false);
   }
 
   /**
