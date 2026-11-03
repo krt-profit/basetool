@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Outbound projection of a {@code Terminal}, including the admin-override flags and the raw values
@@ -42,6 +43,12 @@ import java.util.UUID;
  * @param uexHasLoadingDock raw value from the latest UEX sweep; {@code null} before the first sync
  * @param uexIsAutoLoad raw value from the latest UEX sweep; {@code null} before the first sync
  * @param uexSyncedAt UTC instant of the latest UEX sweep, or {@code null} if never synced
+ * @param maxContainerSize largest SCU container the terminal handles, or {@code null} before the
+ *     first sync
+ * @param isRefinery UEX's claim that the location offers refining, or {@code null}
+ * @param isRefuel UEX's claim that the location offers refuelling, or {@code null}
+ * @param isRepair UEX's claim that the location offers repairs, or {@code null}
+ * @param gameVersion game version UEX last confirmed the terminal's data against, or {@code null}
  * @param hidden whether the terminal is hidden from regular dropdowns / lists
  */
 public record TerminalDto(
@@ -59,4 +66,9 @@ public record TerminalDto(
     Boolean uexHasLoadingDock,
     Boolean uexIsAutoLoad,
     Instant uexSyncedAt,
+    @Nullable Integer maxContainerSize,
+    @Nullable Boolean isRefinery,
+    @Nullable Boolean isRefuel,
+    @Nullable Boolean isRepair,
+    @Nullable String gameVersion,
     boolean hidden) {}

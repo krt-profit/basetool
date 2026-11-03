@@ -497,6 +497,37 @@ class UexUniverseSyncServiceTest {
   }
 
   @Test
+  void syncTerminals_writesTheServicesContainerLimitAndGameVersion() {
+    UexTerminalDto dto =
+        UexTerminalDto.builder()
+            .id(81)
+            .name("Everus Harbor Admin")
+            .isRefinery(1)
+            .isRefuel(0)
+            .maxContainerSize(32)
+            .gameVersion("4.3.1")
+            .build();
+    UexTerminalDto blank = UexTerminalDto.builder().id(82).name("Blank").gameVersion("").build();
+    when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto, blank)));
+    when(terminalRepository.findByIdTerminal(any())).thenReturn(Optional.empty());
+    when(terminalRepository.findByName(any())).thenReturn(Optional.empty());
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncTerminals();
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository, atLeastOnce()).save(cap.capture());
+    Terminal written =
+        cap.getAllValues().stream().filter(t -> t.getIdTerminal() == 81).toList().getLast();
+    assertEquals(Boolean.TRUE, written.getIsRefinery());
+    assertEquals(Boolean.FALSE, written.getIsRefuel());
+    assertNull(written.getIsRepair(), "an absent flag stays unknown");
+    assertEquals(32, written.getMaxContainerSize());
+    assertEquals("4.3.1", written.getGameVersion());
+    assertNull(cap.getValue().getGameVersion(), "a blank game version is stored as null");
+  }
+
+  @Test
   void syncTerminals_emptyResponse_aborts() {
     when(uexClient.getTerminals()).thenReturn(fetched(List.of()));
     service.syncTerminals();

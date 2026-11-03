@@ -1471,6 +1471,38 @@ zeros.
 `ProfitCalculationPageControllerMvcTest` · **Code:** `UexVehicleDto`, `ShipType`, `ShipTypeDto`,
 `ProfitCalculationService`, V334
 
+### REQ-DATA-030 — UEX price averages, container sizes and terminal services are stored typed
+
+The UEX sync stores these fields of UEX API 2.0, inside the key sets of REQ-DATA-015:
+
+- **`GET /commodities_prices_all` → `material_price`.** `price_buy_avg` and `price_sell_avg` as
+  `NUMERIC` like `price_buy`; `scu_buy_avg`, `scu_sell_avg` and `scu_sell_stock_avg` as `INTEGER`;
+  `container_sizes` as `INTEGER[]` in UEX order. A blank or partly non-numeric list
+  (`UexValues.parseContainerSizes`) is stored as `NULL`, never half-parsed.
+- **`GET /terminals` → `terminal`.** `max_container_size` as `INTEGER`; `is_refinery`, `is_refuel`
+  and `is_repair` as nullable `BOOLEAN` (an absent flag stays `NULL`); `game_version` as text, a
+  blank value as `NULL`. `is_refinery` is UEX's claim for the location and is set on terminals of
+  every type; the refinery kiosk itself stays `type = 'refinery'` (REQ-REFINERY-020).
+- **Where they show.** The material detail price list (`MaterialPriceDto`) carries the five averages
+  and the container sizes: the page shows a positive average price below each price, the positive
+  SCU averages as the price cell's tooltip and the container range (`1–32`, full list as tooltip)
+  in its own column; a zero average is UEX's "no data" and is not shown. `TerminalDto` carries the
+  terminal fields; the admin UEX terminal tables show the largest container, the services as chips
+  and the game version.
+
+**Acceptance**
+
+- [x] A price sync writes the five averages and the parsed container sizes; a terminal sync writes
+  the services, the container limit and the game version.
+- [x] `container_sizes` round-trips through PostgreSQL in UEX order via the detail price query.
+- [x] The material detail page and the admin UEX terminal table render the values, and dashes where
+  UEX has none.
+
+**Enforced by:** `ExternalCatalogueMappingTest`, `UexValuesTest`, `UexCommodityServiceTest`,
+`UexUniverseSyncServiceTest`, `MaterialMatrixQueryDataTest`, `MaterialTerminalPricesTest`,
+`MaterialsPageControllerMvcTest`, `AdminUexPageControllerMvcTest` · **Code:** `MaterialPrice`,
+`Terminal`, `UexCommodityService`, `UexUniverseSyncService`, `MaterialTerminalPrices`, V335
+
 ### REQ-DATA-031 — a material's UEX locations are a join to the location tables, replaced on every complete commodity sync
 
 UEX `GET /commodities` names where a commodity can be found in five comma-separated id lists:

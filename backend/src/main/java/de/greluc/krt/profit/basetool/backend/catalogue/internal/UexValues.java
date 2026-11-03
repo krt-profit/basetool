@@ -19,14 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.util.StringUtils;
 
@@ -104,6 +107,31 @@ public final class UexValues {
       }
     }
     return Collections.unmodifiableSet(ids);
+  }
+
+  /**
+   * Parses UEX's comma-separated SCU container list ({@code "1,2,4,8,16,24,32"}) into its sizes.
+   *
+   * <p>A list with any non-numeric entry is dropped whole rather than half-parsed.
+   *
+   * @param sizes the raw {@code container_sizes} value, or {@code null}
+   * @return the sizes in UEX order, or {@code null} when the value is absent, blank or unparseable
+   */
+  public static @Nullable @Unmodifiable List<Integer> parseContainerSizes(@Nullable String sizes) {
+    if (!StringUtils.hasText(sizes)) {
+      return null;
+    }
+    String[] parts = sizes.split(",", -1);
+    List<Integer> parsed = new ArrayList<>(parts.length);
+    try {
+      for (String part : parts) {
+        parsed.add(Integer.parseInt(part.trim()));
+      }
+      return List.copyOf(parsed);
+    } catch (NumberFormatException _) {
+      log.debug("Non-numeric UEX container_sizes value '{}' — leaving it null", sizes);
+      return null;
+    }
   }
 
   /**

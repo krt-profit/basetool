@@ -46,8 +46,14 @@ import org.springframework.context.i18n.LocaleContextHolder;
  */
 public final class MaterialTerminalPrices {
 
-  /** Placeholder shown for a price that does not exist. */
-  private static final String NO_PRICE = "–";
+  /** Placeholder shown for a price or container list that does not exist. */
+  private static final String NO_VALUE = "–";
+
+  /** Separator between the smallest and the largest container size. */
+  private static final String RANGE_SEPARATOR = "–";
+
+  /** Separator between the container sizes of the full list. */
+  private static final String LIST_SEPARATOR = ", ";
 
   /** Separator between the parts of a location label. */
   private static final String LOCATION_SEPARATOR = " · ";
@@ -57,6 +63,44 @@ public final class MaterialTerminalPrices {
 
   /** Utility class — not instantiable. */
   private MaterialTerminalPrices() {}
+
+  /**
+   * UEX's running averages of one terminal's price row; each value is {@code null} when UEX carried
+   * none or zero, which UEX uses for "no data".
+   *
+   * @param priceBuy the average purchase price per SCU
+   * @param priceSell the average sale price per SCU
+   * @param scuBuy the average SCU the terminal has for sale
+   * @param scuSell the average SCU the terminal buys
+   * @param scuSellStock the average SCU of the terminal's sell stock
+   */
+  public record Averages(
+      @Nullable BigDecimal priceBuy,
+      @Nullable BigDecimal priceSell,
+      @Nullable Integer scuBuy,
+      @Nullable Integer scuSell,
+      @Nullable Integer scuSellStock) {
+
+    /**
+     * The average sale price as the table shows it below the sale price.
+     *
+     * @return the formatted price, or {@code null} when UEX has no average
+     */
+    @Nullable
+    public String sellText() {
+      return priceSell == null ? null : format(priceSell);
+    }
+
+    /**
+     * The average purchase price as the table shows it below the purchase price.
+     *
+     * @return the formatted price, or {@code null} when UEX has no average
+     */
+    @Nullable
+    public String buyText() {
+      return priceBuy == null ? null : format(priceBuy);
+    }
+  }
 
   /**
    * One terminal row of the detail table.
@@ -69,6 +113,9 @@ public final class MaterialTerminalPrices {
    * @param priceSell the sale price per SCU, or {@code null} when the terminal buys none
    * @param uexAge how long ago UEX last updated the terminal's price, or {@code null} when unknown
    * @param uexStale whether that update is older than {@link #STALE_AFTER}
+   * @param averages UEX's running averages of the row
+   * @param containerSizes the SCU container sizes the terminal handles for the material, in UEX
+   *     order; empty when UEX lists none
    */
   public record Row(
       @NotNull String terminalName,
@@ -77,7 +124,9 @@ public final class MaterialTerminalPrices {
       @Nullable BigDecimal priceBuy,
       @Nullable BigDecimal priceSell,
       @Nullable UexAge uexAge,
-      boolean uexStale) {
+      boolean uexStale,
+      @NotNull Averages averages,
+      @NotNull @Unmodifiable List<Integer> containerSizes) {
 
     /**
      * The sale price as the table shows it.
@@ -97,6 +146,33 @@ public final class MaterialTerminalPrices {
     @NotNull
     public String buyText() {
       return format(priceBuy);
+    }
+
+    /**
+     * The container sizes as the table cell shows them: the smallest and the largest size.
+     *
+     * @return {@code "1–32"}, a single size, or a dash when UEX lists none
+     */
+    @NotNull
+    public String containerRangeText() {
+      if (containerSizes.isEmpty()) {
+        return NO_VALUE;
+      }
+      int min = containerSizes.stream().mapToInt(Integer::intValue).min().orElseThrow();
+      int max = containerSizes.stream().mapToInt(Integer::intValue).max().orElseThrow();
+      return min == max ? Integer.toString(min) : min + RANGE_SEPARATOR + max;
+    }
+
+    /**
+     * Every container size, for the cell's tooltip.
+     *
+     * @return the sizes comma-separated, or {@code null} when UEX lists none
+     */
+    @Nullable
+    public String containerListText() {
+      return containerSizes.isEmpty()
+          ? null
+          : String.join(LIST_SEPARATOR, containerSizes.stream().map(String::valueOf).toList());
     }
   }
 
@@ -186,7 +262,14 @@ public final class MaterialTerminalPrices {
               positive(price.priceBuy()),
               positive(price.priceSell()),
               UexAge.of(updatedAt, now),
-              updatedAt != null && Duration.between(updatedAt, now).compareTo(STALE_AFTER) > 0));
+              updatedAt != null && Duration.between(updatedAt, now).compareTo(STALE_AFTER) > 0,
+              new Averages(
+                  positive(price.priceBuyAvg()),
+                  positive(price.priceSellAvg()),
+                  positive(price.scuBuyAvg()),
+                  positive(price.scuSellAvg()),
+                  positive(price.scuSellStockAvg())),
+              price.containerSizes() == null ? List.of() : List.copyOf(price.containerSizes())));
     }
     rows.sort(
         Comparator.comparing(
@@ -301,6 +384,18 @@ public final class MaterialTerminalPrices {
   }
 
   /**
+   * Drops an SCU figure that is absent or not positive, which UEX uses for "no data".
+   *
+   * @param scu the raw figure
+   * @return the figure when positive, otherwise {@code null}
+   */
+  @Nullable
+  @Contract("null -> null")
+  private static Integer positive(@Nullable Integer scu) {
+    return scu != null && scu > 0 ? scu : null;
+  }
+
+  /**
    * Formats a price with the separators of the request's language and at most two decimals, like
    * the price matrix.
    *
@@ -310,7 +405,7 @@ public final class MaterialTerminalPrices {
   @NotNull
   private static String format(@Nullable BigDecimal price) {
     if (price == null) {
-      return NO_PRICE;
+      return NO_VALUE;
     }
     DecimalFormat format =
         new DecimalFormat(

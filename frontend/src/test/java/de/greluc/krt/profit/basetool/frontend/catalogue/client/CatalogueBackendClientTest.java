@@ -250,7 +250,7 @@ class CatalogueBackendClientTest {
         ID,
         new TerminalDto(
             ID, "TDD", null, "Stanton", null, null, null, null, null, false, false, null, null,
-            null, true));
+            null, null, null, null, null, null, true));
 
     backend.expect("GET", "/api/v1/cities?size=10000&sort=name,asc&page=0");
     backend.expect("GET", "/api/v1/space-stations?size=10000&sort=name,asc&page=1");

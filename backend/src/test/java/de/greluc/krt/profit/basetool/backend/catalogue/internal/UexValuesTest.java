@@ -89,4 +89,20 @@ class UexValuesTest {
       assertTrue(UexValues.parseIdList(raw).isEmpty(), "ids for '" + raw + "'");
     }
   }
+
+  @Test
+  @DisplayName("a container list is split into its sizes in UEX order")
+  void containerSizes_areParsedInOrder() {
+    assertEquals(
+        List.of(1, 2, 4, 8, 16, 24, 32), UexValues.parseContainerSizes("1,2,4,8,16,24,32"));
+    assertEquals(List.of(8, 16), UexValues.parseContainerSizes(" 8, 16 "));
+  }
+
+  @Test
+  @DisplayName("absent, blank and unparseable container lists are dropped whole")
+  void containerSizes_unparseable_yieldNull() {
+    for (String raw : new String[] {null, "", "   ", "x", "1,x", "1,", ","}) {
+      assertNull(UexValues.parseContainerSizes(raw), "sizes for '" + raw + "'");
+    }
+  }
 }

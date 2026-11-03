@@ -1,7 +1,20 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
-<table><tbody>
+<table>
+<thead th:fragment="terminalHead">
+    <tr>
+        <th th:text="#{admin.terminal.name}">Name</th>
+        <th th:text="#{admin.terminal.nickname}">Nickname</th>
+        <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
+        <th th:text="#{admin.uex.flag.column.autoLoad}">Autoload</th>
+        <th class="num" th:text="#{admin.terminal.maxContainer}">Max. Container</th>
+        <th th:text="#{admin.terminal.services}">Dienste</th>
+        <th th:text="#{admin.terminal.gameVersion}">Spielversion</th>
+        <th th:text="#{general.action}">Aktion</th>
+    </tr>
+</thead>
+<tbody>
     <tr th:fragment="terminalRow(term)" th:id="'terminal-' + ${term.id}" class="uex-row-terminal" th:attr="data-name=${term.name}">
         <td th:text="${term.name}">Name</td>
         <td th:text="${term.nickname}">Nickname</td>
@@ -61,6 +74,16 @@
                       th:text="#{admin.terminal.uexValue.unknown}">--</span>
             </div>
         </td>
+        <td class="num" data-testid="terminal-max-container"
+            th:text="${term.maxContainerSize != null and term.maxContainerSize > 0} ? #{admin.terminal.maxContainer.value(${term.maxContainerSize})} : '–'">32 SCU</td>
+        <td data-testid="terminal-services">
+            <div class="flex-gap-xs">
+                <span th:if="${term.isRefinery}" class="chip chip--info" th:text="#{admin.terminal.service.refinery}">Raffinerie</span>
+                <span th:if="${term.isRefuel}" class="chip chip--info" th:text="#{admin.terminal.service.refuel}">Tanken</span>
+                <span th:if="${term.isRepair}" class="chip chip--info" th:text="#{admin.terminal.service.repair}">Reparatur</span>
+            </div>
+        </td>
+        <td data-testid="terminal-game-version" th:text="${term.gameVersion != null} ? ${term.gameVersion} : '–'">4.3.1</td>
         <td>
             <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" class="m-0">
                 <input type="hidden" name="hidden" th:value="${!term.hidden}">

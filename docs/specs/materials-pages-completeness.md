@@ -134,14 +134,16 @@ a danger chip, the two volatility flags as warning chips), followed by four figu
 Verkauf" (highest sale price and its terminal), „Bester Einkauf" (lowest purchase price and its
 terminal), „Ø Verkauf" (mean of the positive sale prices, with the number of buying terminals) and
 „Aktualisiert" (age of the last UEX sweep, labelled „Letzter UEX-Sync"). The table lists Terminal ·
-Ort · Verkauf · Einkauf · UEX-Stand; the location and the planet stripe come from the cached price
+Ort · Verkauf · Einkauf · Container (SCU) · UEX-Stand; below each price UEX's positive average
+price („Ø 3.750"), the positive SCU averages as the price cell's tooltip, and the container sizes
+as a range with the full list as tooltip (REQ-DATA-030). The location and the planet stripe come from the cached price
 matrix's rows of the same material (a matrix failure only empties the location). Zero or negative
 prices show as „–". The rows are sorted by sale price, highest first, terminals buying nothing last
 by name. Each of the Terminal, Ort, Verkauf and Einkauf headers is a sort button of the shared
 sortable header ([REQ-UI-030](ui-design-system.md)): a click on an inactive column sorts by it in
 its first direction (Terminal and Ort A–Z, Verkauf highest first, Einkauf lowest first), a second
 click reverses it; rows without a value stay last, ties go by terminal name, and the header carries
-the matching `aria-sort`. „UEX-Stand" is not sortable. Sorting happens in the browser and keeps the
+the matching `aria-sort`. „Container (SCU)" and „UEX-Stand" are not sortable. Sorting happens in the browser and keeps the
 terminal search's narrowing. On a phone, where the stacked table hides its header row, the four
 sort buttons stay visible as a strip above the rows, so the table sorts on every device class.
 

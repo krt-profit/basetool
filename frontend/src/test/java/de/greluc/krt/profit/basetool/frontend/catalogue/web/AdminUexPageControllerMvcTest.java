@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -34,7 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,6 +98,11 @@ class AdminUexPageControllerMvcTest {
         true,
         false,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
         false);
   }
 
@@ -115,6 +125,97 @@ class AdminUexPageControllerMvcTest {
         .andExpect(content().string(not(containsString("class=\"greeting"))))
         .andExpect(content().string(not(containsString("hud-box"))))
         .andExpect(content().string(not(containsString("btn--cta"))));
+  }
+
+  /**
+   * A terminal row shows the largest container, the UEX services as chips and the game version; a
+   * terminal without them shows dashes and no chip (REQ-DATA-030).
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheTerminalServicesContainerLimitAndGameVersion() throws Exception {
+    TerminalDto serviced =
+        new TerminalDto(
+            UUID.randomUUID(),
+            "Everus Harbor Admin",
+            "Everus",
+            "Stanton",
+            "Hurston",
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            true,
+            false,
+            null,
+            32,
+            true,
+            true,
+            false,
+            "4.3.1",
+            false);
+    TerminalDto bare =
+        new TerminalDto(
+            UUID.randomUUID(),
+            "Zeta Bare Post",
+            "Bare",
+            "Stanton",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            null,
+            null,
+            null,
+            0,
+            null,
+            null,
+            null,
+            null,
+            false);
+    PageResponse<Object> empty = new PageResponse<>(List.of(), 0, 10000, 0L, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
+    when(backendApiClient.get(contains("/api/v1/terminals?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(serviced, bare), 0, 10000, 2L, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/uex-data").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String servicedRow = rowOf(html, "Everus Harbor Admin");
+    assertThat(html).contains(">Max. Container</th>").contains(">Spielversion</th>");
+    assertThat(servicedRow)
+        .containsPattern("data-testid=\"terminal-max-container\"\\s*>32 SCU<")
+        .contains("class=\"chip chip--info\">Raffinerie<")
+        .contains("class=\"chip chip--info\">Tanken<")
+        .doesNotContain(">Reparatur<")
+        .contains("data-testid=\"terminal-game-version\">4.3.1<");
+    assertThat(rowOf(html, "Zeta Bare Post"))
+        .containsPattern("data-testid=\"terminal-max-container\"\\s*>–<")
+        .doesNotContain("chip--info")
+        .contains("data-testid=\"terminal-game-version\">–<");
+  }
+
+  /**
+   * The markup of one terminal row of the rendered admin page.
+   *
+   * @param html the rendered page
+   * @param name the terminal name
+   * @return the row from its opening tag to its end
+   */
+  private static String rowOf(String html, String name) {
+    int start = html.indexOf("data-name=\"" + name + "\"");
+    assertThat(start).as("row of %s", name).isNotNegative();
+    return html.substring(start, html.indexOf("</tr>", start));
   }
 
   @Test

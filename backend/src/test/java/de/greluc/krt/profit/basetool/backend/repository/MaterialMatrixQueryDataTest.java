@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixIt
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -59,6 +60,7 @@ class MaterialMatrixQueryDataTest {
   @Autowired private MaterialPriceRepository materialPriceRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private TerminalRepository terminalRepository;
+  @Autowired private EntityManager entityManager;
 
   private String uid;
   private String aluminum;
@@ -214,6 +216,57 @@ class MaterialMatrixQueryDataTest {
         .extracting(MaterialPriceDto::terminalName, MaterialPriceDto::uexUpdatedAt)
         .containsExactlyInAnyOrder(
             tuple("Stamped-" + uid, updatedAt), tuple("Unstamped-" + uid, null));
+  }
+
+  /**
+   * The detail price list carries UEX's averages and the container sizes, and the {@code integer[]}
+   * column round-trips in UEX order (REQ-DATA-030).
+   */
+  @Test
+  void detailPriceList_carriesTheUexAveragesAndContainerSizes() {
+    Material copper = persistMaterial("Copper-" + uid);
+    Terminal terminal = persistTerminal("Averaged-" + uid, stanton, true, true, false);
+    MaterialPrice price = persistPrice(copper, terminal, null, BigDecimal.valueOf(90));
+    price.setPriceSellAvg(new BigDecimal("88.5"));
+    price.setScuSellAvg(120);
+    price.setScuSellStockAvg(40);
+    price.setContainerSizes(List.of(1, 2, 4, 8, 16, 24, 32));
+    entityManager.flush();
+    entityManager.clear();
+
+    Page<MaterialPriceDto> page =
+        materialPriceRepository.findPricesByMaterialId(copper.getId(), PAGE);
+
+    assertThat(page.getContent())
+        .singleElement()
+        .satisfies(dto -> {
+          assertThat(dto.priceSellAvg()).isEqualByComparingTo("88.5");
+          assertThat(dto.priceBuyAvg()).isNull();
+          assertThat(dto.scuSellAvg()).isEqualTo(120);
+          assertThat(dto.scuSellStockAvg()).isEqualTo(40);
+          assertThat(dto.scuBuyAvg()).isNull();
+          assertThat(dto.containerSizes()).containsExactly(1, 2, 4, 8, 16, 24, 32);
+        });
+  }
+
+  /** The terminal's UEX services, container limit and game version round-trip (REQ-DATA-030). */
+  @Test
+  void terminal_roundTripsTheUexServicesAndGameVersion() {
+    Terminal terminal = persistTerminal("Serviced-" + uid, stanton, true, true, false);
+    terminal.setMaxContainerSize(32);
+    terminal.setIsRefinery(true);
+    terminal.setIsRefuel(false);
+    terminal.setGameVersion("4.3.1");
+    entityManager.flush();
+    entityManager.clear();
+
+    Terminal reloaded = terminalRepository.findById(terminal.getId()).orElseThrow();
+
+    assertThat(reloaded.getMaxContainerSize()).isEqualTo(32);
+    assertThat(reloaded.getIsRefinery()).isTrue();
+    assertThat(reloaded.getIsRefuel()).isFalse();
+    assertThat(reloaded.getIsRepair()).isNull();
+    assertThat(reloaded.getGameVersion()).isEqualTo("4.3.1");
   }
 
   private Material persistMaterial(String name) {
