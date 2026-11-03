@@ -106,6 +106,11 @@ class UexAgeTest {
         null,
         null,
         uexSyncedAt,
+        null,
+        null,
+        null,
+        null,
+        null,
         false);
   }
 }

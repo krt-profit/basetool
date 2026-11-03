@@ -101,6 +101,7 @@
                                     <span class="sort-header__mark" aria-hidden="true"></span>
                                 </button>
                             </th>
+                            <th scope="col" class="num" th:text="#{materials.detail.th.containers}">Container (SCU)</th>
                             <th scope="col" class="num" th:text="#{materials.detail.th.uexUpdated}">UEX-Stand</th>
                         </tr>
                     </thead>
@@ -113,9 +114,26 @@
                             </td>
                             <td th:text="${row.location() != null ? row.location() : '–'}">ArcCorp · Area18</td>
                             <td class="num md-price-sell" th:attr="data-label=#{materials.detail.th.sell}"
-                                th:classappend="${row.priceSell() == null} ? 'md-price--none'" th:text="${row.sellText()}">89,6</td>
+                                th:classappend="${row.priceSell() == null} ? 'md-price--none'"
+                                th:title="${row.averages().scuSell() == null ? null : #messages.msg('materials.detail.avg.scuSell', row.averages().scuSell())
+                                    + (row.averages().scuSellStock() == null ? '' : ' · ' + #messages.msg('materials.detail.avg.scuSellStock', row.averages().scuSellStock()))}"
+                                data-testid="material-price-sell"
+                                ><span th:text="${row.sellText()}">89,6</span
+                                ><span class="cell-sub md-price-avg" th:if="${row.averages().sellText() != null}"
+                                       th:text="#{materials.detail.avg.price(${row.averages().sellText()})}">Ø 88,1</span
+                            ></td>
                             <td class="num md-price-buy" th:attr="data-label=#{materials.detail.th.buy}"
-                                th:classappend="${row.priceBuy() == null} ? 'md-price--none'" th:text="${row.buyText()}">–</td>
+                                th:classappend="${row.priceBuy() == null} ? 'md-price--none'"
+                                th:title="${row.averages().scuBuy() == null ? null : #messages.msg('materials.detail.avg.scuBuy', row.averages().scuBuy())}"
+                                data-testid="material-price-buy"
+                                ><span th:text="${row.buyText()}">–</span
+                                ><span class="cell-sub md-price-avg" th:if="${row.averages().buyText() != null}"
+                                       th:text="#{materials.detail.avg.price(${row.averages().buyText()})}">Ø 90,2</span
+                            ></td>
+                            <td class="num md-containers" th:attr="data-label=#{materials.detail.th.containers}"
+                                th:classappend="${row.containerSizes().isEmpty()} ? 'md-price--none'"
+                                th:title="${row.containerListText()}" th:text="${row.containerRangeText()}"
+                                data-testid="material-price-containers">1–32</td>
                             <td class="num md-uex-age" th:attr="data-label=#{materials.detail.th.uexUpdated}"
                                 th:classappend="${row.uexAge() == null} ? 'md-price--none' : (${row.uexStale()} ? 'md-uex-age--stale')"
                                 data-testid="material-price-uex-age">

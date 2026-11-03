@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiIte
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiVehicleDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexFactionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexJurisdictionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexOutpostDto;
@@ -366,6 +367,30 @@ class ExternalCatalogueMappingTest {
           "weight_scu",
           "wiki");
 
+  private static final Set<String> UEX_COMMODITY_PRICE_KEYS =
+      Set.of(
+          "commodity_name",
+          "container_sizes",
+          "date_added",
+          "date_modified",
+          "id",
+          "id_commodity",
+          "id_terminal",
+          "price_buy",
+          "price_buy_avg",
+          "price_sell",
+          "price_sell_avg",
+          "quality",
+          "scu_buy",
+          "scu_buy_avg",
+          "scu_sell",
+          "scu_sell_avg",
+          "scu_sell_stock",
+          "scu_sell_stock_avg",
+          "status_buy",
+          "status_sell",
+          "terminal_name");
+
   private static final Set<String> UEX_FACTION_KEYS =
       Set.of(
           "date_added",
@@ -611,10 +636,11 @@ class ExternalCatalogueMappingTest {
   }
 
   @Test
-  @DisplayName("UEX vehicle + commodity DTOs bind only names their payloads carry")
+  @DisplayName("UEX vehicle, commodity and price DTOs bind only names their payloads carry")
   void uexCatalogueDtos_bindOnlyServedNames() {
     assertMapsOnlyServedNames(UexVehicleDto.class, UEX_VEHICLE_KEYS);
     assertMapsOnlyServedNames(UexCommodityDto.class, UEX_COMMODITY_KEYS);
+    assertMapsOnlyServedNames(UexCommodityPriceDto.class, UEX_COMMODITY_PRICE_KEYS);
   }
 
   @Test

@@ -41,6 +41,12 @@ public record UexCommodityPriceDto(
     @JsonProperty("scu_buy") Integer scuBuy,
     @JsonProperty("scu_sell") Integer scuSell,
     @JsonProperty("scu_sell_stock") Integer scuSellStock,
+    @JsonProperty("price_buy_avg") BigDecimal priceBuyAvg,
+    @JsonProperty("price_sell_avg") BigDecimal priceSellAvg,
+    @JsonProperty("scu_buy_avg") Integer scuBuyAvg,
+    @JsonProperty("scu_sell_avg") Integer scuSellAvg,
+    @JsonProperty("scu_sell_stock_avg") Integer scuSellStockAvg,
+    @JsonProperty("container_sizes") String containerSizes,
     @JsonProperty("status_buy") Integer statusBuy,
     @JsonProperty("status_sell") Integer statusSell,
     @JsonProperty("date_modified") Long dateModified) {

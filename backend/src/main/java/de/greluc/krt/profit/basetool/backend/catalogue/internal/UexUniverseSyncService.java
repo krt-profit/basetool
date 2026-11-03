@@ -45,6 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * Imports the UEX universe topology: factions, jurisdictions, planets, moons, orbits, cities,
@@ -810,6 +811,12 @@ public class UexUniverseSyncService {
             if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
               entity.setIsAutoLoad(Boolean.TRUE.equals(uexAutoLoad));
             }
+            entity.setIsRefinery(UexValues.asBooleanOrNull(dto.isRefinery()));
+            entity.setIsRefuel(UexValues.asBooleanOrNull(dto.isRefuel()));
+            entity.setIsRepair(UexValues.asBooleanOrNull(dto.isRepair()));
+            entity.setMaxContainerSize(dto.maxContainerSize());
+            entity.setGameVersion(
+                StringUtils.hasText(dto.gameVersion()) ? dto.gameVersion() : null);
             entity.setNickname(dto.nickname());
             entity.setStarSystemName(dto.starSystemName());
             entity.setPlanetName(dto.planetName());

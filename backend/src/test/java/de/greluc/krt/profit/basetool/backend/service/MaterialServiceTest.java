@@ -174,6 +174,12 @@ class MaterialServiceTest {
             200,
             true,
             true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             Instant.parse("2026-10-17T09:12:00Z"));
     Page<MaterialPriceDto> expectedPage = new PageImpl<>(List.of(dto));
 

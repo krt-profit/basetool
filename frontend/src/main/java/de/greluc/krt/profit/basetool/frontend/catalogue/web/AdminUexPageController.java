@@ -231,23 +231,7 @@ public class AdminUexPageController {
       RedirectAttributes redirectAttributes) {
     try {
       TerminalDto current = catalogueClient.terminal(id);
-      TerminalDto body =
-          new TerminalDto(
-              id,
-              current.name(),
-              current.nickname(),
-              current.starSystemName(),
-              current.planetName(),
-              current.cityName(),
-              current.spaceStationName(),
-              current.hasLoadingDock(),
-              current.isAutoLoad(),
-              current.hasLoadingDockOverridden(),
-              current.isAutoLoadOverridden(),
-              current.uexHasLoadingDock(),
-              current.uexIsAutoLoad(),
-              current.uexSyncedAt(),
-              hidden);
+      TerminalDto body = current.withHidden(hidden);
       catalogueClient.updateTerminal(id, body);
       cacheEviction.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -322,23 +306,7 @@ public class AdminUexPageController {
         "toggle terminal visibility (ajax)",
         () -> {
           TerminalDto current = catalogueClient.terminal(id);
-          TerminalDto body =
-              new TerminalDto(
-                  id,
-                  current.name(),
-                  current.nickname(),
-                  current.starSystemName(),
-                  current.planetName(),
-                  current.cityName(),
-                  current.spaceStationName(),
-                  current.hasLoadingDock(),
-                  current.isAutoLoad(),
-                  current.hasLoadingDockOverridden(),
-                  current.isAutoLoadOverridden(),
-                  current.uexHasLoadingDock(),
-                  current.uexIsAutoLoad(),
-                  current.uexSyncedAt(),
-                  !current.hidden());
+          TerminalDto body = current.withHidden(!current.hidden());
           catalogueClient.updateTerminal(id, body);
           cacheEviction.evict(CacheDomain.TERMINAL);
           return ResponseEntity.ok().build();
