@@ -47,6 +47,9 @@ class StickyHeaderTest {
   private static final Pattern SCROLL_CONTAINER =
       Pattern.compile("(?<![-\\w])overflow(?:-[xy])?\\s*:\\s*[^;]*\\b(?:hidden|auto|scroll)\\b");
 
+  /** The selector of the page header, which the layout places directly under {@code body}. */
+  private static final String PAGE_HEADER = "body > header";
+
   /** Any {@code position} or {@code top} declaration. */
   private static final Pattern POSITION = Pattern.compile("(?<![-\\w])(?:position|top)\\s*:");
 
@@ -57,8 +60,8 @@ class StickyHeaderTest {
   private static final Pattern TOP_ZERO = Pattern.compile("(?<![-\\w])top\\s*:\\s*0\\s*;");
 
   /**
-   * Asserts that the bare {@code header} rules of {@code styles.css} keep the header sticky at the
-   * top edge at every breakpoint.
+   * Asserts that the {@code body > header} rules of {@code styles.css} keep the page header sticky
+   * at the top edge at every breakpoint.
    *
    * @throws IOException if the stylesheet cannot be read
    * @throws URISyntaxException if the classpath root cannot be resolved
@@ -70,15 +73,15 @@ class StickyHeaderTest {
     List<String> headerRules = new ArrayList<>();
     Matcher rule = RULE.matcher(css);
     while (rule.find()) {
-      if ("header".equals(rule.group(1).strip())) {
+      if (PAGE_HEADER.equals(rule.group(1).strip().replaceAll("\\s+", " "))) {
         headerRules.add(rule.group(2));
       }
     }
     assertThat(headerRules)
-        .as("REQ-UI-026: a bare `header` rule makes the header sticky at the top edge")
+        .as("REQ-UI-026: a `body > header` rule makes the header sticky at the top edge")
         .anyMatch(body -> STICKY.matcher(body).find() && TOP_ZERO.matcher(body).find());
     assertThat(headerRules)
-        .as("REQ-UI-026: no bare `header` rule overrides its position or its top offset")
+        .as("REQ-UI-026: no `body > header` rule overrides its position or its top offset")
         .allMatch(body ->
             !POSITION.matcher(body).find()
                 || STICKY.matcher(body).find() && TOP_ZERO.matcher(body).find());
