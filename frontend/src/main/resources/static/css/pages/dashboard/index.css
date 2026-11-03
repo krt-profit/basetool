@@ -213,7 +213,7 @@
     .dash-catalogue {
         display: flex;
         flex-direction: column;
-        gap: var(--space-3);
+        gap: var(--space-2);
         margin: 0;
         padding: 0;
         list-style: none;
@@ -224,12 +224,39 @@
         gap: var(--space-4);
         align-items: center;
         justify-content: space-between;
+        padding: var(--space-3) var(--space-4);
+        background: var(--surface-inset);
+        border: var(--border-hairline);
+        border-left: 3px solid var(--color-gray-3);
+        border-radius: var(--radius-sm);
+        transition: border-color 0.15s;
+    }
+
+    .dash-catalogue__item:hover,
+    .dash-catalogue__item:focus-within {
+        border-left-color: var(--color-primary);
     }
 
     .dash-catalogue__text {
         display: flex;
         flex-direction: column;
         gap: var(--space-1);
+        min-width: 0;
+    }
+
+    .dash-catalogue__text .cell-title {
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+    }
+
+    .dash-catalogue__text .cell-sub {
+        font-size: var(--fs-sm);
+        color: var(--color-gray-2-text);
+    }
+
+    .dash-catalogue__item .btn {
+        flex-shrink: 0;
+        white-space: nowrap;
     }
 
     .home-card-head {
