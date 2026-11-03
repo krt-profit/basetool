@@ -49,14 +49,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
 import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -64,10 +61,11 @@ import org.springframework.web.client.RestClient;
 /**
  * Read-only, fail-soft HTTP client for the UEX (uexcorp.space) catalog API.
  *
- * <p>Every fetch uses a conditional GET with the endpoint's last ETag and returns empty rows on
- * {@code 304} or any error; callers must treat an empty result as "skip this run", never as an
- * empty catalogue. An {@code ok} envelope with {@code data: null} is UEX's empty result set, not a
- * fault. Response bodies are capped at {@value #MAX_RESPONSE_BYTES} bytes (ADR-0204).
+ * <p>Every fetch is a plain GET that returns empty rows on any error; callers must treat an empty
+ * result as "skip this run", never as an empty catalogue. UEX serves no {@code ETag} or {@code
+ * Last-Modified}, so there is no conditional request. An {@code ok} envelope with {@code data:
+ * null} is UEX's empty result set, not a fault. Response bodies are capped at {@value
+ * #MAX_RESPONSE_BYTES} bytes (ADR-0204).
  */
 @Slf4j
 @Component
@@ -126,12 +124,6 @@ public class UexClient {
    */
   private RestClient client;
 
-  /**
-   * Last-seen {@code ETag} per UEX endpoint, replayed as {@code If-None-Match} on the next request;
-   * kept in memory only.
-   */
-  private final Map<String, String> etagByEndpoint = new ConcurrentHashMap<>();
-
   /** Builds the shared {@link RestClient} once after dependency injection. */
   @PostConstruct
   void initClient() {
@@ -145,8 +137,7 @@ public class UexClient {
   /**
    * Fetches the full UEX commodity catalog. See class Javadoc for the shared pattern.
    *
-   * @return the commodities plus the {@code 304 Not Modified} outcome; {@code data} is empty on
-   *     error / 304 / empty-200
+   * @return the commodities; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexCommodityDto> getCommodities() {
     return fetchListWithOutcome(
@@ -157,8 +148,7 @@ public class UexClient {
    * Fetches the full UEX commodity-price matrix (every commodity × every terminal). This is the
    * largest UEX payload by far ({@literal >}1 MB) — see {@link #MAX_RESPONSE_BYTES}.
    *
-   * @return the commodity prices plus the {@code 304 Not Modified} outcome; {@code data} is empty
-   *     on error / 304 / empty-200
+   * @return the commodity prices; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexCommodityPriceDto> getCommoditiesPricesAll() {
     return fetchListWithOutcome(
@@ -170,8 +160,7 @@ public class UexClient {
   /**
    * Fetches the full UEX item-price matrix ({@code /items_prices_all}).
    *
-   * @return the item prices plus the {@code 304} outcome; {@code data} is empty on error / 304 /
-   *     empty-200
+   * @return the item prices; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexItemPriceDto> getItemPrices() {
     return fetchListWithOutcome(
@@ -179,10 +168,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all star systems plus the {@code 304 Not Modified} outcome.
+   * Returns all star systems.
    *
-   * @return the star systems plus the {@code 304 Not Modified} outcome; {@code data} is empty on
-   *     error / 304 / empty-200
+   * @return the star systems; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexStarSystemDto> getStarSystems() {
     return fetchListWithOutcome(
@@ -190,10 +178,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all companies (in-universe manufacturers) plus the {@code 304 Not Modified} outcome.
+   * Returns all companies (in-universe manufacturers).
    *
-   * @return the companies plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
-   *     / 304 / empty-200
+   * @return the companies; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexCompanyDto> getCompanies() {
     return fetchListWithOutcome(
@@ -201,10 +188,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all vehicles (ships and ground vehicles) plus the {@code 304 Not Modified} outcome.
+   * Returns all vehicles (ships and ground vehicles).
    *
-   * @return the vehicles plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
-   *     / 304 / empty-200
+   * @return the vehicles; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexVehicleDto> getVehicles() {
     return fetchListWithOutcome(
@@ -212,10 +198,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all cities plus the {@code 304 Not Modified} outcome.
+   * Returns all cities.
    *
-   * @return the cities plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
-   *     304 / empty-200
+   * @return the cities; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexCityDto> getCities() {
     return fetchListWithOutcome(
@@ -223,10 +208,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all in-universe factions plus the {@code 304 Not Modified} outcome.
+   * Returns all in-universe factions.
    *
-   * @return the factions plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
-   *     / 304 / empty-200
+   * @return the factions; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexFactionDto> getFactions() {
     return fetchListWithOutcome(
@@ -234,11 +218,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all jurisdictions (legal authorities covering a system or region) plus the {@code 304
-   * Not Modified} outcome.
+   * Returns all jurisdictions (legal authorities covering a system or region).
    *
-   * @return the jurisdictions plus the {@code 304 Not Modified} outcome; {@code data} is empty on
-   *     error / 304 / empty-200
+   * @return the jurisdictions; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexJurisdictionDto> getJurisdictions() {
     return fetchListWithOutcome(
@@ -248,10 +230,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all moons plus the {@code 304 Not Modified} outcome.
+   * Returns all moons.
    *
-   * @return the moons plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
-   *     304 / empty-200
+   * @return the moons; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexMoonDto> getMoons() {
     return fetchListWithOutcome(
@@ -259,10 +240,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all orbital locations plus the {@code 304 Not Modified} outcome.
+   * Returns all orbital locations.
    *
-   * @return the orbits plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
-   *     304 / empty-200
+   * @return the orbits; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexOrbitDto> getOrbits() {
     return fetchListWithOutcome(
@@ -270,10 +250,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all outposts plus the {@code 304 Not Modified} outcome.
+   * Returns all outposts.
    *
-   * @return the outposts plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
-   *     / 304 / empty-200
+   * @return the outposts; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexOutpostDto> getOutposts() {
     return fetchListWithOutcome(
@@ -281,10 +260,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all planets plus the {@code 304 Not Modified} outcome.
+   * Returns all planets.
    *
-   * @return the planets plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
-   *     304 / empty-200
+   * @return the planets; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexPlanetDto> getPlanets() {
     return fetchListWithOutcome(
@@ -292,11 +270,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all points of interest (Lagrange points, derelicts, anomalies) plus the {@code 304 Not
-   * Modified} outcome.
+   * Returns all points of interest (Lagrange points, derelicts, anomalies).
    *
-   * @return the points of interest plus the {@code 304 Not Modified} outcome; {@code data} is empty
-   *     on error / 304 / empty-200
+   * @return the points of interest; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexPoiDto> getPoi() {
     return fetchListWithOutcome(
@@ -304,10 +280,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all space stations plus the {@code 304 Not Modified} outcome.
+   * Returns all space stations.
    *
-   * @return the space stations plus the {@code 304 Not Modified} outcome; {@code data} is empty on
-   *     error / 304 / empty-200
+   * @return the space stations; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexSpaceStationDto> getSpaceStations() {
     return fetchListWithOutcome(
@@ -317,11 +292,9 @@ public class UexClient {
   }
 
   /**
-   * Returns all terminals (trade kiosks at any location type) plus the {@code 304 Not Modified}
-   * outcome.
+   * Returns all terminals (trade kiosks at any location type).
    *
-   * @return the terminals plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
-   *     / 304 / empty-200
+   * @return the terminals; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexTerminalDto> getTerminals() {
     return fetchListWithOutcome(
@@ -331,7 +304,7 @@ public class UexClient {
   /**
    * Fetches all refining methods (e.g. {@code Cormack}, {@code Pyrometric}).
    *
-   * @return all refining methods, or an empty list on error / 304
+   * @return all refining methods, or an empty list on error
    */
   public List<UexRefiningMethodDto> getRefineriesMethods() {
     return fetchList(
@@ -346,7 +319,7 @@ public class UexClient {
    *
    * <p>Bare-list caveat as for {@link #getRefineriesMethods()}.
    *
-   * @return all refinery yields, or an empty list on error / 304
+   * @return all refinery yields, or an empty list on error
    */
   public List<UexRefineryYieldDto> getRefineriesYields() {
     return fetchList(
@@ -357,10 +330,9 @@ public class UexClient {
 
   /**
    * Fetches the UEX category reference table (R2). The list drives {@code UexItemSyncService}'s
-   * 98-iteration walk through {@code /items?id_category=<n>}.
+   * walk over every game-related item category through {@code /items?id_category=<n>}.
    *
-   * @return the categories plus the {@code 304 Not Modified} outcome; {@code data} is empty on
-   *     error / 304 / empty-200
+   * @return the categories; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexCategoryDto> getCategories() {
     return fetchListWithOutcome(
@@ -368,11 +340,10 @@ public class UexClient {
   }
 
   /**
-   * Fetches every UEX item in one category, with an ETag cached per category URL.
+   * Fetches every UEX item in one category.
    *
    * @param categoryId UEX integer category id (from {@code /categories[].id})
-   * @return the items plus the {@code 304} outcome; {@code data} is empty on error / 304 /
-   *     empty-200
+   * @return the items; {@code data} is empty on error or an empty 200
    */
   public FetchResult<UexItemDto> getItemsForCategory(int categoryId) {
     String endpoint = uexProperties.itemsEndpoint() + "?id_category=" + categoryId;
@@ -385,10 +356,10 @@ public class UexClient {
    * endpoints must not use it.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
-   * @param endpoint UEX endpoint path; also the ETag cache key
+   * @param endpoint UEX endpoint path
    * @param typeRef typed wrapper carrying the parametric envelope type
    * @param resourceLabel label for log messages
-   * @return the parsed rows, or an empty list on error / 304
+   * @return the parsed rows, or an empty list on error
    */
   private <T> List<T> fetchList(
       String endpoint,
@@ -398,51 +369,28 @@ public class UexClient {
   }
 
   /**
-   * Shared request pipeline for every UEX list endpoint: conditional GET, envelope unwrapping, and
-   * a fail-soft fallback.
+   * Shared request pipeline for every UEX list endpoint: GET, envelope unwrapping, and a fail-soft
+   * fallback.
    *
-   * <p>A {@code 304} is logged at INFO and yields an unchanged result; a {@code 2xx} stores the new
-   * ETag and goes through {@link #unwrapEnvelope}; any error is logged at WARN, counted on {@link
-   * CatalogueMetricNames#EXTERNAL_FETCH_ERRORS} and yields empty rows.
+   * <p>A {@code 2xx} goes through {@link #unwrapEnvelope}; any error is logged at WARN, counted on
+   * {@link CatalogueMetricNames#EXTERNAL_FETCH_ERRORS} and yields empty rows.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
-   * @param endpoint UEX endpoint path; also the ETag cache key
+   * @param endpoint UEX endpoint path
    * @param typeRef typed wrapper carrying the parametric envelope type
    * @param resourceLabel label for log messages
-   * @return the parsed rows plus the {@code 304} outcome; {@code data} is empty on error / 304 /
-   *     empty-200
+   * @return the parsed rows; {@code data} is empty on error or an empty 200
    */
   private <T> FetchResult<T> fetchListWithOutcome(
       String endpoint,
       ParameterizedTypeReference<UexResponseDto<T>> typeRef,
       String resourceLabel) {
     log.info("Fetching all {} from UEX API", resourceLabel);
-    RestClient.RequestHeadersSpec<?> request = client.get().uri(endpoint);
-    String previousEtag = etagByEndpoint.get(endpoint);
-    if (previousEtag != null) {
-      request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
-    }
     try {
-      return request.exchangeForRequiredValue((_, response) -> {
-        if (response.getStatusCode().value() == 304) {
-          log.info(
-              "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
-                  + " nothing to re-import.",
-              resourceLabel);
-          return FetchResult.<T>unchanged();
-        }
-        if (!response.getStatusCode().is2xxSuccessful()) {
-          throw response.createException();
-        }
-        String etag = response.getHeaders().getETag();
-        if (etag != null && !etag.isBlank()) {
-          etagByEndpoint.put(endpoint, etag);
-        }
-        UexResponseDto<T> body = response.bodyTo(typeRef);
-        return body == null
-            ? FetchResult.<T>partial(Collections.emptyList())
-            : unwrapEnvelope(body, resourceLabel);
-      });
+      UexResponseDto<T> body = client.get().uri(endpoint).retrieve().body(typeRef);
+      return body == null
+          ? FetchResult.partial(Collections.emptyList())
+          : unwrapEnvelope(body, resourceLabel);
     } catch (RuntimeException e) {
       log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
       recordFetchError();
@@ -461,7 +409,7 @@ public class UexClient {
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
    * @param body the decoded envelope
    * @param resourceLabel label for log messages
-   * @return the envelope's rows (empty when {@code data} was absent), not flagged as not-modified
+   * @return the envelope's rows (empty when {@code data} was absent)
    */
   private <T> FetchResult<T> unwrapEnvelope(@NotNull UexResponseDto<T> body, String resourceLabel) {
     String status = LogSafe.text(body.status(), MAX_STATUS_LOG_LENGTH);
@@ -511,18 +459,16 @@ public class UexClient {
   }
 
   /**
-   * Outcome of one UEX list fetch: the rows, whether the upstream answered {@code 304 Not
-   * Modified}, and whether the call got a usable answer.
+   * Outcome of one UEX list fetch: the rows and whether the call got a usable answer.
    *
    * <p>Only a {@link #complete()} result may drive a tombstone sweep (REQ-DATA-014), since failures
-   * and {@code 304}s also yield empty rows.
+   * also yield empty rows.
    *
    * @param <T> the per-row payload type
-   * @param data the parsed rows, or an empty list on {@code 304} / empty-200 / error
-   * @param notModified {@code true} only when the upstream returned {@code 304 Not Modified}
+   * @param data the parsed rows, or an empty list on an empty 200 or an error
    * @param complete {@code true} iff the upstream gave a usable answer
    */
-  public record FetchResult<T>(List<T> data, boolean notModified, boolean complete) {
+  public record FetchResult<T>(List<T> data, boolean complete) {
 
     /**
      * The healthy outcome of a {@code 2xx} whose envelope reported no problem, including empty
@@ -530,11 +476,11 @@ public class UexClient {
      *
      * @param <T> the per-row payload type
      * @param data the parsed rows (possibly empty)
-     * @return a result with {@code notModified == false, complete == true}
+     * @return a result with {@code complete == true}
      */
     @NotNull
     public static <T> FetchResult<T> of(List<T> data) {
-      return new FetchResult<>(data, false, true);
+      return new FetchResult<>(data, true);
     }
 
     /**
@@ -543,22 +489,11 @@ public class UexClient {
      *
      * @param <T> the per-row payload type
      * @param data whatever rows arrived (possibly empty)
-     * @return a result with {@code notModified == false, complete == false}
+     * @return a result with {@code complete == false}
      */
     @NotNull
     public static <T> FetchResult<T> partial(List<T> data) {
-      return new FetchResult<>(data, false, false);
-    }
-
-    /**
-     * The {@code 304 Not Modified} outcome: empty rows, not modified, and not complete.
-     *
-     * @param <T> the per-row payload type
-     * @return an unchanged, incomplete result with an empty row list
-     */
-    @NotNull
-    public static <T> FetchResult<T> unchanged() {
-      return new FetchResult<>(List.of(), true, false);
+      return new FetchResult<>(data, false);
     }
   }
 }

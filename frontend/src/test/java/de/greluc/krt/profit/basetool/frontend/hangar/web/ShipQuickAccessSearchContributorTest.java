@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewD
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessHit;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessSearchKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -65,7 +66,9 @@ class ShipQuickAccessSearchContributorTest {
   /** Each type becomes a hit on the unit hangar filtered to its name. */
   @Test
   void mapsTypesToFilteredHangarHits() {
-    ShipTypeDto type = new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 46, false);
+    ShipTypeDto type =
+        new ShipTypeDto(
+            UUID.randomUUID(), "Cutlass Black", null, null, new BigDecimal("46"), false);
     when(hangarClient.squadronOverview(0, 5, "cutl"))
         .thenReturn(
             new PageResponse<>(

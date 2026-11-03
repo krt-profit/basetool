@@ -50,19 +50,13 @@ public class UexStarSystemService {
   private final SyncChunkWriter chunkWriter;
 
   /**
-   * Pulls the star-system catalog and upserts each row. An unchanged feed ({@code 304}) and an
-   * empty response are both no-ops, but only the latter is reported as a problem — the former is a
-   * healthy fully-cached run. Neither wipes local data.
+   * Pulls the star-system catalog and upserts each row. An empty response is a reported no-op that
+   * never wipes local data.
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void fetchAndProcessStarSystems() {
     log.info("Starting synchronization of UEX star systems...");
     UexClient.FetchResult<UexStarSystemDto> fetched = uexClient.getStarSystems();
-    if (fetched.notModified()) {
-      log.info(
-          "UEX star system catalogue unchanged since the last sync (304) — nothing to import.");
-      return;
-    }
     List<UexStarSystemDto> dtos = fetched.data();
 
     if (dtos.isEmpty()) {

@@ -83,7 +83,7 @@ class ShipMapperTest {
     type.setId(shipTypeId);
     type.setName("Cutlass Black");
     type.setManufacturer(mfr);
-    type.setScu(46);
+    type.setScu(new BigDecimal("46"));
 
     Location loc = new Location();
     loc.setId(locationId);
@@ -115,7 +115,7 @@ class ShipMapperTest {
     assertNotNull(dto.shipType());
     assertEquals(shipTypeId, dto.shipType().id());
     assertEquals("Cutlass Black", dto.shipType().name());
-    assertEquals(46, dto.shipType().scu());
+    assertEquals(new BigDecimal("46"), dto.shipType().scu());
 
     assertNotNull(dto.shipType().manufacturer());
     assertEquals(manufacturerId, dto.shipType().manufacturer().id());

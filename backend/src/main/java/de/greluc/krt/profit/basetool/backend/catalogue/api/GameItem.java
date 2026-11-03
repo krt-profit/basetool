@@ -188,6 +188,7 @@ public class GameItem extends AbstractEntity<UUID> {
   private String scwikiGameVersionSeen;
 
   /** UEX integer item id. Unique across the table; the fastest re-resolution key. */
+  @Nullable
   @Column(name = "uex_item_id", unique = true)
   private Integer uexItemId;
 

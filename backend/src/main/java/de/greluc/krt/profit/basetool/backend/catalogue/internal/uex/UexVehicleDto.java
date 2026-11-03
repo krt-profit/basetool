@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal.uex;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.math.BigDecimal;
 
 /**
  * Inbound JSON record for UEX Corp's {@code /vehicles} endpoint, mapped onto {@code ShipType} by
@@ -98,7 +99,7 @@ public record UexVehicleDto(
     @JsonProperty("name_full") String nameFull,
     @JsonProperty("slug") String slug,
     @JsonProperty("company_name") String companyName,
-    @JsonProperty("scu") Integer scu,
+    @JsonProperty("scu") BigDecimal scu,
     @JsonProperty("crew") String crew,
     @JsonProperty("mass") Double mass,
     @JsonProperty("width") Double width,

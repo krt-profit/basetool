@@ -62,7 +62,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "krt.uex")
 public record UexProperties(
-    @DefaultValue("https://api.uexcorp.space/2.0") @NotBlank String apiUrl,
+    @DefaultValue("https://api.uexcorp.uk/2.0") @NotBlank String apiUrl,
     @DefaultValue("/commodities") @NotBlank String commoditiesEndpoint,
     @DefaultValue("/commodities_prices_all") @NotBlank String commoditiesPricesEndpoint,
     @DefaultValue("/star_systems") @NotBlank String starSystemsEndpoint,
