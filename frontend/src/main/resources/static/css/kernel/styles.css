@@ -6589,6 +6589,18 @@
         min-height: 0;
         overflow-y: auto;
     }
+    .krt-modal-body .form-group:not(.check-row) > label {
+        display: block;
+        margin-bottom: var(--space-2);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-sm);
+    }
+    .krt-modal-body
+        .form-group
+        > :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+        width: 100%;
+        box-sizing: border-box;
+    }
     .krt-modal-close {
         background: none;
         border: none;

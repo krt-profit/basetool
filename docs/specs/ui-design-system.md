@@ -426,6 +426,10 @@ prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt
 material/item pickers and the refinery store sheet. A dialog that needs a width none of these gives
 is a signal to revisit its content, not to add a per-page `max-width`.
 
+**A dialog's form fields stack.** Inside `.krt-modal-body` every `.form-group` that is not a
+`.check-row` puts its label on its own line above a full-width control; the kernel owns this rule,
+so a page never restates it.
+
 **The head's parts are styled.** `.krt-modal-close` carries the
 `.close-sidebar-btn` treatment (its already-approved sibling — same job, an ✕ that dismisses a
 surface), squared and floored to 44 px in the touch block, with `flex-shrink: 0` so a long German
