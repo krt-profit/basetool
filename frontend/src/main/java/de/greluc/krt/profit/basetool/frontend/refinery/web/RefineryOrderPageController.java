@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryYieldBonusDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -886,12 +887,13 @@ public class RefineryOrderPageController {
    * Proxies the backend's UEX yield map of a refinery location for the bonus badges.
    *
    * @param locationId target refinery location
-   * @return percent per material UUID; empty on a backend error
+   * @return the yield bonus with its 7- and 30-day averages per material UUID; empty on a backend
+   *     error
    */
   @GetMapping("/locations/{locationId}/yields")
   @PreAuthorize("isAuthenticated()")
   @ResponseBody
-  public Map<String, Integer> getYieldsForLocation(@PathVariable UUID locationId) {
+  public Map<String, RefineryYieldBonusDto> getYieldsForLocation(@PathVariable UUID locationId) {
     return fetchYieldsForLocation(locationId);
   }
 
@@ -913,11 +915,11 @@ public class RefineryOrderPageController {
    * Fetches the per-material UEX yield map of a location; a {@code null} id or any failure yields
    * an empty map.
    */
-  private Map<String, Integer> fetchYieldsForLocation(UUID locationId) {
+  private Map<String, RefineryYieldBonusDto> fetchYieldsForLocation(UUID locationId) {
     if (locationId == null) {
       return Map.of();
     }
-    Map<String, Integer> yields =
+    Map<String, RefineryYieldBonusDto> yields =
         SectionFallback.load(
             log, "refinery-location-yields", () -> refineryClient.yields(locationId), null);
     return yields != null ? yields : Map.of();

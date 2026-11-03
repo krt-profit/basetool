@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
+/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_YIELD_BONUS_WEEK, MATERIAL_YIELD_BONUS_MONTH, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
@@ -27,7 +27,11 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 
-krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
+krtRefineryYield.init(MATERIAL_YIELD_BONUSES, {
+    help: MATERIAL_YIELD_BONUS_HELP,
+    weekAverage: MATERIAL_YIELD_BONUS_WEEK,
+    monthAverage: MATERIAL_YIELD_BONUS_MONTH,
+});
 
 /**
  * Derives a material row's SCU amount from its unit quantity.

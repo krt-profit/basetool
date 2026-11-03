@@ -219,6 +219,8 @@ public class UexRefinerySyncService {
         entity.setMaterial(materialRepository.getReferenceById(materialId));
       }
       entity.setYieldBonus(dto.value());
+      entity.setYieldBonusWeek(dto.valueWeek());
+      entity.setYieldBonusMonth(dto.valueMonth());
       written.put(key, entity);
       rowKeys.add(key);
     }

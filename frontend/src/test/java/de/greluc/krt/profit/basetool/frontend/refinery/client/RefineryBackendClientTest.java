@@ -27,8 +27,10 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryYieldBonusDto;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -97,6 +99,23 @@ class RefineryBackendClientTest {
     backend.expect("GET", "/api/v1/locations/" + LOCATION + "/refinery-yields");
     backend.expect(
         "POST", "/api/v1/refinery-orders/import-extract", "{\"refinery\":\"ARC-L1\",\"goods\":[]}");
+  }
+
+  @Test
+  void yieldsReadTheBonusWithItsAverages() {
+    backend.answerJson(
+        "{\""
+            + MATERIAL
+            + "\":{\"percent\":5,\"weekAveragePercent\":4,\"monthAveragePercent\":-2},"
+            + "\""
+            + ID
+            + "\":{\"percent\":0}}");
+
+    Map<String, RefineryYieldBonusDto> yields = client.yields(LOCATION);
+
+    assertThat(yields)
+        .containsEntry(MATERIAL.toString(), new RefineryYieldBonusDto(5, 4, -2))
+        .containsEntry(ID.toString(), new RefineryYieldBonusDto(0, null, null));
   }
 
   @Test
