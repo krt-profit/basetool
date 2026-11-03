@@ -94,6 +94,14 @@ class ScLinkCatalogTest {
   }
 
   @Test
+  void theOrganisationSectionHoldsTheOrgSitesAndTheConnectedDesktopTools() {
+    assertThat(ScLinkCategory.ORGANISATION.links())
+        .containsExactly(
+            ScLink.DAS_KARTELL, ScLink.KRT_OPSEC, ScLink.SC_EXTRACTOR, ScLink.VERSEKIT);
+    assertThat(ScLink.SC_EXTRACTOR.displayHost()).isEqualTo("github.com");
+  }
+
+  @Test
   void systemSevenSitsDirectlyBesideDaymarRally() {
     List<ScLink> universe = ScLinkCategory.UNIVERSE.links();
     assertThat(universe.indexOf(ScLink.SYSTEM_SEVEN))

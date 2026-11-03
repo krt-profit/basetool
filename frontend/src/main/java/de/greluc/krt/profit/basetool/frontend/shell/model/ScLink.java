@@ -36,6 +36,12 @@ public enum ScLink {
   DAS_KARTELL(
       "dasKartell", "https://das-kartell.org/", "das-kartell.png", ScLinkCategory.ORGANISATION),
   KRT_OPSEC("krtOpsec", "https://krt-opsec.de/", "krt-opsec.png", ScLinkCategory.ORGANISATION),
+  SC_EXTRACTOR(
+      "scExtractor",
+      "https://github.com/krt-profit/basetool-sc-extractor",
+      "basetool-sc-extractor.svg",
+      ScLinkCategory.ORGANISATION),
+  VERSEKIT("versekit", "https://versekit.xharig.com/", "versekit.png", ScLinkCategory.ORGANISATION),
   RSI("rsi", "https://robertsspaceindustries.com/", "rsi.png", ScLinkCategory.OFFICIAL),
   COMM_LINK(
       "commLink",
@@ -114,7 +120,6 @@ public enum ScLink {
   CORNERSTONE("cornerstone", "https://cstone.space/", "cstone.png", ScLinkCategory.DATABASES),
   SCMDB("scmdb", "https://scmdb.net/", "scmdb.svg", ScLinkCategory.DATABASES),
   SC_CRAFT("scCraft", "https://sc-craft.tools/", "sc-craft.png", ScLinkCategory.DATABASES),
-  VERSEKIT("versekit", "https://versekit.xharig.com/", "versekit.png", ScLinkCategory.DATABASES),
   LOOTMASTER("lootmaster", "https://lootmaster.org/", "lootmaster.svg", ScLinkCategory.DATABASES),
   VERSEGUIDE("verseguide", "https://verseguide.com/", "verseguide.png", ScLinkCategory.UNIVERSE),
   UEEXI("ueexi", "https://ueexi.com/", "ueexi.svg", ScLinkCategory.UNIVERSE),

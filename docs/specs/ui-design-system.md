@@ -1596,8 +1596,10 @@ them in one place so nobody has to collect the addresses from Discord.
   in the footer (REQ-UI-026) and from the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
-- **What.** Forty links in six sections, in this order:
-  - **Organisation** — das-kartell.org, krt-opsec.de
+- **What.** Forty-one links in six sections, in this order:
+  - **Organisation** — das-kartell.org, krt-opsec.de, the Basetool SC Extractor
+    (github.com/krt-profit/basetool-sc-extractor), versekit.xharig.com — the org's sites and the
+    desktop tools that connect to the Basetool
   - **Offizielles** / Official — robertsspaceindustries.com, its Spectrum community
     (`/spectrum/community/SC`), the roadmap, issue-council, status and public-telemetry
     pages, the ship matrix, the loaner ship matrix (support article), the ARK starmap, the
@@ -1606,8 +1608,7 @@ them in one place so nobody has to collect the addresses from Discord.
     sc-trading.kamille.ovh
   - **Schiffe & Ausrüstung** — erkul.games/calculator, spviewer.eu, fleetyards.net,
     starcitizen-community.de/holoviewer, ccugame.app, maps.adi.sc
-  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, versekit.xharig.com,
-    lootmaster.org
+  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, lootmaster.org
   - **Universum & Community** — verseguide.com, ueexi.com, star-citizen-characters.com,
     daymarrally.com, systemseven.gg, star-citizen.wiki, starcitizen.tools, sc-deutsch-launcher.de,
     sc-links.org, verseintel.org
@@ -1621,9 +1622,9 @@ them in one place so nobody has to collect the addresses from Discord.
   in a new tab with `rel="noopener noreferrer"`, and says so to screen readers. A closing line states
   that the sites are run by third parties and their names and logos belong to them.
 - **Logos are local copies.** Each site's favicon or touch icon is stored under
-  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, five sites as
+  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, six sites as
   SVG; sites of one operator may share a logo file. The CSP's `img-src 'self' data:` forbids hotlinking, and a hotlinked logo would
-  also send every member's address to forty third parties on each visit. A shipped SVG carries no
+  also send every member's address to forty-one third parties on each visit. A shipped SVG carries no
   script, event handler, `foreignObject` or external reference.
 - **The catalogue is code.** `ScLink` (key, address, logo, section) and `ScLinkCategory` are enums;
   names and descriptions are i18n keys `scLinks.link.<key>.name` / `.description`. Changing the list
@@ -1632,7 +1633,8 @@ them in one place so nobody has to collect the addresses from Discord.
   apply), no audit event and no business metric.
 
 **Enforced by:** `ScLinkCatalogTest` (unique HTTPS addresses, every logo shipped and none unused,
-SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageControllerMvcTest`
+SVG hygiene, the copy in every bundle, every section non-empty, the Organisation section's
+order) · `ScLinksPageControllerMvcTest`
 (renders every card with its logo and address in DE and EN, the footer link) ·
 `AnonymousSurfaceSweepMvcTest` (anonymous navigation is sent to the login) ·
 **Related:** REQ-UI-018, REQ-SEC-052
