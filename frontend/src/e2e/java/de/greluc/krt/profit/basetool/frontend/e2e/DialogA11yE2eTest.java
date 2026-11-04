@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -48,6 +49,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
@@ -258,6 +260,7 @@ class DialogA11yE2eTest {
    * with all findings, including declared dialogs neither exercised nor in {@link #UNREACHED}.
    */
   @Test
+  @Timeout(value = 8, unit = TimeUnit.MINUTES)
   void everyDialogFollowsTheContract() {
     String baseUrl = STACK.baseUrl();
     Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);

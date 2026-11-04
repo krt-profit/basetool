@@ -2091,8 +2091,12 @@ to the shared group and restores the defect exactly.
   subset of the full one (ADR-0312).
 - [ ] The `Exchange changes carry the e2e label` job runs on `opened`, `synchronize`, `reopened` and
   on `labeled` only for the `e2e` label; any other label starts no runner for it (ADR-0311).
+- [ ] Every E2E and smoke test method runs under a three-minute timeout, so a browser call that is
+  never answered fails that one test and names it, instead of holding the cell until the job's
+  45-minute limit; a method that legitimately runs longer carries its own `@Timeout`.
 
-**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
+**Enforced by:** `frontend/src/e2e/resources/junit-platform.properties` (the default test timeout) ·
+`.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
 `jobs.build-stack.if`, `jobs.build-stack-main.if`, `jobs.exchange-label.if`, the `device` axis) ·
 `.github/actions/build-e2e-images` · `.github/scripts/build_e2e_images.sh` ·
 `.github/scripts/check_e2e_gate_mirror.py` · `.github/scripts/check_e2e_device_matrix.py` ·
