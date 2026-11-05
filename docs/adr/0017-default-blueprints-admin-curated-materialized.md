@@ -1,6 +1,7 @@
 # ADR-0017 — default-blueprints-admin-curated-materialized
 
-- **Status:** Accepted
+- **Status:** Accepted — the `product_key` key is **amended by ADR-0343** (keyed by the produced
+  item's GUID).
 - **Date:** 2026-06-16
 - **Deciders:** @greluc
 - **Related:** [REQ-INV-016/017](../specs/personal-inventory-blueprints.md) · [ADR-0014](0014-notification-system-architecture.md)

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md)
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md); planned: [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md), [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -729,6 +729,12 @@ change alone.
   „(1000 → +5 %)" — reads as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %", `1`
   „±0 %", with at most one decimal.
 
+> [!note] Planned amendment — the tooltip names the value's source (#2927;
+> [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md))
+> A base value comes from the P4K catalogue, or from the SC Wiki where the catalogue has none. The
+> chip shows every value as above; its tooltip also names the source, „P4K" or „SC Wiki". No build
+> stamp stands beside the values.
+
 **Acceptance**
 
 - [x] The recipe response carries the crafted item's base values sorted by property key, and none
@@ -740,3 +746,42 @@ change alone.
 **Code:** `BlueprintStatBaseDto`, `BlueprintProductService#resolveRecipe`,
 `personal-inventory-blueprint-stats.js`, `personal-inventory-blueprints-recipe.js`
 `renderQualityBlock` / `showChipValue` · **Decision:** ADR-0309
+
+### REQ-INV-070 — A personal blueprint is keyed by its produced item's GUID
+
+> [!note] Planned — implementation pending (#2893;
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
+> Today a personal blueprint is keyed by the normalised product key (`product_key`).
+
+A member owns a **product** — what a blueprint produces — not a single recipe record. Its key is
+the DataForge GUID of the produced item, which the P4K import stores as `producedItemGuid` on the
+`blueprint` row, so the key does not depend on a matched `game_item` row. Only the DataForge GUID
+counts, never a Wiki UUID. A name is used only to resolve to that key.
+
+- **Game.log resolution.** The name chain stays — scmdb `tag`, normalised name, alias, pack-tag
+  strip, fuzzy — and ends at a GUID. A name that resolves to several GUIDs is `SUGGESTED` with the
+  candidates; the member picks, and the pick is learned as an alias. No match stays `UNMATCHED` /
+  `SUGGESTED`.
+- **Existing rows.** A backfill maps `product_key` → `blueprint.output_name` → produced-item GUID. A
+  row that resolves to no GUID or to several keeps its name key as a fallback, goes on the review
+  list of the P4K change report
+  ([ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md)),
+  and is upgraded by a later P4K run that resolves it.
+- **Fallback meets GUID.** When a member holds a fallback row and the same product arrives by GUID,
+  the two merge into one GUID row: the earliest `acquired_at`, the note kept, the fallback row
+  removed. The merge is audited in the Blueprints area (REQ-INV-051).
+- **One key.** `blueprint_external_alias`, `default_blueprint`, the material exchange's
+  `item_product_key`, the exchange change feed's entity key and journal, and the audit details move
+  to the GUID key in the same step; there is no translation layer. The exchange carries the key as
+  `guid` and deprecates `bt` (REQ-XCH-015).
+
+**Acceptance**
+
+- [ ] A name that resolves to one GUID is stored under that GUID; one that resolves to several is
+  `SUGGESTED` with the candidates, and the pick is learned as an alias.
+- [ ] The backfill keys every resolvable row by GUID and keeps the name key, with a review case, for
+  the others; a later run that resolves such a row upgrades it.
+- [ ] A fallback row and a GUID row of the same product merge into one GUID row with the earliest
+  date and the note, and the merge writes one audit event.
+
+**Enforced by:** — (planned) · **Issues:** #2893

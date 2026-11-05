@@ -1,6 +1,6 @@
 # ADR-0283 — A game item's size, grade and class come from the SC Wiki only
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0337
 - **Date:** 2026-10-18
 - **Deciders:** @greluc
 - **Related:** spec `REQ-DATA-024` ([`data-persistence.md`](../specs/data-persistence.md)) ·

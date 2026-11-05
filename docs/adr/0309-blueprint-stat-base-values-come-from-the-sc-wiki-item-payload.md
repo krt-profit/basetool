@@ -1,6 +1,10 @@
 # ADR-0309 — Blueprint stat base values come from the SC Wiki item payload
 
-- **Status:** Accepted
+- **Status:** Accepted — decision 1 (the SC Wiki as the only source) is **partially superseded by
+  [ADR-0342](0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)**:
+  the P4K catalogue leads and the SC Wiki fills gaps; the mapping keys on the gameplay property's
+  `className` and `game_item_stat` gains a `source` column. The value rule and the Wiki's
+  completion pass are unchanged.
 - **Date:** 2026-10-23
 - **Deciders:** @greluc
 - **Related:** REQ-DATA-027 · REQ-INV-069 · REQ-INV-009 · ADR-0195 (the item sync's kind passes) ·

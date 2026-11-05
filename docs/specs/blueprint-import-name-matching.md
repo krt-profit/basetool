@@ -23,6 +23,11 @@ uploaded export file's envelope.
 
 ### REQ-INV-006 — Import matches on the normalized `output_name`
 
+> [!note] Planned amendment — the name chain ends at a GUID key (#2893;
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md), REQ-INV-070)
+> The match below resolves to the produced item's DataForge GUID, which keys the member's product;
+> a name that resolves to several GUIDs is `SUGGESTED` with the candidates.
+
 The blueprint import and product search match the in-game/log product name against the master
 list of `blueprint.output_name`s, comparing both sides through the single
 `BlueprintNameNormalizer` (trim, collapse internal whitespace, fold Unicode quote/apostrophe
@@ -233,6 +238,11 @@ string only), via a single `BlueprintVariantFamilyResolver.familyKey(name)` both
 **Code:** `BlueprintVariantFamilyResolver`, `BlueprintVariantAliasOverrides` · **Issues:** —
 
 ### REQ-INV-019 — Structural tag match for the scmdb.net export
+
+> [!note] Planned amendment — the tag match ends at a GUID key (#2893;
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md), REQ-INV-070)
+> A matched blueprint key resolves to the produced item's DataForge GUID, which keys the member's
+> product.
 
 The scmdb.net export uniquely carries, per blueprint, the **DataForge blueprint key** under `tag`
 (e.g. `BP_CRAFT_behr_rifle_ballistic_02_civilian`). That key is the same identifier the basetool
