@@ -18,8 +18,10 @@ Additive changes keep `schemaVersion`, and a consumer ignores kinds and fields i
 Within a Channel `changeNumber` is monotonic. Only `LIVE` may be imported in production; `PTU`,
 `EPTU`, `TECH-PREVIEW` and `HOTFIX` are confidential test Channels. The LIVE catalogue of p4kx
 0.4.2 is 214 MB uncompressed, above the 64 MB upload limit, so the upload is in practice
-`.json.zst` (3.9 MB). Its `source.build.publicPatch` is `null`; the patch is visible only in
-`source.build.branch` (`sc-alpha-4.10.2`).
+`.json.zst` (3.9 MB). Its `source.build.publicPatch` is `null`: p4kx reads the public patch only
+from the RSI Launcher's install log, the archive holds none (p4kx ADR-0053), and
+`source.build.branch` (`sc-alpha-4.10.2`) serves several public patches (4.7.0, 4.7.1 and 4.7.2
+all came from `sc-alpha-4.7.0`).
 
 The import today seeds new rows on request (`seedNew`), keeps no history of applied runs, and the
 P4K GUID (`p4k_uuid`) of a row can differ from the in-game UUID the SC Wiki wrote.
@@ -45,9 +47,12 @@ P4K GUID (`p4k_uuid`) of a row can differ from the in-game UUID the SC Wiki wrot
    `resourceGroups` and `blueprintCategories`, is set on every row the catalogue matched in that
    run, changed or not. The Build is read through the join.
 6. **Patch version.** A run's patch version is `source.build.publicPatch` when present. When it is
-   `null`, it is derived from `source.build.branch` only if the branch matches exactly
-   `sc-alpha-<major>.<minor>.<patch>` (`sc-alpha-4.10.2` gives `4.10.2`); otherwise it stays
-   unknown. The run records whether the version came from `publicPatch` or from the branch.
+   `null`, the version of `source.build.branch` is kept as a lower bound, only if the branch
+   matches exactly `sc-alpha-<major>.<minor>.<patch>` (`sc-alpha-4.10.2` gives at least `4.10.2`);
+   otherwise it stays unknown. The run records whether its version is a public patch or a branch
+   lower bound; the UI shows a lower bound marked as the branch. "Import due" compares a lower
+   bound like a patch version, so it never misses a patch and may read as due for a later public
+   patch of the same branch until a catalogue with `publicPatch` is applied.
 7. **Build order.** APPLY refuses a catalogue whose `source.build.changeNumber` is lower than that
    of the last applied run. Re-applying the same Build is allowed; the import is idempotent.
 8. **Partial catalogues are accepted.** Matching runs as usual and the run records `completeness`
@@ -89,3 +94,8 @@ P4K GUID (`p4k_uuid`) of a row can differ from the in-game UUID the SC Wiki wrot
   there is nothing to configure.
 - **Resolve UUID conflicts in the import.** Rejected: the import never merges rows; an admin
   decides from the review list.
+- **Read the branch as the public patch.** Rejected: a branch serves several public patches, so
+  it can only be a lower bound.
+- **Only `publicPatch` counts for "import due".** Rejected: a run without it would be no basis at
+  all; a lower bound never misses a patch, at the cost of a due signal for a later patch of the
+  same branch.

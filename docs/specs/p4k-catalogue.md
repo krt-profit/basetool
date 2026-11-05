@@ -120,11 +120,15 @@ comparison is always within one Channel, where the contract guarantees the numbe
   vanished, reappeared, changed), the uploading admin and the apply time. A PREVIEW writes no run.
   Runs are never pruned; the reference to `p4k_import_job` is `ON DELETE SET NULL`, since jobs are
   pruned by age.
-- **Patch version:** `source.build.publicPatch` when it is set. When it is `null` (as in the LIVE
-  export of p4kx 0.4.2), the version is derived from `source.build.branch` only when the branch
-  matches exactly `sc-alpha-<major>.<minor>.<patch>` (`sc-alpha-4.10.2` → `4.10.2`); otherwise the
+- **Patch version:** `source.build.publicPatch` when it is set; p4kx reads it from the RSI
+  Launcher's install log and writes `null` until the launcher logs this build. The archive holds no
+  public patch number (p4kx ADR-0053), and a branch serves several public patches (4.7.0, 4.7.1 and
+  4.7.2 all came from `sc-alpha-4.7.0`). When `publicPatch` is `null`, the run keeps the version
+  of `source.build.branch` as a **lower bound**, only when the branch matches exactly
+  `sc-alpha-<major>.<minor>.<patch>` (`sc-alpha-4.10.2` → at least `4.10.2`); otherwise the
   version is unknown and the run is no comparison basis for "import due" (REQ-P4K-047). The run
-  records whether its version came from `publicPatch` or from the branch.
+  records whether its version is a public patch or a branch lower bound, and the UI shows a lower
+  bound marked as the branch, never as a public patch.
 - **`p4k_seen_run_id`:** a foreign key to `p4k_import_run` on every P4K-keyed table (the five base
   kinds, the commodity and blueprint categories, starmap objects, shops), set on every row the
   catalogue matched in that run, changed or not. The Build of a row is read through the join; no
@@ -133,9 +137,9 @@ comparison is always within one Channel, where the contract guarantees the numbe
 **Acceptance**
 
 - [ ] An APPLY writes one run with the Build, completeness and counts; a PREVIEW writes none.
-- [ ] A run with `publicPatch` `4.10.2` records `4.10.2` from `publicPatch`; one with `publicPatch`
-  `null` and branch `sc-alpha-4.10.2` records `4.10.2` from the branch; one with branch
-  `sc-alpha-4.10` or `sc-beta-4.10.2` records no version.
+- [ ] A run with `publicPatch` `4.10.2` records the public patch `4.10.2`; one with `publicPatch`
+  `null` and branch `sc-alpha-4.10.2` records the branch lower bound `4.10.2` and shows it as a
+  branch; one with branch `sc-alpha-4.10` or `sc-beta-4.10.2` records no version.
 - [ ] Every matched row carries the run's id, also when no value changed.
 - [ ] Pruning the job leaves the run with a `null` job reference.
 

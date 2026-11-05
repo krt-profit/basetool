@@ -4017,11 +4017,14 @@ uploads the gate refused.
   newer than the patch version of the last successful APPLY run with a known version.
 - **An APPLY run's patch version.** It is `source.build.publicPatch` of the
   [catalogue contract](https://github.com/p4kx-org/p4kx/blob/main/docs/basetool-catalog.md) when
-  present. When that is `null`, it is derived from `source.build.branch` only if the branch matches
-  exactly `sc-alpha-<major>.<minor>.<patch>` (`sc-alpha-4.10.2` → `4.10.2`); otherwise the run's
-  version is unknown and the run is no basis for the comparison. The run records where its version
-  came from (`publicPatch` or `branch`). With no successful APPLY run of known version the import
-  counts as due. The Build number (`changeNumber`) is never used in its place.
+  present. When that is `null`, the version of `source.build.branch` serves as a lower bound, only
+  if the branch matches exactly `sc-alpha-<major>.<minor>.<patch>` (`sc-alpha-4.10.2` → at least
+  `4.10.2`), since one branch serves several public patches; otherwise the run's version is unknown
+  and the run is no basis for the comparison. A lower bound is compared like a patch version, so a
+  later public patch of the same branch reads as due until a catalogue with `publicPatch` is
+  applied. The run records whether its version is a public patch or a branch lower bound. With no
+  successful APPLY run of known version the import counts as due. The Build number
+  (`changeNumber`) is never used in its place.
 - **Where it shows.** A "P4K import due" banner on `/admin/p4k-import` appears as soon as the
   condition holds. A Prometheus alert (`severity: warning`) fires once the condition has held for
   7 days, with an `absent()` companion for the case of no successful APPLY run. There is no
@@ -4051,8 +4054,9 @@ uploads the gate refused.
 
 - [ ] The due signal holds for a UEX or Wiki version newer than the last known APPLY version,
   stays off for an equal or older one, and holds with no successful APPLY run of known version.
-- [ ] A run's version comes from `publicPatch`, else from an exact `sc-alpha-<major>.<minor>.<patch>`
-  branch, else is unknown; the run records its origin.
+- [ ] A run's version is `publicPatch`, else the lower bound of an exact
+  `sc-alpha-<major>.<minor>.<patch>` branch, else unknown; the run records which it is, and a UEX
+  version above a branch lower bound reads as due.
 - [ ] The banner shows on `/admin/p4k-import` while the signal holds; the alert fires only after
   7 days of it.
 - [ ] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
