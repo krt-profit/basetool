@@ -14,9 +14,10 @@
 
 Commodities (`material`) are written by UEX, the SC Wiki and the P4K import; their categories are
 maintained by admins. The p4kx catalogue's `commodities` kind identifies a commodity by its own
-`guid`, names its `ResourceType` in `subtypeGuid` (not unique: in the LIVE export of p4kx 0.4.2
-three SLAM commodities share one, MedPens and Redfin Energy Modulators share one, and one commodity
-has none) and links it to its group (`typeGuid`, a record of the
+`guid`, links the `ResourceType` of its first composition entry in `subtypeGuid` (an n:1, nullable
+link, not a key: on LIVE 4.10.2, 170 commodities hold 167 distinct values; three SLAM packagings
+share one, MedPens and the counterfeit Redfin Energy Modulators share one, and one commodity has
+none; p4kx #1044) and links it to its group (`typeGuid`, a record of the
 `resourceGroups` kind), to the commodity it refines into (`refinedSubtypeGuid`, one step) and to
 its density (`densityGramsPerCubicCentimetre`, present for all 207 records). A resource group
 carries `name` and `parentGuid`. The catalogue has no RAW / REFINED flag, and the archive holds no
@@ -27,8 +28,10 @@ refinery yields. Instability lives on the `mineableElements` kind, not on the co
 1. **Identity.** A commodity's P4K identity is its own `guid`, stored in a unique `p4k_uuid`;
    match order P4K GUID, then the UEX id, then the name. `subtypeGuid` is stored in a non-unique
    column and is only the join for blueprint ingredients (`resourceGuid`) and for
-   `refinedSubtypeGuid`. An ingredient that matches several commodities goes to the review list;
-   the admin's assignment survives re-imports.
+   `refinedSubtypeGuid`, so a join yields zero, one or several commodities. Zero or several go to
+   the review list, and a reference that joins several creates none; the admin's assignment
+   survives re-imports. Should p4kx add a kind of its own for the `ResourceType` records (p4kx
+   #1044), the join runs through it; the identity stays the commodity's `guid`.
 2. **The P4K leads** `name`, `name_de`, the group (`typeGuid`), the density
    (`densityGramsPerCubicCentimetre`) and the refined-from relation (`refinedSubtypeGuid`). The Wiki
    and UEX write these only on rows without a P4K GUID; a disagreement goes to

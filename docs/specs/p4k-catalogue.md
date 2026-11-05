@@ -507,11 +507,15 @@ falls back to `name`. Search and matching keep running on `name`.
 ### REQ-P4K-024 — the P4K leads a commodity's identity, name, group, density and refined-from link
 
 - **Identity:** the commodity's own `guid` in a unique `material.p4k_uuid`; match order P4K GUID,
-  then the UEX id, then the name. `subtypeGuid` (the `ResourceType`) is not unique in the export
-  (the SLAM variants share one, so do the MedPens and the Redfin, and one is `null`): it is stored
-  in a non-unique column and serves only as the join for a blueprint ingredient's `resourceGuid` and
-  for `refinedSubtypeGuid`. An ingredient whose `resourceGuid` matches several commodities opens a
-  review case (REQ-P4K-016); the commodity an admin assigns survives re-imports.
+  then the UEX id, then the name. `subtypeGuid` is an n:1, nullable link to the `ResourceType` of
+  the commodity's first composition entry, not a key (p4kx #1044: on LIVE 4.10.2, 170 commodities
+  hold 167 distinct values; the three SLAM packagings share one, MedPens and the counterfeit Redfin
+  Energy Modulators share one, and `Special_HolidayLetter` has none). It is stored in a non-unique
+  column and serves only as the join for a blueprint ingredient's `resourceGuid` and for
+  `refinedSubtypeGuid`, which therefore yields zero, one or several commodities. Zero or several
+  open a review case (REQ-P4K-016); the commodity an admin assigns survives re-imports. Should
+  p4kx add a kind of its own for the `ResourceType` records (p4kx #1044), the join runs through it
+  and the identity stays the commodity's `guid`.
 - **The P4K leads** `name`, `name_de`, the group (`typeGuid`), the density
   (`densityGramsPerCubicCentimetre`) and the one-step refined-from link (`refinedSubtypeGuid`). The
   Wiki and UEX write these only on rows without a P4K GUID; a disagreement goes to
@@ -525,8 +529,8 @@ falls back to `name`. Search and matching keep running on `name`.
 **Acceptance**
 
 - [ ] Three commodities sharing one `subtypeGuid` import as three rows keyed by their `guid`.
-- [ ] An ingredient whose `resourceGuid` matches two commodities opens a review case; the admin's
-  assignment survives the next APPLY.
+- [ ] An ingredient whose `resourceGuid` matches two commodities, or none, opens a review case; the
+  admin's assignment survives the next APPLY.
 - [ ] A UEX commodity sync leaves the P4K name and density of a P4K-known material and reports a
   different name.
 - [ ] A material UEX does not know becomes RAW when it has `refinedSubtypeGuid` and its target
@@ -558,7 +562,8 @@ like any other P4K row (REQ-P4K-011).
 
 The import creates a commodity only when a record imported in the same run references it: a
 blueprint ingredient (`resourceGuid`) or a `refinedSubtypeGuid`, both joined by `subtypeGuid`
-(REQ-P4K-024). Such a row is visible at once.
+(REQ-P4K-024). Such a row is visible at once. A reference that joins several commodity records
+creates none of them and opens the review case of REQ-P4K-024 instead.
 Every other unmatched commodity stays match-only and appears in the report's unmatched list.
 
 **Acceptance**
