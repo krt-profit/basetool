@@ -958,13 +958,25 @@ groups:
             > 3 * sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[7d] offset 1h)) / 168
           )
           and
-          sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[1h])) >= 30
+          (
+            sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[1h]))
+            - 3 * sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[7d] offset 1h))
+            * (
+              sum by (client_id) (increase({__name__=~"basetool_ingest_exchange_(relay|refused)_total"}[1h]))
+              or 0 * sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[1h]))
+            )
+            / clamp_min(
+              sum by (client_id) (increase({__name__=~"basetool_ingest_exchange_(relay|refused)_total"}[7d] offset 1h))
+              or 0 * sum by (client_id) (increase(keycloak_user_events_total{event=~"oauth2_device_code_to_token|refresh_token", client_id!~"|unknown|null|basetool-frontend|grafana|backend-service|basetool-ingest-gateway|basetool-provisioner|admin-cli|account|security-admin-console"}[1h])),
+              1
+            )
+          ) >= 30
         for: 15m
         labels:
           severity: warning
         annotations:
           summary: "Unusually many token requests for one exchange client"
-          description: "Keycloak answered token requests (device-code redemptions and refreshes, failed ones included) for {{ $labels.client_id }} more than three times as often in the last hour as in its average hour of the past week (at least 30). Either a client release refreshes in a loop, or someone drives that client's sign-in from browsers (ADR-0303). Compare with the client's gateway traffic on the Exchange dashboard before suspending it."
+          description: "Keycloak answered token requests (device-code redemptions and refreshes, failed ones included) for {{ $labels.client_id }} more than three times as often in the last hour as in its average hour of the past week, and at least 30 of them are more than its gateway traffic explains at three times the client's usual token requests per gateway request. More members or a busy evening raise both and stay silent. Either a client release refreshes in a loop without calling the API, or someone drives that client's sign-in from browsers (ADR-0303); a loop whose calls are refused shows on ExchangeClientRefusalsSpike. Check the client's panels on the Exchange dashboard before suspending it."
 
       - alert: LiveSyncRedisFanoutBroken
         expr: sum(rate(basetool_livesync_redis_errors_total{op="publish"}[5m])) > 0 or sum(rate(basetool_sse_redis_errors_total{op="publish"}[5m])) > 0

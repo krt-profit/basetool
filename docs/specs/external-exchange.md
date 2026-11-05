@@ -1951,7 +1951,10 @@ tombstones and journal reports task metrics.
   for any other). `ExchangeClientDeviceLoginSurge` fires when members confirm device codes for one
   client more than three times as often in an hour as in its average hour of the past week (at
   least 5), `ExchangeClientTokenRequestSurge` on the same relative rule for device-code redemptions
-  and refreshes of an exchange client (at least 30), and `KeycloakEventMetricsUntagged` when the
+  and refreshes of an exchange client when at least 30 of them in the hour are more than the
+  client's gateway traffic explains at three times its usual token requests per gateway request (so
+  a growing audience or an evening peak, which raise both, stays silent), and
+  `KeycloakEventMetricsUntagged` when the
   tag goes missing; the „Exchange" dashboard shows the events per client. A device flow that is only
   started or polled emits no Keycloak event (verified against 26.8: `DeviceEndpoint` raises
   `OAUTH2_DEVICE_AUTH` for errors only), so the signal is the confirmed code, not the start
