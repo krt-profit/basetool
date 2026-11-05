@@ -121,7 +121,8 @@ public class SecurityConfig {
           "RateLimit-Policy",
           "Retry-After",
           "Idempotency-Replayed",
-          "X-Correlation-Id");
+          "X-Correlation-Id",
+          "Date");
 
   /** How long a browser may cache an exchange preflight answer, in seconds. */
   static final long EXCHANGE_CORS_MAX_AGE_SECONDS = 600L;

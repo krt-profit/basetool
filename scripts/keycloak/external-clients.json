@@ -3,5 +3,14 @@
     "clientId": "versekit",
     "name": "VerseKit",
     "description": "VerseKit desktop companion, an approved third-party client of the exchange API (REQ-XCH-005)"
+  },
+  {
+    "clientId": "hangar-exporter",
+    "name": "Hangar-Exporter",
+    "description": "Hangar-Exporter browser extension, an approved third-party client of the exchange API (REQ-XCH-005)",
+    "extensionOrigins": [
+      "chrome-extension://hgmnaolojobpmeieccpholmjacbjkpbm"
+    ],
+    "firefoxExtension": true
   }
 ]

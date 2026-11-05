@@ -3,6 +3,16 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-05
+
+- **New: `Date` is readable cross-origin.** The gateway exposes `Date` to approved extensions on
+  `/exchange/**`, so an extension can measure its clock offset for the DPoP `iat`
+  ([authentication](authentication.md)).
+- **New: a loopback host permission for a local companion app.** An extension may also name
+  `http://127.0.0.1/*`, `http://localhost/*` and `http://[::1]/*` to send what it read to an
+  application on the member's computer; no token, key or Basetool data goes there
+  ([client security](client-security.md#browser-extensions)).
+
 ## 2026-10-25
 
 - **Changed: the issuer moved to `https://profit-base.online/auth/realms/basetool`.** The identity
