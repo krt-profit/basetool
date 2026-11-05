@@ -152,7 +152,7 @@ public class JobTypeService {
     jobType.setName(jobTypeDto.name());
     jobType.setDescription(jobTypeDto.description());
     jobType.setArchetype(jobTypeDto.archetype());
-    jobType.setLeadershipRole(jobTypeDto.isLeadershipRole());
+    jobType.setLeadershipRole(Boolean.TRUE.equals(jobTypeDto.isLeadershipRole()));
     applyMissionLeadDesignation(jobType, Boolean.TRUE.equals(jobTypeDto.isMissionLead()));
 
     if (jobTypeDto.parentId() != null) {
