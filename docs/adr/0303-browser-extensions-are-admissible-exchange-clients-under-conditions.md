@@ -1,7 +1,9 @@
 # ADR-0303 — Browser extensions are admissible exchange clients under conditions
 
 - **Status:** Accepted — amended by [ADR-0304](0304-extension-clients-are-bound-to-their-origin-and-reviewed-on-manifest-change.md)
-  (origin bound to the client, 14-day idle timeout, review on every manifest change)
+  (origin bound to the client, 14-day idle timeout, review on every manifest change) and by
+  [ADR-0334](0334-an-extension-may-hold-a-loopback-host-permission-for-a-local-companion-app.md)
+  (a loopback host permission for a local companion app, `Date` exposed)
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
 - **Related:** REQ-XCH-024 · REQ-XCH-027 · REQ-INGEST-001 · spec

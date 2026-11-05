@@ -84,7 +84,8 @@ Beyond roles there are three mechanisms that are easy to miss:
   `profit-base.online`, so an extension gets no host permission there and reaches Keycloak through
   its Web Origins (REQ-XCH-027): the exact Chromium origins, and `*` per client — never realm-wide —
   for a client with a Firefox build, which admits every web page to that client's sign-in endpoints
-  (risk in §11.7a).
+  (risk in §11.7a). A loopback host permission for a local companion app is admissible and carries
+  nothing of the Basetool's ([ADR-0334](../adr/0334-an-extension-may-hold-a-loopback-host-permission-for-a-local-companion-app.md)).
 - **A token is accepted only from a named client** ([ADR-0270](../adr/0270-the-backend-accepts-tokens-only-from-named-clients.md)).
   `aud` says the token was minted for this API; `azp` says which client asked for it, and only
   `basetool-frontend` and `basetool-ingest-gateway` are accepted. The check is a validator on the

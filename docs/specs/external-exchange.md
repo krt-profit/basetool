@@ -1862,6 +1862,11 @@ conditions (owner decision 2026-10-20, ADR-0303):
   `externally_connectable`. The exchange host is a separate origin whose gateway reads no cookie.
   Keycloak is reached through CORS. The manifest is checked at application time and for every
   release that changes its permissions.
+- **Loopback for a local companion app.** Host permissions and optional host permissions may also
+  name `http://127.0.0.1/*`, `http://localhost/*` and `http://[::1]/*`, for a companion
+  application on the member's own computer that the member picks as a target. No token, no DPoP
+  key and no data read from the Basetool is sent there, and no content script matches a loopback
+  origin (owner decision 2026-11-05, ADR-0334).
 - **Disconnect and uninstall.** "Disconnect" revokes the refresh token (RFC 7009) and deletes the
   token and the key. Where a browser API lets the extension act on uninstall, it revokes there too;
   an uninstall URL never carries a token or an id.
@@ -1888,8 +1893,9 @@ fixed `chrome-extension://<id>`, bound to its client as `<clientId>=chrome-exten
 `BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
-`RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed` and `X-Correlation-Id`.
-Every other path keeps the empty allowlist. **The origin is bound to the client** (ADR-0304): the
+`RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed`, `X-Correlation-Id` and
+`Date`, the last for the DPoP clock offset (ADR-0334). Every other path keeps the empty allowlist.
+**The origin is bound to the client** (ADR-0304): the
 registry gate refuses with `403 ORIGIN_NOT_ALLOWED` a request whose `Origin` is a
 `chrome-extension://` origin bound to another client than the token's `azp`, a `moz-extension://`
 origin for a client without a Firefox build, or any other browser origin; a request without

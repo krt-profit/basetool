@@ -147,6 +147,18 @@ class ExchangeCorsTest {
         .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
   }
 
+  @Test
+  void anExtensionMayReadTheDateHeaderToMeasureItsClockOffset() throws Exception {
+    mockMvc
+        .perform(get("/exchange/v1").header(HttpHeaders.ORIGIN, CHROME))
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, CHROME))
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS,
+                    Matchers.containsString(HttpHeaders.DATE)));
+  }
+
   /**
    * Sends a CORS preflight.
    *

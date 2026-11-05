@@ -97,6 +97,11 @@ applies; these points replace or add to it.
   sign-in share that origin, and a permission there would let the extension act in the member's
   web session. No `<all_urls>`, no `cookies`, `webRequest` or `debugger` permission, and no Basetool
   origin in `externally_connectable`. The exchange host is a separate origin and reads no cookie.
+- **Loopback for a companion app.** Host permissions may also name `http://127.0.0.1/*`,
+  `http://localhost/*` and `http://[::1]/*` when the extension sends what it read to an application
+  on the member's own computer that the member picks as a target. Never send a token, the key or
+  data read from the Basetool there, and match no content script on loopback. Name the permission
+  and its use in the application.
 - Reach the sign-in endpoints — device authorization, token and revocation — through CORS, without
   a host permission. Their answers allow your extension's origin once the client is registered:
   each Chrome or Edge origin exactly. Keycloak cannot match a pattern and refuses an unlisted

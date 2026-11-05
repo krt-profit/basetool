@@ -180,6 +180,8 @@ stricter: from about 25 seconds before to 15 seconds after, and it checks the pr
 grant, so a desktop clock that runs 15 seconds fast fails the sign-in itself. Measure each server's
 offset from the `Date` header of its answers and correct `iat` per server. Retry a proof refused for
 its time once with the corrected clock; if that fails too, ask the member to synchronise the clock.
+A browser extension can read `Date` cross-origin only from the exchange host, which exposes it; the
+sign-in endpoints run on the same clock, so use that offset for them too.
 
 ### The server nonce
 
