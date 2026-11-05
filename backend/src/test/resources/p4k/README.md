@@ -11,7 +11,7 @@ when the Basetool moves to another p4kx release, and update this table in the sa
 | Tag | `v0.4.2` (tag object `27bc54cbfaad7b66d91eb2a259abc28a66994c77`) |
 | Size | 420,656 bytes |
 | SHA-256 | `1534e33bf4620771023e84b0712441ad75802f9a4525c4bdf99c848ac11c8f1f` |
-| Licence | Apache License 2.0, as p4kx publishes it in its repository at that tag ([v0.4.2](https://github.com/p4kx-org/p4kx/tree/v0.4.2)) |
+| Licence | `MIT OR Apache-2.0` (p4kx `Cargo.toml` at that tag); both texts are copied verbatim beside the schema as `LICENSE-MIT` and `LICENSE-APACHE` |
 
 Readers: `GameTextClassificationTest` reads its `"x-gameText": true` annotations (REQ-P4K-033);
 the P4K import tests may validate their fixtures against it. The path is fixed: other tests
