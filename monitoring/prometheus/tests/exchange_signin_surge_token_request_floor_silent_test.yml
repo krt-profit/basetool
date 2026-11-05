@@ -1,0 +1,15 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - fewer than 30 token requests beyond what the gateway traffic explains
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="refresh_token", error="", client_id="versekit"}'
+        values: "0+1x336 346+10x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts: []

@@ -1,0 +1,21 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - ten times as many members sign in, sync and refuse alike
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="refresh_token", error="", client_id="versekit"}'
+        values: "0+5x336 1730+50x6"
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="oauth2_device_code_to_token", error="", client_id="versekit"}'
+        values: "0+0.1x336 34.6+1x6"
+      - series: 'basetool_ingest_exchange_relay_total{job="basetool-ingest", instance="ingest:11272", outcome="ok", client_id="versekit"}'
+        values: "0+8x336 2768+80x6"
+      - series: 'basetool_ingest_exchange_refused_total{job="basetool-ingest", instance="ingest:11272", reason="rate_limited", client_id="versekit"}'
+        values: "0+2x336 692+20x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts: []

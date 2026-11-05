@@ -1,0 +1,23 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - token requests for a client the gateway has never seen a request from
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="refresh_token", error="", client_id="hangar-exporter"}'
+        values: "0+1x336 356+20x6"
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="oauth2_device_code_to_token", error="", client_id="hangar-exporter"}'
+        values: "0+0x336 10+10x6"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientTokenRequestSurge
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: hangar-exporter
+            exp_annotations:
+              summary: "Unusually many token requests for one exchange client"
+              description: "Keycloak answered token requests (device-code redemptions and refreshes, failed ones included) for hangar-exporter more than three times as often in the last hour as in its average hour of the past week, and at least 30 of them are more than its gateway traffic explains at three times the client's usual token requests per gateway request. More members or a busy evening raise both and stay silent. Either a client release refreshes in a loop without calling the API, or someone drives that client's sign-in from browsers (ADR-0303); a loop whose calls are refused shows on ExchangeClientRefusalsSpike. Check the client's panels on the Exchange dashboard before suspending it."
