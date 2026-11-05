@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [v1.22.2](https://github.com/krt-profit/basetool/releases/tag/v1.22.2) - 2026-11-05
+
+### Added
+
+- **Star-Citizen-Links: Tallyline.** Der Bereich „Organisation" verlinkt Tallyline, den Desktop-Client für DataRunner, der Terminal-Daten an UEX meldet (REQ-UI-025).
+
+- **Exchange: Hangar-Exporter zugelassen.** Die Browser-Erweiterung Hangar-Exporter (Chrome, Edge, Firefox) darf die eigenen Schiffe eines Mitglieds lesen und abgleichen (`exchange.hangar.read`/`write`); eine Loopback-Berechtigung für eine lokale Begleit-App ist für Erweiterungen jetzt zulässig (ADR-0334, REQ-XCH-027).
+
+### Changed
+
+- **Star-Citizen-Links: Desktop-Werkzeuge unter „Organisation".** VerseKit steht jetzt im Bereich „Organisation" statt unter „Datenbanken & Crafting", und der Basetool SC Extractor ist dort neu verlinkt (REQ-UI-025).
+
+- **Exchange-Gateway: `Date` lesbar für Erweiterungen.** Das Gateway gibt `Date` per CORS frei, damit eine Erweiterung ihren Uhrversatz für DPoP messen kann.
+
+### Fixed
+
+- **Überwachung: weniger Fehlalarme bei Token-Anfragen je Exchange-Client.** `ExchangeClientTokenRequestSurge` misst die Token-Anfragen eines Clients jetzt zusätzlich an seinem Gateway-Verkehr und meldet nur noch, wenn mindestens 30 davon in der Stunde nicht durch diesen Verkehr erklärt sind. Ein voller Abend oder mehr Mitglieder, die den Client nutzen, lösen den Alarm damit nicht mehr aus; eine Anmeldeschleife ohne API-Aufrufe und über Browser gesteuerte Anmeldungen weiterhin (REQ-XCH-028, ADR-0303).
+
+- **Überwachung: neue Verbindungen wachsen mit dem Client.** `ExchangeClientDeviceLoginSurge` und `ExchangeInstallationSurge` vergleichen eine Stunde jetzt mit der stärksten Stunde des Clients in den sieben Tagen vor dem letzten Tag, nicht mehr mit dem Wochenschnitt oder einem festen Wert. Abendspitzen und eine wachsende Nutzerschaft lösen sie nicht mehr aus; eine Welle weit über alles, was der Client in der Woche hatte, weiterhin (REQ-XCH-007, REQ-XCH-028, ADR-0303).
+
 ## [v1.22.1](https://github.com/krt-profit/basetool/releases/tag/v1.22.1) - 2026-11-03
 
 ### Added
