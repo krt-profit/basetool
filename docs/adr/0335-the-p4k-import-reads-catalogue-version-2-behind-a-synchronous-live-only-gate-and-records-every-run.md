@@ -1,6 +1,8 @@
 # ADR-0335 — The P4K import reads catalogue version 2 behind a synchronous LIVE-only gate and records every run
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
+- **Amended:** 2026-11-05, §11: the unique-`p4k_uuid` migration clears every duplicate group's
+  `p4k_uuid` and then adds the constraint, instead of failing while duplicates remain (@greluc).
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-001…010), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -71,7 +73,8 @@ P4K GUID (`p4k_uuid`) of a row can differ from the in-game UUID the SC Wiki wrot
     Wiki UUID in `scwiki_uuid` and records the mismatch in the change report. A row two P4K GUIDs
     would claim, or a P4K GUID two rows would claim, goes to the review list; the admin merges or
     splits, the import never does. The unique constraint is added after the clean-up in the same
-    release, guarded by a migration that fails on remaining duplicates.
+    release by a migration that clears `p4k_uuid` on every row of a duplicate group and then adds
+    the constraint; the next APPLY matches those rows again and sends an ambiguous match to review.
 
 ## Consequences
 
@@ -83,8 +86,8 @@ P4K GUID (`p4k_uuid`) of a row can differ from the in-game UUID the SC Wiki wrot
 - New records no longer appear automatically: items and ships need the per-run checkbox, other
   kinds their own rule, and everything else shows up as unmatched in the change report for an
   admin to add by hand.
-- Implementation is pending, together with the clean-up of diverging UUIDs (B1 / B2); the
-  requirements are in the P4K catalogue spec, `docs/specs/p4k-catalogue.md`.
+- The requirements are in the P4K catalogue spec, `docs/specs/p4k-catalogue.md`; the sweep of
+  §8 is ADR-0336's.
 
 ## Alternatives considered
 

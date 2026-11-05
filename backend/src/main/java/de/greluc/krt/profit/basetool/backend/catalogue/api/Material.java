@@ -46,7 +46,7 @@ import org.jetbrains.annotations.Nullable;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class Material extends AbstractEntity<UUID> {
+public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -227,12 +227,10 @@ public class Material extends AbstractEntity<UUID> {
   private MaterialCategory category;
 
   /**
-   * DataForge {@code __ref} commodity GUID observed by the KRT P4K Reader import. Kept alongside
-   * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it
-   * is null and unclaimed, but always records the P4K-observed GUID here so a UUID disagreement
-   * stays auditable. Not UNIQUE.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code scwiki_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /**
@@ -250,4 +248,9 @@ public class Material extends AbstractEntity<UUID> {
   /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
   @Column(name = "p4k_deleted_at")
   private Instant p4kDeletedAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 }

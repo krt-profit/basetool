@@ -54,7 +54,7 @@ import org.jetbrains.annotations.Nullable;
 @ToString(exclude = "manufacturer")
 @NoArgsConstructor
 @AllArgsConstructor
-public class ShipType extends AbstractEntity<UUID> {
+public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -410,12 +410,10 @@ public class ShipType extends AbstractEntity<UUID> {
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
 
   /**
-   * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this ship. Kept
-   * alongside (not in place of) {@link #externalUuid}: the importer backfills {@code external_uuid}
-   * only when it is null and unclaimed, but always records the P4K-observed GUID here so a UUID
-   * disagreement stays auditable. Not UNIQUE.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code external_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /**
@@ -433,4 +431,9 @@ public class ShipType extends AbstractEntity<UUID> {
   /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
   @Column(name = "p4k_deleted_at")
   private Instant p4kDeletedAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 }

@@ -306,7 +306,8 @@ class CatalogueBackendClientTest {
         .contains("name=\"file\"", "filename=\"catalog.json\"", "{\"items\":[]}");
     backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs");
     backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs/" + ID);
-    backend.expect("POST", "/api/v1/catalog/admin/import/p4k/jobs/" + ID + "/apply?seedNew=true");
+    backend.expect(
+        "POST", "/api/v1/catalog/admin/import/p4k/jobs/" + ID + "/apply?createItemsAndShips=true");
   }
 
   @Test

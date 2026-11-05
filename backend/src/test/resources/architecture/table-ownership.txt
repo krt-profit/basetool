@@ -97,6 +97,10 @@ org_unit_membership orgunit
 outpost catalogue
 p4k_import_job catalogue
 p4k_import_job_payload catalogue
+p4k_import_change catalogue
+p4k_import_run catalogue
+p4k_import_run_kind catalogue
+p4k_review_case catalogue
 personal_blueprint blueprint
 personal_inventory_item personalinventory
 planet catalogue

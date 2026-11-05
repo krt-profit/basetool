@@ -20,50 +20,28 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * One ship record from the P4K catalog, matched to {@code ship_type} by {@link #guid} ({@code
- * external_uuid}) first, then a unique case-insensitive {@link #className}, then a case-insensitive
- * {@link #name}.
+ * One entry of {@code ships} in catalogue version 2, bound to the fields the import writes or
+ * decides on; every other field is skipped.
  *
- * <p>Any field may be {@code null}. Crew and SCU columns are never touched.
- *
- * @param guid DataForge {@code __ref} GUID (string form of {@code ship_type.external_uuid})
- * @param className RSI engine class name; matches {@code ship_type.class_name}
- * @param path source DCB record path (forensic; not persisted)
- * @param name English display name; matches {@code ship_type.name}
- * @param nameDe German display name, or {@code null}
- * @param desc English description, filled into {@code ship_type.description_en} when null
- * @param descDe German description, filled into {@code ship_type.description_de} when null
- * @param nameKey raw {@code @LOC} name localization key, stored as {@code name_key} without the
- *     {@code @}
- * @param descKey raw {@code @LOC} description localization key (forensic; not persisted)
- * @param role ship role token (forensic; not persisted)
- * @param career ship career token (forensic; not persisted)
- * @param crewSize crew size (forensic; not persisted)
- * @param manufacturerGuid manufacturer GUID, filled into {@code ship_type.manufacturer} when null
- * @param vehicleDefinition vehicle-definition path (forensic; not persisted)
+ * @param guid the Record GUID
+ * @param className the Record name
+ * @param recordPath the record path without {@code .xml}
+ * @param name the localised name
+ * @param description the localised description, a game text
+ * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
+ * @param playability {@code player}, {@code ai}, {@code mission}, {@code special}, another value or
+ *     {@code null}; read through {@link P4kClosedSet#parse} as a {@link P4kShipPlayability}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kShipDto(
-    String guid,
-    String className,
-    String path,
-    String name,
-    String nameDe,
-    String desc,
-    String descDe,
-    String nameKey,
-    String descKey,
-    String role,
-    String career,
-    Integer crewSize,
-    String manufacturerGuid,
-    String vehicleDefinition) {
-
-  /** Decodes the escaped line breaks of both descriptions (REQ-DATA-025). */
-  public P4kShipDto {
-    desc = P4kText.decodeLineBreaks(desc);
-    descDe = P4kText.decodeLineBreaks(descDe);
-  }
-}
+    @Nullable String guid,
+    @Nullable String className,
+    @Nullable String recordPath,
+    @Nullable P4kLocalisedText name,
+    @Nullable P4kLocalisedText description,
+    @Nullable String manufacturerGuid,
+    @Nullable String playability)
+    implements P4kRecord {}

@@ -208,3 +208,18 @@ answers the review URL, and the member saves through the ordinary path — as in
    the member may no longer see is deleted through the backend, and an entry unavailable only in the
    active org unit renders greyed. Another tab shows the change on its next page load; the open
    dashboard re-reads every ten minutes (REQ-UI-032, REQ-UI-034).
+
+## 6.10 An admin imports the P4K catalogue
+
+1. **Upload.** `/admin/p4k-import` sends the file (`.json`, `.json.gz` or `.json.zst`) to
+   `POST /api/v1/catalog/admin/import/p4k/jobs`. `P4kUploadGate` checks it synchronously: the size
+   limits, the form by magic bytes, and the head (`schemaVersion` 2, Channel `LIVE`, a Build). A
+   refusal is a `400` `P4K_UPLOAD_REJECTED` with its reason, counted in
+   `basetool_p4k_import_rejected_total`; no job exists (REQ-P4K-001, REQ-P4K-002).
+2. **Preview.** The accepted upload is stored compressed on a PREVIEW job; the async runner streams
+   it through `P4kCatalogueReader` and the per-kind reconcilers and writes the would-be result on the
+   job. Nothing else is written.
+3. **APPLY.** An APPLY job reads the same payload in one transaction: an older Build than the last
+   run is refused; otherwise it writes `p4k_import_run`, matches every kind by P4K GUID first,
+   stamps the matched rows with the run, creates playable items and ships only when the admin ticked
+   the box, and stores the change report and the review cases (REQ-P4K-004…010).

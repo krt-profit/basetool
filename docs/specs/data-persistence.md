@@ -1111,7 +1111,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 39 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `catalogue` | 43 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1170,9 +1170,10 @@ listed with its reason:
   of its participants is checked to call (11 columns: reassigned, nulled or purged); or it outlives the account by design
   (`audit_event.target_user_id`, `bank_audit_event.target_user_id`, REQ-AUDIT-001; and
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
-  after every import run).
+  after every import run; `p4k_import_run.created_by`, the applying admin's id on a run, which
+  is never pruned, REQ-P4K-005).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
-  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 13 are not, each of which names the
+  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 14 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported
   column. The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
@@ -1183,7 +1184,7 @@ listed with its reason:
   column that holds data about the member.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
   as the union of the modules' `UserReassignmentParticipant` declarations; only
-  `p4k_import_job.created_by` is listed as not merged. `UserAccountMergeCoverageTest` holds the
+  `p4k_import_job.created_by` and `p4k_import_run.created_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
   foreign-key columns as before; this requirement adds the ones without a key.
 
 **Acceptance**

@@ -707,11 +707,11 @@ public class CatalogueBackendClient {
    * Enqueues the apply job of a finished P4K preview.
    *
    * @param id the preview job
-   * @param seedNew whether to insert game rows that match no existing row
+   * @param createItemsAndShips whether the run creates playable items and ships that match no row
    * @return the enqueued apply job, or {@code null} when the backend sent no body
    */
   @Nullable
-  public P4kImportJobDto applyP4kImportJob(@NotNull UUID id, boolean seedNew) {
+  public P4kImportJobDto applyP4kImportJob(@NotNull UUID id, boolean createItemsAndShips) {
     return backendApiClient.execute(
         HttpMethod.POST,
         JOBS_URI + "/{id}/apply",
@@ -721,7 +721,7 @@ public class CatalogueBackendClient {
                 .uri(uriBuilder ->
                     uriBuilder
                         .path(JOBS_URI + "/{id}/apply")
-                        .queryParam("seedNew", seedNew)
+                        .queryParam("createItemsAndShips", createItemsAndShips)
                         .build(id)),
         spec -> spec.bodyToMono(P4kImportJobDto.class));
   }

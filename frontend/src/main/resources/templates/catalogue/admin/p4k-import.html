@@ -17,9 +17,10 @@
             <h2 id="krt-p4k-upload-title" class="card-title" th:text="#{admin.p4kImport.upload.title}">Katalog hochladen</h2>
         </div>
         <p th:text="#{admin.p4kImport.intro}">Der Katalog wird im Hintergrund analysiert.</p>
+        <p class="form-hint" th:text="#{admin.p4kImport.upload.hint}">Nur LIVE-Kataloge mit schemaVersion 2.</p>
 
         <div class="cluster">
-            <input type="file" id="krt-p4k-file" accept=".json,application/json" hidden>
+            <input type="file" id="krt-p4k-file" accept=".json,.gz,.zst,application/json,application/gzip,application/zstd" hidden>
             <button type="button" id="krt-p4k-pick" class="btn btn-ghost"
                     th:text="#{admin.p4kImport.file.choose}">Datei wählen</button>
             <span id="krt-p4k-filename" class="text-muted grow" th:text="#{admin.p4kImport.file.none}">Keine Datei ausgewählt</span>
@@ -64,13 +65,14 @@
         </p>
         <div class="form-group">
             <label>
-                <input type="checkbox" id="krt-p4k-seed">
-                <span th:text="#{admin.p4kImport.seed.label}">Neue Datensätze aus dem Spiel anlegen</span>
+                <input type="checkbox" id="krt-p4k-create-new">
+                <span th:text="#{admin.p4kImport.createNew.label}">Neue Items und Schiffe anlegen</span>
             </label>
-            <p class="alert alert-warning">
-                <span aria-hidden="true">&#9888;</span>
-                <span th:text="#{admin.p4kImport.seed.warning}">Achtung: Beim Anlegen werden neue Spiel-Datensätze eingefügt.</span>
+            <p class="form-hint">
+                <span th:text="#{admin.p4kImport.createNew.wouldCreate}">Laut Vorschau neu anzulegen</span>:
+                <span id="krt-p4k-would-create" class="data-value">0</span>
             </p>
+            <p class="form-hint" th:text="#{admin.p4kImport.createNew.hint}">Angelegt werden nur spielbare Datensätze.</p>
         </div>
         <div class="cluster">
             <button type="button" id="krt-p4k-apply-confirm" class="btn btn--cta"
@@ -90,8 +92,24 @@
             <span th:text="#{admin.p4kImport.results.mode}">Modus</span>:
             <span id="krt-p4k-mode" class="data-value"></span>
             &nbsp;·&nbsp;
-            <span th:text="#{admin.p4kImport.results.seeding}">Seeding</span>:
-            <span id="krt-p4k-seeding" class="data-value"></span>
+            <span th:text="#{admin.p4kImport.results.createNew}">Neue Items und Schiffe</span>:
+            <span id="krt-p4k-create-new-mode" class="data-value"></span>
+        </p>
+        <p id="krt-p4k-build-line" hidden>
+            <span th:text="#{admin.p4kImport.build.channel}">Channel</span>:
+            <span id="krt-p4k-build-channel" class="data-value"></span>
+            &nbsp;·&nbsp;
+            <span th:text="#{admin.p4kImport.build.branch}">Branch</span>:
+            <span id="krt-p4k-build-branch" class="data-value data-value--mono"></span>
+            &nbsp;·&nbsp;
+            <span th:text="#{admin.p4kImport.build.version}">Version</span>:
+            <span id="krt-p4k-build-version" class="data-value data-value--mono"></span>
+            &nbsp;·&nbsp;
+            <span th:text="#{admin.p4kImport.build.changeNumber}">Change-Nummer</span>:
+            <span id="krt-p4k-build-change" class="data-value data-value--mono"></span>
+            &nbsp;·&nbsp;
+            <span th:text="#{admin.p4kImport.build.patch}">Patch-Version</span>:
+            <span id="krt-p4k-build-patch" class="data-value"></span>
         </p>
 
         <div class="table-responsive">
@@ -99,12 +117,14 @@
                 <thead>
                 <tr>
                     <th th:text="#{admin.p4kImport.col.type}">Typ</th>
+                    <th th:text="#{admin.p4kImport.col.completeness}">Vollständigkeit</th>
                     <th th:text="#{admin.p4kImport.col.matched}">Zugeordnet</th>
-                    <th th:text="#{admin.p4kImport.col.backfilled}">UUID ergänzt</th>
-                    <th th:text="#{admin.p4kImport.col.conflicts}">UUID-Konflikte</th>
                     <th th:text="#{admin.p4kImport.col.enriched}">Angereichert</th>
+                    <th th:text="#{admin.p4kImport.col.identityMismatches}">Abweichende UUID</th>
                     <th th:text="#{admin.p4kImport.col.created}">Neu angelegt</th>
                     <th th:text="#{admin.p4kImport.col.unmatched}">Nicht zugeordnet</th>
+                    <th th:text="#{admin.p4kImport.col.review}">Zu prüfen</th>
+                    <th th:text="#{admin.p4kImport.col.unknownValues}">Unbekannte Werte</th>
                 </tr>
                 </thead>
                 <tbody id="krt-p4k-rows">
@@ -140,8 +160,13 @@
         actionApply:      /*[[#{admin.p4kImport.action.apply}]]*/ 'Apply',
         modeDryRun:       /*[[#{admin.p4kImport.results.mode.dryRun}]]*/ 'Preview (dry run)',
         modeApplied:      /*[[#{admin.p4kImport.results.mode.applied}]]*/ 'Applied',
-        seedingOn:        /*[[#{admin.p4kImport.results.seeding.on}]]*/ 'on',
-        seedingOff:       /*[[#{admin.p4kImport.results.seeding.off}]]*/ 'off',
+        createNewOn:      /*[[#{admin.p4kImport.results.createNew.on}]]*/ 'create',
+        createNewOff:     /*[[#{admin.p4kImport.results.createNew.off}]]*/ 'do not create',
+        patchUnknown:     /*[[#{admin.p4kImport.build.patch.unknown}]]*/ 'unknown',
+        patchLowerBound:  /*[[#{admin.p4kImport.build.patch.lowerBound}]]*/ 'at least {0} (branch {1})',
+        completeComplete: /*[[#{admin.p4kImport.completeness.complete}]]*/ 'complete',
+        completePartial:  /*[[#{admin.p4kImport.completeness.partial}]]*/ 'partial',
+        rejected:         /*[[#{admin.p4kImport.toast.rejected}]]*/ 'The file was refused.',
         rowManufacturers: /*[[#{admin.p4kImport.row.manufacturers}]]*/ 'Manufacturers',
         rowItems:         /*[[#{admin.p4kImport.row.items}]]*/ 'Items',
         rowShips:         /*[[#{admin.p4kImport.row.ships}]]*/ 'Ships',

@@ -5,6 +5,7 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /** @typedef {ApiDto<'P4kImportJobDto'>} P4kJob */
 /** @typedef {ApiDto<'P4kImportResultDto'>} P4kResult */
+/** @typedef {ApiDto<'Build'>} P4kBuild */
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -23,7 +24,9 @@ let applyPanelEl = null;
 /** @type {HTMLElement | null} */
 let applyFilenameEl = null;
 /** @type {HTMLInputElement | null} */
-let seedEl = null;
+let createNewEl = null;
+/** @type {HTMLElement | null} */
+let wouldCreateEl = null;
 /** @type {HTMLButtonElement | null} */
 let applyConfirmBtn = null;
 
@@ -89,6 +92,19 @@ function toastError() {
 }
 
 /**
+ * Shows the upload gate's refusal: the problem's localized `detail`, else the generic text.
+ *
+ * @param {unknown} body the parsed problem body of the 400 answer
+ */
+function toastRejected(body) {
+    const detail =
+        body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string'
+            ? body.detail
+            : '';
+    showFrontendErrorToast(detail || krtI18nText(i18n().rejected, 'krtP4kImportI18n.rejected'));
+}
+
+/**
  * Shows a success toast.
  *
  * @param {string} msg the message
@@ -106,7 +122,8 @@ function init() {
     resultsEl = $('krt-p4k-results');
     applyPanelEl = $('krt-p4k-apply-panel');
     applyFilenameEl = $('krt-p4k-apply-filename');
-    seedEl = /** @type {HTMLInputElement | null} */ ($('krt-p4k-seed'));
+    createNewEl = /** @type {HTMLInputElement | null} */ ($('krt-p4k-create-new'));
+    wouldCreateEl = $('krt-p4k-would-create');
     applyConfirmBtn = /** @type {HTMLButtonElement | null} */ ($('krt-p4k-apply-confirm'));
 
     const pickBtn = $('krt-p4k-pick');
@@ -181,9 +198,13 @@ function upload() {
             formData: fd,
             submitter: uploadBtn,
             toast: false,
-            onError() {
+            onError(status, body) {
                 reported = true;
-                toastError();
+                if (status === 400) {
+                    toastRejected(body);
+                } else {
+                    toastError();
+                }
                 return true;
             },
             onNetworkError() {
@@ -386,6 +407,81 @@ function createdTotal(result) {
 }
 
 /**
+ * The items and ships a preview would create with the "create new items and ships" box ticked.
+ *
+ * @param {P4kResult | undefined} result the preview result
+ * @returns {number} the would-be count of new items and ships
+ */
+function wouldCreate(result) {
+    if (!result) return 0;
+    const items = result.items ? result.items.created || 0 : 0;
+    const ships = result.ships ? result.ships.created || 0 : 0;
+    return items + ships;
+}
+
+/**
+ * Localised label of a kind's completeness.
+ *
+ * @param {string | null | undefined} completeness `COMPLETE`, `PARTIAL` or null
+ * @returns {string} the label, empty when the catalogue did not state it
+ */
+function completenessLabel(completeness) {
+    if (completeness === 'COMPLETE') {
+        return krtI18nText(i18n().completeComplete, 'krtP4kImportI18n.completeComplete');
+    }
+    if (completeness === 'PARTIAL') {
+        return krtI18nText(i18n().completePartial, 'krtP4kImportI18n.completePartial');
+    }
+    return '';
+}
+
+/**
+ * The display text of a run's patch version: a public patch as is, a branch lower bound marked
+ * as the branch, an unknown version as "unknown".
+ *
+ * @param {P4kBuild} build the Build of the run
+ * @returns {string} the patch-version text
+ */
+function patchText(build) {
+    if (build.patchVersion && build.patchVersionOrigin === 'PUBLIC_PATCH') {
+        return build.patchVersion;
+    }
+    if (build.patchVersion && build.patchVersionOrigin === 'BRANCH_LOWER_BOUND') {
+        return krtI18nText(i18n().patchLowerBound, 'krtP4kImportI18n.patchLowerBound')
+            .replace('{0}', build.patchVersion)
+            .replace('{1}', build.branch || '');
+    }
+    return krtI18nText(i18n().patchUnknown, 'krtP4kImportI18n.patchUnknown');
+}
+
+/**
+ * Fills the Build line of the result panel, hiding it when the result names no Build.
+ *
+ * @param {P4kBuild | null | undefined} build the Build of the run
+ */
+function renderBuild(build) {
+    const line = $('krt-p4k-build-line');
+    if (!line) return;
+    if (!build) {
+        line.hidden = true;
+        return;
+    }
+    /** @type {[string, string][]} */
+    const fields = [
+        ['krt-p4k-build-channel', build.channel || ''],
+        ['krt-p4k-build-branch', build.branch || ''],
+        ['krt-p4k-build-version', build.version || ''],
+        ['krt-p4k-build-change', build.changeNumber || ''],
+        ['krt-p4k-build-patch', patchText(build)],
+    ];
+    fields.forEach((pair) => {
+        const el = $(pair[0]);
+        if (el) el.textContent = pair[1];
+    });
+    line.hidden = false;
+}
+
+/**
  * Summary column text of a job.
  *
  * @param {P4kJob} job the job
@@ -465,11 +561,12 @@ function renderResult(result) {
         modeEl.textContent = result.dryRun
             ? krtI18nText(i18n().modeDryRun, 'krtP4kImportI18n.modeDryRun')
             : krtI18nText(i18n().modeApplied, 'krtP4kImportI18n.modeApplied');
-    const seedingEl = $('krt-p4k-seeding');
-    if (seedingEl)
-        seedingEl.textContent = result.seedingEnabled
-            ? krtI18nText(i18n().seedingOn, 'krtP4kImportI18n.seedingOn')
-            : krtI18nText(i18n().seedingOff, 'krtP4kImportI18n.seedingOff');
+    const createNewModeEl = $('krt-p4k-create-new-mode');
+    if (createNewModeEl)
+        createNewModeEl.textContent = result.createItemsAndShips
+            ? krtI18nText(i18n().createNewOn, 'krtP4kImportI18n.createNewOn')
+            : krtI18nText(i18n().createNewOff, 'krtP4kImportI18n.createNewOff');
+    renderBuild(result.build);
 
     /** @type {[string, ApiDto<'Counts'> | undefined][]} */
     const rows = [
@@ -487,13 +584,16 @@ function renderResult(result) {
         const c = pair[1] || {};
         const cells = [
             c.matched,
-            c.uuidBackfilled,
-            c.uuidConflicts,
             c.enriched,
+            c.identityMismatches,
             c.created,
             c.unmatched,
+            c.review,
+            c.unknownValues,
         ].map((v) => krtHtml`<td>${v == null ? 0 : v}</td>`);
-        return krtHtml`<tr><th scope="row">${pair[0]}</th>${cells}</tr>`;
+        return krtHtml`<tr><th scope="row">${pair[0]}</th><td>${completenessLabel(
+            c.completeness,
+        )}</td>${cells}</tr>`;
     });
     if (body) {
         krtHtml.set(body, html);
@@ -525,7 +625,8 @@ function openApply(id) {
     if (!job) return;
     applyTargetId = id;
     if (applyFilenameEl) applyFilenameEl.textContent = job.sourceFilename || '';
-    if (seedEl) seedEl.checked = false;
+    if (createNewEl) createNewEl.checked = false;
+    if (wouldCreateEl) wouldCreateEl.textContent = String(wouldCreate(job.result));
     if (applyPanelEl) {
         applyPanelEl.hidden = false;
         applyPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -539,10 +640,10 @@ function cancelApply() {
 
 function confirmApply() {
     if (!applyTargetId) return;
-    const seed = !!(seedEl && seedEl.checked);
-    const url = `${jobsUrl()}/${encodeURIComponent(applyTargetId)}/apply?seedNew=${
-        seed ? 'true' : 'false'
-    }`;
+    const createNew = !!(createNewEl && createNewEl.checked);
+    const url = `${jobsUrl()}/${encodeURIComponent(
+        applyTargetId,
+    )}/apply?createItemsAndShips=${createNew ? 'true' : 'false'}`;
 
     let reported = false;
     krtFetch

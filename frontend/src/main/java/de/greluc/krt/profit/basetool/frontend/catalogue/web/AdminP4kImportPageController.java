@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -47,17 +49,18 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Admin-only controller for the {@code /admin/p4k-import} page: uploads a JSON catalog extracted
- * from the Star Citizen game files as an asynchronous backend import job, polls its preview and
- * applies it.
+ * Admin-only controller for the {@code /admin/p4k-import} page: uploads a p4kx catalogue as an
+ * asynchronous backend import job, polls its preview and applies it.
  *
  * <p>Every action proxies to {@code /api/v1/catalog/admin/import/p4k/jobs} through {@link
- * CatalogueBackendClient}, so a backend refusal is mapped like any other backend call.
+ * CatalogueBackendClient}; the upload relays the backend's refusal body, the other actions its
+ * status.
  */
 @Controller
 @UsesLayoutModel
 @RequestMapping("/admin/p4k-import")
 @RequiredArgsConstructor
+@Slf4j
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminP4kImportPageController {
 
@@ -81,23 +84,29 @@ public class AdminP4kImportPageController {
   }
 
   /**
-   * Uploads a P4K catalog and enqueues a preview job. The multipart {@code file} is forwarded to
-   * the backend, which stores it and returns immediately with the {@code PENDING} job.
+   * Uploads a P4K catalogue and enqueues a preview job. The multipart {@code file} ({@code .json},
+   * {@code .json.gz} or {@code .json.zst}) is forwarded to the backend, which checks it and returns
+   * immediately with the {@code PENDING} job.
    *
-   * @param file the uploaded P4K catalog JSON
-   * @return {@code 202 Accepted} with the enqueued job
+   * <p>A refusal of the backend's upload gate is relayed as {@code problem+json} with its code and
+   * localized {@code detail}, so the page can show why the file was refused.
+   *
+   * @param file the uploaded P4K catalogue
+   * @return {@code 202 Accepted} with the enqueued job, or the backend's refusal
    */
   @PostMapping(value = "/jobs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseBody
   @NotNull
-  public ResponseEntity<P4kImportJobDto> enqueuePreview(
-      @RequestParam("file") @NotNull MultipartFile file) {
+  public ResponseEntity<Object> enqueuePreview(@RequestParam("file") @NotNull MultipartFile file) {
     byte[] bytes = readBytes(file);
     String filename =
         file.getOriginalFilename() != null ? file.getOriginalFilename() : "p4k-catalog.json";
-    P4kImportJobDto job =
-        withBackendStatus(() -> catalogueClient.enqueueP4kImport(bytes, filename));
-    return ResponseEntity.status(HttpStatus.ACCEPTED).body(job);
+    return relay(
+        log,
+        "P4K catalogue upload",
+        () ->
+            ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(catalogueClient.enqueueP4kImport(bytes, filename)));
   }
 
   /**
@@ -126,10 +135,11 @@ public class AdminP4kImportPageController {
   }
 
   /**
-   * Enqueues an apply job from a finished preview (no re-upload), optionally seeding new rows.
+   * Enqueues an apply job from a finished preview (no re-upload), optionally creating new playable
+   * items and ships.
    *
    * @param id the preview job to apply
-   * @param seedNew whether to insert brand-new game rows that have no existing match
+   * @param createItemsAndShips whether the run creates playable items and ships that match no row
    * @return {@code 202 Accepted} with the enqueued apply job
    */
   @PostMapping("/jobs/{id}/apply")
@@ -137,8 +147,10 @@ public class AdminP4kImportPageController {
   @NotNull
   public ResponseEntity<P4kImportJobDto> applyJob(
       @PathVariable("id") @NotNull UUID id,
-      @RequestParam(value = "seedNew", defaultValue = "false") boolean seedNew) {
-    P4kImportJobDto job = withBackendStatus(() -> catalogueClient.applyP4kImportJob(id, seedNew));
+      @RequestParam(value = "createItemsAndShips", defaultValue = "false")
+          boolean createItemsAndShips) {
+    P4kImportJobDto job =
+        withBackendStatus(() -> catalogueClient.applyP4kImportJob(id, createItemsAndShips));
     cacheEviction.evict(
         CacheDomain.MATERIAL,
         CacheDomain.MANUFACTURER,

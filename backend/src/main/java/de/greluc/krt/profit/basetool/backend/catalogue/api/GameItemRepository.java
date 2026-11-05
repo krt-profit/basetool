@@ -47,6 +47,15 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   Optional<GameItem> findByExternalUuid(UUID externalUuid);
 
   /**
+   * Finds the GameItem row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<GameItem> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a game item by UEX's integer item id, the match key for UEX rows without a UUID.
    *
    * @param uexItemId UEX's integer item id

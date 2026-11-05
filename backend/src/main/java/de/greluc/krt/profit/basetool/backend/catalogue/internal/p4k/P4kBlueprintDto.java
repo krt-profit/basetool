@@ -20,31 +20,27 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * One crafting-blueprint record from the P4K catalog, matched to {@code blueprint} by {@link #guid}
- * ({@code scwiki_uuid}) first, then {@link #key} ({@code scwiki_key}).
+ * One entry of {@code blueprints} in catalogue version 2, bound to the fields the import writes or
+ * matches on; every other field is skipped.
  *
- * <p>The importer only fills null blueprint columns; it never creates blueprints or rewrites
- * ingredient rows. Any field may be {@code null} when the source did not resolve it.
- *
- * @param guid DataForge {@code __ref} GUID (string form of {@code blueprint.scwiki_uuid})
- * @param key blueprint key {@code BP_CRAFT_*}; matches {@code blueprint.scwiki_key}
- * @param path source DCB record path (forensic; not persisted)
- * @param categoryGuid blueprint category GUID (forensic; not persisted)
- * @param producedItemGuid produced item GUID, resolved against {@code game_item.external_uuid} and
- *     filled into {@code blueprint.output_item} when null
- * @param craftTimeSeconds craft time in seconds, filled into {@code blueprint.craft_time_seconds}
- *     when null
- * @param ingredients ingredient lines; not read by the importer
+ * @param guid the Record GUID
+ * @param className the Record name
+ * @param recordPath the record path without {@code .xml}
+ * @param key the blueprint key, e.g. {@code BP_CRAFT_cds_armor_heavy_arms_01_01_01}
+ * @param name the localised name
+ * @param producedItemGuid the GUID of the item the blueprint produces, or {@code null}
+ * @param craftTimeSeconds the craft time of the default tier in seconds, or {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kBlueprintDto(
-    String guid,
-    String key,
-    String path,
-    String categoryGuid,
-    String producedItemGuid,
-    Integer craftTimeSeconds,
-    List<P4kIngredientDto> ingredients) {}
+    @Nullable String guid,
+    @Nullable String className,
+    @Nullable String recordPath,
+    @Nullable String key,
+    @Nullable P4kLocalisedText name,
+    @Nullable String producedItemGuid,
+    @Nullable Integer craftTimeSeconds)
+    implements P4kRecord {}

@@ -49,6 +49,15 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Optional<Blueprint> findByScwikiUuid(UUID scwikiUuid);
 
   /**
+   * Finds the Blueprint row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<Blueprint> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a blueprint by its {@code BP_CRAFT_*} key, the P4K import's fallback upsert key.
    *
    * <p>The key is not unique; the lowest {@code scwiki_uuid} wins deterministically.

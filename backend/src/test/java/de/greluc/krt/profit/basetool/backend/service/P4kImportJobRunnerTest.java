@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -30,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunner;
@@ -69,8 +69,17 @@ class P4kImportJobRunnerTest {
   }
 
   private static P4kImportResultDto someResult() {
-    P4kImportResultDto.Counts zero = new P4kImportResultDto.Counts(0, 0, 0, 0, 0, 0);
-    return new P4kImportResultDto(true, true, zero, zero, zero, zero, zero, 0, UUID.randomUUID());
+    P4kImportResultDto.Counts zero = new P4kImportResultDto.Counts(null, 0, 0, 0, 0, 0, 0, 0);
+    return new P4kImportResultDto(
+        true, true, null, zero, zero, zero, zero, zero, 0, UUID.randomUUID());
+  }
+
+  private UUID stubAdmin(UUID jobId) {
+    UUID admin = UUID.randomUUID();
+    P4kImportJob job = new P4kImportJob();
+    job.setCreatedBy(admin);
+    when(jobService.getJob(jobId)).thenReturn(job);
+    return admin;
   }
 
   @Test
@@ -86,7 +95,7 @@ class P4kImportJobRunnerTest {
     order.verify(jobService).markRunning(id);
     order.verify(importService).previewImport(bytes);
     order.verify(jobService).markSucceeded(eq(id), anyString());
-    verify(importService, never()).applyImport(any(), anyBoolean());
+    verify(importService, never()).applyImport(any(), any());
     verify(jobService, never()).deletePayload(any());
     verify(jobService, never()).markFailed(any(), anyString());
     verify(jobService).pruneOldJobs();
@@ -98,11 +107,14 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    when(importService.applyImport(bytes, true)).thenReturn(someResult());
+    UUID admin = stubAdmin(id);
+    P4kImportService.P4kApplyRequest request =
+        new P4kImportService.P4kApplyRequest(id, admin, true);
+    when(importService.applyImport(bytes, request)).thenReturn(someResult());
 
     runner.run(id, P4kImportJobKind.APPLY, true);
 
-    verify(importService).applyImport(bytes, true);
+    verify(importService).applyImport(bytes, request);
     verify(importService, never()).previewImport(any());
     verify(jobService).markSucceeded(eq(id), anyString());
     verify(jobService).deletePayload(id);
@@ -115,7 +127,8 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    when(importService.applyImport(bytes, false))
+    UUID admin = stubAdmin(id);
+    when(importService.applyImport(bytes, new P4kImportService.P4kApplyRequest(id, admin, false)))
         .thenThrow(new BadRequestException("empty catalog"));
 
     runner.run(id, P4kImportJobKind.APPLY, false);

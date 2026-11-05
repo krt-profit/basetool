@@ -158,6 +158,15 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Optional<Material> findByScwikiUuid(UUID scwikiUuid);
 
   /**
+   * Finds the Material row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<Material> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Marks as SC-Wiki-deleted every material whose {@code scwiki_uuid} is set, not in {@code
    * seenScwikiUuids}, and not already marked.
    *

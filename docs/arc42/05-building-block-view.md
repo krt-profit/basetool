@@ -215,7 +215,10 @@ an entity of the catalogue. The six records no model class embeds (`CityDto`, `O
 modules call (`BlueprintNameNormalizer`, `MaterialNameCanonicalizer`) sit in `catalogue.api`; the
 sync infrastructure (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`), the UEX, SC Wiki
 and P4K feed records (`catalogue.internal.uex`, `.scwiki`, `.p4k`), the sync report entity and its
-repository and the integration properties sit in `catalogue.internal`. The kernel types
+repository and the integration properties sit in `catalogue.internal`. The P4K import there is an
+orchestrator (`P4kImportService`) over one reconciler per catalogue kind and the shared
+`P4kRowMatcher`, behind the upload gate `P4kUploadGate`; its wire format and streaming reader are
+`catalogue.internal.p4k` (REQ-P4K-001…010). The kernel types
 `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, and the catalogue's entities,
 enums, DTOs, repositories and validation types followed (P4-5 part 2): 69 in `catalogue.api`, which
 publishes the entities as the foundation modules do (§5.2 of the plan), and 32 in
