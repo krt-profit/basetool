@@ -22,9 +22,9 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Planned
-> Every requirement of this spec is **planned** but REQ-P4K-033, which is built except for its
-> check against a checked-in copy of the catalogue schema: the other acceptance boxes are open, and
-> the test classes named under their "Enforced by" are the planned ones. The import of today
+> Every requirement of this spec is **planned** but REQ-P4K-033, which is built: the other
+> acceptance boxes are open, and the test classes named under their "Enforced by" are the planned
+> ones. The import of today
 > (`P4kImportService`, the old flat format) is what the first requirements replace. The order of
 > delivery is the map's migration order: the gate, the run record and the UUID clean-up first
 > (REQ-P4K-001…007), then the sweep and the change report, then the areas one by one.
@@ -739,11 +739,11 @@ nobody's).
 
 **Acceptance**
 
-- [ ] Every entity field filled from an `x-gameText` field of the checked-in schema carries
-  `@GameText`. *Built against the contract's field list in `GameTextClassificationTest`
-  (`manufacturers`, `items`, `ships`, `commodities` `description`); reading the list from a
-  checked-in copy of `schemas/basetool-catalog.schema.json` is pending, as the Basetool holds no
-  copy yet.*
+- [x] Every entity field filled from an `x-gameText` field of the checked-in schema carries
+  `@GameText`. *The schema is vendored at
+  `backend/src/test/resources/p4k/basetool-catalog.schema.json` (p4kx `v0.4.2`, provenance in the
+  `README.md` beside it); every `x-gameText` property is mapped to the fields it fills or listed
+  as not imported, so a new one fails the test until it is classified.*
 - [x] Every catalogue description column carries `@GameText` unless it is one of the admin-authored
   columns above; no column carries both annotations, and none carries `@GameMedia`.
 
