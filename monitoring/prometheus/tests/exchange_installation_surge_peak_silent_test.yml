@@ -1,0 +1,15 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - more than 20 new installations but within the week's busiest hour
+    interval: 30m
+    input_series:
+      - series: 'basetool_exchange_installations_created_total{job="basetool-backend", instance="backend:11261", client_id="versekit"}'
+        values: "0+1x200 215+15x1 231+1x133 384+20x5"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeInstallationSurge
+        exp_alerts: []

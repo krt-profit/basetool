@@ -1,0 +1,15 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - device logins above the week's average but within its busiest hour
+    interval: 30m
+    input_series:
+      - series: 'keycloak_user_events_total{job="keycloak", realm="basetool", idp="", event="oauth2_device_verify_user_code", error="", client_id="versekit"}'
+        values: "0+0.5x200 105+5x1 110.5+0.5x133 184.5+7.5x5"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeClientDeviceLoginSurge
+        exp_alerts: []

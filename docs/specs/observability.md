@@ -1943,8 +1943,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   (`org_stock`), counted by the journal after commit; `ExchangeRemoveSpike` fires above 100 an hour
   for one client (REQ-XCH-028).
 - `basetool_exchange_installations_created_total{client_id}` counter — installations seen for the
-  first time; `ExchangeInstallationSurge` fires above 20 an hour for one client (REQ-XCH-007,
-  REQ-XCH-028). `ExchangeUnknownClient` fires when the gateway keeps refusing tokens of a client the
+  first time; `ExchangeInstallationSurge` fires above 20 an hour for one client when that is also
+  more than three times its busiest hour of the seven days before the last day, so a growing
+  audience raises its own baseline (REQ-XCH-007, REQ-XCH-028). `ExchangeUnknownClient` fires when the gateway keeps refusing tokens of a client the
   registry does not list (`basetool_ingest_exchange_refused_total{client_id="unregistered"}`).
 - The `client_id` label of these backend counters is always a registered client, since only those
   pass the relay; they are not pre-registered at zero, as the clients are not known at start-up.

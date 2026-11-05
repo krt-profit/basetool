@@ -1,0 +1,21 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - new installations jump far above the week's busiest hour
+    interval: 30m
+    input_series:
+      - series: 'basetool_exchange_installations_created_total{job="basetool-backend", instance="backend:11261", client_id="versekit"}'
+        values: "0+1x200 215+15x1 231+1x133 414+50x5"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: ExchangeInstallationSurge
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: versekit
+            exp_annotations:
+              summary: "Many new installations of one exchange client"
+              description: "More than 20 new installations of one registered client (client_id) connected in the last hour, and more than three times its busiest hour in the seven days before the last day. A release day or a promotion can explain it; a device-code phishing wave or a leaked client cannot. Check the new-connection notifications and the installations on the admin page, and suspend the client if the connections are not expected (REQ-XCH-007, REQ-XCH-028)."
