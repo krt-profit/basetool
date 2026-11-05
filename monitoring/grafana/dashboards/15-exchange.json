@@ -57,7 +57,7 @@
       },
       "type": "timeseries",
       "title": "Relayed requests/min per client and outcome",
-      "description": "Admitted exchange requests the gateway relayed to the backend, per registry client: ok, refused by the backend with an exchange error code, or failed (answered 502 BACKEND_RELAY_FAILED; ExchangeRelayFailing). REQ-XCH-011, REQ-XCH-028.",
+      "description": "Admitted exchange requests the gateway relayed to the backend, per registry client: ok, refused by the backend with an exchange error code, failed (answered 502 BACKEND_RELAY_FAILED; ExchangeRelayFailing), or answer_contract_broken (a 2xx answer that broke its schema or carried an undeclared property, answered 502; ExchangeAnswerContractBroken). REQ-XCH-011, REQ-XCH-028, REQ-XCH-050.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

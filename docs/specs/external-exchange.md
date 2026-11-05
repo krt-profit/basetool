@@ -7,10 +7,10 @@
 > [ADR-0219](../adr/0219-the-exchange-contract-grows-additively-under-a-path-major-version.md),
 > [ADR-0220](../adr/0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md),
 > [ADR-0221](../adr/0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md),
-> [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md);
+> [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md),
+> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md);
 > planned: [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
 > [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
-> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md),
 > [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
 
 # External client exchange
@@ -3047,11 +3047,10 @@ query per lot or line.
 
 ### REQ-XCH-050 — Game texts and game media never leave the Basetool to third parties
 
-> [!note] Planned — implementation pending (#2894;
-> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md))
-> Nothing yellow or red leaves today: no exchange DTO or schema carries a description,
-> `displayType`, lore, image or URL field, and the exchange queries (`EXCHANGE_LOTS`,
-> `ExchangeShipRow`) select no description column. What is missing is the structural guard below.
+Decided in [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md).
+No exchange DTO or schema carries a description, `displayType`, lore, image or URL field, and the
+exchange queries (`EXCHANGE_LOTS`, `ExchangeShipRow`) select no description column; the three
+guards below keep it so.
 
 Data is classified **by content, per column**; a column has exactly one class, whichever writer
 fills it (P4K import, SC Wiki, UEX, admin):
@@ -3068,34 +3067,44 @@ guards hold it for the exchange, and every new outbound integration (the VerseKi
 joins the first two:
 
 1. **Getter rule.** An ArchUnit rule fails the build when code of an outbound integration — today
-   the backend's `exchange` module — calls the getter of a `@GameText` or `@GameMedia` field.
-2. **Field ratchet.** A ratchet test lists every field of the backend exchange DTOs, recursively,
-   and every property of the published v1 schemas and the OpenAPI document, each with a green class
-   (identifier, short name, fact value, member free text, client data). An unlisted field fails the
-   build, a yellow or red class is refused, and a DTO field and its schema property must agree, so a
-   new DTO field is declared in its v1 schema in the same pull request. Model:
-   `CredentialFieldRatchetTest`.
+   the backend's `exchange` module — calls the getter of a `@GameText` or `@GameMedia` field
+   (`getX()`, `isX()` or a record-style `x()` of a field `x` in the owner or a superclass).
+2. **Field ratchet.** A ratchet test lists every leaf property of the published v1 schemas and the
+   inline schemas of the OpenAPI document by its JSON Pointer
+   (`backend/src/test/resources/exchange/field-classes.txt`), each with a green class (identifier,
+   short name, fact value, member free text, client data); a container property is classified
+   through its leaves. It walks every backend exchange DTO, recursively, along the schema that
+   publishes it, and every record of the exchange DTO packages is published or named internal. An
+   unlisted property fails the build, a yellow or red class is refused, and a DTO field missing from
+   its schema fails it, so a new DTO field is declared in its v1 schema — and classified — in the
+   same pull request. Model: `CredentialFieldRatchetTest`.
 3. **Fail-closed gateway.** A backend answer that carries a property its response schema does not
    declare is answered `502 BACKEND_RELAY_FAILED` like a schema violation (REQ-XCH-011), never passed
    on. The content of a declared free-form map (`extensions`, `additionalProperties` with a schema)
-   passes verbatim. This changes the frozen exchange path (REQ-XCH-036): the goldens are re-recorded
+   passes verbatim. This changes the frozen exchange path (REQ-XCH-036): goldens record both cases
    and the pull request carries the `e2e` label.
 
 **Monitoring.** `basetool_ingest_exchange_relay_total` gains the outcome `answer_contract_broken`
-for an answer refused by guard 3 or by its response schema, and an alert fires on any increase. The
-WARN line names the route and the field path, never the value (REQ-OBS-004, REQ-OBS-011).
+for an answer refused by guard 3 or by its response schema; a usable answer counts once, as `ok` or
+`answer_contract_broken`, after the gateway checked it. `ExchangeAnswerContractBroken` fires on
+any one. The WARN line names the schema, the route and the field paths, never a value (REQ-OBS-004,
+REQ-OBS-011).
 
 **Acceptance**
 
-- [ ] A call from the `exchange` module to the getter of a `@GameText` field fails the ArchUnit
-  rule (planted violation).
-- [ ] A new DTO field or schema property without a listed green class, a yellow or red class, and a
-  DTO field missing from its schema each fail the ratchet.
-- [ ] A backend answer with an undeclared property is answered `502` and counted
-  `answer_contract_broken`; a declared free-form map passes unchanged. *Goldens re-recorded.*
-- [ ] The alert on `answer_contract_broken` has a promtool rule test.
+- [x] A call from the `exchange` module to the getter of a `@GameText` field fails the ArchUnit
+  rule (planted violation). *`ArchitectureTest`, `ArchitectureRuleFailureTest`.*
+- [x] A new DTO field or schema property without a listed green class, a yellow or red class, and a
+  DTO field missing from its schema each fail the ratchet. *`ExchangeFieldRatchetTest`.*
+- [x] A backend answer with an undeclared property is answered `502` and counted
+  `answer_contract_broken`; a declared free-form map passes unchanged. *`ExchangeSchemasTest`,
+  `ExchangeControllerTest`, `ExchangeRelayTest`, `ExchangeGoldenAnswerTest` (goldens
+  `failed-ships-answer-carries-undeclared-property`, `route-get-ships-with-extensions`).*
+- [x] The alert on `answer_contract_broken` has a promtool rule test.
+  *`exchange_gateway_alerts_test.yml`.*
 
-**Enforced by:** — (planned) · **Status:** planned (#2894)
+**Enforced by:** the tests above · **Code:** `GameText`, `GameMedia`,
+`ExchangeSchemas#answerBreaches`, `ExchangeAnswers`, `ExchangeRelay` · **Status:** built (#3041)
 
 ## Threat model
 
@@ -3129,7 +3138,7 @@ WARN line names the route and the field path, never the value (REQ-OBS-004, REQ-
 | Token leakage via backups, diagnostics or a problem-report webhook | client security requirements (REQ-XCH-027) |
 | A switchable issuer used for phishing | only through a developer environment variable, never in the UI (REQ-XCH-027) |
 | The installation label as a spoofing channel or PC-name leak | length and character limits, always after the client name, never logged or audited (REQ-XCH-007) |
-| Game texts or game media reaching a third party through a new field | classification by content (`@GameText`, `@GameMedia`), the getter rule, the field ratchet over DTOs and v1 schemas, and the fail-closed gateway that answers an undeclared property `502` (REQ-XCH-050, ADR-0344) — planned |
+| Game texts or game media reaching a third party through a new field | classification by content (`@GameText`, `@GameMedia`), the getter rule, the field ratchet over DTOs and v1 schemas, and the fail-closed gateway that answers an undeclared property `502` (REQ-XCH-050, ADR-0344) |
 
 ## Out of scope
 

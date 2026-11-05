@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -70,6 +71,7 @@ public class Material extends AbstractEntity<UUID> {
 
   @Column(columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String description;
 
   @Column(name = "code")

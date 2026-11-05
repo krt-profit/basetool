@@ -215,7 +215,15 @@ groups:
           severity: warning
         annotations:
           summary: "Exchange relays to the backend keep failing"
-          description: "The ingest gateway relayed admitted exchange requests but the backend answered unusably - 5xx, a refusal outside the exchange error registry, an answer that breaks the v1 schema, or no answer at all (unreachable, circuit open, no gateway token) - and the client got 502 BACKEND_RELAY_FAILED (REQ-XCH-011). Check the backend and its exchange layer and the gateway log lines 'Exchange relay to' or 'Exchange answer breaks'."
+          description: "The ingest gateway relayed admitted exchange requests but the backend answered unusably - 5xx, a refusal outside the exchange error registry, or no answer at all (unreachable, circuit open, no gateway token) - and the client got 502 BACKEND_RELAY_FAILED (REQ-XCH-011). An answer that breaks its contract is counted apart, see ExchangeAnswerContractBroken. Check the backend and its exchange layer and the gateway log lines 'Exchange relay to'."
+
+      - alert: ExchangeAnswerContractBroken
+        expr: sum by (client_id) (increase(basetool_ingest_exchange_relay_total{outcome="answer_contract_broken"}[15m])) > 0 or sum by (client_id) (basetool_ingest_exchange_relay_total{outcome="answer_contract_broken"} unless basetool_ingest_exchange_relay_total{outcome="answer_contract_broken"} offset 15m) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "The backend sent an exchange answer that breaks its contract"
+          description: "The ingest gateway refused a 2xx answer of the backend for client {{ $labels.client_id }} with 502 BACKEND_RELAY_FAILED, because it broke its v1 response schema or carried a property the schema does not declare (REQ-XCH-050). A new backend field that is not declared in the published schema is the usual cause; it may be a game text on its way to a third party. Find the route and the field path in the gateway log line 'Exchange answer breaks', then declare the field in the schema with its class in the field ratchet, or drop it from the exchange DTO."
 
       - alert: ExchangeLargeChangeSetsBusy
         expr: sum(increase(basetool_ingest_exchange_refused_total{reason="relay_busy"}[15m])) > 30

@@ -174,6 +174,29 @@ class ExchangeControllerTest {
             "VerseKit/2.1.0")
         .andExpect(status().isBadGateway())
         .andExpect(jsonPath("$.code").value("BACKEND_RELAY_FAILED"));
+    verify(relay).countContractBroken(ExchangeTestSupport.CLIENT);
+    verify(relay, never()).countPassedOn(anyString());
+  }
+
+  @Test
+  void anAnswerWithAPropertyItsSchemaDoesNotDeclareFailsClosed() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET), eq("/api/v1/exchange/catalog/locations"), any(), any(), any()))
+        .thenReturn(
+            ok("{\"items\":[{\"name\":\"Area18\",\"description\":\"A city on ArcCorp.\"}]}"));
+
+    ExchangeTestSupport.call(
+            mockMvc,
+            key,
+            TOKEN,
+            HttpMethod.GET,
+            "/exchange/v1/catalog/locations",
+            null,
+            "VerseKit/2.1.0")
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value("BACKEND_RELAY_FAILED"))
+        .andExpect(jsonPath("$.items").doesNotExist());
+    verify(relay).countContractBroken(ExchangeTestSupport.CLIENT);
   }
 
   @Test
@@ -192,6 +215,8 @@ class ExchangeControllerTest {
             "VerseKit/2.1.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].name").value("Area18"));
+    verify(relay).countPassedOn(ExchangeTestSupport.CLIENT);
+    verify(relay, never()).countContractBroken(anyString());
   }
 
   @Test
@@ -261,6 +286,7 @@ class ExchangeControllerTest {
         .andExpect(jsonPath("$.limits.requestsPerMinute").value(120))
         .andExpect(jsonPath("$.minClientVersion").value("2.0.0"))
         .andExpect(jsonPath("$.docsUrl").exists());
+    verify(relay).countPassedOn(ExchangeTestSupport.CLIENT);
   }
 
   @Test
@@ -272,6 +298,7 @@ class ExchangeControllerTest {
             mockMvc, key, TOKEN, HttpMethod.GET, "/exchange/v1", null, "VerseKit/2.1.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.installationId").doesNotExist());
+    verify(relay, never()).countPassedOn(anyString());
   }
 
   @Test

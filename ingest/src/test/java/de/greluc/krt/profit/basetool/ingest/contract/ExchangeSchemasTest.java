@@ -91,6 +91,33 @@ class ExchangeSchemasTest {
   }
 
   @Test
+  void anAnswerBreaksItsContractWithAViolationOrAnUndeclaredPropertyButNotWithItsExtensions() {
+    JsonNode page =
+        mapper.readTree(
+            "{\"items\":[{\"key\":\"k\",\"material\":{\"bt\":\"a\",\"name\":\"Gold\","
+                + "\"description\":\"lore\"},\"location\":{\"name\":\"Area18\"},\"quality\":-1,"
+                + "\"stolen\":false,\"quantity\":{\"amount\":1,\"unit\":\"SCU\"},"
+                + "\"extensions\":{\"org.example.x\":{\"anything\":\"goes\"}}}],"
+                + "\"removed\":[],\"hasMore\":false}");
+
+    assertThat(schemas.answerBreaches("page.schema.json#/$defs/stockPage", page))
+        .containsExactlyInAnyOrder("/items/0/quality", "/items/0/material/description");
+  }
+
+  @Test
+  void anAnswerThatHoldsItsContractHasNoBreach() {
+    JsonNode page =
+        mapper.readTree(
+            "{\"items\":[{\"key\":\"k\",\"material\":{\"bt\":\"a\",\"name\":\"Gold\"},"
+                + "\"location\":{\"name\":\"Area18\"},\"quality\":500,\"stolen\":false,"
+                + "\"quantity\":{\"amount\":1,\"unit\":\"SCU\"},"
+                + "\"extensions\":{\"org.example.x\":{\"anything\":\"goes\"}}}],"
+                + "\"removed\":[],\"hasMore\":false}");
+
+    assertThat(schemas.answerBreaches("page.schema.json#/$defs/stockPage", page)).isEmpty();
+  }
+
+  @Test
   void aFieldDeclaredInSeveralBranchesIsWalkedAlongAllOfThem() {
     JsonNode page =
         mapper.readTree(

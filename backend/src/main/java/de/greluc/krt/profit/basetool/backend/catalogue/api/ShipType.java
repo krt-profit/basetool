@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -379,11 +380,13 @@ public class ShipType extends AbstractEntity<UUID> {
   /** English description, filled by the SC Wiki vehicle sync and the P4K import, never by UEX. */
   @Column(name = "description_en", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionEn;
 
   /** German description (filled by R4 Wiki sync; UEX does not expose a DE field today). */
   @Column(name = "description_de", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionDe;
 
   /** Last successful UEX sync touch. */

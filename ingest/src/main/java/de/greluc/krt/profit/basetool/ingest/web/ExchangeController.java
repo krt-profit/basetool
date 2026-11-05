@@ -75,8 +75,8 @@ import tools.jackson.databind.node.ObjectNode;
  * The authenticated exchange routes built so far (REQ-XCH-001). Each request has passed both
  * exchange gates; a body is checked against its v1 schema before the relay, undeclared fields are
  * reported as {@code UNKNOWN_FIELD} warnings where the answer carries warnings, and the backend's
- * answer is checked against its schema before it reaches the client. The committed exchange
- * document describes these routes.
+ * answer reaches the client only when it matches its schema and carries no property the schema does
+ * not declare (REQ-XCH-050). The committed exchange document describes these routes.
  */
 @Slf4j
 @RestController
@@ -96,9 +96,6 @@ public class ExchangeController {
    * (REQ-XCH-023).
    */
   static final int LARGE_CHANGE_SET_OPS = 100;
-
-  /** The warning code of an undeclared field. */
-  static final String UNKNOWN_FIELD = "UNKNOWN_FIELD";
 
   /** The largest page, as the contract fixes it. */
   static final int PAGE_MAX_LIMIT = 1000;
@@ -158,6 +155,7 @@ public class ExchangeController {
   private final IngestProperties ingestProperties;
   private final MeterRegistry meterRegistry;
   private final HeldMassChanges heldMassChanges;
+  private final ExchangeAnswers answers;
 
   /**
    * Returns the service document: what this token may do and what the server expects.
@@ -200,7 +198,12 @@ public class ExchangeController {
     document.putArray("deprecations");
     document.put("docsUrl", properties.docsUrl());
     document.put("minClientVersion", context.client().minClientVersion());
-    return answer(document, "service-document.schema.json");
+    String schema = "service-document.schema.json";
+    boolean passes =
+        installation.isOk()
+            ? answers.passesRelayed(document, schema, request, context)
+            : answers.passes(document, schema, request);
+    return passes ? ok(document) : failed();
   }
 
   /**
@@ -296,7 +299,9 @@ public class ExchangeController {
         relay.forward(
             HttpMethod.GET, BACKEND + "/catalog/locations", null, context, acceptLanguage),
         "location-list.schema.json",
-        List.of());
+        List.of(),
+        context,
+        request);
   }
 
   /**
@@ -389,7 +394,9 @@ public class ExchangeController {
     return relayed(
         relay.forward(HttpMethod.GET, BACKEND + "/me/org-demand", null, context, acceptLanguage),
         "org-demand.schema.json",
-        List.of());
+        List.of(),
+        context,
+        request);
   }
 
   /**
@@ -412,7 +419,9 @@ public class ExchangeController {
     return relayed(
         relay.forward(HttpMethod.GET, BACKEND + "/me/org-units", null, context, acceptLanguage),
         "org-unit-list.schema.json",
-        List.of());
+        List.of(),
+        context,
+        request);
   }
 
   /**
@@ -471,7 +480,9 @@ public class ExchangeController {
             context,
             acceptLanguage),
         "org-stock-members.schema.json",
-        List.of());
+        List.of(),
+        context,
+        request);
   }
 
   /**
@@ -518,7 +529,9 @@ public class ExchangeController {
             context,
             acceptLanguage),
         "org-stock-targets.schema.json",
-        List.of());
+        List.of(),
+        context,
+        request);
   }
 
   /**
@@ -686,6 +699,7 @@ public class ExchangeController {
     if (!result.isOk()) {
       return problem(result.status(), result.code(), result.detail());
     }
+    relay.countPassedOn(context.clientId());
     String json = objectMapper.writeValueAsString(result.body());
     long bytes = stagingService.stagedBytes(kind, json);
     if (json.getBytes(StandardCharsets.UTF_8).length > ingestProperties.maxHandoffBytes()
@@ -728,7 +742,7 @@ public class ExchangeController {
         ingestProperties.frontendBaseUrl() + path + "?handoff=" + staged.handoffId());
     answer.put("handoffId", staged.handoffId());
     answer.put("kind", kind.name());
-    return answer(answer, "draft-result.schema.json");
+    return answers.passes(answer, "draft-result.schema.json", request) ? ok(answer) : failed();
   }
 
   /**
@@ -800,7 +814,7 @@ public class ExchangeController {
     if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
       return staged(context, request, resource, body, result, digest);
     }
-    return relayed(result, "change-result.schema.json", unknown);
+    return relayed(result, "change-result.schema.json", unknown, context, request);
   }
 
   /**
@@ -1045,7 +1059,9 @@ public class ExchangeController {
     return relayed(
         relay.forward(HttpMethod.GET, target.toString(), null, context, acceptLanguage),
         responseSchema,
-        List.of());
+        List.of(),
+        context,
+        request);
   }
 
   /**
@@ -1096,70 +1112,44 @@ public class ExchangeController {
     return relayed(
         relay.forward(HttpMethod.POST, BACKEND + path, body, context, acceptLanguage),
         responseSchema,
-        unknown);
+        unknown,
+        context,
+        request);
   }
 
   /**
-   * Turns a relay result into the answer, checking a usable one against its schema and adding the
-   * unknown-field warnings where the schema carries warnings.
+   * Turns a relay result into the answer: a usable one gains the request's unknown-field warnings
+   * and reaches the client only when it holds its contract.
    *
    * @param result the relay result
    * @param responseSchema the answer's schema
    * @param unknown the request's undeclared fields
+   * @param context what the gate established
+   * @param request the admitted request
    * @return the answer or a problem
    */
   private @NotNull ResponseEntity<?> relayed(
       @NotNull ExchangeRelay.Result result,
       @NotNull String responseSchema,
-      @NotNull List<String> unknown) {
+      @NotNull List<String> unknown,
+      @NotNull ExchangeRequestContext context,
+      @NotNull HttpServletRequest request) {
     if (!result.isOk()) {
       return problem(result.status(), result.code(), result.detail());
     }
     JsonNode body = result.body();
-    if (!unknown.isEmpty()
-        && body instanceof ObjectNode object
-        && acceptsWarnings(responseSchema)) {
-      ArrayNode warnings =
-          object.get("warnings") instanceof ArrayNode existing
-              ? existing
-              : object.putArray("warnings");
-      for (String pointer : unknown) {
-        if (warnings.size() >= ExchangeSchemas.MAX_REPORTED) {
-          break;
-        }
-        ObjectNode warning = warnings.addObject();
-        warning.put("pointer", pointer);
-        warning.put("code", UNKNOWN_FIELD);
-      }
-    }
-    return answer(body, responseSchema);
+    answers.addUnknownFieldWarnings(body, responseSchema, unknown);
+    return answers.passesRelayed(body, responseSchema, request, context) ? ok(body) : failed();
   }
 
   /**
-   * Answers with a document once it matches its schema.
+   * Answers with a JSON document.
    *
    * @param body the document
-   * @param schema its schema
-   * @return {@code 200}, or {@code 502} when the document breaks the contract
+   * @return {@code 200}
    */
-  private @NotNull ResponseEntity<?> answer(@NotNull JsonNode body, @NotNull String schema) {
-    List<ExchangeSchemas.Violation> violations = schemas.validate(schema, body);
-    if (!violations.isEmpty()) {
-      log.warn("Exchange answer breaks {} with {} violation(s)", schema, violations.size());
-      return failed();
-    }
+  private static @NotNull ResponseEntity<?> ok(@NotNull JsonNode body) {
     return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body);
-  }
-
-  /**
-   * Whether a response schema carries a {@code warnings} list.
-   *
-   * @param responseSchema the schema's file name
-   * @return {@code true} for the resolve and change answers
-   */
-  private static boolean acceptsWarnings(@NotNull String responseSchema) {
-    return "resolve-response.schema.json".equals(responseSchema)
-        || "change-result.schema.json".equals(responseSchema);
   }
 
   /**

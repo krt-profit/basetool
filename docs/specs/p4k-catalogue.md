@@ -22,8 +22,9 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Planned
-> Every requirement of this spec is **planned**: none is implemented yet, every acceptance box is
-> open, and the test classes named under "Enforced by" are the planned ones. The import of today
+> Every requirement of this spec is **planned** but REQ-P4K-033, which is built except for its
+> check against a checked-in copy of the catalogue schema: the other acceptance boxes are open, and
+> the test classes named under their "Enforced by" are the planned ones. The import of today
 > (`P4kImportService`, the old flat format) is what the first requirements replace. The order of
 > delivery is the map's migration order: the gate, the run record and the UUID clean-up first
 > (REQ-P4K-001…007), then the sweep and the change report, then the areas one by one.
@@ -722,8 +723,14 @@ A column is classified by its content, not its source, and has exactly one class
   and `description_de`, `Material.description`, and on every column filled from a catalogue field
   the contract marks `"x-gameText": true` (`displayType` should it be persisted, the starmap
   object's `name` and `name_de`).
+- A catalogue description column that no game-data source fills, only an admin in the Basetool,
+  holds no game text and stays unmarked: `Location.description`, `StarSystem.description`,
+  `FrequencyType.description`, `RefiningMethod.description` and `JobType.description`. Should a
+  game-data source ever fill one, it becomes `@GameText`.
 - **`@GameMedia`** is defined and sits on no column: the import stores no archive media, and the UEX
   link and image columns stay unmarked UEX data.
+
+Both annotations live in the backend's `kernel` package (`GameText`, `GameMedia`).
 
 A `@GameText` or `@GameMedia` column is shown to logged-in members only and never leaves the
 Basetool to a third party; the exchange enforces this with the guards of REQ-XCH-050.
@@ -733,10 +740,14 @@ nobody's).
 **Acceptance**
 
 - [ ] Every entity field filled from an `x-gameText` field of the checked-in schema carries
-  `@GameText`.
-- [ ] Every description column carries `@GameText`; no column carries both annotations.
+  `@GameText`. *Built against the contract's field list in `GameTextClassificationTest`
+  (`manufacturers`, `items`, `ships`, `commodities` `description`); reading the list from a
+  checked-in copy of `schemas/basetool-catalog.schema.json` is pending, as the Basetool holds no
+  copy yet.*
+- [x] Every catalogue description column carries `@GameText` unless it is one of the admin-authored
+  columns above; no column carries both annotations, and none carries `@GameMedia`.
 
-**Enforced by (planned):** `GameTextClassificationTest` · **ADR:** [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md) · **Issues:** #2894,
+**Enforced by:** `GameTextClassificationTest` · **ADR:** [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md) · **Issues:** #2894,
 #2887
 
 ## Starmap and locations
