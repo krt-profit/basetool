@@ -73,5 +73,13 @@ released object; the contract leaves the decision to the Basetool from `system`,
 - The P4K catalogue spec carries the starmap, linking and visibility rules; the exchange spec gains
   the additive `guid`; arc42 §12 gains *starmap object* (a node of the archive's location tree) and
   *storage place* (`location`, on any starmap node an admin picks).
-- Pending: both migration steps, the linking and its review, the visibility rule and override, and
-  the exchange field.
+- Pending: step B, the linking and its review, the visibility rule and override, and the exchange
+  field.
+
+## Amendment
+
+- **2026-11-05, step A shipped (#3043, @greluc):** the key points at `location.id`. A referenced
+  city or station without a storage place gets one marked `reference_only`, which no existing
+  `location` consumer offers and the UEX sync clears once the place is live; the member picker
+  offers the offered places plus the ones the owner's rows use; a row that resolves to no place
+  keeps its snapshot with a `null` key (REQ-P4K-039).

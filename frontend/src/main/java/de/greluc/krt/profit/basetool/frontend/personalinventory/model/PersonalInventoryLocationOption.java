@@ -17,18 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.catalogue.model;
+package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationType;
+import java.util.UUID;
 
 /**
- * Combined typeahead entry for cities and space stations. Mirrors the backend {@code
- * UexLocationDto}.
+ * One entry of the personal-inventory location picker. Mirrors the backend {@code
+ * PersonalInventoryLocationOption}; {@code id} is the {@code locationId} a write sends.
+ *
+ * @param id the location's id
+ * @param type the kind of place, for the picker's marker
+ * @param name the location's name
+ * @param starSystemName the star system of the linked city or station, or {@code null}
+ * @param parentName the planet of the linked city, or {@code null}
  */
 @DtoMirror
-public record UexLocationDto(
-    Integer uexId,
+public record PersonalInventoryLocationOption(
+    UUID id,
     PersonalInventoryLocationType type,
     String name,
     String starSystemName,

@@ -58,10 +58,6 @@ class ApiDomainsMatchTheDomainMapTest {
               "blueprint: the REST cut serves the recipe graph with the blueprints; the code keeps"
                   + " the synced graph in the catalogue"),
           Map.entry(
-              "UexLocationController",
-              "catalogue: the REST cut serves the UEX locations with the catalogue; the code"
-                  + " serves the picker from the personal inventory"),
-          Map.entry(
               "MeController",
               "identity: the REST cut serves the caller's own context under identity; the code"
                   + " hosts the read across seven modules in the composition root"),

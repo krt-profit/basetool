@@ -19,17 +19,23 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Combined search result entry exposing UEX cities and space stations to the frontend for the
- * personal-inventory location typeahead. The numeric {@code uexId} is the value persisted in {@code
- * personal_inventory_item.location_uex_id} and must be paired with {@link #type()} to identify the
- * location unambiguously.
+ * One entry of the personal-inventory location picker (REQ-P4K-039); {@link #id()} is the {@code
+ * location.id} a write sends as {@code locationId}.
+ *
+ * @param id the location's id
+ * @param type the kind of place, for the picker's marker
+ * @param name the location's name
+ * @param starSystemName the star system of the linked city or station, or {@code null}
+ * @param parentName the planet of the linked city, or {@code null}
  */
-public record UexLocationDto(
-    Integer uexId,
-    PersonalInventoryLocationType type,
-    String name,
-    String starSystemName,
+public record PersonalInventoryLocationOption(
+    @NotNull UUID id,
+    @NotNull PersonalInventoryLocationType type,
+    @NotNull String name,
+    @Nullable String starSystemName,
     @Nullable String parentName) {}

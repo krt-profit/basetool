@@ -29,7 +29,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** Spring Data repository for Location. */
+/**
+ * Spring Data repository for Location.
+ *
+ * <p>Every list, picker and exchange read skips reference-only rows ({@link
+ * Location#getReferenceOnly()}, REQ-P4K-039); only a lookup by id or by city / space station
+ * reaches them.
+ */
 @Repository
 public interface LocationRepository extends LookupTableRepository<Location, UUID> {
 
@@ -41,7 +47,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto(l.id,
-      l.name) FROM Location l WHERE l.hidden = false ORDER BY l.name
+      l.name) FROM Location l WHERE l.hidden = false AND l.referenceOnly = false ORDER BY l.name
       """)
   List<LocationReferenceDto> findAllReference();
 
@@ -56,7 +62,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
       SELECT new
       de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository$ExchangeLocationRow(
       l.name, c.idCity, s.idSpaceStation) FROM Location l LEFT JOIN l.city c
-      LEFT JOIN l.spaceStation s WHERE l.hidden = false ORDER BY l.name
+      LEFT JOIN l.spaceStation s WHERE l.hidden = false AND l.referenceOnly = false ORDER BY l.name
       """)
   List<ExchangeLocationRow> findExchangeLocations();
 
@@ -72,12 +78,14 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
       value =
           """
           SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto(l.id,
-          l.name) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
+          l.name) FROM Location l WHERE l.hidden = false AND l.referenceOnly = false
+          AND (cast(:q as string) IS NULL
           OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           """,
       countQuery =
           """
-          SELECT COUNT(l) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
+          SELECT COUNT(l) FROM Location l WHERE l.hidden = false AND l.referenceOnly = false
+          AND (cast(:q as string) IS NULL
           OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           """)
   Page<LocationReferenceDto> searchReference(@Param("q") @Nullable String q, Pageable pageable);
@@ -91,28 +99,43 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   /** Derived Spring-Data query - returns entities matching {@code SpaceStationId}. */
   Optional<Location> findBySpaceStationId(UUID spaceStationId);
 
-  /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
-  Page<Location> findByHiddenFalse(Pageable pageable);
+  /**
+   * Pages every storage place, hidden ones included, for the admin list.
+   *
+   * @param pageable page request
+   * @return paged locations without the reference-only rows
+   */
+  Page<Location> findByReferenceOnlyFalse(Pageable pageable);
 
   /**
-   * Pages every location, hidden ones included, whose name contains {@code name}
+   * Pages the non-hidden storage places.
+   *
+   * @param pageable page request
+   * @return paged non-hidden locations without the reference-only rows
+   */
+  Page<Location> findByHiddenFalseAndReferenceOnlyFalse(Pageable pageable);
+
+  /**
+   * Pages every storage place, hidden ones included, whose name contains {@code name}
    * case-insensitively; LIKE wildcards in {@code name} match literally.
    *
    * @param name the search fragment
    * @param pageable page request
-   * @return paged matching locations
+   * @return paged matching locations without the reference-only rows
    */
-  Page<Location> findByNameContainingIgnoreCase(String name, Pageable pageable);
+  Page<Location> findByReferenceOnlyFalseAndNameContainingIgnoreCase(
+      String name, Pageable pageable);
 
   /**
-   * Pages the non-hidden locations whose name contains {@code name} case-insensitively; LIKE
+   * Pages the non-hidden storage places whose name contains {@code name} case-insensitively; LIKE
    * wildcards in {@code name} match literally.
    *
    * @param name the search fragment
    * @param pageable page request
-   * @return paged matching non-hidden locations
+   * @return paged matching non-hidden locations without the reference-only rows
    */
-  Page<Location> findByHiddenFalseAndNameContainingIgnoreCase(String name, Pageable pageable);
+  Page<Location> findByHiddenFalseAndReferenceOnlyFalseAndNameContainingIgnoreCase(
+      String name, Pageable pageable);
 
   /**
    * Returns the curated, non-hidden home locations ordered by name descending (Z-&gt;A). Backs the
@@ -121,7 +144,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    *
    * @return curated home locations, name descending
    */
-  List<Location> findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+  List<Location> findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc();
 
   /**
    * Returns every non-hidden location whose city or space station hosts a live refinery terminal,
@@ -133,7 +156,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   @Query(
       """
       SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s
-      WHERE l.hidden = false
+      WHERE l.hidden = false AND l.referenceOnly = false
       AND (c.hasRefineryTerminal = true OR s.hasRefineryTerminal = true)
       """)
   List<Location> findLocationsWithRefinery();
@@ -147,7 +170,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   @Query(
       """
       SELECT l FROM Location l JOIN l.city c WHERE c.idCity = :idCity AND l.hidden = false
-      ORDER BY l.name ASC
+      AND l.referenceOnly = false ORDER BY l.name ASC
       """)
   List<Location> findExchangeByCity(@Param("idCity") Integer idCity);
 
@@ -160,17 +183,17 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   @Query(
       """
       SELECT l FROM Location l JOIN l.spaceStation s WHERE s.idSpaceStation = :idSpaceStation
-      AND l.hidden = false ORDER BY l.name ASC
+      AND l.hidden = false AND l.referenceOnly = false ORDER BY l.name ASC
       """)
   List<Location> findExchangeBySpaceStation(@Param("idSpaceStation") Integer idSpaceStation);
 
   /**
-   * Finds the non-hidden location with an exact name.
+   * Finds the non-hidden storage place with an exact name.
    *
    * @param name the name
    * @return the location, or empty
    */
-  Optional<Location> findFirstByNameAndHiddenFalseOrderByIdAsc(String name);
+  Optional<Location> findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(String name);
 
   /**
    * One non-hidden location as the exchange catalogue reads it from the database.

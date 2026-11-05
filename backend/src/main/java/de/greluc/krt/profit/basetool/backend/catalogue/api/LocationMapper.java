@@ -34,6 +34,7 @@ public interface LocationMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "city", ignore = true)
   @Mapping(target = "spaceStation", ignore = true)
+  @Mapping(target = "referenceOnly", ignore = true)
   Location toEntity(LocationDto dto);
 
   /**

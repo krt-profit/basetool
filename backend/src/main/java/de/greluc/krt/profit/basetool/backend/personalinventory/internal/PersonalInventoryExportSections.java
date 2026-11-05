@@ -42,7 +42,7 @@ public class PersonalInventoryExportSections implements PersonalDataExportSectio
                 ART_15_20,
                 "Entered by the member, including free-text notes.",
                 """
-                SELECT name, quantity, location_type, location_name_snapshot, note, created_at
+                SELECT name, quantity, location_name_snapshot, note, created_at
                 FROM personal_inventory_item WHERE owner_user_id = :userId ORDER BY created_at
                 """)
             .scrubbing("name", "note"));

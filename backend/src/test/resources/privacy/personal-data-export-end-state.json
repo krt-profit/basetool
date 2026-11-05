@@ -202,7 +202,6 @@
     "rows" : [ {
       "name" : "Probe #OTHER_MEMBER#",
       "quantity" : 1,
-      "location_type" : "CITY",
       "location_name_snapshot" : "Export City",
       "note" : "Uebergabe an #OTHER_MEMBER# erledigt",
       "created_at" : "<instant>"
