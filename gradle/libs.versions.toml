@@ -35,7 +35,7 @@ axeCorePlaywright = "4.14.0"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
 openpdf = "3.0.5"
-aircompressor = "3.11"
+zstdJni = "1.5.7-24"
 commonmark = "0.31.0"
 spotbugs = "6.5.13"
 pitest = "1.19.0"
@@ -93,7 +93,7 @@ axe-core-playwright = { module = "com.deque.html.axe-core:playwright", version.r
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
 lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-binding", version.ref = "lombokMapstructBinding" }
 openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }
-aircompressor = { module = "io.airlift:aircompressor-v3", version.ref = "aircompressor" }
+zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstdJni" }
 commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }

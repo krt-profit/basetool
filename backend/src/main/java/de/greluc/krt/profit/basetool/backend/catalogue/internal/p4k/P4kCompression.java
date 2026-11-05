@@ -19,8 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
-import io.airlift.compress.v3.MalformedInputException;
-import io.airlift.compress.v3.zstd.ZstdInputStream;
+import com.github.luben.zstd.ZstdInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FilterInputStream;
@@ -33,8 +32,8 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * The three forms an upload may take (REQ-P4K-002), recognised by magic bytes, never by name: plain
- * JSON, gzip ({@code 1f 8b}) and zstd ({@code 28 b5 2f fd}, decoded by the pure-Java aircompressor
- * decoder).
+ * JSON, gzip ({@code 1f 8b}) and zstd ({@code 28 b5 2f fd}, decoded by zstd-jni with a window of at
+ * most {@value #ZSTD_WINDOW_LOG_MAX} bits).
  */
 public enum P4kCompression {
 
@@ -46,6 +45,12 @@ public enum P4kCompression {
 
   /** A zstd frame. */
   ZSTD;
+
+  /**
+   * The largest zstd window the decoder accepts, as a power of two: 2^27 = 128 MiB, the window p4kx
+   * writes with long-distance matching ({@code zstd -19 --long=27}).
+   */
+  static final int ZSTD_WINDOW_LOG_MAX = 27;
 
   /** The size of the buffer the gzip decoder reads through. */
   private static final int GZIP_BUFFER_BYTES = 64 * 1024;
@@ -89,10 +94,10 @@ public enum P4kCompression {
           switch (detect(bytes)) {
             case PLAIN -> raw;
             case GZIP -> new GZIPInputStream(raw, GZIP_BUFFER_BYTES);
-            case ZSTD -> new ZstdInputStream(raw);
+            case ZSTD -> new ZstdInputStream(raw).setLongMax(ZSTD_WINDOW_LOG_MAX);
           };
       return new GuardedInputStream(decoded, limitBytes);
-    } catch (IOException | MalformedInputException e) {
+    } catch (IOException e) {
       throw new P4kCatalogueFormatException("The compressed upload cannot be read.", e);
     }
   }
@@ -185,7 +190,7 @@ public enum P4kCompression {
       int n;
       try {
         n = super.read(b, off, len);
-      } catch (IOException | MalformedInputException e) {
+      } catch (IOException e) {
         throw new P4kCatalogueFormatException("The compressed upload cannot be read.", e);
       }
       if (n > 0) {

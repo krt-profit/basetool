@@ -279,6 +279,10 @@ exempt-table|material
 exempt-table|moon
 exempt-table|orbit
 exempt-table|outpost
+exempt-table|p4k_import_change
+exempt-table|p4k_import_run
+exempt-table|p4k_import_run_kind
+exempt-table|p4k_review_case
 exempt-table|planet
 exempt-table|poi
 exempt-table|refining_method

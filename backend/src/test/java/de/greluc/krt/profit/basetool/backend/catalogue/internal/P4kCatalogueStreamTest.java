@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogueReader;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCompression;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kContentTooLargeException;
-import io.airlift.compress.v3.zstd.ZstdOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -157,7 +156,8 @@ class P4kCatalogueStreamTest {
         "{\"entityGuid\":\"0079c5d5-1678-4f8c-85ba-18ca8f642af6\",\"ports\":[{\"name\":\"hardpoint\"}]},"
             .getBytes(StandardCharsets.UTF_8);
     ByteArrayOutputStream sink = new ByteArrayOutputStream();
-    try (OutputStream out = new ZstdOutputStream(sink)) {
+    try (OutputStream out =
+        P4kTestCatalogues.longWindowZstd(sink, P4kTestCatalogues.LIVE_WINDOW_LOG)) {
       out.write(head);
       long written = head.length + tail.length;
       while (written + element.length < LIVE_SIZE_BYTES) {

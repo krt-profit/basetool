@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import io.airlift.compress.v3.zstd.ZstdOutputStream;
+import com.github.luben.zstd.ZstdOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,6 +79,9 @@ public final class P4kTestCatalogues {
 
   /** A commodity. */
   public static final UUID ASLARITE = UUID.fromString("fde0cd65-8827-4b23-804d-cc8845dfa7ac");
+
+  /** The window log p4kx writes the LIVE catalogue with ({@code --long=27}). */
+  public static final int LIVE_WINDOW_LOG = 27;
 
   /** Shared mapper for building variants. */
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -181,18 +184,34 @@ public final class P4kTestCatalogues {
   }
 
   /**
-   * Compresses with zstd.
+   * Compresses with zstd and long-distance matching over a 128 MiB window, as p4kx writes it.
    *
    * @param plain the plain bytes
-   * @return a zstd frame sequence
+   * @return a zstd frame
    */
   public static byte @NotNull [] zstd(byte @NotNull [] plain) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try (OutputStream zstd = new ZstdOutputStream(out)) {
+    try (OutputStream zstd = longWindowZstd(out, LIVE_WINDOW_LOG)) {
       zstd.write(plain);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
     return out.toByteArray();
+  }
+
+  /**
+   * Opens a zstd encoder that writes one frame of unknown size with long-distance matching, so the
+   * frame header declares the full window.
+   *
+   * @param sink the sink
+   * @param windowLog the window log
+   * @return the encoder
+   * @throws IOException if the encoder rejects the parameters
+   */
+  public static @NotNull OutputStream longWindowZstd(@NotNull OutputStream sink, int windowLog)
+      throws IOException {
+    ZstdOutputStream zstd = new ZstdOutputStream(sink, 3);
+    zstd.setLong(windowLog);
+    return zstd;
   }
 }

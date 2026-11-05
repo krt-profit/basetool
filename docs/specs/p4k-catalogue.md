@@ -70,21 +70,19 @@ The upload accepts `.json`, `.json.gz` and `.json.zst`, recognised by their magi
 file name. The 64 MB limit applies to the uploaded (compressed) file; the decompressed content is
 capped at 1 GB, an `@ConfigurationProperties` default that also guards against decompression bombs.
 The parser reads the decompressed stream without holding it in memory, and the payload is stored
-compressed. zstd is decoded in the backend by a pure-Java decoder (`aircompressor`), no native
-binary. A file above either limit is refused by the gate with reason `too_large`. In practice a
+compressed. zstd is decoded in the backend by zstd-jni, whose jar bundles the native library for
+every image platform (`linux/amd64`, `linux/arm64`, glibc and musl), with a window of at most
+2^27 = 128 MiB, the window p4kx writes (`--long=27`); a larger window is unreadable and refused as
+`schema_version`. A file above either limit is refused by the gate with reason `too_large`. In practice a
 LIVE catalogue arrives as `.json.zst` (p4kx writes level 19 with long-distance matching): the LIVE
 export of p4kx 0.4.2 is 214 MB as JSON and 3.9 MB as `.json.zst`.
 
 The upload limit is the contract's `UPLOAD_LIMIT`, 64,000,000 bytes (`P4kUploadGate`); the
 decompressed limit is `krt.p4k-import.decompressed-limit-bytes` (`P4kImportProperties`,
 1,000,000,000 bytes). The gate drains the decompressed stream once to enforce that limit. A plain
-upload is stored gzipped, a compressed one as it came.
-
-> [!warning] The zstd decoder cannot read the LIVE frame
-> aircompressor 3.11 decodes zstd frames with a window of at most 8 MiB. The p4kx LIVE export
-> (`basetool-catalog.json.zst`, change 12913470) declares a 128 MiB window and fails with "Window
-> size too large"; the gate refuses it as unreadable. Until the owner decides between another
-> decoder and a p4kx frame with a smaller window, a LIVE catalogue is uploaded as `.json.gz`.
+upload is stored gzipped, a compressed one as it came. zstd-jni extracts its library to
+`java.io.tmpdir` on first use; the backend's `/tmp` is the container runtime's tmpfs, writable
+and without `noexec`. A host that mounts it `noexec` sets `-DZstdTempFolder=<exec-allowed dir>`.
 
 **Acceptance**
 
@@ -92,8 +90,7 @@ upload is stored gzipped, a compressed one as it came.
   imports to the same result.
 - [x] A compressed file above 64 MB, and one whose decompressed content passes 1 GB, is refused with
   `too_large` before the content is read to the end.
-- [ ] A LIVE-sized `.json.zst` fixture imports with a heap bound well below its decompressed size.
-  A 256 MB catalogue in an aircompressor frame does; the p4kx LIVE frame does not decode (above).
+- [x] A LIVE-sized `.json.zst` fixture imports with a heap bound well below its decompressed size.
 
 **Enforced by:** `P4kCatalogueStreamTest`, `P4kUploadGateTest` · **Code:** `P4kCompression`,
 `P4kCatalogueReader` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·

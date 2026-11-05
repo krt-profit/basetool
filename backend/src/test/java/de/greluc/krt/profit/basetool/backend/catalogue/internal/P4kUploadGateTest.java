@@ -82,6 +82,34 @@ class P4kUploadGateTest {
     assertThat(meters.find(CatalogueMetricNames.P4K_IMPORT_REJECTED).counters()).isEmpty();
   }
 
+  @Test
+  void zstdWithTheLiveWindowOf128MiB_isAccepted() {
+    byte[] zstd = P4kTestCatalogues.zstd(P4kTestCatalogues.fixtureBytes());
+
+    assertThat(windowLog(zstd)).isEqualTo(27);
+    assertThat(gate().check(zstd).storedPayload()).isEqualTo(zstd);
+  }
+
+  @Test
+  void zstdWithAWindowAboveTheContractsMaximum_isRefused() {
+    byte[] zstd = P4kTestCatalogues.zstd(P4kTestCatalogues.fixtureBytes());
+    zstd[5] = (byte) ((28 - 10) << 3);
+
+    assertThat(windowLog(zstd)).isEqualTo(28);
+    assertRefused(zstd, P4kRejectionReason.SCHEMA_VERSION);
+  }
+
+  /**
+   * Reads the window log of a zstd frame that is not single-segment (RFC 8878, 3.1.1.1.2).
+   *
+   * @param frame the frame
+   * @return the window log the header declares
+   */
+  private static int windowLog(byte @NotNull [] frame) {
+    assertThat(frame[4] & 0x20).as("single-segment flag").isZero();
+    return ((frame[5] & 0xff) >>> 3) + 10;
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {1, 3})
   void otherSchemaVersion_isRefused(int version) {

@@ -3,6 +3,8 @@
 - **Status:** Accepted
 - **Amended:** 2026-11-05, §11: the unique-`p4k_uuid` migration clears every duplicate group's
   `p4k_uuid` and then adds the constraint, instead of failing while duplicates remain (@greluc).
+- **Amended:** 2026-11-05: zstd is decoded by the native zstd-jni (window log up to 27), since
+  the pure-Java aircompressor cannot read the 128 MiB window of the LIVE export (@greluc).
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-001…010), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
