@@ -635,7 +635,6 @@ DELETE /api/v1/users/{id} | AccountRemovalController#deleteUser | pre=hasRole('A
 GET /api/v1/users/{id} | UserProfileController#getUserById | pre=hasAnyRole('ADMIN', 'KRT_MEMBER') | url=GET /api/v1/users/* -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER)
 PUT /api/v1/users/{id}/attributes | UserProfileController#updateUserAttributes | pre=hasRole('ADMIN') | url=PUT /api/v1/users/*/attributes -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/users/{id}/consolidate | AccountRemovalController#consolidateAccount | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/users/{id}/rank-range | UserController#getUserRankRange | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/{id}/rsi-handle | UserController#getUserRsiHandle | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
 GET /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll

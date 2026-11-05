@@ -46,9 +46,6 @@
                                     th:selected="${i == memberEditForm.rank}">
                             </option>
                         </select>
-                        <p class="form-hint" data-testid="member-rank-role-hint"
-                           th:if="${memberRankRange != null and memberRankRange.basis != null}"
-                           th:text="#{|members.edit.rank.hint.${memberRankRange.basis}|}">Erlaubte R&auml;nge</p>
                         <div class="field-error" data-error-for="rank"
                              th:text="${#fields.hasErrors('rank') ? #fields.errors('rank')[0] : ''}"></div>
                     </div>

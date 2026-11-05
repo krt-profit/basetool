@@ -305,23 +305,14 @@ another read.
 `OrgUnitMembershipService`, `KommandoGroupService`, `LeitungViewService`, `LeitungPageController` ·
 **Decision:** ADR-0042, ADR-0331 · **Issues:** #800, #2987
 
-### REQ-ROLE-007 — The member rank follows officer reach
+### REQ-ROLE-007 — The member rank is set freely by the admin
 
 Besides the functional rank of REQ-ROLE-001, every account carries a numeric **member rank** from 1
 to 20 (`app_user.rank`), which an admin sets on the member-edit page
-(`PUT /api/v1/users/{id}/attributes`). Its permitted range follows the account's standing:
-
-- an **admin** may hold any rank **1–20**: the admin's pass on officer checks counts for this range;
-- for everyone else, an account with officer reach in **at least one** org unit, derived from a
-  leadership seat held with `KRT Member` (REQ-ROLE-002), holds ranks **1–12**;
-- an account with `KRT_MEMBER` and no officer reach holds ranks **13–20**;
-- an account with none of these is not range-checked; a ranked account's rank outside 1–20 is
-  `ILLEGAL_ARGUMENT`.
-
-A stored `OFFICER` role no longer sets a range. Because reach follows the seats the tool itself
-writes, a former lead can be given a rank above 12 as soon as their last seat is removed; no
-Keycloak change and no reconciliation is needed. The identity module asks the org-unit module through
-its own SPI (`OfficerReachDirectory`).
+(`PUT /api/v1/users/{id}/attributes`). **Any account may hold any rank 1–20**, independent of its
+roles and of whether it holds a leadership seat; keeping rank and seats consistent is the admin's
+call. A rank outside 1–20 is `ILLEGAL_ARGUMENT`. The member rank grants no rights: officer reach
+comes only from leadership seats (REQ-ROLE-002).
 
 **Officer surfaces read only the caller's reach.** The Leitung page lists and edits only the units
 where the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows
@@ -330,36 +321,23 @@ caller's seat on it reaches through the cascade (a Bereich or OL pin covers the 
 to nothing when it is not within reach (the page is then hidden); unpinned, the units of reach are
 the union. Admins are not restricted beyond their pin.
 
-A rank that does not fit the range is refused with `400 RANK_OUTSIDE_ROLE_RANGE`
-(`identity.api.RankOutsideRoleRangeException`). Its `detail` is localized and names the basis of the
-range (a leadership seat, or `KRT Member`) and what has to change in the tool. The problem body
-carries `role` (the basis: `LEADERSHIP_SEAT` or `KRT_MEMBER`), `minRank` and `maxRank`. The admin-only
-`GET /api/v1/users/{id}/rank-range` returns the basis (`ADMIN`, `LEADERSHIP_SEAT`, `KRT_MEMBER`, or
-none) and the bounds; the member-edit page shows them as a hint under the rank select, a refusal is
-shown on the rank field (the AJAX save answers `422 {rank: detail}`, the form post flashes
-`error.member.rank.outsideRoleRange`), so the admin can reset the rank and save the Staffel change in
-the same form. A rank that differs from the stored one records `MEMBER_RANK_CHANGED` in the Rollen &
-Mitglieder audit area, with only the old and new rank in its details (REQ-AUDIT-001); an unchanged or
-refused rank records nothing.
+A rank that differs from the stored one records `MEMBER_RANK_CHANGED` in the Rollen & Mitglieder
+audit area, with only the old and new rank in its details (REQ-AUDIT-001); an unchanged or refused
+rank records nothing.
 
 **Acceptance**
 
-- [x] A rank above 12 for an account with officer reach, or below 13 for a `KRT_MEMBER` without it,
-  is refused with `RANK_OUTSIDE_ROLE_RANGE`, its basis-specific detail and the range; the stored rank
-  does not change.
-- [x] An admin may hold any rank 1–20; a stored `OFFICER` role without a seat sets no range.
-- [x] The member-edit page names the refusal on the rank field and no membership change is sent with
-  it; a save with an unchanged, fitting rank sends the Staffel set as usual.
-- [x] The page shows the basis and the permitted range under the rank select.
+- [x] Any rank 1–20 is accepted for every account — with or without a leadership seat, with or
+  without `KRT Member`, admin or not.
+- [x] A rank outside 1–20 is refused with `ILLEGAL_ARGUMENT`; the stored rank does not change.
 - [x] A changed rank writes one `MEMBER_RANK_CHANGED` audit row; an unchanged or refused rank writes
   none.
 
-**Enforced by:** `UserServiceRankTest`, `UserServiceAttributesTest`, `OrgUnitOfficerReachDirectoryTest`,
-`UserControllerTest`, `DomainProblemContractTest`, `ProblemCodeRegistryTest`,
+**Enforced by:** `UserServiceRankTest`, `UserServiceAttributesTest`,
 `MemberManagementControllerTest` · **Code:** `UserService#updateUserAttributes`,
-`UserService#findRankRange`, `RankRange`, `RankOutsideRoleRangeException`, `OfficerReachDirectory`,
-`IdentityProblemCode`, `MemberManagementController#updateMemberAjax`, `identity/member-edit.html` ·
-**Decision:** ADR-0264, ADR-0300 · **Issues:** #2636, #2844
+`MemberManagementController#updateMember`, `identity/member-edit.html` ·
+**Decision:** ADR-0348, ADR-0300 · **Issues:** #2636, #2844
+
 ## Out of scope
 
 - Per-rank / per-feature differentiation of rights beyond the SK-lead-equivalent baseline.
