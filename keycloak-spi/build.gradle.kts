@@ -16,7 +16,6 @@ dependencies {
   compileOnly(libs.keycloak.services)
   compileOnly(libs.keycloak.core)
   compileOnly(platform(libs.protobuf3.bom))
-  compileOnly(platform(libs.vertx.bom))
   compileOnly(platform(libs.opentelemetry.bom))
 
   testImplementation(platform(libs.junit.bom))
@@ -31,7 +30,6 @@ dependencies {
   testImplementation(libs.keycloak.core)
   testImplementation(libs.jboss.logmanager) { isTransitive = false }
   testImplementation(platform(libs.protobuf3.bom))
-  testImplementation(platform(libs.vertx.bom))
   testImplementation(platform(libs.opentelemetry.bom))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
