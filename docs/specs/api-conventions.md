@@ -268,9 +268,9 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`),
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
   `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes) and
-  `identity.api.IdentityProblemCode` (`RANK_OUTSIDE_ROLE_RANGE`, REQ-ROLE-007). Names and wire
-  values did not change when they left `CoreProblemCode`; the registry holds 81 codes across the
-  ten enums. Two are
+  `orgunit.api.OrgUnitProblemCode` (`LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER`). Names and wire values
+  did not change when they left `CoreProblemCode`; the registry holds 81 codes across the ten
+  enums. Two are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039) and
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109). `APP_UPDATE_REQUIRED` left the registry with the app
   floor (REQ-API-020, superseded). Every producer references the enum; no code is a literal any
