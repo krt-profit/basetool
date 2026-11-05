@@ -2,8 +2,9 @@
 
 - **Status:** Accepted — the "stated quantity, no live-read" decision is **partially superseded by
   ADR-0108** for *stock-backed* item offers (an item offer released from a Lager item-stock row has a
-  live, stock-clamped quantity). The discriminated-aggregate model, the `product_key` identity and
-  the free-stated flavour are unchanged.
+  live, stock-clamped quantity). The `product_key` identity is **amended by ADR-0343** (keyed by
+  the produced item's GUID). The discriminated-aggregate model and the free-stated flavour are
+  unchanged.
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
 - **Related:** ADR-0082 (extends D1; the partial-offer amount ADR is a separate D1 amendment) · ADR-0108 (partially supersedes; stock-backed item offers) · spec REQ-MARKET-012 (`docs/specs/materialboerse.md`) · REQ-AUDIT-001 · REQ-OBS-011 · REQ-FE-010

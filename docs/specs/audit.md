@@ -448,11 +448,73 @@ audited (`basetool_navigation_preference_writes_total`, REQ-OBS-011).
 **Enforced by:** `StockLevelIntegrationTest`, `OfficerCutMigrationTest`,
 `SonderkontoBucketRetirementMigrationTest`, `AdminAuditLogPageControllerTest`
 
+#### Planned amendment — the catalogue admin area (ADR-0346)
+
+> [!note] Planned — implementation pending (#2901; ADR-0346)
+> Built with the orphan sweep and change report of the P4K import
+> ([ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md)).
+> Until then the catalogue admin area writes no audit events.
+
+The coverage list gains the **Katalog** area
+([ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md)):
+
+- **Katalog** (`AuditDomain.CATALOGUE`, `ADMIN` only) — every state-mutating activity of the
+  catalogue admin area, one event type per entity kind and verb in the style of the other areas:
+  - the P4K import ([`p4k-catalogue.md`](p4k-catalogue.md)): a PREVIEW enqueued and an APPLY, one
+    event per run with the Build, the run id and the counts per kind;
+    `CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN`, one event per kind whose sweep ran on the admin's "apply
+    marking anyway" override, with the kind, the rows to stamp and their share in percent; and the
+    resolution of a review case as keep or hide, one event per case;
+  - the manual delete of sync reports, with the source, `olderThanDays` and the deleted count (the
+    automatic `pruneRuns` stays a log line);
+  - every catalogue master-data mutation: materials, material categories and material external
+    aliases; manufacturer and ship-type visibility; locations; terminals, their loading-dock and
+    auto-load overrides included; the loading-dock overrides on cities, outposts, POIs and space
+    stations; star systems; frequency types, activate and reorder included; job types, activate
+    included;
+  - the starmap and its places
+    ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)): an
+    admin setting or clearing the link of a UEX location to a starmap object, creating a storage
+    place on a starmap node without a UEX row, and setting a starmap object visible or hidden
+    against the visibility rule (#2902);
+  - an admin's manual link of a P4K shop to a UEX terminal
+    ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md), #3028);
+  - the scheduled UEX and SC Wiki syncs, one summary event per run and source with the added,
+    updated and stamped counts, actor `system`; the detail stays in `external_sync_report`;
+  - `CATALOGUE_AUDIT_EXPORTED` and `CATALOGUE_AUDIT_PURGED`, as every area records its export and
+    purge (REQ-AUDIT-003, REQ-AUDIT-004).
+
+  The subject is the row's UUID, or the run id for a P4K run or a sync, labelled by the row's
+  display name at event time; there is no target user. An update event names only the changed
+  fields (`changed=name,category`); values appear only for enums and switches (`visible=false`,
+  `autoLoad=true`). Admin-entered free text never enters the details payload. Refining methods and
+  the UEX refinery sync stay in **Raffinerie**, quality tiers in **Aufträge**. `p4k_import_change`
+  stays the never-pruned detail record of a run beside the trail.
+
+The new types join the viewer's per-area event-type list and the DE/EN labels
+(`admin.audit.domain.CATALOGUE`, `admin.audit.event.*`, `pdf.audit.title.CATALOGUE`), both exhaustive
+domain switches (purge marker, export marker) gain the case, and `basetool_audit_events_total{domain}`
+counts them (REQ-OBS-011).
+
+**Acceptance**
+
+- [ ] For a representative mutation of each activity above a test asserts exactly one `CATALOGUE`
+  event (type, actor, subject); an update names changed fields only.
+- [ ] Every `CATALOGUE` event type is offered by the Katalog tab and carries a label
+  (`AdminAuditLogPageControllerTest`).
+
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
-All thirteen logs are read on **one** admin page (`/admin/audit-log`) with a **tab switcher**
+> [!note] Planned amendment — the Katalog tab (#2901; [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md))
+> The viewer gains a fifteenth tab, **Katalog** (`domain=CATALOGUE`), for the area of the
+> REQ-AUDIT-001 amendment. Like every other area it is read, exported and purged by admins only,
+> and the global 730-day ceiling of REQ-AUDIT-006 sweeps it through `AuditRetentionTask` with no
+> retention of its own. `CATALOGUE` joins the low-traffic exclusions of `AuditDomainSilenceAnomaly`
+> (REQ-OBS-011); sync outages are reported by the sync monitoring instead.
+
+All fourteen logs are read on **one** admin page (`/admin/audit-log`) with a **tab switcher**
 (Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen ·
-Materialbörse · Hangar · Blueprints · Verbundene Anwendungen · Bedarf & Spenden) built from the design-system `.tab-nav` component. The bank tab reads
+Materialbörse · Hangar · Blueprints · Verbundene Anwendungen · Bedarf & Spenden · Ankauf) built from the design-system `.tab-nav` component. The bank tab reads
 the existing `/api/v1/bank/admin/audit` endpoint; the generic area tabs read `/api/v1/audit/{domain}`;
 both DTO
 shapes are adapted into one uniform row view so a single
@@ -465,7 +527,7 @@ redirects here with the bank tab preselected.
 
 **Acceptance**
 
-- [ ] An admin sees one tab per audited area (thirteen); switching a tab loads that area's log; filtering/paging stays in place.
+- [ ] An admin sees one tab per audited area (fourteen; fifteen with the planned Katalog tab); switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
 - [x] The client filter is offered on **every** tab, the bank included; selecting it reaches the
   backend as a query parameter and survives paging.

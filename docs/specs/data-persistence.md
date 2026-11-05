@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-05.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -940,6 +940,10 @@ failure rather than a census check that silently degrades to comparing sizes. Ro
 serves without a UUID each count as their own row, so an id-less feed does not read as one row
 repeated N times.
 
+The P4K import is a file import, not a page walk, so this census does not fit it: its sweep follows
+[REQ-P4K-011](p4k-catalogue.md#req-p4k-011--a-complete-kind-sweeps-the-rows-it-no-longer-lists-on-a-valid-census-only)
+(a complete kind, at least one record, no repeated GUID, and the mass guard of REQ-P4K-012).
+
 **Acceptance** (`UexItemSyncServiceTest`): a run in which one category fetch comes back incomplete
 ingests the other categories but runs no sweep; a run in which a category answers *completely* with
 zero rows still sweeps. (`StalePriceSweepTest`): the same rows are cleared as the `NOT IN` form
@@ -1296,7 +1300,13 @@ Production held no value outside the range when the checks were added (read-only
 **Enforced by:** `V261QualityTierMigrationTest`, `QualityTierServiceTest` · **Code:** `Quality`,
 `QualityValue`, V265, `ScWikiBlueprintSyncService`, `P4kImportService`
 
-### REQ-DATA-024 — a game item's size, grade and class come from the SC Wiki only (ADR-0283)
+### REQ-DATA-024 — a game item's size, grade and class come from the SC Wiki only (ADR-0283) *(superseded)*
+
+> [!warning] Superseded 2026-11-05 by
+> [REQ-P4K-017…019](p4k-catalogue.md#req-p4k-017--the-p4k-leads-a-game-items-attributes-and-the-sc-wiki-fills-only-its-gaps)
+> / [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
+> — kept for the reasoning. The P4K catalogue leads size, grade and class and the SC Wiki fills
+> only its gaps; the rule below holds until those requirements are implemented.
 
 A `game_item` row carries a ship component's **size** (`size_class`), **grade** (`grade`) and
 **class** (`item_class`). All three are written by the SC Wiki item sync and by nothing else: the
@@ -1329,24 +1339,11 @@ P4K import and the UEX sync leave them alone.
 `V307MigrationTest`, `ExternalCatalogueMappingTest` · **Code:** `ShipComponentClass`,
 `ScWikiItemSyncService#applyWikiFields`, V307 · **Issues:** #2720
 
-### REQ-DATA-025 — a P4K description is stored with real line breaks
+### REQ-DATA-025 — a P4K description is stored with real line breaks *(moved)*
 
-The game's localisation writes a line break inside a description as the two characters backslash
-and `n`. The P4K import decodes every such pair in the English and German description of a
-commodity, a manufacturer, an item and a ship into a real line break before it matches, fills or
-seeds anything, so `material.description`, `manufacturer.description` and the `description_en` /
-`description_de` of `game_item` and `ship_type` never hold the escaped form. V308 decoded the rows
-already stored. The material detail page shows the line breaks (`white-space: pre-line`).
-
-**Acceptance**
-
-- [x] An imported description `NDR: 08\nEffect: Toxic` (escaped) is stored with a real line break.
-- [x] V308 turns a stored escaped line break into a real one and leaves other text unchanged.
-- [x] The material detail page renders each line of the description on its own line.
-
-**Enforced by:** `P4kTextTest`, `P4kImportServiceTest#commodity_seededDescription_hasRealLineBreaks`,
-`V308MigrationTest` · **Code:** `P4kText`, the compact constructors of `P4kCommodityDto`,
-`P4kManufacturerDto`, `P4kItemDto` and `P4kShipDto`, V308, `catalogue/material-detail.css`
+> [!note] Moved 2026-11-05 to
+> [REQ-P4K-045](p4k-catalogue.md#req-p4k-045--a-p4k-description-is-stored-with-real-line-breaks)
+> in [`p4k-catalogue.md`](p4k-catalogue.md), the spec of the P4K import. The id stays reserved here.
 
 ### REQ-DATA-026 — a UEX vehicle reaches its ship type through a curated alias when nothing else ties them (ADR-0307)
 
@@ -1389,7 +1386,13 @@ request and no sync writes it.
 `ShipTypeRepository#findBy…UexAlias…` queries, `UexVehicleService`, `ScWikiVehicleSyncService`,
 `P4kImportService`, V310
 
-### REQ-DATA-027 — a crafted item's blueprint stat base values come from the SC Wiki item payload (ADR-0309)
+### REQ-DATA-027 — a crafted item's blueprint stat base values come from the SC Wiki item payload (ADR-0309) *(superseded)*
+
+> [!warning] Superseded 2026-11-05 by
+> [REQ-P4K-030](p4k-catalogue.md#req-p4k-030--a-crafted-items-blueprint-stat-base-values-come-from-the-p4k-and-the-sc-wiki-fills-gaps)
+> / [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)
+> — kept for the reasoning. The P4K catalogue leads the stat base values and the SC Wiki fills
+> gaps; the rule below holds until REQ-P4K-030 is implemented.
 
 A blueprint modifier names the stat it changes by its SC Wiki `property_key` (`health_maxhealth`,
 `weapon_damage`, `armor_temperaturemin`, …) and gives only the factor a quality applies. The value

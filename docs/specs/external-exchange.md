@@ -7,7 +7,11 @@
 > [ADR-0219](../adr/0219-the-exchange-contract-grows-additively-under-a-path-major-version.md),
 > [ADR-0220](../adr/0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md),
 > [ADR-0221](../adr/0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md),
-> [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md)
+> [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md);
+> planned: [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
+> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md),
+> [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
 
 # External client exchange
 
@@ -806,6 +810,31 @@ not resolve; a response carries at most 50 warnings. Per catalogue:
 | `MATERIAL` | the material id | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
 | `SHIP_TYPE` | the ship type id | `class_name` | Wiki UUID | UEX vehicle id | `name_key` | the hangar import's `ShipTypeMatcher` |
 
+> [!note] Planned amendment — ship types match by GUID and class name before name (#2897;
+> [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md))
+> The hangar import's `ShipTypeMatcher` and the `SHIP_TYPE` row resolve in one order: the P4K GUID
+> (`ship_type.p4k_uuid`) and the class name first, then the UEX vehicle id and the curated class-name
+> alias of ADR-0307, then the name as the last step. A name that matches several ship types answers
+> `ambiguous` with at most ten `{bt, name}` candidates, never the first duplicate. A class name
+> resolves to the ship type that carries exactly that class name; when none does and the catalogue
+> record has `variantOf`, it resolves to the ship type of its group base. Variants are never merged.
+> The row becomes:
+>
+> | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
+> | --- | --- | --- | --- | --- | --- | --- |
+> | `SHIP_TYPE` | the ship type id | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the normalised name; duplicates `ambiguous` |
+>
+> Narrowing what `name` resolves is a behaviour change within `v1`: `docs/exchange/changelog.md`
+> records it after a check against `docs/exchange/versioning.md` (REQ-XCH-026, ADR-0219), and
+> `ExchangeResolveServiceTest` covers the precedence, duplicate names and a variant's class name.
+
+> [!note] Planned amendment — a blueprint reference carries its produced item's GUID (#2893;
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
+> A blueprint reference gains the field `guid`: the DataForge GUID of the produced item, the key of
+> a personal blueprint, never a Wiki UUID. `bt` stays readable for 90 days from the release that
+> adds `guid`, deprecated and announced in the exchange documentation, then it is removed
+> (REQ-XCH-015).
+
 The backend answers on `POST /api/v1/exchange/catalog/resolve` for any exchange capability; the
 gateway reports unknown request fields as `UNKNOWN_FIELD` warnings (WP 3.2).
 
@@ -900,6 +929,16 @@ Blueprints domain with the external client. An `add` records the client and the 
 A blueprint's `key` and its `ref.bt` are the same value: the normalised product key, or `h:` and
 its SHA-256 in hex when that is longer than 128 characters. The display name is cut to 200. The
 resolver (REQ-XCH-012) answers a blueprint with the same `bt` and accepts it back.
+
+> [!note] Planned amendment — blueprints carry `guid`, and `bt` is deprecated (#2893;
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
+> A personal blueprint is keyed by its produced item's DataForge GUID (REQ-INV-070). A blueprint
+> reference gains `guid`, additive in the v1 schemas (REQ-XCH-026). `bt` is deprecated: it stays
+> for 90 days from the release that adds `guid`, the exchange documentation (`docs/exchange/`)
+> announces it, a usage metric under bounded labels (REQ-OBS-011) watches it, and then it is
+> removed. The
+> change feed's entity key and the journal move to the GUID key in the same step as the member's
+> rows, so the system holds one key and no translation layer.
 
 **Acceptance**
 
@@ -1205,6 +1244,14 @@ units (REQ-XCH-047, ADR-0257); without it the answer is exactly as described her
 
 The backend serves the location list as `GET /api/v1/exchange/catalog/locations` (any exchange
 scope), one query, a city link winning over a space-station link.
+
+> [!note] Planned amendment — a linked place carries its starmap `guid` (#2896;
+> [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md))
+> `uex: {kind, id}` stays and is not deprecated. A place linked to a P4K starmap object additionally
+> carries that object's `guid`, additive in the v1 schemas (`location`, `location-ref`;
+> REQ-XCH-026). The write resolver of REQ-XCH-016 tries `guid`, then `uex`, then the exact name.
+> The name a place carries is `location.name`, the curated name, never the P4K name of the starmap
+> object.
 
 The backend serves the demand as `GET /api/v1/exchange/me/org-demand` (`exchange.demand.read`): the
 open and in-progress orders a unit of the member's memberships is responsible for. A material line
@@ -2998,6 +3045,58 @@ query per lot or line.
 `ExchangeOrgStockService`, `ExchangeDemandService`, `InventoryItemRepository#EXCHANGE_LOTS` and
 `#EXCHANGE_ORG_LOTS` · **Status:** built (#2748)
 
+### REQ-XCH-050 — Game texts and game media never leave the Basetool to third parties
+
+> [!note] Planned — implementation pending (#2894;
+> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md))
+> Nothing yellow or red leaves today: no exchange DTO or schema carries a description,
+> `displayType`, lore, image or URL field, and the exchange queries (`EXCHANGE_LOTS`,
+> `ExchangeShipRow`) select no description column. What is missing is the structural guard below.
+
+Data is classified **by content, per column**; a column has exactly one class, whichever writer
+fills it (P4K import, SC Wiki, UEX, admin):
+
+- **`@GameText`** (yellow) marks every description column — `GameItem.description_en` /
+  `description_de`, `ShipType.description_en` / `description_de`, `Manufacturer.description` and
+  the planned `Manufacturer.description_de`, `Material.description` — and `displayType` should it ever be persisted. The
+  classification rule itself is in [`p4k-catalogue.md`](p4k-catalogue.md).
+- **`@GameMedia`** (red) exists and marks no column: no archive media is in scope. The UEX link and
+  image columns (`uex_screenshot`, `url_photo`, `url_video`, `url_store`, …) stay unmarked UEX data.
+
+Neither class ever reaches a third party. The rule covers every outflow to third parties; three
+guards hold it for the exchange, and every new outbound integration (the VerseKit sync, #2821)
+joins the first two:
+
+1. **Getter rule.** An ArchUnit rule fails the build when code of an outbound integration — today
+   the backend's `exchange` module — calls the getter of a `@GameText` or `@GameMedia` field.
+2. **Field ratchet.** A ratchet test lists every field of the backend exchange DTOs, recursively,
+   and every property of the published v1 schemas and the OpenAPI document, each with a green class
+   (identifier, short name, fact value, member free text, client data). An unlisted field fails the
+   build, a yellow or red class is refused, and a DTO field and its schema property must agree, so a
+   new DTO field is declared in its v1 schema in the same pull request. Model:
+   `CredentialFieldRatchetTest`.
+3. **Fail-closed gateway.** A backend answer that carries a property its response schema does not
+   declare is answered `502 BACKEND_RELAY_FAILED` like a schema violation (REQ-XCH-011), never passed
+   on. The content of a declared free-form map (`extensions`, `additionalProperties` with a schema)
+   passes verbatim. This changes the frozen exchange path (REQ-XCH-036): the goldens are re-recorded
+   and the pull request carries the `e2e` label.
+
+**Monitoring.** `basetool_ingest_exchange_relay_total` gains the outcome `answer_contract_broken`
+for an answer refused by guard 3 or by its response schema, and an alert fires on any increase. The
+WARN line names the route and the field path, never the value (REQ-OBS-004, REQ-OBS-011).
+
+**Acceptance**
+
+- [ ] A call from the `exchange` module to the getter of a `@GameText` field fails the ArchUnit
+  rule (planted violation).
+- [ ] A new DTO field or schema property without a listed green class, a yellow or red class, and a
+  DTO field missing from its schema each fail the ratchet.
+- [ ] A backend answer with an undeclared property is answered `502` and counted
+  `answer_contract_broken`; a declared free-form map passes unchanged. *Goldens re-recorded.*
+- [ ] The alert on `answer_contract_broken` has a promtool rule test.
+
+**Enforced by:** — (planned) · **Status:** planned (#2894)
+
 ## Threat model
 
 | Threat | Countered by |
@@ -3030,6 +3129,7 @@ query per lot or line.
 | Token leakage via backups, diagnostics or a problem-report webhook | client security requirements (REQ-XCH-027) |
 | A switchable issuer used for phishing | only through a developer environment variable, never in the UI (REQ-XCH-027) |
 | The installation label as a spoofing channel or PC-name leak | length and character limits, always after the client name, never logged or audited (REQ-XCH-007) |
+| Game texts or game media reaching a third party through a new field | classification by content (`@GameText`, `@GameMedia`), the getter rule, the field ratchet over DTOs and v1 schemas, and the fail-closed gateway that answers an undeclared property `502` (REQ-XCH-050, ADR-0344) — planned |
 
 ## Out of scope
 
