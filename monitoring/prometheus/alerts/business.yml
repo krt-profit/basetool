@@ -299,13 +299,20 @@ groups:
           description: "More than 50 org-stock ops of one registered client (client_id) were rejected in the last hour: writes to pools the member is no Logistician of, to personal or foreign entries, with stale versions, unknown holders, earmarked or offered stock, or earmarks to wrong targets or beyond the entry. A client that ignores the per-op reasons, or one probing other units' pools, looks like this. Check the client's recent org-stock writes and consider suspending it (REQ-XCH-045, REQ-XCH-028)."
 
       - alert: ExchangeInstallationSurge
-        expr: sum by (client_id) (increase(basetool_exchange_installations_created_total[1h])) > 20
+        expr: >-
+          sum by (client_id) (increase(basetool_exchange_installations_created_total[1h])) > 20
+          and
+          sum by (client_id) (increase(basetool_exchange_installations_created_total[1h]))
+          > 3 * (
+            max_over_time(sum by (client_id) (increase(basetool_exchange_installations_created_total[1h]))[7d:1h] offset 1d)
+            or 0 * sum by (client_id) (increase(basetool_exchange_installations_created_total[1h]))
+          )
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Many new installations of one exchange client"
-          description: "More than 20 new installations of one registered client (client_id) connected in the last hour. A release day can explain it; a device-code phishing wave or a leaked client cannot. Check the new-connection notifications and the installations on the admin page, and suspend the client if the connections are not expected (REQ-XCH-007, REQ-XCH-028)."
+          description: "More than 20 new installations of one registered client (client_id) connected in the last hour, and more than three times its busiest hour in the seven days before the last day. A release day or a promotion can explain it; a device-code phishing wave or a leaked client cannot. Check the new-connection notifications and the installations on the admin page, and suspend the client if the connections are not expected (REQ-XCH-007, REQ-XCH-028)."
 
       - alert: ExchangeBulkUndoFailed
         expr: sum(increase(basetool_scheduled_job_executions_total{task="exchange_bulk_undo",outcome="failure"}[1h])) > 0
@@ -938,9 +945,10 @@ groups:
 
       - alert: ExchangeClientDeviceLoginSurge
         expr: >-
-          (
-            sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h]))
-            > 3 * sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[7d] offset 1h)) / 168
+          sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h]))
+          > 3 * (
+            max_over_time(sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h]))[7d:1h] offset 1d)
+            or 0 * sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h]))
           )
           and
           sum by (client_id) (increase(keycloak_user_events_total{event="oauth2_device_verify_user_code", error="", client_id!~"|unknown|null"}[1h])) >= 5
@@ -949,7 +957,7 @@ groups:
           severity: warning
         annotations:
           summary: "Unusually many device logins for one client"
-          description: "Members confirmed device codes for {{ $labels.client_id }} more than three times as often in the last hour as in its average hour of the past week (at least 5). For a client with a browser-extension build, whose Keycloak Web Origins are *, this is the signal of a page driving that client's device flow in members' browsers (ADR-0303). Check who connected on the Exchange dashboard and the connected-apps audit trail; suspend the client under Administration - Verbundene Anwendungen if the logins are not the client's own."
+          description: "Members confirmed device codes for {{ $labels.client_id }} more than three times as often in the last hour as in its busiest hour in the seven days before the last day (at least 5), so an evening peak or a growing audience stays silent. For a client with a browser-extension build, whose Keycloak Web Origins are *, this is the signal of a page driving that client's device flow in members' browsers (ADR-0303). Check who connected on the Exchange dashboard and the connected-apps audit trail; suspend the client under Administration - Verbundene Anwendungen if the logins are not the client's own."
 
       - alert: ExchangeClientTokenRequestSurge
         expr: >-

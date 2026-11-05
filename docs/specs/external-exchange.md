@@ -1949,9 +1949,11 @@ tombstones and journal reports task metrics.
   `clientId` and `KC_EVENT_METRICS_USER_EVENTS` the `oauth2_device_*` events, so
   `keycloak_user_events_total` has a `client_id` label (bounded by the realm's clients, `unknown`
   for any other). `ExchangeClientDeviceLoginSurge` fires when members confirm device codes for one
-  client more than three times as often in an hour as in its average hour of the past week (at
-  least 5), `ExchangeClientTokenRequestSurge` on the same relative rule for device-code redemptions
-  and refreshes of an exchange client when at least 30 of them in the hour are more than the
+  client more than three times as often in an hour as in its busiest hour of the seven days before
+  the last day (at least 5), so evening peaks and steady growth stay silent while a wave beyond
+  anything the client saw that week fires and keeps firing through its first day;
+  `ExchangeClientTokenRequestSurge` fires when device-code redemptions and refreshes of an exchange
+  client are more than three times its average hour of the past week and at least 30 of them in the hour are more than the
   client's gateway traffic explains at three times its usual token requests per gateway request (so
   a growing audience or an evening peak, which raise both, stays silent), and
   `KeycloakEventMetricsUntagged` when the

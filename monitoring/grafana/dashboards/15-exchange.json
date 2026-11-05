@@ -591,7 +591,7 @@
       },
       "type": "timeseries",
       "title": "Installations created/day per client",
-      "description": "Installations of the selected clients seen for the first time. ExchangeInstallationSurge fires above 20 an hour for one client (REQ-XCH-007, REQ-XCH-028).",
+      "description": "Installations of the selected clients seen for the first time. ExchangeInstallationSurge fires above 20 an hour for one client and three times its busiest hour of the seven days before the last day (REQ-XCH-007, REQ-XCH-028).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1149,7 +1149,7 @@
       },
       "type": "timeseries",
       "title": "Keycloak sign-in events per client",
-      "description": "Keycloak's own user events of the selected clients per hour: device codes members confirmed (oauth2_device_verify_user_code), device codes redeemed for tokens (oauth2_device_code_to_token) and refreshes, failed ones under their error. A device flow that is only started or polled emits no event, so it does not show here. ExchangeClientDeviceLoginSurge compares the last hour with the client's own week; ExchangeClientTokenRequestSurge also weighs it against the client's gateway traffic, so more members stay silent (ADR-0303, REQ-XCH-028).",
+      "description": "Keycloak's own user events of the selected clients per hour: device codes members confirmed (oauth2_device_verify_user_code), device codes redeemed for tokens (oauth2_device_code_to_token) and refreshes, failed ones under their error. A device flow that is only started or polled emits no event, so it does not show here. ExchangeClientDeviceLoginSurge compares the last hour with the client's busiest hour of the week before; ExchangeClientTokenRequestSurge also weighs it against the client's gateway traffic, so more members stay silent (ADR-0303, REQ-XCH-028).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

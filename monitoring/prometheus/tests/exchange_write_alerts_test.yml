@@ -156,7 +156,7 @@ tests:
               client_id: versekit
             exp_annotations:
               summary: "Many new installations of one exchange client"
-              description: "More than 20 new installations of one registered client (client_id) connected in the last hour. A release day can explain it; a device-code phishing wave or a leaked client cannot. Check the new-connection notifications and the installations on the admin page, and suspend the client if the connections are not expected (REQ-XCH-007, REQ-XCH-028)."
+              description: "More than 20 new installations of one registered client (client_id) connected in the last hour, and more than three times its busiest hour in the seven days before the last day. A release day or a promotion can explain it; a device-code phishing wave or a leaked client cannot. Check the new-connection notifications and the installations on the admin page, and suspend the client if the connections are not expected (REQ-XCH-007, REQ-XCH-028)."
 
   - name: silent - a few new installations
     interval: 1m
