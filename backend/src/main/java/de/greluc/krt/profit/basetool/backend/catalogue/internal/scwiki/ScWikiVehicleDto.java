@@ -31,19 +31,32 @@ import lombok.Builder;
  *
  * <p>Only Wiki-owned fields are modelled; {@link #description} maps locale to text.
  *
- * @param uuid in-game asset UUID (the join key against {@code ship_type.external_uuid})
- * @param slug Wiki URL slug
- * @param name display name
- * @param gameName Wiki game-name field
- * @param className RSI engine class name
- * @param vehicleInventory vehicle internal inventory in micro-SCU (Wiki's {@code
- *     vehicle_inventory})
- * @param description locale to description text map
- * @param oreCapacity ore storage in SCU
- * @param maxMedicalTier medical service tier, such as {@code T2}
- * @param health hull health points
- * @param shieldHp shield health points
- * @param version upstream game build
+ * <dl>
+ *   <dt>{@code uuid}
+ *   <dd>in-game asset UUID (the join key against {@code ship_type.external_uuid})
+ *   <dt>{@code slug}
+ *   <dd>Wiki URL slug
+ *   <dt>{@code name}
+ *   <dd>display name
+ *   <dt>{@code gameName}
+ *   <dd>Wiki game-name field
+ *   <dt>{@code className}
+ *   <dd>RSI engine class name
+ *   <dt>{@code vehicleInventory}
+ *   <dd>vehicle internal inventory in micro-SCU (Wiki's {@code vehicle_inventory})
+ *   <dt>{@code description}
+ *   <dd>locale to description text map
+ *   <dt>{@code oreCapacity}
+ *   <dd>ore storage in SCU
+ *   <dt>{@code maxMedicalTier}
+ *   <dd>medical service tier, such as {@code T2}
+ *   <dt>{@code health}
+ *   <dd>hull health points
+ *   <dt>{@code shieldHp}
+ *   <dd>shield health points
+ *   <dt>{@code version}
+ *   <dd>upstream game build
+ * </dl>
  */
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
