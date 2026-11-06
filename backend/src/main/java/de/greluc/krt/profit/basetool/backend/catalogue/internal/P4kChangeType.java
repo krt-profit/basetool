@@ -41,5 +41,27 @@ public enum P4kChangeType {
    * A value of a closed set the import does not know, read as {@code null} (REQ-P4K-003); {@code
    * field_name} names the field, {@code new_value} holds the value.
    */
-  UNKNOWN_VALUE
+  UNKNOWN_VALUE,
+
+  /**
+   * A field of a matched row the run wrote (REQ-P4K-014); {@code field_name} names the column,
+   * {@code old_value} and {@code new_value} hold the values, both {@code null} for a game text.
+   */
+  CHANGED,
+
+  /**
+   * A P4K-known row the complete catalogue no longer lists, stamped by the sweep (REQ-P4K-011);
+   * {@code still_live_elsewhere} flags a row UEX or the SC Wiki still list (REQ-P4K-013).
+   */
+  VANISHED,
+
+  /** A stamped row the run matched again, its stamp cleared (REQ-P4K-011). */
+  REAPPEARED,
+
+  /**
+   * A kind whose sweep did not run (REQ-P4K-011, REQ-P4K-012); {@code field_name} holds the {@link
+   * P4kSweepOutcome}, {@code old_value} the kind's P4K-known rows and {@code new_value} the rows
+   * the sweep would have stamped.
+   */
+  SWEEP_SKIPPED
 }

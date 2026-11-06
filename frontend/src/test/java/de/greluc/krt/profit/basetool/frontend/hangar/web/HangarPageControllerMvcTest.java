@@ -70,7 +70,8 @@ class HangarPageControllerMvcTest {
             BigDecimal.ZERO,
             false,
             new de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipCatalogueFacts(
-                0.71, 12.0, 2, 1000.0, 500.0, "4.10.2-LIVE"));
+                0.71, 12.0, 2, 1000.0, 500.0, "4.10.2-LIVE"),
+            false);
     ShipDto ship =
         new ShipDto(
             UUID.randomUUID(), "Stalker", type, "LTI", null, true, null, null, 0L, 0L, null, null);

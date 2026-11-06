@@ -80,6 +80,7 @@ public class AdminP4kImportPageController {
   @GetMapping
   public String view(@NotNull Model model) {
     model.addAttribute("jobsUrl", "/admin/p4k-import/jobs");
+    model.addAttribute("pageUrl", "/admin/p4k-import");
     return "catalogue/admin/p4k-import";
   }
 
@@ -140,6 +141,7 @@ public class AdminP4kImportPageController {
    *
    * @param id the preview job to apply
    * @param createItemsAndShips whether the run creates playable items and ships that match no row
+   * @param overrideMassGuard whether a kind is swept even above the 5 % mass guard (REQ-P4K-012)
    * @return {@code 202 Accepted} with the enqueued apply job
    */
   @PostMapping("/jobs/{id}/apply")
@@ -148,9 +150,12 @@ public class AdminP4kImportPageController {
   public ResponseEntity<P4kImportJobDto> applyJob(
       @PathVariable("id") @NotNull UUID id,
       @RequestParam(value = "createItemsAndShips", defaultValue = "false")
-          boolean createItemsAndShips) {
+          boolean createItemsAndShips,
+      @RequestParam(value = "overrideMassGuard", defaultValue = "false")
+          boolean overrideMassGuard) {
     P4kImportJobDto job =
-        withBackendStatus(() -> catalogueClient.applyP4kImportJob(id, createItemsAndShips));
+        withBackendStatus(
+            () -> catalogueClient.applyP4kImportJob(id, createItemsAndShips, overrideMassGuard));
     cacheEviction.evict(
         CacheDomain.MATERIAL,
         CacheDomain.MANUFACTURER,

@@ -179,7 +179,7 @@ class AdminP4kImportPageControllerTest {
             .setHeader("Content-Type", "application/json")
             .setBody(jobJson(UUID.randomUUID().toString(), "APPLY", "PENDING")));
 
-    ResponseEntity<P4kImportJobDto> response = controller.applyJob(id, true);
+    ResponseEntity<P4kImportJobDto> response = controller.applyJob(id, true, true);
 
     assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
     assertNotNull(response.getBody());
@@ -189,7 +189,9 @@ class AdminP4kImportPageControllerTest {
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
     assertEquals(
-        "/api/v1/catalog/admin/import/p4k/jobs/" + id + "/apply?createItemsAndShips=true",
+        "/api/v1/catalog/admin/import/p4k/jobs/"
+            + id
+            + "/apply?createItemsAndShips=true&overrideMassGuard=true",
         req.getPath());
 
     verify(backendApiClient)
@@ -225,7 +227,8 @@ class AdminP4kImportPageControllerTest {
 
     ResponseStatusException ex =
         assertThrows(
-            ResponseStatusException.class, () -> controller.applyJob(UUID.randomUUID(), false));
+            ResponseStatusException.class,
+            () -> controller.applyJob(UUID.randomUUID(), false, false));
 
     assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }

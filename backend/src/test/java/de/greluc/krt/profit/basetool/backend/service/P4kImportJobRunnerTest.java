@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunn
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kPreviewReportCodec;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -107,6 +108,7 @@ class P4kImportJobRunnerTest {
         new P4kImportJobRunner(
             jobService,
             importService,
+            new P4kPreviewReportCodec(JsonMapper.builder().build()),
             cacheEvictionService,
             JsonMapper.builder().build(),
             authHelperService,
@@ -119,7 +121,7 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    stubAdmin(id);
+    stubAdmin(id, false);
     AtomicBoolean syncCouldRun = new AtomicBoolean(true);
     when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
         .thenAnswer(_ -> {
@@ -127,7 +129,7 @@ class P4kImportJobRunnerTest {
           return someResult();
         });
 
-    runner.run(id, P4kImportJobKind.APPLY, false, ADMIN);
+    runner.run(id, P4kImportJobKind.APPLY, ADMIN);
 
     assertThat(syncCouldRun).isFalse();
     verify(jobService).markSucceeded(eq(id), anyString());
@@ -137,9 +139,9 @@ class P4kImportJobRunnerTest {
   void run_apply_failsWithoutApplyingWhileASyncHoldsTheLock() throws Exception {
     UUID id = UUID.randomUUID();
     when(jobService.loadPayload(id)).thenReturn("{}".getBytes(StandardCharsets.UTF_8));
-    stubAdmin(id);
+    stubAdmin(id, false);
 
-    whileASyncHoldsTheLock(() -> runner.run(id, P4kImportJobKind.APPLY, false, ADMIN));
+    whileASyncHoldsTheLock(() -> runner.run(id, P4kImportJobKind.APPLY, ADMIN));
 
     verify(importService, never()).applyImport(any(), any());
     verify(jobService).markFailed(eq(id), contains("catalogue lock"));
@@ -151,9 +153,9 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    when(importService.previewImport(bytes)).thenReturn(someResult());
+    when(importService.previewImport(bytes)).thenReturn(somePreview());
 
-    whileASyncHoldsTheLock(() -> runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN));
+    whileASyncHoldsTheLock(() -> runner.run(id, P4kImportJobKind.PREVIEW, ADMIN));
 
     verify(jobService).markSucceeded(eq(id), anyString());
   }
@@ -206,13 +208,18 @@ class P4kImportJobRunnerTest {
   private static P4kImportResultDto someResult() {
     P4kImportResultDto.Counts zero = new P4kImportResultDto.Counts(null, 0, 0, 0, 0, 0, 0, 0);
     return new P4kImportResultDto(
-        true, true, null, zero, zero, zero, zero, zero, 0, UUID.randomUUID());
+        true, true, null, zero, zero, zero, zero, zero, 0, UUID.randomUUID(), List.of());
   }
 
-  private UUID stubAdmin(UUID jobId) {
+  private static P4kImportService.P4kPreview somePreview() {
+    return new P4kImportService.P4kPreview(someResult(), List.of());
+  }
+
+  private UUID stubAdmin(UUID jobId, boolean createItemsAndShips) {
     UUID admin = UUID.randomUUID();
     P4kImportJob job = new P4kImportJob();
     job.setCreatedBy(admin);
+    job.setCreateItemsAndShips(createItemsAndShips);
     when(jobService.getJob(jobId)).thenReturn(job);
     return admin;
   }
@@ -222,13 +229,14 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    when(importService.previewImport(bytes)).thenReturn(someResult());
+    when(importService.previewImport(bytes)).thenReturn(somePreview());
 
-    runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN);
+    runner.run(id, P4kImportJobKind.PREVIEW, ADMIN);
 
     InOrder order = inOrder(jobService, importService);
     order.verify(jobService).markRunning(id);
     order.verify(importService).previewImport(bytes);
+    order.verify(jobService).storePreviewReport(eq(id), any());
     order.verify(jobService).markSucceeded(eq(id), anyString());
     verify(importService, never()).applyImport(any(), any());
     verify(jobService, never()).deletePayload(any());
@@ -242,12 +250,12 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    UUID admin = stubAdmin(id);
+    UUID admin = stubAdmin(id, true);
     P4kImportService.P4kApplyRequest request =
-        new P4kImportService.P4kApplyRequest(id, admin, true);
+        new P4kImportService.P4kApplyRequest(id, admin, true, false);
     when(importService.applyImport(bytes, request)).thenReturn(someResult());
 
-    runner.run(id, P4kImportJobKind.APPLY, true, ADMIN);
+    runner.run(id, P4kImportJobKind.APPLY, ADMIN);
 
     verify(importService).applyImport(bytes, request);
     verify(importService, never()).previewImport(any());
@@ -262,15 +270,16 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    UUID admin = stubAdmin(id);
+    UUID admin = stubAdmin(id, false);
     AtomicReference<Authentication> actingAs = new AtomicReference<>();
-    when(importService.applyImport(bytes, new P4kImportService.P4kApplyRequest(id, admin, false)))
+    when(importService.applyImport(
+            bytes, new P4kImportService.P4kApplyRequest(id, admin, false, false)))
         .thenAnswer(_ -> {
           actingAs.set(authHelperService.currentAuthentication().orElse(null));
           return someResult();
         });
 
-    runner.run(id, P4kImportJobKind.APPLY, false, ADMIN);
+    runner.run(id, P4kImportJobKind.APPLY, ADMIN);
 
     assertThat(actingAs.get()).isSameAs(ADMIN);
     assertThat(authHelperService.currentAuthentication()).isEmpty();
@@ -281,11 +290,12 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    UUID admin = stubAdmin(id);
-    when(importService.applyImport(bytes, new P4kImportService.P4kApplyRequest(id, admin, false)))
+    UUID admin = stubAdmin(id, false);
+    when(importService.applyImport(
+            bytes, new P4kImportService.P4kApplyRequest(id, admin, false, false)))
         .thenThrow(new BadRequestException("empty catalog"));
 
-    runner.run(id, P4kImportJobKind.APPLY, false, ADMIN);
+    runner.run(id, P4kImportJobKind.APPLY, ADMIN);
 
     verify(jobService).markFailed(id, "empty catalog");
     verify(jobService).deletePayload(id);
@@ -299,7 +309,7 @@ class P4kImportJobRunnerTest {
     when(jobService.loadPayload(id)).thenReturn(bytes);
     when(importService.previewImport(bytes)).thenThrow(new BadRequestException("not valid JSON"));
 
-    runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN);
+    runner.run(id, P4kImportJobKind.PREVIEW, ADMIN);
 
     verify(jobService).markFailed(id, "not valid JSON");
     verify(jobService, never()).markSucceeded(any(), anyString());
@@ -311,10 +321,10 @@ class P4kImportJobRunnerTest {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(id)).thenReturn(bytes);
-    when(importService.previewImport(bytes)).thenReturn(someResult());
+    when(importService.previewImport(bytes)).thenReturn(somePreview());
     doThrow(new RuntimeException("db down")).when(jobService).pruneOldJobs();
 
-    assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN));
+    assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, ADMIN));
     verify(jobService).markSucceeded(eq(id), anyString());
   }
 
@@ -325,13 +335,14 @@ class P4kImportJobRunnerTest {
     var zero = new P4kImportResultDto.Counts(null, 0, 0, 0, 0, 0, 0, 0);
     var enriched = new P4kImportResultDto.Counts(null, 1, 1, 0, 0, 0, 0, 0);
     var result =
-        new P4kImportResultDto(false, false, null, zero, enriched, zero, zero, zero, 0, job);
+        new P4kImportResultDto(
+            false, false, null, zero, enriched, zero, zero, zero, 0, job, List.of());
     when(jobService.loadPayload(job)).thenReturn(bytes);
-    stubAdmin(job);
+    stubAdmin(job, false);
     when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
         .thenReturn(result);
 
-    runner.run(job, P4kImportJobKind.APPLY, false, ADMIN);
+    runner.run(job, P4kImportJobKind.APPLY, ADMIN);
 
     InOrder order = inOrder(importService, catalogueUpdates);
     order.verify(importService).applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class));
@@ -343,11 +354,11 @@ class P4kImportJobRunnerTest {
     UUID job = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(job)).thenReturn(bytes);
-    stubAdmin(job);
+    stubAdmin(job, false);
     when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
         .thenReturn(someResult());
 
-    runner.run(job, P4kImportJobKind.APPLY, false, ADMIN);
+    runner.run(job, P4kImportJobKind.APPLY, ADMIN);
 
     verifyNoInteractions(catalogueUpdates);
   }

@@ -175,11 +175,12 @@ class P4kImportJobServiceTest {
     when(jobRepository.findById(previewId)).thenReturn(Optional.of(preview));
     when(payloadRepository.copyPayload(any(UUID.class), eq(previewId))).thenReturn(1);
 
-    P4kImportJob apply = service.createApplyJob(previewId, true, user);
+    P4kImportJob apply = service.createApplyJob(previewId, true, true, user);
 
     assertEquals(P4kImportJobKind.APPLY, apply.getKind());
     assertEquals(P4kImportJobStatus.PENDING, apply.getStatus());
     assertTrue(apply.isCreateItemsAndShips());
+    assertTrue(apply.isOverrideMassGuard());
     assertEquals(previewId, apply.getPreviewJobId());
     assertEquals("p4k.json", apply.getSourceFilename());
     assertEquals(4096L, apply.getFileSizeBytes());
@@ -191,7 +192,7 @@ class P4kImportJobServiceTest {
     UUID id = UUID.randomUUID();
     when(jobRepository.findById(id)).thenReturn(Optional.empty());
     assertThrows(
-        NotFoundException.class, () -> service.createApplyJob(id, false, UUID.randomUUID()));
+        NotFoundException.class, () -> service.createApplyJob(id, false, false, UUID.randomUUID()));
     verify(payloadRepository, never()).copyPayload(any(), any());
   }
 
@@ -202,7 +203,8 @@ class P4kImportJobServiceTest {
     applyJob.setKind(P4kImportJobKind.APPLY);
     when(jobRepository.findById(id)).thenReturn(Optional.of(applyJob));
     assertThrows(
-        BadRequestException.class, () -> service.createApplyJob(id, false, UUID.randomUUID()));
+        BadRequestException.class,
+        () -> service.createApplyJob(id, false, false, UUID.randomUUID()));
   }
 
   @Test
@@ -211,7 +213,8 @@ class P4kImportJobServiceTest {
     when(jobRepository.findById(id))
         .thenReturn(Optional.of(jobWithId(id, P4kImportJobStatus.RUNNING)));
     assertThrows(
-        BadRequestException.class, () -> service.createApplyJob(id, false, UUID.randomUUID()));
+        BadRequestException.class,
+        () -> service.createApplyJob(id, false, false, UUID.randomUUID()));
   }
 
   @Test
@@ -223,7 +226,7 @@ class P4kImportJobServiceTest {
     when(payloadRepository.copyPayload(any(UUID.class), eq(previewId))).thenReturn(0);
     assertThrows(
         BadRequestException.class,
-        () -> service.createApplyJob(previewId, false, UUID.randomUUID()));
+        () -> service.createApplyJob(previewId, false, false, UUID.randomUUID()));
   }
 
   @Test

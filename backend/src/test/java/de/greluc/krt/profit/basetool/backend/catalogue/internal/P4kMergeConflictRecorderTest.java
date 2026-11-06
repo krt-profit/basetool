@@ -45,7 +45,7 @@ class P4kMergeConflictRecorderTest {
   @Mock private P4kImportRunRepository runs;
 
   @Test
-  void opensOneGuidConflictPerGuidNamingTheOtherRow() {
+  void opensOneGuidConflictPerGuidAboutItsRowNamingTheOtherRow() {
     UUID run = UUID.randomUUID();
     GameItem retired = row(null);
     GameItem survivor = row(run);
@@ -65,9 +65,11 @@ class P4kMergeConflictRecorderTest {
           assertThat(reviewCase.getLastRunId()).isEqualTo(run);
         });
     assertThat(cases.get(0).getGuid()).isEqualTo(retired.getP4kUuid());
-    assertThat(cases.get(0).getRowId()).isEqualTo(survivor.getId());
+    assertThat(cases.get(0).getRowId()).isEqualTo(retired.getId());
+    assertThat(cases.get(0).getOtherRowId()).isEqualTo(survivor.getId());
     assertThat(cases.get(1).getGuid()).isEqualTo(survivor.getP4kUuid());
-    assertThat(cases.get(1).getRowId()).isEqualTo(retired.getId());
+    assertThat(cases.get(1).getRowId()).isEqualTo(survivor.getId());
+    assertThat(cases.get(1).getOtherRowId()).isEqualTo(retired.getId());
     verify(runs, never()).findFirstByOrderByAppliedAtDesc();
   }
 

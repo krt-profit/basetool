@@ -31,8 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Puts two catalogue items that a Wiki/UEX duplicate merge would join but that carry different P4K
- * GUIDs on the P4K review list (REQ-P4K-007): one {@code GUID_CONFLICT} case per GUID, naming the
- * other row as the row it collides with. Neither row is changed; the administrator decides.
+ * GUIDs on the P4K review list (REQ-P4K-007): one {@code GUID_CONFLICT} case per GUID, about the
+ * row holding the GUID and naming the other row as the one it collides with. Neither row is
+ * changed; the administrator decides.
  */
 @Component
 @RequiredArgsConstructor
@@ -61,8 +62,8 @@ public class P4kMergeConflictRecorder {
     if (runId.isEmpty()) {
       return false;
     }
-    open(retiredGuid, survivor.getId(), runId.get());
-    open(survivorGuid, retired.getId(), runId.get());
+    open(retiredGuid, retired.getId(), survivor.getId(), runId.get());
+    open(survivorGuid, survivor.getId(), retired.getId(), runId.get());
     return true;
   }
 
@@ -88,10 +89,12 @@ public class P4kMergeConflictRecorder {
    * Creates the case of one GUID unless it exists; an existing case keeps its runs.
    *
    * @param guid the P4K GUID under review
+   * @param rowId the row holding the GUID
    * @param collidingRowId the other row the GUID would be merged into
    * @param runId the run a new case is filed under
    */
-  private void open(@NotNull UUID guid, @NotNull UUID collidingRowId, @NotNull UUID runId) {
+  private void open(
+      @NotNull UUID guid, @NotNull UUID rowId, @NotNull UUID collidingRowId, @NotNull UUID runId) {
     P4kReviewCase reviewCase =
         reviewCases
             .findByKindAndGuidAndReason(P4kKind.ITEM, guid, P4kReviewReason.GUID_CONFLICT)
@@ -105,7 +108,10 @@ public class P4kMergeConflictRecorder {
               return created;
             });
     if (reviewCase.getRowId() == null) {
-      reviewCase.setRowId(collidingRowId);
+      reviewCase.setRowId(rowId);
+    }
+    if (reviewCase.getOtherRowId() == null) {
+      reviewCase.setOtherRowId(collidingRowId);
     }
     reviewCases.save(reviewCase);
   }

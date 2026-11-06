@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.List;
 
 /**
  * Frontend mirror of the backend {@code P4kImportResultDto}, shared by a P4K import preview and
@@ -37,6 +38,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  * @param blueprints per-kind tallies for blueprints
  * @param ingredientsResolved number of blueprint ingredient links repaired
  * @param runId id of the recorded import run, or {@code null} for a preview
+ * @param sweeps what the sweep did per kind, or {@code null} in a result stored before the sweep
+ *     existed
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @DtoMirror
@@ -50,7 +53,27 @@ public record P4kImportResultDto(
     Counts commodities,
     Counts blueprints,
     long ingredientsResolved,
-    String runId) {
+    String runId,
+    List<Sweep> sweeps) {
+
+  /**
+   * What the sweep did, or in a preview would do, with one kind (REQ-P4K-011, REQ-P4K-012).
+   *
+   * @param kind the kind
+   * @param outcome {@code SWEPT} or why the sweep was skipped, or {@code null}
+   * @param known the kind's P4K-known rows, the base of the 5 % mass guard
+   * @param toStamp the rows the sweep stamps, or would have stamped
+   * @param vanished the rows the sweep stamped; in a preview the rows it would stamp
+   * @param reappeared stamped rows the run matched again
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Sweep(
+      @BackendEnumAsString String kind,
+      @BackendEnumAsString String outcome,
+      long known,
+      long toStamp,
+      long vanished,
+      long reappeared) {}
 
   /**
    * The Build of the imported catalogue and the patch version derived from it.

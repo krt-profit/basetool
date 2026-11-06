@@ -56,6 +56,7 @@ public class P4kImportJobMapper {
         job.getKind(),
         job.getStatus(),
         job.isCreateItemsAndShips(),
+        job.isOverrideMassGuard(),
         job.getSourceFilename(),
         job.getFileSizeBytes(),
         job.getPreviewJobId(),

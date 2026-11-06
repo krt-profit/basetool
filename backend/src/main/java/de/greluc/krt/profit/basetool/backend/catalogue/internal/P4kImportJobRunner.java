@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -60,6 +61,7 @@ public class P4kImportJobRunner {
 
   private final P4kImportJobService jobService;
   private final P4kImportService importService;
+  private final P4kPreviewReportCodec reportCodec;
   private final MasterDataCacheEvictionService cacheEvictionService;
   private final ObjectMapper objectMapper;
   private final AuthHelperService authHelperService;
@@ -71,20 +73,15 @@ public class P4kImportJobRunner {
    * failure is recorded on the job as {@link
    * de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus#FAILED FAILED}.
    *
-   * @param jobId the (already-committed) job to run
+   * @param jobId the (already-committed) job to run; an APPLY job carries the admin's choices
    * @param kind whether to preview or apply
-   * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
-   *     created
    * @param admin the authentication of the administrator who enqueued the job; the run acts under
    *     it, so its audit events name that administrator
    */
   @Async(AsyncConfig.IMPORT_EXECUTOR)
   public void run(
-      @NotNull UUID jobId,
-      @NotNull P4kImportJobKind kind,
-      boolean createItemsAndShips,
-      @NotNull Authentication admin) {
-    authHelperService.runAs(admin, () -> execute(jobId, kind, createItemsAndShips));
+      @NotNull UUID jobId, @NotNull P4kImportJobKind kind, @NotNull Authentication admin) {
+    authHelperService.runAs(admin, () -> execute(jobId, kind));
   }
 
   /**
@@ -92,11 +89,8 @@ public class P4kImportJobRunner {
    *
    * @param jobId the (already-committed) job to run
    * @param kind whether to preview or apply
-   * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
-   *     created
    */
-  private void execute(
-      @NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean createItemsAndShips) {
+  private void execute(@NotNull UUID jobId, @NotNull P4kImportJobKind kind) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;
     boolean changedCatalogue = false;
@@ -105,14 +99,23 @@ public class P4kImportJobRunner {
       byte[] bytes = jobService.loadPayload(jobId);
       P4kImportResultDto result;
       if (kind == P4kImportJobKind.APPLY) {
-        UUID createdBy = jobService.getJob(jobId).getCreatedBy();
+        P4kImportJob job = jobService.getJob(jobId);
         result =
             applyExclusively(
-                bytes, new P4kImportService.P4kApplyRequest(jobId, createdBy, createItemsAndShips));
+                bytes,
+                new P4kImportService.P4kApplyRequest(
+                    jobId,
+                    job.getCreatedBy(),
+                    job.isCreateItemsAndShips(),
+                    job.isOverrideMassGuard()));
         appliedMasterData = true;
         changedCatalogue = hasChanges(result);
       } else {
-        result = importService.previewImport(bytes);
+        P4kImportService.P4kPreview preview = importService.previewImport(bytes);
+        jobService.storePreviewReport(
+            jobId,
+            reportCodec.encode(preview.changes().stream().map(P4kImportChangeDto::of).toList()));
+        result = preview.result();
       }
       jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result));
       log.info("P4K import job {} ({}) succeeded.", jobId, kind);

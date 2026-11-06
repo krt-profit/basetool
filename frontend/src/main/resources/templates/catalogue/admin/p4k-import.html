@@ -74,6 +74,14 @@
             </p>
             <p class="form-hint" th:text="#{admin.p4kImport.createNew.hint}">Angelegt werden nur spielbare Datensätze.</p>
         </div>
+        <div id="krt-p4k-mass-guard-wrap" class="form-group" hidden>
+            <p class="form-hint" th:text="#{admin.p4kImport.massGuard.hint}">Der Abgleich würde mehr als 5 % dieser Typen markieren:</p>
+            <ul id="krt-p4k-mass-guard"></ul>
+            <label>
+                <input type="checkbox" id="krt-p4k-mark-anyway">
+                <span th:text="#{admin.p4kImport.massGuard.label}">Markierung trotzdem anwenden</span>
+            </label>
+        </div>
         <div class="cluster">
             <button type="button" id="krt-p4k-apply-confirm" class="btn btn--cta"
                     th:text="#{admin.p4kImport.apply.panel.confirm}">Jetzt anwenden</button>
@@ -132,6 +140,24 @@
             </table>
         </div>
 
+        <h3 class="p4k-section-title" th:text="#{admin.p4kImport.sweeps.title}">Abgleich verschwundener Datensätze</h3>
+        <div class="table-responsive">
+            <table class="data-table data-table--compact">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.p4kImport.col.type}">Typ</th>
+                    <th th:text="#{admin.p4kImport.sweeps.col.outcome}">Ergebnis</th>
+                    <th th:text="#{admin.p4kImport.sweeps.col.known}">Aus P4K bekannt</th>
+                    <th th:text="#{admin.p4kImport.sweeps.col.toStamp}">Zu markieren</th>
+                    <th th:text="#{admin.p4kImport.sweeps.col.vanished}">Markiert</th>
+                    <th th:text="#{admin.p4kImport.sweeps.col.reappeared}">Wieder aufgetaucht</th>
+                </tr>
+                </thead>
+                <tbody id="krt-p4k-sweeps">
+                </tbody>
+            </table>
+        </div>
+
         <p class="mt-2">
             <span th:text="#{admin.p4kImport.results.ingredients}">Zutaten-Verknüpfungen repariert</span>:
             <span id="krt-p4k-ingredients" class="data-value">0</span>
@@ -140,6 +166,92 @@
             <span th:text="#{admin.p4kImport.results.runId}">Lauf-ID</span>:
             <span id="krt-p4k-runid" class="data-value data-value--mono"></span>
         </p>
+    </section>
+
+    <section id="krt-p4k-report" class="card p4k-panel" hidden aria-labelledby="krt-p4k-report-title">
+        <div class="card-head">
+            <h2 id="krt-p4k-report-title" class="card-title"><span th:text="#{admin.p4kImport.report.title}">Änderungsbericht</span> · <span id="krt-p4k-report-subject"></span></h2>
+            <button type="button" id="krt-p4k-report-close" class="btn btn-ghost"
+                    th:text="#{admin.p4kImport.apply.panel.cancel}">Schließen</button>
+        </div>
+        <form class="search-form" onsubmit="return false">
+            <div>
+                <label for="krt-p4k-report-kind" th:text="#{admin.p4kImport.col.type}">Typ</label>
+                <select id="krt-p4k-report-kind">
+                    <option value="" th:text="#{admin.p4kImport.report.filter.all}">Alle</option>
+                </select>
+            </div>
+            <div>
+                <label for="krt-p4k-report-type" th:text="#{admin.p4kImport.report.col.change}">Änderung</label>
+                <select id="krt-p4k-report-type">
+                    <option value="" th:text="#{admin.p4kImport.report.filter.all}">Alle</option>
+                </select>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.p4kImport.col.type}">Typ</th>
+                    <th th:text="#{admin.p4kImport.report.col.change}">Änderung</th>
+                    <th th:text="#{admin.p4kImport.report.col.record}">Datensatz</th>
+                    <th th:text="#{admin.p4kImport.report.col.field}">Feld</th>
+                    <th th:text="#{admin.p4kImport.report.col.value}">Wert</th>
+                </tr>
+                </thead>
+                <tbody id="krt-p4k-report-rows">
+                </tbody>
+            </table>
+        </div>
+        <p id="krt-p4k-report-empty" class="text-muted" hidden th:text="#{admin.p4kImport.report.empty}">Keine Einträge.</p>
+        <nav id="krt-p4k-report-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+    </section>
+
+    <section class="p4k-jobs" aria-labelledby="krt-p4k-runs-title">
+        <h2 id="krt-p4k-runs-title" class="p4k-section-title" th:text="#{admin.p4kImport.runs.title}">Angewendete Läufe</h2>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.p4kImport.runs.col.applied}">Angewendet</th>
+                        <th th:text="#{admin.p4kImport.runs.col.build}">Build</th>
+                        <th th:text="#{admin.p4kImport.runs.col.counts}">Ergebnis</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody id="krt-p4k-runs">
+                    </tbody>
+                </table>
+            </div>
+            <p id="krt-p4k-runs-empty" class="text-muted" hidden th:text="#{admin.p4kImport.runs.empty}">Noch kein Lauf angewendet.</p>
+            <nav id="krt-p4k-runs-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </div>
+    </section>
+
+    <section class="p4k-jobs" aria-labelledby="krt-p4k-cases-title">
+        <h2 id="krt-p4k-cases-title" class="p4k-section-title" th:text="#{admin.p4kImport.review.title}">Zu prüfen</h2>
+        <p class="form-hint" th:text="#{admin.p4kImport.review.hint}">Behalten lässt den Datensatz unverändert; Ausblenden nimmt ihn aus allen Auswahllisten.</p>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.p4kImport.col.type}">Typ</th>
+                        <th th:text="#{admin.p4kImport.review.col.reason}">Grund</th>
+                        <th th:text="#{admin.p4kImport.report.col.record}">Datensatz</th>
+                        <th th:text="#{admin.p4kImport.review.col.row}">Basetool-Eintrag</th>
+                        <th th:text="#{admin.p4kImport.review.col.since}">Offen seit</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody id="krt-p4k-cases">
+                    </tbody>
+                </table>
+            </div>
+            <p id="krt-p4k-cases-empty" class="text-muted" hidden th:text="#{admin.p4kImport.review.empty}">Keine offenen Fälle.</p>
+            <nav id="krt-p4k-cases-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </div>
     </section>
 </main>
 </th:block>
@@ -175,10 +287,52 @@
         toastUploaded:    /*[[#{admin.p4kImport.toast.uploaded}]]*/ 'Uploaded.',
         toastApplyStarted:/*[[#{admin.p4kImport.toast.applyStarted}]]*/ 'Apply started.',
         error:            /*[[#{admin.p4kImport.toast.error}]]*/ 'Import failed.',
-        pickFirst:        /*[[#{admin.p4kImport.toast.pickFirst}]]*/ 'Please choose a file first.'
+        pickFirst:        /*[[#{admin.p4kImport.toast.pickFirst}]]*/ 'Please choose a file first.',
+        'actionReport': /*[[#{admin.p4kImport.action.report}]]*/ 'Report',
+        'pagePrevious': /*[[#{general.pagination.previous}]]*/ 'Previous',
+        'pageNext': /*[[#{general.pagination.next}]]*/ 'Next',
+        'adminUnknown': /*[[#{admin.p4kImport.runs.adminUnknown}]]*/ 'unknown admin',
+        'countMatched': /*[[#{admin.p4kImport.runs.count.matched}]]*/ 'matched',
+        'countAdded': /*[[#{admin.p4kImport.runs.count.added}]]*/ 'added',
+        'countChanged': /*[[#{admin.p4kImport.runs.count.changed}]]*/ 'changed',
+        'countVanished': /*[[#{admin.p4kImport.runs.count.vanished}]]*/ 'vanished',
+        'countReappeared': /*[[#{admin.p4kImport.runs.count.reappeared}]]*/ 'reappeared',
+        'reportRun': /*[[#{admin.p4kImport.report.run}]]*/ 'Run',
+        'reportPreview': /*[[#{admin.p4kImport.report.preview}]]*/ 'Preview',
+        'stillLive': /*[[#{admin.p4kImport.report.stillLive}]]*/ 'still live in UEX/Wiki',
+        'sweepCounts': /*[[#{admin.p4kImport.report.sweepCounts}]]*/ '{0} of {1}',
+        'noRow': /*[[#{admin.p4kImport.review.noRow}]]*/ 'no row',
+        'actionKeep': /*[[#{admin.p4kImport.review.keep}]]*/ 'Keep',
+        'actionHide': /*[[#{admin.p4kImport.review.hide}]]*/ 'Hide',
+        'toastKept': /*[[#{admin.p4kImport.review.toast.kept}]]*/ 'Kept.',
+        'toastHidden': /*[[#{admin.p4kImport.review.toast.hidden}]]*/ 'Hidden.',
+        'conflict': /*[[#{admin.p4kImport.review.toast.conflict}]]*/ 'The case changed meanwhile.',
+        'kind.MANUFACTURER': /*[[#{admin.p4kImport.kind.MANUFACTURER}]]*/ 'MANUFACTURER',
+        'kind.ITEM': /*[[#{admin.p4kImport.kind.ITEM}]]*/ 'ITEM',
+        'kind.SHIP': /*[[#{admin.p4kImport.kind.SHIP}]]*/ 'SHIP',
+        'kind.COMMODITY': /*[[#{admin.p4kImport.kind.COMMODITY}]]*/ 'COMMODITY',
+        'kind.BLUEPRINT': /*[[#{admin.p4kImport.kind.BLUEPRINT}]]*/ 'BLUEPRINT',
+        'type.ADDED': /*[[#{admin.p4kImport.change.ADDED}]]*/ 'ADDED',
+        'type.CHANGED': /*[[#{admin.p4kImport.change.CHANGED}]]*/ 'CHANGED',
+        'type.VANISHED': /*[[#{admin.p4kImport.change.VANISHED}]]*/ 'VANISHED',
+        'type.REAPPEARED': /*[[#{admin.p4kImport.change.REAPPEARED}]]*/ 'REAPPEARED',
+        'type.UNMATCHED': /*[[#{admin.p4kImport.change.UNMATCHED}]]*/ 'UNMATCHED',
+        'type.REVIEW': /*[[#{admin.p4kImport.change.REVIEW}]]*/ 'REVIEW',
+        'type.IDENTITY_MISMATCH': /*[[#{admin.p4kImport.change.IDENTITY_MISMATCH}]]*/ 'IDENTITY_MISMATCH',
+        'type.UNKNOWN_VALUE': /*[[#{admin.p4kImport.change.UNKNOWN_VALUE}]]*/ 'UNKNOWN_VALUE',
+        'type.SWEEP_SKIPPED': /*[[#{admin.p4kImport.change.SWEEP_SKIPPED}]]*/ 'SWEEP_SKIPPED',
+        'reason.UNCLEAR_PLAYABILITY': /*[[#{admin.p4kImport.reason.UNCLEAR_PLAYABILITY}]]*/ 'UNCLEAR_PLAYABILITY',
+        'reason.SEEDED_NOT_CREATABLE': /*[[#{admin.p4kImport.reason.SEEDED_NOT_CREATABLE}]]*/ 'SEEDED_NOT_CREATABLE',
+        'reason.GUID_CONFLICT': /*[[#{admin.p4kImport.reason.GUID_CONFLICT}]]*/ 'GUID_CONFLICT',
+        'sweep.SWEPT': /*[[#{admin.p4kImport.sweep.SWEPT}]]*/ 'SWEPT',
+        'sweep.SKIPPED_PARTIAL': /*[[#{admin.p4kImport.sweep.SKIPPED_PARTIAL}]]*/ 'SKIPPED_PARTIAL',
+        'sweep.SKIPPED_EMPTY': /*[[#{admin.p4kImport.sweep.SKIPPED_EMPTY}]]*/ 'SKIPPED_EMPTY',
+        'sweep.SKIPPED_DUPLICATE_GUID': /*[[#{admin.p4kImport.sweep.SKIPPED_DUPLICATE_GUID}]]*/ 'SKIPPED_DUPLICATE_GUID',
+        'sweep.SKIPPED_MASS_GUARD': /*[[#{admin.p4kImport.sweep.SKIPPED_MASS_GUARD}]]*/ 'SKIPPED_MASS_GUARD'
     };
     window.krtP4kImportEndpoints = {
-        jobs: /*[[${jobsUrl}]]*/ '/admin/p4k-import/jobs'
+        jobs: /*[[${jobsUrl}]]*/ '/admin/p4k-import/jobs',
+        page: /*[[${pageUrl}]]*/ '/admin/p4k-import'
     };
 </script>
 <script type="module" th:src="@{/js/catalogue/p4k-import.js}" th:attr="nonce=${cspNonce}"></script>

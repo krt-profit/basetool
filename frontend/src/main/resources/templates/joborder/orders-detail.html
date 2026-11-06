@@ -299,6 +299,7 @@
                     <span class="od-item-main">
                     <span class="od-item-name" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
                     <span th:if="${item.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
+                    <span th:if="${item.gameItem != null and item.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                     <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
                     <span th:if="${item.blueprintStale}" class="chip chip--warning"
                           th:text="#{orders.detail.item.blueprintStale}"
@@ -750,7 +751,7 @@
                         <ul class="od-plain-list">
                             <li th:each="entry : ${ho.entries}">
                                 <span th:text="${entry.gameItem != null ? entry.gameItem.name() : '-'}"></span>
-                                <span th:if="${entry.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${entry.gameItem})}"></span>:
+                                <span th:if="${entry.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${entry.gameItem})}"></span><span th:if="${entry.gameItem != null and entry.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>:
                                 <span th:text="${#numbers.formatInteger(entry.amount, 1)}"></span>
                             </li>
                         </ul>
@@ -1052,6 +1053,7 @@
                     <div>
                         <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}">Item</label>
                         <span th:if="${item.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
+                    <span th:if="${item.gameItem != null and item.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                         <div class="form-hint od-line__meta">
                             <span th:text="#{orders.detail.item.outstanding}">Ausstehend</span>:
                             <span th:text="${#numbers.formatInteger(outstanding, 1)}">0</span>

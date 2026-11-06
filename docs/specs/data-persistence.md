@@ -1177,9 +1177,10 @@ listed with its reason:
   (`audit_event.target_user_id`, `bank_audit_event.target_user_id`, REQ-AUDIT-001; and
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
   after every import run; `p4k_import_run.created_by`, the applying admin's id on a run, which
-  is never pruned, REQ-P4K-005).
+  is never pruned, REQ-P4K-005; `p4k_review_case.resolved_by`, the admin who resolved a review
+  case, never pruned, REQ-P4K-016).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
-  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 14 are not, each of which names the
+  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 15 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported
   column. The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
@@ -1190,7 +1191,7 @@ listed with its reason:
   column that holds data about the member.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
   as the union of the modules' `UserReassignmentParticipant` declarations; only
-  `p4k_import_job.created_by` and `p4k_import_run.created_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
+  `p4k_import_job.created_by`, `p4k_import_run.created_by` and `p4k_review_case.resolved_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
   foreign-key columns as before; this requirement adds the ones without a key.
 
 **Acceptance**

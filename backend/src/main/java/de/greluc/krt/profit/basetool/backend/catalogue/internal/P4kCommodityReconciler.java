@@ -65,18 +65,15 @@ public class P4kCommodityReconciler {
       P4kRowMatcher.Match<Material> match =
           matcher.match(commodity, null, commodity.nameEn(), false, context);
       if (match instanceof P4kRowMatcher.Matched<Material>(Material row, UUID guid)) {
-        boolean apply = context.isApply();
-        boolean enriched =
-            P4kFields.fillIfNull(
-                row.getDescription(),
-                P4kLocalisedText.enOf(commodity.description()),
-                row::setDescription,
-                apply);
-        enriched |=
-            P4kFields.refreshNameKey(
-                row.getNameKey(), P4kLocalisedText.keyOf(commodity.name()), row::setNameKey, apply);
-        context.stamp(row, guid);
-        context.getReport().matched(P4kKind.COMMODITY, enriched);
+        P4kRowWriter writer = new P4kRowWriter(context, P4kKind.COMMODITY, commodity);
+        writer.fillGameText(
+            "description",
+            row.getDescription(),
+            P4kLocalisedText.enOf(commodity.description()),
+            row::setDescription);
+        writer.nameKey(row.getNameKey(), P4kLocalisedText.keyOf(commodity.name()), row::setNameKey);
+        context.stamp(P4kKind.COMMODITY, commodity, row, guid);
+        context.getReport().matched(P4kKind.COMMODITY, writer.isChanged());
       } else if (match instanceof P4kRowMatcher.Unmatched<Material>) {
         context.getReport().unmatched(P4kKind.COMMODITY, commodity);
       }

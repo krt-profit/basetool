@@ -142,9 +142,21 @@ public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "p4k_synced_at")
   private Instant p4kSyncedAt;
 
-  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  /**
+   * When the P4K sweep found the row gone from a complete catalogue (REQ-P4K-011), or {@code null};
+   * a later match clears it.
+   */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
+
+  /**
+   * When an admin hid the row through a P4K review case (REQ-P4K-016), or {@code null}; no match
+   * clears it.
+   */
+  @Column(name = "p4k_hidden_at")
+  @Nullable
+  private Instant p4kHiddenAt;
 
   /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
   @Column(name = "p4k_seen_run_id")

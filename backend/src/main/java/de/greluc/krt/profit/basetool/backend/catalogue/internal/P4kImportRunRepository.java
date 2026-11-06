@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -42,4 +44,12 @@ public interface P4kImportRunRepository extends JpaRepository<P4kImportRun, UUID
    * @return the latest run, empty before the first run
    */
   Optional<P4kImportRun> findFirstByOrderByAppliedAtDesc();
+
+  /**
+   * Pages the applied runs, newest first (REQ-P4K-015).
+   *
+   * @param pageable the page
+   * @return the page of runs
+   */
+  Page<P4kImportRun> findAllByOrderByAppliedAtDesc(Pageable pageable);
 }

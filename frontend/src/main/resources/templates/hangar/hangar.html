@@ -122,6 +122,7 @@
                                            th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></label>
                                     <span class="hangar-row__name">
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                        <span th:if="${ship.shipType != null and ship.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
                                               class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
                                         <th:block th:replace="~{hangar/fragments/ship-meta :: shipMeta(${ship})}"></th:block>
@@ -239,6 +240,7 @@
                                               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></button></span>
                                         <span class="hangar-tree__name">
                                             <span class="cell-title" th:text="${item.shipType.name}">Cutlass Black</span>
+                                            <span th:if="${item.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                                             <span class="cell-sub" th:if="${item.shipType.manufacturer != null}"
                                                   th:text="${item.shipType.manufacturer.name}">Drake</span>
                                         </span>

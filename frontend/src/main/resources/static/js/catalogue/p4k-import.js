@@ -2,10 +2,12 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { openReport, refreshAfterApply } from '/js/catalogue/p4k-report.js';
 
 /** @typedef {ApiDto<'P4kImportJobDto'>} P4kJob */
 /** @typedef {ApiDto<'P4kImportResultDto'>} P4kResult */
 /** @typedef {ApiDto<'Build'>} P4kBuild */
+/** @typedef {ApiDto<'Sweep'>} P4kSweep */
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -29,6 +31,8 @@ let createNewEl = null;
 let wouldCreateEl = null;
 /** @type {HTMLButtonElement | null} */
 let applyConfirmBtn = null;
+/** @type {HTMLInputElement | null} */
+let markAnywayEl = null;
 
 /** @type {P4kJob[]} */
 let lastJobs = [];
@@ -38,6 +42,7 @@ let applyTargetId = null;
 let pollTimer = null;
 
 let gated = false;
+let wasActive = false;
 
 /**
  * Looks up an element by id.
@@ -125,6 +130,7 @@ function init() {
     createNewEl = /** @type {HTMLInputElement | null} */ ($('krt-p4k-create-new'));
     wouldCreateEl = $('krt-p4k-would-create');
     applyConfirmBtn = /** @type {HTMLButtonElement | null} */ ($('krt-p4k-apply-confirm'));
+    markAnywayEl = /** @type {HTMLInputElement | null} */ ($('krt-p4k-mark-anyway'));
 
     const pickBtn = $('krt-p4k-pick');
     const detailsCloseBtn = $('krt-p4k-details-close');
@@ -258,6 +264,8 @@ function isActive(job) {
  */
 function pollControl(jobs) {
     const anyActive = jobs.some(isActive);
+    if (wasActive && !anyActive) refreshAfterApply();
+    wasActive = anyActive;
     if (anyActive && !pollTimer) {
         pollTimer = window.setInterval(loadJobs, 3000);
     } else if (!anyActive) {
@@ -327,6 +335,11 @@ function renderJobs(jobs) {
                 }">${krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView')}</button>`,
             );
             if (job.kind === 'PREVIEW') {
+                html.push(
+                    krtHtml` <button type="button" class="btn btn-ghost btn-xs" data-action="report" data-job-id="${
+                        job.id
+                    }">${krtI18nText(i18n().actionReport, 'krtP4kImportI18n.actionReport')}</button>`,
+                );
                 html.push(
                     krtHtml` <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="${
                         job.id
@@ -529,6 +542,10 @@ function onJobsClick(e) {
     if (!id) return;
     if (action === 'view') viewDetails(id);
     else if (action === 'apply') openApply(id);
+    else if (action === 'report') {
+        const job = findJob(id);
+        openReport('jobs', id, job && job.sourceFilename ? job.sourceFilename : id);
+    }
 }
 
 /**
@@ -599,6 +616,8 @@ function renderResult(result) {
         krtHtml.set(body, html);
     }
 
+    renderSweeps(result.sweeps || []);
+
     const ingredientsEl = $('krt-p4k-ingredients');
     if (ingredientsEl) ingredientsEl.textContent = String(result.ingredientsResolved || 0);
 
@@ -616,6 +635,71 @@ function renderResult(result) {
 }
 
 /**
+ * Localised label of a kind.
+ *
+ * @param {string | undefined} kind the kind
+ * @returns {string} the label
+ */
+function kindText(kind) {
+    return krtI18nText(i18n()[`kind.${kind}`], `krtP4kImportI18n.kind.${kind}`);
+}
+
+/**
+ * Localised label of a sweep outcome.
+ *
+ * @param {string | null | undefined} outcome the outcome
+ * @returns {string} the label, empty when no sweep was decided
+ */
+function sweepText(outcome) {
+    return outcome
+        ? krtI18nText(i18n()[`sweep.${outcome}`], `krtP4kImportI18n.sweep.${outcome}`)
+        : '';
+}
+
+/**
+ * Renders what the sweep did, or would do, per kind (REQ-P4K-011, REQ-P4K-012).
+ *
+ * @param {P4kSweep[]} sweeps the sweep results
+ */
+function renderSweeps(sweeps) {
+    const body = $('krt-p4k-sweeps');
+    if (!body) return;
+    krtHtml.set(
+        body,
+        sweeps.map(
+            (s) =>
+                krtHtml`<tr><th scope="row">${kindText(s.kind)}</th><td>${sweepText(
+                    s.outcome,
+                )}</td><td>${s.known}</td><td>${s.toStamp}</td><td>${s.vanished}</td><td>${
+                    s.reappeared
+                }</td></tr>`,
+        ),
+    );
+}
+
+/**
+ * Lists the kinds whose sweep the mass guard would hold back, with the rows it would stamp.
+ *
+ * @param {P4kResult | undefined} result the preview result
+ */
+function renderMassGuard(result) {
+    const list = $('krt-p4k-mass-guard');
+    const wrap = $('krt-p4k-mass-guard-wrap');
+    const held = ((result && result.sweeps) || []).filter(
+        (s) => s.outcome === 'SKIPPED_MASS_GUARD',
+    );
+    if (wrap) wrap.hidden = held.length === 0;
+    if (!list) return;
+    krtHtml.set(
+        list,
+        held.map(
+            (s) =>
+                krtHtml`<li>${kindText(s.kind)}: <span class="data-value">${s.toStamp}</span> / ${s.known}</li>`,
+        ),
+    );
+}
+
+/**
  * Opens the apply confirmation panel for a preview job.
  *
  * @param {string} id the job id
@@ -626,6 +710,8 @@ function openApply(id) {
     applyTargetId = id;
     if (applyFilenameEl) applyFilenameEl.textContent = job.sourceFilename || '';
     if (createNewEl) createNewEl.checked = false;
+    if (markAnywayEl) markAnywayEl.checked = false;
+    renderMassGuard(job.result);
     if (wouldCreateEl) wouldCreateEl.textContent = String(wouldCreate(job.result));
     if (applyPanelEl) {
         applyPanelEl.hidden = false;
@@ -641,9 +727,12 @@ function cancelApply() {
 function confirmApply() {
     if (!applyTargetId) return;
     const createNew = !!(createNewEl && createNewEl.checked);
+    const markAnyway = !!(markAnywayEl && markAnywayEl.checked);
     const url = `${jobsUrl()}/${encodeURIComponent(
         applyTargetId,
-    )}/apply?createItemsAndShips=${createNew ? 'true' : 'false'}`;
+    )}/apply?createItemsAndShips=${createNew ? 'true' : 'false'}&overrideMassGuard=${
+        markAnyway ? 'true' : 'false'
+    }`;
 
     let reported = false;
     krtFetch

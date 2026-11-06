@@ -184,8 +184,8 @@ public abstract class InventoryItemMapper {
 
   /**
    * Projects a {@link GameItem} into the slim Lager reference DTO: id, display name, manufacturer
-   * name, kind name and, for a ship component, its type, size, grade and class (REQ-INV-029,
-   * REQ-INV-061, REQ-INV-062).
+   * name, kind name, for a ship component its type, size, grade and class (REQ-INV-029,
+   * REQ-INV-061, REQ-INV-062), and whether the P4K retired it (REQ-P4K-013).
    *
    * <p>Dereferences the lazy {@code manufacturer} association, so it must be fetched or the session
    * still open.
@@ -204,7 +204,7 @@ public abstract class InventoryItemMapper {
     ShipComponentType componentType = ShipComponentType.fromWikiType(gameItem.getWikiType());
     if (componentType == null) {
       return new InventoryGameItemReferenceDto(
-          gameItem.getId(), gameItem.getName(), manufacturer, kind);
+          gameItem.getId(), gameItem.getName(), manufacturer, kind, gameItem.isP4kRetired());
     }
     ShipComponentClass itemClass = gameItem.getItemClass();
     return new InventoryGameItemReferenceDto(
@@ -215,7 +215,8 @@ public abstract class InventoryItemMapper {
         componentType.name(),
         gameItem.getSizeClass(),
         StringNormalization.trimToNull(gameItem.getGrade()),
-        itemClass != null ? itemClass.name() : null);
+        itemClass != null ? itemClass.name() : null,
+        gameItem.isP4kRetired());
   }
 
   /**

@@ -53,24 +53,28 @@ class BlueprintServiceTest {
   @Test
   void getBlueprints_blankSearch_usesUnfilteredQueryAndMaps() {
     Blueprint bp = new Blueprint();
-    when(blueprintRepository.findByScwikiDeletedAtIsNull(any(Pageable.class)))
+    when(blueprintRepository.findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+            any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(bp)));
     when(blueprintMapper.toDto(bp)).thenReturn(minimalDto());
 
     Page<BlueprintDto> result = blueprintService.getBlueprints("   ", PageRequest.of(0, 10));
 
     assertEquals(1, result.getContent().size());
-    verify(blueprintRepository).findByScwikiDeletedAtIsNull(any(Pageable.class));
+    verify(blueprintRepository)
+        .findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(any(Pageable.class));
   }
 
   @Test
   void getBlueprints_nullSearch_usesUnfilteredQuery() {
-    when(blueprintRepository.findByScwikiDeletedAtIsNull(any(Pageable.class)))
+    when(blueprintRepository.findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+            any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of()));
 
     blueprintService.getBlueprints(null, PageRequest.of(0, 10));
 
-    verify(blueprintRepository).findByScwikiDeletedAtIsNull(any(Pageable.class));
+    verify(blueprintRepository)
+        .findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(any(Pageable.class));
   }
 
   @Test

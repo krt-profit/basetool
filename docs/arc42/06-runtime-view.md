@@ -237,11 +237,20 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
    refusal is a `400` `P4K_UPLOAD_REJECTED` with its reason, counted in
    `basetool_p4k_import_rejected_total`; no job exists (REQ-P4K-001, REQ-P4K-002).
 2. **Preview.** The accepted upload is stored compressed on a PREVIEW job; the async runner streams
-   it through `P4kCatalogueReader` and the per-kind reconcilers and writes the would-be result on the
-   job. Nothing else is written.
+   it through `P4kCatalogueReader`, the per-kind reconcilers and `P4kSweeper` and writes the
+   would-be result on the job and its change report beside the upload; the report expires with the
+   job (REQ-P4K-015). Nothing else is written.
 3. **APPLY.** An APPLY job takes the `SyncCoordinator` lock of the Wiki and UEX syncs (or fails
    when a sync holds it past the wait cap) and reads the same payload in one transaction: an older
    Build than the last run is refused; otherwise it writes `p4k_import_run`, matches every kind by
    P4K GUID first, stamps the matched rows with the run, creates playable items and ships only when
    the admin ticked the box, and stores the change report and the review cases
    (REQ-P4K-004…010).
+4. **Sweep.** In the same transaction `P4kSweeper` stamps `p4k_deleted_at` on the P4K-known rows a
+   complete kind no longer lists, on a valid census and within the 5 % mass guard unless the admin
+   ticked "apply marking anyway"; a matched stamped row is cleared. Every outcome is a report row
+   (REQ-P4K-011…014).
+5. **Review.** The run list, each run's report and the open review cases are read through
+   `P4kImportReportService` and `P4kReviewService`; resolving a case as keep or hide is audited, and
+   a hide stamps `p4k_hidden_at`, which the pickers filter like the sweep's stamp (REQ-P4K-013,
+   REQ-P4K-016).

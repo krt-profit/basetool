@@ -39,6 +39,7 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -116,6 +117,7 @@ public class P4kImportRun extends AbstractEntity<UUID> {
 
   /** The completeness and counts per kind. */
   @ElementCollection(fetch = FetchType.EAGER)
+  @BatchSize(size = 50)
   @CollectionTable(name = "p4k_import_run_kind", joinColumns = @JoinColumn(name = "run_id"))
   @NotNull
   private List<P4kImportRunKind> kinds = new ArrayList<>();

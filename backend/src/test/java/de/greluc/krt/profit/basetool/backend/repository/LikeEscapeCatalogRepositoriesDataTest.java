@@ -136,9 +136,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
                 .map(Material::getName))
         .containsExactly(visible.getName());
     assertThat(materialRepository.findByNameContainingIgnoreCase(TAG + " Gem_B", page)).hasSize(1);
-    assertThat(
-            materialRepository.findByIsVisibleTrueAndNameContainingIgnoreCase(TAG + " Gem_B", page))
-        .isEmpty();
+    assertThat(materialRepository.searchPickableByName(TAG + " Gem_B", page)).isEmpty();
   }
 
   @Test

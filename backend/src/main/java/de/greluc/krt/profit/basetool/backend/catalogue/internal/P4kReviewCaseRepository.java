@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /** Spring Data repository for {@link P4kReviewCase}. */
@@ -37,4 +39,14 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
    */
   Optional<P4kReviewCase> findByKindAndGuidAndReason(
       P4kKind kind, UUID guid, P4kReviewReason reason);
+
+  /**
+   * Pages the cases of one status, oldest first (REQ-P4K-016).
+   *
+   * @param status the status
+   * @param pageable the page
+   * @return the page of cases
+   */
+  Page<P4kReviewCase> findByStatusOrderByCreatedAtAscIdAsc(
+      P4kReviewStatus status, Pageable pageable);
 }

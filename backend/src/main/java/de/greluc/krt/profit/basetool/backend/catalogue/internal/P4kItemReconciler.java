@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kClosedSet;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kItemPlayability;
@@ -79,7 +80,7 @@ public class P4kItemReconciler {
               item, item.className(), item.nameEn(), seeding == P4kSeeding.CREATE, context);
       if (match instanceof P4kRowMatcher.Matched<GameItem>(GameItem row, UUID guid)) {
         boolean enriched = enrich(row, item, context);
-        context.stamp(row, guid);
+        context.stamp(P4kKind.ITEM, item, row, guid);
         context.getReport().matched(P4kKind.ITEM, enriched);
       } else if (match instanceof P4kRowMatcher.Unmatched<GameItem>(UUID guid)) {
         unmatched(item, guid, seeding, context);
@@ -97,32 +98,27 @@ public class P4kItemReconciler {
    */
   private boolean enrich(
       @NotNull GameItem row, @NotNull P4kItemDto item, @NotNull P4kImportContext context) {
-    boolean apply = context.isApply();
-    boolean enriched =
-        P4kFields.fillIfNull(row.getClassName(), item.className(), row::setClassName, apply);
-    enriched |=
-        P4kFields.fillIfNull(
-            row.getManufacturer(),
-            context.manufacturer(item.manufacturerGuid()),
-            row::setManufacturer,
-            apply);
-    enriched |= P4kFields.fillIfNull(row.getMass(), item.mass(), row::setMass, apply);
-    enriched |=
-        P4kFields.fillIfNull(
-            row.getDescriptionEn(),
-            P4kLocalisedText.enOf(item.description()),
-            row::setDescriptionEn,
-            apply);
-    enriched |=
-        P4kFields.fillIfNull(
-            row.getDescriptionDe(),
-            P4kLocalisedText.deOf(item.description()),
-            row::setDescriptionDe,
-            apply);
-    enriched |=
-        P4kFields.refreshNameKey(
-            row.getNameKey(), P4kLocalisedText.keyOf(item.name()), row::setNameKey, apply);
-    return enriched;
+    P4kRowWriter writer = new P4kRowWriter(context, P4kKind.ITEM, item);
+    writer.fill("class_name", row.getClassName(), item.className(), row::setClassName);
+    writer.fill(
+        "manufacturer_id",
+        row.getManufacturer(),
+        context.manufacturer(item.manufacturerGuid()),
+        row::setManufacturer,
+        Manufacturer::getName);
+    writer.fill("mass", row.getMass(), item.mass(), row::setMass);
+    writer.fillGameText(
+        "description_en",
+        row.getDescriptionEn(),
+        P4kLocalisedText.enOf(item.description()),
+        row::setDescriptionEn);
+    writer.fillGameText(
+        "description_de",
+        row.getDescriptionDe(),
+        P4kLocalisedText.deOf(item.description()),
+        row::setDescriptionDe);
+    writer.nameKey(row.getNameKey(), P4kLocalisedText.keyOf(item.name()), row::setNameKey);
+    return writer.isChanged();
   }
 
   /**
@@ -163,7 +159,7 @@ public class P4kItemReconciler {
       row.setKind(GameItemKind.GENERIC);
       row.setSourceSystems(GameItemSourceSystem.P4K);
       row.setNameKey(P4kFields.storedNameKey(P4kLocalisedText.keyOf(item.name())));
-      context.stamp(row, guid);
+      context.stamp(P4kKind.ITEM, item, row, guid);
       gameItemRepository.save(row);
     }
     context.getReport().added(P4kKind.ITEM, item);

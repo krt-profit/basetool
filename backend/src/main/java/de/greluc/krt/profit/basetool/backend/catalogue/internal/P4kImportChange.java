@@ -98,4 +98,12 @@ public class P4kImportChange {
   @Column(name = "record_path", columnDefinition = "TEXT")
   @Nullable
   private String recordPath;
+
+  /** The row's place in the order the run found its rows, starting at 0. */
+  @Column(name = "position", nullable = false)
+  private int position;
+
+  /** Whether a {@code VANISHED} row is still live in UEX or the SC Wiki (REQ-P4K-013). */
+  @Column(name = "still_live_elsewhere", nullable = false)
+  private boolean stillLiveElsewhere;
 }

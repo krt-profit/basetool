@@ -97,7 +97,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
-   * Pages active blueprints without a search term.
+   * Pages active blueprints without a search term; a blueprint the P4K retired is not active
+   * (REQ-P4K-013).
    *
    * <p>Separate from {@link #searchActive(String, Pageable)} so no {@code null} is bound into
    * {@code LOWER(CONCAT(...))}, which PostgreSQL rejects as {@code bytea}.
@@ -105,7 +106,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @param pageable page request (whitelisted sort)
    * @return a page of active blueprints
    */
-  Page<Blueprint> findByScwikiDeletedAtIsNull(Pageable pageable);
+  Page<Blueprint> findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+      Pageable pageable);
 
   /**
    * Pages active blueprints whose output-item name or Wiki key contains {@code q}, ignoring case.
@@ -116,7 +118,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       """
-      SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL
+      SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
       AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
       OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')
       """)
@@ -130,7 +132,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return active blueprints whose {@code outputItem} is that game item
    */
   @Query(
-      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND (b.outputItem.id = :gameItemId"
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL"
+          + " AND b.p4kHiddenAt IS NULL AND (b.outputItem.id = :gameItemId"
           + " OR b.outputItem.id = (SELECT r.canonicalItem.id FROM GameItemRedirect r"
           + " WHERE r.id = :gameItemId))")
   List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
@@ -152,7 +155,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * Pages the distinct game items orderable as item-order lines: outputs of an active blueprint
-   * with at least one resolved RESOURCE ingredient.
+   * with at least one resolved RESOURCE ingredient, the items and blueprints the P4K retired left
+   * out (REQ-P4K-013).
    *
    * @param q case-insensitive item-name substring, or {@code null} for no filter
    * @param pageable page request (whitelisted sort)
@@ -163,23 +167,26 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           """
           SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
           (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND
-          b.scwikiDeletedAt IS NULL AND i.kind =
+          b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+          AND i.material IS NOT NULL) AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
+          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
           SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi WHERE
           EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi
-          AND b.scwikiDeletedAt IS NULL AND i.kind =
+          AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+          AND i.material IS NOT NULL) AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
+          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """)
   Page<GameItem> findOrderableItems(@Param("q") String q, Pageable pageable);
 
   /**
    * Pages the distinct game items bookable as Lager item stock: outputs of at least one active
-   * blueprint (REQ-INV-029); a superset of {@link #findOrderableItems(String, Pageable)}.
+   * blueprint (REQ-INV-029), the items and blueprints the P4K retired left out (REQ-P4K-013); a
+   * superset of {@link #findOrderableItems(String, Pageable)}.
    *
    * @param q case-insensitive item-name substring; must be non-null ({@code ""} = no filter)
    * @param pageable page request (whitelisted {@code name} / {@code id} sort)
@@ -190,14 +197,15 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           """
           SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi
           LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
-          (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL)
+          (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL)
+          AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
           AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
           SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi WHERE
-          EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS
-          NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+          EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL)
+          AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """)
   Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 

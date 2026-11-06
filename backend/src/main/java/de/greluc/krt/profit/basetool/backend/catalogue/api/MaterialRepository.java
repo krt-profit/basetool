@@ -38,8 +38,8 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity type) for every visible
-   * material, ordered by name, for material pickers.
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity type) for every visible material
+   * the P4K did not retire (REQ-P4K-013), ordered by name, for material pickers.
    *
    * <p>The list is complete and unbounded; bounded pickers use {@link #searchPicker(String,
    * boolean, MaterialType, boolean, Pageable)}.
@@ -47,13 +47,15 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto(m.id,
-      m.name, m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name
+      m.name, m.quantityType) FROM Material m WHERE m.isVisible = true AND m.p4kDeletedAt IS NULL
+      AND m.p4kHiddenAt IS NULL ORDER BY m.name
       """)
   List<MaterialReferenceDto> findAllReference();
 
   /**
-   * Paged live search for the material pickers (REQ-FE-016): visible materials whose name contains
-   * the fragment, case-insensitively, with the refined material fetch-joined.
+   * Paged live search for the material pickers (REQ-FE-016): visible materials the P4K did not
+   * retire (REQ-P4K-013) whose name contains the fragment, case-insensitively, with the refined
+   * material fetch-joined.
    *
    * @param q the LIKE-escaped name fragment, or {@code null} for no filter
    * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
@@ -66,6 +68,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       value =
           """
           SELECT m FROM Material m LEFT JOIN FETCH m.refinedMaterial WHERE m.isVisible = true
+          AND m.p4kDeletedAt IS NULL AND m.p4kHiddenAt IS NULL
           AND (cast(:q as string) IS NULL
               OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           AND (:jobOrderOnly = false OR m.isJobOrder = true)
@@ -74,6 +77,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       countQuery =
           """
           SELECT COUNT(m) FROM Material m WHERE m.isVisible = true
+          AND m.p4kDeletedAt IS NULL AND m.p4kHiddenAt IS NULL
           AND (cast(:q as string) IS NULL
               OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           AND (:jobOrderOnly = false OR m.isJobOrder = true)
@@ -87,13 +91,13 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       Pageable pageable);
 
   /**
-   * Paged list of visible materials for the public trading catalog; the admin catalog uses {@link
-   * #findAll(Pageable)} instead.
+   * Paged list of visible materials the P4K did not retire (REQ-P4K-013) for the public trading
+   * catalog; the admin catalog uses {@link #findAll(Pageable)} instead.
    *
    * @param pageable page request
    * @return paged visible materials
    */
-  Page<Material> findByIsVisibleTrue(Pageable pageable);
+  Page<Material> findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Pageable pageable);
 
   /**
    * Pages every material, hidden ones included, whose name contains {@code name}
@@ -106,20 +110,32 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Page<Material> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
   /**
-   * Pages the visible materials whose name contains {@code name} case-insensitively; LIKE wildcards
-   * in {@code name} match literally.
+   * Pages the visible materials the P4K did not retire (REQ-P4K-013) whose name contains {@code
+   * name} case-insensitively; LIKE wildcards in {@code name} match literally.
    *
    * @param name the search fragment
    * @param pageable page request
    * @return paged matching visible materials
    */
-  Page<Material> findByIsVisibleTrueAndNameContainingIgnoreCase(String name, Pageable pageable);
+  @Query(
+      """
+      SELECT m FROM Material m WHERE m.isVisible = true AND m.p4kDeletedAt IS NULL
+      AND m.p4kHiddenAt IS NULL
+      AND LOWER(m.name) LIKE LOWER(CONCAT('%', :#{escape([0])}, '%')) ESCAPE :#{escapeCharacter()}
+      """)
+  Page<Material> searchPickableByName(String name, Pageable pageable);
 
   /**
-   * Returns every <b>visible</b> material flagged {@code isJobOrder=true}, ordered by name. The
-   * {@code isVisible} clause keeps unreviewed wiki-only rows out of the job-order material picker.
+   * Returns every <b>visible</b> material flagged {@code isJobOrder=true} that the P4K did not
+   * retire (REQ-P4K-013), ordered by name. The {@code isVisible} clause keeps unreviewed wiki-only
+   * rows out of the job-order material picker.
    */
-  List<Material> findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
+  @Query(
+      """
+      SELECT m FROM Material m WHERE m.isJobOrder = true AND m.isVisible = true
+      AND m.p4kDeletedAt IS NULL AND m.p4kHiddenAt IS NULL ORDER BY m.name ASC
+      """)
+  List<Material> findPickableJobOrderMaterials();
 
   /** Derived Spring-Data query - returns entities matching {@code IdCommodity}. */
   Optional<Material> findByIdCommodity(Integer idCommodity);

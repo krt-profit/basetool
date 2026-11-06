@@ -31,9 +31,10 @@ import org.springframework.data.domain.PageRequest;
 
 /**
  * Runs {@link BlueprintRepository}'s admin list queries against PostgreSQL to ensure the no-filter
- * path ({@link BlueprintRepository#findByScwikiDeletedAtIsNull(Pageable)}) and the search path
- * ({@link BlueprintRepository#searchActive(String, Pageable)}) plan without a {@code lower(bytea)}
- * error.
+ * path ({@link
+ * BlueprintRepository#findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Pageable)})
+ * and the search path ({@link BlueprintRepository#searchActive(String, Pageable)}) plan without a
+ * {@code lower(bytea)} error.
  */
 @SpringBootTest
 class BlueprintRepositoryTest {
@@ -42,7 +43,9 @@ class BlueprintRepositoryTest {
 
   @Test
   void findByScwikiDeletedAtIsNull_executesAgainstPostgresWithoutSearchTerm() {
-    Page<Blueprint> page = blueprintRepository.findByScwikiDeletedAtIsNull(PageRequest.of(0, 25));
+    Page<Blueprint> page =
+        blueprintRepository.findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+            PageRequest.of(0, 25));
     assertNotNull(page);
   }
 

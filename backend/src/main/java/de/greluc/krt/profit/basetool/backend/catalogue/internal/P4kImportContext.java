@@ -122,13 +122,26 @@ public final class P4kImportContext {
   }
 
   /**
-   * Stamps a matched row with its GUID, the apply time and the run (REQ-P4K-005, REQ-P4K-007); a
-   * preview writes nothing.
+   * Stamps a matched or created row with its GUID, the apply time and the run (REQ-P4K-005,
+   * REQ-P4K-007), and clears the sweep's stamp of a row that reappeared (REQ-P4K-011); a preview
+   * only reports the reappearance and writes nothing.
    *
+   * @param kind the kind
+   * @param record the record that matched the row
    * @param row the row
    * @param guid the P4K GUID
    */
-  public void stamp(@NotNull P4kKeyedRow row, @NotNull UUID guid) {
+  public void stamp(
+      @NotNull P4kKind kind,
+      @NotNull P4kRecord record,
+      @NotNull P4kKeyedRow row,
+      @NotNull UUID guid) {
+    if (row.getP4kDeletedAt() != null) {
+      report.reappeared(kind, record);
+      if (apply) {
+        row.setP4kDeletedAt(null);
+      }
+    }
     if (!apply) {
       return;
     }

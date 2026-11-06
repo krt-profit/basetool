@@ -43,6 +43,7 @@
                         <span class="collection-group__item">
                             <span class="collection-group__title" th:text="${group.stock.gameItem != null ? group.stock.gameItem.name() : '-'}">Item</span>
                             <span th:if="${group.stock.gameItem != null}" class="collection-group__chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${group.stock.gameItem})}"></span>
+                            <span th:if="${group.stock.gameItem != null and group.stock.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                         </span>
                         <span class="collection-progress collection-progress--group" data-collection-progress="group" role="progressbar"
                               aria-valuemin="0" aria-valuemax="100" th:aria-valuenow="${group.progress.percent()}"
