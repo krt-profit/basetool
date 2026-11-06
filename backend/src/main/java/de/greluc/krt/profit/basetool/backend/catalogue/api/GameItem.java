@@ -308,6 +308,7 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
    * Wiki UUID stays in {@code external_uuid}.
    */
   @Column(name = "p4k_uuid", unique = true)
+  @Nullable
   private UUID p4kUuid;
 
   /**
@@ -320,10 +321,12 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
   @Column(name = "p4k_synced_at")
+  @Nullable
   private Instant p4kSyncedAt;
 
   /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
 
   /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */

@@ -55,9 +55,13 @@ public class ItemReconciliationService {
   private final GameItemStatRepository stats;
   private final List<GameItemReassignmentParticipant> participants;
   private final SyncReportService reports;
+  private final P4kMergeConflictRecorder p4kConflicts;
 
   /**
    * Consolidates a uniquely matched uuid-less UEX row into an existing Wiki identity.
+   *
+   * <p>The merge respects P4K identity (REQ-P4K-007): rows with different P4K GUIDs stay apart and
+   * go to the P4K review list; a GUID only the retired row holds moves onto the survivor.
    *
    * @param wikiItem managed Wiki item
    * @param uexItemId uuid-less source row's local id
@@ -103,10 +107,30 @@ public class ItemReconciliationService {
     if (uexId == null) {
       return null;
     }
+    UUID retiredGuid = source.getP4kUuid();
+    UUID survivorGuid = target.getP4kUuid();
+    if (retiredGuid != null && survivorGuid != null && !retiredGuid.equals(survivorGuid)) {
+      p4kConflicts.record(source, retiredGuid, target, survivorGuid);
+      reports.logScwikiEvent(
+          runId,
+          SyncEventType.SOURCE_IDENTITY_CONFLICT,
+          "game_item",
+          target.getExternalUuid(),
+          target.getName(),
+          "retiredItem=" + uexItemId + ";survivorItem=" + target.getId() + ";p4kGuidConflict");
+      return null;
+    }
     final String archive = redirects.snapshot(uexItemId, target.getId());
+    final P4kParticipation moved =
+        retiredGuid != null && survivorGuid == null
+            ? P4kParticipation.detach(source, retiredGuid)
+            : null;
     source.setUexItemId(null);
     items.saveAndFlush(source);
     copyUexColumns(source, target);
+    if (moved != null) {
+      moved.attachTo(target);
+    }
     target.setUexItemId(uexId);
     items.saveAndFlush(target);
     for (GameItemReassignmentParticipant participant : participants) {
@@ -149,9 +173,63 @@ public class ItemReconciliationService {
       @Nullable Manufacturer manufacturer,
       @Nullable String className) {}
 
+  /**
+   * The P4K columns of a row (REQ-P4K-005, REQ-P4K-007), carried from a retired row onto a survivor
+   * that the P4K never matched.
+   *
+   * @param p4kUuid the P4K GUID
+   * @param nameKey the {@code global.ini} name key
+   * @param syncedAt the last P4K touch
+   * @param deletedAt the P4K soft-delete marker
+   * @param seenRunId the run that last matched the row
+   */
+  private record P4kParticipation(
+      @NotNull UUID p4kUuid,
+      @Nullable String nameKey,
+      @Nullable Instant syncedAt,
+      @Nullable Instant deletedAt,
+      @Nullable UUID seenRunId) {
+
+    /**
+     * Takes the P4K columns off a row; the GUID is unique, so it must leave before it lands.
+     *
+     * @param row the row that holds a P4K GUID
+     * @param guid the row's P4K GUID
+     * @return the removed columns
+     */
+    static @NotNull P4kParticipation detach(@NotNull GameItem row, @NotNull UUID guid) {
+      final P4kParticipation taken =
+          new P4kParticipation(
+              guid,
+              row.getNameKey(),
+              row.getP4kSyncedAt(),
+              row.getP4kDeletedAt(),
+              row.getP4kSeenRunId());
+      row.setP4kUuid(null);
+      row.setNameKey(null);
+      row.setP4kSyncedAt(null);
+      row.setP4kDeletedAt(null);
+      row.setP4kSeenRunId(null);
+      return taken;
+    }
+
+    /**
+     * Writes the columns onto a row.
+     *
+     * @param row the survivor
+     */
+    void attachTo(@NotNull GameItem row) {
+      row.setP4kUuid(p4kUuid);
+      row.setNameKey(nameKey);
+      row.setP4kSyncedAt(syncedAt);
+      row.setP4kDeletedAt(deletedAt);
+      row.setP4kSeenRunId(seenRunId);
+    }
+  }
+
   private static void copyUexColumns(GameItem from, GameItem to) {
     to.setUexName(from.getUexName() == null ? from.getName() : from.getUexName());
-    if (to.getSourceSystems() != GameItemSourceSystem.P4K) {
+    if (to.getP4kUuid() == null && to.getSourceSystems() != GameItemSourceSystem.P4K) {
       to.setName(from.getName());
       if (from.getManufacturer() != null) {
         to.setManufacturer(from.getManufacturer());

@@ -62,6 +62,7 @@ class ItemReconciliationConcurrencyIntegrationTest {
   @Autowired private GameItemStatRepository stats;
   @Autowired private List<GameItemReassignmentParticipant> participants;
   @Autowired private SyncReportService reports;
+  @Autowired private P4kMergeConflictRecorder p4kConflicts;
   @Autowired private StockCommands stock;
 
   @Test
@@ -82,7 +83,8 @@ class ItemReconciliationConcurrencyIntegrationTest {
     });
     observed.addAll(participants);
     ItemReconciliationService merger =
-        new ItemReconciliationService(items, redirects, recipes, prices, stats, observed, reports);
+        new ItemReconciliationService(
+            items, redirects, recipes, prices, stats, observed, reports, p4kConflicts);
 
     try (var pool = Executors.newFixedThreadPool(2)) {
       var booking =

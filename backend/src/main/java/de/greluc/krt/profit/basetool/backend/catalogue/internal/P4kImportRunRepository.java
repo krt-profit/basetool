@@ -35,4 +35,11 @@ public interface P4kImportRunRepository extends JpaRepository<P4kImportRun, UUID
    */
   @Query("SELECT MAX(r.changeNumber) FROM P4kImportRun r")
   Optional<Long> findHighestChangeNumber();
+
+  /**
+   * Returns the run applied last.
+   *
+   * @return the latest run, empty before the first run
+   */
+  Optional<P4kImportRun> findFirstByOrderByAppliedAtDesc();
 }

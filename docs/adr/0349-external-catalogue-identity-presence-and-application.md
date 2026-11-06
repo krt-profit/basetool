@@ -40,6 +40,11 @@ Persist each attempted source sweep and slice independently of anomaly events, w
 complete/partial/failed/unchanged outcomes, committed counts and cleanup decisions. Existing-row
 repairs follow current source evidence; no blanket migration infers units from a sync timestamp.
 
+**Amendment (P4K identity guard, 2026-11-07):** a duplicate merge never joins two rows with
+different P4K GUIDs; both stay untouched and go to the P4K review list as `GUID_CONFLICT`
+(REQ-P4K-007). A GUID only the retired row holds moves onto the survivor, and a P4K-matched
+survivor keeps its name and manufacturer.
+
 ## Consequences
 
 A source error or local failure cannot masquerade as upstream removal. Source order and variant
