@@ -24,12 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncAggregate;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCategoryRefService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexItemPriceSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexItemSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexManufacturerService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexRefinerySyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexScheduler;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexStarSystemService;
@@ -39,6 +43,8 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.function.IntSupplier;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -61,10 +67,11 @@ class UexSchedulerTest {
   @Mock private UexVehicleService uexVehicleService;
   @Mock private UexUniverseSyncService uexUniverseSyncService;
   @Mock private UexRefinerySyncService uexRefinerySyncService;
-  @Mock private UexCategoryRefService uexCategoryRefService;
+  @Mock private UexProperties properties;
   @Mock private UexItemSyncService uexItemSyncService;
   @Mock private UexItemPriceSyncService uexItemPriceSyncService;
   @Mock private MasterDataCacheEvictionService masterDataCacheEvictionService;
+  @Mock private SyncRunService syncRuns;
 
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
@@ -73,6 +80,27 @@ class UexSchedulerTest {
   @Spy private TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
   @InjectMocks private UexScheduler scheduler;
+
+  @BeforeEach
+  void runAttemptTasks() {
+    org.mockito.Mockito.lenient().when(properties.itemPriceSyncEnabled()).thenReturn(true);
+    org.mockito.Mockito.lenient()
+        .when(syncRuns.run(any(), any(), any(), any()))
+        .thenAnswer(invocation ->
+            new SyncRunService.Result(
+                ((IntSupplier) invocation.getArgument(3)).getAsInt(), SyncRunStatus.SUCCESS));
+  }
+
+  @Test
+  void disabledItemPriceSlice_hasNoFetchOrDurableAttempt() {
+    when(properties.itemPriceSyncEnabled()).thenReturn(false);
+
+    scheduler.scheduleCommodityPriceUpdate();
+
+    verify(uexItemPriceSyncService, never()).syncItemPrices();
+    verify(syncRuns, never())
+        .run(eq(SyncSourceSystem.UEX), eq(SyncAggregate.ITEM_PRICE), any(), any());
+  }
 
   @Test
   void scheduleTask_invokesEverySyncServiceOnce() {
@@ -94,7 +122,6 @@ class UexSchedulerTest {
     verify(uexManufacturerService).syncManufacturers();
     verify(uexVehicleService).syncVehicles();
 
-    verify(uexCategoryRefService).syncCategories();
     verify(uexItemSyncService).syncItems();
     verify(uexItemPriceSyncService).syncItemPrices();
 
@@ -109,7 +136,6 @@ class UexSchedulerTest {
         uexCommodityService,
         uexManufacturerService,
         uexVehicleService,
-        uexCategoryRefService,
         uexItemSyncService,
         uexItemPriceSyncService,
         uexRefinerySyncService);
@@ -126,7 +152,6 @@ class UexSchedulerTest {
             uexCommodityService,
             uexManufacturerService,
             uexVehicleService,
-            uexCategoryRefService,
             uexItemSyncService,
             uexItemPriceSyncService,
             uexRefinerySyncService);
@@ -148,7 +173,6 @@ class UexSchedulerTest {
     order.verify(uexManufacturerService).syncManufacturers();
     order.verify(uexVehicleService).syncVehicles();
 
-    order.verify(uexCategoryRefService).syncCategories();
     order.verify(uexItemSyncService).syncItems();
     order.verify(uexItemPriceSyncService).syncItemPrices();
 
@@ -262,7 +286,6 @@ class UexSchedulerTest {
         uexCommodityService,
         uexManufacturerService,
         uexVehicleService,
-        uexCategoryRefService,
         uexItemSyncService,
         uexItemPriceSyncService,
         uexRefinerySyncService,

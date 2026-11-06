@@ -366,7 +366,7 @@ public class InventoryAggregationService {
         inventoryItemViewRepository.findUserItemStacks(
             user.getId(),
             filter.hasGameItems(),
-            filter.gameItemIdsOrNull(),
+            canonicalGameItemIds(filter),
             filter.hasLocations(),
             filter.locationIdsOrNull(),
             filter.hasJobOrders(),
@@ -438,7 +438,7 @@ public class InventoryAggregationService {
     return inventoryItemViewRepository.findUserItemEntryIds(
         user.getId(),
         filter.hasGameItems(),
-        filter.gameItemIdsOrNull(),
+        canonicalGameItemIds(filter),
         filter.hasLocations(),
         filter.locationIdsOrNull(),
         filter.hasJobOrders(),
@@ -476,7 +476,7 @@ public class InventoryAggregationService {
     List<InventoryItemStackAggregate> stacks =
         inventoryItemViewRepository.findGlobalItemStacks(
             filter.hasGameItems(),
-            filter.gameItemIdsOrNull(),
+            canonicalGameItemIds(filter),
             filter.hasLocations(),
             filter.locationIdsOrNull(),
             filter.hasJobOrders(),
@@ -772,7 +772,7 @@ public class InventoryAggregationService {
     return inventoryItemRepository
         .findUserItemStackEntries(
             user.getId(),
-            gameItemId,
+            canonicalGameItemId(gameItemId),
             locationId,
             personal != null ? personal : Boolean.FALSE,
             stolen != null ? stolen : Boolean.FALSE,
@@ -804,7 +804,7 @@ public class InventoryAggregationService {
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return inventoryItemRepository
         .findGlobalItemStackEntries(
-            gameItemId,
+            canonicalGameItemId(gameItemId),
             userId,
             locationId,
             stolen != null ? stolen : Boolean.FALSE,
@@ -814,6 +814,14 @@ public class InventoryAggregationService {
             scope.memberOrgUnitIds(),
             pageable)
         .map(inventoryItemMapper::toDto);
+  }
+
+  private UUID canonicalGameItemId(UUID gameItemId) {
+    return gameItemRepository.resolveLocalIds(List.of(gameItemId)).getFirst();
+  }
+
+  private @Nullable List<UUID> canonicalGameItemIds(LagerFilter filter) {
+    return filter.hasGameItems() ? gameItemRepository.resolveLocalIds(filter.gameItemIds()) : null;
   }
 
   /**
@@ -873,7 +881,7 @@ public class InventoryAggregationService {
     return inventoryItemRepository
         .findGlobalItemsByFilters(
             filter.hasGameItems(),
-            filter.gameItemIdsOrNull(),
+            canonicalGameItemIds(filter),
             filter.hasLocations(),
             filter.locationIdsOrNull(),
             filter.hasJobOrders(),

@@ -1,6 +1,26 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .sync-history,
+    .sync-events-title {
+        padding: var(--space-4);
+    }
+    .sync-source-history + .sync-source-history {
+        margin-top: var(--space-4);
+    }
+    .sync-source-summary,
+    .sync-attempt-counts {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+    .sync-source-summary {
+        margin-bottom: var(--space-3);
+    }
+    .sync-attempt-counts {
+        min-width: 12rem;
+    }
     .sync-tabs {
         margin-bottom: var(--space-3);
     }

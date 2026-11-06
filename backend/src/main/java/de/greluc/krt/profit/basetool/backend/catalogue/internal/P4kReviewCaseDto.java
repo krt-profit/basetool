@@ -39,9 +39,9 @@ import org.jetbrains.annotations.Nullable;
  * @param nameEn the record's English short name as that run read it, or {@code null}
  * @param rowId the Basetool row the case is about, or {@code null}
  * @param rowName that row's name, or {@code null} when there is no row
- * @param otherRowId the second row of a GUID conflict between two rows, or {@code null}
- * @param firstRunId the run that found the case first, or {@code null}
- * @param lastRunId the last run that found it, or {@code null}
+ * @param otherRowId the row a GUID conflict between two rows collides with, or {@code null}
+ * @param firstRunId the run that found the case first
+ * @param lastRunId the last run that found it
  * @param createdAt when the case was opened
  * @param resolution the admin's decision, or {@code null} while open
  * @param resolvedAt when it was resolved, or {@code null}
@@ -58,8 +58,8 @@ public record P4kReviewCaseDto(
     @Nullable UUID rowId,
     @Nullable String rowName,
     @Nullable UUID otherRowId,
-    @Nullable UUID firstRunId,
-    @Nullable UUID lastRunId,
+    @NotNull UUID firstRunId,
+    @NotNull UUID lastRunId,
     @Nullable Instant createdAt,
     @Nullable P4kReviewResolution resolution,
     @Nullable Instant resolvedAt) {}

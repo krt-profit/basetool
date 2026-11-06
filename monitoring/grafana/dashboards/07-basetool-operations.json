@@ -4632,6 +4632,186 @@
         }
       ],
       "description": "95th percentile of the entity search; QuickAccessSearchSlow alerts above 1 s for 10 minutes (REQ-UI-033)."
+    },
+    {
+      "gridPos": {
+        "h": 8,
+        "y": 336,
+        "x": 0,
+        "w": 12
+      },
+      "options": {
+        "showHeader": true
+      },
+      "description": "Current durable source and aggregate application outcome. Clean runs do not depend on anomaly events.",
+      "targets": [
+        {
+          "format": "table",
+          "refId": "A",
+          "expr": "basetool_catalogue_attempt_status == 1",
+          "instant": true,
+          "datasource": {
+            "uid": "prometheus",
+            "type": "prometheus"
+          }
+        }
+      ],
+      "type": "table",
+      "title": "Latest catalogue attempt outcomes",
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "id": 97
+    },
+    {
+      "gridPos": {
+        "h": 8,
+        "y": 336,
+        "x": 12,
+        "w": 6
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "graphMode": "none"
+      },
+      "description": "Age since every required source slice applied completely. Partial attempts do not advance freshness.",
+      "targets": [
+        {
+          "legendFormat": "{{source}}",
+          "refId": "A",
+          "expr": "time() - basetool_catalogue_attempt_last_complete_timestamp_seconds{aggregate=\"CATALOGUE\"}",
+          "datasource": {
+            "uid": "prometheus",
+            "type": "prometheus"
+          }
+        }
+      ],
+      "type": "stat",
+      "title": "Complete source apply age",
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 172800,
+                "color": "yellow"
+              },
+              {
+                "value": 259200,
+                "color": "red"
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "id": 98
+    },
+    {
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "max": 1,
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{source}}",
+          "refId": "A",
+          "expr": "basetool_catalogue_attempt_active{aggregate=\"CATALOGUE\"}",
+          "datasource": {
+            "uid": "prometheus",
+            "type": "prometheus"
+          }
+        }
+      ],
+      "id": 99,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Active catalogue source sweeps",
+      "gridPos": {
+        "h": 8,
+        "y": 336,
+        "x": 18,
+        "w": 6
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "graphMode": "none"
+      }
+    },
+    {
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{source}} / {{status}}",
+          "refId": "A",
+          "expr": "sum by (source, status) (increase(basetool_catalogue_attempts_total{aggregate=\"CATALOGUE\"}[48h]))",
+          "datasource": {
+            "uid": "prometheus",
+            "type": "prometheus"
+          }
+        }
+      ],
+      "id": 100,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Catalogue attempts by outcome (48h)",
+      "gridPos": {
+        "h": 8,
+        "y": 344,
+        "x": 0,
+        "w": 24
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
     }
   ]
 }

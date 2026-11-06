@@ -29,7 +29,7 @@ tests:
               source: scwiki
             exp_annotations:
               summary: "External fetch errors (scwiki)"
-              description: "The scwiki client swallowed more than 3 fetch/parse errors in 6 hours (incomplete page-walk censuses, reason=census, are excluded: they carry a standing per-run floor and are watched by ScWikiCensusIncompleteStreak) — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
+              description: "The scwiki client handled more than 3 fetch/parse errors in 6 hours (incomplete page-walk censuses, reason=census, are excluded and watched by ScWikiCensusIncompleteStreak). The affected attempts record PARTIAL or FAILED while independent healthy slices may still apply. Check the upstream API, durable run history and sync logs."
 
   - name: suppressed - dnf-makecache is a self-healing distribution timer
     interval: 1m

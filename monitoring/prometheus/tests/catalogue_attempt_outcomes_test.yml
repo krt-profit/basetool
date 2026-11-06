@@ -1,0 +1,64 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: first observed partial attempt alerts without a counter baseline
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_attempt_status{source="UEX",aggregate="ITEM_PRICE",status="PARTIAL"}'
+        values: "1x60"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: CatalogueAttemptIncomplete
+        exp_alerts:
+          - exp_labels:
+              source: UEX
+              aggregate: ITEM_PRICE
+              status: PARTIAL
+              severity: warning
+            exp_annotations:
+              summary: "Catalogue apply incomplete (UEX / ITEM_PRICE)"
+              description: "The latest UEX ITEM_PRICE attempt is PARTIAL. The sync-report page records actual start/end, source build, row counters and cleanup refusal even when no anomaly event was emitted. Absence-based cleanup is refused when its source census or required writes are incomplete. Check that attempt before retrying; a later complete attempt clears this state."
+
+  - name: a complete retry clears the prior partial state
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_attempt_status{source="UEX",aggregate="ITEM_PRICE",status="PARTIAL"}'
+        values: "1x20 0x40"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: CatalogueAttemptIncomplete
+        exp_alerts: []
+
+  - name: short active runs do not look two hours old without a full range
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_attempt_active{source="SCWIKI",aggregate="CATALOGUE"}'
+        values: "1x60"
+      - series: 'basetool_catalogue_attempt_started_timestamp_seconds{source="SCWIKI",aggregate="CATALOGUE"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: CatalogueAttemptRunningTooLong
+        exp_alerts: []
+
+  - name: a source sweep active for over two hours alerts
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_attempt_active{source="SCWIKI",aggregate="CATALOGUE"}'
+        values: "1x180"
+      - series: 'basetool_catalogue_attempt_started_timestamp_seconds{source="SCWIKI",aggregate="CATALOGUE"}'
+        values: "0x180"
+    alert_rule_test:
+      - eval_time: 140m
+        alertname: CatalogueAttemptRunningTooLong
+        exp_alerts:
+          - exp_labels:
+              source: SCWIKI
+              aggregate: CATALOGUE
+              severity: warning
+            exp_annotations:
+              summary: "Catalogue sync still running after two hours (SCWIKI)"
+              description: "The SCWIKI source sweep has remained active for more than two hours. Inspect its durable run history and outbound request timing; avoid starting another apply while it holds the catalogue coordinator."

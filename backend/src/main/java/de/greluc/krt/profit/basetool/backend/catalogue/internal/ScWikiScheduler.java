@@ -55,6 +55,7 @@ public class ScWikiScheduler {
   private final TaskMetrics taskMetrics;
   private final MasterDataCacheEvictionService masterDataCacheEvictionService;
   private final MeterRegistry meterRegistry;
+  private final SyncRunService syncRuns;
 
   /**
    * Periodic SC Wiki sync entry point on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool; returns
@@ -69,9 +70,13 @@ public class ScWikiScheduler {
       log.info("ScWikiScheduler invoked but disabled (krt.scwiki.scheduler-enabled=false) — skip.");
       return;
     }
+    if (!hasEnabledSlices()) {
+      log.info("ScWikiScheduler has no enabled catalogue slices — skipping source resolution.");
+      return;
+    }
     syncCoordinator.runExclusively(
         "SC Wiki",
-        () -> taskMetrics.recordCounting(ScheduledJob.SCWIKI_SYNC, this::runAllSyncSteps));
+        () -> taskMetrics.recordCounting(ScheduledJob.SCWIKI_SYNC, this::runSourceSweep));
   }
 
   /**
@@ -82,31 +87,88 @@ public class ScWikiScheduler {
    * @return the total number of catalogue rows written across all steps; a failing step counts
    *     {@code 0}
    */
-  private int runAllSyncSteps() {
+  private int runSourceSweep() {
     log.debug("Running scheduled SC Wiki sync against {}", scWikiClient.getClass().getSimpleName());
-    int total = 0;
+    return syncRuns
+        .run(
+            SyncSourceSystem.SCWIKI,
+            SyncAggregate.CATALOGUE,
+            null,
+            () -> {
+              try (ScWikiClient.SyncRun scope = scWikiClient.openSyncRun()) {
+                syncRuns.recordGameVersion(scope.version());
+                return runAllSyncSteps(scope.version());
+              }
+            })
+        .count();
+  }
+
+  private int runAllSyncSteps(String version) {
     try {
-      total += runStep("commodity", commoditySyncService::syncCommodities);
-      total += runStep("vehicle", vehicleSyncService::syncVehicles);
-      total += runStep("item", itemSyncService::syncItems);
-      total += runStep("blueprint", blueprintSyncService::syncBlueprints);
-      total += runStep("manufacturer", manufacturerSyncService::syncManufacturers);
+      SyncRunService.Result[] results = {
+        runStep(
+            "commodity", SyncAggregate.COMMODITY, version, commoditySyncService::syncCommodities),
+        runStep("vehicle", SyncAggregate.SHIP_TYPE, version, vehicleSyncService::syncVehicles),
+        runStep("item", SyncAggregate.GAME_ITEM, version, itemSyncService::syncItems),
+        runStep(
+            "blueprint", SyncAggregate.BLUEPRINT, version, blueprintSyncService::syncBlueprints),
+        runStep(
+            "manufacturer",
+            SyncAggregate.MANUFACTURER,
+            version,
+            manufacturerSyncService::syncManufacturers)
+      };
+      if (java.util.Arrays.stream(results).anyMatch(result -> !result.complete())) {
+        throw new IllegalStateException(
+            "SC Wiki sync did not completely apply every catalogue slice");
+      }
+      return java.util.Arrays.stream(results).mapToInt(SyncRunService.Result::count).sum();
     } finally {
       masterDataCacheEvictionService.evictScWikiSyncedMasterData();
     }
-    return total;
   }
 
   /**
    * Runs one sync step, logging and swallowing any exception.
    *
    * @param label short name of the step for the error log line
+   * @param aggregate independently applied catalogue slice
+   * @param version frozen upstream build
    * @param step the sync invocation, returning the number of rows it wrote
-   * @return the step's written-row count, or {@code 0} if it threw
+   * @return durable outcome, or a failed outcome when the step threw
    */
-  private int runStep(String label, IntSupplier step) {
+  private SyncRunService.Result runStep(
+      String label, SyncAggregate aggregate, String version, IntSupplier step) {
+    boolean enabled =
+        switch (aggregate) {
+          case COMMODITY -> Boolean.TRUE.equals(properties.commoditySyncEnabled());
+          case SHIP_TYPE -> Boolean.TRUE.equals(properties.vehicleSyncEnabled());
+          case GAME_ITEM -> Boolean.TRUE.equals(properties.itemSyncEnabled());
+          case BLUEPRINT -> Boolean.TRUE.equals(properties.blueprintSyncEnabled());
+          case MANUFACTURER -> Boolean.TRUE.equals(properties.manufacturerSyncEnabled());
+          case CATALOGUE,
+              STAR_SYSTEM,
+              FACTION,
+              JURISDICTION,
+              PLANET,
+              MOON,
+              ORBIT,
+              CITY,
+              OUTPOST,
+              POI,
+              SPACE_STATION,
+              TERMINAL,
+              CATEGORY,
+              ITEM_PRICE,
+              REFINING_METHOD,
+              REFINERY_YIELD ->
+              throw new IllegalArgumentException("Unsupported SC Wiki catalogue slice");
+        };
+    if (!enabled) {
+      return new SyncRunService.Result(0, SyncRunStatus.UNCHANGED);
+    }
     try {
-      return step.getAsInt();
+      return syncRuns.run(SyncSourceSystem.SCWIKI, aggregate, version, step);
     } catch (Exception e) {
       log.error("Scheduled SC Wiki {} sync failed", label, e);
       meterRegistry
@@ -117,7 +179,7 @@ public class ScWikiScheduler {
               MetricNames.TAG_STEP,
               label)
           .increment();
-      return 0;
+      return new SyncRunService.Result(0, SyncRunStatus.FAILED);
     }
   }
 
@@ -127,8 +189,16 @@ public class ScWikiScheduler {
    */
   @PostConstruct
   void publishEnabledGauge() {
-    if (Boolean.TRUE.equals(properties.schedulerEnabled())) {
+    if (Boolean.TRUE.equals(properties.schedulerEnabled()) && hasEnabledSlices()) {
       taskMetrics.markEnabled(ScheduledJob.SCWIKI_SYNC);
     }
+  }
+
+  private boolean hasEnabledSlices() {
+    return Boolean.TRUE.equals(properties.commoditySyncEnabled())
+        || Boolean.TRUE.equals(properties.vehicleSyncEnabled())
+        || Boolean.TRUE.equals(properties.itemSyncEnabled())
+        || Boolean.TRUE.equals(properties.blueprintSyncEnabled())
+        || Boolean.TRUE.equals(properties.manufacturerSyncEnabled());
   }
 }

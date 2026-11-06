@@ -80,6 +80,7 @@ public class UexItemPriceSyncService {
     UexClient.FetchResult<UexItemPriceDto> fetched = uexClient.getItemPrices();
     List<UexItemPriceDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
+      chunkWriter.recordSweep(false);
       log.warn("No item prices received from UEX API. Aborting synchronization (no stale sweep).");
       return;
     }
@@ -102,10 +103,18 @@ public class UexItemPriceSyncService {
     int processed = seenPriceIds.size();
     int skipped = dtos.size() - outcome.results().size() - outcome.failedRows();
 
-    if (seenPriceIds.isEmpty()) {
+    boolean cleanupAllowed =
+        fetched.complete()
+            && outcome.failedRows() == 0
+            && dtos.stream()
+                .allMatch(row ->
+                    lookups.parentId(row.idItem()) != null
+                        && lookups.terminalId(row.idTerminal()) != null);
+    if (seenPriceIds.isEmpty() || !cleanupAllowed) {
+      chunkWriter.recordSweep(false);
       log.warn(
-          "Skipping stale-row cleanup because no item-price row could be processed "
-              + "({} dto(s) received). Refusing to wipe the entire item-price matrix.",
+          "Skipping stale-row cleanup because the item-price census or its application"
+              + " is incomplete ({} dto(s) received).",
           dtos.size());
     } else {
       int cleared =
@@ -114,6 +123,8 @@ public class UexItemPriceSyncService {
                   gameItemPriceRepository.findIdsWithLivePrices(),
                   seenPriceIds,
                   gameItemPriceRepository::clearPricesByIds));
+      chunkWriter.recordApplied(cleared);
+      chunkWriter.recordSweep(true);
       if (cleared > 0) {
         log.info("Cleared prices on {} game_item_price row(s) no longer returned by UEX.", cleared);
       }
@@ -170,7 +181,7 @@ public class UexItemPriceSyncService {
       }
       if (price == null) {
         price = new GameItemPrice();
-        price.setGameItem(gameItemRepository.getReferenceById(itemId));
+        price.setGameItem(gameItemRepository.getCanonicalReferenceById(itemId));
         price.setTerminal(terminalRepository.getReferenceById(terminalId));
       }
       price.setPriceBuy(dto.priceBuy());

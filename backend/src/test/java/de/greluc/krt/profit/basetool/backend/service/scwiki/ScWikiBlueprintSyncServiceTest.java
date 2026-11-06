@@ -57,6 +57,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlu
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintSummaryPropertyDto;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +72,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Unit tests for {@link ScWikiBlueprintSyncService} — the R4 blueprint recipe-graph sync. */
 @ExtendWith(MockitoExtension.class)
@@ -195,6 +200,10 @@ class ScWikiBlueprintSyncServiceTest {
             List.of(),
             null,
             null,
+            null,
+            null,
+            null,
+            null,
             null);
 
     ScWikiBlueprintModifierDto frameModifier =
@@ -211,7 +220,7 @@ class ScWikiBlueprintSyncServiceTest {
                 new ScWikiBlueprintModifierSegmentDto(500.0, 1000.0, 1.0, 1.1)));
     ScWikiBlueprintRequirementChildDto frameChild =
         new ScWikiBlueprintRequirementChildDto(
-            null, "resource", resourceUuid, "Agricium", null, 0.36, 1);
+            null, "resource", resourceUuid, "Agricium", null, 0.36, 1, null);
     ScWikiBlueprintRequirementGroupDto frame =
         new ScWikiBlueprintRequirementGroupDto(
             "FRAME", "Frame", "group", 1, List.of(frameModifier), List.of(frameChild));
@@ -227,7 +236,8 @@ class ScWikiBlueprintSyncServiceTest {
             "linear",
             null);
     ScWikiBlueprintRequirementChildDto emitterChild =
-        new ScWikiBlueprintRequirementChildDto(null, "item", itemUuid, "Hadanite", 7, null, 1);
+        new ScWikiBlueprintRequirementChildDto(
+            null, "item", itemUuid, "Hadanite", 7, null, 1, null);
     ScWikiBlueprintRequirementGroupDto emitter =
         new ScWikiBlueprintRequirementGroupDto(
             "EMITTER", "Emitter", "group", 1, List.of(emitterModifier), List.of(emitterChild));
@@ -251,7 +261,11 @@ class ScWikiBlueprintSyncServiceTest {
             List.of(),
             List.of(frame, emitter),
             List.of(summary),
-            new ScWikiBlueprintDismantleDto(15, 0.5));
+            new ScWikiBlueprintDismantleDto(15, 0.5),
+            null,
+            null,
+            null,
+            null);
 
     Material agricium = material("Agricium");
     GameItem hadanite = gameItem(itemUuid);
@@ -368,6 +382,10 @@ class ScWikiBlueprintSyncServiceTest {
             List.of(),
             null,
             null,
+            null,
+            null,
+            null,
+            null,
             null);
 
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
@@ -393,20 +411,26 @@ class ScWikiBlueprintSyncServiceTest {
     verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
     verify(blueprintRepository, never()).save(any());
     assertEquals(0, written, "an empty Wiki response must report zero upserted blueprints");
+    verify(syncReportService).recordSweep(false);
   }
 
   @Test
-  void syncBlueprints_notModified_reportsLiveCount_andSkipsDetailFetchAndSweep() {
+  void repeatedBlueprintPayloadsAreAppliedAgainWhenTheirListBodyIsTheSame() {
+    ScWikiBlueprintDto dto = blueprint(null, List.of(), List.of());
+    Blueprint existing = new Blueprint();
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
-        .thenReturn(ScWikiClient.FetchResult.unchanged());
-    when(blueprintRepository.countLiveScwikiBlueprints()).thenReturn(1559L);
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.of(existing));
+    when(blueprintRepository.save(any(Blueprint.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
-    int written = service.syncBlueprints();
+    assertEquals(1, service.syncBlueprints());
+    existing.setOutputName("stale");
+    assertEquals(1, service.syncBlueprints());
 
-    assertEquals(1559, written, "a 304 (unchanged) list must report the live blueprint count");
-    verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
-    verify(blueprintRepository, never()).save(any());
-    verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
+    assertEquals(dto.outputName(), existing.getOutputName());
+    verify(blueprintRepository, times(2)).save(existing);
+    verify(scWikiClient, times(2)).fetchOne(any(), any(), eq(ScWikiBlueprintDto.class), any());
   }
 
   @Test
@@ -549,6 +573,16 @@ class ScWikiBlueprintSyncServiceTest {
     existingSummary.setBetterWhen("higher");
     existing.addSummaryProperty(existingSummary);
 
+    Material agricium = material("Agricium");
+    BlueprintIngredient existingIngredient = new BlueprintIngredient();
+    existingIngredient.setOrderIndex(0);
+    existingIngredient.setKind(BlueprintIngredientKind.RESOURCE);
+    existingIngredient.setMaterial(agricium);
+    existingIngredient.setWikiResourceUuid(resourceUuid);
+    existingIngredient.setQuantityScu(0.25);
+    existingIngredient.setRequirementGroup(existingGroup);
+    existing.addIngredient(existingIngredient);
+
     ScWikiBlueprintIngredientDto resource =
         new ScWikiBlueprintIngredientDto("Agricium", "resource", resourceUuid, null, 0.36, null);
     ScWikiBlueprintDto listDto =
@@ -567,15 +601,17 @@ class ScWikiBlueprintSyncServiceTest {
             List.of(),
             null,
             null,
+            null,
+            null,
+            null,
+            null,
             null);
 
-    Material agricium = material("Agricium");
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(listDto)));
     when(scWikiClient.fetchOne(anyString(), any(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
         .thenReturn(null);
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.of(existing));
-    when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.of(agricium));
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
     service.syncBlueprints();
@@ -590,10 +626,14 @@ class ScWikiBlueprintSyncServiceTest {
     assertSame(existingSummary, bp.getSummaryProperties().get(0), "same summary object preserved");
     assertEquals("Impact Force", bp.getSummaryProperties().get(0).getLabel());
 
-    assertEquals(1, bp.getIngredients().size(), "flat ingredient list is still reconciled");
+    assertEquals(1, bp.getIngredients().size(), "loaded recipe graph remains coherent");
     BlueprintIngredient line = bp.getIngredients().get(0);
     assertEquals(BlueprintIngredientKind.RESOURCE, line.getKind());
+    assertSame(existingIngredient, line);
+    assertSame(existingGroup, line.getRequirementGroup());
     assertSame(agricium, line.getMaterial());
+    assertEquals(
+        0.25, line.getQuantityScu(), "a flat fallback cannot rewrite a loaded recipe graph");
   }
 
   @Test
@@ -638,6 +678,10 @@ class ScWikiBlueprintSyncServiceTest {
         List.of(),
         null,
         null,
+        null,
+        null,
+        null,
+        null,
         null);
   }
 
@@ -660,6 +704,10 @@ class ScWikiBlueprintSyncServiceTest {
         dismantle,
         null,
         null,
+        null,
+        null,
+        null,
+        null,
         null);
   }
 
@@ -676,5 +724,134 @@ class ScWikiBlueprintSyncServiceTest {
     g.setExternalUuid(externalUuid);
     g.setName("Item " + externalUuid);
     return g;
+  }
+
+  @Test
+  void capturedDetailPreservesResourceAndOreUuidsAndTypedUnlockEvidence() throws IOException {
+    ScWikiBlueprintDto dto = capturedDetail();
+    when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
+
+    service.upsertBlueprintWithinTransaction(dto.uuid(), dto, UUID.randomUUID(), Instant.now());
+
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    Blueprint bp = saved.getValue();
+    BlueprintIngredient resource = bp.getIngredients().getFirst();
+    assertEquals(
+        UUID.fromString("dc6fbcbb-5990-4ed5-82ee-93152dab7845"), resource.getWikiResourceUuid());
+    assertEquals(
+        UUID.fromString("fc1ec740-3047-48d8-81f0-396f4c9a90ef"), resource.getWikiOreUuid());
+    assertNotEquals(resource.getWikiResourceUuid(), resource.getWikiOreUuid());
+    var metadata = bp.getWikiMetadata();
+    assertNotNull(metadata);
+    assertEquals("Tactical Strike Group Needed", metadata.unlockingMissions().getFirst().title());
+    assertEquals(1.0, metadata.unlockingMissions().getFirst().chance());
+    assertEquals(3, metadata.aspects().aspects().size());
+    assertEquals(540, metadata.tiers().getFirst().craftTimeSeconds());
+    assertEquals(
+        UUID.fromString("93a49e68-01cf-4d7e-b995-8224466a9982"),
+        metadata
+            .tiers()
+            .getFirst()
+            .requirements()
+            .children()
+            .getFirst()
+            .modifiers()
+            .getFirst()
+            .propertyUuid());
+    JsonMapper mapper = JsonMapper.builder().build();
+    assertEquals(
+        metadata,
+        mapper.readValue(
+            mapper.writeValueAsString(metadata),
+            de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata.class));
+  }
+
+  @Test
+  void listFallbackDoesNotEraseLoadedGroupsIngredientsOrMetadata() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint bp = new Blueprint();
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+    var originalMetadata = bp.getWikiMetadata();
+    var originalGroup = bp.getRequirementGroups().getFirst();
+    var originalIngredient = bp.getIngredients().getFirst();
+    ObjectNode listPayload = JsonMapper.builder().build().valueToTree(detail);
+    for (String key :
+        List.of(
+            "requirement_groups",
+            "summary_properties",
+            "dismantle",
+            "unlocking_missions",
+            "unlocking_missions_grouped",
+            "aspects",
+            "tiers")) {
+      listPayload.remove(key);
+    }
+    ScWikiBlueprintDto list =
+        JsonMapper.builder().build().treeToValue(listPayload, ScWikiBlueprintDto.class);
+
+    service.upsertBlueprintWithinTransaction(detail.uuid(), list, UUID.randomUUID(), Instant.now());
+
+    assertSame(originalMetadata, bp.getWikiMetadata());
+    assertSame(originalGroup, bp.getRequirementGroups().getFirst());
+    assertSame(originalIngredient, bp.getIngredients().getFirst());
+    assertEquals(3, bp.getIngredients().size());
+  }
+
+  @Test
+  void wikiDetailEnrichesP4kBlueprintWithoutOverwritingItsRecipe() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint bp = new Blueprint();
+    bp.setP4kSyncedAt(Instant.now());
+    bp.setOutputName("P4K output");
+    bp.setCraftTimeSeconds(77);
+    BlueprintIngredient canonical = new BlueprintIngredient();
+    canonical.setKind(BlueprintIngredientKind.RESOURCE);
+    canonical.setOrderIndex(0);
+    canonical.setQuantityScu(9.0);
+    bp.addIngredient(canonical);
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+
+    assertEquals("P4K output", bp.getOutputName());
+    assertEquals(77, bp.getCraftTimeSeconds());
+    assertSame(canonical, bp.getIngredients().getFirst());
+    assertEquals(9.0, canonical.getQuantityScu());
+    assertTrue(bp.getRequirementGroups().isEmpty());
+    assertNotNull(bp.getWikiMetadata());
+    assertFalse(bp.getWikiMetadata().unlockingMissions().isEmpty());
+  }
+
+  @Test
+  void failedWritesAreNotCountedAsAppliedAndCanBeReplayed() {
+    ScWikiBlueprintDto dto = blueprint(UUID.randomUUID(), List.of(), List.of());
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
+    when(blueprintRepository.save(any(Blueprint.class)))
+        .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("unavailable"))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    assertEquals(0, service.syncBlueprints());
+    verify(syncReportService).recordFailed(1);
+    verify(syncReportService, never()).recordApplied(anyLong());
+
+    assertEquals(1, service.syncBlueprints());
+    verify(syncReportService).recordApplied(1);
+    verify(scWikiClient, times(2)).fetchAllPagesResult(any(), any(), eq("blueprints"));
+  }
+
+  private static ScWikiBlueprintDto capturedDetail() throws IOException {
+    try (InputStream input =
+        ScWikiBlueprintSyncServiceTest.class.getResourceAsStream(
+            "/catalogue/scwiki-blueprint-detail.json")) {
+      assertNotNull(input);
+      JsonMapper mapper = JsonMapper.builder().build();
+      return mapper.treeToValue(mapper.readTree(input).path("data"), ScWikiBlueprintDto.class);
+    }
   }
 }

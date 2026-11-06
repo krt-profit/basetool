@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="itemCatalogue(details)" class="card card--inset item-catalogue-details" th:if="${details != null}"
+         data-testid="item-wiki-catalogue">
+    <h2 class="section-title" th:text="#{catalogue.item.title}">Catalogue details</h2>
+    <p th:if="${details.wikiMetadata != null}" class="cell-sub" th:text="#{catalogue.source.wiki}">SC Wiki source data</p>
+    <dl class="kv-list">
+        <th:block th:if="${details.gameUuid != null}"><dt th:text="#{catalogue.item.uuid}">Game asset identity</dt><dd th:text="${details.gameUuid}"></dd></th:block>
+        <th:block th:if="${details.className != null}"><dt th:text="#{catalogue.item.className}">Engine class</dt><dd th:text="${details.className}"></dd></th:block>
+    </dl>
+    <p th:if="${details.wikiMetadata == null}" class="cell-sub" th:text="#{catalogue.item.unavailable}">Source details have not been loaded.</p>
+    <th:block th:if="${details.wikiMetadata != null}" th:with="wiki=${details.wikiMetadata}">
+        <p th:if="${wiki.gameVersion != null}" class="cell-sub" th:text="#{catalogue.source.version(${wiki.gameVersion})}">Source version</p>
+        <p th:if="${wiki.sourceUpdatedAt != null}" class="cell-sub"><span th:text="#{catalogue.item.updated}">Source updated</span> <span class="utc-time" th:text="${wiki.sourceUpdatedAt}"></span></p>
+        <p th:if="${wiki.lootable != null}" th:text="${wiki.lootable} ? #{catalogue.item.lootable.yes} : #{catalogue.item.lootable.no}">Lootable</p>
+        <dl class="kv-list">
+            <th:block th:if="${!#lists.isEmpty(wiki.tags)}"><dt th:text="#{catalogue.item.tags}">Tags</dt><dd th:text="${#strings.listJoin(wiki.tags, ', ')}"></dd></th:block>
+            <th:block th:if="${!#lists.isEmpty(wiki.requiredTags)}"><dt th:text="#{catalogue.item.requiredTags}">Required tags</dt><dd th:text="${#strings.listJoin(wiki.requiredTags, ', ')}"></dd></th:block>
+        </dl>
+        <section th:if="${wiki.geometry != null}" data-testid="item-catalogue-geometry">
+            <h3 class="section-title" th:text="#{catalogue.item.geometry}">Dimensions and storage volume</h3>
+            <dl class="kv-list">
+                <th:block th:if="${wiki.geometry.physical != null}"><dt th:text="#{catalogue.item.physical}">Physical bounds</dt><dd th:text="#{catalogue.item.axes(${wiki.geometry.physical.width ?: '—'}, ${wiki.geometry.physical.height ?: '—'}, ${wiki.geometry.physical.length ?: '—'})}"></dd></th:block>
+                <th:block th:if="${wiki.geometry.cargo != null}"><dt th:text="#{catalogue.item.cargo}">Cargo grid</dt><dd th:text="#{catalogue.item.axes(${wiki.geometry.cargo.width ?: '—'}, ${wiki.geometry.cargo.height ?: '—'}, ${wiki.geometry.cargo.length ?: '—'})}"></dd></th:block>
+                <th:block th:if="${wiki.geometry.ui != null}"><dt th:text="#{catalogue.item.ui}">Inventory display</dt><dd th:text="#{catalogue.item.axes(${wiki.geometry.ui.width ?: '—'}, ${wiki.geometry.ui.height ?: '—'}, ${wiki.geometry.ui.length ?: '—'})}"></dd></th:block>
+                <th:block th:if="${wiki.geometry.volumeScu != null}"><dt th:text="#{catalogue.item.volume}">Stored volume (SCU)</dt><dd th:text="${#numbers.formatDecimal(wiki.geometry.volumeScu, 1, 6)}"></dd></th:block>
+            </dl>
+        </section>
+        <section th:if="${!#lists.isEmpty(wiki.ports)}">
+            <h3 class="section-title" th:text="#{catalogue.item.ports}">Equipment compatibility</h3>
+            <th:block th:replace="~{catalogue/fragments/item-catalogue :: ports(${wiki.ports})}"></th:block>
+        </section>
+        <section>
+            <h3 class="section-title" th:text="#{catalogue.item.variants}">Variants</h3>
+            <p th:unless="${itemVariantsLoaded}" class="cell-sub" th:text="#{catalogue.item.notRequested}">Relationship not loaded.</p>
+            <th:block th:if="${itemVariantsLoaded}">
+                <p th:if="${#lists.isEmpty(wiki.variants)}" class="cell-sub" th:text="#{catalogue.item.noneReported}">None reported.</p>
+                <ul th:if="${!#lists.isEmpty(wiki.variants)}"><li th:each="variant : ${wiki.variants}" th:text="${variant.name ?: variant.className}"></li></ul>
+            </th:block>
+            <p th:if="${wiki.baseVariant != null}" th:text="#{catalogue.item.baseVariant(${wiki.baseVariant.name ?: wiki.baseVariant.className})}">Base variant</p>
+        </section>
+        <section>
+            <h3 class="section-title" th:text="#{catalogue.item.related}">Related equipment</h3>
+            <p th:unless="${itemRelatedLoaded}" class="cell-sub" th:text="#{catalogue.item.notRequested}">Relationship not loaded.</p>
+            <p th:if="${itemRelatedLoaded and wiki.relatedItems == null}" class="cell-sub" th:text="#{catalogue.item.noneReported}">None reported.</p>
+            <dl class="kv-list" th:if="${itemRelatedLoaded and wiki.relatedItems != null}" th:with="related=${wiki.relatedItems}">
+                <th:block th:if="${related.setName != null}"><dt th:text="#{catalogue.item.set}">Equipment set</dt><dd th:text="${related.setName}"></dd></th:block>
+                <th:block th:if="${related.baseItem != null}"><dt th:text="#{catalogue.item.base}">Base item</dt><dd th:text="${related.baseItem.name ?: related.baseItem.className}"></dd></th:block>
+                <dt th:text="#{catalogue.item.bySize}">By size</dt><dd><span class="cell-sub" th:each="item : ${related.bySize}" th:text="${item.name ?: item.className}"></span></dd>
+                <dt th:text="#{catalogue.item.byGrade}">By grade</dt><dd><span class="cell-sub" th:each="item : ${related.byGrade}" th:text="${item.name ?: item.className}"></span></dd>
+                <dt th:text="#{catalogue.item.byColor}">By colour</dt><dd><span class="cell-sub" th:each="item : ${related.byColor}" th:text="${item.name ?: item.className}"></span></dd>
+                <dt th:text="#{catalogue.item.set}">Equipment set</dt><dd><span class="cell-sub" th:each="item : ${related.setItems}" th:text="${item.name ?: item.className}"></span></dd>
+            </dl>
+        </section>
+        <section>
+            <h3 class="section-title" th:text="#{catalogue.item.vehicles}">Installed on vehicles</h3>
+            <p th:unless="${itemVehiclesLoaded}" class="cell-sub" th:text="#{catalogue.item.notRequested}">Relationship not loaded.</p>
+            <th:block th:if="${itemVehiclesLoaded}">
+                <p th:if="${#lists.isEmpty(wiki.vehicles)}" class="cell-sub" th:text="#{catalogue.item.noneReported}">None reported.</p>
+                <ul th:if="${!#lists.isEmpty(wiki.vehicles)}"><li th:each="vehicle : ${wiki.vehicles}" th:text="${vehicle.name ?: vehicle.className}"></li></ul>
+            </th:block>
+        </section>
+        <section th:if="${!#lists.isEmpty(wiki.images)}">
+            <h3 class="section-title" th:text="#{catalogue.item.images}">Attributed image references</h3>
+            <ul><li th:each="image : ${wiki.images}"><span class="cell-title" th:text="${image.source}"></span><span class="cell-sub" th:text="${image.originalUrl}"></span></li></ul>
+        </section>
+        <section th:if="${!#lists.isEmpty(wiki.uexPriceEvidence)}" data-testid="item-derived-uex-evidence">
+            <h3 class="section-title" th:text="#{catalogue.item.uexEvidence}">UEX observations through SC Wiki</h3>
+            <p class="cell-sub" th:text="#{catalogue.item.uexEvidence.help}">Derived observations retain source and timestamp.</p>
+            <div class="table-responsive"><table class="data-table data-table--stack">
+                <thead><tr><th th:text="#{catalogue.item.terminal}">Terminal</th><th th:text="#{catalogue.item.location}">Wiki location</th><th th:text="#{catalogue.item.observedPrices}">Observed prices</th><th th:text="#{catalogue.item.updated}">Updated</th></tr></thead>
+                <tbody><tr th:each="evidence : ${wiki.uexPriceEvidence}">
+                    <td><span th:text="${evidence.terminalName ?: evidence.terminalCode}"></span><span class="cell-sub" th:text="${evidence.terminalId}"></span></td>
+                    <td th:attr="data-label=#{catalogue.item.location}"><span th:if="${evidence.location != null}" th:text="${evidence.location.name ?: evidence.location.slug}"></span></td>
+                    <td th:attr="data-label=#{catalogue.item.observedPrices}" th:text="#{catalogue.item.priceEvidence(${evidence.priceBuy ?: '—'}, ${evidence.priceSell ?: '—'}, ${evidence.priceRent ?: '—'})}"></td>
+                    <td th:attr="data-label=#{catalogue.item.updated}"><span class="utc-time" th:if="${evidence.updatedAt != null}" th:text="${evidence.updatedAt}"></span><span class="cell-sub" th:text="${evidence.gameVersion}"></span></td>
+                </tr></tbody>
+            </table></div>
+        </section>
+    </th:block>
+</section>
+<ul th:fragment="ports(values)">
+    <li th:each="port : ${values}">
+        <span class="cell-title" th:text="${port.displayName ?: port.name}"></span>
+        <span th:if="${port.size != null}" class="chip chip--data" th:text="#{catalogue.item.portSize(${port.size})}">Size</span>
+        <span th:if="${port.sizes != null}" class="chip chip--data" th:text="#{catalogue.item.portRange(${port.sizes.min ?: '—'}, ${port.sizes.max ?: '—'})}">Size range</span>
+        <span th:if="${port.position != null}" class="cell-sub" th:text="${port.position}"></span>
+        <span th:if="${port.editable != null}" class="cell-sub" th:text="${port.editable} ? #{catalogue.item.editable.yes} : #{catalogue.item.editable.no}">Editable</span>
+        <span th:each="type : ${port.compatibleTypes}" class="cell-sub" th:text="#{catalogue.item.compatibleType(${type.type ?: '—'}, ${#strings.listJoin(type.subTypes, ', ')})}"></span>
+        <span th:if="${!#lists.isEmpty(port.tags)}" class="cell-sub" th:text="#{catalogue.item.portTags(${#strings.listJoin(port.tags, ', ')})}"></span>
+        <span th:if="${!#lists.isEmpty(port.requiredTags)}" class="cell-sub" th:text="#{catalogue.item.portRequiredTags(${#strings.listJoin(port.requiredTags, ', ')})}"></span>
+        <span th:if="${port.equippedItemUuid != null}" class="cell-sub" th:text="#{catalogue.item.equipped(${port.equippedItemUuid})}"></span>
+        <th:block th:if="${!#lists.isEmpty(port.ports)}" th:replace="~{catalogue/fragments/item-catalogue :: ports(${port.ports})}"></th:block>
+    </li>
+</ul>
+</body>
+</html>

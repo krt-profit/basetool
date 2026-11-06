@@ -73,7 +73,10 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAcc
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CommodityMiningData;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemCatalogueMetadata;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
@@ -84,11 +87,22 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipCatalogueFacts;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemIdentityCompatibility;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationIndex;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexIdentityCensus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiUexPriceEvidenceDto;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
@@ -363,6 +377,20 @@ class ArchitectureTest {
   static final Set<Class<?>> LEAF_HELPER_CLASSES =
       Set.of(
           ActingMemberAuthorities.class,
+          ItemIdentityCompatibility.class,
+          ItemReconciliationIndex.class,
+          ScWikiItemPasses.class,
+          ScWikiProperties.class,
+          CommodityMiningData.class,
+          ShipCatalogueFacts.class,
+          GameItemKind.class,
+          ItemCatalogueMetadata.class,
+          ScWikiItemDto.class,
+          ScWikiDimensionDto.class,
+          ScWikiItemManufacturerDto.class,
+          ScWikiUexPriceEvidenceDto.class,
+          ScWikiRow.class,
+          UexIdentityCensus.class,
           ActingMemberHeader.class,
           ApiClientMetricsProperties.class,
           AppProblemProperties.class,
@@ -477,7 +505,10 @@ class ArchitectureTest {
           "integration code (UexClient, ScWikiClient and their nested classes)",
           c ->
               outermost(c).isEquivalentTo(UexClient.class)
-                  || outermost(c).isEquivalentTo(ScWikiClient.class));
+                  || outermost(c).isEquivalentTo(ScWikiClient.class)
+                  || outermost(c)
+                      .getName()
+                      .equals(ScWikiClient.class.getPackageName() + ".ScWikiRequestExecutor"));
 
   /**
    * The event payloads: the {@code api.events} package tree of every module, which holds {@link
@@ -1257,7 +1288,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 72);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 86);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

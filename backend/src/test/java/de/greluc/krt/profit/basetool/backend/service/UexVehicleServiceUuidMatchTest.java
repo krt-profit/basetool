@@ -31,16 +31,21 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexVehicleService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexVehicleDto;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -60,9 +65,12 @@ class UexVehicleServiceUuidMatchTest {
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private ManufacturerUexCompanyRepository manufacturerAliasRepository;
+  @Mock private SyncReportService syncReportService;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexVehicleService service;
 
@@ -94,7 +102,7 @@ class UexVehicleServiceUuidMatchTest {
     service.syncVehicles();
 
     verify(shipTypeRepository).findByExternalUuid(externalUuid);
-    verify(shipTypeRepository, never()).findByUexVehicleId(any());
+    verify(shipTypeRepository).findByUexVehicleId(1);
     verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
   }
 
@@ -169,6 +177,25 @@ class UexVehicleServiceUuidMatchTest {
     assertEquals("San'tok.yai", wikiRow.getName(), "the matched row keeps its own name");
     assertEquals(GameItemSourceSystem.BOTH, wikiRow.getSourceSystems());
     verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
+  }
+
+  @Test
+  void aPartialFeedCannotReassignAnAbsentSourceIdThroughACuratedAlias() {
+    UexVehicleDto dto = vehicleDto(173, "", "San tok.Yai");
+    ShipType claimed = new ShipType();
+    claimed.setId(UUID.randomUUID());
+    claimed.setUexVehicleId(100);
+    claimed.setName("Claimed source row");
+    when(uexClient.getVehicles()).thenReturn(UexClient.FetchResult.partial(List.of(dto)));
+    when(shipTypeRepository.findByUexAliasOfVehicleId(173)).thenReturn(List.of(claimed));
+
+    service.syncVehicles();
+
+    assertEquals(100, claimed.getUexVehicleId());
+    assertEquals("Claimed source row", claimed.getName());
+    verify(shipTypeRepository, never()).save(any());
+    verify(shipTypeRepository, never()).markUexDeletedExcept(any(), any());
+    verify(syncReportService).recordIncomplete();
   }
 
   @Test
@@ -335,6 +362,67 @@ class UexVehicleServiceUuidMatchTest {
     service.syncVehicles();
 
     verify(shipTypeRepository, never()).markUexDeletedExcept(any(), any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void duplicateGameUuidsNeverCollapseDistinctUexVehicles(boolean reverse) {
+    UUID shared = UUID.fromString("087b2253-2fc7-4fae-9f9d-97f64b7c43db");
+    ShipType prowler = new ShipType();
+    prowler.setId(UUID.randomUUID());
+    prowler.setName("Prowler");
+    prowler.setUexVehicleId(149);
+    prowler.setExternalUuid(shared);
+    List<ShipType> rows = new ArrayList<>(List.of(prowler));
+    when(shipTypeRepository.findByUexVehicleId(any()))
+        .thenAnswer(inv ->
+            rows.stream()
+                .filter(row -> inv.getArgument(0).equals(row.getUexVehicleId()))
+                .findFirst());
+    when(shipTypeRepository.findByNameIgnoreCase(any()))
+        .thenAnswer(inv ->
+            rows.stream()
+                .filter(row -> inv.<String>getArgument(0).equalsIgnoreCase(row.getName()))
+                .findFirst());
+    when(shipTypeRepository.save(any()))
+        .thenAnswer(inv -> {
+          ShipType row = inv.getArgument(0);
+          if (row.getId() == null) {
+            row.setId(UUID.randomUUID());
+            rows.add(row);
+          }
+          return row;
+        });
+    UexVehicleDto base = vehicleDto(149, shared.toString(), "Prowler");
+    UexVehicleDto utility = vehicleDto(262, shared.toString(), "Prowler Utility");
+    when(uexClient.getVehicles())
+        .thenReturn(fetched(reverse ? List.of(utility, base) : List.of(base, utility)));
+
+    service.syncVehicles();
+
+    assertEquals(2, rows.size());
+    assertEquals(149, prowler.getUexVehicleId());
+    assertEquals("Prowler", prowler.getName());
+    ShipType sibling =
+        rows.stream()
+            .filter(row -> Integer.valueOf(262).equals(row.getUexVehicleId()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("Prowler Utility", sibling.getName());
+    assertNull(sibling.getExternalUuid());
+    verify(shipTypeRepository, never()).findByExternalUuid(any());
+  }
+
+  @Test
+  void incompleteVehicleFetchKeepsEveryLocalOrphanUntouched() {
+    UexVehicleDto row = vehicleDto(149, "", "Prowler");
+    when(uexClient.getVehicles()).thenReturn(UexClient.FetchResult.partial(List.of(row)));
+    when(shipTypeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    verify(shipTypeRepository, never()).markUexDeletedExcept(any(), any());
+    verify(syncReportService).recordSweep(false);
   }
 
   private UexVehicleDto vehicleDto(int id, String uuid, String name) {

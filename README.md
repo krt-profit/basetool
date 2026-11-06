@@ -25,6 +25,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar; admins keep a member's hangar from the member's page.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen) — individually or for a whole marked selection at once — earmark slices to job orders and missions, and track both materials (with quality) and craftable game items. Each unit's Logisticians set minimum and target levels per material and quality tier, or per game item, in the „Mindestbestände“ tab, which shows the free stock allocated to each level from the top tier down and the amount already requested. A low level marks its material or game item „niedrig“ in the global Lager, offers a prefilled job order and need, and tells the direct Logisticians and seat holders once, until the target is reached again.
 - **Refinery & materials** — refinery job orders, material handovers and a planet-aware materials matrix; new orders can be pre-filled from a desktop-extractor screenshot JSON.
+- **Source-attributed game catalogue** — normalized vehicle capacities, mining and cargo details, item compatibility/variants and blueprint unlock evidence; source conflicts stay distinct, and partial feeds preserve existing data. The owning contracts are [REQ-DATA-032…038](docs/specs/data-persistence.md#req-data-032--one-wiki-snapshot-context-governs-every-request-of-a-sync-run).
 - **Materialbörse** — a central, org-wide material-exchange trade board where members both **offer** owned stock (Angebote) and post **requests** (Gesuche) for materials and craftable items; requests carry an optional minimum quality and a desired quantity, and other members signal "Ich kann liefern". Handover and location stay off-tool and private.
 - **Bedarf & Spenden** — units that may raise needs publish what they lack; members pledge material donations (optionally straight from their own Lager row), the receiving unit confirms them into its pool, and monthly statistics show how many members donate. Switched on by an admin (`supply.enabled`, default off).
 - **Ankauf** — appointed trade delegates (Handelsbeauftragte) buy released needs from external partners: deals with a risk class, money requested as four-eyes bank withdrawals within a monthly limit and a budget cap, deliveries the raising unit accepts into its pool, a settlement that returns the remainder, a pause switch and a monthly report with CSV and forum text. Switched on by an admin (`purchasing.enabled`, default off).
@@ -367,6 +368,24 @@ The frontend hand-mirrors the backend's DTOs as its own records (no shared modul
 | `EDGE_GRAFANA_UPSTREAM_VERIFY` | `on` makes the edge verify Grafana's upstream certificate against Grafana's own `grafana.crt` (pinned) and the name `grafana` (REQ-OBS-008). `on` without the certificate, or any value but `on`/`off`, refuses to start. Runbook: [`deployment.md` → *The edge verifies Grafana*](docs/deployment.md#the-edge-verifies-grafana). | `off` |
 
 `.env.example` carries only the keys every stack needs. The complete set a host can set — Keycloak JWKS, Discord login/precheck, SMTP, the ingest and exchange switches, and the monitoring scrape/tracing gates — is the closed allow-list in `docker-compose.yml` and `quadlet/env.d/*.env.tmpl`, described in the specs under [`docs/specs/`](docs/specs/INDEX.md); a variable outside it never reaches a container. Type-safe settings live in `@ConfigurationProperties` classes with `@Validated`, so misconfiguration is caught at startup.
+
+### Wiki sync policy
+
+The backend's canonical Spring properties below control the versioned Wiki transport and matching.
+Deployment environment variables remain subject to the compose/Quadlet allow-list above.
+
+| Property | Default | Contract |
+| --- | --- | --- |
+| `krt.scwiki.game-version` | API default | Resolve once per run; reuse for lists, details and statistics. |
+| `krt.scwiki.vehicles-page-size` | `50` | Vehicle pages accept `1`–`50`; other Wiki pages use their own configured limit. |
+| `krt.scwiki.requests-per-second` | `5` | Shared pacing for every request, including retries and detail calls (`1`–`20`). |
+| `krt.scwiki.max-attempts` | `3` | Total bounded attempts per request (`1`–`5`). |
+| `krt.scwiki.retry-delay-millis` | `1000` | Initial exponential retry delay (`1`–`30000` ms). |
+| `krt.scwiki.max-retry-delay-millis` | `30000` | Maximum retry/cooldown wait (`1`–`60000` ms). |
+| `krt.scwiki.reconcile-uuidless-by-name` | `true` | Link only unique compatible current source claims; archive verified existing duplicates and preserve their old local ids. |
+
+Failed or partial source evidence never authorizes absence cleanup. The sync report distinguishes
+the latest attempt from the last complete source apply (REQ-DATA-032…038).
 
 ### API conventions
 

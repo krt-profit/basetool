@@ -124,6 +124,9 @@ class CatalogueCachedReadsTest {
 
   private final Instant startedAt = Instant.now();
 
+  /** The signed-in admin; a real {@code app_user} row, since audited mutators name their actor. */
+  private final UUID adminId = UUID.randomUUID();
+
   @Autowired private CityController cityController;
   @Autowired private FrequencyTypeController frequencyTypeController;
   @Autowired private JobTypeController jobTypeController;
@@ -176,12 +179,17 @@ class CatalogueCachedReadsTest {
 
   @BeforeEach
   void seedAndSignInAsAdmin() {
+    new JdbcTemplate(dataSource)
+        .update(
+            "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)",
+            adminId,
+            "cat-admin-" + tag);
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(
                 Jwt.withTokenValue("catalogue-cached-reads")
                     .header("alg", "none")
-                    .subject(UUID.randomUUID().toString())
+                    .subject(adminId.toString())
                     .build(),
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
     transactionTemplate.executeWithoutResult(status -> seed());
@@ -196,13 +204,15 @@ class CatalogueCachedReadsTest {
         cleanup.pop().run();
       }
     });
-    new JdbcTemplate(dataSource)
-        .update(
-            """
-            DELETE FROM audit_event WHERE actor_user_id IS NULL AND occurred_at >= ?
-              AND event_type = 'REFINERY_METHOD_UPDATED'
-            """,
-            Timestamp.from(startedAt));
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    jdbc.update(
+        """
+        DELETE FROM audit_event WHERE actor_user_id IS NULL AND occurred_at >= ?
+          AND event_type = 'REFINERY_METHOD_UPDATED'
+        """,
+        Timestamp.from(startedAt));
+    jdbc.update("DELETE FROM audit_event WHERE actor_user_id = ?", adminId);
+    jdbc.update("DELETE FROM app_user WHERE id = ?", adminId);
     clearCaches();
   }
 

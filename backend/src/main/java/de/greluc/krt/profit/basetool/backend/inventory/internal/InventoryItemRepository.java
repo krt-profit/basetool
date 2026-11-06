@@ -50,7 +50,8 @@ import org.springframework.stereotype.Repository;
  * ({@code game_item_id} set, no quality), so queries come in per-catalog variants (REQ-INV-029).
  */
 @Repository
-public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
+public interface InventoryItemRepository
+    extends JpaRepository<InventoryItem, UUID>, InventoryLotLockRepository {
 
   /** A member's lots, personal and shared, with what the exchange shows of them (REQ-XCH-016). */
   String EXCHANGE_LOTS =
@@ -1132,16 +1133,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("locationId") UUID locationId,
       @Param("quality") int quality,
       @Param("stolen") boolean stolen);
-
-  /**
-   * Waits for and takes a transaction-scoped PostgreSQL advisory lock, released at commit or
-   * rollback (ADR-0229).
-   *
-   * @param key the lock key
-   * @return always {@code 1}
-   */
-  @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(:key)", nativeQuery = true)
-  int lockExchangeLot(@Param("key") long key);
 
   /** The holder and lot of a Lager row, read without locking it (ADR-0229). */
   interface RowLot {

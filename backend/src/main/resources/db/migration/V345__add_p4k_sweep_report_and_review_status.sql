@@ -28,10 +28,7 @@ ALTER TABLE p4k_import_run_kind
         CHECK (sweep IN ('SWEPT', 'SKIPPED_PARTIAL', 'SKIPPED_EMPTY', 'SKIPPED_DUPLICATE_GUID',
                          'SKIPPED_MASS_GUARD'));
 
--- A case opened outside a P4K run (a GUID conflict the SC Wiki / UEX reconciliation meets) has no
--- run; other_row_id names the second row of a GUID conflict.
-ALTER TABLE p4k_review_case ALTER COLUMN first_run_id DROP NOT NULL;
-ALTER TABLE p4k_review_case ALTER COLUMN last_run_id DROP NOT NULL;
+-- other_row_id names the row a GUID conflict between two rows collides with; row_id holds the GUID.
 ALTER TABLE p4k_review_case ADD COLUMN other_row_id UUID;
 ALTER TABLE p4k_review_case ADD COLUMN resolution VARCHAR(8);
 ALTER TABLE p4k_review_case ADD COLUMN resolved_by UUID;

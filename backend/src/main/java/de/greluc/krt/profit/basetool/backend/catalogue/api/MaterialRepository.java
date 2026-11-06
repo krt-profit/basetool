@@ -195,27 +195,13 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   @Modifying
   @Query(
       """
-      UPDATE Material m SET m.scwikiDeletedAt = :now
+      UPDATE Material m SET m.scwikiDeletedAt = :now, m.version = m.version + 1, m.updatedAt = :now
       WHERE m.scwikiUuid IS NOT NULL
       AND m.scwikiUuid NOT IN :seenScwikiUuids
       AND m.scwikiDeletedAt IS NULL
       """)
   int markScwikiDeleted(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
-
-  /**
-   * Counts the materials that carry an SC Wiki UUID and are not tombstoned; reported by the
-   * commodity sync when the Wiki catalogue answers {@code 304 Not Modified}.
-   *
-   * @return the number of non-tombstoned materials carrying a SC Wiki UUID
-   */
-  @Query(
-      """
-      SELECT COUNT(m) FROM Material m
-      WHERE m.scwikiUuid IS NOT NULL
-      AND m.scwikiDeletedAt IS NULL
-      """)
-  long countLiveScwikiMaterials();
 
   /**
    * Returns the visible materials the refinery-order create path accepts as input ({@code type ==

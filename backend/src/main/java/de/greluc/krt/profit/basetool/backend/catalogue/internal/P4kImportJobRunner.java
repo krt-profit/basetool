@@ -22,9 +22,14 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +44,9 @@ import tools.jackson.databind.ObjectMapper;
  * parse-and-reconcile work to the transactional {@link P4kImportJobService} and {@link
  * P4kImportService}.
  *
+ * <p>An APPLY holds the {@link SyncCoordinator} lock that the Wiki and UEX syncs share; PREVIEW
+ * writes nothing and takes no lock.
+ *
  * <p>Each run marks the job {@code RUNNING}, reconciles in a separate transaction, then marks it
  * {@code SUCCEEDED} or {@code FAILED}. Afterwards an APPLY reclaims its payload and every run
  * prunes the job history; housekeeping failures are only logged.
@@ -48,12 +56,17 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 public class P4kImportJobRunner {
 
+  /** The holder name an APPLY shows in the {@link SyncCoordinator} wait and skip log lines. */
+  static final String APPLY_LOCK_LABEL = "P4K APPLY";
+
   private final P4kImportJobService jobService;
   private final P4kImportService importService;
   private final P4kPreviewReportCodec reportCodec;
   private final MasterDataCacheEvictionService cacheEvictionService;
   private final ObjectMapper objectMapper;
   private final AuthHelperService authHelperService;
+  private final LiveSyncPublisher catalogueUpdates;
+  private final SyncCoordinator syncCoordinator;
 
   /**
    * Executes one import job asynchronously on the {@code importExecutor}. Never throws: every
@@ -80,6 +93,7 @@ public class P4kImportJobRunner {
   private void execute(@NotNull UUID jobId, @NotNull P4kImportJobKind kind) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;
+    boolean changedCatalogue = false;
     try {
       jobService.markRunning(jobId);
       byte[] bytes = jobService.loadPayload(jobId);
@@ -87,7 +101,7 @@ public class P4kImportJobRunner {
       if (kind == P4kImportJobKind.APPLY) {
         P4kImportJob job = jobService.getJob(jobId);
         result =
-            importService.applyImport(
+            applyExclusively(
                 bytes,
                 new P4kImportService.P4kApplyRequest(
                     jobId,
@@ -95,6 +109,7 @@ public class P4kImportJobRunner {
                     job.isCreateItemsAndShips(),
                     job.isOverrideMassGuard()));
         appliedMasterData = true;
+        changedCatalogue = hasChanges(result);
       } else {
         P4kImportService.P4kPreview preview = importService.previewImport(bytes);
         jobService.storePreviewReport(
@@ -117,10 +132,65 @@ public class P4kImportJobRunner {
               cacheEvictionService::evictP4kSyncedMasterData,
               "evict P4K-synced master-data caches");
         }
+        if (changedCatalogue) {
+          safely(
+              () ->
+                  catalogueUpdates.publishAfterCommit(
+                      LiveSyncTopic.global(LiveSyncTopicClass.CATALOGUE), List.of("catalogue")),
+              "publish catalogue change");
+        }
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
       safely(jobService::pruneOldJobs, "prune old jobs");
     }
+  }
+
+  /**
+   * Applies the catalogue under the {@link SyncCoordinator} lock, so an APPLY never runs beside a
+   * Wiki or UEX sync and its duplicate merges.
+   *
+   * @param bytes the payload
+   * @param request the APPLY parameters
+   * @return the result of the APPLY
+   * @throws SyncLockUnavailableException if a sync held the lock past the coordinator's wait cap
+   */
+  @NotNull
+  private P4kImportResultDto applyExclusively(
+      byte @NotNull [] bytes, @NotNull P4kImportService.P4kApplyRequest request) {
+    AtomicReference<P4kImportResultDto> applied = new AtomicReference<>();
+    boolean ran =
+        syncCoordinator.runExclusively(
+            APPLY_LOCK_LABEL, () -> applied.set(importService.applyImport(bytes, request)));
+    P4kImportResultDto result = applied.get();
+    if (!ran || result == null) {
+      throw new SyncLockUnavailableException();
+    }
+    return result;
+  }
+
+  /** The APPLY could not take the catalogue sync lock within the coordinator's wait cap. */
+  static final class SyncLockUnavailableException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    /** Creates the exception with the message stored on the failed job. */
+    SyncLockUnavailableException() {
+      super(
+          "A Wiki or UEX sync held the catalogue lock past the wait limit; the APPLY did not run."
+              + " Start it again later.");
+    }
+  }
+
+  private static boolean hasChanges(P4kImportResultDto result) {
+    return result.ingredientsResolved() > 0
+        || hasChanges(result.manufacturers())
+        || hasChanges(result.items())
+        || hasChanges(result.ships())
+        || hasChanges(result.commodities())
+        || hasChanges(result.blueprints());
+  }
+
+  private static boolean hasChanges(P4kImportResultDto.Counts counts) {
+    return counts.created() > 0 || counts.enriched() > 0;
   }
 
   /**
@@ -134,7 +204,8 @@ public class P4kImportJobRunner {
   @NotNull
   private String describe(@NotNull Exception e) {
     String message = e.getMessage();
-    if (e instanceof BadRequestException && message != null) {
+    if ((e instanceof BadRequestException || e instanceof SyncLockUnavailableException)
+        && message != null) {
       return message;
     }
     String simple = e.getClass().getSimpleName();

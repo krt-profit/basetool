@@ -224,7 +224,8 @@ public class BlueprintProductService implements BlueprintProducts {
             variantCount,
             blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
             blueprintMapper.toIngredientDtos(recipe.getIngredients()),
-            baseStats(recipe.getOutputItem())));
+            baseStats(recipe.getOutputItem()),
+            recipe.getWikiMetadata()));
   }
 
   /**

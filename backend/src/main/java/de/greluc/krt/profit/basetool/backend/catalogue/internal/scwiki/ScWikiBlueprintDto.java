@@ -21,8 +21,12 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * SC Wiki blueprint row from {@code /api/blueprints}.
@@ -47,6 +51,10 @@ import java.util.UUID;
  *     response only, {@code null} on list payloads
  * @param summaryProperties de-duplicated roll-up of the affected stats; detail response only
  * @param dismantle dismantle time / efficiency; detail response only
+ * @param unlockingMissions mission unlock rewards; detail response only
+ * @param unlockingMissionGroups missions grouped by reward chance
+ * @param aspects source aspect inputs and choice constraints
+ * @param tiers complete source requirement trees for each crafting tier
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiBlueprintDto(
@@ -64,5 +72,46 @@ public record ScWikiBlueprintDto(
     @JsonProperty("dismantle_returns") List<ScWikiBlueprintIngredientDto> dismantleReturns,
     @JsonProperty("requirement_groups") List<ScWikiBlueprintRequirementGroupDto> requirementGroups,
     @JsonProperty("summary_properties") List<ScWikiBlueprintSummaryPropertyDto> summaryProperties,
-    @JsonProperty("dismantle") ScWikiBlueprintDismantleDto dismantle)
-    implements ScWikiRow {}
+    @JsonProperty("dismantle") ScWikiBlueprintDismantleDto dismantle,
+    @Nullable @JsonProperty("unlocking_missions")
+        List<BlueprintCatalogueMetadata.Mission> unlockingMissions,
+    @Nullable @JsonProperty("unlocking_missions_grouped")
+        List<BlueprintCatalogueMetadata.MissionGroup> unlockingMissionGroups,
+    @Nullable @JsonProperty("aspects") BlueprintCatalogueMetadata.Aspects aspects,
+    @Nullable @JsonProperty("tiers") List<BlueprintCatalogueMetadata.Tier> tiers)
+    implements ScWikiRow {
+
+  /**
+   * Projects only explicitly supplied detail sections, keeping list fallbacks distinguishable.
+   *
+   * @return optional typed detail evidence
+   */
+  @Nullable
+  public BlueprintCatalogueMetadata metadata() {
+    Set<BlueprintCatalogueMetadata.DetailSection> loaded =
+        EnumSet.noneOf(BlueprintCatalogueMetadata.DetailSection.class);
+    if (unlockingMissions != null) {
+      loaded.add(BlueprintCatalogueMetadata.DetailSection.MISSIONS);
+    }
+    if (unlockingMissionGroups != null) {
+      loaded.add(BlueprintCatalogueMetadata.DetailSection.MISSION_GROUPS);
+    }
+    if (aspects != null) {
+      loaded.add(BlueprintCatalogueMetadata.DetailSection.ASPECTS);
+    }
+    if (tiers != null) {
+      loaded.add(BlueprintCatalogueMetadata.DetailSection.TIERS);
+    }
+    if (loaded.isEmpty()) {
+      return null;
+    }
+    return new BlueprintCatalogueMetadata(
+        BlueprintCatalogueMetadata.Source.SC_WIKI,
+        gameVersion,
+        loaded,
+        unlockingMissions == null ? List.of() : unlockingMissions,
+        unlockingMissionGroups == null ? List.of() : unlockingMissionGroups,
+        aspects,
+        tiers == null ? List.of() : tiers);
+  }
+}

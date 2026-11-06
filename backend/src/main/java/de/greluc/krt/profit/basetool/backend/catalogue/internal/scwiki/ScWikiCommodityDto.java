@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CommodityMiningData;
+import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
 /**
  * SC Wiki commodity row from {@code GET /api/commodities}; unmapped fields are ignored.
@@ -37,6 +40,7 @@ import java.util.UUID;
  * @param isMineable whether the Wiki flags the commodity as mineable
  * @param hasHarvestables whether the Wiki flags the commodity as a harvestable source
  */
+@Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiCommodityDto(
     UUID uuid,
@@ -46,5 +50,47 @@ public record ScWikiCommodityDto(
     String kind,
     @JsonProperty("density_g_per_cc") Double densityGramPerCc,
     @JsonProperty("is_mineable") Boolean isMineable,
-    @JsonProperty("has_harvestables") Boolean hasHarvestables)
-    implements ScWikiRow {}
+    @JsonProperty("has_harvestables") Boolean hasHarvestables,
+    Integer tier,
+    Double instability,
+    Double resistance,
+    Double volatility,
+    @JsonProperty("volatility_health_decay_per_second") Double volatilityHealthDecayPerSecond,
+    Double signature,
+    @JsonProperty("has_ship_mineables") Boolean hasShipMineables,
+    @JsonProperty("has_ground_vehicle_mineables") Boolean hasGroundVehicleMineables,
+    @JsonProperty("has_fps_mineables") Boolean hasFpsMineables,
+    @JsonProperty("has_salvage") Boolean hasSalvage,
+    @JsonProperty("box_sizes_scu") List<Double> boxSizesScu,
+    @JsonProperty("commodity_groups") List<String> commodityGroups,
+    List<String> methods,
+    List<String> systems,
+    List<CommodityMiningData.Location> locations)
+    implements ScWikiRow {
+
+  /**
+   * Projects typed source evidence without changing market or canonical resource identity.
+   *
+   * @return immutable mining and cargo metadata
+   */
+  public CommodityMiningData miningData() {
+    return new CommodityMiningData(
+        tier,
+        instability,
+        resistance,
+        volatility,
+        volatilityHealthDecayPerSecond,
+        signature,
+        isMineable,
+        hasShipMineables,
+        hasGroundVehicleMineables,
+        hasFpsMineables,
+        hasHarvestables,
+        hasSalvage,
+        boxSizesScu,
+        commodityGroups,
+        methods,
+        systems,
+        locations);
+  }
+}

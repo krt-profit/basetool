@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementIngredientDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * SC Wiki recipe graph of one owned blueprint's product, for the Personal Inventory blueprint view.
@@ -37,10 +39,12 @@ import java.util.List;
  * @param ingredients flat ingredient list, used when {@link #requirementGroups} is empty
  * @param baseStats the crafted item's stat base values per property key (REQ-INV-069); empty when
  *     none is stored
+ * @param wikiMetadata source unlock conditions and complete tier evidence
  */
 public record PersonalBlueprintRecipeResponse(
     String productName,
     int variantCount,
     List<BlueprintRequirementGroupDto> requirementGroups,
     List<BlueprintRequirementIngredientDto> ingredients,
-    List<BlueprintStatBaseDto> baseStats) {}
+    List<BlueprintStatBaseDto> baseStats,
+    @Nullable BlueprintCatalogueMetadata wikiMetadata) {}

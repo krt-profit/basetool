@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code PersonalBlueprintRecipeResponse}: the SC Wiki recipe of one
@@ -33,6 +34,7 @@ import java.util.List;
  * @param ingredients flat ingredient list used as the fallback when {@code requirementGroups} is
  *     empty
  * @param baseStats the crafted item's stat base values per property key; empty when none is stored
+ * @param wikiMetadata source unlock conditions, aspect choices and complete tier evidence
  */
 @DtoMirror
 public record PersonalBlueprintRecipeDto(
@@ -40,4 +42,5 @@ public record PersonalBlueprintRecipeDto(
     int variantCount,
     List<BlueprintRequirementGroupDto> requirementGroups,
     List<BlueprintRequirementIngredientDto> ingredients,
-    List<BlueprintStatBaseDto> baseStats) {}
+    List<BlueprintStatBaseDto> baseStats,
+    @Nullable BlueprintCatalogueMetadata wikiMetadata) {}

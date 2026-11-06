@@ -39,6 +39,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -88,6 +90,20 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Enumerated(EnumType.STRING)
   @Column(name = "source_systems", nullable = false, length = 16)
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
+
+  /** Typed Wiki enrichment with explicit source and relationship-loading evidence. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "wiki_metadata", columnDefinition = "jsonb")
+  @Nullable
+  private ItemCatalogueMetadata wikiMetadata;
+
+  /** Display identity supplied by the Wiki, independent of the canonical item name. */
+  @Column(name = "scwiki_name")
+  private String scwikiName;
+
+  /** Display identity supplied by UEX, independent of the canonical item name. */
+  @Column(name = "uex_name")
+  private String uexName;
 
   /** SC Wiki URL slug (e.g. {@code "venture-helmet-white-2"}). R4. */
   @Column(name = "scwiki_slug")
@@ -147,14 +163,17 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   /** Bounding box X (m). R4. */
   @Column(name = "dimension_x")
+  @Nullable
   private Double dimensionX;
 
   /** Bounding box Y (m). R4. */
   @Column(name = "dimension_y")
+  @Nullable
   private Double dimensionY;
 
   /** Bounding box Z (m). R4. */
   @Column(name = "dimension_z")
+  @Nullable
   private Double dimensionZ;
 
   /** English description from Wiki. R4. */
@@ -289,6 +308,7 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
    * Wiki UUID stays in {@code external_uuid}.
    */
   @Column(name = "p4k_uuid", unique = true)
+  @Nullable
   private UUID p4kUuid;
 
   /**
@@ -301,6 +321,7 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
   @Column(name = "p4k_synced_at")
+  @Nullable
   private Instant p4kSyncedAt;
 
   /**

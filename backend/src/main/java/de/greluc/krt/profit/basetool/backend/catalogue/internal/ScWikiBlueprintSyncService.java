@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintDismantleReturn;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
@@ -66,10 +67,10 @@ import org.springframework.util.StringUtils;
  * Syncs SC Wiki blueprints into {@code blueprint} and its ingredient, dismantle-return,
  * requirement-group, modifier and summary-property tables.
  *
- * <p>Lists all blueprints, fetches each detail (paced via {@link ScWikiClient#paceForRateLimit()})
- * and upserts each in its own {@code REQUIRES_NEW} transaction. Unresolved ingredients keep their
- * Wiki snapshot and are re-resolved on later runs. When the detail is unavailable, the flat
- * ingredient list is used and existing group data is kept.
+ * <p>Lists all blueprints and fetches each detail through the paced client, and upserts each in its
+ * own {@code REQUIRES_NEW} transaction. Unresolved ingredients keep their Wiki snapshot and are
+ * re-resolved on later runs. When the detail is unavailable, the flat ingredient list is used and
+ * existing group data is kept.
  *
  * <p>Gated by {@code krt.scwiki.blueprint-sync-enabled} (default {@code false}); an empty Wiki
  * response skips the orphan sweep.
@@ -104,9 +105,7 @@ public class ScWikiBlueprintSyncService {
    * skips the orphan sweep. Each detail is fetched outside a transaction and persisted via {@link
    * #upsertBlueprintWithinTransaction(UUID, ScWikiBlueprintDto, UUID, Instant)}.
    *
-   * @return the number of blueprints upserted, {@code 0} when disabled or empty, or the live
-   *     blueprint count ({@link BlueprintRepository#countLiveScwikiBlueprints()}) on {@code 304 Not
-   *     Modified}
+   * @return the number of committed blueprint upserts, or zero when disabled or empty
    */
   public int syncBlueprints() {
     if (!Boolean.TRUE.equals(properties.blueprintSyncEnabled())) {
@@ -116,23 +115,28 @@ public class ScWikiBlueprintSyncService {
       return 0;
     }
 
+    try (ScWikiClient.SyncRun _ = scWikiClient.openSyncRun()) {
+      return syncBlueprintsWithinRun();
+    }
+  }
+
+  /**
+   * Applies one version-pinned blueprint census.
+   *
+   * @return number of committed blueprint writes
+   */
+  private int syncBlueprintsWithinRun() {
     log.info("Starting SC Wiki blueprint sync...");
     ScWikiClient.FetchResult<ScWikiBlueprintDto> listResult =
         scWikiClient.fetchAllPagesResult(
             properties.blueprintsEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiBlueprintDto>>() {},
             "blueprints");
-    if (listResult.notModified()) {
-      long live = blueprintRepository.countLiveScwikiBlueprints();
-      log.info(
-          "SC Wiki blueprint list unchanged since last sync (304) — reporting {} live blueprint"
-              + " row(s) instead of 0.",
-          live);
-      return (int) live;
-    }
+
     List<ScWikiBlueprintDto> fetched = listResult.data();
     if (fetched.isEmpty()) {
       log.warn("No blueprints received from SC Wiki API. Aborting sync (no orphan sweep).");
+      syncReportService.recordSweep(false);
       return 0;
     }
 
@@ -146,12 +150,13 @@ public class ScWikiBlueprintSyncService {
     Set<String> overrideKeysFired = new HashSet<>();
 
     for (ScWikiBlueprintDto listDto : fetched) {
-      if (listDto.uuid() == null) {
+      if (listDto == null || listDto.uuid() == null) {
+        syncReportService.recordSkipped(1);
+        syncReportService.recordIncomplete();
         continue;
       }
       try {
         seen.add(listDto.uuid());
-        scWikiClient.paceForRateLimit();
         ScWikiBlueprintDto detail =
             scWikiClient.fetchOne(
                 properties.blueprintsEndpoint(),
@@ -160,6 +165,11 @@ public class ScWikiBlueprintSyncService {
                 "blueprint");
         if (detail == null) {
           detailMisses++;
+        }
+        if (detail != null && !listDto.uuid().equals(detail.uuid())) {
+          syncReportService.recordFailed(1);
+          syncReportService.recordIncomplete();
+          continue;
         }
         ScWikiBlueprintDto dto = detail != null ? detail : listDto;
         if (outputNameOverrides.isRegistered(dto.key())) {
@@ -171,12 +181,19 @@ public class ScWikiBlueprintSyncService {
         unresolvedLines +=
             self.getObject().upsertBlueprintWithinTransaction(listDto.uuid(), dto, runId, now);
         processed++;
+        syncReportService.recordApplied(1);
       } catch (Exception e) {
+        syncReportService.recordFailed(1);
         log.error("Failed to process SC Wiki blueprint dto: {}", listDto.uuid(), e);
       }
     }
 
-    if (!seen.isEmpty() && !listResult.complete()) {
+    boolean sweep =
+        !seen.isEmpty()
+            && listResult.complete()
+            && fetched.stream().allMatch(dto -> dto != null && dto.uuid() != null);
+    syncReportService.recordSweep(sweep);
+    if (!seen.isEmpty() && !sweep) {
       log.warn(
           "Skipping the blueprint scwiki_deleted sweep: the Wiki blueprint page walk did not"
               + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
@@ -221,24 +238,46 @@ public class ScWikiBlueprintSyncService {
       UUID scwikiUuid, ScWikiBlueprintDto dto, UUID runId, Instant now) {
     Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
     bp.setScwikiUuid(scwikiUuid);
-    bp.setScwikiKey(dto.key());
-    bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
-    bp.setCategoryUuid(dto.categoryUuid());
-    bp.setCraftTimeSeconds(dto.craftTimeSeconds());
-    bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
-    bp.setIngredientCount(dto.ingredientCount());
-    bp.setUnlockingMissionsCount(dto.unlockingMissionsCount());
-    bp.setGameVersionSeen(dto.gameVersion());
-    bp.setOutputItem(resolveGameItem(dto.outputItemUuid()));
-    applyDismantle(bp, dto);
-
-    int unresolved;
-    if (dto.requirementGroups() != null && !dto.requirementGroups().isEmpty()) {
-      unresolved = applyRequirementGraph(bp, dto, runId);
-    } else {
-      unresolved = applyIngredients(bp, dto, runId);
+    boolean p4kOwned = bp.getP4kSyncedAt() != null;
+    if (!p4kOwned || !StringUtils.hasText(bp.getScwikiKey())) {
+      bp.setScwikiKey(dto.key());
     }
-    applyDismantleReturns(bp, dto, runId);
+    if (!p4kOwned || !StringUtils.hasText(bp.getOutputName())) {
+      bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
+    }
+    if (!p4kOwned || bp.getCategoryUuid() == null) {
+      bp.setCategoryUuid(dto.categoryUuid());
+    }
+    if (!p4kOwned || bp.getCraftTimeSeconds() == null) {
+      bp.setCraftTimeSeconds(dto.craftTimeSeconds());
+    }
+    bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
+    bp.setUnlockingMissionsCount(dto.unlockingMissionsCount());
+    if (!p4kOwned || bp.getOutputItem() == null) {
+      bp.setOutputItem(resolveGameItem(dto.outputItemUuid()));
+    }
+    BlueprintCatalogueMetadata metadata = dto.metadata();
+    if (metadata != null) {
+      bp.setWikiMetadata(metadata.retainingMissingSections(bp.getWikiMetadata()));
+    }
+
+    int unresolved = 0;
+    boolean recipeWritable = !p4kOwned || bp.getIngredients().isEmpty();
+    if (recipeWritable) {
+      if (dto.requirementGroups() != null) {
+        unresolved = applyRequirementGraph(bp, dto, runId);
+        bp.setIngredientCount(dto.ingredientCount());
+        bp.setGameVersionSeen(dto.gameVersion());
+      } else if (bp.getRequirementGroups().isEmpty() && dto.ingredients() != null) {
+        unresolved = applyIngredients(bp, dto, runId);
+        bp.setIngredientCount(dto.ingredientCount());
+        bp.setGameVersionSeen(dto.gameVersion());
+      }
+      applyDismantle(bp, dto);
+      if (dto.dismantleReturns() != null) {
+        applyDismantleReturns(bp, dto, runId);
+      }
+    }
     bp.setScwikiSyncedAt(now);
     bp.setScwikiDeletedAt(null);
     blueprintRepository.save(bp);
@@ -447,6 +486,7 @@ public class ScWikiBlueprintSyncService {
     } else {
       line.setKind(BlueprintIngredientKind.RESOURCE);
       line.setWikiResourceUuid(child.uuid());
+      line.setWikiOreUuid(child.oreUuid());
       line.setQuantityScu(child.quantityScu());
       Material resolved = resolveMaterialForChild(child);
       line.setMaterial(resolved);
@@ -469,8 +509,7 @@ public class ScWikiBlueprintSyncService {
    * @return number of unresolved ingredient lines
    */
   private int applyIngredients(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
-    List<ScWikiBlueprintIngredientDto> incoming =
-        dto.ingredients() == null ? List.of() : dto.ingredients();
+    List<ScWikiBlueprintIngredientDto> incoming = dto.ingredients();
     List<BlueprintIngredient> lines = bp.getIngredients();
     int unresolved = 0;
 
@@ -529,8 +568,7 @@ public class ScWikiBlueprintSyncService {
    * @param runId current run id for unresolved events
    */
   private void applyDismantleReturns(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
-    List<ScWikiBlueprintIngredientDto> incoming =
-        dto.dismantleReturns() == null ? List.of() : dto.dismantleReturns();
+    List<ScWikiBlueprintIngredientDto> incoming = dto.dismantleReturns();
     List<BlueprintDismantleReturn> lines = bp.getDismantleReturns();
 
     for (int i = 0; i < incoming.size(); i++) {

@@ -353,6 +353,11 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
+    .file(layout.settingsDirectory.file("docker-compose.e2e.yml"))
+    .withPropertyName("e2eCatalogueSchedulerIsolation")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
     .files(fileTree("src/e2e/java") { include("**/*.java") })
     .withPropertyName("e2eSourcesForTestProfileScan")
     .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -971,6 +976,11 @@ val testBlueprintStatsJs =
     inputs.file(
       layout.projectDirectory.file(
         "src/main/resources/static/js/personalinventory/personal-inventory-blueprint-stats.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/personalinventory/personal-inventory-blueprint-metadata.js",
       ),
     )
     outputs.upToDateWhen { false }

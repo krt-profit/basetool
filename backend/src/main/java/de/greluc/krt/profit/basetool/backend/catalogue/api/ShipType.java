@@ -149,7 +149,11 @@ public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "fuel_hydrogen")
   private Double fuelHydrogen;
 
-  /** Vehicle internal inventory in SCU (Wiki's {@code vehicle_inventory}). */
+  /** Wiki game build that supplied the vehicle enrichment. */
+  @Column(name = "scwiki_game_version_seen")
+  private String scwikiGameVersionSeen;
+
+  /** Vehicle internal inventory in SCU. */
   @Column(name = "vehicle_inventory_scu")
   private Double vehicleInventoryScu;
 
@@ -167,11 +171,11 @@ public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   /** Hull health points. */
   @Column(name = "health")
-  private Integer health;
+  private Double health;
 
   /** Shield health points. */
   @Column(name = "shield_hp")
-  private Integer shieldHp;
+  private Double shieldHp;
 
   /** Add-on module to a parent ship (not a stand-alone vehicle). */
   @Column(name = "is_addon")

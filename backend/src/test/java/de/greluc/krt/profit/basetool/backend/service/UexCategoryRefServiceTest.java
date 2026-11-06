@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCategoryRefService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
@@ -48,7 +49,9 @@ class UexCategoryRefServiceTest {
   @Mock private UexCategoryRepository repository;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexCategoryRefService service;
 
@@ -78,7 +81,7 @@ class UexCategoryRefServiceTest {
     when(repository.findById(3)).thenReturn(Optional.of(existing));
     when(repository.findById(5)).thenReturn(Optional.empty());
     when(repository.save(any(UexCategory.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(repository.findAll()).thenReturn(List.of(existing));
+    when(repository.findAllById(any())).thenReturn(List.of(existing));
 
     service.syncCategories();
 
@@ -101,7 +104,7 @@ class UexCategoryRefServiceTest {
     when(repository.findById(3)).thenReturn(Optional.empty());
     when(repository.findById(7)).thenReturn(Optional.empty());
     when(repository.save(any(UexCategory.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(repository.findAll()).thenReturn(List.of());
+    when(repository.findAllById(any())).thenReturn(List.of());
 
     service.syncCategories();
 
@@ -123,5 +126,36 @@ class UexCategoryRefServiceTest {
     service.syncCategories();
 
     verify(repository, never()).save(any());
+  }
+
+  @Test
+  void aPartialCategoryResponseCannotVouchForAnItemCensus() {
+    UexCategoryDto item = new UexCategoryDto(3, "item", "Armor", "Helmets", 1, 0);
+    when(uexClient.getCategories()).thenReturn(UexClient.FetchResult.partial(List.of(item)));
+    when(repository.save(any(UexCategory.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAll()).thenReturn(List.of());
+
+    assertFalse(service.syncCategoriesResult().complete());
+
+    verify(repository, never()).findAllById(any());
+  }
+
+  @Test
+  void aCompleteCategoryResponseExcludesHistoricalLocalCategories() {
+    UexCategoryDto item = new UexCategoryDto(3, "item", "Armor", "Helmets", 1, 0);
+    when(uexClient.getCategories()).thenReturn(fetched(List.of(item)));
+    when(repository.save(any(UexCategory.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findAllById(any())).thenReturn(List.of());
+
+    assertTrue(service.syncCategoriesResult().complete());
+
+    verify(repository)
+        .findAllById(
+            argThat(ids -> {
+              java.util.List<Integer> values = new java.util.ArrayList<>();
+              ids.forEach(values::add);
+              return values.equals(List.of(3));
+            }));
+    verify(repository, never()).findAll();
   }
 }

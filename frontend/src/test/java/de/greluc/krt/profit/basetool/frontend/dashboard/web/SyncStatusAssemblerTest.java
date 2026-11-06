@@ -121,6 +121,23 @@ class SyncStatusAssemblerTest {
   }
 
   @Test
+  void partialSync_preservesItsOutcomeAndTheOlderCompleteApplyTime() {
+    Instant complete = NOW.minusSeconds(86_400);
+    when(syncReports.syncRunSummaries(7))
+        .thenReturn(
+            List.of(
+                new SyncRunSummaryDto(
+                    "UEX", 1, NOW.minusSeconds(60), complete, "PARTIAL", List.of())));
+    when(catalogue.p4kImportJobs()).thenReturn(List.of());
+
+    SyncStatusRow row = assembler.rows(7, NOW).getFirst();
+
+    assertThat(row.status()).isEqualTo("PARTIAL");
+    assertThat(row.lastCompleteAt()).isEqualTo(complete);
+    assertThat(row.lastRunAt()).isEqualTo(NOW.minusSeconds(60));
+  }
+
+  @Test
   void aSyncWhoseLastRunLiesOutsideTheRangeKeepsItsTimeAndIsOutOfRange() {
     Instant old = NOW.minusSeconds(20 * 86_400L);
     when(syncReports.syncRunSummaries(7)).thenReturn(summaries(0, old, 0));

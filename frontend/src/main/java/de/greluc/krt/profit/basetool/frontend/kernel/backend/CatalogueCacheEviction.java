@@ -44,6 +44,18 @@ public class CatalogueCacheEviction {
     backendApiClient.evict(domains);
   }
 
+  /** Evicts source-synced reference data before catalogue receivers reload their fragments. */
+  public void evictSourceCatalogues() {
+    backendApiClient.evict(
+        CacheDomain.MATERIAL,
+        CacheDomain.LOCATION,
+        CacheDomain.SHIP_TYPE,
+        CacheDomain.REFINING_METHOD,
+        CacheDomain.TERMINAL,
+        CacheDomain.MANUFACTURER,
+        CacheDomain.ITEM_CATALOG);
+  }
+
   /** Evicts every catalogue domain, for a write whose affected domains are not known. */
   public void evictAllCatalogues() {
     backendApiClient.evictAllCatalogues();

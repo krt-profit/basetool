@@ -76,7 +76,12 @@ class SyncStatusAssembler {
   private static SyncStatusRow syncRow(SyncSource source, @Nullable SyncRunSummaryDto summary) {
     long runs = summary == null ? 0 : summary.runs();
     return new SyncStatusRow(
-        source, summary == null ? null : summary.lastRanAt(), null, runs > 0, runs);
+        source,
+        summary == null ? null : summary.lastRanAt(),
+        summary == null ? null : summary.lastStatus(),
+        runs > 0,
+        runs,
+        summary == null ? null : summary.lastCompleteAt());
   }
 
   private SyncStatusRow importRow(@Nullable SyncRunSummaryDto summary, Instant since) {

@@ -17,6 +17,7 @@
     <div id="inventory-game-item-results" class="card card--flush">
         <th:block th:fragment="inventoryGameItemResults">
         <div th:if="${error}" class="alert alert-danger drill-alert" role="alert" th:text="#{__${error}__}">Fehler</div>
+        <th:block th:replace="~{catalogue/fragments/item-catalogue :: itemCatalogue(${itemCatalogue})}"></th:block>
 
         <div class="table-responsive" th:if="${!#lists.isEmpty(items)}">
             <table class="data-table data-table--stack">

@@ -39,12 +39,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.UexCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.service.RecordingTransactionManager;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -66,10 +70,13 @@ class UexItemSyncServiceTest {
   @Mock private ManufacturerUexCompanyRepository manufacturerAliasRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private ScWikiProperties scWikiProperties;
   @Mock private ObjectProvider<UexItemSyncService> self;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexItemSyncService service;
 
@@ -80,6 +87,7 @@ class UexItemSyncServiceTest {
   @BeforeEach
   void setUp() {
     lenient().when(self.getObject()).thenReturn(service);
+    lenient().when(scWikiProperties.reconcileUuidlessByName()).thenReturn(true);
 
     helmetsCategory = new UexCategory();
     helmetsCategory.setId(3);
@@ -135,7 +143,8 @@ class UexItemSyncServiceTest {
             456L,
             null);
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(42)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
@@ -169,7 +178,8 @@ class UexItemSyncServiceTest {
     helmetsCategory.setSection("Avionics");
     helmetsCategory.setName("Flight Blade");
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(avionics));
     when(gameItemRepository.findByUexItemId(99)).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -197,7 +207,8 @@ class UexItemSyncServiceTest {
     prior.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     prior.setScwikiSyncedAt(java.time.Instant.now());
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(7)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.of(prior));
@@ -230,7 +241,8 @@ class UexItemSyncServiceTest {
     uuidOwner.setUexItemId(879);
     uuidOwner.setExternalUuid(sharedUuid);
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(skin));
     when(gameItemRepository.findByUexItemId(4752)).thenReturn(Optional.of(skinRow));
     when(gameItemRepository.findByExternalUuid(sharedUuid)).thenReturn(Optional.of(uuidOwner));
@@ -272,7 +284,8 @@ class UexItemSyncServiceTest {
     prior.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     prior.setScwikiSyncedAt(java.time.Instant.now());
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(liveriesCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(liveriesCategory), true));
     when(uexClient.getItemsForCategory(75)).thenReturn(fetched(paint));
     when(gameItemRepository.findByUexItemId(21)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.of(prior));
@@ -290,7 +303,8 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_skipsOrphanSweep_whenNoItemsWereProcessed() {
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched());
 
     int upserted = service.syncItems();
@@ -301,7 +315,8 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_reportsZeroWithoutCatalogueFallback_whenEmpty200Outage() {
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched());
 
     int reported = service.syncItems();
@@ -314,12 +329,13 @@ class UexItemSyncServiceTest {
   void syncItems_skipsOrphanSweep_whenACategoryFetchFailed_evenWithFreshItems() {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
-    when(categoryRefService.syncCategories())
-        .thenReturn(List.of(helmetsCategory, liveriesCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(
+            new UexCategoryRefService.CategorySyncResult(
+                List.of(helmetsCategory, liveriesCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(uexClient.getItemsForCategory(75)).thenReturn(failed());
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
-    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
     int upserted = service.syncItems();
@@ -333,8 +349,10 @@ class UexItemSyncServiceTest {
   void syncItems_runsOrphanSweep_whenAnEmptyCategoryAnsweredCompletely() {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
-    when(categoryRefService.syncCategories())
-        .thenReturn(List.of(helmetsCategory, liveriesCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(
+            new UexCategoryRefService.CategorySyncResult(
+                List.of(helmetsCategory, liveriesCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(uexClient.getItemsForCategory(75)).thenReturn(fetched());
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
@@ -351,7 +369,8 @@ class UexItemSyncServiceTest {
   void syncItems_runsOrphanSweep_whenAtLeastOneItemProcessed() {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
@@ -368,7 +387,8 @@ class UexItemSyncServiceTest {
   void syncItems_writesOneUexRunSummaryEvent_andPrunesUexRuns() {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
@@ -446,7 +466,8 @@ class UexItemSyncServiceTest {
     UexItemDto colliding = helmetDto(100, "Colliding Helmet", "", helmetsCategory);
     UexItemDto surviving = helmetDto(200, "Surviving Helmet", "", helmetsCategory);
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(colliding, surviving));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
@@ -465,9 +486,8 @@ class UexItemSyncServiceTest {
     verify(gameItemRepository, times(2)).save(any(GameItem.class));
     verify(gameItemRepository).save(argThat(g -> Integer.valueOf(200).equals(g.getUexItemId())));
     assertEquals(1, upserted, "the failing item must not be counted, the surviving one must be");
-    verify(gameItemRepository)
-        .markUexDeletedExcept(
-            argThat(ids -> ids.contains(200) && !ids.contains(100)), any(Instant.class));
+    verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+    verify(syncReportService).recordFailed(1);
     verify(syncReportService)
         .logUexEvent(
             any(),
@@ -520,7 +540,8 @@ class UexItemSyncServiceTest {
     existing.setUexSlug("ballistic-helmet-old");
     existing.setSourceSystems(GameItemSourceSystem.BOTH);
 
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(500)).thenReturn(Optional.of(existing));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -552,7 +573,8 @@ class UexItemSyncServiceTest {
     stubRepositoryOver(rows);
     when(gameItemRepository.findExternalUuidRefs())
         .thenReturn(List.of(uuidRef(5, uuidX), uuidRef(7, uuidY)));
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3))
         .thenReturn(
             fetched(
@@ -577,7 +599,8 @@ class UexItemSyncServiceTest {
     stubRepositoryOver(List.of(rowX, rowY));
     when(gameItemRepository.findExternalUuidRefs())
         .thenReturn(List.of(uuidRef(5, uuidX), uuidRef(7, uuidY)));
-    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
     when(uexClient.getItemsForCategory(3))
         .thenReturn(
             fetched(
@@ -590,6 +613,182 @@ class UexItemSyncServiceTest {
     assertEquals(uuidX, rowX.getExternalUuid());
     assertEquals(7, rowY.getUexItemId());
     verify(gameItemRepository, never()).saveAndFlush(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void aNewSharedUuidSiblingNeverTakesTheExistingItemsUexId(boolean reverse) {
+    UUID shared = UUID.fromString("091fc83c-aa96-44af-a850-45c381af311b");
+    GameItem existing = storedItem(261, shared);
+    existing.setName("FBL-8a Arms Arctic Digital");
+    List<GameItem> rows = new ArrayList<>(List.of(existing));
+    stubMutableRepository(rows);
+    List<UexItemDto> source =
+        new ArrayList<>(
+            List.of(
+                helmetDto(261, "FBL-8a Arms Arctic Digital", shared.toString(), helmetsCategory),
+                helmetDto(6002, "FBL-8a Arms Righteous", shared.toString(), helmetsCategory)));
+    if (reverse) {
+      Collections.reverse(source);
+    }
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(source.toArray(UexItemDto[]::new)));
+
+    assertEquals(2, service.syncItems());
+
+    assertEquals(2, rows.size());
+    assertEquals(261, existing.getUexItemId());
+    assertEquals("FBL-8a Arms Arctic Digital", existing.getName());
+    GameItem sibling =
+        rows.stream()
+            .filter(row -> Integer.valueOf(6002).equals(row.getUexItemId()))
+            .findFirst()
+            .orElseThrow();
+    assertNull(sibling.getExternalUuid());
+    assertEquals("FBL-8a Arms Righteous", sibling.getName());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void sharedUuidClaimsStaySeparateOnAFreshCatalogue(boolean reverse) {
+    UUID shared = UUID.randomUUID();
+    List<GameItem> rows = new ArrayList<>();
+    stubMutableRepository(rows);
+    UexItemDto first = helmetDto(41, "Base Item", shared.toString(), helmetsCategory);
+    UexItemDto second = helmetDto(42, "Variant Item", shared.toString(), helmetsCategory);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(reverse ? fetched(second, first) : fetched(first, second));
+
+    service.syncItems();
+
+    assertEquals(2, rows.size());
+    assertTrue(rows.stream().allMatch(row -> row.getExternalUuid() == null));
+    assertEquals(
+        java.util.Set.of(41, 42),
+        rows.stream().map(GameItem::getUexItemId).collect(java.util.stream.Collectors.toSet()));
+    verify(gameItemRepository)
+        .markUexDeletedExcept(argThat(ids -> ids.containsAll(List.of(41, 42))), any());
+  }
+
+  @Test
+  void incompleteCategoryCensusNeverPermitsAnItemOrphanSweep() {
+    UexItemDto dto = helmetDto(8, "Known Item", "", helmetsCategory);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), false));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(dto));
+    when(gameItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncItems());
+
+    verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
+  void aFailedWriteStillCountsAsAnUpstreamIdentity() {
+    UexItemDto failed = helmetDto(8, "Failed Item", "", helmetsCategory);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(failed));
+    when(gameItemRepository.save(any())).thenThrow(new DataIntegrityViolationException("rejected"));
+
+    assertEquals(0, service.syncItems());
+
+    verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+    verify(syncReportService).recordSweep(false);
+    verify(syncReportService).recordFailed(1);
+  }
+
+  @Test
+  void aUuidlessUexItemAdoptsTheExistingUniqueWikiIdentityWithoutReplacingItsLocalId() {
+    UUID wikiUuid = UUID.randomUUID();
+    GameItem wiki = new GameItem();
+    wiki.setId(UUID.randomUUID());
+    wiki.setExternalUuid(wikiUuid);
+    wiki.setName("P4K Display Name");
+    wiki.setScwikiName("Venture Helmet");
+    wiki.setKind(GameItemKind.ARMOR);
+    wiki.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    when(gameItemRepository.findWikiNameCandidates("Venture Helmet")).thenReturn(List.of(wiki));
+    when(gameItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(fetched(helmetDto(88, "Venture Helmet", "", helmetsCategory)));
+
+    assertEquals(1, service.syncItems());
+
+    verify(gameItemRepository).save(wiki);
+    assertEquals(wikiUuid, wiki.getExternalUuid());
+    assertEquals(88, wiki.getUexItemId());
+    assertEquals(GameItemSourceSystem.BOTH, wiki.getSourceSystems());
+  }
+
+  @Test
+  void aUuidlessUexItemNeverChoosesBetweenTwoWikiVariantsWithTheSameSourceName() {
+    GameItem first = storedItem(90, UUID.randomUUID());
+    GameItem second = storedItem(91, UUID.randomUUID());
+    first.setUexItemId(null);
+    second.setUexItemId(null);
+    when(gameItemRepository.findWikiNameCandidates("Venture Helmet"))
+        .thenReturn(List.of(first, second));
+    when(gameItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(fetched(helmetDto(88, "Venture Helmet", "", helmetsCategory)));
+
+    service.syncItems();
+
+    verify(gameItemRepository)
+        .save(
+            argThat(row ->
+                row != first
+                    && row != second
+                    && Integer.valueOf(88).equals(row.getUexItemId())
+                    && row.getExternalUuid() == null));
+    assertNull(first.getUexItemId());
+    assertNull(second.getUexItemId());
+  }
+
+  @Test
+  void anExistingRowIsReportedAsUpdatedEvenWhenItsAuditTimestampsAreAbsent() {
+    GameItem item = storedItem(88, UUID.randomUUID());
+    when(gameItemRepository.findByUexItemId(88)).thenReturn(Optional.of(item));
+    when(gameItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(
+            fetched(
+                helmetDto(
+                    88, "Existing Helmet", item.getExternalUuid().toString(), helmetsCategory)));
+
+    assertEquals(1, service.syncItems());
+
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.SYNC_RUN_SUMMARY),
+            eq("game_item"),
+            isNull(),
+            isNull(),
+            contains("created=0, updated=1"));
+  }
+
+  private void stubMutableRepository(List<GameItem> rows) {
+    stubFindersOver(rows);
+    when(gameItemRepository.save(any(GameItem.class)))
+        .thenAnswer(inv -> {
+          GameItem row = inv.getArgument(0);
+          if (row.getId() == null) {
+            row.setId(UUID.randomUUID());
+            rows.add(row);
+          }
+          return row;
+        });
   }
 
   private GameItem storedItem(int uexItemId, UUID externalUuid) {
@@ -610,6 +809,14 @@ class UexItemSyncServiceTest {
    * @param rows the stored rows the repository answers from
    */
   private void stubRepositoryOver(List<GameItem> rows) {
+    stubFindersOver(rows);
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    lenient()
+        .when(gameItemRepository.saveAndFlush(any(GameItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+  }
+
+  private void stubFindersOver(List<GameItem> rows) {
     when(gameItemRepository.findByUexItemId(anyInt()))
         .thenAnswer(inv ->
             rows.stream()
@@ -619,10 +826,6 @@ class UexItemSyncServiceTest {
         .when(gameItemRepository.findByExternalUuid(any()))
         .thenAnswer(inv ->
             rows.stream().filter(r -> inv.getArgument(0).equals(r.getExternalUuid())).findFirst());
-    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
-    lenient()
-        .when(gameItemRepository.saveAndFlush(any(GameItem.class)))
-        .thenAnswer(inv -> inv.getArgument(0));
   }
 
   private static GameItemRepository.ExternalUuidRef uuidRef(int uexItemId, UUID externalUuid) {

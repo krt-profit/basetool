@@ -177,11 +177,7 @@ public class P4kReviewService {
    */
   @NotNull
   private Map<RecordKey, P4kImportChange> reviewRows(@NotNull List<P4kReviewCase> cases) {
-    Set<UUID> runs =
-        cases.stream()
-            .map(P4kReviewCase::getLastRunId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+    Set<UUID> runs = cases.stream().map(P4kReviewCase::getLastRunId).collect(Collectors.toSet());
     if (runs.isEmpty()) {
       return Map.of();
     }

@@ -50,7 +50,9 @@ class AdminSyncReportsPageControllerTest {
             eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(7));
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
     String view = controller.deleteOld("", 30, attrs);
@@ -70,7 +72,9 @@ class AdminSyncReportsPageControllerTest {
             eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(2));
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
     String view = controller.deleteOld("UEX", 14, attrs);
@@ -87,7 +91,9 @@ class AdminSyncReportsPageControllerTest {
   void deleteOld_rejectsNonPositiveDaysWithoutBackendCall() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
     String view = controller.deleteOld("SCWIKI", 0, attrs);
@@ -104,7 +110,9 @@ class AdminSyncReportsPageControllerTest {
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(3));
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
     String view = controller.deleteOld("  scwiki  ", 30, attrs);
@@ -122,7 +130,9 @@ class AdminSyncReportsPageControllerTest {
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(0));
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
     String view = controller.deleteOld("UEX&olderThanDays=99999", 30, attrs);
@@ -139,7 +149,9 @@ class AdminSyncReportsPageControllerTest {
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(5));
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
 
     controller.deleteOldAjax("uex", 7);
 
@@ -155,7 +167,9 @@ class AdminSyncReportsPageControllerTest {
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenThrow(new BackendServiceException("boom", new RuntimeException(), 500));
     AdminSyncReportsPageController controller =
-        new AdminSyncReportsPageController(new SyncReportBackendClient(client));
+        new AdminSyncReportsPageController(
+            new SyncReportBackendClient(client),
+            new SyncReportPageReader(new SyncReportBackendClient(client)));
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
     String view = controller.deleteOld("", 30, attrs);

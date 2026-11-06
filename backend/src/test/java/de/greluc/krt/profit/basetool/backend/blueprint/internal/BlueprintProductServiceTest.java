@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
@@ -308,11 +309,23 @@ class BlueprintProductServiceTest {
                 new BlueprintIdNameRow(id1, "Arclight Pistol"),
                 new BlueprintIdNameRow(id2, "Arclight Pistol")));
     Blueprint recipe = new Blueprint();
+    var metadata =
+        new BlueprintCatalogueMetadata(
+            BlueprintCatalogueMetadata.Source.SC_WIKI,
+            "4.10.2-LIVE.12881860",
+            java.util.Set.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of());
+    recipe.setWikiMetadata(metadata);
     when(blueprintRepository.findById(id1)).thenReturn(Optional.of(recipe));
     List<BlueprintRequirementGroupDto> groups =
         List.of(new BlueprintRequirementGroupDto("Emitter", "EMITTER", 1, List.of(), List.of()));
     List<BlueprintRequirementIngredientDto> ingredients =
-        List.of(new BlueprintRequirementIngredientDto("RESOURCE", "Tin", 0.36, null, null, "SCU"));
+        List.of(
+            new BlueprintRequirementIngredientDto(
+                "RESOURCE", "Tin", 0.36, null, null, "SCU", null, null, null));
     when(blueprintMapper.toGroupDtos(any())).thenReturn(groups);
     when(blueprintMapper.toIngredientDtos(any())).thenReturn(ingredients);
 
@@ -323,6 +336,7 @@ class BlueprintProductServiceTest {
     assertEquals(2, result.get().variantCount());
     assertSame(groups, result.get().requirementGroups());
     assertSame(ingredients, result.get().ingredients());
+    assertSame(metadata, result.get().wikiMetadata());
     assertTrue(result.get().baseStats().isEmpty());
   }
 

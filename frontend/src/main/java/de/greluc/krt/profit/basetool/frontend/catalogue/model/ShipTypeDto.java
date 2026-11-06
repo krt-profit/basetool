@@ -32,6 +32,7 @@ import java.util.UUID;
  * @param description its description
  * @param scu its cargo capacity
  * @param hidden whether an admin hid it from the pickers
+ * @param catalogueFacts the source-owned vehicle facts, or {@code null} in a summary
  * @param noLongerInGame whether the P4K retired it; a ship of the type then shows the "no longer in
  *     the game" notice (REQ-P4K-013)
  */
@@ -43,18 +44,10 @@ public record ShipTypeDto(
     String description,
     BigDecimal scu,
     boolean hidden,
+    ShipCatalogueFacts catalogueFacts,
     boolean noLongerInGame) {
 
-  /**
-   * Builds a ship type still in the game.
-   *
-   * @param id the ship type's id
-   * @param name its name
-   * @param manufacturer its manufacturer
-   * @param description its description
-   * @param scu its cargo capacity
-   * @param hidden whether an admin hid it from the pickers
-   */
+  /** Creates a summary of a type still in the game, without source-owned vehicle facts. */
   public ShipTypeDto(
       UUID id,
       String name,
@@ -62,6 +55,6 @@ public record ShipTypeDto(
       String description,
       BigDecimal scu,
       boolean hidden) {
-    this(id, name, manufacturer, description, scu, hidden, false);
+    this(id, name, manufacturer, description, scu, hidden, null, false);
   }
 }

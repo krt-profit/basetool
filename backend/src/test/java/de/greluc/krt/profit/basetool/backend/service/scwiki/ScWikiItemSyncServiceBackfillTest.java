@@ -22,11 +22,18 @@ package de.greluc.krt.profit.basetool.backend.service.scwiki;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,13 +41,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemFieldWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemStatFollowUp;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
@@ -55,6 +65,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +75,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
@@ -89,6 +101,7 @@ class ScWikiItemSyncServiceBackfillTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private ItemReconciliationService itemReconciliationService;
   @Mock private GameItemStatRepository gameItemStatRepository;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
@@ -131,7 +144,10 @@ class ScWikiItemSyncServiceBackfillTest {
             syncReportService,
             gameItemStatRepository,
             new GameItemStatWriter(gameItemStatRepository),
-            new ScWikiItemStatFollowUp(scWikiClient, properties, gameItemStatRepository),
+            new ScWikiItemStatFollowUp(
+                scWikiClient, properties, gameItemStatRepository, syncReportService),
+            itemReconciliationService,
+            new ScWikiItemFieldWriter(meterRegistry),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
@@ -164,17 +180,45 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
+  void statFollowUp_rejectsMismatchedMockedDetailWithoutMetadataOrStatsWrites() {
+    UUID requested = UUID.randomUUID();
+    when(gameItemStatRepository.findBlueprintOutputUuidsWithoutStats())
+        .thenReturn(List.of(requested));
+    when(scWikiClient.fetchOne(eq(ITEMS), eq(requested), eq(ScWikiItemDto.class), any()))
+        .thenReturn(itemDto(UUID.randomUUID(), "Wrong Asset"));
+
+    assertEquals(0, service.syncItems());
+
+    verify(syncReportService).recordFailed(1);
+    verify(syncReportService).recordIncomplete();
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("game_item"),
+            eq(requested),
+            isNull(),
+            any());
+    verify(gameItemRepository, never()).findByExternalUuid(any());
+    verify(gameItemRepository, never()).save(any());
+    verify(gameItemStatRepository, never()).findByGameItemId(any());
+    verify(gameItemStatRepository, never()).save(any());
+    verify(syncReportService, never()).recordApplied(anyLong());
+  }
+
+  @Test
   void syncItems_dispatchesToClosure_whenSyncAllItemsFalse() {
     config.put("sync-all-items", false);
     rebuild();
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
+    when(scWikiClient.fetchOneResult(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenReturn(new ScWikiClient.DetailResult<>(ScWikiClient.DetailOutcome.MISSING, null));
 
     service.syncItems();
 
-    verify(scWikiClient).fetchOne(eq(ITEMS), eq(uuid), eq(ScWikiItemDto.class), any());
+    verify(scWikiClient).fetchOneResult(eq(ITEMS), eq(uuid), eq(ScWikiItemDto.class), any());
     verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any(), any(), any());
   }
 
@@ -190,19 +234,24 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
-  void backfill_everyPassNotModified_reportsLiveCount_andSkipsSweep() {
-    when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
-        .thenReturn(ScWikiClient.FetchResult.unchanged());
-    when(gameItemRepository.countLiveScwikiItems()).thenReturn(9000L);
+  void repeatedBackfillPayloadsRefreshTheSameSourceRowAgain() {
+    UUID uuid = UUID.randomUUID();
+    ScWikiItemDto dto = itemDto(uuid, "Replay item");
+    stubPass(ITEMS, dto);
+    GameItem existing = new GameItem();
+    existing.setId(UUID.randomUUID());
+    existing.setExternalUuid(uuid);
+    existing.setName("Replay item");
+    existing.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
 
-    int written = service.syncItems();
+    assertEquals(1, service.syncItems());
+    existing.setScwikiName("stale");
+    assertEquals(1, service.syncItems());
 
-    assertEquals(9000, written, "an all-304 backfill must report the live item count, not 0");
-    verify(gameItemRepository, never()).save(any());
-    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    assertEquals(1.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_NOT_MODIFIED));
-    assertEquals(0.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_INCOMPLETE));
-    assertEquals(0.0, sweepSkips(CatalogueMetricNames.SWEEP_SKIP_NO_ROWS));
+    assertEquals(dto.name(), existing.getScwikiName());
+    verify(gameItemRepository, times(2)).save(existing);
+    verify(scWikiClient, times(2)).fetchAllPagesResult(eq(ITEMS), any(), any(), any(), any());
   }
 
   @Test
@@ -500,6 +549,41 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
+  void aBusyReferenceOwnerRetriesTheIsolatedWriterAndCountsOnlyTheCommit() {
+    ScWikiItemDto dto = itemDto(UUID.randomUUID(), "Contended Item");
+    stubPass(ITEMS, dto);
+    ScWikiItemSyncService writer = mock(ScWikiItemSyncService.class);
+    when(self.getObject()).thenReturn(writer);
+    when(writer.upsertBackfillItemWithinTransaction(any(), any(), any(), any(), any(), any()))
+        .thenThrow(new GameItemReconciliationBusyException())
+        .thenReturn(ScWikiItemSyncService.BackfillOutcome.RECONCILED);
+
+    assertEquals(1, service.syncItems());
+
+    verify(writer, times(2))
+        .upsertBackfillItemWithinTransaction(any(), any(), any(), any(), any(), any());
+    verify(syncReportService).recordApplied(1);
+    verify(syncReportService, never()).recordFailed(anyLong());
+  }
+
+  @Test
+  void referenceOwnerContentionIsBoundedAndDefersWithoutAnOrphanSweep() {
+    stubPass(ITEMS, itemDto(UUID.randomUUID(), "Contended Item"));
+    ScWikiItemSyncService writer = mock(ScWikiItemSyncService.class);
+    when(self.getObject()).thenReturn(writer);
+    when(writer.upsertBackfillItemWithinTransaction(any(), any(), any(), any(), any(), any()))
+        .thenThrow(new GameItemReconciliationBusyException());
+
+    assertEquals(0, service.syncItems());
+
+    verify(writer, times(3))
+        .upsertBackfillItemWithinTransaction(any(), any(), any(), any(), any(), any());
+    verify(syncReportService).recordFailed(1);
+    verify(syncReportService, never()).recordApplied(anyLong());
+    verify(writer, never()).markBackfillOrphansWithinTransaction(any(), any());
+  }
+
+  @Test
   void backfill_reconcilesUuidlessUexRowByName_insteadOfCreatingADuplicate() {
     UUID wikiUuid = UUID.randomUUID();
     UUID uexRowId = UUID.randomUUID();
@@ -510,6 +594,7 @@ class ScWikiItemSyncServiceBackfillTest {
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.findById(uexRowId)).thenReturn(Optional.of(uexRow));
     stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Avionics Blade"));
+    stubPass(ITEMS, itemDto(wikiUuid, "Avionics Blade"));
 
     service.syncItems();
 
@@ -534,11 +619,20 @@ class ScWikiItemSyncServiceBackfillTest {
         .thenReturn(List.of(rowA, rowB));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Power Plant"));
+    stubPass(ITEMS, itemDto(wikiUuid, "Power Plant"));
 
     service.syncItems();
 
     assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
     verify(gameItemRepository, never()).findById(any());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MULTI_MATCH_AMBIGUOUS),
+            eq("game_item"),
+            eq(wikiUuid),
+            eq("Power Plant"),
+            eq("Exact-name reconciliation declined;reason=UEX_NAME"));
     verify(syncReportService, never())
         .logScwikiEvent(any(), eq(SyncEventType.LINKED_VIA_NAME), any(), any(), any(), any());
   }
@@ -556,10 +650,12 @@ class ScWikiItemSyncServiceBackfillTest {
     assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
     verify(gameItemRepository, never()).findByExternalUuidIsNullAndSourceSystems(any());
     verify(gameItemRepository, never()).findById(any());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), any(), any(), any());
   }
 
   @Test
-  void backfill_consumesEachUexRowOnce_soASecondNameTwinBecomesWikiOnly() {
+  void backfill_rejectsBothWikiNameTwinsBeforeEitherCanConsumeTheUexRow() {
     UUID firstWiki = UUID.randomUUID();
     UUID secondWiki = UUID.randomUUID();
     UUID uexRowId = UUID.randomUUID();
@@ -568,18 +664,251 @@ class ScWikiItemSyncServiceBackfillTest {
     when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
         .thenReturn(List.of(uexRow));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
-    when(gameItemRepository.findById(uexRowId)).thenReturn(Optional.of(uexRow));
     lenient()
         .when(scWikiClient.fetchAllPagesResult(eq(VEHICLE_ITEMS), any(), any(), any(), any()))
         .thenReturn(
             ScWikiClient.FetchResult.of(
                 List.of(itemDto(firstWiki, "Cooler"), itemDto(secondWiki, "Cooler"))));
+    stubPassRows(ITEMS, itemDto(firstWiki, "Cooler"), itemDto(secondWiki, "Cooler"));
 
     service.syncItems();
 
     Map<UUID, GameItem> saved = captureSaves();
-    assertEquals(GameItemSourceSystem.BOTH, saved.get(firstWiki).getSourceSystems());
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, saved.get(firstWiki).getSourceSystems());
     assertEquals(GameItemSourceSystem.WIKI_ONLY, saved.get(secondWiki).getSourceSystems());
+    assertNull(uexRow.getExternalUuid());
+    verify(gameItemRepository, never()).findById(any());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MULTI_MATCH_AMBIGUOUS),
+            eq("game_item"),
+            eq(firstWiki),
+            eq("Cooler"),
+            eq("Exact-name reconciliation declined;reason=WIKI_NAME"));
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MULTI_MATCH_AMBIGUOUS),
+            eq("game_item"),
+            eq(secondWiki),
+            eq("Cooler"),
+            eq("Exact-name reconciliation declined;reason=WIKI_NAME"));
+  }
+
+  @Test
+  void backfill_nameReconciliationRejectsAnIncompatibleItemKind() {
+    UUID wikiUuid = UUID.randomUUID();
+    GameItem uexRow = uuidlessUex(UUID.randomUUID(), "Same Name", "different-slug");
+    uexRow.setKind(GameItemKind.ARMOR);
+    when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
+        .thenReturn(List.of(uexRow));
+    when(gameItemRepository.findById(uexRow.getId())).thenReturn(Optional.of(uexRow));
+    stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Same Name"));
+    stubPass(ITEMS, itemDto(wikiUuid, "Same Name"));
+
+    service.syncItems();
+
+    assertNull(uexRow.getExternalUuid());
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
+  }
+
+  @Test
+  void existingWikiRowsPassTheirCurrentEndpointFactsToTheLockedMerger() {
+    UUID wikiUuid = UUID.randomUUID();
+    GameItem wiki = new GameItem();
+    wiki.setId(UUID.randomUUID());
+    wiki.setExternalUuid(wikiUuid);
+    wiki.setName("Same Name");
+    wiki.setKind(GameItemKind.GENERIC);
+    wiki.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    GameItem armor = uuidlessUex(UUID.randomUUID(), "Same Name", "unrelated-slug");
+    armor.setKind(GameItemKind.ARMOR);
+    when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
+        .thenReturn(List.of(armor));
+    when(gameItemRepository.findByExternalUuid(wikiUuid)).thenReturn(Optional.of(wiki));
+    stubPass(WEAPONS, itemDto(wikiUuid, "Same Name"));
+    stubPass(ITEMS, itemDto(wikiUuid, "Same Name"));
+
+    service.syncItems();
+
+    ArgumentCaptor<ItemReconciliationService.WikiIdentity> incoming = ArgumentCaptor.captor();
+    verify(itemReconciliationService)
+        .mergeExisting(eq(wiki), eq(armor.getId()), any(), incoming.capture());
+    assertEquals(GameItemKind.WEAPON, incoming.getValue().kind());
+    assertEquals("Same Name", incoming.getValue().name());
+    assertEquals(GameItemKind.WEAPON, wiki.getKind());
+    assertNull(armor.getExternalUuid());
+  }
+
+  @Test
+  void backfill_doesNotReconcileWithoutACompleteWikiIdentityCensus() {
+    UUID wikiUuid = UUID.randomUUID();
+    GameItem uexRow = uuidlessUex(UUID.randomUUID(), "Same Name", "different-slug");
+    when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
+        .thenReturn(List.of(uexRow));
+    stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Same Name"));
+    stubPartialPass(ITEMS, itemDto(wikiUuid, "Same Name"));
+
+    service.syncItems();
+
+    assertNull(uexRow.getExternalUuid());
+    verify(gameItemRepository, never()).findById(any());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), any(), any(), any());
+  }
+
+  @Test
+  void aLiveItemOutsidePlayerScopeIsProtectedByTheFullExistenceCensus() {
+    UUID player = UUID.randomUUID();
+    UUID internal = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, internal));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(player, internal), true));
+
+    service.syncItems();
+
+    verify(gameItemRepository)
+        .markScwikiDeletedExcept(
+            argThat(ids -> ids.contains(player) && ids.contains(internal)), any());
+    verify(gameItemRepository, times(1)).save(any(GameItem.class));
+  }
+
+  @Test
+  void aLiveItemAbsentFromTheCompleteFullScopeMayBeTombstoned() {
+    UUID player = UUID.randomUUID();
+    UUID removed = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, removed));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(player), true));
+
+    service.syncItems();
+
+    verify(gameItemRepository)
+        .markScwikiDeletedExcept(
+            argThat(ids -> ids.contains(player) && !ids.contains(removed)), any());
+  }
+
+  @Test
+  void anIncompleteFullScopeCannotProveThatAnOmittedLiveItemWasDeleted() {
+    UUID player = UUID.randomUUID();
+    UUID omitted = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, omitted));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(player), false));
+
+    service.syncItems();
+
+    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  @Test
+  void aFullScopeThatDoesNotContainTheRelevantCensusCannotVouchForDeletions() {
+    UUID player = UUID.randomUUID();
+    UUID omitted = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, omitted));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(omitted), true));
+
+    service.syncItems();
+
+    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  @Test
+  void noFullScopeRequestIsNeededWhenEveryLiveIdentityWasSeenInPlayerScope() {
+    UUID player = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player));
+
+    service.syncItems();
+
+    verify(scWikiClient, never()).fetchExistenceCensus(any(), any(), anyInt());
+    verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
+  }
+
+  @Test
+  void aKnownTombstoneIsRestoredOnlyAfterPositiveFullScopeEvidence() {
+    UUID player = UUID.randomUUID();
+    UUID tombstone = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, tombstone));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(player, tombstone), true));
+    when(gameItemRepository.restoreKnownWikiItems(any(), any())).thenReturn(1);
+
+    assertEquals(2, service.syncItems());
+
+    verify(gameItemRepository)
+        .restoreKnownWikiItems(argThat(ids -> ids.equals(List.of(tombstone))), any());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_RECORDS_RESTORED),
+            eq("game_item"),
+            any(),
+            any(),
+            eq("restored=1;scope=all_assets"));
+  }
+
+  @Test
+  void anAbsentKnownTombstoneIsNeverRestored() {
+    UUID player = UUID.randomUUID();
+    UUID tombstone = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, tombstone));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(player), true));
+
+    service.syncItems();
+
+    verify(gameItemRepository, never()).restoreKnownWikiItems(any(), any());
+  }
+
+  @Test
+  void restorationFailureCannotBeFollowedByAnOrphanSweep() {
+    UUID player = UUID.randomUUID();
+    UUID tombstone = UUID.randomUUID();
+    stubPass(ITEMS, itemDto(player, "Player Item"));
+    when(gameItemRepository.findKnownWikiExternalUuids()).thenReturn(List.of(player, tombstone));
+    when(scWikiClient.fetchExistenceCensus(ITEMS, "items", properties.pageSize()))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(player, tombstone), true));
+    when(gameItemRepository.restoreKnownWikiItems(any(), any()))
+        .thenThrow(new DataIntegrityViolationException("rejected correction"));
+
+    assertThrows(DataIntegrityViolationException.class, service::syncItems);
+
+    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService).recordFailed(1);
+  }
+
+  @Test
+  void positivePresenceUpdatesUseBoundedBatchesWithoutLosingAnyIdentity() {
+    Set<UUID> ids =
+        java.util.stream.IntStream.rangeClosed(1, 1200)
+            .mapToObj(value -> new UUID(0, value))
+            .collect(Collectors.toSet());
+    when(gameItemRepository.restoreKnownWikiItems(any(), any()))
+        .thenAnswer(inv -> inv.<java.util.Collection<UUID>>getArgument(0).size());
+
+    assertEquals(
+        1200,
+        service.restoreKnownItemsWithinTransaction(
+            ids, UUID.randomUUID(), java.time.Instant.now()));
+
+    ArgumentCaptor<java.util.Collection<UUID>> batches = ArgumentCaptor.captor();
+    verify(gameItemRepository, times(3)).restoreKnownWikiItems(batches.capture(), any());
+    assertEquals(
+        ids,
+        batches.getAllValues().stream()
+            .flatMap(java.util.Collection::stream)
+            .collect(Collectors.toSet()));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        batches.getAllValues().stream().allMatch(batch -> !batch.isEmpty() && batch.size() <= 500));
   }
 
   /**
@@ -679,6 +1008,18 @@ class ScWikiItemSyncServiceBackfillTest {
         Boolean.TRUE,
         Boolean.FALSE,
         "4.8.0-LIVE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null,
         null,
         null,

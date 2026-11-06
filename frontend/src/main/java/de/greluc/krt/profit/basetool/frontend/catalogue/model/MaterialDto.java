@@ -40,4 +40,42 @@ public record MaterialDto(
     @JsonProperty("isJobOrder") Boolean isJobOrder,
     @JsonProperty("isManualEntry") Boolean isManualEntry,
     @JsonProperty("isVisible") Boolean isVisible,
-    Long version) {}
+    Long version,
+    CommodityMiningData miningData) {
+
+  /** Creates an editable material summary without source-owned mining data. */
+  public MaterialDto(
+      UUID id,
+      String name,
+      String type,
+      String quantityType,
+      String description,
+      MaterialDto refinedMaterial,
+      MaterialCategoryDto category,
+      Boolean isIllegal,
+      Boolean isVolatileQt,
+      Boolean isVolatileTime,
+      Boolean isManualRawMaterial,
+      Boolean isJobOrder,
+      Boolean isManualEntry,
+      Boolean isVisible,
+      Long version) {
+    this(
+        id,
+        name,
+        type,
+        quantityType,
+        description,
+        refinedMaterial,
+        category,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        isManualRawMaterial,
+        isJobOrder,
+        isManualEntry,
+        isVisible,
+        version,
+        null);
+  }
+}

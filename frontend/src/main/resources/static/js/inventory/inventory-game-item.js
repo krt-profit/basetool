@@ -35,4 +35,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ? { coalesceMs: 1500 }
             : undefined,
     });
+    krtPageSections.create({
+        topicClass: 'CATALOGUE',
+        topic: 'catalogue',
+        sections: {
+            catalogue: { container: '#inventory-game-item-results', fragmentValue: 'results' },
+        },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        receiver: { coalesceMs: 1500 },
+    });
 });

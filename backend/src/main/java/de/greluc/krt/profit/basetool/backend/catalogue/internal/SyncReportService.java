@@ -64,6 +64,9 @@ public class SyncReportService {
   private final AdminDashboardLiveSync adminDashboardLiveSync;
   private final AuditRecorder auditRecorder;
 
+  private final ExternalSyncRunRepository runRepository;
+  private final SyncRunProgress progress;
+
   /**
    * Starts a new sync cycle and returns its {@code run_id}. Every event logged for this cycle
    * carries the same id so the admin UI can group them.
@@ -72,7 +75,65 @@ public class SyncReportService {
    */
   @NotNull
   public UUID beginRun() {
-    return UUID.randomUUID();
+    SyncRunProgress.Snapshot active = progress.active();
+    return active == null ? UUID.randomUUID() : active.getRunId();
+  }
+
+  /**
+   * Records a source census in the active attempt.
+   *
+   * @param fetched decoded source rows
+   * @param valid rows with usable identities
+   * @param complete whether the requested scope was enumerated
+   */
+  public void recordFetch(long fetched, long valid, boolean complete) {
+    progress.fetched(fetched, valid, complete);
+  }
+
+  /**
+   * Adds independently committed rows to the active attempt.
+   *
+   * @param count committed rows
+   */
+  public void recordApplied(long count) {
+    progress.applied(count);
+  }
+
+  /**
+   * Adds rejected source rows to the active attempt.
+   *
+   * @param count deliberately skipped rows
+   */
+  public void recordSkipped(long count) {
+    progress.skipped(count);
+  }
+
+  /**
+   * Adds handled failures to the active attempt.
+   *
+   * @param count failed operations
+   */
+  public void recordFailed(long count) {
+    progress.failed(count);
+  }
+
+  /** Marks the active attempt incomplete after a source identity or validation conflict. */
+  public void recordIncomplete() {
+    progress.invalidateCensus();
+  }
+
+  /** Accepts a verified complete union census without overriding identity rejection. */
+  public void recordCompleteCensus() {
+    progress.vouchForCensus();
+  }
+
+  /**
+   * Records the active attempt's absence-based cleanup decision.
+   *
+   * @param performed whether cleanup ran
+   */
+  public void recordSweep(boolean performed) {
+    progress.sweep(performed);
   }
 
   /**
@@ -288,8 +349,8 @@ public class SyncReportService {
 
   /**
    * Counts, per source, the runs that finished at or after {@code now} minus {@code days}, next to
-   * when each source last ran at all. A run finishes with its newest event, so each run is counted
-   * once. Only runs still retained (the newest {@link #RUNS_TO_KEEP} per source) are visible.
+   * when each source last attempted and completely applied a sync. Legacy sources without durable
+   * attempts retain their event-based summary.
    *
    * @param days the length of the range in days; at least 1
    * @param now the instant the range ends at
@@ -315,8 +376,40 @@ public class SyncReportService {
                     ExternalSyncReportRepository.SourceFinish::getFinishedAt));
     return Arrays.stream(SyncSourceSystem.values())
         .map(source ->
-            new SyncRunSummaryDto(
-                source.name(), runsInRange.getOrDefault(source, 0L), lastRun.get(source)))
+            summary(
+                source,
+                now.minus(Duration.ofDays(days)),
+                runsInRange.getOrDefault(source, 0L),
+                lastRun.get(source)))
         .toList();
+  }
+
+  private SyncRunSummaryDto summary(
+      SyncSourceSystem source, Instant since, long legacyCount, @Nullable Instant legacyLast) {
+    List<ExternalSyncRun> attempts =
+        runRepository.findBySourceSystemOrderByStartedAtDesc(
+            source, PageRequest.of(0, RUNS_TO_KEEP));
+    if (attempts.isEmpty()) {
+      return new SyncRunSummaryDto(source.name(), legacyCount, legacyLast);
+    }
+    ExternalSyncRun latest =
+        attempts.stream()
+            .filter(run -> run.getAggregate() == SyncAggregate.CATALOGUE)
+            .findFirst()
+            .orElse(attempts.getFirst());
+    List<ExternalSyncRun> complete =
+        runRepository.findBySourceSystemAndAggregateAndStatusInOrderByFinishedAtDesc(
+            source,
+            SyncAggregate.CATALOGUE,
+            List.of(SyncRunStatus.SUCCESS, SyncRunStatus.UNCHANGED),
+            PageRequest.of(0, 1));
+    return new SyncRunSummaryDto(
+        source.name(),
+        runRepository.countBySourceSystemAndAggregateAndStartedAtGreaterThanEqual(
+            source, SyncAggregate.CATALOGUE, since),
+        latest.getStartedAt(),
+        complete.isEmpty() ? null : complete.getFirst().getFinishedAt(),
+        latest.getStatus().name(),
+        attempts.stream().map(SyncRunDto::from).toList());
   }
 }

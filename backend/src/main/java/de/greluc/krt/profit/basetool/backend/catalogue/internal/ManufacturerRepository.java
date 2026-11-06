@@ -77,6 +77,14 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   Optional<Manufacturer> findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(String abbreviation);
 
   /**
+   * Enumerates code candidates so a Wiki reconciliation can reject ambiguous local brands.
+   *
+   * @param abbreviation engine manufacturer code
+   * @return every manufacturer with that code
+   */
+  List<Manufacturer> findByAbbreviationIgnoreCase(String abbreviation);
+
+  /**
    * Marks every Wiki-linked manufacturer whose {@code scwiki_uuid} is not in {@code
    * seenScwikiUuids} as SC Wiki-deleted, unless already marked. Callers must pass a non-empty set;
    * UEX-canonical columns are untouched.
@@ -88,27 +96,13 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   @Modifying
   @Query(
       """
-      UPDATE Manufacturer m SET m.scwikiDeletedAt = :now
+      UPDATE Manufacturer m SET m.scwikiDeletedAt = :now, m.version = m.version + 1, m.updatedAt = :now
       WHERE m.scwikiSyncedAt IS NOT NULL
       AND m.scwikiUuid NOT IN :seenScwikiUuids
       AND m.scwikiDeletedAt IS NULL
       """)
   int markScwikiDeletedExcept(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
-
-  /**
-   * Counts the manufacturers linked by the SC Wiki reconciliation and not tombstoned, reported as
-   * the run's item count when the Wiki catalogue returns {@code 304 Not Modified}.
-   *
-   * @return the number of non-tombstoned manufacturers the SC Wiki reconciliation has linked
-   */
-  @Query(
-      """
-      SELECT COUNT(m) FROM Manufacturer m
-      WHERE m.scwikiSyncedAt IS NOT NULL
-      AND m.scwikiDeletedAt IS NULL
-      """)
-  long countLiveScwikiManufacturers();
 
   /**
    * The name and id of every manufacturer, in one query — the item sync's name fallback for a row

@@ -1804,3 +1804,12 @@ path; every handler keeps its own `hasRole('ADMIN')`. Every admin sub-tree is `n
 `SecurityConfig`, `NoStoreApiScopes` · **Related:** REQ-API-009, REQ-API-021, REQ-SEC-031, ADR-0234
 
 ---
+
+### Member catalogue evidence projection
+
+`GET /api/v1/game-items/{id}/catalogue` is a read-only full-catalogue projection for `ADMIN`,
+`LOGISTICIAN` and `KRT_MEMBER`. It accepts a current or retained redirected local id and returns
+typed source/build/loading-state evidence (REQ-DATA-034, REQ-DATA-037). Its `catalogue` domain
+is included in the generated OpenAPI document. Game content is not added to the frozen exchange
+DTOs by this projection. Material list DTOs remain lightweight; mining evidence is returned only
+by the material detail projection.

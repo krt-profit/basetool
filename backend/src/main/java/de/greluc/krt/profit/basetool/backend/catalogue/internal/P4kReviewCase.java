@@ -80,19 +80,17 @@ public class P4kReviewCase extends AbstractEntity<UUID> {
   @Nullable
   private UUID rowId;
 
-  /** The second row of a GUID conflict between two rows, or {@code null}. */
+  /** The row a GUID conflict between two rows collides with, or {@code null}. */
   @Column(name = "other_row_id")
   @Nullable
   private UUID otherRowId;
 
-  /** The run that found the case first, {@code null} for a case opened outside a P4K run. */
-  @Column(name = "first_run_id", updatable = false)
-  @Nullable
+  /** The run that found the case first. */
+  @Column(name = "first_run_id", nullable = false, updatable = false)
   private UUID firstRunId;
 
-  /** The last run that found the case, {@code null} for a case opened outside a P4K run. */
-  @Column(name = "last_run_id")
-  @Nullable
+  /** The last run that found the case. */
+  @Column(name = "last_run_id", nullable = false)
   private UUID lastRunId;
 
   /** The admin's decision, {@code null} while the case is open. */

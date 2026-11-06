@@ -500,3 +500,20 @@ deleted instead of being carried across. Every container that shares a network w
 reaches its management port, so health there is open and everything else answers only to the scrape
 identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 [`monitoring/`](../../monitoring/README.md).
+
+### External catalogue reconciliation
+
+`catalogue.internal.ItemReconciliationIndex` holds scalar source identity candidates;
+`ItemReconciliationService` validates and locks a verified pair and calls the owner-implemented
+`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply
+and purchasing update only their own references and emit their own audit/live events. The
+catalogue archives both original item/price/stat sets in `game_item_redirect` before retiring
+the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical ids
+have a separate reference seam for bulk reads.
+
+`ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
+and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt
+outcomes separately from anomaly reports; the frontend's sync report reader joins those views.
+Typed API enrichment records keep source units and relationship loading state at the boundary.
+See [ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md) and
+[REQ-DATA-032…038](../specs/data-persistence.md).

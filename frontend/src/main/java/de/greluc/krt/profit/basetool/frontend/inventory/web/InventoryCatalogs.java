@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueDetailsDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
@@ -28,6 +29,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +48,21 @@ class InventoryCatalogs {
 
   /** The inventory domain's typed backend client. */
   private final InventoryBackendClient inventoryClient;
+
+  /**
+   * Reads the drilled-into item's attributed source details without hiding its stock on failure.
+   *
+   * @param id local game-item identity
+   * @return details when this section could be read
+   */
+  @NotNull
+  Optional<ItemCatalogueDetailsDto> catalogueItem(UUID id) {
+    return SectionFallback.load(
+        log,
+        "item-catalogue",
+        () -> Optional.ofNullable(inventoryClient.itemCatalogue(id)),
+        Optional.empty());
+  }
 
   /**
    * Reads the user catalog.

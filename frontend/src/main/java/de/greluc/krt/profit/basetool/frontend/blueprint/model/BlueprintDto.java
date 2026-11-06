@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /** Frontend mirror of the backend blueprint DTO consumed by the admin blueprint page. */
 @DtoMirror
@@ -44,4 +45,5 @@ public record BlueprintDto(
     List<BlueprintRequirementIngredientDto> ingredients,
     List<BlueprintSummaryPropertyDto> summaryProperties,
     List<BlueprintDismantleReturnDto> dismantleReturns,
-    Long version) {}
+    Long version,
+    @Nullable BlueprintCatalogueMetadata wikiMetadata) {}

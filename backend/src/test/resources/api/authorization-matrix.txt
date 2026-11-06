@@ -156,6 +156,7 @@ PUT /api/v1/frequency-types/{id} | FrequencyTypeController#updateFrequencyType |
 POST /api/v1/frequency-types/{id}/activate | FrequencyTypeController#activateFrequencyType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/game-items | GameItemController#getGameItems | pre=isAuthenticated() and (#orderable or hasAnyRole('ADMIN','LOGISTICIAN','KRT_MEMBER')) | url=anyRequest -> authenticated
 GET /api/v1/game-items/{gameItemId}/blueprints | GameItemController#getBlueprintsForItem | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/game-items/{id}/catalogue | ItemCatalogueDetailsController#get | pre=hasAnyRole('ADMIN','LOGISTICIAN','KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/hangar/admin/users/{userId}/ships | HangarController#getUserShips | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/hangar/admin/users/{userId}/ships | HangarController#addUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/hangar/admin/users/{userId}/ships/bulk-org-unit | HangarController#bulkChangeUserShipsOrgUnit | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)

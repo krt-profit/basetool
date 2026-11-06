@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexVehicleDto;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -47,8 +46,8 @@ import org.springframework.util.StringUtils;
  * <p>Resolution chain:
  *
  * <ol>
- *   <li>{@code findByExternalUuid(dto.uuid)};
- *   <li>{@code findByUexVehicleId(dto.id)}, for rows stamped without a UUID;
+ *   <li>{@code findByUexVehicleId(dto.id)};
+ *   <li>{@code findByExternalUuid(dto.uuid)}, only for an unambiguous UUID and an unclaimed row;
  *   <li>the class name the {@code ship_type_uex_alias} table ties {@code dto.id} to, when exactly
  *       one ship type carries it (REQ-DATA-026);
  *   <li>{@code findByNameIgnoreCase(dto.name)}, which backfills {@code external_uuid} and {@code
@@ -58,7 +57,7 @@ import org.springframework.util.StringUtils;
  *
  * <p>Descriptions are not written here, as UEX serves none. An empty response writes nothing;
  * orphans are marked via {@link ShipTypeRepository#markUexDeletedExcept(java.util.Collection,
- * Instant)} only for a non-empty seen-id set.
+ * Instant)} only for a complete pre-write source-id census with no rejected writes.
  */
 @Slf4j
 @Service
@@ -76,6 +75,7 @@ public class UexVehicleService {
   private final ShipTypeRepository shipTypeRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
+  private final SyncReportService syncReportService;
 
   /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
@@ -92,12 +92,24 @@ public class UexVehicleService {
     }
 
     Instant now = Instant.now();
-    Set<Integer> seenUexVehicleIds = new HashSet<>();
-    SyncChunkWriter.Outcome<Boolean> outcome =
+    UUID runId = syncReportService.beginRun();
+    UexIdentityCensus census =
+        UexIdentityCensus.of(
+            vehicles,
+            UexVehicleDto::id,
+            UexVehicleDto::uuid,
+            UexVehicleDto::name,
+            fetched.complete());
+    Set<Integer> seenUexVehicleIds = census.ids();
+    SyncChunkWriter.Outcome<VehicleOutcome> outcome =
         chunkWriter.write(
             vehicles,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
-            chunk -> chunk.stream().map(dto -> upsertVehicle(dto, now, seenUexVehicleIds)).toList(),
+            chunk ->
+                chunk.stream()
+                    .map(dto -> upsertVehicle(dto, now, census, runId))
+                    .filter(result -> result != VehicleOutcome.SKIPPED)
+                    .toList(),
             "vehicle",
             dto ->
                 "(id="
@@ -105,12 +117,21 @@ public class UexVehicleService {
                     + ", name='"
                     + LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH)
                     + "')");
-    long added = outcome.results().stream().filter(Boolean::booleanValue).count();
-    long updated = outcome.results().size() - added;
-    int skipped = outcome.failedRows();
+    final long added = outcome.results().stream().filter(VehicleOutcome.CREATED::equals).count();
+    final long updated = outcome.results().stream().filter(VehicleOutcome.UPDATED::equals).count();
+    long declined = (long) vehicles.size() - outcome.results().size() - outcome.failedRows();
+    long skipped = outcome.failedRows() + declined;
+    if (!census.complete() || declined > 0) {
+      syncReportService.recordIncomplete();
+    }
 
-    if (seenUexVehicleIds.isEmpty()) {
-      log.warn("Skipping orphan sweep — no UEX vehicle was processed successfully.");
+    boolean sweep = !seenUexVehicleIds.isEmpty() && census.complete() && skipped == 0;
+    if (!sweep) {
+      log.warn(
+          "Skipping vehicle orphan sweep — upstream ids={}, complete census={}, skipped rows={}",
+          seenUexVehicleIds.size(),
+          census.complete(),
+          skipped);
     } else {
       int marked =
           chunkWriter.inNewTransaction(
@@ -119,6 +140,7 @@ public class UexVehicleService {
         log.info("Marked {} ship_type row(s) uex_deleted (no longer in UEX feed)", marked);
       }
     }
+    syncReportService.recordSweep(sweep);
 
     log.info(
         "Finished UEX vehicle sync: {} added, {} updated, {} skipped", added, updated, skipped);
@@ -129,23 +151,27 @@ public class UexVehicleService {
    *
    * @param dto inbound UEX row
    * @param now timestamp to stamp on the row
-   * @param seenUexVehicleIds accumulator for the orphan sweep
-   * @return {@code true} when the row was newly inserted
+   * @param census validated source identities and UUID claims
+   * @param runId current report run
+   * @return whether the row was created, updated or rejected
    */
-  private boolean upsertVehicle(UexVehicleDto dto, Instant now, Set<Integer> seenUexVehicleIds) {
-    if (!StringUtils.hasText(dto.name())) {
+  private VehicleOutcome upsertVehicle(
+      UexVehicleDto dto, Instant now, UexIdentityCensus census, UUID runId) {
+    if (dto.id() == null || dto.id() <= 0 || !StringUtils.hasText(dto.name())) {
       log.debug("Skipping UEX vehicle with missing name (id={}, uuid={})", dto.id(), dto.uuid());
-      return false;
+      return VehicleOutcome.SKIPPED;
     }
 
     UUID externalUuid = UexValues.parseUuid(dto.uuid());
 
-    Optional<ShipType> existingOpt = Optional.empty();
-    if (externalUuid != null) {
-      existingOpt = shipTypeRepository.findByExternalUuid(externalUuid);
-    }
-    if (existingOpt.isEmpty() && dto.id() != null) {
-      existingOpt = shipTypeRepository.findByUexVehicleId(dto.id());
+    Optional<ShipType> existingOpt = shipTypeRepository.findByUexVehicleId(dto.id());
+    if (existingOpt.isEmpty() && externalUuid != null && census.uniqueUuid(externalUuid)) {
+      existingOpt =
+          shipTypeRepository
+              .findByExternalUuid(externalUuid)
+              .filter(candidate ->
+                  candidate.getUexVehicleId() == null
+                      || !census.containsId(candidate.getUexVehicleId()));
     }
     if (existingOpt.isEmpty() && dto.id() != null) {
       List<ShipType> aliased = shipTypeRepository.findByUexAliasOfVehicleId(dto.id());
@@ -153,8 +179,30 @@ public class UexVehicleService {
         existingOpt = Optional.of(aliased.getFirst());
       }
     }
-    if (existingOpt.isEmpty()) {
+    if (existingOpt.isEmpty() && census.uniqueName(dto.name())) {
       existingOpt = shipTypeRepository.findByNameIgnoreCase(dto.name());
+    }
+
+    if (existingOpt.isPresent()) {
+      ShipType candidate = existingOpt.orElseThrow();
+      boolean sourceConflict =
+          candidate.getUexVehicleId() != null
+              && !dto.id().equals(candidate.getUexVehicleId())
+              && (!census.complete() || census.containsId(candidate.getUexVehicleId()));
+      boolean uuidConflict =
+          candidate.getExternalUuid() != null
+              && externalUuid != null
+              && !candidate.getExternalUuid().equals(externalUuid);
+      if (sourceConflict || uuidConflict) {
+        syncReportService.logUexEvent(
+            runId,
+            SyncEventType.SOURCE_IDENTITY_CONFLICT,
+            "ship_type",
+            externalUuid,
+            dto.name(),
+            "UEX vehicle " + dto.id() + " conflicts with an existing source id or game UUID.");
+        return VehicleOutcome.SKIPPED;
+      }
     }
 
     ShipType shipType = existingOpt.orElseGet(ShipType::new);
@@ -164,16 +212,19 @@ public class UexVehicleService {
       shipType.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     }
 
-    if (externalUuid != null && shipType.getExternalUuid() == null) {
+    if (externalUuid != null
+        && shipType.getExternalUuid() == null
+        && census.uniqueUuid(externalUuid)) {
       shipType.setExternalUuid(externalUuid);
     }
     if (dto.id() != null) {
       shipType.setUexVehicleId(dto.id());
-      seenUexVehicleIds.add(dto.id());
     }
 
     Manufacturer manufacturer = resolveManufacturer(dto);
-    if (manufacturer != null) {
+    if (manufacturer != null
+        && (shipType.getSourceSystems() != GameItemSourceSystem.P4K
+            || shipType.getManufacturer() == null)) {
       shipType.setManufacturer(manufacturer);
     }
 
@@ -186,7 +237,14 @@ public class UexVehicleService {
     }
 
     shipTypeRepository.save(shipType);
-    return isNew;
+    return isNew ? VehicleOutcome.CREATED : VehicleOutcome.UPDATED;
+  }
+
+  /** Persistence outcome of one UEX vehicle. */
+  private enum VehicleOutcome {
+    CREATED,
+    UPDATED,
+    SKIPPED
   }
 
   /**

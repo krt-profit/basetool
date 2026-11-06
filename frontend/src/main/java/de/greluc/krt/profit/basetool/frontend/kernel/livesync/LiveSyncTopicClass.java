@@ -295,6 +295,21 @@ public enum LiveSyncTopicClass {
       null,
       Set.of(Roles.authority(Roles.ADMIN))),
 
+  /** Shared source-catalogue changes, restricted to the catalogue read roles. */
+  CATALOGUE(
+      "catalogue",
+      false,
+      Set.of("catalogue"),
+      false,
+      "catalogue",
+      null,
+      null,
+      null,
+      Set.of(
+          Roles.authority(Roles.ADMIN),
+          Roles.authority(Roles.LOGISTICIAN),
+          Roles.authority(Roles.KRT_MEMBER))),
+
   /**
    * Global supply room for {@code /supply/needs}, {@code /supply/donations/mine} and the statistics
    * with the sections {@code needs}, {@code mine} and {@code stats}, authorized by the socket's

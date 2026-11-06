@@ -20,6 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemCatalogueMetadata;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiIdentityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiRow;
@@ -30,19 +33,20 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
 import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -50,19 +54,21 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Read-only HTTP client for the SC Wiki catalogue API ({@code https://api.star-citizen.wiki}).
- *
- * <p>Walks paginated endpoints ({@link #fetchAllPages}), paces page fetches via {@link
- * #paceForRateLimit()}, sends ETag conditional GETs keyed by the page-1 URI (a page-1 304 skips the
- * whole walk) and caps response bodies at 16 MB. Failures are fail-soft and yield empty or partial
- * results.
- */
+/** Reads complete, version-pinned SC Wiki catalogue snapshots with bounded HTTP retries. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConcurrencyLimit(ScWikiClient.MAX_CONCURRENT_CALLS)
 public class ScWikiClient {
+
+  /** Item relationships included in both list and detail metadata snapshots. */
+  public static final String ITEM_METADATA_INCLUDES = "related_items,variants,vehicles";
+
+  /** Largest item page supported by the Wiki. */
+  private static final int MAX_ITEM_PAGE_SIZE = 200;
+
+  /** Largest vehicle page supported by the Wiki. */
+  private static final int MAX_VEHICLE_PAGE_SIZE = 50;
 
   /**
    * Most calls in flight at once through this client; further callers wait. Equal to the SC Wiki
@@ -78,9 +84,8 @@ public class ScWikiClient {
 
   /**
    * A fresh, observed builder for external hosts from {@code RestClientConfig} (prototype-scoped),
-   * so the base URL set here does not leak into any other client. Its request factory bounds each
-   * call by the same 30 s read timeout as the UEX client, so a single hung Wiki page cannot delay
-   * the whole {@code ScWikiScheduler} tick beyond the scheduler's own grace window.
+   * so its base URL remains local to this client. Each HTTP attempt has the external request
+   * factory's 30-second read timeout; retries have a separately bounded attempt and delay budget.
    */
   @Qualifier(RestClientConfig.EXTERNAL_REST_CLIENT_BUILDER)
   private final RestClient.Builder restClientBuilder;
@@ -96,14 +101,17 @@ public class ScWikiClient {
    */
   private final MeterRegistry meterRegistry;
 
+  /** Durable counters for the active catalogue run. */
+  private final SyncRunProgress syncRunProgress;
+
   /** Reusable client bound to the Wiki base URL. Built once after dependency injection. */
   private RestClient client;
 
-  /**
-   * Last-seen {@code ETag} per canonical page-1 request URI, replayed as {@code If-None-Match} on
-   * the next first-page fetch of the same URI.
-   */
-  private final Map<String, String> etagByFirstPageUri = new ConcurrentHashMap<>();
+  /** Version selected once for the current thread's sync run. */
+  private final ThreadLocal<String> runVersion = new ThreadLocal<>();
+
+  /** Shared request pacing and retry policy. */
+  private ScWikiRequestExecutor requests;
 
   /**
    * Jackson mapper that {@link #fetchOne} uses to unwrap the optional {@code {data: …}} envelope
@@ -123,6 +131,7 @@ public class ScWikiClient {
             .baseUrl(properties.apiUrl())
             .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
             .build();
+    requests = new ScWikiRequestExecutor(client, properties);
   }
 
   /**
@@ -175,7 +184,7 @@ public class ScWikiClient {
    * @param endpoint Wiki endpoint path (e.g. {@code "/api/commodities"})
    * @param typeRef typed wrapper carrying the parametric envelope type
    * @param resourceLabel label for log lines
-   * @return merged rows across all pages, or an empty list on 304 / error
+   * @return merged rows across all pages, or an empty list on error
    */
   public <T extends ScWikiRow> List<T> fetchAllPages(
       String endpoint,
@@ -193,7 +202,7 @@ public class ScWikiClient {
    * @param typeRef typed wrapper carrying the parametric envelope type
    * @param resourceLabel label for log lines
    * @param include optional {@code ?include=…} value; {@code null} or blank means none
-   * @return merged rows across all pages, or an empty list on 304 / error
+   * @return merged rows across all pages, or an empty list on error
    */
   public <T extends ScWikiRow> List<T> fetchAllPages(
       String endpoint,
@@ -205,7 +214,7 @@ public class ScWikiClient {
 
   /**
    * Returns only the merged rows of {@link #fetchAllPagesResult(String, ParameterizedTypeReference,
-   * String, String, Map)}, dropping the {@code notModified} and {@code complete} flags.
+   * String, String, Map)}, dropping the census-completeness verdict.
    *
    * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
    * @param endpoint Wiki endpoint path
@@ -213,7 +222,7 @@ public class ScWikiClient {
    * @param resourceLabel label for log lines
    * @param include optional {@code ?include=…} value; {@code null} or blank means none
    * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} or empty means none
-   * @return merged rows across all pages, or an empty list on 304 / error
+   * @return merged rows across all pages, or an empty list on error
    */
   public <T extends ScWikiRow> List<T> fetchAllPages(
       String endpoint,
@@ -225,15 +234,31 @@ public class ScWikiClient {
   }
 
   /**
-   * Walks every page of a paginated Wiki endpoint and returns the merged {@code data[]} with a
-   * page-1 {@code notModified} flag and a {@code complete} census flag.
+   * Overload of {@link #fetchAllPagesResult(String, ParameterizedTypeReference, String, String,
+   * Map)} without {@code include} and without filters.
    *
-   * <p>Page 1 carries the cached ETag, and a 304 short-circuits to an empty not-modified result;
-   * pages 2..N are paced by {@link #paceForRateLimit()}. An error returns the rows gathered so far.
-   * The result is incomplete when a page fails, pagination metadata is missing on a full page 1, a
-   * row repeats, the distinct rows fall short of {@code meta.total}, or the page count grows during
-   * the walk; a surplus over {@code meta.total} is not a failure. Each non-blank filter is sent as
-   * {@code filter[<key>]=<value>}.
+   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
+   * @param endpoint Wiki endpoint path (e.g. {@code "/api/commodities"})
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel label for log lines
+   * @return the merged rows plus the census-completeness verdict
+   */
+  public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel) {
+    return fetchAllPagesResult(endpoint, typeRef, resourceLabel, null, null);
+  }
+
+  /**
+   * Walks every page of a paginated Wiki endpoint and returns the merged {@code data[]} with a
+   * {@code complete} census flag.
+   *
+   * <p>Every request is paced and fetched unconditionally; an error returns the rows gathered so
+   * far. The result is incomplete when a page fails, pagination metadata is missing on a full page
+   * 1, a row repeats, the distinct rows fall short of {@code meta.total}, or the page count grows
+   * during the walk; a surplus over {@code meta.total} is not a failure. Each non-blank filter is
+   * sent as {@code filter[<key>]=<value>}.
    *
    * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
    * @param endpoint Wiki endpoint path (e.g. {@code "/api/armor"})
@@ -242,7 +267,7 @@ public class ScWikiClient {
    * @param include optional {@code ?include=…} value; {@code null} or blank means none
    * @param filters optional {@code filter[<key>]=<value>} pairs in a stable iteration order; {@code
    *     null} or empty means none, blank values are skipped
-   * @return the merged rows plus the {@code notModified} and {@code complete} flags
+   * @return the merged rows plus the census-completeness verdict
    */
   public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
       String endpoint,
@@ -265,9 +290,34 @@ public class ScWikiClient {
    * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} or empty means none
    * @param pageSizeOverride rows per page, or {@code null} / non-positive for the configured
    *     default
-   * @return the merged rows plus the {@code notModified} and {@code complete} flags
+   * @return the merged rows plus the census-completeness verdict
    */
   public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel,
+      @Nullable String include,
+      @Nullable Map<String, String> filters,
+      @Nullable Integer pageSizeOverride) {
+    try (SyncRun _ = openSyncRun()) {
+      return fetchPagesWithinRun(
+          endpoint, typeRef, resourceLabel, include, filters, pageSizeOverride);
+    }
+  }
+
+  /**
+   * Enumerates one endpoint under the calling run's immutable game version.
+   *
+   * @param <T> row type
+   * @param endpoint endpoint path
+   * @param typeRef paginated response type
+   * @param resourceLabel log label
+   * @param include eager-loaded relationships
+   * @param filters endpoint filters
+   * @param pageSizeOverride optional page size
+   * @return rows and census completeness
+   */
+  private <T extends ScWikiRow> FetchResult<T> fetchPagesWithinRun(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
@@ -278,17 +328,12 @@ public class ScWikiClient {
 
     int pageSize = effectivePageSize(pageSizeOverride);
     String firstPageUri = buildPagedUri(endpoint, 1, include, filters, pageSize);
-    String previousEtag = etagByFirstPageUri.get(firstPageUri);
     FetchErrorLatch errorLatch = new FetchErrorLatch();
 
-    PageOutcome<T> firstOutcome =
-        fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag, errorLatch);
-    if (firstOutcome.notModified()) {
-      return FetchResult.unchanged();
-    }
-    ScWikiResponseDto<T> first = firstOutcome.body();
+    ScWikiResponseDto<T> first =
+        fetchSinglePage(firstPageUri, typeRef, resourceLabel, include, errorLatch);
     if (first == null) {
-      forgetFirstPageEtag(firstPageUri);
+      syncRunProgress.fetched(0, 0, false);
       return FetchResult.partial(Collections.emptyList());
     }
 
@@ -319,10 +364,9 @@ public class ScWikiClient {
 
     int pagesFetched = 1;
     for (int page = 2; page <= lastPage; page++) {
-      paceForRateLimit();
       String pageUri = buildPagedUri(endpoint, page, include, filters, pageSize);
       ScWikiResponseDto<T> next =
-          fetchSinglePage(pageUri, typeRef, resourceLabel, null, errorLatch).body();
+          fetchSinglePage(pageUri, typeRef, resourceLabel, include, errorLatch);
       if (next == null) {
         log.warn(
             "Page {} of {} failed mid-pagination; returning an INCOMPLETE result of {} row(s).",
@@ -396,6 +440,16 @@ public class ScWikiClient {
       complete = false;
     }
 
+    long validRows =
+        accumulated.stream()
+            .filter(row -> row != null && row.uuid() != null)
+            .map(ScWikiRow::uuid)
+            .distinct()
+            .count();
+    if (validRows < distinctRows) {
+      recordCensusIncompleteOnce(errorLatch);
+      complete = false;
+    }
     log.info(
         "Fetched {} {} ({} distinct) from SC Wiki API across {} of {} announced page(s)"
             + " (complete={}).",
@@ -405,27 +459,9 @@ public class ScWikiClient {
         pagesFetched,
         lastPage,
         complete);
-    if (!complete) {
-      forgetFirstPageEtag(firstPageUri);
-    }
-    return complete ? FetchResult.of(accumulated) : FetchResult.partial(accumulated);
-  }
 
-  /**
-   * Overload of {@link #fetchAllPagesResult(String, ParameterizedTypeReference, String, String,
-   * Map)} without {@code include} and without filters.
-   *
-   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
-   * @param endpoint Wiki endpoint path (e.g. {@code "/api/commodities"})
-   * @param typeRef typed wrapper carrying the parametric envelope type
-   * @param resourceLabel label for log lines
-   * @return the merged rows plus the {@code notModified} and {@code complete} flags
-   */
-  public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
-      String endpoint,
-      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
-      String resourceLabel) {
-    return fetchAllPagesResult(endpoint, typeRef, resourceLabel, null, null);
+    syncRunProgress.fetched(accumulated.size(), validRows, complete);
+    return complete ? FetchResult.of(accumulated) : FetchResult.partial(accumulated);
   }
 
   /**
@@ -490,94 +526,322 @@ public class ScWikiClient {
    * @param type the DTO class to bind the payload to
    * @param resourceLabel label for log lines
    * @return the parsed DTO, or {@code null} on 404 / error / unparseable body
+   * @throws SourceIdentityMismatchException when a UUID request receives another or no UUID
    */
   @Nullable
-  @SuppressWarnings("NullAway")
   public <T> T fetchOne(String endpoint, Object id, Class<T> type, String resourceLabel) {
-    String uri = endpoint + "/" + id;
-    log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
+    return fetchOneResult(endpoint, id, type, resourceLabel).data();
+  }
+
+  /**
+   * Fetches one version-pinned detail, distinguishing a missing asset from an unavailable response.
+   *
+   * @param <T> decoded resource type
+   * @param endpoint source endpoint
+   * @param id UUID or source slug appended to the endpoint
+   * @param type decoded payload type
+   * @param resourceLabel bounded diagnostic label
+   * @return source outcome and its validated detail when found
+   * @throws SourceIdentityMismatchException when a UUID request receives another or no UUID
+   */
+  public <T> DetailResult<T> fetchOneResult(
+      String endpoint, Object id, Class<T> type, String resourceLabel) {
     FetchErrorLatch errorLatch = new FetchErrorLatch();
-    String rawBody;
-    try {
-      rawBody =
-          client
-              .get()
-              .uri(endpoint + "/{id}", id)
-              .exchange((_, response) -> {
-                int status = response.getStatusCode().value();
-                if (status == 404 || status == 304) {
-                  return null;
-                }
-                if (!response.getStatusCode().is2xxSuccessful()) {
-                  throw response.createException();
-                }
-                return response.bodyTo(String.class);
-              });
-    } catch (RuntimeException e) {
-      log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
-      recordFetchErrorOnce(errorLatch);
-      return null;
-    }
-    if (rawBody == null || rawBody.isBlank()) {
-      return null;
-    }
-    try {
+    long decodedRows = 0;
+    try (SyncRun run = openSyncRun(errorLatch)) {
+      String include = type == ScWikiItemDto.class ? ITEM_METADATA_INCLUDES : null;
+      ScWikiRequestExecutor.Response response =
+          include == null
+              ? requests.getResult(endpoint + "/{id}?version={version}", id, run.version())
+              : requests.getResult(
+                  endpoint + "/{id}?version={version}&include={include}",
+                  id,
+                  run.version(),
+                  include);
+      if (response.missing()) {
+        recordFetchErrorOnce(errorLatch);
+        syncRunProgress.fetched(0, 0, false);
+        syncRunProgress.failed(1);
+        return new DetailResult<>(DetailOutcome.MISSING, null);
+      }
+      String rawBody = response.body();
+      if (rawBody == null || rawBody.isBlank()) {
+        throw new IllegalStateException("SC Wiki returned no detail resource");
+      }
       JsonNode body = objectMapper.readTree(rawBody);
       JsonNode payload = body.has("data") ? body.get("data") : body;
-      return objectMapper.treeToValue(payload, type);
-    } catch (Exception e) {
-      log.warn("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
+      validateVersion(payload);
+      T decoded = objectMapper.treeToValue(payload, type);
+      if (decoded == null) {
+        throw new IllegalStateException("SC Wiki detail decoded to no resource");
+      }
+      decodedRows = 1;
+      if (id instanceof UUID requested
+          && decoded instanceof ScWikiRow row
+          && !requested.equals(row.uuid())) {
+        recordFetchErrorOnce(errorLatch);
+        syncRunProgress.fetched(1, 0, false);
+        syncRunProgress.invalidateCensus();
+        throw new SourceIdentityMismatchException(requested, row.uuid());
+      }
+      T result = type.cast(withRequestedIncludes(decoded, include));
+      long validRows = decoded instanceof ScWikiRow row && row.uuid() != null ? 1 : 0;
+      syncRunProgress.fetched(1, validRows, true);
+      return new DetailResult<>(DetailOutcome.FOUND, result);
+    } catch (SourceIdentityMismatchException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch {} from SC Wiki API", resourceLabel, e);
+      recordFetchErrorOnce(errorLatch);
+      syncRunProgress.fetched(decodedRows, 0, false);
+      syncRunProgress.failed(1);
+      return new DetailResult<>(DetailOutcome.UNAVAILABLE, null);
+    }
+  }
+
+  /** Distinguishes a validated detail, explicit HTTP 404 and an unusable response. */
+  public enum DetailOutcome {
+    /** A decoded detail passed the request's identity and game-version checks. */
+    FOUND,
+    /** The upstream explicitly returned HTTP 404 for the requested resource. */
+    MISSING,
+    /** Transport, source-version or decoding failed without proving the asset absent. */
+    UNAVAILABLE
+  }
+
+  /**
+   * Carries a single-resource source outcome without treating temporary errors as asset absence.
+   *
+   * @param <T> detail payload type
+   * @param outcome validated source outcome
+   * @param data decoded detail, present only when the outcome is FOUND
+   */
+  public record DetailResult<T>(DetailOutcome outcome, @Nullable T data) {
+
+    /** Rejects an outcome that disagrees with the presence of its detail. */
+    public DetailResult {
+      Objects.requireNonNull(outcome);
+      if ((outcome == DetailOutcome.FOUND) != (data != null)) {
+        throw new IllegalArgumentException("A found detail must carry exactly one payload");
+      }
+    }
+  }
+
+  /**
+   * Fetches and validates a page without treating its validator as a collection validator.
+   *
+   * @param <T> row type
+   * @param requestUri versioned page URI
+   * @param typeRef response type
+   * @param resourceLabel log label
+   * @param include explicitly requested relationships
+   * @param errorLatch enclosing walk's error counter latch
+   * @return decoded page, or null after a request or contract failure
+   */
+  @Nullable
+  private <T> ScWikiResponseDto<T> fetchSinglePage(
+      String requestUri,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel,
+      @Nullable String include,
+      FetchErrorLatch errorLatch) {
+    try {
+      String raw = requests.get(requestUri);
+      if (raw == null || raw.isBlank()) {
+        throw new IllegalStateException("SC Wiki returned no page body");
+      }
+      JsonNode body = objectMapper.readTree(raw);
+      JsonNode rows = body.get("data");
+      if (rows == null || !rows.isArray()) {
+        throw new IllegalStateException("SC Wiki page has no data array");
+      }
+      for (JsonNode row : rows) {
+        validateVersion(row);
+      }
+      ScWikiResponseDto<T> decoded =
+          objectMapper.readValue(
+              raw, objectMapper.getTypeFactory().constructType(typeRef.getType()));
+      List<T> stamped =
+          decoded.data().stream().map(row -> withRequestedIncludes(row, include)).toList();
+      return new ScWikiResponseDto<>(stamped, decoded.meta(), decoded.links());
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch {} page from SC Wiki API", resourceLabel, e);
+      syncRunProgress.failed(1);
       recordFetchErrorOnce(errorLatch);
       return null;
     }
   }
 
   /**
-   * Issues one GET for a prebuilt URI, sending {@code If-None-Match} when an ETag is given, and
-   * stores the response ETag under that URI on 2xx.
+   * Carries the requested relationship set into an item's immutable source snapshot.
    *
-   * @param <T> per-row payload type
-   * @param requestUri prebuilt request URI including page, include and version params
-   * @param typeRef typed envelope reference
-   * @param resourceLabel log label
-   * @param previousEtag value for {@code If-None-Match}, or {@code null} to skip
-   * @param errorLatch the enclosing fetch's one-increment error latch
-   * @return a parsed envelope on 2xx, {@link PageOutcome#notModified()} on 304, or a null-bodied
-   *     {@link PageOutcome#error()} on empty / error
+   * @param <T> decoded resource type
+   * @param row decoded resource
+   * @param include relationships sent with the request
+   * @return resource with its request context, preserving its runtime type
    */
-  private <T> PageOutcome<T> fetchSinglePage(
-      String requestUri,
-      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
-      String resourceLabel,
-      @Nullable String previousEtag,
-      FetchErrorLatch errorLatch) {
-    RestClient.RequestHeadersSpec<?> request = client.get().uri(requestUri);
-    if (previousEtag != null && !previousEtag.isBlank()) {
-      request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
+  @SuppressWarnings("unchecked")
+  private static <T> T withRequestedIncludes(T row, @Nullable String include) {
+    if (!(row instanceof ScWikiItemDto item)) {
+      return row;
+    }
+    Set<ItemCatalogueMetadata.Relationship> requested =
+        EnumSet.noneOf(ItemCatalogueMetadata.Relationship.class);
+    if (include != null) {
+      for (String relationship : include.split(",", -1)) {
+        ItemCatalogueMetadata.Relationship selected =
+            switch (relationship.strip()) {
+              case "variants" -> ItemCatalogueMetadata.Relationship.VARIANTS;
+              case "related_items" -> ItemCatalogueMetadata.Relationship.RELATED_ITEMS;
+              case "vehicles" -> ItemCatalogueMetadata.Relationship.VEHICLES;
+              default -> null;
+            };
+        if (selected != null) {
+          requested.add(selected);
+        }
+      }
+    }
+    return (T) item.withRequestedIncludes(Set.copyOf(requested));
+  }
+
+  /**
+   * Enumerates all upstream asset identities, including assets excluded from normal import.
+   *
+   * @param endpoint source item or vehicle endpoint
+   * @param resourceLabel source label for diagnostics
+   * @param pageSize requested page size, bounded by the endpoint's upstream limit
+   * @return immutable identities and whether the all-asset census was complete
+   */
+  public ExistenceCensus fetchExistenceCensus(String endpoint, String resourceLabel, int pageSize) {
+    int maximumPageSize =
+        endpoint.equals(properties.vehiclesEndpoint()) ? MAX_VEHICLE_PAGE_SIZE : MAX_ITEM_PAGE_SIZE;
+    int boundedPageSize = Math.max(1, Math.min(pageSize, maximumPageSize));
+    FetchResult<ScWikiIdentityDto> result =
+        fetchAllPagesResult(
+            endpoint,
+            new ParameterizedTypeReference<ScWikiResponseDto<ScWikiIdentityDto>>() {},
+            resourceLabel + " existence",
+            null,
+            Map.of("include_irrelevant", "true"),
+            boundedPageSize);
+    Set<UUID> identities = new HashSet<>();
+    for (ScWikiIdentityDto row : result.data()) {
+      if (row != null && row.uuid() != null) {
+        identities.add(row.uuid());
+      }
+    }
+    return new ExistenceCensus(
+        identities, result.complete() && identities.size() == result.data().size());
+  }
+
+  /**
+   * Contains an all-asset identity census without any asset metadata eligible for import.
+   *
+   * @param uuids immutable source asset identities
+   * @param complete whether every source row had a unique usable identity
+   */
+  public record ExistenceCensus(Set<UUID> uuids, boolean complete) {
+
+    /** Copies the identity set before it can vouch for an absence-based sweep. */
+    public ExistenceCensus {
+      uuids = Set.copyOf(uuids);
+    }
+  }
+
+  /**
+   * Rejects a resource carrying a patch different from the selected run.
+   *
+   * @param payload resource payload
+   */
+  private void validateVersion(JsonNode payload) {
+    if (payload == null || !payload.isObject()) {
+      throw new IllegalStateException("SC Wiki resource is not an object");
+    }
+    JsonNode version =
+        payload.has("version") ? payload.get("version") : payload.get("game_version");
+    if (version != null
+        && !version.isNull()
+        && (!version.isString() || !version.stringValue().equals(runVersion.get()))) {
+      throw new IllegalStateException("SC Wiki resource belongs to a different game version");
+    }
+  }
+
+  /**
+   * Pins the configured or current default patch for a complete, reentrant sync run.
+   *
+   * @return thread-confined version scope
+   * @throws IllegalStateException when no concrete game version can be resolved
+   */
+  public SyncRun openSyncRun() {
+    return openSyncRun(new FetchErrorLatch());
+  }
+
+  /** Pins a run using the current operation's failure-metric latch. */
+  private SyncRun openSyncRun(FetchErrorLatch errorLatch) {
+    String previous = runVersion.get();
+    String version = previous == null ? resolveGameVersion(errorLatch) : previous;
+    runVersion.set(version);
+    return new SyncRun(previous, version);
+  }
+
+  /**
+   * Resolves an explicit patch before catalogue writes start.
+   *
+   * @param errorLatch failure metric latch of the enclosing operation
+   * @return configured or upstream-default patch
+   */
+  private String resolveGameVersion(FetchErrorLatch errorLatch) {
+    if (properties.gameVersion() != null && !properties.gameVersion().isBlank()) {
+      return properties.gameVersion().strip();
     }
     try {
-      return request.exchangeForRequiredValue((_, response) -> {
-        int status = response.getStatusCode().value();
-        if (status == 304) {
-          log.debug(
-              "SC Wiki {} page unchanged since last sync (304 Not Modified) — skipping.",
-              resourceLabel);
-          return PageOutcome.<T>unchanged();
-        }
-        if (!response.getStatusCode().is2xxSuccessful()) {
-          throw response.createException();
-        }
-        String etag = response.getHeaders().getETag();
-        if (etag != null && !etag.isBlank()) {
-          etagByFirstPageUri.put(requestUri, etag);
-        }
-        ScWikiResponseDto<T> body = response.bodyTo(typeRef);
-        return body == null ? PageOutcome.<T>error() : PageOutcome.ok(body);
-      });
+      String raw = requests.get("/api/game-versions/default");
+      JsonNode body = raw == null ? null : objectMapper.readTree(raw);
+      JsonNode code = body == null ? null : body.path("data").get("code");
+      if (code == null || !code.isString() || code.stringValue().isBlank()) {
+        throw new IllegalStateException("SC Wiki default game version is absent");
+      }
+      return code.stringValue();
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
       recordFetchErrorOnce(errorLatch);
-      return PageOutcome.error();
+      throw new IllegalStateException("Cannot select a game version for the SC Wiki sync", e);
+    }
+  }
+
+  /** Restores the enclosing version scope when a sync step finishes. */
+  @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+  public final class SyncRun implements AutoCloseable {
+
+    /** Enclosing scope's version, or null at the outer run boundary. */
+    @Nullable private final String previous;
+
+    /** Immutable patch for this run. */
+    private final String selected;
+
+    /** Whether this scope has already restored its enclosing scope. */
+    private boolean closed;
+
+    /**
+     * Returns the concrete patch selected for every request in this run.
+     *
+     * @return game-version code
+     */
+    public String version() {
+      return selected;
+    }
+
+    /** Restores the enclosing run's version on the current thread. */
+    @Override
+    public void close() {
+      if (closed) {
+        return;
+      }
+      if (previous == null) {
+        runVersion.remove();
+      } else {
+        runVersion.set(previous);
+      }
+      closed = true;
     }
   }
 
@@ -616,121 +880,45 @@ public class ScWikiClient {
         }
       }
     }
-    if (properties.gameVersion() != null && !properties.gameVersion().isBlank()) {
-      sb.append("&version=").append(properties.gameVersion());
+    if (runVersion.get() != null) {
+      sb.append("&version=").append(runVersion.get());
     }
     return sb.toString();
   }
 
   /**
-   * Sleeps {@code 1000 / requestsPerSecond} milliseconds (default 5 requests per second) between
-   * page fetches. An interrupt re-sets the thread's interrupted flag and ends the sleep.
-   */
-  public void paceForRateLimit() {
-    int rps = properties.requestsPerSecond() == null ? 5 : properties.requestsPerSecond();
-    long sleepMillis = Math.max(1L, 1000L / Math.max(1, rps));
-    try {
-      Thread.sleep(sleepMillis);
-    } catch (InterruptedException _) {
-      Thread.currentThread().interrupt();
-    }
-  }
-
-  /**
-   * Outcome of a paginated Wiki fetch: the merged rows, whether page 1 answered {@code 304 Not
-   * Modified}, and whether the walk enumerated the whole feed.
+   * Contains the decoded rows and census completeness of an unconditional Wiki page walk.
    *
-   * <p>Only a {@code complete} result may drive a tombstone sweep.
+   * <p>Only a complete result may authorize an absence-based sweep.
    *
-   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
-   * @param data the merged rows across all pages; empty on 304 / error
-   * @param notModified {@code true} iff page 1 answered 304 Not Modified
-   * @param complete {@code true} iff every announced page was fetched, no row was served twice, and
-   *     no shortfall against {@code meta.total} occurred
+   * @param <T> decoded source row type
+   * @param data decoded rows across fetched pages, possibly empty after a source failure
+   * @param complete whether every source row had a usable unique identity and all pages were read
    */
-  public record FetchResult<T>(List<T> data, boolean notModified, boolean complete) {
+  public record FetchResult<T>(List<T> data, boolean complete) {
 
     /**
-     * Wraps a fully-walked list as a <em>modified, complete</em> result — the healthy 2xx outcome,
-     * including a genuine empty-200 whose envelope was intact.
+     * Wraps rows from a verified complete page walk, including a valid empty source catalogue.
      *
-     * @param <T> per-row payload type
-     * @param data the merged rows (possibly empty)
-     * @return a result carrying {@code data} with {@code notModified == false, complete == true}
+     * @param <T> decoded source row type
+     * @param data complete decoded source rows
+     * @return rows eligible to establish the requested scope's source census
      */
     @NotNull
     public static <T> FetchResult<T> of(List<T> data) {
-      return new FetchResult<>(data, false, true);
+      return new FetchResult<>(data, true);
     }
 
     /**
-     * Wraps the rows of a walk that could not enumerate the whole feed as an <em>incomplete</em>
-     * result; upserts may use them, tombstone sweeps must not.
+     * Retains usable rows from an incomplete walk without authorizing absence-based cleanup.
      *
-     * @param <T> per-row payload type
-     * @param data the rows merged before the walk was abandoned (possibly empty)
-     * @return a result carrying {@code data} with {@code notModified == false, complete == false}
+     * @param <T> decoded source row type
+     * @param data rows decoded before the source failure or census conflict
+     * @return rows eligible for individual writes but never a tombstone sweep
      */
     @NotNull
     public static <T> FetchResult<T> partial(List<T> data) {
-      return new FetchResult<>(data, false, false);
-    }
-
-    /**
-     * The {@code 304 Not Modified} result: empty data, {@code notModified == true} and {@code
-     * complete == false}.
-     *
-     * @param <T> per-row payload type
-     * @return a not-modified result with an empty data list
-     */
-    @NotNull
-    public static <T> FetchResult<T> unchanged() {
-      return new FetchResult<>(List.of(), true, false);
-    }
-  }
-
-  /**
-   * Outcome of a single page fetch: the parsed envelope or {@code null}, plus whether the upstream
-   * answered {@code 304 Not Modified}.
-   *
-   * @param <T> per-row payload type
-   * @param body the parsed page envelope, or {@code null} on 304 / empty / error
-   * @param notModified {@code true} iff the upstream answered 304 Not Modified
-   */
-  private record PageOutcome<T>(@Nullable ScWikiResponseDto<T> body, boolean notModified) {
-
-    /**
-     * A successful 2xx page carrying a parsed envelope.
-     *
-     * @param <T> per-row payload type
-     * @param body the parsed page envelope
-     * @return an outcome wrapping {@code body} with {@code notModified == false}
-     */
-    @NotNull
-    private static <T> PageOutcome<T> ok(ScWikiResponseDto<T> body) {
-      return new PageOutcome<>(body, false);
-    }
-
-    /**
-     * A {@code 304 Not Modified} page: no body, {@code notModified == true}.
-     *
-     * @param <T> per-row payload type
-     * @return a not-modified outcome
-     */
-    @NotNull
-    private static <T> PageOutcome<T> unchanged() {
-      return new PageOutcome<>(null, true);
-    }
-
-    /**
-     * A failed / empty page: no body, {@code notModified == false}.
-     *
-     * @param <T> per-row payload type
-     * @return an error outcome
-     */
-    @NotNull
-    private static <T> PageOutcome<T> error() {
-      return new PageOutcome<>(null, false);
+      return new FetchResult<>(data, false);
     }
   }
 
@@ -756,20 +944,6 @@ public class ScWikiClient {
       }
       recorded = true;
       return true;
-    }
-  }
-
-  /**
-   * Drops the cached page-1 {@code ETag} after a walk that produced no complete census, so the next
-   * run refetches every page instead of receiving a 304.
-   *
-   * @param firstPageUri the canonical page-1 request URI of the walk; never null
-   */
-  private void forgetFirstPageEtag(String firstPageUri) {
-    if (etagByFirstPageUri.remove(firstPageUri) != null) {
-      log.debug(
-          "Dropped the cached page-1 ETag after an incomplete walk so the next run re-fetches"
-              + " unconditionally instead of being answered 304.");
     }
   }
 }

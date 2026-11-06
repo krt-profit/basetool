@@ -86,7 +86,8 @@ public class UexCommodityOccurrenceSync {
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
             chunk -> writeChunk(chunk, lookups),
             "commodity location",
-            dto -> "(id=" + dto.id() + ")");
+            dto -> "(id=" + dto.id() + ")",
+            row -> (long) row.inserted() + row.deleted());
     int kept = 0;
     int inserted = 0;
     int deleted = 0;

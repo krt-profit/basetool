@@ -43,6 +43,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
@@ -128,6 +130,12 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   /** Game version in which the Wiki last reported this blueprint. */
   @Column(name = "game_version_seen")
   private String gameVersionSeen;
+
+  /** Optional Wiki detail evidence, independent of canonical recipe ownership. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "wiki_metadata", columnDefinition = "jsonb")
+  @Nullable
+  private BlueprintCatalogueMetadata wikiMetadata;
 
   /** Last successful SC Wiki sync touch. */
   @Column(name = "scwiki_synced_at")

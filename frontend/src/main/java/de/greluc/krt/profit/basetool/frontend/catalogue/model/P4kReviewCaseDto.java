@@ -37,9 +37,9 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  * @param nameEn the record's English short name, or {@code null}
  * @param rowId the Basetool row, or {@code null}
  * @param rowName that row's name, or {@code null}
- * @param otherRowId the second row of a GUID conflict, or {@code null}
- * @param firstRunId the run that found the case first, or {@code null}
- * @param lastRunId the last run that found it, or {@code null}
+ * @param otherRowId the row a GUID conflict between two rows collides with, or {@code null}
+ * @param firstRunId the run that found the case first
+ * @param lastRunId the last run that found it
  * @param createdAt ISO-8601 instant the case was opened
  * @param resolution {@code KEEP}, {@code HIDE} or {@code null} while open
  * @param resolvedAt ISO-8601 instant of the resolution, or {@code null}

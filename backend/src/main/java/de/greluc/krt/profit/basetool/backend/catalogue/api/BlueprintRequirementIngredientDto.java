@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Boundary DTO for one ingredient line of a blueprint. The {@link #name} is the Wiki name snapshot
  * persisted on the ingredient (always present, so rendering it never triggers a material /
@@ -35,6 +38,9 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
  * @param quantityType the resolved material's quantity unit ({@code "SCU"} / {@code "PIECE"}) for a
  *     RESOURCE line, so the UI labels {@code quantityScu} correctly; {@code null} for an ITEM line
  *     or an unresolved RESOURCE line
+ * @param wikiResourceUuid required source resource UUID
+ * @param wikiOreUuid distinct source ore UUID
+ * @param wikiItemUuid required source item UUID
  */
 public record BlueprintRequirementIngredientDto(
     String kind,
@@ -42,4 +48,7 @@ public record BlueprintRequirementIngredientDto(
     Double quantityScu,
     Integer quantityUnits,
     Integer minQuality,
-    String quantityType) {}
+    String quantityType,
+    @Nullable UUID wikiResourceUuid,
+    @Nullable UUID wikiOreUuid,
+    @Nullable UUID wikiItemUuid) {}

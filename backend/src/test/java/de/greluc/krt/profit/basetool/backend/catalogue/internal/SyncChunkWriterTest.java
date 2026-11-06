@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 class SyncChunkWriterTest {
 
   private final RecordingTransactionManager tx = new RecordingTransactionManager();
-  private final SyncChunkWriter writer = new SyncChunkWriter(tx);
+  private final SyncChunkWriter writer = new SyncChunkWriter(tx, new SyncRunProgress());
 
   @Test
   void happyPath_oneTransactionPerChunk() {
@@ -115,5 +115,31 @@ class SyncChunkWriterTest {
   void aChunkSizeBelowOneIsRefused() {
     assertThatThrownBy(() -> writer.write(List.of(1), 0, chunk -> chunk, "row", String::valueOf))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void weightedResults_countOnlyCommittedChanges_andPreserveObservedZeroWrites() {
+    SyncRunProgress progress = new SyncRunProgress();
+    SyncChunkWriter counted = new SyncChunkWriter(tx, progress);
+    SyncRunProgress.Snapshot snapshot = progress.begin(java.util.UUID.randomUUID());
+    try {
+      counted.write(
+          List.of(0, 2), 10, chunk -> chunk, "occurrence", String::valueOf, Integer::longValue);
+      assertThat(snapshot.getApplied()).isEqualTo(2);
+      assertThat(snapshot.getSkipped()).isZero();
+      assertThat(snapshot.isWriteObserved()).isTrue();
+    } finally {
+      progress.end();
+    }
+
+    snapshot = progress.begin(java.util.UUID.randomUUID());
+    try {
+      counted.write(
+          List.of(0), 10, chunk -> chunk, "occurrence", String::valueOf, Integer::longValue);
+      assertThat(snapshot.getApplied()).isZero();
+      assertThat(snapshot.isWriteObserved()).isTrue();
+    } finally {
+      progress.end();
+    }
   }
 }

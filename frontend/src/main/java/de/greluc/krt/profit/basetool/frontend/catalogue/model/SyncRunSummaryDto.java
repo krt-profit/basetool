@@ -21,14 +21,36 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Frontend mirror of the backend {@code SyncRunSummaryDto}, read by the sync status widget; must
  * match it field for field.
  *
  * @param sourceSystem the source's name ({@code UEX}, {@code SCWIKI} or {@code P4K})
- * @param runs how many distinct runs finished inside the range
- * @param lastRanAt when the source last ran at all, or {@code null} when it never did
+ * @param runs source sweeps started inside the range
+ * @param lastRanAt newest source attempt start
+ * @param lastCompleteAt newest completely applied source sweep finish
+ * @param lastStatus newest source attempt outcome
+ * @param attempts bounded recent source and aggregate attempts
  */
 @DtoMirror
-public record SyncRunSummaryDto(String sourceSystem, long runs, Instant lastRanAt) {}
+public record SyncRunSummaryDto(
+    String sourceSystem,
+    long runs,
+    Instant lastRanAt,
+    Instant lastCompleteAt,
+    String lastStatus,
+    List<SyncRunDto> attempts) {
+
+  /**
+   * Represents a source with only legacy event history.
+   *
+   * @param sourceSystem external source
+   * @param runs retained legacy runs in the range
+   * @param lastRanAt latest legacy event timestamp
+   */
+  public SyncRunSummaryDto(String sourceSystem, long runs, Instant lastRanAt) {
+    this(sourceSystem, runs, lastRanAt, null, null, List.of());
+  }
+}

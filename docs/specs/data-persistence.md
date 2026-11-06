@@ -478,6 +478,12 @@ create does not. (`AdminLocationsPageControllerTest`): the visibility / home-loc
 `TERMINAL`. (`AdminP4kImportPageControllerTest`): an apply evicts
 `MATERIAL, MANUFACTURER, SHIP_TYPE, ITEM_CATALOG`.
 
+A committed source catalogue change invalidates `MATERIAL`, `LOCATION`, `SHIP_TYPE`,
+`REFINING_METHOD`, `TERMINAL`, `MANUFACTURER` and `ITEM_CATALOG` in the frontend Redis consumer
+before browser rooms receive the notification. Org-structure and unrelated settings caches stay
+intact. The same ordering applies after a changed P4K APPLY; preview and no-op runs emit no data
+change. `FrontendCacheSplitTest` and Redis fanout tests verify both the cache scope and ordering.
+
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 
 `UserDeletionService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak).
@@ -1111,7 +1117,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 43 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `catalogue` | 45 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1557,3 +1563,119 @@ input rules for one place to look.
 
 Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented in the root `AGENTS.md` and
 [`backend-concurrency.md`](../agents/backend-concurrency.md) (see the concurrency note above).
+
+
+### REQ-DATA-032 — one Wiki snapshot context governs every request of a sync run
+
+A Wiki sync resolves its configured game version, or the API's default game build, once before
+applying any rows. Lists, single-resource details, and follow-up item statistics use that same
+version. Nested sync scopes reuse the outer context; concurrent runs do not share a mutable
+version. Failure to resolve the version records a failed attempt and applies nothing.
+
+Every request uses one bounded transport policy: shared pacing for first pages, later pages and
+details; bounded retries for 429 and transient gateway/server failures; `Retry-After` seconds and
+HTTP dates; interruption preservation. A page-level validator never authorizes skipping a whole
+collection. A failed local apply can fetch and replay the same unchanged upstream payload.
+
+The requested relevance filter is part of the snapshot scope. A complete player-relevant list is
+not proof that an asset excluded by that filter no longer exists. Scope changes and failed
+identity checks cannot silently authorize tombstoning previously imported records. An all-asset
+identity census is fetched only when known records are omitted; it must contain the relevant
+census, never seeds internal assets, and restores known false tombstones in bounded batches.
+
+**Acceptance:** version consistency and nested scopes, independently paced concurrent callers,
+bounded retry/cooldown, interrupted waits, and replay after unchanged upstream data are tested
+with deterministic local HTTP fixtures, never a live network dependency in an application test.
+
+### REQ-DATA-033 — conflicting source identity claims never overwrite another entity
+
+An upstream UUID is usable as a cross-source key only when it identifies one compatible source
+record. Distinct UEX item or vehicle ids sharing a UUID remain distinct; a first-seen sibling
+cannot take an existing row's UEX id, name or capabilities. A verified UEX-id reassignment retains
+the protections of REQ-DATA-028. UUID-less name and slug candidates must be unambiguous in both
+source censuses and compatible in kind and manufacturer. Vehicle aliases remain curated.
+
+Every Wiki alias, exact-name and canonical-name fallback rejects a different existing non-null
+game/Wiki UUID before applying attributes. Material canonical candidates are revalidated in the
+write transaction. A repeated canonical core in the Wiki feed is not a unique match. Conflicts
+are reported as `SOURCE_IDENTITY_CONFLICT` or `MULTI_MATCH_AMBIGUOUS`; they do not rebind a row.
+Original UEX and Wiki names are retained separately from the canonical item name.
+
+### REQ-DATA-034 — equivalent existing catalogue rows converge without breaking references
+
+UEX-first and Wiki-first arrivals produce the same verified source link. Repairing already
+persisted equivalent rows runs atomically, locks both catalogue identities in deterministic
+order, and delegates reference changes to each owning module through its catalogue SPI.
+The catalogue row locks fence concurrent FK inserts. Reconciliation acquires stock advisory
+locks without waiting while holding that fence; a busy lot rolls back and retries at most three
+times in fresh transactions. Exhaustion records a deferred failure and suppresses cleanup.
+Stock, order, allocation, ownership and location records retain their ids and quantities.
+Both original item rows and their complete price/statistic sets are archived before active
+duplicates are removed. A colliding price keeps the newer source timestamp; a colliding statistic
+keeps the Wiki survivor value, with both originals retained in the archive.
+Every changed user row keeps optimistic-lock and audit semantics. Duplicate minimum-stock
+settings of one unit retain the greater minimum and target; the notification is re-armed.
+
+Retired local ids remain resolvable through a persistent redirect for `findById`, `findAllById`
+and `getReferenceById`. Blueprint picking, inventory filters, stack reads and donation-source
+queries normalize retained ids at their read boundary; unknown filter ids remain restrictive.
+Batch normalization uses at most 500 ids per alias lookup. Verified preloaded canonical ids have
+a separate reference seam so price matrices and blueprint bulk imports add no query per row. Real-database tests cover every FK owner, collisions,
+rollback, audit records, source arrival order, legacy ids and repeated idempotent reconciliation.
+
+### REQ-DATA-035 — destructive cleanup uses source identities, not successful writes
+
+Every absence-based cleanup requires a complete, validated census of its exact source scope.
+Collect fetched source identities before writing. A local constraint, optimistic-lock or decode
+failure is never evidence of upstream removal. Nonempty partial UEX responses may upsert known
+rows but never tombstone vehicles/items or clear prices outside their subset. Unresolved
+identities or failed writes suppress any cleanup whose census cannot independently protect
+the affected existing rows. Empty responses never wipe a catalogue or price matrix.
+
+Commodity occurrence replacement honors its complete-fetch contract and remains scoped to the
+commodities actually supplied. Existing prices survive an update failure. Tests use previously
+persisted items and prices, not only newly inserted rows, and distinguish fetched from applied
+counts. This extends REQ-DATA-014 to all destructive external writers.
+
+### REQ-DATA-036 — external HTTP never spans a catalogue write transaction
+
+All external fetch orchestrators suspend database transactions. Writes run in short isolated
+transactions; a failed chunk is rolled back before its rows are retried individually.
+Callbacks do not carry managed entities across transaction boundaries, swallow database
+exceptions inside an aborted transaction, or count uncommitted work as applied. A real constraint
+failure between two valid rows must leave both valid rows committed.
+
+### REQ-DATA-037 — source enrichment has explicit units, semantics and provenance
+
+Wiki vehicle `vehicle_inventory` is micro-SCU and is normalized to SCU at the inbound boundary.
+Refreshes derive their value from the current source payload; no migration blindly divides
+historical values whose provenance is unknown. Hull/shield values retain fractional precision;
+medical tiers are parsed explicitly. Inventory, ore capacity, medical tier, hull/shield health
+and source build are available through the ship catalogue projection.
+
+Physical dimensions, cargo dimensions, UI dimensions and volume are distinct values. Explicit
+physical dimensions lead the physical axes; a UI/cargo box never silently substitutes for them.
+Current nested tractor fields lead deprecated aliases. Mining properties, supported cargo box
+sizes, commodity groups, acquisition methods and typed Wiki location references are retained as
+immutable source enrichment. Material summaries stay light; material details expose enrichment.
+
+Item snapshots retain source/build and requested-relationship state, variants, compatibility
+ports/tags, lootability, images and related items/vehicles. Wiki-derived UEX information is marked
+`UEX_VIA_SC_WIKI` and is not an independent price authority. Enrichment never changes canonical
+identity or the per-area P4K precedence. Blueprint resource UUID and ore UUID remain distinct
+source facts; unlocking missions and loaded recipe sections retain their provenance.
+
+### REQ-DATA-038 — every attempted source sync has a durable, accurate outcome
+
+Each source sweep and aggregate attempt is persisted even when it emits no anomaly event or
+applies no changed row. Store actual start/end, source build where known, fetched/valid/applied/
+skipped/failed counts, census validity and sweep decision. Outcomes are `RUNNING`, `SUCCESS`,
+`PARTIAL`, `FAILED`, `UNCHANGED`. An interrupted attempt becomes failed after restart without
+inventing its unknown finish time. Recovery and metric hydration run once per process before
+the first new attempt is recorded; a refresh-only cache-training context makes no database call.
+An aggregate success cannot conceal a failed source sweep.
+
+The run view displays outcomes, counters and the last fully successful source sweep separately
+from the most recent attempt. Existing anomalies stay queryable. Metrics, alerts and dashboards
+follow the same bounded source/aggregate/status vocabulary. A clean run without events and a
+failed run before the first event both appear in history.

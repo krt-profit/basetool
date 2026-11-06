@@ -39,6 +39,13 @@ public interface P4kImportRunRepository extends JpaRepository<P4kImportRun, UUID
   Optional<Long> findHighestChangeNumber();
 
   /**
+   * Returns the run applied last.
+   *
+   * @return the latest run, empty before the first run
+   */
+  Optional<P4kImportRun> findFirstByOrderByAppliedAtDesc();
+
+  /**
    * Pages the applied runs, newest first (REQ-P4K-015).
    *
    * @param pageable the page

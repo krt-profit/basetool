@@ -136,7 +136,11 @@ comparison is always within one Channel, where the contract guarantees the numbe
 The refusal fails the APPLY job with a message; a re-applied run moves `p4k_seen_run_id` to the
 new run and writes no other value.
 
-**Enforced by:** `P4kImportServiceBuildOrderTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
+An APPLY runs under the `SyncCoordinator` lock the Wiki and UEX syncs share, so it never runs
+beside their duplicate merges (ADR-0349); it waits up to `krt.sync.coordinator.max-wait-ms`, and
+when that elapses the job fails with a message and writes nothing. A PREVIEW takes no lock.
+
+**Enforced by:** `P4kImportServiceBuildOrderTest`, `P4kImportJobRunnerTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
 
 ### REQ-P4K-005 — every successful APPLY is recorded as a run, and every matched row names it
 
@@ -200,7 +204,12 @@ kind: the P4K GUID, then the Wiki UUID, then a class name and a name that each i
 one row and one record of the catalogue. A row that two P4K GUIDs would claim, or a P4K GUID that
 two rows would claim (also two catalogue records sharing a name, as three commodities named
 "SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
-the admin merges or splits; the import never merges. `p4k_uuid` becomes unique per kind in the
+the admin merges or splits; the import never merges. The Wiki/UEX duplicate merge
+(`ItemReconciliationService.mergeExisting`, ADR-0349) keeps the same rule: it never joins two items
+with different P4K GUIDs but opens a `GUID_CONFLICT` case for each GUID and leaves both rows as they
+are; a GUID only the retired row holds moves with its P4K columns onto the survivor before the
+retired row is archived; and a survivor with a P4K GUID, like a P4K-seeded one, keeps its name and
+manufacturer against the UEX values. `p4k_uuid` becomes unique per kind in the
 same release (V343): the migration first clears `p4k_uuid` on every row of a duplicate group, then
 adds the unique index, and the next APPLY matches those rows again.
 
@@ -212,8 +221,11 @@ adds the unique index, and the next APPLY matches those rows again.
 - [x] Two rows claiming one P4K GUID produce a review case and keep their values.
 - [x] The unique-constraint migration clears every duplicate group's `p4k_uuid`, then enforces
   uniqueness.
+- [x] The Wiki/UEX duplicate merge refuses two different P4K GUIDs with a review case per GUID,
+  moves a GUID only the retired row holds, and keeps a P4K-matched survivor's name.
 
-**Enforced by:** `P4kIdentityCleanupTest`, `V343MigrationTest` · **Code:** `P4kRowMatcher` ·
+**Enforced by:** `P4kIdentityCleanupTest`, `V343MigrationTest`, `ItemReconciliationServiceTest`,
+`P4kMergeConflictRecorderTest` · **Code:** `P4kRowMatcher`, `P4kMergeConflictRecorder` ·
 **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #3029
 
 ## Matching and seeding
@@ -450,9 +462,9 @@ lifts. The row records who resolved the case and when, and each resolution is an
 
 `p4k_review_case` holds `status` (`OPEN`, `REVIEWED`), `resolution` (`KEEP`, `HIDE`),
 `resolved_by` and `resolved_at`; a resolution echoes the case version (`409` when stale), and a
-resolved case is never resolved again. A hide stamps `p4k_hidden_at` on the row. A case opened
-outside a P4K run, such as a GUID conflict the SC Wiki / UEX reconciliation meets between two rows,
-has no run and names the second row in `other_row_id`.
+resolved case is never resolved again. A hide stamps `p4k_hidden_at` on the row. A GUID conflict
+between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMergeConflictRecorder`),
+is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
 
 **Enforced by:** `P4kReviewServiceTest`, `AdminP4kImportPageControllerMvcTest`,
 `P4kImportReportControllerMvcTest` · **Code:** `P4kReviewService` · **ADR:**
