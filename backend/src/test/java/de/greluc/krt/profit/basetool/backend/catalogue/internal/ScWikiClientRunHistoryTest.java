@@ -126,7 +126,13 @@ class ScWikiClientRunHistoryTest {
             self);
     history =
         new SyncRunService(
-            runs, progress, metrics, dashboard, catalogue, new RecordingTransactionManager());
+            runs,
+            progress,
+            metrics,
+            dashboard,
+            catalogue,
+            audit,
+            new RecordingTransactionManager());
     try (var resource = getClass().getResourceAsStream("/catalogue/scwiki-item-metadata.json")) {
       assertNotNull(resource);
       itemFixture = new String(resource.readAllBytes(), StandardCharsets.UTF_8);

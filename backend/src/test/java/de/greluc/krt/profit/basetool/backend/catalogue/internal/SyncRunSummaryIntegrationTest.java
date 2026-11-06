@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -109,6 +110,7 @@ class SyncRunSummaryIntegrationTest {
               restartedMetrics,
               mock(AdminDashboardLiveSync.class),
               mock(LiveSyncPublisher.class),
+              mock(AuditRecorder.class),
               transactionManager);
       restarted.recoverInterruptedAttempts();
     } finally {

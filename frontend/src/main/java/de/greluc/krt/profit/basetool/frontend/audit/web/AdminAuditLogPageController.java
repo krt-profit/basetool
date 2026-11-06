@@ -430,6 +430,7 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_P4K_REVIEW_KEPT",
                   "CATALOGUE_P4K_REVIEW_HIDDEN",
                   "CATALOGUE_SYNC_REPORTS_DELETED",
+                  "CATALOGUE_SYNC_RUN_FINISHED",
                   "CATALOGUE_MATERIAL_CREATED",
                   "CATALOGUE_MATERIAL_UPDATED",
                   "CATALOGUE_MATERIAL_DELETED",

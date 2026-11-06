@@ -3084,6 +3084,11 @@ joins the first two:
    passes verbatim. This changes the frozen exchange path (REQ-XCH-036): goldens record both cases
    and the pull request carries the `e2e` label.
 
+The Wiki/UEX catalogue evidence follows the same rule: `game_item_redirect.retired_snapshot` and
+`game_item.wiki_metadata` are on no exchange or relay surface, and a material's `miningData` travels
+only on the backend relay of a refinery draft preview, which the ingest stages for the member and
+never returns to the client.
+
 **Monitoring.** `basetool_ingest_exchange_relay_total` gains the outcome `answer_contract_broken`
 for an answer refused by guard 3 or by its response schema; a usable answer counts once, as `ok` or
 `answer_contract_broken`, after the gateway checked it. `ExchangeAnswerContractBroken` fires on
@@ -3096,6 +3101,9 @@ REQ-OBS-011).
   rule (planted violation). *`ArchitectureTest`, `ArchitectureRuleFailureTest`.*
 - [x] A new DTO field or schema property without a listed green class, a yellow or red class, and a
   DTO field missing from its schema each fail the ratchet. *`ExchangeFieldRatchetTest`.*
+- [x] The retired-row snapshot and the Wiki item metadata reach neither the relay nor the published
+  exchange, and `miningData` reaches only the relay, on `MaterialDto`.
+  *`ExchangeCatalogueEvidenceFenceTest`.*
 - [x] A backend answer with an undeclared property is answered `502` and counted
   `answer_contract_broken`; a declared free-form map passes unchanged. *`ExchangeSchemasTest`,
   `ExchangeControllerTest`, `ExchangeRelayTest`, `ExchangeGoldenAnswerTest` (goldens
