@@ -51,6 +51,15 @@ public final class Roles {
    */
   public static final String NO_ROLE_MARKER = ROLE_PREFIX + "NO_ROLE";
 
+  /**
+   * The lone marker authority of a pending or rejected registration (REQ-SEC-017), already {@code
+   * ROLE_}-prefixed.
+   *
+   * <p>Not in the role hierarchy; {@code PendingApprovalAccessFilter} turns it into {@code 403
+   * PENDING_APPROVAL} before any handler runs.
+   */
+  public static final String PENDING_APPROVAL_MARKER = ROLE_PREFIX + "PENDING_APPROVAL";
+
   public static final String LOGISTICIAN = "LOGISTICIAN";
   public static final String MISSION_MANAGER = "MISSION_MANAGER";
 

@@ -606,6 +606,35 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     verifyNoInteractions(orgUnitMembershipRepository, orgUnitCascadeService);
   }
 
+  /**
+   * A pending verdict is not memoised, so an approval applies on the next request of the same
+   * Keycloak session instead of after the cache TTL (REQ-SEC-056).
+   */
+  @Test
+  void convert_pendingVerdict_isNotMemoised_approvalAppliesOnTheNextRequest() {
+    when(jwt.getSubject()).thenReturn("sub-1");
+    when(jwt.getClaimAsString("sid")).thenReturn("keycloak-session-1");
+    User pending = userWithNoRoles();
+    pending.setApprovalStatus(ApprovalStatus.PENDING);
+    User approved = userWithNoRoles();
+    when(userReconciliationService.syncUser(jwt))
+        .thenReturn(
+            ReconciledUser.of(pending),
+            new ReconciledUser(approved, Set.of(namedRole("KRT Member"))));
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    Collection<GrantedAuthority> beforeApproval = converter.convert(jwt);
+    Collection<GrantedAuthority> afterApproval = converter.convert(jwt);
+    Collection<GrantedAuthority> memoised = converter.convert(jwt);
+
+    assertEquals(
+        List.of(new SimpleGrantedAuthority(Roles.PENDING_APPROVAL_MARKER)),
+        List.copyOf(beforeApproval));
+    assertTrue(afterApproval.contains(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    assertEquals(afterApproval, memoised, "the approved verdict is memoised as before");
+    verify(userReconciliationService, times(2)).syncUser(jwt);
+  }
+
   @Test
   void memberlessUser_getsNoMembershipDerivedAuthorities() {
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
