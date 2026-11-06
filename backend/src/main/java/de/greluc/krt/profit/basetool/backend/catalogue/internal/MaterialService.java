@@ -90,7 +90,9 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'visible-' + #pageable")
   public Page<MaterialDto> getVisibleMaterials(@NotNull Pageable pageable) {
-    return materialRepository.findByIsVisibleTrue(pageable).map(materialMapper::toDto);
+    return materialRepository
+        .findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(pageable)
+        .map(materialMapper::toDto);
   }
 
   /**
@@ -106,7 +108,7 @@ public class MaterialService {
       @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
     return (includeHidden
             ? materialRepository.findByNameContainingIgnoreCase(query, pageable)
-            : materialRepository.findByIsVisibleTrueAndNameContainingIgnoreCase(query, pageable))
+            : materialRepository.searchPickableByName(query, pageable))
         .map(materialMapper::toDto);
   }
 
@@ -241,7 +243,7 @@ public class MaterialService {
    * @return job-order materials in alphabetical order
    */
   public List<Material> getAllJobOrderMaterials() {
-    return materialRepository.findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
+    return materialRepository.findPickableJobOrderMaterials();
   }
 
   /**

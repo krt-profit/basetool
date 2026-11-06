@@ -33,8 +33,9 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The change report and the counts of one P4K run while it is computed (REQ-P4K-008, REQ-P4K-014):
- * report rows and review cases in memory, persisted by {@link P4kImportRecorder} after an APPLY. A
- * preview computes the same report and keeps only its counts.
+ * report rows and review cases in memory, persisted by {@link P4kImportRecorder} after an APPLY and
+ * stored on the job after a preview. Report rows hold identifiers, short names and fact values,
+ * never a game text.
  */
 public final class P4kImportReport {
 
@@ -86,7 +87,7 @@ public final class P4kImportReport {
    */
   public void unmatched(@NotNull P4kKind kind, @NotNull P4kRecord record) {
     tally(kind).unmatched++;
-    changes.add(row(kind, record, P4kChangeType.UNMATCHED));
+    add(row(kind, record, P4kChangeType.UNMATCHED));
   }
 
   /**
@@ -97,7 +98,83 @@ public final class P4kImportReport {
    */
   public void added(@NotNull P4kKind kind, @NotNull P4kRecord record) {
     tally(kind).created++;
-    changes.add(row(kind, record, P4kChangeType.ADDED));
+    add(row(kind, record, P4kChangeType.ADDED));
+  }
+
+  /**
+   * Records a field of a matched row the run writes (REQ-P4K-014).
+   *
+   * @param kind the kind
+   * @param record the record
+   * @param field the column written
+   * @param oldValue the value before the run, {@code null} for none or for a game text
+   * @param newValue the value written, {@code null} for a game text
+   */
+  public void changed(
+      @NotNull P4kKind kind,
+      @NotNull P4kRecord record,
+      @NotNull String field,
+      @Nullable String oldValue,
+      @Nullable String newValue) {
+    P4kImportChange change = row(kind, record, P4kChangeType.CHANGED);
+    change.setFieldName(field);
+    change.setOldValue(shorten(oldValue));
+    change.setNewValue(shorten(newValue));
+    add(change);
+  }
+
+  /**
+   * Records a stamped row the run matched again (REQ-P4K-011).
+   *
+   * @param kind the kind
+   * @param record the record
+   */
+  public void reappeared(@NotNull P4kKind kind, @NotNull P4kRecord record) {
+    tally(kind).reappeared++;
+    add(row(kind, record, P4kChangeType.REAPPEARED));
+  }
+
+  /**
+   * Records a row the sweep stamps (REQ-P4K-011).
+   *
+   * @param kind the kind
+   * @param row the P4K-known row the catalogue no longer lists
+   */
+  public void vanished(@NotNull P4kKind kind, @NotNull P4kKnownRow row) {
+    tally(kind).vanished++;
+    P4kImportChange change = new P4kImportChange();
+    change.setKind(kind);
+    change.setChangeType(P4kChangeType.VANISHED);
+    change.setGuid(row.guid());
+    change.setClassName(shorten(row.className()));
+    change.setNameEn(shorten(row.name()));
+    change.setStillLiveElsewhere(row.stillLiveElsewhere());
+    add(change);
+  }
+
+  /**
+   * Records what the sweep did with a kind, and a report row when it was skipped.
+   *
+   * @param kind the kind
+   * @param outcome the sweep's outcome
+   * @param known the kind's P4K-known rows
+   * @param toStamp the rows the sweep stamps, or would have stamped
+   */
+  public void sweep(
+      @NotNull P4kKind kind, @NotNull P4kSweepOutcome outcome, int known, int toStamp) {
+    Tally tally = tally(kind);
+    tally.sweep = outcome;
+    tally.known = known;
+    tally.toStamp = toStamp;
+    if (outcome != P4kSweepOutcome.SWEPT) {
+      P4kImportChange change = new P4kImportChange();
+      change.setKind(kind);
+      change.setChangeType(P4kChangeType.SWEEP_SKIPPED);
+      change.setFieldName(outcome.name());
+      change.setOldValue(Integer.toString(known));
+      change.setNewValue(Integer.toString(toStamp));
+      add(change);
+    }
   }
 
   /**
@@ -118,7 +195,7 @@ public final class P4kImportReport {
     change.setFieldName(wikiColumn);
     change.setOldValue(wikiUuid.toString());
     change.setNewValue(record.guid());
-    changes.add(change);
+    add(change);
   }
 
   /**
@@ -138,7 +215,7 @@ public final class P4kImportReport {
     P4kImportChange change = row(kind, record, P4kChangeType.UNKNOWN_VALUE);
     change.setFieldName(field);
     change.setNewValue(shorten(value));
-    changes.add(change);
+    add(change);
   }
 
   /**
@@ -164,7 +241,7 @@ public final class P4kImportReport {
     tally(kind).review++;
     P4kImportChange change = row(kind, record, P4kChangeType.REVIEW);
     change.setFieldName(reason.name());
-    changes.add(change);
+    add(change);
   }
 
   /**
@@ -190,6 +267,19 @@ public final class P4kImportReport {
   }
 
   /**
+   * Returns the sweep result of one kind.
+   *
+   * @param kind the kind
+   * @return the sweep result; its outcome is {@code null} when no sweep was decided for the kind
+   */
+  @NotNull
+  public P4kImportResultDto.Sweep sweepResult(@NotNull P4kKind kind) {
+    Tally t = tally(kind);
+    return new P4kImportResultDto.Sweep(
+        kind, t.sweep, t.known, t.toStamp, t.vanished, t.reappeared);
+  }
+
+  /**
    * Returns the report rows, without their run id.
    *
    * @return the rows in the order found
@@ -209,6 +299,16 @@ public final class P4kImportReport {
   @Unmodifiable
   public List<ReviewFinding> reviews() {
     return List.copyOf(reviews.values());
+  }
+
+  /**
+   * Appends a report row at the next position.
+   *
+   * @param change the row
+   */
+  private void add(@NotNull P4kImportChange change) {
+    change.setPosition(changes.size());
+    changes.add(change);
   }
 
   /**
@@ -275,5 +375,10 @@ public final class P4kImportReport {
     private int unmatched;
     private int review;
     private int unknownValues;
+    private int reappeared;
+    private int vanished;
+    private int known;
+    private int toStamp;
+    @Nullable private P4kSweepOutcome sweep;
   }
 }

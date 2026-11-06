@@ -37,6 +37,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -118,6 +119,7 @@ public class P4kImportJobService {
    *
    * @param previewJobId the SUCCEEDED preview job to apply
    * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @param overrideMassGuard whether a kind is swept even above the 5 % mass guard (REQ-P4K-012)
    * @param createdBy JWT {@code sub} of the enqueuing administrator
    * @return the persisted apply job
    * @throws NotFoundException if no job has the given id
@@ -127,7 +129,10 @@ public class P4kImportJobService {
   @Transactional
   @NotNull
   public P4kImportJob createApplyJob(
-      @NotNull UUID previewJobId, boolean createItemsAndShips, @NotNull UUID createdBy) {
+      @NotNull UUID previewJobId,
+      boolean createItemsAndShips,
+      boolean overrideMassGuard,
+      @NotNull UUID createdBy) {
     P4kImportJob preview =
         Entities.require(
             jobRepository.findById(previewJobId),
@@ -143,6 +148,7 @@ public class P4kImportJobService {
     job.setKind(P4kImportJobKind.APPLY);
     job.setStatus(P4kImportJobStatus.PENDING);
     job.setCreateItemsAndShips(createItemsAndShips);
+    job.setOverrideMassGuard(overrideMassGuard);
     job.setSourceFilename(preview.getSourceFilename());
     job.setFileSizeBytes(preview.getFileSizeBytes());
     job.setPreviewJobId(previewJobId);
@@ -196,6 +202,34 @@ public class P4kImportJobService {
         .map(P4kImportJobPayload::getContent)
         .orElseThrow(
             () -> new IllegalStateException("Payload missing for P4K import job " + jobId));
+  }
+
+  /**
+   * Stores the change report a preview computed beside its upload (REQ-P4K-015); it expires with
+   * the job.
+   *
+   * @param jobId the preview job
+   * @param report the encoded report
+   * @throws IllegalStateException if the payload row is missing (pruned mid-run)
+   */
+  @Transactional
+  public void storePreviewReport(@NotNull UUID jobId, byte @NotNull [] report) {
+    payloadRepository
+        .findById(jobId)
+        .orElseThrow(() -> new IllegalStateException("Payload missing for P4K import job " + jobId))
+        .setPreviewReport(report);
+  }
+
+  /**
+   * Loads the change report a preview stored.
+   *
+   * @param jobId the preview job
+   * @return the encoded report, empty when the job has none or is gone
+   */
+  @Transactional(readOnly = true)
+  @NotNull
+  public Optional<byte[]> loadPreviewReport(@NotNull UUID jobId) {
+    return payloadRepository.findById(jobId).map(P4kImportJobPayload::getPreviewReport);
   }
 
   /**

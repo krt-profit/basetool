@@ -29,16 +29,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A lasting review case of the P4K import (REQ-P4K-016): one entry per kind, GUID and reason, found
- * by the first run and touched by every later run that finds it again. A new case is {@code OPEN},
- * the database default of its {@code status} column.
+ * A lasting review case of the P4K import (REQ-P4K-016): one entry per kind, GUID and reason,
+ * touched by every later run that finds it again. A case is {@code OPEN} until an admin resolves it
+ * as keep or hide; a resolved case stays {@code REVIEWED} whatever a later run finds.
  */
 @Entity
 @Table(name = "p4k_review_case")
@@ -67,16 +69,45 @@ public class P4kReviewCase extends AbstractEntity<UUID> {
   @Column(name = "reason", nullable = false, length = 32)
   private P4kReviewReason reason;
 
+  /** Whether the case waits for an admin. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false, length = 16)
+  @NotNull
+  private P4kReviewStatus status = P4kReviewStatus.OPEN;
+
   /** The Basetool row the case is about, or {@code null} for a record without one. */
   @Column(name = "row_id")
   @Nullable
   private UUID rowId;
 
-  /** The run that found the case first. */
-  @Column(name = "first_run_id", nullable = false, updatable = false)
+  /** The second row of a GUID conflict between two rows, or {@code null}. */
+  @Column(name = "other_row_id")
+  @Nullable
+  private UUID otherRowId;
+
+  /** The run that found the case first, {@code null} for a case opened outside a P4K run. */
+  @Column(name = "first_run_id", updatable = false)
+  @Nullable
   private UUID firstRunId;
 
-  /** The last run that found the case. */
-  @Column(name = "last_run_id", nullable = false)
+  /** The last run that found the case, {@code null} for a case opened outside a P4K run. */
+  @Column(name = "last_run_id")
+  @Nullable
   private UUID lastRunId;
+
+  /** The admin's decision, {@code null} while the case is open. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "resolution", length = 8)
+  @Nullable
+  private P4kReviewResolution resolution;
+
+  /** The admin who resolved the case, {@code null} while it is open. */
+  @Column(name = "resolved_by")
+  @Nullable
+  private UUID resolvedBy;
+
+  /** When the case was resolved, {@code null} while it is open. */
+  @Column(name = "resolved_at")
+  @Nullable
+  private Instant resolvedAt;
 }

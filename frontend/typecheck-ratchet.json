@@ -48,6 +48,7 @@
       "catalogue/materials.js",
       "catalogue/mission-data.js",
       "catalogue/p4k-import.js",
+      "catalogue/p4k-report.js",
       "catalogue/ship-data.js",
       "catalogue/sync-reports.js",
       "catalogue/uex.js"

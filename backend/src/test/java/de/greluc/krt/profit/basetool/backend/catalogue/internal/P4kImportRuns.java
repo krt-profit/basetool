@@ -49,6 +49,20 @@ record P4kImportRuns(
    */
   @NotNull
   P4kImportResultDto apply(byte @NotNull [] plain, boolean createItemsAndShips) {
+    return apply(plain, createItemsAndShips, false);
+  }
+
+  /**
+   * Applies a catalogue with the mass-guard choice.
+   *
+   * @param plain the plain catalogue JSON
+   * @param createItemsAndShips the run's checkbox
+   * @param overrideMassGuard the "apply marking anyway" box
+   * @return the result
+   */
+  @NotNull
+  P4kImportResultDto apply(
+      byte @NotNull [] plain, boolean createItemsAndShips, boolean overrideMassGuard) {
     P4kImportJob job = new P4kImportJob();
     job.setKind(P4kImportJobKind.APPLY);
     job.setStatus(P4kImportJobStatus.RUNNING);
@@ -56,7 +70,8 @@ record P4kImportRuns(
     jobRepository.save(job);
     return service.applyImport(
         P4kCompression.toStoredPayload(plain),
-        new P4kImportService.P4kApplyRequest(job.getId(), ADMIN, createItemsAndShips));
+        new P4kImportService.P4kApplyRequest(
+            job.getId(), ADMIN, createItemsAndShips, overrideMassGuard));
   }
 
   /**
@@ -67,6 +82,17 @@ record P4kImportRuns(
    */
   @NotNull
   P4kImportResultDto preview(byte @NotNull [] plain) {
+    return previewWithReport(plain).result();
+  }
+
+  /**
+   * Previews a catalogue and keeps the report it computed.
+   *
+   * @param plain the plain catalogue JSON
+   * @return the result and the report rows
+   */
+  @NotNull
+  P4kImportService.P4kPreview previewWithReport(byte @NotNull [] plain) {
     return service.previewImport(P4kCompression.toStoredPayload(plain));
   }
 }

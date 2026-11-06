@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param grade the component grade, or {@code null} when unknown or no component
  * @param itemClass the {@code ShipComponentClass} name, or {@code null} when unknown or no
  *     component
+ * @param noLongerInGame whether the P4K stamped the item as gone from the game or an admin hid it;
+ *     an existing reference then shows the "no longer in the game" notice (REQ-P4K-013)
  */
 public record InventoryGameItemReferenceDto(
     UUID id,
@@ -47,10 +49,11 @@ public record InventoryGameItemReferenceDto(
     @Nullable String componentType,
     @Nullable Integer size,
     @Nullable String grade,
-    @Nullable String itemClass) {
+    @Nullable String itemClass,
+    boolean noLongerInGame) {
 
   /**
-   * Builds a reference without component data, for items that are no ship component.
+   * Builds a reference to an item still in the game without component data.
    *
    * @param id the game item's primary key
    * @param name the item's display name
@@ -59,6 +62,24 @@ public record InventoryGameItemReferenceDto(
    */
   public InventoryGameItemReferenceDto(
       UUID id, String name, @Nullable String manufacturer, @Nullable String kind) {
-    this(id, name, manufacturer, kind, null, null, null, null);
+    this(id, name, manufacturer, kind, false);
+  }
+
+  /**
+   * Builds a reference without component data, for items that are no ship component.
+   *
+   * @param id the game item's primary key
+   * @param name the item's display name
+   * @param manufacturer the manufacturer's display name, or {@code null} when unresolved
+   * @param kind the {@code GameItemKind} name
+   * @param noLongerInGame whether the P4K retired the item (REQ-P4K-013)
+   */
+  public InventoryGameItemReferenceDto(
+      UUID id,
+      String name,
+      @Nullable String manufacturer,
+      @Nullable String kind,
+      boolean noLongerInGame) {
+    this(id, name, manufacturer, kind, null, null, null, null, noLongerInGame);
   }
 }

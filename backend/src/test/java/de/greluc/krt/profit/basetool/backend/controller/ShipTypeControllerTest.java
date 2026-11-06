@@ -64,7 +64,7 @@ class ShipTypeControllerTest {
   void getAll_wrapsServicePageIntoPageResponse() {
     ShipTypeDto dto =
         new ShipTypeDto(
-            UUID.randomUUID(), "Cutlass Black", null, null, new BigDecimal("46"), false);
+            UUID.randomUUID(), "Cutlass Black", null, null, new BigDecimal("46"), false, false);
     when(service.getAllShipTypes(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(dto)));
 
@@ -88,7 +88,7 @@ class ShipTypeControllerTest {
   @Test
   void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, new BigDecimal("1"), false);
+    ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, new BigDecimal("1"), false, false);
     when(service.getShipType(id)).thenReturn(dto);
 
     ShipTypeDto result = controller.getShipType(id);
@@ -100,7 +100,7 @@ class ShipTypeControllerTest {
   void updateVisibility_passesHiddenFlagVerbatim() {
     UUID id = UUID.randomUUID();
     ShipType updated = new ShipType();
-    ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, new BigDecimal("1"), true);
+    ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, new BigDecimal("1"), true, false);
 
     when(service.updateShipTypeVisibility(id, true)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(dto);
@@ -116,7 +116,7 @@ class ShipTypeControllerTest {
     UUID id = UUID.randomUUID();
     when(service.updateShipTypeVisibility(id, false)).thenReturn(new ShipType());
     when(mapper.toDto(any()))
-        .thenReturn(new ShipTypeDto(id, "x", null, null, new BigDecimal("1"), false));
+        .thenReturn(new ShipTypeDto(id, "x", null, null, new BigDecimal("1"), false, false));
 
     controller.updateShipTypeVisibility(id, false);
 

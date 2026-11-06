@@ -64,4 +64,44 @@ public interface P4kKeyedRow {
    * @param p4kSeenRunId the run id
    */
   void setP4kSeenRunId(@Nullable UUID p4kSeenRunId);
+
+  /**
+   * Returns when the P4K sweep stamped the row as gone from the game (REQ-P4K-011).
+   *
+   * @return the stamp, or {@code null} while the catalogue lists the row
+   */
+  @Nullable
+  Instant getP4kDeletedAt();
+
+  /**
+   * Sets or clears the sweep's stamp.
+   *
+   * @param p4kDeletedAt the stamp, or {@code null} when the row reappeared
+   */
+  void setP4kDeletedAt(@Nullable Instant p4kDeletedAt);
+
+  /**
+   * Returns when an admin hid the row through a review case (REQ-P4K-016).
+   *
+   * @return the time of the hide, or {@code null}
+   */
+  @Nullable
+  Instant getP4kHiddenAt();
+
+  /**
+   * Hides the row through a review case.
+   *
+   * @param p4kHiddenAt the time of the hide
+   */
+  void setP4kHiddenAt(@Nullable Instant p4kHiddenAt);
+
+  /**
+   * Whether the row is out of the game or hidden, so it leaves every picker and its references show
+   * the "no longer in the game" notice (REQ-P4K-013).
+   *
+   * @return {@code true} when the sweep stamped it or an admin hid it
+   */
+  default boolean isP4kRetired() {
+    return getP4kDeletedAt() != null || getP4kHiddenAt() != null;
+  }
 }

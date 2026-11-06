@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kClosedSet;
@@ -78,7 +79,7 @@ public class P4kShipReconciler {
               ship, ship.className(), ship.nameEn(), seeding == P4kSeeding.CREATE, context);
       if (match instanceof P4kRowMatcher.Matched<ShipType>(ShipType row, UUID guid)) {
         boolean enriched = enrich(row, ship, context);
-        context.stamp(row, guid);
+        context.stamp(P4kKind.SHIP, ship, row, guid);
         context.getReport().matched(P4kKind.SHIP, enriched);
       } else if (match instanceof P4kRowMatcher.Unmatched<ShipType>(UUID guid)) {
         unmatched(ship, guid, seeding, context);
@@ -96,31 +97,26 @@ public class P4kShipReconciler {
    */
   private boolean enrich(
       @NotNull ShipType row, @NotNull P4kShipDto ship, @NotNull P4kImportContext context) {
-    boolean apply = context.isApply();
-    boolean enriched =
-        P4kFields.fillIfNull(row.getClassName(), ship.className(), row::setClassName, apply);
-    enriched |=
-        P4kFields.fillIfNull(
-            row.getManufacturer(),
-            context.manufacturer(ship.manufacturerGuid()),
-            row::setManufacturer,
-            apply);
-    enriched |=
-        P4kFields.fillIfNull(
-            row.getDescriptionEn(),
-            P4kLocalisedText.enOf(ship.description()),
-            row::setDescriptionEn,
-            apply);
-    enriched |=
-        P4kFields.fillIfNull(
-            row.getDescriptionDe(),
-            P4kLocalisedText.deOf(ship.description()),
-            row::setDescriptionDe,
-            apply);
-    enriched |=
-        P4kFields.refreshNameKey(
-            row.getNameKey(), P4kLocalisedText.keyOf(ship.name()), row::setNameKey, apply);
-    return enriched;
+    P4kRowWriter writer = new P4kRowWriter(context, P4kKind.SHIP, ship);
+    writer.fill("class_name", row.getClassName(), ship.className(), row::setClassName);
+    writer.fill(
+        "manufacturer_id",
+        row.getManufacturer(),
+        context.manufacturer(ship.manufacturerGuid()),
+        row::setManufacturer,
+        Manufacturer::getName);
+    writer.fillGameText(
+        "description_en",
+        row.getDescriptionEn(),
+        P4kLocalisedText.enOf(ship.description()),
+        row::setDescriptionEn);
+    writer.fillGameText(
+        "description_de",
+        row.getDescriptionDe(),
+        P4kLocalisedText.deOf(ship.description()),
+        row::setDescriptionDe);
+    writer.nameKey(row.getNameKey(), P4kLocalisedText.keyOf(ship.name()), row::setNameKey);
+    return writer.isChanged();
   }
 
   /**
@@ -158,7 +154,7 @@ public class P4kShipReconciler {
           StringNormalization.blankToNull(P4kLocalisedText.deOf(ship.description())));
       row.setSourceSystems(GameItemSourceSystem.P4K);
       row.setNameKey(P4kFields.storedNameKey(P4kLocalisedText.keyOf(ship.name())));
-      context.stamp(row, guid);
+      context.stamp(P4kKind.SHIP, ship, row, guid);
       shipTypeRepository.save(row);
     }
     context.getReport().added(P4kKind.SHIP, ship);

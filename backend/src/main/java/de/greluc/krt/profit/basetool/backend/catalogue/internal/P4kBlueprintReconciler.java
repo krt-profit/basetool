@@ -78,24 +78,22 @@ public class P4kBlueprintReconciler {
       P4kRowMatcher.Match<Blueprint> match =
           matcher.match(blueprint, blueprint.key(), null, false, context);
       if (match instanceof P4kRowMatcher.Matched<Blueprint>(Blueprint row, UUID guid)) {
-        boolean apply = context.isApply();
-        boolean enriched =
-            P4kFields.fillIfNull(row.getScwikiKey(), blueprint.key(), row::setScwikiKey, apply);
-        enriched |=
-            P4kFields.fillIfNull(
-                row.getOutputItem(),
-                producedItem(blueprint.producedItemGuid()),
-                row::setOutputItem,
-                apply);
-        enriched |=
-            P4kFields.fillIfNull(
-                row.getCraftTimeSeconds(),
-                blueprint.craftTimeSeconds(),
-                row::setCraftTimeSeconds,
-                apply);
-        context.stamp(row, guid);
-        context.getReport().matched(P4kKind.BLUEPRINT, enriched);
-        ingredientsResolved += resolveIngredients(row, apply);
+        P4kRowWriter writer = new P4kRowWriter(context, P4kKind.BLUEPRINT, blueprint);
+        writer.fill("scwiki_key", row.getScwikiKey(), blueprint.key(), row::setScwikiKey);
+        writer.fill(
+            "output_item_id",
+            row.getOutputItem(),
+            producedItem(blueprint.producedItemGuid()),
+            row::setOutputItem,
+            GameItem::getName);
+        writer.fill(
+            "craft_time_seconds",
+            row.getCraftTimeSeconds(),
+            blueprint.craftTimeSeconds(),
+            row::setCraftTimeSeconds);
+        context.stamp(P4kKind.BLUEPRINT, blueprint, row, guid);
+        context.getReport().matched(P4kKind.BLUEPRINT, writer.isChanged());
+        ingredientsResolved += resolveIngredients(row, context.isApply());
       } else if (match instanceof P4kRowMatcher.Unmatched<Blueprint>) {
         context.getReport().unmatched(P4kKind.BLUEPRINT, blueprint);
       }

@@ -301,7 +301,7 @@
                                   th:with="unitResponsible=${unit.responsibleUser != null ? unit.responsibleUser.effectiveName : (unit.ship != null and unit.ship.owner != null ? unit.ship.owner.effectiveName : null)}">
                                 <span th:text="${unit.name}">Unit</span>
                                 <small>
-                                    <th:block th:if="${unit.shipType != null}">&mdash; <span th:text="${unit.shipType.name}">Typ</span></th:block>
+                                    <th:block th:if="${unit.shipType != null}">&mdash; <span th:text="${unit.shipType.name}">Typ</span> <span th:if="${unit.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span></th:block>
                                     <th:block th:if="${unitResponsible != null}">&middot; <span th:text="${unitResponsible}" th:title="#{mission.unit.responsible}">Owner</span></th:block>
                                     <th:block th:if="${unit.frequency != null}">&middot; <span class="data-value--mono" th:text="#{mission.unit.frequency} + ' ' + ${#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT')}">Freq</span></th:block>
                                     <span th:if="${!#strings.isEmpty(unit.note)}" class="notemark" th:title="${unit.note}" tabindex="0" th:attr="aria-label=#{mission.unit.note} + ': ' + ${unit.note}">&#x270E;</span>

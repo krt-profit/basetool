@@ -77,4 +77,10 @@ public class P4kImportRunKind {
   /** Matched rows the run changed (REQ-P4K-014). */
   @Column(name = "changed", nullable = false)
   private int changed;
+
+  /** What the sweep did with the kind, {@code null} on a run recorded before the sweep existed. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "sweep", length = 24)
+  @Nullable
+  private P4kSweepOutcome sweep;
 }

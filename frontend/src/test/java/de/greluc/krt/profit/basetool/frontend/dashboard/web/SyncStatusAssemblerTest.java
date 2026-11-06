@@ -57,7 +57,19 @@ class SyncStatusAssemblerTest {
 
   private static P4kImportJobDto job(String status, String createdAt, String finishedAt) {
     return new P4kImportJobDto(
-        null, null, status, false, null, null, null, null, null, createdAt, null, finishedAt);
+        null,
+        null,
+        status,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        createdAt,
+        null,
+        finishedAt);
   }
 
   private static List<SyncRunSummaryDto> summaries(long uex, Instant uexLast, long p4k) {

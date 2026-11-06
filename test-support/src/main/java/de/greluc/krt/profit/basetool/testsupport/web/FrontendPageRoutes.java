@@ -146,6 +146,8 @@ public final class FrontendPageRoutes {
           "/inventory/my/game-item-stack/entries",
           "/admin/default-blueprints/search",
           "/admin/p4k-import/jobs",
+          "/admin/p4k-import/runs",
+          "/admin/p4k-import/review-cases",
           "/blueprint-overview/owners",
           "/catalog/location-search",
           "/catalog/material-search",

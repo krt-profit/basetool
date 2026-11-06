@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param blueprints the blueprint counts
  * @param ingredientsResolved blueprint ingredient lines whose material or item the run resolved
  * @param runId the {@code p4k_import_run} of an APPLY, {@code null} for a preview
+ * @param sweeps the sweep result per kind (REQ-P4K-011, REQ-P4K-012), in the order of the kinds;
+ *     {@code null} in a result stored before the sweep existed
  */
 public record P4kImportResultDto(
     boolean dryRun,
@@ -47,7 +51,26 @@ public record P4kImportResultDto(
     Counts commodities,
     Counts blueprints,
     int ingredientsResolved,
-    @Nullable UUID runId) {
+    @Nullable UUID runId,
+    @Nullable List<Sweep> sweeps) {
+
+  /**
+   * What the sweep did, or in a preview would do, with one kind (REQ-P4K-011, REQ-P4K-012).
+   *
+   * @param kind the kind
+   * @param outcome whether it swept or why it skipped
+   * @param known the kind's P4K-known rows, the base of the 5 % mass guard
+   * @param toStamp the rows the sweep stamps, or would have stamped
+   * @param vanished the rows the sweep stamped; in a preview the rows it would stamp
+   * @param reappeared stamped rows the run matched again
+   */
+  public record Sweep(
+      P4kKind kind,
+      @Nullable P4kSweepOutcome outcome,
+      int known,
+      int toStamp,
+      int vanished,
+      int reappeared) {}
 
   /**
    * The Build of the catalogue and the patch version derived from it (REQ-P4K-005).

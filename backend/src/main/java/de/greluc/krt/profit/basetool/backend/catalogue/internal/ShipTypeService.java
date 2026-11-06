@@ -63,7 +63,8 @@ public class ShipTypeService {
   public Page<ShipTypeDto> getAllShipTypes(@NotNull Pageable pageable, boolean includeHidden) {
     return (includeHidden
             ? shipTypeRepository.findAll(pageable)
-            : shipTypeRepository.findByHiddenFalse(pageable))
+            : shipTypeRepository.findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+                pageable))
         .map(shipTypeMapper::toDto);
   }
 
@@ -80,7 +81,7 @@ public class ShipTypeService {
       @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
     return (includeHidden
             ? shipTypeRepository.findByNameContainingIgnoreCase(query, pageable)
-            : shipTypeRepository.findByHiddenFalseAndNameContainingIgnoreCase(query, pageable))
+            : shipTypeRepository.searchPickableByName(query, pageable))
         .map(shipTypeMapper::toDto);
   }
 

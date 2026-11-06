@@ -40,7 +40,9 @@ import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -49,6 +51,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,6 +80,7 @@ public class P4kImportService {
   private final P4kShipReconciler shipReconciler;
   private final P4kCommodityReconciler commodityReconciler;
   private final P4kBlueprintReconciler blueprintReconciler;
+  private final P4kSweeper sweeper;
   private final P4kImportRunRepository runRepository;
   private final P4kImportRecorder recorder;
   private final P4kRejections rejections;
@@ -89,33 +93,50 @@ public class P4kImportService {
    * @param jobId the APPLY job
    * @param createdBy the administrator who uploaded the catalogue
    * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @param overrideMassGuard whether a kind is swept even when the sweep would stamp more than 5 %
+   *     of it (REQ-P4K-012)
    */
   public record P4kApplyRequest(
-      @NotNull UUID jobId, @NotNull UUID createdBy, boolean createItemsAndShips) {}
+      @NotNull UUID jobId,
+      @NotNull UUID createdBy,
+      boolean createItemsAndShips,
+      boolean overrideMassGuard) {}
 
   /**
-   * Previews an import: everything an APPLY with "create new items and ships" ticked would do,
-   * without writing anything.
+   * What a preview computed: its result and the change report an APPLY would write.
+   *
+   * @param result the result with {@code dryRun = true}
+   * @param changes the report rows in the order found, without a run
+   */
+  public record P4kPreview(
+      @NotNull P4kImportResultDto result, @NotNull @Unmodifiable List<P4kImportChange> changes) {}
+
+  /**
+   * Previews an import: everything an APPLY with "create new items and ships" ticked and without
+   * the mass-guard override would do, its change report included, without writing anything.
    *
    * @param payload the stored upload
-   * @return the result with {@code dryRun = true} and no run
+   * @return the result with {@code dryRun = true} and no run, and the report rows
    * @throws BadRequestException when the payload is no readable version-2 LIVE catalogue
    */
   @NotNull
-  public P4kImportResultDto previewImport(byte @NotNull [] payload) {
+  public P4kPreview previewImport(byte @NotNull [] payload) {
     P4kCatalogue catalogue = read(payload);
     P4kBuild build = requireBuild(catalogue.head());
     P4kImportContext context = new P4kImportContext(catalogue, false, Instant.now(), null, true);
     int ingredientsResolved = reconcile(catalogue, context);
-    return result(catalogue, build, context, ingredientsResolved);
+    sweeper.sweep(catalogue, context, false);
+    return new P4kPreview(
+        result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
   }
 
   /**
    * Applies an import in one transaction: refuses an older Build, records the run, reconciles every
-   * kind, stamps the matched rows with the run and stores the change report.
+   * kind, stamps the matched rows with the run, sweeps the complete kinds and stores the change
+   * report.
    *
    * @param payload the stored upload
-   * @param request the job, the uploader and the "create new items and ships" choice
+   * @param request the job, the uploader and the admin's choices
    * @return the result with the run id
    * @throws BadRequestException when the payload is unreadable or its Build is older than that of
    *     the last applied run
@@ -134,9 +155,11 @@ public class P4kImportService {
     P4kImportContext context =
         new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
     int ingredientsResolved = reconcile(catalogue, context);
+    List<P4kKind> overridden = sweeper.sweep(catalogue, context, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
+    overridden.forEach(kind -> auditOverride(run, context.getReport().sweepResult(kind)));
     syncReportService.logP4kEvent(
         run.getId(), SyncEventType.SYNC_RUN_SUMMARY, "catalog", null, null, summary(result));
     auditRecorder.record(
@@ -274,6 +297,7 @@ public class P4kImportService {
     for (P4kKind kind : P4kKind.values()) {
       P4kCompleteness completeness = completeness(head, kind);
       P4kImportResultDto.Counts counts = report.counts(kind, completeness);
+      P4kImportResultDto.Sweep sweep = report.sweepResult(kind);
       P4kKindCompleteness entry = head.completeness().get(kind.getCatalogueField());
       P4kImportRunKind row = new P4kImportRunKind();
       row.setKind(kind);
@@ -282,6 +306,10 @@ public class P4kImportService {
       row.setMatched(counts.matched());
       row.setUnmatched(counts.unmatched());
       row.setAdded(counts.created());
+      row.setChanged(counts.enriched());
+      row.setVanished(sweep.vanished());
+      row.setReappeared(sweep.reappeared());
+      row.setSweep(sweep.outcome());
       kinds.add(row);
     }
     return kinds;
@@ -323,7 +351,26 @@ public class P4kImportService {
         report.counts(P4kKind.COMMODITY, completeness(head, P4kKind.COMMODITY)),
         report.counts(P4kKind.BLUEPRINT, completeness(head, P4kKind.BLUEPRINT)),
         ingredientsResolved,
-        context.getRunId());
+        context.getRunId(),
+        Arrays.stream(P4kKind.values()).map(report::sweepResult).toList());
+  }
+
+  /**
+   * Records the audit event of a kind swept on the admin's mass-guard override (REQ-P4K-012).
+   *
+   * @param run the run
+   * @param sweep the kind's sweep result
+   */
+  private void auditOverride(@NotNull P4kImportRun run, @NotNull P4kImportResultDto.Sweep sweep) {
+    double share = sweep.known() == 0 ? 0 : 100.0 * sweep.toStamp() / sweep.known();
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN,
+        run.getId(),
+        sweep.kind().name(),
+        null,
+        AuditDetails.of("kind", sweep.kind().name())
+            .with("count", sweep.toStamp())
+            .with("sharePercent", String.format(Locale.ROOT, "%.1f", share)));
   }
 
   /**

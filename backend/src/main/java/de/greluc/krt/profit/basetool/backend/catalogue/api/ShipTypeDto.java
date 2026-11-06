@@ -22,11 +22,24 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Data transfer record carrying Ship Type payload. */
+/**
+ * Data transfer record carrying Ship Type payload.
+ *
+ * @param id the ship type's id
+ * @param name its name
+ * @param manufacturer its manufacturer
+ * @param description its German description, falling back to the English one
+ * @param scu its cargo capacity
+ * @param hidden whether an admin hid it from the pickers
+ * @param noLongerInGame whether the P4K stamped it as gone from the game or an admin hid it through
+ *     a review case; an existing ship of the type then shows the "no longer in the game" notice
+ *     (REQ-P4K-013)
+ */
 public record ShipTypeDto(
     UUID id,
     String name,
     ManufacturerDto manufacturer,
     String description,
     BigDecimal scu,
-    boolean hidden) {}
+    boolean hidden,
+    boolean noLongerInGame) {}

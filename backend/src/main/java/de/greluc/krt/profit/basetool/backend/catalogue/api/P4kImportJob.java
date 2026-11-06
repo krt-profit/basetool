@@ -72,6 +72,13 @@ public class P4kImportJob extends AbstractEntity<UUID> {
   @Column(name = "create_items_and_ships", nullable = false)
   private boolean createItemsAndShips;
 
+  /**
+   * For an APPLY run: whether a kind is swept even when the sweep would stamp more than 5 % of it
+   * (REQ-P4K-012).
+   */
+  @Column(name = "override_mass_guard", nullable = false)
+  private boolean overrideMassGuard;
+
   /** Original upload filename, for display in the job list (forensic; may be {@code null}). */
   @Column(name = "source_filename", length = 255)
   @Nullable

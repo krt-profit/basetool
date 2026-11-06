@@ -64,7 +64,8 @@ public class ManufacturerService {
     Page<Manufacturer> page =
         includeHidden
             ? manufacturerRepository.findAll(pageable)
-            : manufacturerRepository.findByHiddenFalse(pageable);
+            : manufacturerRepository.findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+                pageable);
     return page.map(manufacturerMapper::toDto);
   }
 

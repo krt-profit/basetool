@@ -298,7 +298,7 @@ class CatalogueBackendClientTest {
     client.enqueueP4kImport("{\"items\":[]}".getBytes(StandardCharsets.UTF_8), "catalog.json");
     assertThat(client.p4kImportJobs()).isEmpty();
     client.p4kImportJob(ID);
-    client.applyP4kImportJob(ID, true);
+    client.applyP4kImportJob(ID, true, false);
 
     RecordedRequest upload = backend.expect("POST", "/api/v1/catalog/admin/import/p4k/jobs");
     assertThat(upload.getHeader("Content-Type")).startsWith("multipart/form-data");
@@ -307,7 +307,10 @@ class CatalogueBackendClientTest {
     backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs");
     backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs/" + ID);
     backend.expect(
-        "POST", "/api/v1/catalog/admin/import/p4k/jobs/" + ID + "/apply?createItemsAndShips=true");
+        "POST",
+        "/api/v1/catalog/admin/import/p4k/jobs/"
+            + ID
+            + "/apply?createItemsAndShips=true&overrideMassGuard=false");
   }
 
   @Test

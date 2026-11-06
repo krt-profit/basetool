@@ -695,12 +695,7 @@ public class CatalogueBackendClient {
    */
   @Nullable
   public P4kImportJobDto p4kImportJob(@NotNull UUID id) {
-    return backendApiClient.execute(
-        HttpMethod.GET,
-        JOBS_URI + "/{id}",
-        webClient ->
-            webClient.get().uri(uriBuilder -> uriBuilder.path(JOBS_URI + "/{id}").build(id)),
-        spec -> spec.bodyToMono(P4kImportJobDto.class));
+    return backendApiClient.get(JOBS_URI + "/{id}", P4kImportJobDto.class, id);
   }
 
   /**
@@ -708,10 +703,12 @@ public class CatalogueBackendClient {
    *
    * @param id the preview job
    * @param createItemsAndShips whether the run creates playable items and ships that match no row
+   * @param overrideMassGuard whether a kind is swept even above the 5 % mass guard (REQ-P4K-012)
    * @return the enqueued apply job, or {@code null} when the backend sent no body
    */
   @Nullable
-  public P4kImportJobDto applyP4kImportJob(@NotNull UUID id, boolean createItemsAndShips) {
+  public P4kImportJobDto applyP4kImportJob(
+      @NotNull UUID id, boolean createItemsAndShips, boolean overrideMassGuard) {
     return backendApiClient.execute(
         HttpMethod.POST,
         JOBS_URI + "/{id}/apply",
@@ -722,6 +719,7 @@ public class CatalogueBackendClient {
                     uriBuilder
                         .path(JOBS_URI + "/{id}/apply")
                         .queryParam("createItemsAndShips", createItemsAndShips)
+                        .queryParam("overrideMassGuard", overrideMassGuard)
                         .build(id)),
         spec -> spec.bodyToMono(P4kImportJobDto.class));
   }

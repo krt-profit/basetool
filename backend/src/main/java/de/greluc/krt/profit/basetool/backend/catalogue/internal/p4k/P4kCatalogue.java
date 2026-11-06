@@ -59,4 +59,22 @@ public record P4kCatalogue(
     commodities = List.copyOf(commodities);
     blueprints = List.copyOf(blueprints);
   }
+
+  /**
+   * Returns the records of one kind.
+   *
+   * @param kind the kind
+   * @return its records, empty when the file has none
+   */
+  @NotNull
+  @Unmodifiable
+  public List<? extends P4kRecord> records(@NotNull P4kKind kind) {
+    return switch (kind) {
+      case MANUFACTURER -> manufacturers;
+      case ITEM -> items;
+      case SHIP -> ships;
+      case COMMODITY -> commodities;
+      case BLUEPRINT -> blueprints;
+    };
+  }
 }

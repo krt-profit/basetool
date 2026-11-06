@@ -107,6 +107,11 @@
 /admin/p4k-import/jobs POST consumes=[multipart/form-data] -> AdminP4kImportPageController#enqueuePreview gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id} GET -> AdminP4kImportPageController#getJob gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id}/apply POST -> AdminP4kImportPageController#applyJob gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/jobs/{id}/changes GET -> AdminP4kReportController#previewChanges gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-cases GET -> AdminP4kReportController#openReviewCases gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-cases/{id}/resolve POST -> AdminP4kReportController#resolve gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/runs GET -> AdminP4kReportController#runs gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/runs/{id}/changes GET -> AdminP4kReportController#runChanges gate=class:hasRole('ADMIN') layout=no
 /admin/person-search GET -> AdminPersonSearchPageController#page gate=method:hasRole('ADMIN') layout=yes
 /admin/personal-blueprints GET -> AdminPersonalBlueprintsPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-blueprints/delete-all-users POST -> AdminPersonalBlueprintsPageController#deleteAllUsers gate=class:hasRole('ADMIN') layout=yes

@@ -67,19 +67,16 @@ public class P4kManufacturerReconciler {
       P4kRowMatcher.Match<Manufacturer> match =
           matcher.match(manufacturer, manufacturer.code(), manufacturer.nameEn(), false, context);
       if (match instanceof P4kRowMatcher.Matched<Manufacturer>(Manufacturer row, UUID guid)) {
-        boolean apply = context.isApply();
-        boolean enriched =
-            P4kFields.fillIfNull(
-                row.getScwikiCode(), manufacturer.code(), row::setScwikiCode, apply);
-        enriched |=
-            P4kFields.fillIfNull(
-                row.getDescription(),
-                P4kLocalisedText.enOf(manufacturer.description()),
-                row::setDescription,
-                apply);
-        context.stamp(row, guid);
+        P4kRowWriter writer = new P4kRowWriter(context, P4kKind.MANUFACTURER, manufacturer);
+        writer.fill("scwiki_code", row.getScwikiCode(), manufacturer.code(), row::setScwikiCode);
+        writer.fillGameText(
+            "description",
+            row.getDescription(),
+            P4kLocalisedText.enOf(manufacturer.description()),
+            row::setDescription);
+        context.stamp(P4kKind.MANUFACTURER, manufacturer, row, guid);
         context.indexManufacturer(guid, row);
-        context.getReport().matched(P4kKind.MANUFACTURER, enriched);
+        context.getReport().matched(P4kKind.MANUFACTURER, writer.isChanged());
       } else if (match instanceof P4kRowMatcher.Unmatched<Manufacturer>) {
         context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
       }

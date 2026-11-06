@@ -114,7 +114,7 @@ public class AdminP4kImportController {
     P4kImportJob job =
         jobService.createPreviewJob(
             uploadGate.check(readBytes(file)), file.getOriginalFilename(), adminUserId);
-    jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, false, authentication);
+    jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, authentication);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
 
@@ -160,6 +160,8 @@ public class AdminP4kImportController {
    * @param id the SUCCEEDED preview job to apply
    * @param createItemsAndShips {@code true} to create unmatched playable items and ships
    *     (REQ-P4K-009); {@code false} (default) creates nothing
+   * @param overrideMassGuard {@code true} to sweep a kind even when the sweep would stamp more than
+   *     5 % of it (REQ-P4K-012); {@code false} (default) skips that kind's sweep
    * @param adminUserId the authenticated administrator (for the audit {@code created_by})
    * @param authentication the administrator's authentication, which the background run acts under
    * @return {@code 202 Accepted} with the enqueued apply job
@@ -179,10 +181,12 @@ public class AdminP4kImportController {
       @PathVariable("id") @NotNull UUID id,
       @RequestParam(value = "createItemsAndShips", defaultValue = "false")
           boolean createItemsAndShips,
+      @RequestParam(value = "overrideMassGuard", defaultValue = "false") boolean overrideMassGuard,
       @CurrentUserId @NotNull UUID adminUserId,
       @NotNull Authentication authentication) {
-    P4kImportJob job = jobService.createApplyJob(id, createItemsAndShips, adminUserId);
-    jobRunner.run(job.getId(), P4kImportJobKind.APPLY, createItemsAndShips, authentication);
+    P4kImportJob job =
+        jobService.createApplyJob(id, createItemsAndShips, overrideMassGuard, adminUserId);
+    jobRunner.run(job.getId(), P4kImportJobKind.APPLY, authentication);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
 

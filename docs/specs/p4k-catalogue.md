@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-05.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-07.
 > **Owner area:** P4K · **Related ADRs:** ADR-0335, ADR-0336, ADR-0337, ADR-0338, ADR-0339,
 > ADR-0340, ADR-0341, ADR-0342, ADR-0343, ADR-0344, ADR-0345, ADR-0346, ADR-0347
 
@@ -22,7 +22,8 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…005, REQ-P4K-007…010 and REQ-P4K-045 are implemented (#3031), REQ-P4K-033 is
+> REQ-P4K-001…010 and REQ-P4K-045 are implemented (#3031, #3033), REQ-P4K-011…016 are
+> implemented (#3033) except the remainders their own notes name, REQ-P4K-033 is
 > implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
@@ -183,10 +184,10 @@ a `complete` kind (REQ-P4K-011).
 
 **Acceptance**
 
-- [ ] A catalogue with `items` partial and `ships` complete updates matched items and ships, and
+- [x] A catalogue with `items` partial and `ships` complete updates matched items and ships, and
   sweeps ships only.
 
-**Enforced by (planned):** `P4kImportServiceSweepTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md), [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) ·
+**Enforced by:** `P4kImportServiceSweepTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md), [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) ·
 **Issues:** #2885
 
 ### REQ-P4K-007 — the first version-2 APPLY makes the P4K GUID the unique identity of every kind
@@ -295,12 +296,25 @@ categories from `blueprintCategories`, REQ-P4K-027), the starmap objects (REQ-P4
 
 **Acceptance**
 
-- [ ] A complete kind stamps a P4K-known row it no longer lists and leaves a UEX-only row alone.
-- [ ] A kind with a repeated GUID, an empty kind and a partial kind each stamp nothing, and the
+- [x] A complete kind stamps a P4K-known row it no longer lists and leaves a UEX-only row alone.
+- [x] A kind with a repeated GUID, an empty kind and a partial kind each stamp nothing, and the
   report says why.
-- [ ] A stamped row matched again is cleared and reported `REAPPEARED`.
+- [x] A stamped row matched again is cleared and reported `REAPPEARED`.
 
-**Enforced by (planned):** `P4kImportServiceSweepTest` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
+`P4kSweeper` runs after the reconcilers, in the APPLY's transaction; a preview computes the same
+outcome and writes nothing. A row whose GUID the catalogue lists is never stamped, also when the
+import held it for review. The stamp goes through the entity, so the row's version and update time
+move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PARTIAL`,
+`SKIPPED_EMPTY`, `SKIPPED_DUPLICATE_GUID`, `SKIPPED_MASS_GUARD`) and, when skipped, a
+`SWEEP_SKIPPED` report row with the kind's P4K-known rows and the rows it would have stamped.
+
+> [!note] Planned — the category, starmap and shop tables
+> The commodity and blueprint category tables (REQ-P4K-025, REQ-P4K-027), the starmap objects and
+> the shops do not exist yet; each joins the sweep as one `P4kSweepTarget` when its area adds the
+> table with `p4k_uuid`, `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
+
+**Enforced by:** `P4kImportServiceSweepTest` · **Code:** `P4kSweeper`, `P4kSweepTarget`,
+`P4kSweepOutcome` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-012 — a sweep that would stamp more than 5 % of a kind needs the admin's confirmation
 
@@ -312,12 +326,15 @@ sweep is skipped, and the report records it. Each override is an audit event
 
 **Acceptance**
 
-- [ ] With 6 % to stamp and no box, the kind is matched and updated but not swept; the report says
+- [x] With 6 % to stamp and no box, the kind is matched and updated but not swept; the report says
   "sweep skipped: mass guard".
-- [ ] With the box, the kind is swept and one audit event names the kind, the count and the share.
-- [ ] 5 % exactly sweeps without the box.
+- [x] With the box, the kind is swept and one audit event names the kind, the count and the share.
+- [x] 5 % exactly sweeps without the box.
 
-**Enforced by (planned):** `P4kImportServiceSweepTest`, `P4kImportControllerMvcTest` · **ADR:**
+The box is the APPLY parameter `overrideMassGuard`, stored on the job (`override_mass_guard`); the
+audit event's subject is the run, its details `kind`, `count` and `sharePercent`.
+
+**Enforced by:** `P4kImportServiceSweepTest`, `P4kImportReportControllerMvcTest` · **ADR:**
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888, #2901
 
 ### REQ-P4K-013 — a row the P4K stamped leaves every picker and keeps its references
@@ -331,11 +348,22 @@ prices and terminals.
 
 **Acceptance**
 
-- [ ] A stamped item is absent from the item pickers and searches; an inventory row referencing it
+- [x] A stamped item is absent from the item pickers and searches; an inventory row referencing it
   still renders, with the notice.
-- [ ] A stamped ship that UEX still lists is hidden and reported with the "still live" flag.
+- [x] A stamped ship that UEX still lists is hidden and reported with the "still live" flag.
 
-**Enforced by (planned):** `P4kStampedRowVisibilityTest`, the picker MVC tests of the affected pages
+A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
+set. The pickers that filter it: the Lager and item-order item pickers
+(`BlueprintRepository.findItemsWithActiveBlueprint`, `findOrderableItems`), the blueprint pickers,
+the ship-type, manufacturer and material pickers and searches. The notice is `noLongerInGame` on
+`InventoryGameItemReferenceDto` and `ShipTypeDto`, shown in the Lager, the hangar and the mission
+units.
+
+> [!note] Planned — the notice on job-order references
+> Job-order item lines carry `GameItemReferenceDto`, which has no `noLongerInGame` yet; their
+> references render without the notice until it is added there.
+
+**Enforced by:** `P4kStampedRowVisibilityTest`
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-014 — every run keeps a change report, and the report is never pruned
@@ -358,11 +386,17 @@ pruned; they hold identifiers, short names and fact values only, never a game te
 
 **Acceptance**
 
-- [ ] A run that renames an item, adds a ship and vanishes a blueprint writes one `CHANGED`, one
+- [x] A run that renames an item, adds a ship and vanishes a blueprint writes one `CHANGED`, one
   `ADDED` and one `VANISHED` row with the right old and new values.
-- [ ] No report row holds a `description` or `displayType` value.
+- [x] No report row holds a `description` or `displayType` value.
 
-**Enforced by (planned):** `P4kChangeReportTest` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
+A `CHANGED` row names the column the import wrote (`class_name`, `manufacturer_id`, `mass`,
+`name_key`, …); a game-text column (`description_en`, `description_de`, `description`) is logged
+by name with both values `null`. An item's rename shows as its `name_key`, the only name the import
+writes until REQ-P4K-017. `position` keeps the order the run found its rows in, and
+`still_live_elsewhere` carries the "still live in UEX/Wiki" flag of a `VANISHED` row.
+
+**Enforced by:** `P4kChangeReportTest` · **Code:** `P4kImportReport`, `P4kRowWriter` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-015 — the admin page lists the runs and shows each report, the preview included
 
@@ -374,12 +408,20 @@ job after 7 days.
 
 **Acceptance**
 
-- [ ] Filtering a run's report by kind and change type, and paging it, swaps the list without a
+- [x] Filtering a run's report by kind and change type, and paging it, swaps the list without a
   page reload.
 - [ ] A preview job shows the report it would write; after APPLY the run shows the same rows.
 
-**Enforced by (planned):** `AdminP4kImportPageControllerMvcTest`, an e2e run of upload, preview and
-APPLY · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
+The run list is `GET /api/v1/catalog/admin/import/p4k/runs`, a run's report
+`GET …/runs/{id}/changes` and a preview's `GET …/jobs/{id}/changes`, both filtered by `kind` and
+`type`; the page proxies them under `/admin/p4k-import` and names each run's admin. A preview's
+report is stored gzipped beside its upload (`p4k_import_job_payload.preview_report`). A preview
+computes as if "create new items and ships" were ticked and without the mass-guard override, so
+an APPLY with other choices writes other rows. The P4K tab of the sync-reports page comes with the
+Wiki/UEX reconciliation hardening (#3053).
+
+**Enforced by:** `AdminP4kImportPageControllerMvcTest`, `P4kImportReportControllerMvcTest` ·
+**Enforced by (planned):** an e2e run of upload, preview and APPLY · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-016 — a review case is a lasting status on the row, resolved as keep or hide
 
@@ -402,11 +444,18 @@ lifts. The row records who resolved the case and when, and each resolution is an
 
 **Acceptance**
 
-- [ ] A case found by two runs is one open case, logged as `REVIEW` in both reports.
-- [ ] "Hide" removes the row from the pickers; the next APPLY that matches it leaves it hidden.
-- [ ] The resolution stores the admin and the time and writes one audit event.
+- [x] A case found by two runs is one open case, logged as `REVIEW` in both reports.
+- [x] "Hide" removes the row from the pickers; the next APPLY that matches it leaves it hidden.
+- [x] The resolution stores the admin and the time and writes one audit event.
 
-**Enforced by (planned):** `P4kReviewServiceTest`, `AdminP4kImportPageControllerMvcTest` · **ADR:**
+`p4k_review_case` holds `status` (`OPEN`, `REVIEWED`), `resolution` (`KEEP`, `HIDE`),
+`resolved_by` and `resolved_at`; a resolution echoes the case version (`409` when stale), and a
+resolved case is never resolved again. A hide stamps `p4k_hidden_at` on the row. A case opened
+outside a P4K run, such as a GUID conflict the SC Wiki / UEX reconciliation meets between two rows,
+has no run and names the second row in `other_row_id`.
+
+**Enforced by:** `P4kReviewServiceTest`, `AdminP4kImportPageControllerMvcTest`,
+`P4kImportReportControllerMvcTest` · **Code:** `P4kReviewService` · **ADR:**
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2886, #2888
 
 ## Items
