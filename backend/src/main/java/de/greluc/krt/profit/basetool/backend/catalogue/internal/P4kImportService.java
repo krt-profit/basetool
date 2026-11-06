@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRejectionReason;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
@@ -52,8 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The P4K import of catalogue version 2 (REQ-P4K-003…010, ADR-0335): it reads a stored upload,
  * hands each kind to its reconciler in dependency order (manufacturers before items and ships,
- * items before blueprints) and, on APPLY, records the run, its counts per kind and its change
- * report.
+ * items before blueprints) and, on APPLY, records the run, its counts per kind, its change report
+ * and its {@code CATALOGUE} audit event (REQ-P4K-046).
  *
  * <ul>
  *   <li>{@link #previewImport(byte[])} computes everything and writes nothing.
@@ -78,6 +81,7 @@ public class P4kImportService {
   private final P4kImportRecorder recorder;
   private final P4kRejections rejections;
   private final SyncReportService syncReportService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * What an APPLY needs besides the catalogue.
@@ -135,6 +139,12 @@ public class P4kImportService {
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
     syncReportService.logP4kEvent(
         run.getId(), SyncEventType.SYNC_RUN_SUMMARY, "catalog", null, null, summary(result));
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_P4K_APPLIED,
+        run.getId(),
+        run.getBuildVersion(),
+        null,
+        auditDetails(run, result));
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
     log.info("P4K import applied (run {}): {}", run.getId(), summary(result));
     return result;
@@ -348,6 +358,27 @@ public class P4kImportService {
         + result.ingredientsResolved()
         + "; createItemsAndShips="
         + result.createItemsAndShips();
+  }
+
+  /**
+   * Renders the audit payload of an APPLY: the Build, the run's choice and the counts per kind.
+   *
+   * @param run the recorded run
+   * @param result the result
+   * @return the payload
+   */
+  @NotNull
+  private static AuditDetails auditDetails(
+      @NotNull P4kImportRun run, @NotNull P4kImportResultDto result) {
+    return AuditDetails.of("branch", run.getBuildBranch())
+        .with("change", run.getChangeNumber())
+        .with("createItemsAndShips", result.createItemsAndShips())
+        .with("manufacturers", counts(result.manufacturers()))
+        .with("items", counts(result.items()))
+        .with("ships", counts(result.ships()))
+        .with("commodities", counts(result.commodities()))
+        .with("blueprints", counts(result.blueprints()))
+        .with("ingredientsResolved", result.ingredientsResolved());
   }
 
   /**

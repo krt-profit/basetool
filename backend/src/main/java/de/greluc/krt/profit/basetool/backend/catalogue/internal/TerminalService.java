@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -45,6 +48,7 @@ public class TerminalService {
 
   private final TerminalRepository terminalRepository;
   private final TerminalMapper terminalMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns paged terminal list (includes hidden — frontend filters via {@code includeHidden}).
@@ -91,6 +95,12 @@ public class TerminalService {
   public Terminal updateTerminalVisibility(UUID id, boolean hidden) {
     Terminal terminal = requireTerminal(id);
     terminal.setHidden(hidden);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_TERMINAL_VISIBILITY_CHANGED,
+        terminal.getId(),
+        terminal.getName(),
+        null,
+        AuditDetails.of("hidden", hidden));
     return terminalRepository.save(terminal);
   }
 
@@ -108,6 +118,12 @@ public class TerminalService {
     Terminal terminal = requireTerminal(id);
     terminal.setHasLoadingDock(value);
     terminal.setHasLoadingDockOverridden(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN,
+        terminal.getId(),
+        terminal.getName(),
+        null,
+        AuditDetails.of("hasLoadingDock", value));
     return terminalRepository.save(terminal);
   }
 
@@ -123,6 +139,12 @@ public class TerminalService {
   public Terminal clearLoadingDockOverride(UUID id) {
     Terminal terminal = requireTerminal(id);
     terminal.setHasLoadingDockOverridden(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED,
+        terminal.getId(),
+        terminal.getName(),
+        null,
+        null);
     terminal.setHasLoadingDock(terminal.getUexHasLoadingDock());
     return terminalRepository.save(terminal);
   }
@@ -141,6 +163,12 @@ public class TerminalService {
     Terminal terminal = requireTerminal(id);
     terminal.setIsAutoLoad(value);
     terminal.setIsAutoLoadOverridden(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN,
+        terminal.getId(),
+        terminal.getName(),
+        null,
+        AuditDetails.of("autoLoad", value));
     return terminalRepository.save(terminal);
   }
 
@@ -156,6 +184,12 @@ public class TerminalService {
   public Terminal clearAutoLoadOverride(UUID id) {
     Terminal terminal = requireTerminal(id);
     terminal.setIsAutoLoadOverridden(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED,
+        terminal.getId(),
+        terminal.getName(),
+        null,
+        null);
     terminal.setIsAutoLoad(terminal.getUexIsAutoLoad());
     return terminalRepository.save(terminal);
   }

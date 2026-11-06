@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
@@ -59,6 +63,8 @@ public class JobTypeService {
    * designation, so a stale flag cannot violate the single-lead unique index.
    */
   private final JobTypeDesignationObserver jobTypeDesignationObserver;
+
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
@@ -125,7 +131,14 @@ public class JobTypeService {
       jobType.setParent(null);
     }
     applyMissionLeadDesignation(jobType, jobType.isMissionLead());
-    return jobTypeRepository.save(jobType);
+    JobType saved = jobTypeRepository.save(jobType);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_JOB_TYPE_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        AuditDetails.of("archetype", saved.getArchetype()));
+    return saved;
   }
 
   /**
@@ -149,6 +162,17 @@ public class JobTypeService {
 
     OptimisticLock.check(jobType.getVersion(), jobTypeDto.version(), JobType.class, id);
 
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("name", jobType.getName(), jobTypeDto.name())
+            .compare("description", jobType.getDescription(), jobTypeDto.description())
+            .compare("archetype", jobType.getArchetype(), jobTypeDto.archetype())
+            .compare("isLeadershipRole", jobType.isLeadershipRole(), jobTypeDto.isLeadershipRole())
+            .compare(
+                "isMissionLead",
+                jobType.isMissionLead(),
+                Boolean.TRUE.equals(jobTypeDto.isMissionLead()))
+            .compare("parent", parentIdOf(jobType), jobTypeDto.parentId());
     jobType.setName(jobTypeDto.name());
     jobType.setDescription(jobTypeDto.description());
     jobType.setArchetype(jobTypeDto.archetype());
@@ -164,6 +188,14 @@ public class JobTypeService {
       jobType.setParent(null);
     }
 
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_JOB_TYPE_UPDATED,
+          id,
+          jobType.getName(),
+          null,
+          changed.toDetails());
+    }
     return jobTypeRepository.save(jobType);
   }
 
@@ -180,6 +212,12 @@ public class JobTypeService {
         Entities.require(jobTypeRepository.findById(id), "JobType not found");
 
     jobTypeToDeactivate.setActive(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_JOB_TYPE_DEACTIVATED,
+        id,
+        jobTypeToDeactivate.getName(),
+        null,
+        null);
     jobTypeRepository.save(jobTypeToDeactivate);
   }
 
@@ -195,6 +233,8 @@ public class JobTypeService {
         Entities.require(jobTypeRepository.findById(id), "JobType not found");
 
     jobTypeToActivate.setActive(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_JOB_TYPE_ACTIVATED, id, jobTypeToActivate.getName(), null, null);
     jobTypeRepository.save(jobTypeToActivate);
   }
 
@@ -227,5 +267,16 @@ public class JobTypeService {
       }
     }
     jobType.setMissionLead(true);
+  }
+
+  /**
+   * The id of a job type's parent, for comparing the parent reference by identity.
+   *
+   * @param jobType the job type
+   * @return the parent's id, or {@code null} for a top-level job type
+   */
+  @Nullable
+  private static UUID parentIdOf(@NotNull JobType jobType) {
+    return jobType.getParent() == null ? null : jobType.getParent().getId();
   }
 }

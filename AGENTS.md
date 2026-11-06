@@ -26,7 +26,7 @@ document needs: [`docs/agents/requirements-and-companion-docs.md`](docs/agents/r
 - **Every change updates the requirements in the same PR** — a new `REQ-<AREA>-NNN` or the existing
   ones it touches. A behaviour change with no matching spec change is incomplete.
 - **Every change to an audited area keeps its audit log in sync** (REQ-AUDIT-001,
-  [`docs/specs/audit.md`](docs/specs/audit.md)): the Bank's own trail plus the twelve
+  [`docs/specs/audit.md`](docs/specs/audit.md)): the Bank's own trail plus the fourteen
   `AuditDomain` areas log **every** state-mutating activity. Add or adjust the `AuditEventType`, the
   `auditRecorder.record(...)` call (no user free text, no PII in the details), the viewer's
   event-type filter, the DE/EN labels and the REQ-AUDIT-001 coverage list in the same PR.

@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
@@ -59,6 +63,7 @@ public class LocationService {
   private final LocationRepository locationRepository;
   private final LocationMapper locationMapper;
   private final List<LocationUsage> locationUsages;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns cached page of locations.
@@ -178,7 +183,14 @@ public class LocationService {
       throw new DuplicateEntityException(
           "A Location with the name '" + location.getName() + "' already exists.");
     }
-    return locationRepository.save(location);
+    Location saved = locationRepository.save(location);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_LOCATION_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        AuditDetails.of("hidden", saved.getHidden()));
+    return saved;
   }
 
   /**
@@ -201,11 +213,24 @@ public class LocationService {
 
     OptimisticLock.check(location.getVersion(), locationDto.version(), Location.class, id);
 
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("name", location.getName(), locationDto.name())
+            .compare("description", location.getDescription(), locationDto.description())
+            .compare("hidden", location.getHidden(), locationDto.hidden())
+            .compare("homeLocation", location.getHomeLocation(), locationDto.homeLocation());
     location.setName(locationDto.name());
     location.setDescription(locationDto.description());
     location.setHidden(locationDto.hidden());
     location.setHomeLocation(locationDto.homeLocation());
-
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_LOCATION_UPDATED,
+          id,
+          location.getName(),
+          null,
+          changed.toDetails());
+    }
     return locationRepository.save(location);
   }
 
@@ -229,5 +254,7 @@ public class LocationService {
     }
     Location location = requireLocation(id);
     locationRepository.delete(location);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_LOCATION_DELETED, id, location.getName(), null, null);
   }
 }

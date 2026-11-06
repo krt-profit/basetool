@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDeletionObserver;
@@ -30,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
@@ -63,6 +68,7 @@ public class MaterialService {
   private final MaterialCategoryRepository materialCategoryRepository;
   private final MaterialMapper materialMapper;
   private final MaterialDeletionObserver materialDeletionObserver;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the cached page of all materials, including hidden ones.
@@ -300,7 +306,14 @@ public class MaterialService {
       material.setCategory(category);
     }
 
-    return materialRepository.save(material);
+    Material saved = materialRepository.save(material);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        AuditDetails.of("type", type).with("quantityType", quantityType));
+    return saved;
   }
 
   /**
@@ -321,6 +334,7 @@ public class MaterialService {
     OptimisticLock.checkOptionalClient(
         material.getVersion(), materialDetails.getVersion(), Material.class, id);
 
+    AuditChangedFields changed = changedFields(material, materialDetails);
     material.setName(materialDetails.getName());
     material.setType(materialDetails.getType());
     material.setDescription(materialDetails.getDescription());
@@ -348,7 +362,58 @@ public class MaterialService {
       material.setCategory(null);
     }
 
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_MATERIAL_UPDATED,
+          id,
+          material.getName(),
+          null,
+          changed.toDetails());
+    }
     return materialRepository.save(material);
+  }
+
+  /**
+   * Names the fields an update changes; the visibility switch counts only when the update sets it.
+   *
+   * @param material the stored material
+   * @param details the incoming values
+   * @return the changed field names
+   */
+  @NotNull
+  private static AuditChangedFields changedFields(
+      @NotNull Material material, @NotNull Material details) {
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("name", material.getName(), details.getName())
+            .compare("type", material.getType(), details.getType())
+            .compare("description", material.getDescription(), details.getDescription())
+            .compare("quantityType", material.getQuantityType(), details.getQuantityType())
+            .compare(
+                "isManualRawMaterial",
+                material.getIsManualRawMaterial(),
+                details.getIsManualRawMaterial())
+            .compare("isJobOrder", material.getIsJobOrder(), details.getIsJobOrder())
+            .compare(
+                "refinedMaterial",
+                idOf(material.getRefinedMaterial()),
+                idOf(details.getRefinedMaterial()))
+            .compare("category", idOf(material.getCategory()), idOf(details.getCategory()));
+    if (details.getIsVisible() != null) {
+      changed.compare("isVisible", material.getIsVisible(), details.getIsVisible());
+    }
+    return changed;
+  }
+
+  /**
+   * The id of an optional related row, for comparing references by identity.
+   *
+   * @param entity the related row, or {@code null}
+   * @return its id, or {@code null} when there is no row
+   */
+  @Nullable
+  private static UUID idOf(@Nullable AbstractEntity<UUID> entity) {
+    return entity == null ? null : entity.getId();
   }
 
   /**
@@ -364,5 +429,7 @@ public class MaterialService {
     Material material = requireMaterial(id);
     materialDeletionObserver.beforeMaterialDelete(id);
     materialRepository.delete(material);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_DELETED, id, material.getName(), null, null);
   }
 }

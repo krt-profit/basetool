@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -46,6 +49,7 @@ public class StarSystemService {
 
   private final StarSystemRepository starSystemRepository;
   private final StarSystemMapper starSystemMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns cached page of star systems.
@@ -94,7 +98,10 @@ public class StarSystemService {
       throw new DuplicateEntityException(
           "A Star System with the name '" + starSystem.getName() + "' already exists.");
     }
-    return starSystemRepository.save(starSystem);
+    StarSystem saved = starSystemRepository.save(starSystem);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_STAR_SYSTEM_CREATED, saved.getId(), saved.getName(), null, null);
+    return saved;
   }
 
   /**
@@ -115,8 +122,21 @@ public class StarSystemService {
     }
     StarSystem starSystem = requireStarSystem(id);
 
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("name", starSystem.getName(), starSystemDetails.getName())
+            .compare(
+                "description", starSystem.getDescription(), starSystemDetails.getDescription());
     starSystem.setName(starSystemDetails.getName());
     starSystem.setDescription(starSystemDetails.getDescription());
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_STAR_SYSTEM_UPDATED,
+          id,
+          starSystem.getName(),
+          null,
+          changed.toDetails());
+    }
 
     return starSystemRepository.save(starSystem);
   }
@@ -131,5 +151,7 @@ public class StarSystemService {
   public void deleteStarSystem(@NotNull UUID id) {
     StarSystem starSystem = requireStarSystem(id);
     starSystemRepository.delete(starSystem);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_STAR_SYSTEM_DELETED, id, starSystem.getName(), null, null);
   }
 }

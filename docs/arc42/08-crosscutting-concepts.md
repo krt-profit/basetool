@@ -375,8 +375,9 @@ removed with the `/v1` routes on 2026-09-28.)*
 
 ## 8.8 Audit
 
-Thirteen audited areas (Bank, Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen,
-Rollen, Materialbörse, Hangar, Blueprints, Verbundene Anwendungen, Bedarf & Spenden) log **every** state-mutating activity to an append-only trail. Adding a
+Fifteen audited areas (Bank, Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen,
+Rollen, Materialbörse, Hangar, Blueprints, Verbundene Anwendungen, Bedarf & Spenden, Ankauf,
+Katalog) log **every** state-mutating activity to an append-only trail. Adding a
 mutation to an audited area without its audit event is an incomplete change — including the event
 type, the recording call, the viewer's per-area filter, the DE/EN labels and the coverage list. No
 user free text and no personal data in the details payload.

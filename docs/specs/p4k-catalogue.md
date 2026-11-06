@@ -993,18 +993,22 @@ REQ-DATA-025
 ### REQ-P4K-046 — catalogue admin activity is audited
 
 The catalogue admin area is the audited area `AuditDomain.CATALOGUE` (REQ-AUDIT-001). Within this
-spec that covers: a P4K preview enqueued and an APPLY (one event per run, with Build, run id and
-counts per kind), each mass-guard override (REQ-P4K-012), each review resolution (REQ-P4K-016), each
+spec that covers: a P4K preview enqueued (one event per job, with the Build) and an APPLY (one event
+per run, with Build, run id and counts per kind; actor the admin who enqueued it), each mass-guard override (REQ-P4K-012), each review resolution (REQ-P4K-016), each
 manual starmap link (REQ-P4K-035), shop link (REQ-P4K-043) and visibility override (REQ-P4K-038),
 and each storage place an admin creates on a non-UEX node (REQ-P4K-036). `p4k_import_change` stays
 the never-pruned detail record; the audit event carries no free text.
 
 **Acceptance**
 
-- [ ] Each activity above writes exactly one `CATALOGUE` event with the run id or row UUID as
-  subject.
+- [x] A P4K preview enqueued and an APPLY each write exactly one `CATALOGUE` event with the job or
+  run id as subject, the Build and, for the APPLY, the counts per kind.
+- [ ] Each mass-guard override, review resolution, manual starmap or shop link, visibility
+  override and storage place writes exactly one `CATALOGUE` event with the row UUID as subject;
+  the event types of the override and the review resolution exist.
 
-**Enforced by (planned):** `CatalogueAuditTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901
+**Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest` ·
+**Enforced by (planned):** further cases in `CatalogueAuditTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901
 
 ### REQ-P4K-047 — the import is monitored and says when it is due
 

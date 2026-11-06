@@ -2016,6 +2016,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `PurchasingSettlementOverdue` fires when a settlement has been overdue for 3 days (covered by a
   promtool test); the `PURCHASING` audit domain is excluded from `AuditDomainSilenceAnomaly` like
   `SUPPLY`, and the operations dashboard gains the purchasing panels.
+- The `CATALOGUE` audit domain (ADR-0346) is excluded from `AuditDomainSilenceAnomaly` as well;
+  its admin mutations are rare, and a sync outage is reported by the sync monitoring instead
+  (`audit_domain_silence_alerts_13_silent_catalogue_is_exempt_test.yml`).
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

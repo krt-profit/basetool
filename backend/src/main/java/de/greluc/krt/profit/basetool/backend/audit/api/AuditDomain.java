@@ -93,5 +93,12 @@ public enum AuditDomain {
    * the partners, the delegates and the purchasing settings. The subject is the deal, the partner
    * or the delegate; the details carry ids, enums and amounts, never a partner name or a note.
    */
-  PURCHASING
+  PURCHASING,
+
+  /**
+   * The catalogue admin area (Katalog, ADR-0346): master-data mutations, the manual sync-report
+   * delete and the P4K import. The subject is the row or the P4K run or job, labelled by its
+   * display name; there is no target user and the details carry no admin free text.
+   */
+  CATALOGUE
 }

@@ -70,24 +70,49 @@ public class P4kUploadGate {
    */
   @NotNull
   public P4kAcceptedUpload check(byte @NotNull [] upload) {
-    P4kRejectionReason reason = refusal(upload);
+    Inspection inspection = inspect(upload);
+    P4kRejectionReason reason = inspection.refusal();
     if (reason != null) {
       rejections.record(reason);
       throw new P4kUploadRejectedException(reason);
     }
-    return new P4kAcceptedUpload(P4kCompression.toStoredPayload(upload), upload.length);
+    return new P4kAcceptedUpload(
+        P4kCompression.toStoredPayload(upload),
+        upload.length,
+        Objects.requireNonNull(inspection.build()));
   }
 
   /**
-   * Finds the first rule the upload breaks.
+   * The gate's finding on one upload.
+   *
+   * @param refusal the first rule the upload breaks, or {@code null} when it passes
+   * @param build the Build of an upload that passes, which the head rules require; otherwise {@code
+   *     null}
+   */
+  private record Inspection(@Nullable P4kRejectionReason refusal, @Nullable P4kBuild build) {
+
+    /**
+     * A refused upload.
+     *
+     * @param reason the rule it breaks
+     * @return the finding
+     */
+    @NotNull
+    static Inspection refused(@NotNull P4kRejectionReason reason) {
+      return new Inspection(reason, null);
+    }
+  }
+
+  /**
+   * Finds the first rule the upload breaks, or the Build of an upload that passes.
    *
    * @param upload the uploaded file
-   * @return the reason, or {@code null} when the upload passes
+   * @return the finding
    */
-  @Nullable
-  private P4kRejectionReason refusal(byte @NotNull [] upload) {
+  @NotNull
+  private Inspection inspect(byte @NotNull [] upload) {
     if (upload.length > UPLOAD_LIMIT_BYTES) {
-      return P4kRejectionReason.TOO_LARGE;
+      return Inspection.refused(P4kRejectionReason.TOO_LARGE);
     }
     long limit = properties.decompressedLimitBytes();
     try {
@@ -97,16 +122,16 @@ public class P4kUploadGate {
       }
       P4kRejectionReason headRefusal = headRefusal(head);
       if (headRefusal != null) {
-        return headRefusal;
+        return Inspection.refused(headRefusal);
       }
       try (InputStream in = P4kCompression.openDecompressed(upload, limit)) {
         in.transferTo(OutputStream.nullOutputStream());
       }
-      return null;
+      return new Inspection(null, head.build());
     } catch (P4kContentTooLargeException _) {
-      return P4kRejectionReason.TOO_LARGE;
+      return Inspection.refused(P4kRejectionReason.TOO_LARGE);
     } catch (P4kCatalogueFormatException _) {
-      return P4kRejectionReason.SCHEMA_VERSION;
+      return Inspection.refused(P4kRejectionReason.SCHEMA_VERSION);
     } catch (IOException e) {
       throw new UncheckedIOException("Reading an in-memory upload failed.", e);
     }

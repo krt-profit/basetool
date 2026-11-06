@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
@@ -47,6 +50,7 @@ public class ShipTypeService {
 
   private final ShipTypeRepository shipTypeRepository;
   private final ShipTypeMapper shipTypeMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns cached page result.
@@ -116,6 +120,12 @@ public class ShipTypeService {
   public ShipType updateShipTypeVisibility(@NotNull UUID id, boolean hidden) {
     ShipType shipType = requireShipType(id);
     shipType.setHidden(hidden);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED,
+        shipType.getId(),
+        shipType.getName(),
+        null,
+        AuditDetails.of("hidden", hidden));
     return shipTypeRepository.save(shipType);
   }
 }
