@@ -4731,8 +4731,12 @@ misses, because it opens a new session, so re-authentication picks up new author
 refreshed token whose **claims** changed — a realm role granted or revoked in Keycloak, a renamed
 account, a new e-mail address — also misses: every claim except `iat`, `exp`, `nbf` and `jti` is
 hashed into the key, so a Keycloak-side role change bites on the next refresh, as it did while
-`issuedAt` was in the key. What the TTL alone bounds is a change the token cannot carry: an approval,
-a local role's permissions, an org-unit membership flag. At the default `PT5M` that window equals
+`issuedAt` was in the key. An approval does not wait for the TTL either: the pending-approval verdict
+(`ROLE_PENDING_APPROVAL`) is **never cached**, so the first request after an admin approves a
+registration assembles the member's real authorities — a member who was signed in while pending
+reaches the consent page and the dashboard at once, within the same Keycloak session. What the TTL
+alone bounds is the remaining change the token cannot carry: a local role's permissions, an org-unit
+membership flag, a withdrawn approval. At the default `PT5M` that window equals
 the five-minute access-token lifespan that bounded it before; raising the TTL now really widens it,
 which is what the `PT15M` ceiling is for.
 
@@ -4751,6 +4755,8 @@ and siblings, so the Spring-apps dashboard's cache panels and the `CacheHitRatio
 - [x] A refreshed token of the same session and with unchanged claims is a hit; one with changed
   claims (e.g. a revoked realm role) is a miss and carries the change; two clients (`azp`) of one
   session never share an entry; a token without `sid` falls back to the `issuedAt` key.
+- [x] A pending-approval verdict is not cached: after an approval, the next request of the same
+  Keycloak session carries the member's real authorities.
 - [x] Hits and misses are published under `cache="jwt-authorities"`.
 - [x] The properties class sits in `support`, keeping `ArchitectureTest`'s package-cycle and
   `support`-is-a-leaf invariants green.

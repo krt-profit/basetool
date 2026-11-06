@@ -51,9 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities {
 
-  /** The marker authority of an account awaiting approval, which the approval gate refuses. */
-  private static final String PENDING_APPROVAL = "ROLE_PENDING_APPROVAL";
-
   private final UserRepository userRepository;
   private final CustomJwtGrantedAuthoritiesConverter authorityAssembler;
 
@@ -92,7 +89,8 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
         stored.stream()
             .map(GrantedAuthority::getAuthority)
             .anyMatch(authority ->
-                PENDING_APPROVAL.equals(authority) || Roles.NO_ROLE_MARKER.equals(authority));
+                Roles.PENDING_APPROVAL_MARKER.equals(authority)
+                    || Roles.NO_ROLE_MARKER.equals(authority));
     if (gated) {
       return stored;
     }
