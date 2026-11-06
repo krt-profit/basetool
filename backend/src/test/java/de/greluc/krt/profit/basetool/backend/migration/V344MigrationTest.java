@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Migration test of the personal-inventory location key, {@code
- * V340__key_personal_inventory_location_by_uuid.sql} (REQ-P4K-039): every row with a resolvable UEX
+ * V344__key_personal_inventory_location_by_uuid.sql} (REQ-P4K-039): every row with a resolvable UEX
  * id lands on a {@code location} row, the name snapshot stays, and an unresolvable row keeps its
  * snapshot with a {@code null} key.
  *
@@ -44,10 +44,10 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @SpringBootTest
 @Transactional
-class V340MigrationTest {
+class V344MigrationTest {
 
   private static final String SCRIPT =
-      "/db/migration/V340__key_personal_inventory_location_by_uuid.sql";
+      "/db/migration/V344__key_personal_inventory_location_by_uuid.sql";
 
   @Autowired private JdbcTemplate jdbc;
 
@@ -64,28 +64,28 @@ class V340MigrationTest {
             + " CHECK (location_type IN ('CITY', 'SPACE_STATION'))");
     owner = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)", owner, "v340-" + owner);
+        "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)", owner, "v344-" + owner);
   }
 
   @Test
   void aRowOnAPlaceWithALocationKeepsThatLocationAndItsSnapshot() throws IOException {
-    UUID city = city(990_340_01, "V340 Live City", true);
-    UUID location = location("V340 Live City", city, null);
-    UUID item = item(990_340_01, "CITY", "V340 Old Snapshot");
+    UUID city = city(990_344_01, "V344 Live City", true);
+    UUID location = location("V344 Live City", city, null);
+    UUID item = item(990_344_01, "CITY", "V344 Old Snapshot");
 
     runScript();
 
     assertThat(locationOf(item)).isEqualTo(location);
-    assertThat(snapshotOf(item)).isEqualTo("V340 Old Snapshot");
+    assertThat(snapshotOf(item)).isEqualTo("V344 Old Snapshot");
     assertThat(count("SELECT count(*) FROM location WHERE city_id = ?", city)).isOne();
     assertThat(referenceOnly(location)).isFalse();
   }
 
   @Test
   void aPlaceWithoutALocationGetsOneReferenceOnlyRowSharedByAllItsItems() throws IOException {
-    UUID station = station(990_340_02, "V340 Dark Station");
-    UUID first = item(990_340_02, "SPACE_STATION", "V340 Dark Station");
-    UUID second = item(990_340_02, "SPACE_STATION", "V340 Dark Station");
+    UUID station = station(990_344_02, "V344 Dark Station");
+    UUID first = item(990_344_02, "SPACE_STATION", "V344 Dark Station");
+    UUID second = item(990_344_02, "SPACE_STATION", "V344 Dark Station");
 
     runScript();
 
@@ -93,7 +93,7 @@ class V340MigrationTest {
         jdbc.queryForMap(
             "SELECT id, name, reference_only, hidden FROM location WHERE space_station_id = ?",
             station);
-    assertThat(created.get("name")).isEqualTo("V340 Dark Station");
+    assertThat(created.get("name")).isEqualTo("V344 Dark Station");
     assertThat(created.get("reference_only")).isEqualTo(Boolean.TRUE);
     assertThat(created.get("hidden")).isEqualTo(Boolean.FALSE);
     assertThat(locationOf(first)).isEqualTo(created.get("id"));
@@ -102,15 +102,15 @@ class V340MigrationTest {
 
   @Test
   void aTakenNameFallsBackToTheNameWithItsUexId() throws IOException {
-    location("V340 Twin", null, null);
-    UUID city = city(990_340_03, "V340 Twin", false);
-    UUID item = item(990_340_03, "CITY", "V340 Twin");
+    location("V344 Twin", null, null);
+    UUID city = city(990_344_03, "V344 Twin", false);
+    UUID item = item(990_344_03, "CITY", "V344 Twin");
 
     runScript();
 
     String name =
         jdbc.queryForObject("SELECT name FROM location WHERE city_id = ?", String.class, city);
-    assertThat(name).isEqualTo("V340 Twin (UEX city 99034003)");
+    assertThat(name).isEqualTo("V344 Twin (UEX city 99034403)");
     assertThat(locationOf(item))
         .isEqualTo(
             jdbc.queryForObject("SELECT id FROM location WHERE city_id = ?", UUID.class, city));
@@ -118,15 +118,15 @@ class V340MigrationTest {
 
   @Test
   void anUnresolvableCityAndStationKeepTheirSnapshotWithANullKey() throws IOException {
-    UUID lostCity = item(990_340_04, "CITY", "V340 Lost City");
-    UUID lostStation = item(990_340_04, "SPACE_STATION", "V340 Lost Station");
+    UUID lostCity = item(990_344_04, "CITY", "V344 Lost City");
+    UUID lostStation = item(990_344_04, "SPACE_STATION", "V344 Lost Station");
 
     runScript();
 
     assertThat(locationOf(lostCity)).isNull();
-    assertThat(snapshotOf(lostCity)).isEqualTo("V340 Lost City");
+    assertThat(snapshotOf(lostCity)).isEqualTo("V344 Lost City");
     assertThat(locationOf(lostStation)).isNull();
-    assertThat(snapshotOf(lostStation)).isEqualTo("V340 Lost Station");
+    assertThat(snapshotOf(lostStation)).isEqualTo("V344 Lost Station");
   }
 
   @Test
@@ -194,7 +194,7 @@ class V340MigrationTest {
             + " VALUES (?, 0, now(), now(), ?, ?, ?, ?, ?, 1)",
         id,
         owner,
-        "V340 item " + id,
+        "V344 item " + id,
         uexId,
         type,
         snapshot);
@@ -224,7 +224,7 @@ class V340MigrationTest {
   }
 
   private void runScript() throws IOException {
-    try (InputStream in = V340MigrationTest.class.getResourceAsStream(SCRIPT)) {
+    try (InputStream in = V344MigrationTest.class.getResourceAsStream(SCRIPT)) {
       assertThat(in).isNotNull();
       String sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
       for (String statement : sql.split(";")) {

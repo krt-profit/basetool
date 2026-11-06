@@ -168,7 +168,7 @@ new run and writes no other value.
 - [x] Every matched row carries the run's id, also when no value changed.
 - [x] Pruning the job leaves the run with a `null` job reference.
 
-The run is `p4k_import_run` (V338) with one `p4k_import_run_kind` row per kind (completeness, its
+The run is `p4k_import_run` (V342) with one `p4k_import_run_kind` row per kind (completeness, its
 Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds, the category, starmap
 and shop tables add it with their areas.
 
@@ -200,7 +200,7 @@ one row and one record of the catalogue. A row that two P4K GUIDs would claim, o
 two rows would claim (also two catalogue records sharing a name, as three commodities named
 "SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
 the admin merges or splits; the import never merges. `p4k_uuid` becomes unique per kind in the
-same release (V339): the migration first clears `p4k_uuid` on every row of a duplicate group, then
+same release (V343): the migration first clears `p4k_uuid` on every row of a duplicate group, then
 adds the unique index, and the next APPLY matches those rows again.
 
 **Acceptance**
@@ -212,7 +212,7 @@ adds the unique index, and the next APPLY matches those rows again.
 - [x] The unique-constraint migration clears every duplicate group's `p4k_uuid`, then enforces
   uniqueness.
 
-**Enforced by:** `P4kIdentityCleanupTest`, `V339MigrationTest` · **Code:** `P4kRowMatcher` ·
+**Enforced by:** `P4kIdentityCleanupTest`, `V343MigrationTest` · **Code:** `P4kRowMatcher` ·
 **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #3029
 
 ## Matching and seeding
@@ -913,7 +913,7 @@ The owner's decision (@greluc, 2026-11-05) fixes the edges:
 - [x] The member picker and the write accept an offered location or one the owner already uses, and
   nothing else.
 
-**Enforced by:** `V340MigrationTest`, `LocationRepositoryTest`, `UexUniverseSyncServiceTest`,
+**Enforced by:** `V344MigrationTest`, `LocationRepositoryTest`, `UexUniverseSyncServiceTest`,
 `PersonalInventoryItemRepositoryTest`, `PersonalInventoryItemServiceTest` · **ADR:**
 [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3043
 

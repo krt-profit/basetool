@@ -34,14 +34,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Migration test for {@code V339__make_p4k_uuid_unique_per_kind.sql} (REQ-P4K-007): it clears every
+ * Migration test for {@code V343__make_p4k_uuid_unique_per_kind.sql} (REQ-P4K-007): it clears every
  * duplicate group's {@code p4k_uuid}, keeps a unique one, then enforces uniqueness.
  */
 @SpringBootTest
 @Transactional
-class V339MigrationTest {
+class V343MigrationTest {
 
-  private static final String SCRIPT = "/db/migration/V339__make_p4k_uuid_unique_per_kind.sql";
+  private static final String SCRIPT = "/db/migration/V343__make_p4k_uuid_unique_per_kind.sql";
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -54,16 +54,16 @@ class V339MigrationTest {
     }
     UUID shared = UUID.randomUUID();
     UUID unique = UUID.randomUUID();
-    UUID duplicateA = insertMaterial("V339 Lifecure Medsticks", shared);
-    UUID duplicateB = insertMaterial("V339 Redfin Energy Modulators", shared);
-    UUID single = insertMaterial("V339 SLAM", unique);
+    UUID duplicateA = insertMaterial("V343 Lifecure Medsticks", shared);
+    UUID duplicateB = insertMaterial("V343 Redfin Energy Modulators", shared);
+    UUID single = insertMaterial("V343 SLAM", unique);
 
     runScript();
 
     assertThat(p4kUuid(duplicateA)).isNull();
     assertThat(p4kUuid(duplicateB)).isNull();
     assertThat(p4kUuid(single)).isEqualTo(unique);
-    assertThatThrownBy(() -> insertMaterial("V339 Uncut SLAM", unique))
+    assertThatThrownBy(() -> insertMaterial("V343 Uncut SLAM", unique))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
@@ -87,7 +87,7 @@ class V339MigrationTest {
   }
 
   private void runScript() throws IOException {
-    try (InputStream in = V339MigrationTest.class.getResourceAsStream(SCRIPT)) {
+    try (InputStream in = V343MigrationTest.class.getResourceAsStream(SCRIPT)) {
       assertThat(in).isNotNull();
       String sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
       for (String statement : sql.split(";")) {
