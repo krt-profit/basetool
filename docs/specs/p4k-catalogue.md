@@ -22,8 +22,8 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…010 and REQ-P4K-045 are implemented (#3031, #3033), REQ-P4K-011…016 are
-> implemented (#3033) except the remainders their own notes name, REQ-P4K-033 is
+> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
+> and shop tables join with their areas), REQ-P4K-033 is
 > implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
@@ -368,14 +368,10 @@ A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, R
 set. The pickers that filter it: the Lager and item-order item pickers
 (`BlueprintRepository.findItemsWithActiveBlueprint`, `findOrderableItems`), the blueprint pickers,
 the ship-type, manufacturer and material pickers and searches. The notice is `noLongerInGame` on
-`InventoryGameItemReferenceDto` and `ShipTypeDto`, shown in the Lager, the hangar and the mission
-units.
+`InventoryGameItemReferenceDto`, `GameItemReferenceDto` and `ShipTypeDto`, shown in the Lager, the
+hangar, the job-order items, handovers and item collection, and the mission units.
 
-> [!note] Planned — the notice on job-order references
-> Job-order item lines carry `GameItemReferenceDto`, which has no `noLongerInGame` yet; their
-> references render without the notice until it is added there.
-
-**Enforced by:** `P4kStampedRowVisibilityTest`
+**Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-014 — every run keeps a change report, and the report is never pruned
@@ -422,7 +418,7 @@ job after 7 days.
 
 - [x] Filtering a run's report by kind and change type, and paging it, swaps the list without a
   page reload.
-- [ ] A preview job shows the report it would write; after APPLY the run shows the same rows.
+- [x] A preview job shows the report it would write; after APPLY the run shows the same rows.
 
 The run list is `GET /api/v1/catalog/admin/import/p4k/runs`, a run's report
 `GET …/runs/{id}/changes` and a preview's `GET …/jobs/{id}/changes`, both filtered by `kind` and
@@ -432,8 +428,8 @@ computes as if "create new items and ships" were ticked and without the mass-gua
 an APPLY with other choices writes other rows. The P4K tab of the sync-reports page comes with the
 Wiki/UEX reconciliation hardening (#3053).
 
-**Enforced by:** `AdminP4kImportPageControllerMvcTest`, `P4kImportReportControllerMvcTest` ·
-**Enforced by (planned):** an e2e run of upload, preview and APPLY · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
+**Enforced by:** `AdminP4kImportPageControllerMvcTest`, `P4kImportReportControllerMvcTest`,
+`P4kChangeReportTest`, `P4kImportReportE2eTest` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-016 — a review case is a lasting status on the row, resolved as keep or hide
 
@@ -467,7 +463,7 @@ between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMer
 is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
 
 **Enforced by:** `P4kReviewServiceTest`, `AdminP4kImportPageControllerMvcTest`,
-`P4kImportReportControllerMvcTest` · **Code:** `P4kReviewService` · **ADR:**
+`P4kImportReportControllerMvcTest`, `P4kImportReportE2eTest` · **Code:** `P4kReviewService` · **ADR:**
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2886, #2888
 
 ## Items

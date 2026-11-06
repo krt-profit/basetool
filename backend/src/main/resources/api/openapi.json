@@ -82947,6 +82947,9 @@
           "name" : {
             "type" : "string"
           },
+          "noLongerInGame" : {
+            "type" : "boolean"
+          },
           "size" : {
             "type" : "integer",
             "format" : "int32"

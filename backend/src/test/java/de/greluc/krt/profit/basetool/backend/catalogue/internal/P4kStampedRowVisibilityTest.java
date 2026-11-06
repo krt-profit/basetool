@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -93,6 +94,8 @@ class P4kStampedRowVisibilityTest {
     assertThat(offered).contains(live.getId()).doesNotContain(stamped.getId());
     assertThat(inventoryItemMapper.gameItemToReferenceDto(stamped).noLongerInGame()).isTrue();
     assertThat(inventoryItemMapper.gameItemToReferenceDto(live).noLongerInGame()).isFalse();
+    assertThat(GameItemReferenceDto.of(stamped).noLongerInGame()).isTrue();
+    assertThat(GameItemReferenceDto.of(live).noLongerInGame()).isFalse();
   }
 
   @Test

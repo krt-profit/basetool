@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -123,6 +124,29 @@ class P4kChangeReportTest {
         .flatExtracting(c -> Stream.of(c.getOldValue(), c.getNewValue()).toList())
         .filteredOn(Objects::nonNull)
         .noneMatch(gameTexts::contains);
+  }
+
+  @Test
+  void aPreviewComputesTheReportTheApplyThenWrites() {
+    GameItem shield = new GameItem();
+    shield.setName("Preview shield");
+    shield.setP4kUuid(P4kTestCatalogues.SHIELD);
+    shield.setNameKey("item_NameSHLD_Old_Name");
+    gameItemRepository.save(shield);
+
+    List<P4kImportChangeDto> previewed =
+        runs.previewWithReport(P4kTestCatalogues.fixtureBytes()).changes().stream()
+            .map(P4kImportChangeDto::of)
+            .toList();
+    P4kImportResultDto applied = runs.apply(P4kTestCatalogues.fixtureBytes(), true);
+    List<P4kImportChangeDto> written =
+        changeRepository.findByRunId(applied.runId()).stream()
+            .sorted(Comparator.comparingInt(P4kImportChange::getPosition))
+            .map(P4kImportChangeDto::of)
+            .toList();
+
+    assertThat(previewed).isNotEmpty();
+    assertThat(written).isEqualTo(previewed);
   }
 
   /**
