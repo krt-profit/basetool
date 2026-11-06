@@ -26,8 +26,12 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -41,6 +45,10 @@ final class ScWikiRequestExecutor {
 
   /** Largest exponential shift allowed by the bounded attempt configuration. */
   private static final int MAX_BACKOFF_SHIFT = 4;
+
+  /** Shared response policy for version, list and detail requests. */
+  private static final NonSuccessStatusHandler NON_SUCCESS_STATUS_HANDLER =
+      new NonSuccessStatusHandler();
 
   /** Client whose request factory owns the connection and read timeouts. */
   private final RestClient client;
@@ -78,21 +86,18 @@ final class ScWikiRequestExecutor {
     for (int attempt = 1; ; attempt++) {
       awaitPermit();
       try {
-        Response payload =
+        ResponseEntity<String> response =
             client
                 .get()
                 .uri(uriTemplate, variables)
-                .exchange((_, response) -> {
-                  if (response.getStatusCode().value() == 404) {
-                    return new Response(true, null);
-                  }
-                  if (!response.getStatusCode().is2xxSuccessful()) {
-                    throw response.createException();
-                  }
-                  return new Response(false, response.bodyTo(String.class));
-                });
-        return payload;
+                .retrieve()
+                .onStatus(NON_SUCCESS_STATUS_HANDLER)
+                .toEntity(String.class);
+        return new Response(false, response.getBody());
       } catch (RestClientResponseException e) {
+        if (e.getStatusCode().value() == 404) {
+          return new Response(true, null);
+        }
         if (!retryable(e.getStatusCode().value())) {
           throw e;
         }
@@ -201,6 +206,21 @@ final class ScWikiRequestExecutor {
    */
   private static boolean retryable(int status) {
     return status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+  }
+
+  /** Classifies non-2xx responses as errors while retaining the source response diagnostics. */
+  private static final class NonSuccessStatusHandler extends DefaultResponseErrorHandler {
+
+    /**
+     * Classifies responses without a successful representation as errors.
+     *
+     * @param statusCode source HTTP status
+     * @return whether the response is outside the 2xx range
+     */
+    @Override
+    protected boolean hasError(@NotNull HttpStatusCode statusCode) {
+      return !statusCode.is2xxSuccessful();
+    }
   }
 
   /**
