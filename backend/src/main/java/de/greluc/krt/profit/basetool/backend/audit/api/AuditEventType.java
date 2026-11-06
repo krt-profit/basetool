@@ -899,6 +899,8 @@ public enum AuditEventType {
   CATALOGUE_P4K_REVIEW_HIDDEN(AuditDomain.CATALOGUE),
   /** An admin deleted sync-report rows older than a chosen age. */
   CATALOGUE_SYNC_REPORTS_DELETED(AuditDomain.CATALOGUE),
+  /** A UEX or SC Wiki sync run finished, with its outcome and committed counts. */
+  CATALOGUE_SYNC_RUN_FINISHED(AuditDomain.CATALOGUE),
   /** An admin created a material. */
   CATALOGUE_MATERIAL_CREATED(AuditDomain.CATALOGUE),
   /** An admin edited a material. */

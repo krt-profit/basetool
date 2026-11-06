@@ -469,6 +469,11 @@ The coverage list holds the **Katalog** area
   - `CATALOGUE_SYNC_REPORTS_DELETED`, the manual delete of sync reports, with `source` (`UEX`,
     `SCWIKI`, `P4K` or `ALL`), `olderThanDays` and the `deleted` count (the automatic `pruneRuns`
     stays a log line);
+  - `CATALOGUE_SYNC_RUN_FINISHED`, one summary per finished UEX or SC Wiki sync run (each durable
+    `external_sync_run` attempt of a source and catalogue slice), actor `system`, subject the run
+    id, recorded in the transaction that stores the run's outcome, with `source`, `aggregate`,
+    `status`, the committed counts (`fetched`, `applied`, `skipped`, `failed`) and `sweep`; the
+    detail stays in `external_sync_report`;
   - every catalogue master-data mutation: materials, material categories and material external
     aliases (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_CATEGORY_*`, `CATALOGUE_MATERIAL_ALIAS_*`:
     created, updated, deleted); manufacturer, ship-type and terminal visibility
@@ -497,10 +502,6 @@ domain switches (purge marker, export marker) carry the case, and `basetool_audi
 counts them (REQ-OBS-011).
 
 > [!note] Planned — the rest of the Katalog area (ADR-0346)
-> - The scheduled UEX and SC Wiki syncs record one summary event per run and source, actor
->   `system`, from the committed counts and the actual outcome of the durable sync run when that run
->   finishes; the detail stays in `external_sync_report`. Built on the sync-run record of the
->   Wiki/UEX reconciliation hardening.
 > - The starmap and its places
 >   ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)): an admin
 >   setting or clearing the link of a UEX location to a starmap object, creating a storage place on
@@ -513,11 +514,13 @@ counts them (REQ-OBS-011).
 
 - [x] For a representative mutation of each built activity above a test asserts exactly one
   `CATALOGUE` event (type, subject, label, details); an update names changed fields only
-  (`CatalogueAuditTest`, `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`).
+  (`CatalogueAuditTest`, `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
+  `SyncRunServiceTest`).
 - [x] Every `CATALOGUE` event type is offered by the Katalog tab and carries a label
   (`AdminAuditLogPageControllerTest`).
-- [ ] The sync summaries, the starmap and shop links and the visibility overrides record their
-  events (planned above).
+- [x] Each finished UEX or SC Wiki sync run records one `CATALOGUE_SYNC_RUN_FINISHED` summary with
+  its committed outcome (`SyncRunServiceTest`).
+- [ ] The starmap and shop links and the visibility overrides record their events (planned above).
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
