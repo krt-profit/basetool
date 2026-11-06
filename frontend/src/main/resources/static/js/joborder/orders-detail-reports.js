@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_UNIT_SCU, MSG_UNIT_PIECE, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, ORDER_HANDOVER_I18N */
 
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import {
@@ -336,6 +336,19 @@ async function _loadStockAttribution(orderId, materialId, tierId) {
 }
 
 /**
+ * Formats an inventory amount in the page locale: whole pieces, or SCU with three decimals.
+ *
+ * @param {number} amount the amount to format
+ * @param {boolean} isPiece whether the material is counted in pieces
+ * @returns {string} the localised amount without its unit
+ */
+function formatInventoryAmount(amount, isPiece) {
+    return isPiece
+        ? formatNumber(Math.round(amount), 0, document.documentElement.lang)
+        : formatNumber(amount, 3, document.documentElement.lang);
+}
+
+/**
  * Expands or collapses the linked inventory entries below a material row.
  *
  * @param {HTMLElement} row the material row
@@ -343,7 +356,8 @@ async function _loadStockAttribution(orderId, materialId, tierId) {
 export async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
-    const amountType = row.getAttribute('data-amount-type');
+    const isPiece = row.getAttribute('data-amount-type') === 'PIECE';
+    const unit = isPiece ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
 
     const nextRow = row.nextElementSibling;
     if (nextRow && nextRow.classList.contains('inventory-details-row')) {
@@ -405,18 +419,13 @@ export async function toggleInventory(row) {
                 );
             }
             const quality = item.quality !== null ? item.quality : '-';
-            const unit = amountType ? amountType : '';
             const counted = attribution ? attribution.here.get(item.id) : undefined;
-            const total = formatNumber(
-                item.amount !== null ? item.amount : 0,
-                3,
-                document.documentElement.lang,
-            );
+            const total = formatInventoryAmount(item.amount !== null ? item.amount : 0, isPiece);
             let quantity = `${total} ${unit}`;
             if (counted !== undefined && Math.abs(counted - (item.amount || 0)) > 0.0005) {
                 quantity = MSG_INVENTORY_PART_OF.replace(
                     '{0}',
-                    `${formatNumber(counted, 3, document.documentElement.lang)} ${unit}`,
+                    `${formatInventoryAmount(counted, isPiece)} ${unit}`,
                 ).replace('{1}', `${total} ${unit}`);
             }
             if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {

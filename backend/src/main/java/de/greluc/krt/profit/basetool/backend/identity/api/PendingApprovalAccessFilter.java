@@ -67,7 +67,7 @@ import tools.jackson.databind.ObjectMapper;
 public class PendingApprovalAccessFilter extends OncePerRequestFilter {
 
   /** The synthetic authority a PENDING/REJECTED user carries (and nothing else). */
-  static final String PENDING_AUTHORITY = "ROLE_PENDING_APPROVAL";
+  static final String PENDING_AUTHORITY = Roles.PENDING_APPROVAL_MARKER;
 
   /**
    * The synthetic authority an approved account with no application role carries (REQ-SEC-053).

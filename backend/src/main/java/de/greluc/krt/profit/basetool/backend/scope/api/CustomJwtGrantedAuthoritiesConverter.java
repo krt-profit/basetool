@@ -89,6 +89,10 @@ public class CustomJwtGrantedAuthoritiesConverter
   private static final GrantedAuthority KRT_MEMBER_AUTHORITY =
       new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER));
 
+  /** The lone authority of a pending or rejected registration (REQ-SEC-017). */
+  private static final GrantedAuthority PENDING_APPROVAL_AUTHORITY =
+      new SimpleGrantedAuthority(Roles.PENDING_APPROVAL_MARKER);
+
   /** Upper bound on distinct cached {@code (sub, session, azp, claims)} entries. */
   private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
 
@@ -157,6 +161,9 @@ public class CustomJwtGrantedAuthoritiesConverter
    * the configured TTL (ADR-0174); a miss or an unkeyable token runs {@link
    * #assembleAuthorities(Jwt)}.
    *
+   * <p>A pending-approval verdict is never cached, so an approval applies on the caller's next
+   * request within the same Keycloak session (REQ-SEC-056).
+   *
    * @param jwt the validated Keycloak access token
    * @return the authorities checked against {@code @PreAuthorize}
    */
@@ -170,7 +177,7 @@ public class CustomJwtGrantedAuthoritiesConverter
       }
     }
     Collection<GrantedAuthority> authorities = List.copyOf(assembleAuthorities(jwt));
-    if (cacheKey != null) {
+    if (cacheKey != null && !authorities.contains(PENDING_APPROVAL_AUTHORITY)) {
       authoritiesCache.put(cacheKey, authorities);
     }
     return authorities;
@@ -339,7 +346,7 @@ public class CustomJwtGrantedAuthoritiesConverter
   public Collection<GrantedAuthority> assembleFor(
       @NonNull User user, @NonNull Collection<Role> roles) {
     if (!user.isApproved()) {
-      return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
+      return List.of(PENDING_APPROVAL_AUTHORITY);
     }
 
     Collection<GrantedAuthority> authorities =
