@@ -239,7 +239,9 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
 2. **Preview.** The accepted upload is stored compressed on a PREVIEW job; the async runner streams
    it through `P4kCatalogueReader` and the per-kind reconcilers and writes the would-be result on the
    job. Nothing else is written.
-3. **APPLY.** An APPLY job reads the same payload in one transaction: an older Build than the last
-   run is refused; otherwise it writes `p4k_import_run`, matches every kind by P4K GUID first,
-   stamps the matched rows with the run, creates playable items and ships only when the admin ticked
-   the box, and stores the change report and the review cases (REQ-P4K-004…010).
+3. **APPLY.** An APPLY job takes the `SyncCoordinator` lock of the Wiki and UEX syncs (or fails
+   when a sync holds it past the wait cap) and reads the same payload in one transaction: an older
+   Build than the last run is refused; otherwise it writes `p4k_import_run`, matches every kind by
+   P4K GUID first, stamps the matched rows with the run, creates playable items and ships only when
+   the admin ticked the box, and stores the change report and the review cases
+   (REQ-P4K-004…010).

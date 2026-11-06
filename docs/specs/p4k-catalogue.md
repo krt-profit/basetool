@@ -135,7 +135,11 @@ comparison is always within one Channel, where the contract guarantees the numbe
 The refusal fails the APPLY job with a message; a re-applied run moves `p4k_seen_run_id` to the
 new run and writes no other value.
 
-**Enforced by:** `P4kImportServiceBuildOrderTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
+An APPLY runs under the `SyncCoordinator` lock the Wiki and UEX syncs share, so it never runs
+beside their duplicate merges (ADR-0349); it waits up to `krt.sync.coordinator.max-wait-ms`, and
+when that elapses the job fails with a message and writes nothing. A PREVIEW takes no lock.
+
+**Enforced by:** `P4kImportServiceBuildOrderTest`, `P4kImportJobRunnerTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
 
 ### REQ-P4K-005 — every successful APPLY is recorded as a run, and every matched row names it
 
