@@ -52,6 +52,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
+  private static final String TRANSFER_DESTINATION_ID = "0e2e0000-0000-4000-8000-000000008001";
 
   /** Quality stamped on the seeded item; clears the job order's {@code minQuality} of 650. */
   private static final int SEED_QUALITY = 750;
@@ -82,7 +83,6 @@ class MaterialCollectionTransferInPlaceE2eTest {
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
 
     String sourceLocationId = seeder.findLocationIdByName(USERNAME, PASSWORD, "E2E Refinery Hub");
-    seeder.createLocation(USERNAME, PASSWORD, "E2E Collection Transfer Alt Hub");
     String materialId =
         seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Collection Transfer Mat");
     jobOrderId =
@@ -135,7 +135,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
             response ->
                 response.url().contains("/inventory/" + sourceItemId + "/transfer")
                     && "POST".equals(response.request().method()),
-            () -> selectDifferentLocation(locationSelect));
+            () -> locationSelect.selectOption(TRANSFER_DESTINATION_ID));
 
         assertThat(page.locator(".notification-toast:not(.error-toast)"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
@@ -172,33 +172,6 @@ class MaterialCollectionTransferInPlaceE2eTest {
         throw failure;
       }
     }
-  }
-
-  /**
-   * Selects, in the given row's location dropdown, the first option whose value differs from the
-   * currently selected one and returns that destination id. Picking from the dropdown's actual
-   * options (rather than a freshly seeded id that the frontend's long-lived location cache may not
-   * list) makes the change event fire reliably; the bootstrap source hub plus the locations other
-   * suites seed guarantee at least one distinct option.
-   *
-   * @param locationSelect the row's {@code .location-select} element
-   * @return the chosen destination location id
-   * @throws IllegalStateException when the dropdown offers no option distinct from the selection
-   */
-  private static String selectDifferentLocation(Locator locationSelect) {
-    String current = locationSelect.inputValue();
-    Locator options = locationSelect.locator("option");
-    int count = options.count();
-    for (int i = 0; i < count; i++) {
-      String value = options.nth(i).getAttribute("value");
-      if (value != null && !value.isBlank() && !value.equals(current)) {
-        locationSelect.selectOption(value);
-        return value;
-      }
-    }
-    throw new IllegalStateException(
-        "material-collection location dropdown offered no option distinct from the current"
-            + " selection");
   }
 
   /**
