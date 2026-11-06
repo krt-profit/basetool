@@ -1437,9 +1437,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   yet succeeded in this process publishes nothing at all rather than a falsely-stale `0` (see the
   never-succeeded-sentinel bullet below). The items counter is present only for jobs that report a
   count: user sync, notification retention, default-blueprint provisioning, and — since #1041 item 2
-  — `uex_sync` (the `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue
-  carve-out below) and `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step
-  contributing `0`; same carve-out below). For the two catalogue syncs it is populated from the same
+  — `uex_sync` (the `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the
+  enabled SC-Wiki step counts). An incomplete required slice makes the complete source job fail.
+  For the two catalogue syncs the item counter is populated from the same
   per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
   a sync records a successful run in 48 h but has processed zero rows — the empty-200 catalogue outage
   that neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200
@@ -1451,14 +1451,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   then false-fired continuously (the 2026-07-15…17 storm; UEX was upserting ~7499 rows/run).
   `executions_total{outcome="success"}` shares the items counter's lazy-registration + per-restart-reset
   behaviour, so it cancels the false `0` while still climbing on a genuine outage; same robust shape as
-  `UserSyncZeroItems`. **Unchanged-catalogue carve-out (`scwiki_sync`, #1182):**
-  `ScWikiClient` does conditional GETs, so when the whole catalogue is unchanged every endpoint
-  returns `304 Not Modified` and the run upserts nothing — a healthy no-op indistinguishable from an
-  empty-200 outage by the raw upsert tally alone. To stop that false `SyncZeroItems` firing, each
-  `scwiki_sync` step reports its live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
-  `countLiveScwikiShipTypes` / `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` /
-  `countLiveScwikiItems` for the other steps) on an all-`304` fetch; a genuine empty-200 (no `304`
-  at all) still reports `0` and correctly trips the alert. The same success-with-zero-work idea
+  `UserSyncZeroItems`. SC Wiki retrieves and replays the complete frozen source snapshot on every
+  run; a failed local apply therefore remains eligible for retry. Source counts never substitute
+  a database live-row count for work performed. Durable attempts classify an observed zero-write
+  diff as `UNCHANGED`. The same success-with-zero-work idea
   backs `UserSyncZeroItems` (`user_sync` synced zero users for 30 min while successful runs happened
   — Keycloak returned an empty roster; #1041 item 3).
 
@@ -1522,6 +1518,41 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).
+- `basetool_catalogue_attempts_total{source,aggregate,status}` counts durable source and aggregate
+  attempts. `source`, `aggregate` and `status` are bounded application enums; no record identifiers,
+  names or game-version values become metric labels. Each attempt persists its actual start and
+  finish independently of anomaly events, the frozen Wiki build, fetched/valid/applied/skipped/failed
+  counters, verified census and cleanup decision. A clean run with no events still appears in the
+  admin run history. Interrupted attempts become `FAILED` at startup with an unknown finish time.
+  Fetched and valid counters describe decoded row deliveries across list and detail requests;
+  repeated deliveries of one identity remain separate requests. Source timing includes resolving
+  its game build before applying any slice.
+  Nested aggregate counters roll up into their `CATALOGUE` source attempt without counting rollback
+  attempts as committed writes. Diff-based child collections count inserted and deleted rows, not
+  retained rows. An observed zero-write diff remains `UNCHANGED` even when source rows were read.
+  Any skipped cleanup dominates later successful cleanups in the slice and source summary.
+  A complete transport census can still yield `PARTIAL` with `SKIPPED` cleanup: an empty Wiki
+  catalogue or a manufacturer catalogue with no applicable local match preserves existing rows
+  and does not advance last-complete time. This refusal adds no fetch or write failure count.
+- `basetool_catalogue_attempt_status{source,aggregate,status}` is a one-hot gauge of the latest
+  attempt outcome (`RUNNING`, `SUCCESS`, `PARTIAL`, `FAILED`, `UNCHANGED`).
+  `CatalogueAttemptIncomplete` watches `PARTIAL` and `FAILED` for ten minutes; it detects the first
+  observed failure without needing a counter sample from before that failure. A later complete
+  apply clears the previous failure state. Startup restores the latest outcomes and last-complete
+  timestamps from durable attempts without replaying completion counters. This recovery runs once
+  per process before recording any new attempt, including a zero-delay scheduler tick. A refresh-only
+  cache-training context performs no recovery database access.
+- `basetool_catalogue_attempt_active{source,aggregate}` identifies in-flight attempts;
+  `basetool_catalogue_attempt_started_timestamp_seconds{source,aggregate}` records their actual
+  start. `CatalogueAttemptRunningTooLong` watches source sweeps active for more than two hours.
+- `basetool_catalogue_attempt_last_complete_timestamp_seconds{source,aggregate}` moves only after
+  `SUCCESS` or `UNCHANGED`. Source `CATALOGUE` freshness therefore means all required slices were
+  applied, not merely that a scheduler callback returned. Partial or failed Wiki slices continue
+  independently but make the umbrella job fail; UEX preserves its fail-fast ordering. The existing
+  scheduled-job freshness metrics and `ExternalSyncStale` now use that complete-source outcome.
+  Dashboard `07` shows current outcomes, active sources, complete-apply age and attempt counts.
+  `./gradlew testPrometheusRules` checks the alert syntax and every rule-test case using the exact
+  digest-pinned Prometheus image from `docker-compose.monitoring.yml` with read-only rule files.
 - `basetool_external_fetch_errors_total{source,reason}` counter incremented where the `UexClient` /
   `ScWikiClient` swallow an upstream fetch or parse error into an empty result (`source` = the fixed
   literal `uex` / `scwiki`; `reason` = `fetch` for a transport, decode or envelope failure,
@@ -1529,9 +1560,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `reason!="census"` only: the census series carries a standing per-run floor (`/api/items` and
   `/api/vehicle-items` tie across page boundaries on every run) and a deploy restart or an upstream
   re-pagination pushes it past `> 3` with no outage behind it (false positive 2026-10-12);
-  `ScWikiCensusIncompleteStreak` keeps summing both reasons. Because every upstream failure is mapped to an empty list and the sync
-  job still records a success, this is the only signal of a sustained catalogue outage; it backs the
-  `ExternalFetchErrors` alert. The backend's `RestClient.Builder` (`RestClientConfig`, ADR-0204) is
+  `ScWikiCensusIncompleteStreak` keeps summing both reasons. Source failures may yield empty or
+  partial rows while healthy slices continue; this counter identifies the fetch cause alongside
+  durable `PARTIAL`/`FAILED` attempt outcomes and backs the `ExternalFetchErrors` alert. The
+  backend's `RestClient.Builder` (`RestClientConfig`, ADR-0204) is
   wired to the `ObservationRegistry` (REQ-OBS-009) so these same calls also emit
   `http_client_requests_seconds` + client spans. A response body past the clients' 16 MiB cap
   (`ResponseSizeLimitInterceptor`) fails the fetch into this same counted fallback — it is never
@@ -1596,19 +1628,14 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   feed soft-deletes every row that was merely never fetched — but until this meter existed it was a
   log line and nothing else, so a sweep that had not run for weeks and one running cleanly every
   night were indistinguishable from outside the log. `sweep` is the bounded catalogue literal
-  (`item` today); `reason` is the bounded triple `incomplete` / `not_modified` / `no_rows`.
-  **The `reason` split is load-bearing rather than decorative**: an all-304 run is a fully-cached
-  *healthy* night that also stands the sweep down, so an untagged counter would be non-zero on every
-  healthy deployment and could carry no alert at all. Only `incomplete` means a walk could not vouch
+  (`item` today); emitted `reason` values are `incomplete` and `no_rows`.
+  Only `incomplete` means a walk could not vouch
   for its census; `no_rows` is the total-outage shape already covered by `SyncZeroItems` /
   `ExternalSyncStale`. Registered lazily per reason, so the series is *absent* rather than zero on a
   healthy deployment and `ScWikiOrphanSweepStandingDown` (>= 3 in 72h, warning) cannot false-fire.
-  **Known gap, stated rather than left to be inferred:** `sweep` carries exactly one value today,
-  `item` — the cross-kind game-item sweep, the one the 2026-09-02 export showed standing down. The
-  vehicle, commodity, blueprint and manufacturer sweeps stand down through the same gates and are
-  **not** instrumented; three of them go through the static `ScWikiOrphanSweep` helper, which would
-  need a skip callback threaded in from each caller. So the new alert covers one catalogue, and
-  `ScWikiCensusIncompleteStreak`'s fetch-error proxy is still what covers the other four.
+  The counter covers the cross-kind item sweep. The durable source/aggregate attempt metrics above
+  record skipped sweeps and incomplete outcomes for vehicle, commodity, blueprint and manufacturer
+  slices as well; `CatalogueAttemptIncomplete` covers those independently of this item-only counter.
 - `basetool_catalogue_item_class_unknown_total` counter (untagged, `ScWikiItemSyncService`), bumped
   once per SC Wiki item whose `class` value is no `ShipComponentClass` (REQ-DATA-024, ADR-0283).
   The item is still written, with no class, so without the meter a new in-game class would only
@@ -1637,13 +1664,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_keycloak_sync_fetch_failures_total` counter (untagged, `KeycloakService.fetchUsers`) and
   `basetool_scheduled_job_step_failures_total{task,step}` counter (`ScWikiScheduler.runStep`; `step`
   = the bounded `commodity`/`vehicle`/`item`/`blueprint`/`manufacturer` literal) both cover a
-  swallowed failure the scheduled-job *outcome* signal cannot see. The Keycloak roster fetch is
-  swallowed to an empty list, so the user sync records `success`/0-items and a Keycloak Admin-API
-  outage is indistinguishable from a legitimately empty roster (access-control-relevant — a stalled
-  sync leaves departed users with their local roles); a single SC-Wiki sync step throws but the
-  other steps still run, so `scwiki_sync` records `success` with a non-zero item tally and a
-  reliably-failing step is invisible to `UserSyncStale` / `SyncZeroItems` / `ExternalSyncStale`. They
-  back `KeycloakSyncFetchFailing` and `ScWikiStepFailing` (logging audit).
+  handled failure at its owning step. The Keycloak roster fetch is swallowed to an empty list, so
+  the user sync records `success`/0-items and a Keycloak Admin-API outage is indistinguishable from
+  a legitimately empty roster (access-control-relevant — a stalled sync leaves departed users with
+  their local roles). A failed SC-Wiki step is isolated so the other slices still apply, while the
+  durable aggregate records `FAILED` and the source sweep also fails. These counters back
+  `KeycloakSyncFetchFailing` and `ScWikiStepFailing`; catalogue outcome and freshness gauges remain
+  the canonical signal for complete application.
 - `basetool_account_deletion_keycloak_failures_total` counter (untagged,
   `DeletionRequestService.execute`) covers the third swallowed failure of that kind, and the
   one nothing could see at all. An Art. 17 erasure commits its local half first and deletes
@@ -2279,8 +2306,18 @@ counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` la
 `materialboard`, `inventory_all`, since #1235 `missions_list`, `refinery_queue`, `members_roster`,
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
 `hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
-ADR-0260, and the admin dashboard room `admin_dashboard`, ADR-0328), and
+ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
+`catalogue`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
+
+The backend and frontend share the `catalogue` section allow-list. Committed source changes publish
+through the existing relay after commit; material, item, hangar and blueprint recipe views refresh
+their existing fragments. The frontend consumes a source signal by evicting its seven synced
+reference-cache domains before delivering the browser notification, so the subsequent fragment
+read sees current facts rather than a six-hour cached catalogue. Failed fetches and zero-write diffs emit no catalogue change. Identity
+reassignment also publishes the affected owner rooms after commit, so refreshed interactive forms
+receive their updated versions. These rooms use the existing per-class drop and subscription
+metrics and alerts; no record, user or organization identifier becomes a metric label.
 
 Both drop signals are **alerted** since #1238, on a threshold measured rather than guessed: read on
 2026-08-03 over the preceding 21 days, `basetool_presence_relay_dropped_total` had **no series at

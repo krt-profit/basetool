@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiCommodityDto;
+import de.greluc.krt.profit.basetool.backend.service.RecordingTransactionManager;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;
@@ -69,6 +70,12 @@ class ScWikiCommoditySyncServiceTest {
     config.putAll(Map.of("commodity-sync-enabled", true));
     rebuild();
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+    lenient()
+        .when(materialRepository.findById(any(UUID.class)))
+        .thenAnswer(inv ->
+            materialRepository.findAll().stream()
+                .filter(m -> m.getId().equals(inv.getArgument(0)))
+                .findFirst());
   }
 
   /**
@@ -79,7 +86,12 @@ class ScWikiCommoditySyncServiceTest {
     properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiCommoditySyncService(
-            scWikiClient, properties, materialRepository, aliasService, syncReportService);
+            scWikiClient,
+            properties,
+            materialRepository,
+            aliasService,
+            syncReportService,
+            new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress()));
   }
 
   @Test
@@ -102,21 +114,28 @@ class ScWikiCommoditySyncServiceTest {
     verify(materialRepository, never()).markScwikiDeleted(any(), any());
     verify(materialRepository, never()).save(any());
     assertEquals(0, written, "an empty Wiki response must report zero written rows");
+    verify(syncReportService).recordSweep(false);
+    verify(syncReportService, never()).recordIncomplete();
   }
 
   @Test
-  void syncCommodities_notModified_reportsLiveCount_andSkipsMergeAndSweep() {
+  void repeatedCommodityPayloadsAreAppliedAgainRatherThanReturningAPreviousCount() {
+    ScWikiCommodityDto dto = commodity("Agricium");
+    Material existing = uexMaterial("Agricium");
+    existing.setScwikiUuid(dto.uuid());
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
-        .thenReturn(ScWikiClient.FetchResult.unchanged());
-    when(materialRepository.countLiveScwikiMaterials()).thenReturn(1234L);
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(materialRepository.findAll()).thenReturn(List.of(existing));
+    when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.of(existing));
+    when(materialRepository.save(any(Material.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
-    int written = service.syncCommodities();
+    assertEquals(1, service.syncCommodities());
+    existing.setDensityGramPerCc(999.0);
+    assertEquals(1, service.syncCommodities());
 
-    assertEquals(
-        1234, written, "a 304 (unchanged) catalogue must report the live linked-material count");
-    verify(materialRepository, never()).save(any());
-    verify(materialRepository, never()).markScwikiDeleted(any(), any());
-    verify(syncReportService, never()).beginRun();
+    assertEquals(dto.densityGramPerCc(), existing.getDensityGramPerCc());
+    verify(materialRepository, times(2)).save(existing);
   }
 
   @Test
@@ -308,9 +327,104 @@ class ScWikiCommoditySyncServiceTest {
     verify(syncReportService).pruneRuns(SyncSourceSystem.SCWIKI);
   }
 
+  @Test
+  void exactNameCannotReplaceAnotherWikiUuid() {
+    var dto = commodity("Agricium");
+    Material existing = uexMaterial("Agricium");
+    UUID original = UUID.randomUUID();
+    existing.setScwikiUuid(original);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(materialRepository.findByName(dto.name())).thenReturn(Optional.of(existing));
+    when(materialRepository.findAll()).thenReturn(List.of(existing));
+
+    service.syncCommodities();
+
+    assertEquals(original, existing.getScwikiUuid());
+    verify(materialRepository, never()).save(any());
+    verify(materialRepository, never()).markScwikiDeleted(any(), any());
+  }
+
+  @Test
+  void aliasCannotReplaceAnotherWikiUuid() {
+    var dto = commodity("Raw Silicon");
+    Material existing = uexMaterial("Silicon (Raw)");
+    UUID original = UUID.randomUUID();
+    existing.setScwikiUuid(original);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, dto.name()))
+        .thenReturn(existing);
+    when(materialRepository.findAll()).thenReturn(List.of(existing));
+
+    service.syncCommodities();
+
+    assertEquals(original, existing.getScwikiUuid());
+    verify(materialRepository, never()).save(any());
+    verify(materialRepository, never()).markScwikiDeleted(any(), any());
+  }
+
+  @Test
+  void canonicalNameMustBeUniqueInBothFeeds() {
+    var raw = commodity("Raw Silicon");
+    var refined = commodity("Refined Silicon");
+    Material existing = uexMaterial("Silicon");
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(raw, refined)));
+    when(materialRepository.findAll()).thenReturn(List.of(existing));
+
+    service.syncCommodities();
+
+    assertNull(existing.getScwikiUuid());
+    verify(materialRepository, never()).save(any());
+    verify(materialRepository, never()).markScwikiDeleted(any(), any());
+  }
+
+  @Test
+  void duplicateExactSourceNamesCannotMakeAnOrderDependentFirstAssignment() {
+    ScWikiCommodityDto first = commodity("Agricium");
+    ScWikiCommodityDto second = commodity(" AGRICIUM ");
+    Material existing = uexMaterial("Agricium");
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(first, second)));
+    when(materialRepository.findAll()).thenReturn(List.of(existing));
+
+    assertEquals(0, service.syncCommodities());
+
+    assertNull(existing.getScwikiUuid());
+    verify(aliasService, never()).resolveMaterialByAlias(any(), any());
+    verify(materialRepository, never()).findByName(any());
+    verify(materialRepository, never()).save(any());
+    verify(materialRepository, never()).markScwikiDeleted(any(), any());
+    verify(syncReportService, times(2))
+        .logCommodityEvent(any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), any(), any());
+  }
+
   private ScWikiCommodityDto commodity(String name) {
     return new ScWikiCommodityDto(
-        UUID.randomUUID(), name, name, name.toLowerCase().replace(' ', '-'), "", 1.0, false, false);
+        UUID.randomUUID(),
+        name,
+        name,
+        name.toLowerCase().replace(' ', '-'),
+        "",
+        1.0,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   private Material uexMaterial(String name) {

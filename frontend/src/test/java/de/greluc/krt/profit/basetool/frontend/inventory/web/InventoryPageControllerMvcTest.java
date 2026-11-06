@@ -38,6 +38,8 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueDetailsDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueMetadata;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
@@ -65,6 +67,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +85,79 @@ import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 class InventoryPageControllerMvcTest {
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemCatalogueDetails_renderWithoutStock_andKeepGeometryAndDerivedEvidenceDistinct()
+      throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    ItemCatalogueMetadata.Geometry geometry =
+        new ItemCatalogueMetadata.Geometry(
+            new ItemCatalogueMetadata.Axes(0.07, 0.24, 1.18),
+            new ItemCatalogueMetadata.Axes(0.06, 0.34, 1.0),
+            new ItemCatalogueMetadata.Axes(0.75, 0.75, 1.5),
+            0.0002);
+    ItemCatalogueMetadata metadata =
+        new ItemCatalogueMetadata(
+            ItemCatalogueMetadata.Source.SC_WIKI,
+            "4.10.2-LIVE",
+            Set.of(ItemCatalogueMetadata.Relationship.VARIANTS),
+            geometry,
+            true,
+            List.of("<unsafe-tag>"),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            null,
+            List.of(),
+            List.of(
+                new ItemCatalogueMetadata.UexPriceEvidence(
+                    null,
+                    java.math.BigDecimal.TEN,
+                    java.math.BigDecimal.ONE,
+                    null,
+                    42,
+                    "TDD",
+                    "Trade Terminal",
+                    null,
+                    Instant.parse("2026-11-06T12:00:00Z"),
+                    "4.10.2",
+                    null)),
+            null);
+    when(backendApiClient.get(
+            eq("/api/v1/game-items/{id}/catalogue"),
+            eq(ItemCatalogueDetailsDto.class),
+            eq(gameItemId)))
+        .thenReturn(
+            new ItemCatalogueDetailsDto(
+                gameItemId, "Catalogue-only Rifle", UUID.randomUUID(), "Rifle_Class", metadata));
+
+    String html =
+        mockMvc
+            .perform(get("/inventory/game-item/" + gameItemId).param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(
+            "item-wiki-catalogue",
+            "Catalogue-only Rifle",
+            "Physical bounds",
+            "Cargo-grid occupancy",
+            "Inventory display",
+            "0.000200",
+            "No relationships reported.",
+            "This relationship has not been loaded yet.",
+            "Trade Terminal",
+            "UEX observations through SC Wiki",
+            "not an independent price confirmation",
+            "&lt;unsafe-tag&gt;")
+        .doesNotContain("<unsafe-tag>");
+  }
 
   /**
    * The middle dot an allocation-picker option puts between the order id and its outstanding-need

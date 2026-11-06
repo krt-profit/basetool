@@ -37,6 +37,64 @@
 
     <div id="sync-results" class="card card--flush">
     <th:block th:fragment="results">
+    <section class="sync-history" aria-labelledby="sync-attempts-title">
+        <h2 id="sync-attempts-title" class="section-title" th:text="#{admin.syncReports.attempts.title}">Sync runs</h2>
+        <p class="cell-sub" th:text="#{admin.syncReports.attempts.help}">Recent source and catalogue runs, including runs without events.</p>
+        <p th:unless="${attemptsAvailable}" class="alert alert-danger" role="alert"
+           th:text="#{admin.syncReports.attempts.unavailable}">Run history unavailable.</p>
+        <section th:each="summary : ${runSummaries}" class="sync-source-history">
+            <div class="sync-source-summary">
+                <h3 class="card-title" th:text="${#messages.msgOrNull('admin.syncReports.tab.' + #strings.toLowerCase(summary.sourceSystem)) ?: summary.sourceSystem}">SC Wiki</h3>
+                <span th:if="${summary.lastStatus != null}" class="chip"
+                      th:classappend="${summary.lastStatus == 'FAILED'} ? 'chip--danger' : (${summary.lastStatus == 'PARTIAL'} ? 'chip--warning' : (${summary.lastStatus == 'RUNNING'} ? 'chip--info' : 'chip--success'))"
+                      th:text="#{${'admin.syncReports.status.' + summary.lastStatus}}">Succeeded</span>
+                <span class="cell-sub" th:text="#{admin.syncReports.attempts.lastComplete}">Last complete apply</span>
+                <span th:if="${summary.lastCompleteAt != null}" class="utc-time" th:text="${summary.lastCompleteAt}"></span>
+                <span th:if="${summary.lastCompleteAt == null}" class="cell-sub" th:text="#{admin.syncReports.attempts.neverComplete}">No complete apply yet</span>
+            </div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(summary.attempts)}">
+                <table class="data-table data-table--stack sync-attempt-table" th:data-testid="|sync-attempts-${summary.sourceSystem}|">
+                    <thead><tr>
+                        <th th:text="#{admin.syncReports.col.aggregate}">Catalogue</th>
+                        <th th:text="#{admin.syncReports.attempts.status}">Status</th>
+                        <th th:text="#{admin.syncReports.attempts.started}">Started</th>
+                        <th th:text="#{admin.syncReports.attempts.finished}">Finished</th>
+                        <th th:text="#{admin.syncReports.attempts.version}">Game version</th>
+                        <th th:text="#{admin.syncReports.attempts.counts}">Rows</th>
+                        <th th:text="#{admin.syncReports.attempts.census}">Census</th>
+                        <th th:text="#{admin.syncReports.attempts.sweep}">Cleanup</th>
+                    </tr></thead>
+                    <tbody><tr th:each="attempt : ${summary.attempts}" th:data-run-id="${attempt.runId}">
+                        <td th:attr="data-label=#{admin.syncReports.col.aggregate}"
+                            th:text="#{${'admin.syncReports.aggregate.' + attempt.aggregate}}">Items</td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.status}">
+                            <span class="chip" th:classappend="${attempt.status == 'FAILED'} ? 'chip--danger' : (${attempt.status == 'PARTIAL'} ? 'chip--warning' : (${attempt.status == 'RUNNING'} ? 'chip--info' : 'chip--success'))"
+                                  th:text="#{${'admin.syncReports.status.' + attempt.status}}">Succeeded</span>
+                        </td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.started}"><span class="utc-time" th:text="${attempt.startedAt}"></span></td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.finished}">
+                            <span th:if="${attempt.finishedAt != null}" class="utc-time" th:text="${attempt.finishedAt}"></span>
+                            <span th:if="${attempt.finishedAt == null}" th:text="#{admin.syncReports.attempts.noFinish}">Not recorded</span>
+                        </td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.version}" th:text="${attempt.gameVersion ?: '—'}">4.10.2</td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.counts}"><div class="sync-attempt-counts">
+                            <span class="chip chip--data" th:text="#{admin.syncReports.attempts.fetched(${attempt.fetched})}">Fetched</span>
+                            <span class="chip chip--data" th:text="#{admin.syncReports.attempts.valid(${attempt.valid})}">Valid</span>
+                            <span class="chip chip--data" th:text="#{admin.syncReports.attempts.applied(${attempt.applied})}">Applied</span>
+                            <span class="chip chip--data" th:text="#{admin.syncReports.attempts.skipped(${attempt.skipped})}">Skipped</span>
+                            <span class="chip chip--data" th:text="#{admin.syncReports.attempts.failed(${attempt.failed})}">Failed</span>
+                        </div></td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.census}"
+                            th:text="${attempt.censusComplete} ? #{admin.syncReports.attempts.complete} : #{admin.syncReports.attempts.incomplete}">Complete</td>
+                        <td th:attr="data-label=#{admin.syncReports.attempts.sweep}"
+                            th:text="#{${'admin.syncReports.sweep.' + attempt.sweepOutcome}}">Applied</td>
+                    </tr></tbody>
+                </table>
+            </div>
+            <p th:if="${#lists.isEmpty(summary.attempts)}" class="cell-sub" th:text="#{admin.syncReports.attempts.empty}">No recorded attempts.</p>
+        </section>
+    </section>
+    <h2 class="section-title sync-events-title" th:text="#{admin.syncReports.events.title}">Events</h2>
     <div class="table-responsive" th:if="${!#lists.isEmpty(events)}">
         <table id="syncReportsTable" class="data-table data-table--stack">
             <thead>

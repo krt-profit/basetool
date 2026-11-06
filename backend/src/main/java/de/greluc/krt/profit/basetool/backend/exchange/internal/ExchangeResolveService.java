@@ -344,6 +344,9 @@ public class ExchangeResolveService {
     List<String> locKeys = present(refs, r -> lower(r.locKey()));
 
     Map<UUID, Set<Entry>> byId = new HashMap<>();
+    Map<UUID, UUID> redirects =
+        ids.isEmpty() ? Map.of() : gameItemRepository.findLocalIdRedirects(ids);
+    List<UUID> currentIds = ids.stream().map(id -> redirects.getOrDefault(id, id)).toList();
     Map<String, Set<Entry>> byScRecord = new HashMap<>();
     Map<UUID, Set<Entry>> byScGuid = new HashMap<>();
     Map<Integer, Set<Entry>> byUexId = new HashMap<>();
@@ -357,7 +360,7 @@ public class ExchangeResolveService {
         && locKeys.isEmpty())) {
       for (ExchangeItemKeyRow row :
           gameItemRepository.findExchangeKeyRows(
-              orElse(ids, NO_UUID),
+              orElse(currentIds, NO_UUID),
               orElse(classNames, NO_TEXT),
               orElse(guids, NO_UUID),
               orElse(uexIds, NO_UEX_ID),
@@ -373,6 +376,12 @@ public class ExchangeResolveService {
         add(byLocKey, lower(row.nameKey()), entry);
       }
     }
+    redirects.forEach((retiredId, canonicalId) -> {
+      Set<Entry> entries = byId.get(canonicalId);
+      if (entries != null) {
+        byId.put(retiredId, entries);
+      }
+    });
     return new Catalog(
         bt -> Outcome.of(byId.get(parseUuid(bt))),
         byScRecord,

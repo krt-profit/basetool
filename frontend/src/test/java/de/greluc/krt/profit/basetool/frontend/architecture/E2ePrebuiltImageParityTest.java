@@ -26,16 +26,20 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
+import org.springframework.mock.env.MockEnvironment;
 
 /**
  * Verifies that the E2E workflow's image tags, the {@code image:} templates in {@code
  * docker-compose.build.yml} and {@code docker-compose.e2e.yml}, and {@code E2eStackExtension}'s
  * {@code IMAGE_TAG} and {@code BUILT_IMAGES} name the same prebuilt images, reading the files as
- * text.
+ * text, and keeps external catalogue schedulers disabled for deterministic fixtures.
  */
 class E2ePrebuiltImageParityTest {
 
@@ -125,6 +129,40 @@ class E2ePrebuiltImageParityTest {
     assertThat(workflow)
         .contains("-Pe2e.prebuilt=true")
         .contains("needs: [build-stack, build-stack-main]");
+  }
+
+  /**
+   * E2E environment overrides disable real catalogue fetches even when dev defaults enable them.
+   *
+   * @throws IOException if the E2E compose override cannot be read
+   */
+  @Test
+  void catalogueSchedulers_areDisabledThroughTheirCanonicalSpringProperties() throws IOException {
+    String compose = Files.readString(E2E_OVERRIDE, StandardCharsets.UTF_8);
+    Matcher backend =
+        Pattern.compile("(?ms)^  backend-dev:\\R(.*?)(?=^  [a-z][\\w-]*:|\\z)").matcher(compose);
+    assertThat(backend.find()).as("the E2E backend service must exist").isTrue();
+    final Map<String, Object> sourceEnvironment = new LinkedHashMap<>();
+    for (String flag : List.of("KRT_UEX_SCHEDULER_ENABLED", "KRT_SCWIKI_SCHEDULER_ENABLED")) {
+      Matcher setting =
+          Pattern.compile("(?m)^ {6}" + flag + ":\\s*(\\S+)\\s*$").matcher(backend.group(1));
+      assertThat(setting.find()).as("the E2E backend must explicitly disable %s", flag).isTrue();
+      assertThat(setting.group(1))
+          .as("Compose environment values are quoted strings")
+          .isEqualTo("\"false\"");
+      sourceEnvironment.put(flag, setting.group(1).replace("\"", ""));
+      assertThat(setting.find()).as("the E2E backend must not duplicate %s", flag).isFalse();
+    }
+    MockEnvironment environment =
+        new MockEnvironment()
+            .withProperty("krt.uex.scheduler-enabled", "true")
+            .withProperty("krt.scwiki.scheduler-enabled", "true");
+    environment
+        .getPropertySources()
+        .addFirst(new SystemEnvironmentPropertySource("e2e-catalogue", sourceEnvironment));
+
+    assertThat(environment.getProperty("krt.uex.scheduler-enabled", Boolean.class)).isFalse();
+    assertThat(environment.getProperty("krt.scwiki.scheduler-enabled", Boolean.class)).isFalse();
   }
 
   /**

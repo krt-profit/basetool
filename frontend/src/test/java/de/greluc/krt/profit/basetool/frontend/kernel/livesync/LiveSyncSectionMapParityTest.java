@@ -43,6 +43,24 @@ import org.junit.jupiter.api.Test;
  */
 class LiveSyncSectionMapParityTest {
 
+  @Test
+  void sourceCatalogueViews_shareTheRoleGatedCatalogueRefreshContract() throws IOException {
+    assertThat(LiveSyncTopicClass.CATALOGUE.allowedSections()).containsExactly("catalogue");
+    for (String module :
+        List.of(
+            "/static/js/catalogue/material-detail.js",
+            "/static/js/inventory/inventory-game-item.js",
+            "/static/js/hangar/hangar.js",
+            "/static/js/hangar/member-hangar.js",
+            "/static/js/hangar/hangar-squadron.js")) {
+      String js = readResource(module);
+      assertThat(js)
+          .as("%s refreshes the existing catalogue-bearing fragment", module)
+          .contains("topicClass: 'CATALOGUE'", "topic: 'catalogue'")
+          .containsPattern("catalogue:\\s*\\{\\s*container:");
+    }
+  }
+
   /**
    * Matches one entry of a seam map — a plain, single- or double-quoted key followed by {@code
    * : { container}. Anchoring on {@code container} avoids matching unrelated nested objects.

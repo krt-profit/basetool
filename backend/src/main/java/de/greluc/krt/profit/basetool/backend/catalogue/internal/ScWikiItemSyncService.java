@@ -23,34 +23,38 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses.KindPass;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses.KindPassResult;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
-import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -79,14 +83,8 @@ public class ScWikiItemSyncService {
   private static final ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>> ITEM_PAGE_TYPE =
       new ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>>() {};
 
-  /** Longest unknown class value written to the log. */
-  private static final int MAX_ITEM_CLASS_LOG_LENGTH = 64;
-
-  /** Distinct unknown class values remembered for the once-per-value warning. */
-  private static final int MAX_LOGGED_UNKNOWN_ITEM_CLASSES = 32;
-
-  /** Unknown class values already warned about since this instance started. */
-  private final Set<String> unknownItemClassesLogged = ConcurrentHashMap.newKeySet();
+  private static final int RECONCILIATION_ATTEMPTS = 3;
+  private static final Duration RECONCILIATION_RETRY_DELAY = Duration.ofMillis(25);
 
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
@@ -97,6 +95,8 @@ public class ScWikiItemSyncService {
   private final GameItemStatRepository gameItemStatRepository;
   private final GameItemStatWriter gameItemStatWriter;
   private final ScWikiItemStatFollowUp statFollowUp;
+  private final ItemReconciliationService itemReconciliationService;
+  private final ScWikiItemFieldWriter fieldWriter;
 
   /** Registry the orphan-sweep stand-down counter binds to. */
   private final MeterRegistry meterRegistry;
@@ -118,6 +118,7 @@ public class ScWikiItemSyncService {
    *
    * @return the number of {@code game_item} rows written this run; {@code 0} when disabled
    */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncItems() {
     if (!Boolean.TRUE.equals(properties.itemSyncEnabled())) {
       log.info(
@@ -127,10 +128,12 @@ public class ScWikiItemSyncService {
     }
     meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN);
     meterRegistry.gauge(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS, itemsWithStats);
-    int written =
-        Boolean.TRUE.equals(properties.syncAllItems()) ? syncItemsBackfill() : syncItemsClosure();
-    itemsWithStats.set(gameItemStatRepository.countItemsWithStats());
-    return written;
+    try (var _ = scWikiClient.openSyncRun()) {
+      int written =
+          Boolean.TRUE.equals(properties.syncAllItems()) ? syncItemsBackfill() : syncItemsClosure();
+      itemsWithStats.set(gameItemStatRepository.countItemsWithStats());
+      return written;
+    }
   }
 
   /**
@@ -155,25 +158,40 @@ public class ScWikiItemSyncService {
     int created = 0;
     int missing = 0;
     int deferred = 0;
+    int rejected = 0;
+    int unavailable = 0;
 
     for (UUID uuid : targets) {
-      scWikiClient.paceForRateLimit();
       try {
-        ScWikiItemDto dto =
-            scWikiClient.fetchOne(properties.itemsEndpoint(), uuid, ScWikiItemDto.class, "item");
+        ScWikiClient.DetailResult<ScWikiItemDto> detail =
+            scWikiClient.fetchOneResult(
+                properties.itemsEndpoint(), uuid, ScWikiItemDto.class, "item");
+        if (detail.outcome() == ScWikiClient.DetailOutcome.UNAVAILABLE) {
+          unavailable++;
+          continue;
+        }
         ClosureOutcome outcome =
-            self.getObject().fillClosureItemWithinTransaction(runId, uuid, dto, now);
+            self.getObject().fillClosureItemWithinTransaction(runId, uuid, detail.data(), now);
         if (outcome == ClosureOutcome.FILLED) {
           filled++;
+          syncReportService.recordApplied(1);
         } else if (outcome == ClosureOutcome.CREATED) {
           created++;
+          syncReportService.recordApplied(1);
         } else {
           missing++;
+          syncReportService.recordSkipped(1);
         }
+      } catch (SourceIdentityMismatchException e) {
+        rejected++;
+        recordDetailIdentityConflict(runId, e);
+        syncReportService.recordFailed(1);
       } catch (OptimisticLockingFailureException _) {
         deferred++;
+        syncReportService.recordFailed(1);
         log.warn("Optimistic lock collision filling SC Wiki item {}; deferring to next run", uuid);
       } catch (Exception e) {
+        syncReportService.recordFailed(1);
         log.error("Failed to fill SC Wiki item {}", uuid, e);
       }
     }
@@ -181,11 +199,13 @@ public class ScWikiItemSyncService {
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki item sync: {} filled, {} created WIKI_ONLY, {} missing on Wiki, {}"
-            + " deferred (lock collision).",
+            + " deferred (lock collision), {} rejected identities, {} unavailable details.",
         filled,
         created,
         missing,
-        deferred);
+        deferred,
+        rejected,
+        unavailable);
     return filled + created;
   }
 
@@ -199,7 +219,7 @@ public class ScWikiItemSyncService {
    *
    * @param runId the current run id for the {@code WIKI_MISSING} event
    * @param uuid the in-game asset UUID being filled
-   * @param dto the Wiki item payload, or {@code null} if the Wiki did not return the item
+   * @param dto the Wiki item payload, or {@code null} after a confirmed HTTP 404
    * @param now the shared {@code scwiki_synced_at} timestamp
    * @return {@link ClosureOutcome#FILLED}, {@link ClosureOutcome#CREATED} or {@link
    *     ClosureOutcome#MISSING}
@@ -218,6 +238,9 @@ public class ScWikiItemSyncService {
           "GET /api/items/{uuid} returned no item — Wiki does not know this asset.");
       return ClosureOutcome.MISSING;
     }
+    if (!uuid.equals(dto.uuid())) {
+      throw new SourceIdentityMismatchException(uuid, dto.uuid());
+    }
     GameItem item = gameItemRepository.findByExternalUuid(uuid).orElse(null);
     final boolean isNew = item == null;
     if (item == null) {
@@ -227,7 +250,7 @@ public class ScWikiItemSyncService {
       item.setKind(GameItemKind.GENERIC);
       item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     }
-    applyWikiFields(item, dto, now);
+    fieldWriter.apply(item, dto, now);
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }
@@ -253,9 +276,7 @@ public class ScWikiItemSyncService {
    * Mode B: runs every kind pass (most specific first) and the residual {@code GENERIC} pass, then
    * the orphan sweep when the seen set is non-empty and the census is vouched for (ADR-0195).
    *
-   * @return the number of {@code game_item} rows created, linked or reconciled, or {@link
-   *     GameItemRepository#countLiveScwikiItems() the live Wiki-linked item count} when nothing was
-   *     written but at least one pass returned {@code 304}
+   * @return the number of game items created, linked, reconciled, updated or restored
    */
   private int syncItemsBackfill() {
     log.info("Starting SC Wiki item sync (FULL BACKFILL mode) — paging every kind endpoint...");
@@ -267,7 +288,7 @@ public class ScWikiItemSyncService {
             : List.of();
     if (reconcile) {
       log.info(
-          "Weg-2 reconciliation enabled: indexed {} uuid-less UEX row(s) for name/slug merge.",
+          "Exact-name reconciliation enabled: indexed {} uuid-less UEX candidate row(s).",
           uuidlessUexRows.size());
     }
     BackfillContext ctx =
@@ -276,24 +297,44 @@ public class ScWikiItemSyncService {
             Instant.now(),
             manufacturerRepository.findAll(),
             uuidlessUexRows,
+            reconcile ? gameItemRepository.findByUexItemIdIsNotNull() : List.of(),
             reconcile);
+    List<KindPass> passes = new ArrayList<>(kindPasses());
+    KindPass residualPass =
+        new KindPass(properties.itemsEndpoint(), GameItemKind.GENERIC, null, false);
+    passes.add(residualPass);
+    Map<KindPass, ScWikiClient.FetchResult<ScWikiItemDto>> fetchedPasses = new LinkedHashMap<>();
+    for (KindPass pass : passes) {
+      fetchedPasses.put(pass, fetchKindPass(pass));
+    }
+    ctx.indexWikiCandidates(
+        Objects.requireNonNull(fetchedPasses.get(residualPass)), fetchedPasses.values());
     boolean allPassesSucceeded = true;
-
     for (KindPass pass : kindPasses()) {
-      allPassesSucceeded &= runKindPass(pass, ctx).succeeded();
+      allPassesSucceeded &=
+          runKindPass(pass, Objects.requireNonNull(fetchedPasses.get(pass)), ctx).succeeded();
     }
     KindPassResult residual =
-        runKindPass(
-            new KindPass(properties.itemsEndpoint(), GameItemKind.GENERIC, null, false), ctx);
+        runKindPass(residualPass, Objects.requireNonNull(fetchedPasses.get(residualPass)), ctx);
     allPassesSucceeded &= residual.succeeded();
 
-    if ((allPassesSucceeded || residualVouchesForPool(residual, ctx)) && !ctx.seen.isEmpty()) {
-      int marked = self.getObject().markBackfillOrphansWithinTransaction(ctx.seen, ctx.now);
+    boolean fullCensus = allPassesSucceeded || residualVouchesForPool(residual, ctx);
+    if (fullCensus) {
+      syncReportService.recordCompleteCensus();
+    }
+    Set<UUID> protectedSeen =
+        fullCensus && !ctx.seen.isEmpty() && ctx.failedWrites == 0
+            ? protectKnownItemsOutsidePlayerScope(ctx)
+            : null;
+    if (protectedSeen != null) {
+      int marked = self.getObject().markBackfillOrphansWithinTransaction(protectedSeen, ctx.now);
       if (marked > 0) {
         log.info(
             "Marked {} game_item row(s) scwiki_deleted (no longer in any Wiki kind feed).", marked);
       }
+      syncReportService.recordSweep(true);
     } else {
+      syncReportService.recordSweep(false);
       String reason = sweepSkipReason(ctx);
       meterRegistry
           .counter(
@@ -305,39 +346,112 @@ public class ScWikiItemSyncService {
           .increment();
       log.warn(
           "Skipping cross-kind orphan sweep (reason={}, allPassesSucceeded={}, seenCount={}): a"
-              + " partial, empty, 304 or sanity-capped kind fetch must never wipe Wiki-side state.",
+              + " partial, empty or sanity-capped kind fetch must never wipe Wiki-side state.",
           reason,
           allPassesSucceeded,
           ctx.seen.size());
     }
 
-    statFollowUp.fetchMissing((uuid, dto) ->
-        self.getObject().fillClosureItemWithinTransaction(ctx.runId, uuid, dto, ctx.now));
+    statFollowUp.fetchMissing((uuid, dto) -> {
+      try {
+        self.getObject().fillClosureItemWithinTransaction(ctx.runId, uuid, dto, ctx.now);
+      } catch (SourceIdentityMismatchException e) {
+        recordDetailIdentityConflict(ctx.runId, e);
+        throw e;
+      }
+    });
 
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
-        "Finished SC Wiki item sync (full backfill): {} created WIKI_ONLY, {} linked"
-            + " UEX_ONLY→BOTH, {} reconciled (uuid-less UEX merged by name/slug), {} skipped"
-            + " (junk), {} deferred (lock collision), {} pass(es) empty/capped ({} of them"
-            + " unchanged 304).",
+        "Finished SC Wiki item sync (full backfill): {} created WIKI_ONLY, {} linked UEX_ONLY→BOTH,"
+            + " {} reconciled (uuid-less UEX merged by name), {} updated, {} restored, {} skipped"
+            + " (junk), {} deferred (lock collision), {} pass(es) empty/capped.",
         ctx.created,
         ctx.linked,
         ctx.reconciled,
+        ctx.updated,
+        ctx.restored,
         ctx.skipped,
         ctx.deferred,
-        ctx.failedPasses,
-        ctx.notModifiedPasses);
+        ctx.failedPasses);
 
-    int written = ctx.created + ctx.linked + ctx.reconciled;
-    if (written == 0 && ctx.notModifiedPasses > 0) {
-      long live = gameItemRepository.countLiveScwikiItems();
-      log.info(
-          "SC Wiki item backfill: every fetched kind pass was unchanged (304) and nothing was"
-              + " written — reporting {} live Wiki-linked game_item row(s) instead of 0.",
-          live);
-      return (int) live;
+    return ctx.created + ctx.linked + ctx.reconciled + ctx.updated + ctx.restored;
+  }
+
+  private void recordDetailIdentityConflict(UUID runId, SourceIdentityMismatchException failure) {
+    syncReportService.recordIncomplete();
+    syncReportService.logScwikiEvent(
+        runId,
+        SyncEventType.SOURCE_IDENTITY_CONFLICT,
+        "game_item",
+        failure.getRequestedUuid(),
+        null,
+        "requestedUuid=" + failure.getRequestedUuid() + ";servedUuid=" + failure.getServedUuid());
+  }
+
+  /**
+   * Requires a full-scope existence census before treating a player-scope omission as a deletion.
+   *
+   * @param ctx this run's identity census and committed-write counters
+   * @return protected cleanup identities, or {@code null} when absence cannot be proven
+   */
+  private @Nullable Set<UUID> protectKnownItemsOutsidePlayerScope(@NotNull BackfillContext ctx) {
+    Set<UUID> omittedKnown = new HashSet<>(gameItemRepository.findKnownWikiExternalUuids());
+    omittedKnown.removeAll(ctx.seen);
+    if (omittedKnown.isEmpty()) {
+      return ctx.seen;
     }
-    return written;
+    ScWikiClient.ExistenceCensus full =
+        scWikiClient.fetchExistenceCensus(
+            properties.itemsEndpoint(), "items", properties.pageSize());
+    if (!full.complete() || !full.uuids().containsAll(ctx.seen)) {
+      syncReportService.recordIncomplete();
+      log.warn("Skipping item orphan sweep: the full-scope existence census cannot prove absence.");
+      return null;
+    }
+    Set<UUID> protectedSeen = new HashSet<>(ctx.seen);
+    omittedKnown.retainAll(full.uuids());
+    if (!omittedKnown.isEmpty()) {
+      try {
+        ctx.restored =
+            self.getObject().restoreKnownItemsWithinTransaction(omittedKnown, ctx.runId, ctx.now);
+        syncReportService.recordApplied(ctx.restored);
+      } catch (RuntimeException e) {
+        syncReportService.recordFailed(1);
+        throw e;
+      }
+    }
+    protectedSeen.addAll(omittedKnown);
+    return protectedSeen;
+  }
+
+  /**
+   * Clears false tombstones only for known positively verified Wiki identities in bounded batches.
+   *
+   * @param presentKnown known game UUIDs present in the complete all-asset census
+   * @param runId source report run
+   * @param now time of the presence correction
+   * @return the committed number of restored item rows
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int restoreKnownItemsWithinTransaction(
+      @NotNull Set<UUID> presentKnown, @NotNull UUID runId, @NotNull Instant now) {
+    List<UUID> ids = new ArrayList<>(presentKnown);
+    int restored = 0;
+    for (int start = 0; start < ids.size(); start += SyncChunkWriter.DEFAULT_CHUNK_SIZE) {
+      int end = Math.min(start + SyncChunkWriter.DEFAULT_CHUNK_SIZE, ids.size());
+      restored += gameItemRepository.restoreKnownWikiItems(ids.subList(start, end), now);
+    }
+    if (restored > 0) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.SOURCE_RECORDS_RESTORED,
+          "game_item",
+          null,
+          null,
+          "restored=" + restored + ";scope=all_assets");
+    }
+    return restored;
   }
 
   /**
@@ -353,70 +467,42 @@ public class ScWikiItemSyncService {
     return gameItemRepository.markScwikiDeletedExcept(seenExternalUuids, now);
   }
 
-  /**
-   * The ordered Mode-B kind passes, most specific first so a UUID served by several endpoints gets
-   * the most specific kind; {@link #syncItemsBackfill()} appends the residual pass.
-   *
-   * @return the kind passes in claim order
-   */
-  @NotNull
-  @Unmodifiable
   private List<KindPass> kindPasses() {
-    return List.of(
-        new KindPass(
-            properties.weaponAttachmentsEndpoint(),
-            GameItemKind.WEAPON_ATTACHMENT,
-            properties.weaponAttachmentsFilter(),
-            true),
-        new KindPass(
-            properties.weaponsEndpoint(), GameItemKind.WEAPON, properties.weaponsFilter(), true),
-        new KindPass(
-            properties.vehicleWeaponsEndpoint(),
-            GameItemKind.VEHICLE_WEAPON,
-            properties.vehicleWeaponsFilter(),
-            true),
-        new KindPass(
-            properties.vehicleItemsEndpoint(),
-            GameItemKind.VEHICLE_ITEM,
-            properties.vehicleItemsFilter(),
-            true),
-        new KindPass(
-            properties.armorEndpoint(), GameItemKind.ARMOR, properties.armorFilter(), true),
-        new KindPass(
-            properties.clothesEndpoint(), GameItemKind.CLOTHING, properties.clothesFilter(), true),
-        new KindPass(properties.foodEndpoint(), GameItemKind.FOOD, properties.foodFilter(), true));
+    return ScWikiItemPasses.ordered(properties);
   }
 
   /**
-   * Pages one endpoint, applies the sanity cap for kind passes, and upserts every UUID not already
-   * claimed by an earlier pass.
+   * Fetches one kind pass without applying its source identities.
    *
    * @param pass the endpoint, kind and filter to run
-   * @param ctx the shared backfill state
-   * @return the outcome: {@link KindPassResult#succeeded()} only for a complete, ingested pool, and
-   *     {@link KindPassResult#enumerated()} with every UUID the pass was served
+   * @return the fetched pass and its census verdict
    */
   @NotNull
-  private KindPassResult runKindPass(@NotNull KindPass pass, BackfillContext ctx) {
+  private ScWikiClient.FetchResult<ScWikiItemDto> fetchKindPass(@NotNull KindPass pass) {
     @Nullable
     Map<String, String> filters =
         StringUtils.hasText(pass.classificationFilter())
             ? Map.of("classification", pass.classificationFilter())
             : null;
     String label = pass.kind().name().toLowerCase(Locale.ROOT) + " items";
-    ScWikiClient.FetchResult<ScWikiItemDto> result =
-        scWikiClient.fetchAllPagesResult(pass.endpoint(), ITEM_PAGE_TYPE, label, null, filters);
+    return scWikiClient.fetchAllPagesResult(
+        pass.endpoint(), ITEM_PAGE_TYPE, label, ScWikiClient.ITEM_METADATA_INCLUDES, filters);
+  }
 
-    if (result.notModified()) {
-      log.debug(
-          "Wiki kind pass {} ({}) unchanged since last sync (304) — skipping ingest; no orphan"
-              + " sweep this run.",
-          pass.endpoint(),
-          pass.kind());
-      ctx.notModifiedPasses++;
-      ctx.failedPasses++;
-      return KindPassResult.notEnumerated();
-    }
+  /**
+   * Applies a prefetched kind pool after cross-kind identity ambiguity is known.
+   *
+   * @param pass the kind assigned to this endpoint
+   * @param result the fetched pool and its census verdict
+   * @param ctx the shared backfill state
+   * @return the pass's completeness and enumerated identities
+   */
+  @NotNull
+  private KindPassResult runKindPass(
+      @NotNull KindPass pass,
+      @NotNull ScWikiClient.FetchResult<ScWikiItemDto> result,
+      @NotNull BackfillContext ctx) {
+
     List<ScWikiItemDto> fetched = result.data();
     if (fetched.isEmpty()) {
       log.warn(
@@ -462,11 +548,20 @@ public class ScWikiItemSyncService {
       }
       try {
         Manufacturer resolvedManufacturer = ctx.resolveManufacturer(dto.manufacturer());
-        UUID reconcileUexId = ctx.resolveUuidlessUexMatch(dto);
+        ItemReconciliationIndex.Match match = ctx.resolveUuidlessUexMatch(dto);
+        if (match.ambiguity() != null) {
+          syncReportService.logScwikiEvent(
+              ctx.runId,
+              SyncEventType.MULTI_MATCH_AMBIGUOUS,
+              "game_item",
+              dto.uuid(),
+              dto.name(),
+              "Exact-name reconciliation declined;reason=" + match.ambiguity().name());
+        }
+        UUID reconcileUexId = match.candidateId();
         BackfillOutcome outcome =
-            self.getObject()
-                .upsertBackfillItemWithinTransaction(
-                    dto, pass.kind(), ctx.runId, ctx.now, resolvedManufacturer, reconcileUexId);
+            upsertWithReconciliationRetry(
+                dto, pass.kind(), ctx, resolvedManufacturer, reconcileUexId);
         switch (outcome) {
           case CREATED -> ctx.created++;
           case LINKED -> ctx.linked++;
@@ -474,21 +569,61 @@ public class ScWikiItemSyncService {
             ctx.reconciled++;
             ctx.markConsumed(reconcileUexId);
           }
-          case SKIPPED -> ctx.skipped++;
-          case UPDATED -> {}
+          case SKIPPED -> {
+            ctx.skipped++;
+            syncReportService.recordSkipped(1);
+          }
+          case UPDATED -> ctx.updated++;
           case null -> throw new NullPointerException("backfill outcome");
         }
+        if (outcome != BackfillOutcome.SKIPPED) {
+          syncReportService.recordApplied(1);
+        }
+      } catch (GameItemReconciliationBusyException _) {
+        ctx.deferred++;
+        ctx.failedWrites++;
+        syncReportService.recordFailed(1);
+        log.warn(
+            "Reference-owner locks stayed busy for SC Wiki item {}; deferring reconciliation",
+            dto.uuid());
       } catch (OptimisticLockingFailureException _) {
         ctx.deferred++;
+        ctx.failedWrites++;
+        syncReportService.recordFailed(1);
         log.warn(
             "Optimistic lock collision upserting SC Wiki item {} ({}); deferring to next run",
             dto.uuid(),
             pass.kind());
       } catch (Exception e) {
+        ctx.failedWrites++;
+        syncReportService.recordFailed(1);
         log.error("Failed to upsert SC Wiki item {} ({})", dto.uuid(), pass.kind(), e);
       }
     }
     return new KindPassResult(complete, enumerated);
+  }
+
+  private BackfillOutcome upsertWithReconciliationRetry(
+      ScWikiItemDto dto,
+      GameItemKind kind,
+      BackfillContext ctx,
+      @Nullable Manufacturer manufacturer,
+      @Nullable UUID uexId) {
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return self.getObject()
+            .upsertBackfillItemWithinTransaction(
+                dto, kind, ctx.runId, ctx.now, manufacturer, uexId);
+      } catch (GameItemReconciliationBusyException failure) {
+        if (attempt >= RECONCILIATION_ATTEMPTS || Thread.currentThread().isInterrupted()) {
+          throw failure;
+        }
+        LockSupport.parkNanos(RECONCILIATION_RETRY_DELAY.toNanos());
+        if (Thread.currentThread().isInterrupted()) {
+          throw failure;
+        }
+      }
+    }
   }
 
   /**
@@ -542,8 +677,8 @@ public class ScWikiItemSyncService {
    * @param runId the current run id for the sync-report events
    * @param now the shared {@code scwiki_synced_at} timestamp
    * @param resolvedManufacturer the manufacturer for new rows, or {@code null}
-   * @param reconcileUexId the id of a uuid-less {@code UEX_ONLY} row matched by slug or name, or
-   *     {@code null}
+   * @param reconcileUexId the id of a uuid-less {@code UEX_ONLY} row matched by a unique source
+   *     name, or {@code null}
    * @return the {@link BackfillOutcome} for the row
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -556,7 +691,7 @@ public class ScWikiItemSyncService {
       @Nullable UUID reconcileUexId) {
     GameItem item = gameItemRepository.findByExternalUuid(dto.uuid()).orElse(null);
     if (item == null) {
-      if (shouldSkipNewItem(dto)) {
+      if (ScWikiItemFieldWriter.shouldSkipNewItem(dto)) {
         syncReportService.logScwikiEvent(
             runId,
             SyncEventType.SKIP_JUNK,
@@ -568,7 +703,8 @@ public class ScWikiItemSyncService {
         return BackfillOutcome.SKIPPED;
       }
       if (reconcileUexId != null
-          && reconcileIntoUexRow(reconcileUexId, dto, passKind, runId, now) != null) {
+          && reconcileIntoUexRow(reconcileUexId, dto, passKind, resolvedManufacturer, runId, now)
+              != null) {
         return BackfillOutcome.RECONCILED;
       }
       item = new GameItem();
@@ -577,7 +713,7 @@ public class ScWikiItemSyncService {
       item.setKind(passKind);
       item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
       item.setManufacturer(resolvedManufacturer);
-      applyWikiFields(item, dto, now);
+      fieldWriter.apply(item, dto, now);
       gameItemRepository.save(item);
       gameItemStatWriter.write(item, dto);
       syncReportService.logScwikiEvent(
@@ -590,9 +726,23 @@ public class ScWikiItemSyncService {
       return BackfillOutcome.CREATED;
     }
 
+    boolean reconciled = false;
+    if (reconcileUexId != null) {
+      GameItem survivor =
+          itemReconciliationService.mergeExisting(
+              item,
+              reconcileUexId,
+              runId,
+              new ItemReconciliationService.WikiIdentity(
+                  dto.name(), passKind, resolvedManufacturer, dto.className()));
+      if (survivor != null) {
+        item = survivor;
+        reconciled = true;
+      }
+    }
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), passKind));
-    applyWikiFields(item, dto, now);
-    BackfillOutcome outcome = BackfillOutcome.UPDATED;
+    fieldWriter.apply(item, dto, now);
+    BackfillOutcome outcome = reconciled ? BackfillOutcome.RECONCILED : BackfillOutcome.UPDATED;
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
       outcome = BackfillOutcome.LINKED;
@@ -604,28 +754,36 @@ public class ScWikiItemSyncService {
 
   /**
    * Merges a Wiki item into a uuid-less {@code UEX_ONLY} row within the caller's transaction,
-   * re-checking under the row lock that the row still qualifies; logs {@link
+   * re-checking that its source identity still qualifies; logs {@link
    * SyncEventType#LINKED_VIA_NAME}.
    *
-   * @param uexRowId the id of the uuid-less UEX row matched by slug or name
+   * @param uexRowId the id of the uuid-less UEX row matched by its unique exact source name
    * @param dto the Wiki item payload supplying the {@code external_uuid} and Wiki columns
    * @param passKind the kind derived from the source endpoint, merged more-specific-wins
+   * @param resolvedManufacturer the Wiki source's resolved manufacturer
    * @param runId the current run id for the {@link SyncEventType#LINKED_VIA_NAME} event
    * @param now the shared {@code scwiki_synced_at} timestamp
    * @return the merged row, or {@code null} if the candidate no longer qualifies
    */
   @Nullable
   private GameItem reconcileIntoUexRow(
-      UUID uexRowId, ScWikiItemDto dto, GameItemKind passKind, UUID runId, Instant now) {
+      UUID uexRowId,
+      ScWikiItemDto dto,
+      GameItemKind passKind,
+      @Nullable Manufacturer resolvedManufacturer,
+      UUID runId,
+      Instant now) {
     GameItem uexRow = gameItemRepository.findById(uexRowId).orElse(null);
     if (uexRow == null
         || uexRow.getExternalUuid() != null
-        || uexRow.getSourceSystems() != GameItemSourceSystem.UEX_ONLY) {
+        || uexRow.getSourceSystems() != GameItemSourceSystem.UEX_ONLY
+        || !ItemIdentityCompatibility.matches(
+            uexRow, passKind, resolvedManufacturer, dto.className())) {
       return null;
     }
     uexRow.setExternalUuid(dto.uuid());
     uexRow.setKind(GameItemKind.mergeMoreSpecific(uexRow.getKind(), passKind));
-    applyWikiFields(uexRow, dto, now);
+    fieldWriter.apply(uexRow, dto, now);
     uexRow.setSourceSystems(GameItemSourceSystem.BOTH);
     gameItemRepository.save(uexRow);
     gameItemStatWriter.write(uexRow, dto);
@@ -637,7 +795,7 @@ public class ScWikiItemSyncService {
         uexRow.getName(),
         "Merged Wiki item into uuid-less UEX row '"
             + uexRow.getName()
-            + "' by slug/name; backfilled external_uuid and flipped UEX_ONLY → BOTH.");
+            + "' by its unique source name; attached external_uuid and marked both sources.");
     return uexRow;
   }
 
@@ -659,151 +817,6 @@ public class ScWikiItemSyncService {
   }
 
   /**
-   * Writes the Wiki-owned descriptive columns onto a game item; the UEX {@code name} and, on
-   * existing rows, {@code manufacturer} are never touched.
-   *
-   * <p>A payload without {@code size}, {@code grade} or {@code class} keeps the stored value
-   * (REQ-DATA-024).
-   *
-   * @param item the game item to update
-   * @param dto the Wiki item payload
-   * @param now timestamp for {@code scwiki_synced_at}
-   */
-  private void applyWikiFields(@NotNull GameItem item, @NotNull ScWikiItemDto dto, Instant now) {
-    item.setScwikiSlug(dto.slug());
-    item.setClassName(dto.className());
-    item.setClassification(dto.classification());
-    item.setClassificationLabel(dto.classificationLabel());
-    item.setWikiType(dto.type());
-    item.setWikiTypeLabel(dto.typeLabel());
-    item.setWikiSubType(dto.subType());
-    item.setWikiSubTypeLabel(dto.subTypeLabel());
-    if (StringUtils.hasText(dto.size())) {
-      item.setSizeClass(parseSize(dto.size()));
-    }
-    if (StringUtils.hasText(dto.grade())) {
-      item.setGrade(dto.grade());
-    }
-    if (StringUtils.hasText(dto.itemClass())) {
-      item.setItemClass(resolveItemClass(dto.itemClass()));
-    }
-    item.setRarity(dto.rarity());
-    item.setMass(dto.mass());
-    if (dto.dimension() != null) {
-      item.setDimensionX(dto.dimension().width());
-      item.setDimensionY(dto.dimension().height());
-      item.setDimensionZ(dto.dimension().length());
-    }
-    if (dto.description() != null) {
-      item.setDescriptionEn(dto.description().get("en_EN"));
-      item.setDescriptionDe(dto.description().get("de_DE"));
-    }
-    item.setIsBaseVariant(dto.isBaseVariant());
-    item.setIsCraftable(dto.isCraftable());
-    item.setScwikiGameVersionSeen(dto.version());
-    item.setScwikiSyncedAt(now);
-    item.setScwikiDeletedAt(null);
-  }
-
-  /**
-   * Maps a present Wiki {@code class} value; an unknown one is counted, logged once per value and
-   * resolves to no class (REQ-DATA-024).
-   *
-   * @param wikiClass the non-blank payload value
-   * @return the class, or {@code null} when the value is unknown
-   */
-  @Nullable
-  private ShipComponentClass resolveItemClass(@NotNull String wikiClass) {
-    ShipComponentClass resolved = ShipComponentClass.fromWikiClass(wikiClass);
-    if (resolved == null) {
-      meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).increment();
-      String value = LogSafe.text(wikiClass.strip(), MAX_ITEM_CLASS_LOG_LENGTH);
-      if (unknownItemClassesLogged.size() < MAX_LOGGED_UNKNOWN_ITEM_CLASSES
-          && unknownItemClassesLogged.add(value.toLowerCase(Locale.ROOT))) {
-        log.warn(
-            "Unknown SC Wiki item class '{}' — storing no class; add it to ShipComponentClass.",
-            value);
-      }
-    }
-    return resolved;
-  }
-
-  /**
-   * Parses the Wiki {@code size} token into an integer size class.
-   *
-   * @param size raw size token
-   * @return the integer size class, or {@code null} if not a plain integer
-   */
-  @Nullable
-  private static Integer parseSize(String size) {
-    if (!StringUtils.hasText(size)) {
-      return null;
-    }
-    try {
-      return Integer.valueOf(size.trim());
-    } catch (NumberFormatException _) {
-      log.debug("Non-numeric Wiki item size '{}' — leaving size_class null", size);
-      return null;
-    }
-  }
-
-  /**
-   * Returns whether a Wiki item must not create a new {@code WIKI_ONLY} row: a blank name, a name
-   * with markup ({@code <} or {@code >}), or a {@code NOITEM_Vehicle} type.
-   *
-   * @param dto the Wiki item payload
-   * @return {@code true} if no new row should be created for this item
-   */
-  private static boolean shouldSkipNewItem(ScWikiItemDto dto) {
-    if (!StringUtils.hasText(dto.name())) {
-      return true;
-    }
-    String name = dto.name().trim();
-    if (name.contains("<") || name.contains(">")) {
-      return true;
-    }
-    return "NOITEM_Vehicle".equalsIgnoreCase(dto.type());
-  }
-
-  /**
-   * One Mode-B endpoint pass: endpoint, assigned kind, optional classification filter, and whether
-   * the sanity cap applies.
-   *
-   * @param endpoint Wiki list endpoint path
-   * @param kind the kind assigned to rows from this endpoint
-   * @param classificationFilter the {@code filter[classification]} value, or {@code null} / blank
-   * @param applySanityCap whether to refuse a pool-sized response
-   */
-  private record KindPass(
-      String endpoint,
-      GameItemKind kind,
-      @Nullable String classificationFilter,
-      boolean applySanityCap) {}
-
-  /**
-   * What one Mode-B pass achieved: whether it vouches for its census, and every UUID it was served,
-   * regardless of which pass claimed it.
-   *
-   * @param succeeded whether the pass fetched a complete, usable pool and ingested it
-   * @param enumerated every UUID the pass was served; empty when it enumerated nothing, never
-   *     {@code null}
-   */
-  private record KindPassResult(boolean succeeded, @NotNull Set<UUID> enumerated) {
-
-    /**
-     * The outcome of a pass that never enumerated the feed at all — a {@code 304 Not Modified}, an
-     * empty-200, or a fetch the sanity cap rejected. It failed and it vouches for nothing, so it
-     * can neither satisfy the strict gate nor contribute a pool to the residual-census check.
-     *
-     * @return a failed result carrying no row identities
-     */
-    @Contract(value = " -> new", pure = true)
-    private static @NotNull KindPassResult notEnumerated() {
-      return new KindPassResult(false, Set.of());
-    }
-  }
-
-  /**
    * Mutable per-run Mode-B state: run id, timestamp, cross-kind seen set, manufacturer lookup,
    * reconciliation index and result counters.
    */
@@ -814,48 +827,52 @@ public class ScWikiItemSyncService {
     private final Map<UUID, Manufacturer> manufacturersByScwikiUuid = new HashMap<>();
     private final Map<String, Manufacturer> manufacturersByLowerName = new HashMap<>();
 
-    /**
-     * Weg-2 reconciliation index: lower-cased {@code uex_slug} → id of the single uuid-less {@code
-     * UEX_ONLY} row carrying it. Keys carried by more than one row are dropped (ambiguous → never a
-     * unique match), so a hit is always safe to merge.
-     */
-    private final Map<String, UUID> uexIdBySlug = new HashMap<>();
-
-    /** Weg-2 reconciliation index: lower-cased name → id of the single uuid-less UEX row. */
-    private final Map<String, UUID> uexIdByLowerName = new HashMap<>();
-
-    /** UEX row ids already merged this run, so a second Wiki item can never re-consume one. */
-    private final Set<UUID> consumedUexIds = new HashSet<>();
+    private final ItemReconciliationIndex reconciliationIndex;
 
     private int created;
     private int linked;
     private int reconciled;
     private int skipped;
     private int deferred;
+    private int updated;
+    private int restored;
+    private int failedWrites;
     private int failedPasses;
 
     /**
-     * Count of passes that returned {@code 304 Not Modified}, a subset of {@link #failedPasses}.
+     * Indexes both sides of every name and slug match before any row may be linked.
+     *
+     * @param residual complete unfiltered Wiki item pool
+     * @param passes every fetched kind pool
      */
-    private int notModifiedPasses;
+    private void indexWikiCandidates(
+        ScWikiClient.FetchResult<ScWikiItemDto> residual,
+        java.util.Collection<ScWikiClient.FetchResult<ScWikiItemDto>> passes) {
+      reconciliationIndex.indexWikiCandidates(
+          residual.data(),
+          residual.complete(),
+          passes.stream().map(ScWikiClient.FetchResult::data).toList());
+    }
 
     /**
      * Captures the run id and timestamp, indexes the manufacturer table by Wiki UUID and by
-     * lower-cased name, and builds the Weg-2 reconciliation index over the uuid-less {@code
-     * UEX_ONLY} rows (by {@code uex_slug} and by name, ambiguous keys excluded).
+     * lower-cased name, and builds the reconciliation index over the uuid-less {@code UEX_ONLY}
+     * rows (by {@code uex_slug} and by name, ambiguous keys excluded).
      *
      * @param runId the sync-report run id
      * @param now the shared {@code scwiki_synced_at} timestamp
      * @param manufacturers every manufacturer row, loaded once
      * @param uuidlessUexRows the uuid-less {@code UEX_ONLY} rows to index for reconciliation (empty
      *     when reconciliation is disabled)
-     * @param reconcileEnabled whether Weg-2 name/slug reconciliation is active
+     * @param allUexRows every UEX source row, including variants already linked to Wiki identities
+     * @param reconcileEnabled whether exact-name reconciliation is active
      */
     BackfillContext(
         UUID runId,
         Instant now,
         List<Manufacturer> manufacturers,
         List<GameItem> uuidlessUexRows,
+        List<GameItem> allUexRows,
         boolean reconcileEnabled) {
       this.runId = runId;
       this.now = now;
@@ -867,47 +884,10 @@ public class ScWikiItemSyncService {
           manufacturersByLowerName.putIfAbsent(mfr.getName().trim().toLowerCase(Locale.ROOT), mfr);
         }
       }
-      if (reconcileEnabled) {
-        Set<String> ambiguousSlugs = new HashSet<>();
-        Set<String> ambiguousNames = new HashSet<>();
-        for (GameItem row : uuidlessUexRows) {
-          if (StringUtils.hasText(row.getUexSlug())) {
-            indexUnique(
-                uexIdBySlug,
-                ambiguousSlugs,
-                row.getUexSlug().trim().toLowerCase(Locale.ROOT),
-                row.getId());
-          }
-          if (StringUtils.hasText(row.getName())) {
-            indexUnique(
-                uexIdByLowerName,
-                ambiguousNames,
-                row.getName().trim().toLowerCase(Locale.ROOT),
-                row.getId());
-          }
-        }
-      }
-    }
-
-    /**
-     * Inserts {@code key → id} into {@code index} while the key stays unique; a second distinct id
-     * removes the key and records it as ambiguous.
-     *
-     * @param index the slug- or name-keyed unique index being built
-     * @param ambiguous the keys already found to be non-unique
-     * @param key the normalised lookup key
-     * @param id the candidate UEX row id
-     */
-    private static void indexUnique(
-        Map<String, UUID> index, Set<String> ambiguous, String key, UUID id) {
-      if (ambiguous.contains(key)) {
-        return;
-      }
-      UUID existing = index.putIfAbsent(key, id);
-      if (existing != null && !existing.equals(id)) {
-        index.remove(key);
-        ambiguous.add(key);
-      }
+      reconciliationIndex =
+          new ItemReconciliationIndex(
+              reconcileEnabled ? uuidlessUexRows : List.of(),
+              reconcileEnabled ? allUexRows : List.of());
     }
 
     /**
@@ -936,27 +916,14 @@ public class ScWikiItemSyncService {
     }
 
     /**
-     * Finds the uuid-less {@code UEX_ONLY} row this Wiki item should merge into, preferring a
-     * {@code uex_slug} match over a name match; only unambiguous, unconsumed candidates qualify.
+     * Finds a uuid-less UEX row through a name unique in both censuses and a non-conflicting slug.
      *
      * @param dto the Wiki item payload
-     * @return the id of the uuid-less UEX row to merge into, or {@code null} when none is safe
+     * @return a safe candidate or a bounded ambiguity reason for the source report
      */
-    @Nullable
-    private UUID resolveUuidlessUexMatch(ScWikiItemDto dto) {
-      if (StringUtils.hasText(dto.slug())) {
-        UUID bySlug = uexIdBySlug.get(dto.slug().trim().toLowerCase(Locale.ROOT));
-        if (bySlug != null && !consumedUexIds.contains(bySlug)) {
-          return bySlug;
-        }
-      }
-      if (StringUtils.hasText(dto.name())) {
-        UUID byName = uexIdByLowerName.get(dto.name().trim().toLowerCase(Locale.ROOT));
-        if (byName != null && !consumedUexIds.contains(byName)) {
-          return byName;
-        }
-      }
-      return null;
+    @NotNull
+    private ItemReconciliationIndex.Match resolveUuidlessUexMatch(ScWikiItemDto dto) {
+      return reconciliationIndex.match(dto);
     }
 
     /**
@@ -966,7 +933,7 @@ public class ScWikiItemSyncService {
      * @param uexId the id of the just-merged UEX row
      */
     private void markConsumed(@Nullable UUID uexId) {
-      consumedUexIds.add(uexId);
+      reconciliationIndex.markConsumed(uexId);
     }
   }
 
@@ -975,12 +942,10 @@ public class ScWikiItemSyncService {
    * CatalogueMetricNames#SWEEP_SKIP_INCOMPLETE} indicates a fault.
    *
    * @param ctx the finished run's context
-   * @return one of the three bounded reason values; never {@code null}
+   * @return one of the two bounded reason values; never {@code null}
    */
   private static String sweepSkipReason(BackfillContext ctx) {
-    if (ctx.notModifiedPasses > 0 && ctx.failedPasses == ctx.notModifiedPasses) {
-      return CatalogueMetricNames.SWEEP_SKIP_NOT_MODIFIED;
-    }
+
     if (ctx.seen.isEmpty()) {
       return CatalogueMetricNames.SWEEP_SKIP_NO_ROWS;
     }

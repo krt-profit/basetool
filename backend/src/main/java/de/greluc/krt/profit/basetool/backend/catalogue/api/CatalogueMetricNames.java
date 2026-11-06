@@ -31,7 +31,7 @@ public final class CatalogueMetricNames {
   /**
    * Counter {@code basetool_catalogue_orphan_sweep_skipped_total} — tags {@code sweep} ({@link
    * #SWEEP_ITEM}) and {@code reason} ({@link #SWEEP_SKIP_INCOMPLETE} / {@link
-   * #SWEEP_SKIP_NOT_MODIFIED} / {@link #SWEEP_SKIP_NO_ROWS}), one per stood-down sweep.
+   * #SWEEP_SKIP_NO_ROWS}), one per stood-down sweep.
    */
   public static final String CATALOGUE_ORPHAN_SWEEP_SKIPPED =
       "basetool.catalogue.orphan.sweep.skipped";
@@ -48,9 +48,7 @@ public final class CatalogueMetricNames {
   /**
    * Counter {@code basetool_external_fetch_errors_total} — tags {@code source} ({@link #SOURCE_UEX}
    * / {@link #SOURCE_SCWIKI}) and {@code reason} ({@link #REASON_FETCH} / {@link #REASON_CENSUS}).
-   * Incremented where an upstream fetch/parse error is swallowed into an empty result, or a page
-   * walk is flagged incomplete, so a weeks-long catalogue outage is visible even though the sync
-   * job still "succeeds" (REQ-OBS-011).
+   * Incremented for upstream fetch/parse errors and incomplete page walks (REQ-OBS-011).
    */
   public static final String EXTERNAL_FETCH_ERRORS = "basetool.external.fetch.errors";
 
@@ -92,13 +90,6 @@ public final class CatalogueMetricNames {
   /** Orphan-sweep stand-down: at least one kind pass came back an incomplete census. */
   public static final String SWEEP_SKIP_INCOMPLETE = "incomplete";
 
-  /**
-   * Orphan-sweep stand-down: every kind pass answered 304, so the run held no census to sweep
-   * against. The healthy, expected case — a fully-cached run — and the reason this counter is
-   * tagged at all.
-   */
-  public static final String SWEEP_SKIP_NOT_MODIFIED = "not_modified";
-
   /** Orphan-sweep stand-down: the run ended up with no rows at all, so a sweep would wipe. */
   public static final String SWEEP_SKIP_NO_ROWS = "no_rows";
 
@@ -119,6 +110,26 @@ public final class CatalogueMetricNames {
 
   /** {@code source} value for the Star Citizen Wiki client ({@link #EXTERNAL_FETCH_ERRORS}). */
   public static final String SOURCE_SCWIKI = "scwiki";
+
+  /** Counter of durable catalogue attempts, tagged by source, aggregate and status. */
+  public static final String CATALOGUE_ATTEMPTS = "basetool.catalogue.attempts";
+
+  /** Gauge identifying catalogue attempts active in this process. */
+  public static final String CATALOGUE_ATTEMPT_ACTIVE = "basetool.catalogue.attempt.active";
+
+  /** Gauge of the current attempt outcome, tagged by source, aggregate and status. */
+  public static final String CATALOGUE_ATTEMPT_STATUS = "basetool.catalogue.attempt.status";
+
+  /** Gauge of the newest attempt start, in epoch seconds. */
+  public static final String CATALOGUE_ATTEMPT_STARTED =
+      "basetool.catalogue.attempt.started.timestamp.seconds";
+
+  /** Gauge of the newest completely applied attempt, in epoch seconds. */
+  public static final String CATALOGUE_ATTEMPT_LAST_COMPLETE =
+      "basetool.catalogue.attempt.last.complete.timestamp.seconds";
+
+  /** Tag naming the bounded independently applied catalogue slice. */
+  public static final String TAG_AGGREGATE = "aggregate";
 
   private CatalogueMetricNames() {}
 }

@@ -87,7 +87,7 @@ class UexCommodityOccurrenceSyncTest {
             moonRepository,
             orbitRepository,
             poiRepository,
-            new SyncChunkWriter(new RecordingTransactionManager()));
+            new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress()));
     lenient()
         .when(materialRepository.findUexCommodityRefs())
         .thenReturn(List.of(new Ref(COMMODITY_ID, materialId)));

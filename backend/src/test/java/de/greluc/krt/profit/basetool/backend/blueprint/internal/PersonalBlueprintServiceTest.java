@@ -238,7 +238,7 @@ class PersonalBlueprintServiceTest {
     when(blueprintProductService.resolveByProductKey("k"))
         .thenReturn(Optional.of(new ResolvedProduct("k", "Name", itemId)));
     when(repository.existsByOwnerUserIdAndProductKey(SUB, "k")).thenReturn(false);
-    when(gameItemRepository.getReferenceById(itemId)).thenReturn(ref);
+    when(gameItemRepository.getCanonicalReferenceById(itemId)).thenReturn(ref);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(mapper.toResponse(any(), anyBoolean(), any())).thenReturn(sampleResponse());
 
@@ -466,7 +466,7 @@ class PersonalBlueprintServiceTest {
             .build();
     when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
     PersonalBlueprintRecipeResponse recipe =
-        new PersonalBlueprintRecipeResponse("Name", 2, List.of(), List.of(), List.of());
+        new PersonalBlueprintRecipeResponse("Name", 2, List.of(), List.of(), List.of(), null);
     when(blueprintProductService.resolveRecipe("k")).thenReturn(Optional.of(recipe));
 
     assertSame(recipe, service.recipeForOwn(SUB, id));

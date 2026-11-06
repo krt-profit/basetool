@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
@@ -584,6 +585,27 @@ class SupplyDonationServiceTest {
 
     assertThat(service.sources(null, material.getId(), null))
         .containsExactly(new DonationSourceDto(any.getId(), "Lorville", 100, 3.0, "SCU"));
+  }
+
+  @Test
+  void aFreePledgeWithARetiredItemIdUsesTheSurvivorsStock() {
+    UUID retired = UUID.randomUUID();
+    GameItem canonical = new GameItem();
+    canonical.setId(UUID.randomUUID());
+    callerIs(DONOR);
+    when(gameItemRepository.resolveLocalIds(List.of(retired)))
+        .thenReturn(List.of(canonical.getId()));
+    StockRow row = org.mockito.Mockito.mock(StockRow.class);
+    UUID stockId = UUID.randomUUID();
+    when(row.getId()).thenReturn(stockId);
+    when(row.getLocation()).thenReturn(location);
+    when(row.getGameItem()).thenReturn(canonical);
+    when(row.getAmount()).thenReturn(7.0);
+    when(stockReads.donatableRows(DONOR, null, canonical.getId())).thenReturn(List.of(row));
+
+    assertThat(service.sources(null, null, retired))
+        .containsExactly(new DonationSourceDto(stockId, "Lorville", null, 7.0, "ITEM"));
+    verify(gameItemRepository).resolveLocalIds(List.of(retired));
   }
 
   @Test

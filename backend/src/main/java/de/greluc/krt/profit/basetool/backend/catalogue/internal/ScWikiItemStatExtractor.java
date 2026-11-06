@@ -83,10 +83,20 @@ final class ScWikiItemStatExtractor {
           number(dto.radar(), "aim_assist", "distance_min_assignment");
       case RADAR_MAX_AIM_ASSIST_DISTANCE ->
           number(dto.radar(), "aim_assist", "distance_max_assignment");
-      case TRACTOR_FORCE -> number(dto.tractorBeam(), "max_force");
-      case TRACTOR_MAX_DISTANCE -> number(dto.tractorBeam(), "max_distance");
-      case TRACTOR_FULL_STRENGTH_DISTANCE -> number(dto.tractorBeam(), "full_strength_distance");
-      case TRACTOR_MAX_VOLUME -> number(dto.tractorBeam(), "max_volume");
+      case TRACTOR_FORCE ->
+          firstOf(
+              number(dto.tractorBeam(), "force", "max"), number(dto.tractorBeam(), "max_force"));
+      case TRACTOR_MAX_DISTANCE ->
+          firstOf(
+              number(dto.tractorBeam(), "range", "max"), number(dto.tractorBeam(), "max_distance"));
+      case TRACTOR_FULL_STRENGTH_DISTANCE ->
+          firstOf(
+              number(dto.tractorBeam(), "range", "full_strength_distance"),
+              number(dto.tractorBeam(), "full_strength_distance"));
+      case TRACTOR_MAX_VOLUME ->
+          firstOf(
+              number(dto.tractorBeam(), "force", "max_volume"),
+              number(dto.tractorBeam(), "max_volume"));
       case HULL_SCRAPING_RADIUS -> number(dto.weaponModifier(), "salvage", "radius_multiplier");
       case HULL_SCRAPING_SPEED ->
           number(dto.weaponModifier(), "salvage", "salvage_speed_multiplier");

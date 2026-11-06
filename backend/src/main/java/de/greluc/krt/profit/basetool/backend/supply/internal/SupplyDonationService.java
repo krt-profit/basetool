@@ -549,6 +549,9 @@ public class SupplyDonationService {
     if ((material == null) == (item == null)) {
       throw new BadRequestException("Name a need or exactly one of material and game item");
     }
+    if (need == null && item != null) {
+      item = gameItemRepository.resolveLocalIds(List.of(item)).getFirst();
+    }
     List<DonationSourceDto> sources = new ArrayList<>();
     for (StockRow row : stockReads.donatableRows(donor, material, item)) {
       if (need != null

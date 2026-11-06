@@ -374,6 +374,7 @@
 /materials/overview/data GET -> MaterialsPageController#getMatrixData gate=class:isAuthenticated() layout=yes
 /materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'ADMIN') layout=yes
 /materials/{id} GET -> MaterialsPageController#getMaterialDetail gate=class:isAuthenticated() layout=yes
+/materials/{id} GET params=[fragment=catalogue] -> MaterialsPageController#getMaterialCatalogue gate=class:isAuthenticated() layout=yes
 /me/active-org-unit POST -> MeFrontendController#setActiveOrgUnit gate=class:isAuthenticated() layout=yes
 /members GET -> MemberManagementController#listMembers gate=class:hasRole('ADMIN') layout=yes
 /members/api/search GET -> MemberManagementController#searchMembers gate=class:hasRole('ADMIN') layout=yes

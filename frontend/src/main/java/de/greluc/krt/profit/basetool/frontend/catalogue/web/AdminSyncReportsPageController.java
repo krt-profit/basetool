@@ -25,9 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeRes
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +55,8 @@ public class AdminSyncReportsPageController {
 
   /** Reads and purges the sync reports. */
   private final SyncReportBackendClient syncReportClient;
+
+  private final SyncReportPageReader pageReader;
 
   /**
    * Combined view across both catalogues.
@@ -215,48 +215,22 @@ public class AdminSyncReportsPageController {
   private String render(
       String source, String activeTab, String basePath, int page, String fragment, Model model) {
     int safePage = Math.max(page, 0);
-    if (!SectionFallback.run(log, "sync-reports", () -> addEvents(source, safePage, model))) {
+    SyncReportPageReader.Data data = pageReader.read(safePage, source);
+    if (!data.eventsAvailable()) {
       model.addAttribute("error", "error.admin.syncReports.load");
-      populateEmpty(model);
     }
+    PageResponse<SyncReportDto> events = data.events();
+    model.addAttribute("events", events.content());
+    model.addAttribute("currentPage", events.page());
+    model.addAttribute("totalPages", events.totalPages());
+    model.addAttribute("totalElements", events.totalElements());
+    model.addAttribute("eventsPage", events);
+    model.addAttribute("runSummaries", data.summaries());
+    model.addAttribute("attemptsAvailable", data.attemptsAvailable());
     model.addAttribute("activeTab", activeTab);
     model.addAttribute("basePath", basePath);
     return "results".equals(fragment)
         ? "catalogue/admin/sync-reports :: results"
         : "catalogue/admin/sync-reports";
-  }
-
-  /**
-   * Adds one page of sync-report events and its paging figures, or the empty paging attributes when
-   * the backend sent no page.
-   *
-   * @param source backend source filter, or {@code null} for both
-   * @param page non-negative zero-based page index
-   * @param model Thymeleaf model to fill
-   */
-  private void addEvents(@Nullable String source, int page, @NotNull Model model) {
-    PageResponse<SyncReportDto> events = syncReportClient.syncReportPage(page, source);
-    if (events != null) {
-      model.addAttribute("events", events.content() == null ? List.of() : events.content());
-      model.addAttribute("currentPage", events.page());
-      model.addAttribute("totalPages", events.totalPages());
-      model.addAttribute("totalElements", events.totalElements());
-      model.addAttribute("eventsPage", events);
-    } else {
-      populateEmpty(model);
-    }
-  }
-
-  /**
-   * Fills the paging model attributes with an empty result, used on a backend miss / failure so the
-   * template never dereferences a missing attribute.
-   *
-   * @param model Thymeleaf model to fill
-   */
-  private void populateEmpty(@NotNull Model model) {
-    model.addAttribute("events", List.of());
-    model.addAttribute("currentPage", 0);
-    model.addAttribute("totalPages", 0);
-    model.addAttribute("totalElements", 0L);
   }
 }

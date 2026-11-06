@@ -36,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeResultDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.time.Instant;
@@ -161,6 +163,55 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
         .andExpect(content().string(not(containsString("data-table--stack"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void eventFreeAttempt_rendersActualOutcomeCountersAndCompleteApplyTime() throws Exception {
+    Instant started = Instant.parse("2026-11-06T12:00:00Z");
+    Instant finished = started.plusSeconds(5);
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 100, 0, 0, List.of()));
+    SyncRunDto attempt =
+        new SyncRunDto(
+            UUID.randomUUID(),
+            "GAME_ITEM",
+            "PARTIAL",
+            started,
+            finished,
+            "4.10.2-LIVE",
+            12,
+            12,
+            11,
+            0,
+            1,
+            true,
+            "SKIPPED");
+    when(backendApiClient.get(
+            eq("/api/v1/catalog/admin/sync-reports/runs?days={days}"), anyTypeRef(), eq(30)))
+        .thenReturn(
+            List.of(
+                new SyncRunSummaryDto(
+                    "UEX", 1, started, started.minusSeconds(86_400), "PARTIAL", List.of(attempt))));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/sync-reports").param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(
+            "sync-attempts-UEX",
+            "Partially applied",
+            "Applied: 11",
+            "Failed: 1",
+            "Deferred",
+            "4.10.2-LIVE",
+            "Last complete apply",
+            "No sync events yet.");
   }
 
   @Test

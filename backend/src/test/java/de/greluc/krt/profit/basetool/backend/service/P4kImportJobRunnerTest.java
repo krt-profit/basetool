@@ -28,6 +28,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
@@ -38,8 +39,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobServ
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +68,7 @@ class P4kImportJobRunnerTest {
   @Mock private P4kImportJobService jobService;
   @Mock private P4kImportService importService;
   @Mock private MasterDataCacheEvictionService cacheEvictionService;
+  @Mock private LiveSyncPublisher catalogueUpdates;
 
   private final AuthHelperService authHelperService = new AuthHelperService(roleHierarchy());
 
@@ -91,7 +95,8 @@ class P4kImportJobRunnerTest {
             importService,
             cacheEvictionService,
             JsonMapper.builder().build(),
-            authHelperService);
+            authHelperService,
+            catalogueUpdates);
   }
 
   private static P4kImportResultDto someResult() {
@@ -207,5 +212,39 @@ class P4kImportJobRunnerTest {
 
     assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN));
     verify(jobService).markSucceeded(eq(id), anyString());
+  }
+
+  @Test
+  void applyPublishesCatalogueChangeOnlyAfterCommittedDataChanges() {
+    UUID job = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    var zero = new P4kImportResultDto.Counts(null, 0, 0, 0, 0, 0, 0, 0);
+    var enriched = new P4kImportResultDto.Counts(null, 1, 1, 0, 0, 0, 0, 0);
+    var result =
+        new P4kImportResultDto(false, false, null, zero, enriched, zero, zero, zero, 0, job);
+    when(jobService.loadPayload(job)).thenReturn(bytes);
+    stubAdmin(job);
+    when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
+        .thenReturn(result);
+
+    runner.run(job, P4kImportJobKind.APPLY, false, ADMIN);
+
+    InOrder order = inOrder(importService, catalogueUpdates);
+    order.verify(importService).applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class));
+    order.verify(catalogueUpdates).publishAfterCommit(any(), eq(List.of("catalogue")));
+  }
+
+  @Test
+  void unchangedApplyDoesNotPublishCatalogueChange() {
+    UUID job = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    when(jobService.loadPayload(job)).thenReturn(bytes);
+    stubAdmin(job);
+    when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
+        .thenReturn(someResult());
+
+    runner.run(job, P4kImportJobKind.APPLY, false, ADMIN);
+
+    verifyNoInteractions(catalogueUpdates);
   }
 }

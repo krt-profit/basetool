@@ -136,7 +136,7 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   @Modifying
   @Query(
       """
-      UPDATE ShipType s SET s.uexDeletedAt = :now
+      UPDATE ShipType s SET s.uexDeletedAt = :now, s.version = s.version + 1, s.updatedAt = :now
       WHERE s.uexVehicleId IS NOT NULL
       AND s.uexVehicleId NOT IN :seenIds
       AND s.uexDeletedAt IS NULL
@@ -159,7 +159,7 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   @Modifying
   @Query(
       """
-      UPDATE ShipType s SET s.scwikiDeletedAt = :now
+      UPDATE ShipType s SET s.scwikiDeletedAt = :now, s.version = s.version + 1, s.updatedAt = :now
       WHERE s.scwikiSyncedAt IS NOT NULL
       AND s.externalUuid NOT IN :seenExternalUuids
       AND s.scwikiDeletedAt IS NULL
@@ -168,19 +168,30 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
 
   /**
-   * Counts the live Wiki-written ship types ({@code scwiki_synced_at IS NOT NULL}, not tombstoned),
-   * using the same gate as {@link #markScwikiDeletedExcept}. Reported by the vehicle sync on a
-   * {@code 304 Not Modified} so a cached run is not read as a zero-item outage.
+   * Lists every previously Wiki-written vehicle UUID, including existing tombstones.
    *
-   * @return the number of non-tombstoned ship types the SC Wiki sync has written
+   * @return known Wiki vehicle identities
    */
   @Query(
+      "SELECT s.externalUuid FROM ShipType s WHERE s.scwikiSyncedAt IS NOT NULL AND s.externalUuid"
+          + " IS NOT NULL")
+  List<UUID> findWikiLinkedVehicleUuids();
+
+  /**
+   * Restores known vehicles proven present by a complete all-asset source census.
+   *
+   * @param uuids verified present source identities in a bounded batch
+   * @param now timestamp of the presence correction
+   * @return restored rows
+   */
+  @Modifying
+  @Query(
       """
-      SELECT COUNT(s) FROM ShipType s
-      WHERE s.scwikiSyncedAt IS NOT NULL
-      AND s.scwikiDeletedAt IS NULL
+      UPDATE ShipType s SET s.scwikiDeletedAt = NULL, s.version = s.version + 1, s.updatedAt = :now
+      WHERE s.scwikiSyncedAt IS NOT NULL AND s.scwikiDeletedAt IS NOT NULL
+      AND s.externalUuid IN :uuids
       """)
-  long countLiveScwikiShipTypes();
+  int restoreWikiPresentVehicles(@Param("uuids") Collection<UUID> uuids, @Param("now") Instant now);
 
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code

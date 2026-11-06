@@ -564,3 +564,16 @@ rules hold for every module as it lands:
 The REST API follows the modules by hard cut with a forced app update
 ([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), §8.5). Only the
 exchange and the bank later become Gradle modules of their own. The debt this closes is §11.9.
+
+### External source identity and evidence
+
+Source presence, successful local application and player relevance have independent completeness
+states. An incomplete fetch or a rejected local row cannot prove absence. Strong identity
+conflicts suppress the affected cleanup; aliases and names never override an existing different
+UUID. Duplicate convergence archives both original records, delegates user references to their
+owning modules, and retains retired local ids through persistent redirects.
+
+Enrichment records distinguish physical/cargo/UI geometry, micro-SCU/SCU, source build and
+requested relationship state. They remain game-source evidence under the area's decided P4K
+precedence. [REQ-DATA-032…038](../specs/data-persistence.md) and
+[ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md) are canonical.

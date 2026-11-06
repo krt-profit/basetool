@@ -109,4 +109,241 @@ assert.equal(index.size, 2);
 assert.equal(index.get('health_maxhealth'), integrity);
 assert.equal(indexBaseStats(undefined).size, 0);
 
-console.log('blueprint-stats: all assertions passed');
+class MetadataElement {
+    constructor(tag) {
+        this.tagName = tag;
+        this.children = [];
+        this.text = '';
+    }
+    set textContent(value) {
+        this.text = String(value);
+        this.children = [];
+    }
+    get textContent() {
+        return this.text + this.children.map((child) => child.textContent).join('');
+    }
+    appendChild(child) {
+        this.children.push(child);
+        return child;
+    }
+}
+
+const metadataContext = vm.createContext({
+    Intl,
+    Map,
+    Number,
+    Math,
+    URL,
+    document: {
+        documentElement: { lang: 'en' },
+        createElement(tag) {
+            return new MetadataElement(tag);
+        },
+    },
+    window: {
+        krtI18nText(value, key) {
+            return value || key;
+        },
+    },
+});
+vm.runInContext(
+    flattenModule('personalinventory/personal-inventory-blueprint-metadata.js'),
+    metadataContext,
+);
+const renderBlueprintMetadata = vm.runInContext('renderBlueprintMetadata', metadataContext);
+const metadataLabels = {
+    metadataTitle: 'Recipe source',
+    metadataBuild: 'SC Wiki · game build {0}',
+    metadataSource: 'SC Wiki',
+    metadataMissions: 'Unlock missions',
+    metadataIndividualMissions: 'Individual unlock missions',
+    metadataMissionGroups: 'Mission groups',
+    metadataMissionGroup: 'Mission group',
+    metadataAspects: 'Source inputs and choices',
+    metadataEmpty: '{0}: no entries.',
+    metadataNotLoaded: '{0}: not loaded.',
+    metadataMission: 'Mission',
+    metadataChance: '{0}% chance',
+    metadataTiers: 'Crafting tiers and requirements',
+    metadataTier: 'Crafting tier {0}',
+    metadataTime: 'Crafting time: {0} seconds',
+    metadataInputs: 'Inputs',
+    metadataChoices: '{0} of {1} inputs required',
+    minQuality: 'min. quality',
+    unitScu: 'SCU',
+    unitPiece: 'pieces',
+};
+assert.equal(renderBlueprintMetadata(null, metadataLabels), null);
+const sourcePanel = renderBlueprintMetadata(
+    {
+        gameVersion: '4.10.2-LIVE.12881860',
+        loadedSections: ['MISSIONS', 'ASPECTS', 'TIERS'],
+        unlockingMissions: [
+            {
+                title: '<img src=x onerror=alert(1)>',
+                chance: 0.25,
+                webUrl: 'javascript:alert(1)',
+            },
+        ],
+        aspects: {
+            aspectGroups: [{ choiceGroup: true, name: 'Frame', requiredCount: 1, optionCount: 2 }],
+        },
+        tiers: [
+            {
+                tierIndex: 0,
+                craftTimeSeconds: 540,
+                requirements: {
+                    name: 'Frame',
+                    requiredCount: 1,
+                    children: [
+                        { name: 'Agricium', quantityScu: 0.36, minQuality: 1 },
+                        { name: 'Iron', quantityScu: 0.5, minQuality: 1 },
+                    ],
+                },
+            },
+        ],
+    },
+    metadataLabels,
+);
+assert.ok(sourcePanel.textContent.includes('4.10.2-LIVE.12881860'));
+assert.ok(sourcePanel.textContent.includes('25.0% chance'));
+assert.ok(sourcePanel.textContent.includes('1 of 2 inputs required'));
+assert.ok(sourcePanel.textContent.includes('Crafting time: 540 seconds'));
+assert.ok(sourcePanel.textContent.includes('0.360 SCU'));
+const descendants = (element) => [
+    element,
+    ...element.children.flatMap((child) => descendants(child)),
+];
+assert.equal(descendants(sourcePanel).filter((element) => element.tagName === 'img').length, 0);
+assert.equal(descendants(sourcePanel).filter((element) => element.tagName === 'a').length, 0);
+const linkedPanel = renderBlueprintMetadata(
+    {
+        loadedSections: ['MISSIONS'],
+        unlockingMissions: [
+            {
+                title: 'Tactical Strike Group Needed',
+                webUrl: 'https://api.star-citizen.wiki/missions/24ac3c24-ed16-43f5-bb1c-626f0261fcb5?version=4.10.2-LIVE.12881860',
+            },
+        ],
+    },
+    metadataLabels,
+);
+const missionLink = descendants(linkedPanel).find((element) => element.tagName === 'a');
+assert.ok(missionLink);
+assert.equal(missionLink.rel, 'noopener noreferrer');
+assert.equal(missionLink.target, '_blank');
+const unknownPanel = renderBlueprintMetadata(
+    {
+        loadedSections: [],
+        unlockingMissions: [{ title: 'Unconfirmed mission payload' }],
+        tiers: [{ craftTimeSeconds: 999 }],
+    },
+    metadataLabels,
+);
+assert.ok(unknownPanel.textContent.includes('Individual unlock missions: not loaded.'));
+assert.ok(unknownPanel.textContent.includes('Mission groups: not loaded.'));
+assert.ok(unknownPanel.textContent.includes('Source inputs and choices: not loaded.'));
+assert.ok(unknownPanel.textContent.includes('Crafting tiers and requirements: not loaded.'));
+assert.ok(!unknownPanel.textContent.includes('no entries.'));
+assert.ok(!unknownPanel.textContent.includes('Unconfirmed mission payload'));
+assert.ok(!unknownPanel.textContent.includes('999'));
+
+const emptyPanel = renderBlueprintMetadata(
+    {
+        loadedSections: ['MISSIONS', 'MISSION_GROUPS', 'ASPECTS', 'TIERS'],
+        unlockingMissions: [],
+        unlockingMissionGroups: [],
+        aspects: { aspects: [], aspectGroups: [] },
+        tiers: [],
+    },
+    metadataLabels,
+);
+assert.ok(emptyPanel.textContent.includes('Individual unlock missions: no entries.'));
+assert.ok(emptyPanel.textContent.includes('Mission groups: no entries.'));
+assert.ok(emptyPanel.textContent.includes('Source inputs and choices: no entries.'));
+assert.ok(emptyPanel.textContent.includes('Crafting tiers and requirements: no entries.'));
+assert.ok(!emptyPanel.textContent.includes('not loaded.'));
+
+const groupedMission = {
+    title: 'Tactical Strike Group Needed',
+    webUrl: 'https://api.star-citizen.wiki/missions/24ac3c24-ed16-43f5-bb1c-626f0261fcb5?version=4.10.2-LIVE.12881860',
+};
+const groupedPanel = renderBlueprintMetadata(
+    {
+        loadedSections: ['MISSIONS', 'MISSION_GROUPS'],
+        unlockingMissions: [
+            { ...groupedMission, debugName: 'InterSec_Nyx_TSG_FullStrikeOnStation', chance: 1 },
+        ],
+        unlockingMissionGroups: [{ label: 'Guaranteed', chance: 1, missions: [groupedMission] }],
+    },
+    metadataLabels,
+);
+assert.ok(groupedPanel.textContent.includes('Guaranteed · 100.0% chance'));
+assert.equal(groupedPanel.textContent.split(groupedMission.title).length - 1, 1);
+assert.equal(descendants(groupedPanel).filter((element) => element.tagName === 'a').length, 1);
+assert.ok(!groupedPanel.textContent.includes('Individual unlock missions: no entries.'));
+
+const groupsOnlyPanel = renderBlueprintMetadata(
+    {
+        loadedSections: ['MISSION_GROUPS'],
+        unlockingMissionGroups: [
+            { label: 'Rare rewards', chance: 0.15, missions: [groupedMission] },
+        ],
+    },
+    metadataLabels,
+);
+assert.ok(groupsOnlyPanel.textContent.includes('Rare rewards · 15.0% chance'));
+assert.ok(groupsOnlyPanel.textContent.includes(groupedMission.title));
+assert.ok(groupsOnlyPanel.textContent.includes('Individual unlock missions: not loaded.'));
+assert.ok(!groupsOnlyPanel.textContent.includes('Mission groups: no entries.'));
+
+const distinctMissionPanel = renderBlueprintMetadata(
+    {
+        loadedSections: ['MISSIONS', 'MISSION_GROUPS'],
+        unlockingMissions: [{ title: 'Shared title', debugName: 'one' }],
+        unlockingMissionGroups: [
+            { chance: 0, missions: [{ title: 'Shared title', debugName: 'two' }] },
+        ],
+    },
+    metadataLabels,
+);
+assert.equal(distinctMissionPanel.textContent.split('Shared title').length - 1, 2);
+assert.ok(distinctMissionPanel.textContent.includes('0.0% chance'));
+
+const hostilePanel = renderBlueprintMetadata(
+    {
+        loadedSections: ['MISSIONS', 'MISSION_GROUPS'],
+        unlockingMissions: [
+            {
+                title: '<script>alert(1)</script>',
+                webUrl: 'https://api.star-citizen.wiki.evil/missions/a',
+            },
+            { title: 'Malformed address', webUrl: 'https://[not-an-address' },
+            {
+                title: 'Credential address',
+                webUrl: 'https://name:secret@api.star-citizen.wiki/missions/a',
+            },
+            { title: 'Executable address', webUrl: 'javascript:alert(1)', chance: Number.NaN },
+        ],
+        unlockingMissionGroups: [
+            {
+                label: '<img src=x onerror=alert(1)>',
+                chance: 3,
+                missions: [
+                    {
+                        title: 'Grouped unsafe link',
+                        webUrl: 'data:text/html,<script>alert(1)</script>',
+                    },
+                ],
+            },
+        ],
+    },
+    metadataLabels,
+);
+assert.equal(descendants(hostilePanel).filter((element) => element.tagName === 'script').length, 0);
+assert.equal(descendants(hostilePanel).filter((element) => element.tagName === 'img').length, 0);
+assert.equal(descendants(hostilePanel).filter((element) => element.tagName === 'a').length, 0);
+assert.ok(hostilePanel.textContent.includes('<script>alert(1)</script>'));
+assert.ok(!hostilePanel.textContent.includes('NaN'));
+assert.ok(!hostilePanel.textContent.includes('300.0%'));
+console.log('blueprint-stats and metadata: all assertions passed');

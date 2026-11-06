@@ -99,6 +99,15 @@ class InventoryBackendClientTest {
   }
 
   @Test
+  void itemCatalogueDetails_useTheCanonicalItemPath() {
+    backend.answerJson("{\"id\":\"" + GAME_ITEM + "\",\"name\":\"Helmet\",\"wikiMetadata\":null}");
+
+    client.itemCatalogue(GAME_ITEM);
+
+    backend.expect("GET", "/api/v1/game-items/" + GAME_ITEM + "/catalogue");
+  }
+
+  @Test
   void groupedListingsCarryEveryPresentFilter() {
     for (int i = 0; i < 4; i++) {
       backend.answerJson("[]");

@@ -19,10 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemCatalogueMetadata;
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import lombok.With;
+import org.jetbrains.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -32,42 +39,104 @@ import tools.jackson.databind.JsonNode;
  * <p>{@link #size} is a raw string the sync parses into {@code size_class}; {@link #description}
  * maps locale to text.
  *
- * @param uuid in-game asset UUID (the join key against {@code game_item.external_uuid})
- * @param slug Wiki URL slug
- * @param name display name
- * @param className RSI engine class name
- * @param classification classification path, e.g. {@code "FPS.Armor.Helmet"}
- * @param classificationLabel localised classification label
- * @param type Wiki type field
- * @param typeLabel Wiki type display label
- * @param subType Wiki sub-type field
- * @param subTypeLabel Wiki sub-type display label
- * @param size raw size token, parsed to an integer size class by the sync
- * @param grade item grade
- * @param itemClass the in-game component class, e.g. {@code "Military"}, mapped by the sync
- * @param rarity item rarity
- * @param mass mass in kg
- * @param dimension bounding-box dimensions
- * @param manufacturer manufacturer reference (bound, not written)
- * @param description locale → description text map ({@code en_EN}, {@code de_DE}, …)
- * @param isBaseVariant whether this is the base variant of a family
- * @param isCraftable whether the item is craftable
- * @param version game version the row was last seen in
- * @param durability durability block ({@code health}), or {@code null}
- * @param clothing clothing block (damage resistance, temperature range), or {@code null}
- * @param suitArmor suit-armour block, the same shape as {@code clothing}, or {@code null}
- * @param personalWeapon personal-weapon block (damage per shot, rpm), or {@code null}
- * @param vehicleWeapon vehicle-weapon block (damage per shot), or {@code null}
- * @param miningLaser mining-laser block (laser power), or {@code null}
- * @param shield shield-generator block (max health), or {@code null}
- * @param powerPlant power-plant block (power segment generation), or {@code null}
- * @param cooler cooler block (coolant segment generation), or {@code null}
- * @param quantumDrive quantum-drive block (drive speed, fuel requirement), or {@code null}
- * @param radar radar block (aim-assist distances), or {@code null}
- * @param tractorBeam tractor-beam block (force, distances, volume), or {@code null}
- * @param weaponModifier weapon-modifier block (salvage multipliers), or {@code null}
- * @param radiationResistance radiation-resistance block (dissipation rate), or {@code null}
- * @param temperatureResistance temperature-resistance block (min / max), or {@code null}
+ * <dl>
+ *   <dt>{@code uuid}
+ *   <dd>in-game asset UUID (the join key against {@code game_item.external_uuid})
+ *   <dt>{@code slug}
+ *   <dd>Wiki URL slug
+ *   <dt>{@code name}
+ *   <dd>display name
+ *   <dt>{@code className}
+ *   <dd>RSI engine class name
+ *   <dt>{@code classification}
+ *   <dd>classification path, e.g. {@code "FPS.Armor.Helmet"}
+ *   <dt>{@code classificationLabel}
+ *   <dd>localised classification label
+ *   <dt>{@code type}
+ *   <dd>Wiki type field
+ *   <dt>{@code typeLabel}
+ *   <dd>Wiki type display label
+ *   <dt>{@code subType}
+ *   <dd>Wiki sub-type field
+ *   <dt>{@code subTypeLabel}
+ *   <dd>Wiki sub-type display label
+ *   <dt>{@code size}
+ *   <dd>raw size token, parsed to an integer size class by the sync
+ *   <dt>{@code grade}
+ *   <dd>item grade
+ *   <dt>{@code itemClass}
+ *   <dd>the in-game component class, e.g. {@code "Military"}, mapped by the sync
+ *   <dt>{@code rarity}
+ *   <dd>item rarity
+ *   <dt>{@code mass}
+ *   <dd>mass in kg
+ *   <dt>{@code dimension}
+ *   <dd>bounding-box dimensions
+ *   <dt>{@code manufacturer}
+ *   <dd>manufacturer reference (bound, not written)
+ *   <dt>{@code description}
+ *   <dd>locale → description text map ({@code en_EN}, {@code de_DE}, …)
+ *   <dt>{@code isBaseVariant}
+ *   <dd>whether this is the base variant of a family
+ *   <dt>{@code isCraftable}
+ *   <dd>whether the item is craftable
+ *   <dt>{@code version}
+ *   <dd>game version the row was last seen in
+ *   <dt>{@code durability}
+ *   <dd>durability block ({@code health}), or {@code null}
+ *   <dt>{@code clothing}
+ *   <dd>clothing block (damage resistance, temperature range), or {@code null}
+ *   <dt>{@code suitArmor}
+ *   <dd>suit-armour block, the same shape as {@code clothing}, or {@code null}
+ *   <dt>{@code personalWeapon}
+ *   <dd>personal-weapon block (damage per shot, rpm), or {@code null}
+ *   <dt>{@code vehicleWeapon}
+ *   <dd>vehicle-weapon block (damage per shot), or {@code null}
+ *   <dt>{@code miningLaser}
+ *   <dd>mining-laser block (laser power), or {@code null}
+ *   <dt>{@code shield}
+ *   <dd>shield-generator block (max health), or {@code null}
+ *   <dt>{@code powerPlant}
+ *   <dd>power-plant block (power segment generation), or {@code null}
+ *   <dt>{@code cooler}
+ *   <dd>cooler block (coolant segment generation), or {@code null}
+ *   <dt>{@code quantumDrive}
+ *   <dd>quantum-drive block (drive speed, fuel requirement), or {@code null}
+ *   <dt>{@code radar}
+ *   <dd>radar block (aim-assist distances), or {@code null}
+ *   <dt>{@code tractorBeam}
+ *   <dd>tractor-beam block (force, distances, volume), or {@code null}
+ *   <dt>{@code weaponModifier}
+ *   <dd>weapon-modifier block (salvage multipliers), or {@code null}
+ *   <dt>{@code radiationResistance}
+ *   <dd>radiation-resistance block (dissipation rate), or {@code null}
+ *   <dt>{@code temperatureResistance}
+ *   <dd>temperature-resistance block (min / max), or {@code null}
+ *   <dt>{@code isLootable}
+ *   <dd>whether the source can generate the item as loot
+ *   <dt>{@code tags}
+ *   <dd>compatibility tags
+ *   <dt>{@code requiredTags}
+ *   <dd>tags required by compatible equipment ports
+ *   <dt>{@code ports}
+ *   <dd>equipment-port constraints
+ *   <dt>{@code images}
+ *   <dd>attributed image references
+ *   <dt>{@code baseVariant}
+ *   <dd>base item reference
+ *   <dt>{@code variants}
+ *   <dd>alternate source variants
+ *   <dt>{@code relatedItems}
+ *   <dd>typed size, grade, color and equipment-set relationships
+ *   <dt>{@code vehicles}
+ *   <dd>vehicles with this item installed
+ *   <dt>{@code uexPrices}
+ *   <dd>derived UEX terminal evidence
+ *   <dt>{@code updatedAt}
+ *   <dd>source record update time
+ *   <dt>{@code requestedIncludes}
+ *   <dd>relationships explicitly requested by the HTTP client
+ * </dl>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiItemDto(
@@ -106,5 +175,85 @@ public record ScWikiItemDto(
     @JsonProperty("tractor_beam") JsonNode tractorBeam,
     @JsonProperty("weapon_modifier") JsonNode weaponModifier,
     @JsonProperty("radiation_resistance") JsonNode radiationResistance,
-    @JsonProperty("temperature_resistance") JsonNode temperatureResistance)
-    implements ScWikiRow {}
+    @JsonProperty("temperature_resistance") JsonNode temperatureResistance,
+    @Nullable @JsonProperty("is_lootable") Boolean isLootable,
+    @Nullable @JsonProperty("tags") List<String> tags,
+    @Nullable @JsonProperty("required_tags") List<String> requiredTags,
+    @Nullable @JsonProperty("ports") List<ItemCatalogueMetadata.Port> ports,
+    @Nullable @JsonProperty("images") List<ItemCatalogueMetadata.Image> images,
+    @Nullable @JsonProperty("base_variant") ItemCatalogueMetadata.ItemReference baseVariant,
+    @Nullable @JsonProperty("variants") List<ItemCatalogueMetadata.ItemReference> variants,
+    @Nullable @JsonProperty("related_items") ItemCatalogueMetadata.RelatedItems relatedItems,
+    @Nullable @JsonProperty("vehicles") List<ItemCatalogueMetadata.VehicleReference> vehicles,
+    @Nullable @JsonProperty("uex_prices") ScWikiUexPriceEvidenceDto uexPrices,
+    @Nullable @JsonProperty("updated_at") Instant updatedAt,
+    @Nullable @JsonIgnore @With Set<ItemCatalogueMetadata.Relationship> requestedIncludes)
+    implements ScWikiRow {
+
+  /**
+   * Projects optional Wiki details with explicit provenance and relationship load state.
+   *
+   * @return immutable source metadata
+   */
+  public ItemCatalogueMetadata metadata() {
+    return new ItemCatalogueMetadata(
+        ItemCatalogueMetadata.Source.SC_WIKI,
+        version,
+        requestedIncludes == null ? Set.of() : requestedIncludes,
+        geometry(),
+        isLootable,
+        immutable(tags),
+        immutable(requiredTags),
+        immutable(ports),
+        immutable(images),
+        baseVariant,
+        immutable(variants),
+        relatedItems,
+        immutable(vehicles),
+        uexPrices == null ? List.of() : uexPrices.purchase(),
+        updatedAt);
+  }
+
+  /**
+   * Preserves separate physical, cargo and display geometry contracts.
+   *
+   * @return geometry when the source supplied its dimension block
+   */
+  @Nullable
+  private ItemCatalogueMetadata.Geometry geometry() {
+    if (dimension == null) {
+      return null;
+    }
+    ItemCatalogueMetadata.Axes physical =
+        dimension.width() == null && dimension.height() == null && dimension.length() == null
+            ? null
+            : new ItemCatalogueMetadata.Axes(
+                dimension.width(), dimension.height(), dimension.length());
+    return new ItemCatalogueMetadata.Geometry(
+        physical, axes(dimension.cargo()), axes(dimension.ui()), dimension.volumeScu());
+  }
+
+  /**
+   * Converts one optional source dimension block.
+   *
+   * @param source source axes
+   * @return typed axes in metres
+   */
+  @Nullable
+  private static ItemCatalogueMetadata.Axes axes(@Nullable ScWikiDimensionDto.Axes source) {
+    return source == null
+        ? null
+        : new ItemCatalogueMetadata.Axes(source.width(), source.height(), source.length());
+  }
+
+  /**
+   * Copies an optional source collection.
+   *
+   * @param <T> element type
+   * @param values source values
+   * @return immutable source values
+   */
+  private static <T> List<T> immutable(@Nullable List<T> values) {
+    return values == null ? List.of() : List.copyOf(values);
+  }
+}

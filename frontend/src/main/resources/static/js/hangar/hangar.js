@@ -931,3 +931,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     krtFetch.bindSwap({ container: '#hangar-results', history: true });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('#hangar-results')) return;
+    krtPageSections.create({
+        topicClass: 'CATALOGUE',
+        topic: 'catalogue',
+        sections: { catalogue: { container: '#hangar-results' } },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        receiver: { coalesceMs: 1500 },
+    });
+});

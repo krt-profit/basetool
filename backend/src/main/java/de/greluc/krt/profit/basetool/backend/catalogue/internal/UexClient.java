@@ -118,6 +118,8 @@ public class UexClient {
    */
   private final MeterRegistry meterRegistry;
 
+  private final SyncRunProgress progress;
+
   /**
    * Client bound to the UEX base URL, built once so its connection pool is shared; carries the
    * timeouts from {@code RestClientConfig}.
@@ -388,14 +390,47 @@ public class UexClient {
     log.info("Fetching all {} from UEX API", resourceLabel);
     try {
       UexResponseDto<T> body = client.get().uri(endpoint).retrieve().body(typeRef);
-      return body == null
-          ? FetchResult.partial(Collections.emptyList())
-          : unwrapEnvelope(body, resourceLabel);
+      FetchResult<T> result =
+          body == null
+              ? FetchResult.partial(Collections.emptyList())
+              : unwrapEnvelope(body, resourceLabel);
+      long valid = result.data().stream().filter(UexClient::hasSourceIdentity).count();
+      progress.fetched(
+          result.data().size(), valid, result.complete() && valid == result.data().size());
+      return result;
     } catch (RuntimeException e) {
       log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
       recordFetchError();
+      progress.fetched(0, 0, false);
       return FetchResult.partial(Collections.emptyList());
     }
+  }
+
+  private static boolean hasSourceIdentity(Object row) {
+    return switch (row) {
+      case null -> false;
+      case UexCategoryDto dto -> dto.id() != null;
+      case UexCityDto dto -> dto.id() != null;
+      case UexCommodityDto dto -> dto.id() != null;
+      case UexCommodityPriceDto dto -> dto.idCommodity() != null && dto.idTerminal() != null;
+      case UexCompanyDto dto -> dto.id() != null;
+      case UexFactionDto dto -> dto.id() != null;
+      case UexItemDto dto -> dto.id() != null;
+      case UexItemPriceDto dto -> dto.idItem() != null && dto.idTerminal() != null;
+      case UexJurisdictionDto dto -> dto.id() != null;
+      case UexMoonDto dto -> dto.id() != null;
+      case UexOrbitDto dto -> dto.id() != null;
+      case UexOutpostDto dto -> dto.id() != null;
+      case UexPlanetDto dto -> dto.id() != null;
+      case UexPoiDto dto -> dto.id() != null;
+      case UexRefineryYieldDto dto -> dto.id() != null;
+      case UexRefiningMethodDto dto -> dto.id() != null;
+      case UexSpaceStationDto dto -> dto.id() != null;
+      case UexStarSystemDto dto -> dto.id() != null;
+      case UexTerminalDto dto -> dto.id() != null;
+      case UexVehicleDto dto -> dto.id() != null;
+      default -> throw new IllegalArgumentException("Unsupported UEX catalogue row");
+    };
   }
 
   /**

@@ -31,4 +31,17 @@ public record ShipTypeDto(
     ManufacturerDto manufacturer,
     String description,
     BigDecimal scu,
-    boolean hidden) {}
+    boolean hidden,
+    ShipCatalogueFacts catalogueFacts) {
+
+  /** Creates a summary without source-owned vehicle facts. */
+  public ShipTypeDto(
+      UUID id,
+      String name,
+      ManufacturerDto manufacturer,
+      String description,
+      BigDecimal scu,
+      boolean hidden) {
+    this(id, name, manufacturer, description, scu, hidden, null);
+  }
+}

@@ -22,9 +22,21 @@
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     krtFetch.bindSwap({ container: '#sync-results', history: true });
+    const reports = krtPageSections.create({
+        topicClass: 'ADMIN_DASHBOARD',
+        topic: 'admin-dashboard',
+        sections: {
+            'sync-status': { container: '#sync-results', fragmentValue: 'results' },
+        },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        receiver: { coalesceMs: 1500 },
+    });
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('purge-form'));
     const daysInput = /** @type {HTMLInputElement | null} */ (
@@ -77,19 +89,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = `/admin/sync-reports/delete-old?days=${encodeURIComponent(
             purgeDays.value,
         )}&source=${encodeURIComponent(sourceValue)}`;
-        krtFetch.write({
+        reports.write({
             method: 'POST',
             url,
             toast: false,
             errorMessage: SYNC_MSG.deleteError,
+            refresh: ['sync-status'],
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
                 showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
-                krtFetch.swap({
-                    url: window.location.pathname + window.location.search,
-                    container: '#sync-results',
-                    history: false,
-                });
             },
         });
     }

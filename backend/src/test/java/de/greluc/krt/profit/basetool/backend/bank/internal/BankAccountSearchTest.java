@@ -156,14 +156,21 @@ class BankAccountSearchTest {
 
   @Test
   void blankQuery_dropsTheTextFilter() {
-    BankAccount a = newAccount("Leerprobe Eins " + UUID.randomUUID(), BankAccountType.SPECIAL);
-    BankAccount b = newAccount("Leerprobe Zwei " + UUID.randomUUID(), BankAccountType.SPECIAL);
+    final long existing = accountRepository.count();
+    newAccount("Leerprobe Eins " + UUID.randomUUID(), BankAccountType.SPECIAL);
+    newAccount("Leerprobe Zwei " + UUID.randomUUID(), BankAccountType.SPECIAL);
+    final UUID viewer = UUID.randomUUID();
+    Page<BankAccountDto> baseline =
+        bankAccountService.getAccounts(true, viewer, null, ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
 
     Page<BankAccountDto> result =
-        bankAccountService.getAccounts(
-            true, UUID.randomUUID(), "   ", ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
+        bankAccountService.getAccounts(true, viewer, "   ", ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
 
-    assertThat(result.getContent()).extracting(BankAccountDto::id).contains(a.getId(), b.getId());
+    assertThat(baseline.getTotalElements()).isEqualTo(existing + 2);
+    assertThat(result.getTotalElements()).isEqualTo(baseline.getTotalElements());
+    assertThat(result.getContent())
+        .extracting(BankAccountDto::id)
+        .containsExactlyElementsOf(baseline.getContent().stream().map(BankAccountDto::id).toList());
   }
 
   /** Persists a fresh account of the given type with a server-drawn account number. */

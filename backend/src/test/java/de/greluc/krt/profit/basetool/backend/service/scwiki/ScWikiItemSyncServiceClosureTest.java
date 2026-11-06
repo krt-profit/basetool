@@ -36,11 +36,14 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemFieldWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemStatFollowUp;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SourceIdentityMismatchException;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
@@ -77,6 +80,7 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private ItemReconciliationService itemReconciliationService;
   @Mock private GameItemStatRepository gameItemStatRepository;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
@@ -116,7 +120,10 @@ class ScWikiItemSyncServiceClosureTest {
             syncReportService,
             gameItemStatRepository,
             new GameItemStatWriter(gameItemStatRepository),
-            new ScWikiItemStatFollowUp(scWikiClient, properties, gameItemStatRepository),
+            new ScWikiItemStatFollowUp(
+                scWikiClient, properties, gameItemStatRepository, syncReportService),
+            itemReconciliationService,
+            new ScWikiItemFieldWriter(meterRegistry),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
@@ -151,6 +158,66 @@ class ScWikiItemSyncServiceClosureTest {
   }
 
   @Test
+  void fillClosureItem_rejectsAnotherAssetsPayloadBeforeAnyReadOrWrite() {
+    UUID requested = UUID.randomUUID();
+    UUID served = UUID.randomUUID();
+
+    SourceIdentityMismatchException failure =
+        assertThrows(
+            SourceIdentityMismatchException.class,
+            () ->
+                service.fillClosureItemWithinTransaction(
+                    UUID.randomUUID(), requested, itemDto(served), Instant.now()));
+
+    assertEquals(requested, failure.getRequestedUuid());
+    assertEquals(served, failure.getServedUuid());
+    verifyNoInteractions(gameItemRepository, gameItemStatRepository, manufacturerRepository);
+  }
+
+  @Test
+  void syncItems_rejectsMismatchedMockedDetailAndReportsOneFailedWrite() {
+    UUID requested = UUID.randomUUID();
+    when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(requested));
+    when(scWikiClient.fetchOneResult(any(), eq(requested), eq(ScWikiItemDto.class), any()))
+        .thenReturn(found(itemDto(UUID.randomUUID())));
+
+    assertEquals(0, service.syncItems());
+
+    verify(syncReportService).recordFailed(1);
+    verify(syncReportService).recordIncomplete();
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("game_item"),
+            eq(requested),
+            isNull(),
+            any());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.WIKI_MISSING), any(), any(), any(), any());
+    verify(gameItemRepository, never()).findByExternalUuid(any());
+    verify(gameItemRepository, never()).save(any());
+    verify(gameItemStatRepository, never()).findByGameItemId(any());
+    verify(gameItemStatRepository, never()).save(any());
+    verifyNoInteractions(manufacturerRepository);
+  }
+
+  @Test
+  void syncItems_unavailableDetailDoesNotClaimSourceAbsenceOrDoubleCountFailure() {
+    UUID requested = UUID.randomUUID();
+    when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(requested));
+    when(scWikiClient.fetchOneResult(any(), eq(requested), eq(ScWikiItemDto.class), any()))
+        .thenReturn(new ScWikiClient.DetailResult<>(ScWikiClient.DetailOutcome.UNAVAILABLE, null));
+
+    assertEquals(0, service.syncItems());
+
+    verify(syncReportService, never()).recordFailed(anyLong());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.WIKI_MISSING), any(), any(), any(), any());
+    verify(gameItemRepository, never()).save(any());
+  }
+
+  @Test
   void syncItems_isNoOp_whenFeatureFlagOff() {
     config.put("item-sync-enabled", false);
     rebuild();
@@ -167,12 +234,13 @@ class ScWikiItemSyncServiceClosureTest {
     UUID b = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(a));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of(b));
-    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
+    when(scWikiClient.fetchOneResult(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenReturn(new ScWikiClient.DetailResult<>(ScWikiClient.DetailOutcome.MISSING, null));
 
     service.syncItems();
 
-    verify(scWikiClient).fetchOne(eq("/api/items"), eq(a), eq(ScWikiItemDto.class), any());
-    verify(scWikiClient).fetchOne(eq("/api/items"), eq(b), eq(ScWikiItemDto.class), any());
+    verify(scWikiClient).fetchOneResult(eq("/api/items"), eq(a), eq(ScWikiItemDto.class), any());
+    verify(scWikiClient).fetchOneResult(eq("/api/items"), eq(b), eq(ScWikiItemDto.class), any());
     verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any());
   }
 
@@ -223,12 +291,24 @@ class ScWikiItemSyncServiceClosureTest {
             null,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             null);
 
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
-        .thenReturn(dto);
+    when(scWikiClient.fetchOneResult(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
+        .thenReturn(found(dto));
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -292,11 +372,23 @@ class ScWikiItemSyncServiceClosureTest {
             null,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             null);
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of());
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of(uuid));
-    when(scWikiClient.fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
-        .thenReturn(dto);
+    when(scWikiClient.fetchOneResult(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any()))
+        .thenReturn(found(dto));
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -312,11 +404,12 @@ class ScWikiItemSyncServiceClosureTest {
   }
 
   @Test
-  void syncItems_emitsWikiMissing_whenFetchReturnsNull() {
+  void syncItems_emitsWikiMissing_onlyForConfirmedNotFound() {
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any())).thenReturn(null);
+    when(scWikiClient.fetchOneResult(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenReturn(new ScWikiClient.DetailResult<>(ScWikiClient.DetailOutcome.MISSING, null));
 
     service.syncItems();
 
@@ -333,7 +426,7 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    verify(scWikiClient, never()).fetchOne(any(), any(), any(), any());
+    verify(scWikiClient, never()).fetchOneResult(any(), any(), any(), any());
   }
 
   @Test
@@ -344,8 +437,8 @@ class ScWikiItemSyncServiceClosureTest {
     when(gameItemRepository.findAllExternalUuids())
         .thenReturn(List.of(deadlocked, firstGood, secondGood));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any()))
-        .thenAnswer(inv -> itemDto(inv.getArgument(1)));
+    when(scWikiClient.fetchOneResult(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenAnswer(inv -> found(itemDto(inv.getArgument(1))));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
         .thenAnswer(inv -> {
@@ -372,8 +465,8 @@ class ScWikiItemSyncServiceClosureTest {
     when(gameItemRepository.findAllExternalUuids())
         .thenReturn(List.of(collided, firstGood, secondGood));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any()))
-        .thenAnswer(inv -> itemDto(inv.getArgument(1)));
+    when(scWikiClient.fetchOneResult(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenAnswer(inv -> found(itemDto(inv.getArgument(1))));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
         .thenAnswer(inv -> {
@@ -396,8 +489,8 @@ class ScWikiItemSyncServiceClosureTest {
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
-    when(scWikiClient.fetchOne(any(), any(), eq(ScWikiItemDto.class), any()))
-        .thenReturn(itemDto(uuid));
+    when(scWikiClient.fetchOneResult(any(), any(), eq(ScWikiItemDto.class), any()))
+        .thenReturn(found(itemDto(uuid)));
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -406,7 +499,7 @@ class ScWikiItemSyncServiceClosureTest {
     InOrder ordered = inOrder(scWikiClient, gameItemRepository);
     ordered
         .verify(scWikiClient)
-        .fetchOne(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any());
+        .fetchOneResult(eq("/api/items"), eq(uuid), eq(ScWikiItemDto.class), any());
     ordered.verify(gameItemRepository).save(any(GameItem.class));
   }
 
@@ -503,6 +596,10 @@ class ScWikiItemSyncServiceClosureTest {
     return counter == null ? 0.0 : counter.count();
   }
 
+  private static ScWikiClient.DetailResult<ScWikiItemDto> found(ScWikiItemDto dto) {
+    return new ScWikiClient.DetailResult<>(ScWikiClient.DetailOutcome.FOUND, dto);
+  }
+
   private static GameItem existingShield(UUID uuid) {
     GameItem item = new GameItem();
     item.setId(UUID.randomUUID());
@@ -551,6 +648,18 @@ class ScWikiItemSyncServiceClosureTest {
         null,
         null,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null);
   }
 
@@ -577,6 +686,18 @@ class ScWikiItemSyncServiceClosureTest {
         Boolean.TRUE,
         Boolean.FALSE,
         "4.8.0-LIVE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null,
         null,
         null,

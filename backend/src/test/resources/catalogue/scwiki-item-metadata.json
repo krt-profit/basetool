@@ -1,0 +1,319 @@
+{
+  "source_url": "https://api.star-citizen.wiki/api/items/4577c7a3-76ab-4e37-91de-68862dacb964?version=4.10.2-LIVE.12881860&include=related_items,variants,vehicles",
+  "captured_at_utc": "2026-11-06T16:29:54.2237290+00:00",
+  "data": {
+    "uuid": "4577c7a3-76ab-4e37-91de-68862dacb964",
+    "name": "A03 Akuma Sniper Rifle",
+    "version": "4.10.2-LIVE.12881860",
+    "updated_at": "2026-10-28T21:15:35Z",
+    "is_lootable": false,
+    "tags": [
+      "stocked",
+      "gmni_sniper_ballistic_01"
+    ],
+    "required_tags": [],
+    "dimension": {
+      "width": 0.75,
+      "height": 0.75,
+      "length": 1.5,
+      "volume": 0.019,
+      "volume_converted": 19000,
+      "volume_converted_unit": "µSCU",
+      "true_dimension": {
+        "width": 0.072,
+        "height": 0.238,
+        "length": 1.184
+      },
+      "dimensions": {
+        "width": 0.072,
+        "height": 0.238,
+        "length": 1.184
+      },
+      "cargo_dimension": {
+        "width": 0.06,
+        "height": 0.34,
+        "length": 1
+      },
+      "ui_dimension": {
+        "width": 0.75,
+        "height": 0.75,
+        "length": 1.5
+      }
+    },
+    "ports": [
+      {
+        "name": "magazine_attach",
+        "display_name": "Magazine Attach",
+        "position": "magazine_well",
+        "size": 1,
+        "sizes": {
+          "min": 1,
+          "max": 1
+        },
+        "compatible_types": [
+          {
+            "type": "WeaponAttachment",
+            "sub_types": [
+              "Magazine"
+            ]
+          }
+        ],
+        "types": [
+          "WeaponAttachment.Magazine"
+        ],
+        "type": "WeaponAttachment",
+        "sub_type": "Magazine",
+        "tags": [
+          "gmni_sniper_ballistic_01"
+        ],
+        "port_tags": [
+          "gmni_sniper_ballistic_01"
+        ],
+        "required_tags": [
+          "gmni_sniper_ballistic_01"
+        ],
+        "flags": [],
+        "editable": true,
+        "uneditable": false,
+        "equipped_item_uuid": "c12a76b1-80b2-4db5-9648-20a1cd0f4d67",
+        "equipped_item": {
+          "uuid": "c12a76b1-80b2-4db5-9648-20a1cd0f4d67",
+          "name": "A03 Sniper Rifle Magazine (15 cap)",
+          "class_name": "gmni_sniper_ballistic_01_mag",
+          "type": "WeaponAttachment",
+          "type_label": "Weapon Attachment",
+          "sub_type": "Magazine",
+          "sub_type_label": "Magazine",
+          "classification": "FPS.WeaponAttachment.Magazine",
+          "classification_label": "Magazine",
+          "is_base_variant": true,
+          "variant_name": null,
+          "link": "https://api.star-citizen.wiki/api/items/c12a76b1-80b2-4db5-9648-20a1cd0f4d67?version=4.10.2-LIVE.12881860",
+          "web_url": "https://api.star-citizen.wiki/items/a03-sniper-rifle-magazine-15-cap?version=4.10.2-LIVE.12881860",
+          "size": 1,
+          "mass": 1.15,
+          "grade": 1,
+          "class": null,
+          "manufacturer": {
+            "name": "Gemini",
+            "code": "GMNI",
+            "uuid": "b33050cd-6ca9-4c57-baf8-f4114eb85237",
+            "link": "https://api.star-citizen.wiki/api/manufacturers/GMNI"
+          },
+          "magazine": {
+            "initial_ammo_count": 15,
+            "max_ammo_count": 15,
+            "max_restock_count": 3
+          },
+          "ammunition": {
+            "uuid": "80ac0b57-4f1d-4ff4-8428-09461e8c584e",
+            "size": 1,
+            "lifetime": 2,
+            "speed": 800,
+            "range": 1600,
+            "capacity": 15,
+            "initial_capacity": 15,
+            "damage_falloff_level_1": 0,
+            "damage_falloff_level_2": 0,
+            "damage_falloff_level_3": 0,
+            "max_penetration_thickness": 0.5,
+            "penetration": {
+              "base_distance": 0,
+              "near_radius": 0.5,
+              "far_radius": 5,
+              "angle": null
+            },
+            "impact_damage": [
+              {
+                "type": "impact",
+                "name": "Physical",
+                "damage": 42.5
+              }
+            ],
+            "impact_damage_map": {
+              "physical": 42.5
+            },
+            "damage_drop_min_distance": {
+              "stun": 0,
+              "energy": 0,
+              "thermal": 0,
+              "physical": 150,
+              "distortion": 0,
+              "biochemical": 0,
+              "total": 150
+            },
+            "damage_drop_per_meter": {
+              "stun": 0,
+              "energy": 0,
+              "thermal": 0,
+              "physical": 0.02,
+              "distortion": 0,
+              "biochemical": 0,
+              "total": 0.02
+            },
+            "damage_drop_min_damage": {
+              "stun": 0,
+              "energy": 0,
+              "thermal": 0,
+              "physical": 35,
+              "distortion": 0,
+              "biochemical": 0,
+              "total": 35
+            },
+            "bullet_impulse_falloff": {
+              "min_distance": 1,
+              "drop_falloff": 0.005,
+              "max_falloff": 0.3715
+            },
+            "conversion_rate": 1,
+            "impulse_scale": 1,
+            "bullet_type": 2,
+            "damage_falloffs": {
+              "min_distance": {
+                "Stun": 0,
+                "Energy": 0,
+                "Thermal": 0,
+                "Physical": 150,
+                "Distortion": 0,
+                "Biochemical": 0
+              },
+              "per_meter": {
+                "Stun": 0,
+                "Energy": 0,
+                "Thermal": 0,
+                "Physical": 0.02,
+                "Distortion": 0,
+                "Biochemical": 0
+              },
+              "min_damage": {
+                "Stun": 0,
+                "Energy": 0,
+                "Thermal": 0,
+                "Physical": 35,
+                "Distortion": 0,
+                "Biochemical": 0
+              }
+            }
+          },
+          "version": "4.10.2-LIVE.12881860"
+        },
+        "ports": []
+      }
+    ],
+    "images": [],
+    "base_variant": {
+      "uuid": "6b1fb5e8-f9ec-49bc-befb-c81b7c08c5ea",
+      "name": "A03 Sniper Rifle",
+      "class_name": "gmni_sniper_ballistic_01",
+      "type": "WeaponPersonal",
+      "type_label": "FPS Weapon",
+      "sub_type": "Medium",
+      "sub_type_label": "Medium",
+      "classification": "FPS.Weapon.Medium",
+      "classification_label": "Medium Weapon",
+      "is_base_variant": true,
+      "variant_name": null,
+      "manufacturer": {
+        "name": "Gemini",
+        "code": "GMNI",
+        "uuid": "b33050cd-6ca9-4c57-baf8-f4114eb85237",
+        "link": "https://api.star-citizen.wiki/api/manufacturers/GMNI"
+      },
+      "link": "https://api.star-citizen.wiki/api/items/6b1fb5e8-f9ec-49bc-befb-c81b7c08c5ea?version=4.10.2-LIVE.12881860",
+      "web_url": "https://api.star-citizen.wiki/items/a03-sniper-rifle?version=4.10.2-LIVE.12881860",
+      "size": 3,
+      "updated_at": "2026-11-01T00:19:37Z",
+      "version": "4.10.2-LIVE.12881860"
+    },
+    "variants": [],
+    "related_items": {
+      "set_name": null,
+      "base_item": {
+        "uuid": "6b1fb5e8-f9ec-49bc-befb-c81b7c08c5ea",
+        "name": "A03 Sniper Rifle",
+        "class_name": "gmni_sniper_ballistic_01",
+        "type": "WeaponPersonal",
+        "type_label": "FPS Weapon",
+        "sub_type": "Medium",
+        "sub_type_label": "Medium",
+        "classification": "FPS.Weapon.Medium",
+        "classification_label": "Medium Weapon",
+        "is_base_variant": true,
+        "manufacturer": {
+          "code": "GMNI",
+          "name": "Gemini",
+          "link": "https://api.star-citizen.wiki/api/manufacturers/GMNI"
+        },
+        "size": 3,
+        "grade": 1,
+        "grade_label": 1,
+        "class": null,
+        "link": "https://api.star-citizen.wiki/api/items/6b1fb5e8-f9ec-49bc-befb-c81b7c08c5ea?version=4.10.2-LIVE.12881860",
+        "web_url": "https://api.star-citizen.wiki/items/a03-sniper-rifle?version=4.10.2-LIVE.12881860",
+        "version": "4.10.2-LIVE.12881860",
+        "variant_name": "Sniper Rifle"
+      },
+      "variant_items": [
+        {
+          "uuid": "1aad8334-8d0a-4dd1-bcca-bd195bc013a7",
+          "name": "A03 \"Canuto\" Sniper Rifle",
+          "class_name": "gmni_sniper_ballistic_01_arctic01",
+          "type": "WeaponPersonal",
+          "type_label": "FPS Weapon",
+          "sub_type": "Medium",
+          "sub_type_label": "Medium",
+          "classification": "FPS.Weapon.Medium",
+          "classification_label": "Medium Weapon",
+          "is_base_variant": false,
+          "manufacturer": {
+            "code": "GMNI",
+            "name": "Gemini",
+            "link": "https://api.star-citizen.wiki/api/manufacturers/GMNI"
+          },
+          "size": 3,
+          "grade": 1,
+          "grade_label": 1,
+          "class": null,
+          "link": "https://api.star-citizen.wiki/api/items/1aad8334-8d0a-4dd1-bcca-bd195bc013a7?version=4.10.2-LIVE.12881860",
+          "web_url": "https://api.star-citizen.wiki/items/a03-canuto-sniper-rifle?version=4.10.2-LIVE.12881860",
+          "version": "4.10.2-LIVE.12881860",
+          "variant_name": "Canuto"
+        }
+      ],
+      "by_size": [],
+      "by_grade": [],
+      "by_color": [
+        {
+          "uuid": "6b1fb5e8-f9ec-49bc-befb-c81b7c08c5ea",
+          "name": "A03 Sniper Rifle",
+          "class_name": "gmni_sniper_ballistic_01",
+          "type": "WeaponPersonal",
+          "type_label": "FPS Weapon",
+          "sub_type": "Medium",
+          "sub_type_label": "Medium",
+          "classification": "FPS.Weapon.Medium",
+          "classification_label": "Medium Weapon",
+          "is_base_variant": false,
+          "manufacturer": {
+            "code": "GMNI",
+            "name": "Gemini",
+            "link": "https://api.star-citizen.wiki/api/manufacturers/GMNI"
+          },
+          "size": 3,
+          "grade": 1,
+          "grade_label": 1,
+          "class": null,
+          "link": "https://api.star-citizen.wiki/api/items/6b1fb5e8-f9ec-49bc-befb-c81b7c08c5ea?version=4.10.2-LIVE.12881860",
+          "web_url": "https://api.star-citizen.wiki/items/a03-sniper-rifle?version=4.10.2-LIVE.12881860",
+          "version": "4.10.2-LIVE.12881860",
+          "variant_name": "Sniper Rifle"
+        }
+      ],
+      "set_items": []
+    },
+    "vehicles": [],
+    "uex_prices": {
+      "purchase": []
+    }
+  }
+}

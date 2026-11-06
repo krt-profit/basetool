@@ -44,15 +44,23 @@ exactly the shape the *Alternatives considered* section below warns about in a d
    `LiveSyncRedisConfig` registers no listener container and no executor. The sentence *"the backend
    stops doing either"* is therefore half right: it stops **consuming** `basetool:livesync:changed`
    and keeps **publishing** on it.
-4. **`LiveSyncTopicClass` shrinks to the six rooms the backend actually publishes into** —
+4. **`LiveSyncTopicClass` names only rooms the backend actually publishes into** —
    `inventory`, `hangar:{id}`, `hangar-unit:{id}`, `hangar-units`, `blueprints:{id}`,
-   `materialboard` — and loses its `authorization` column and its wire parser with the subscribe
-   path. The other nine classes existed only so an app could subscribe to them.
+   `materialboard`, `admin-dashboard`, `catalogue`, `order:{id}`, `supply-needs`,
+   `supply-donations:{id}` and `purchasing-deals`. It has no `authorization` column or wire parser
+   for subscriptions. Classes without a backend write owner stay solely in the frontend registry.
 5. **`LiveSyncTopicRegistryParityTest` stays, against the decision below.** With a publish-only
    registry the drift risk it guards is *larger*, not smaller: a prefix or section key the frontend
    renames is a frame the browser clips away on arrival. The test was already one-directional — every
    backend class must exist in the frontend with the same arity and sections — so a smaller backend
    registry only makes it stricter.
+
+Catalogue identity reconciliation writes owner references in the backend (ADR-0349). Its
+after-commit publications refresh existing inventory, blueprint, order, supply and purchasing
+receivers with current row versions. In particular, `order:{id}` is shared by ordinary browser
+mutations and `JobOrderItemReassignment`; its subscribe authorization and section whitelist stay
+the frontend's read contract. The `catalogue` room carries committed source-fact changes. These
+publishers use the same Redis channel and add no backend subscription surface.
 
 *What this costs.* The backend still holds a live-sync vocabulary that must stay in step with the
 frontend's, which is most of what the decision below wanted to be rid of. The honest version of

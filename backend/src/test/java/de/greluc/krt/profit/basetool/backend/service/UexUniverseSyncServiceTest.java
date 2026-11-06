@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.PlanetRepository
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexUniverseSyncService;
@@ -90,7 +91,9 @@ class UexUniverseSyncServiceTest {
   @Mock private LocationRepository locationRepository;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexUniverseSyncService service;
 

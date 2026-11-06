@@ -39,5 +39,6 @@ public interface ShipTypeMapper {
       expression =
           "java(shipType.getDescriptionDe() != null ? shipType.getDescriptionDe()"
               + " : shipType.getDescriptionEn())")
+  @Mapping(target = "catalogueFacts", expression = "java(ShipCatalogueFacts.of(shipType))")
   ShipTypeDto toDto(ShipType shipType);
 }

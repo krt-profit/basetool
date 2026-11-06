@@ -27,6 +27,8 @@ services:
   backend-dev:
     user: "0:0"
     environment:
+      KRT_UEX_SCHEDULER_ENABLED: "false"
+      KRT_SCWIKI_SCHEDULER_ENABLED: "false"
       APP_RATE_LIMIT_ENABLED: "false"
       APP_REGISTRATION_REQUIRE_APPROVAL: "false"
       APP_INVENTORY_STOLEN_MARKING_ENABLED: "true"

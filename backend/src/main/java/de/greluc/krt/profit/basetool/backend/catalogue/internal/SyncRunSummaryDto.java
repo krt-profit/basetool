@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.time.Instant;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,8 +29,27 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param sourceSystem the source's name ({@code UEX}, {@code SCWIKI} or {@code P4K})
  * @param runs how many distinct runs finished inside the range
- * @param lastRanAt when the source last ran at all, inside the range or not, {@code null} when it
- *     never did
+ * @param lastRanAt when the source last attempted a sync, absent when it never did
+ * @param lastCompleteAt newest fully applied attempt finish
+ * @param lastStatus outcome of the newest attempt
+ * @param attempts bounded recent attempt history, including event-free attempts
  */
 public record SyncRunSummaryDto(
-    @NotNull String sourceSystem, long runs, @Nullable Instant lastRanAt) {}
+    @NotNull String sourceSystem,
+    long runs,
+    @Nullable Instant lastRanAt,
+    @Nullable Instant lastCompleteAt,
+    @Nullable String lastStatus,
+    List<SyncRunDto> attempts) {
+
+  /**
+   * Represents a source whose history contains only legacy anomaly events.
+   *
+   * @param sourceSystem source name
+   * @param runs retained legacy runs in the requested range
+   * @param lastRanAt newest legacy event timestamp
+   */
+  public SyncRunSummaryDto(String sourceSystem, long runs, @Nullable Instant lastRanAt) {
+    this(sourceSystem, runs, lastRanAt, null, null, List.of());
+  }
+}

@@ -95,11 +95,82 @@ class InventoryAggregationServiceTest {
   @BeforeEach
   void noLowLevels() {
     lenient()
+        .when(gameItemRepository.resolveLocalIds(any()))
+        .thenAnswer(invocation -> List.copyOf(invocation.<List<UUID>>getArgument(0)));
+    lenient()
         .when(stockLevelService.lowSubjects())
         .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
   }
 
   @InjectMocks private InventoryAggregationService service;
+
+  @Nested
+  class RetiredItemStackTests {
+
+    @Test
+    void ownerDrilldownUsesSurvivorAndPreservesPageCounts() {
+      UUID owner = UUID.randomUUID();
+      UUID retired = UUID.randomUUID();
+      UUID canonical = UUID.randomUUID();
+      UUID location = UUID.randomUUID();
+      UUID unit = UUID.randomUUID();
+      Pageable pageable = PageRequest.of(0, 2);
+      InventoryItem row = new InventoryItem();
+      stubUser(owner);
+      when(gameItemRepository.resolveLocalIds(List.of(retired))).thenReturn(List.of(canonical));
+      when(inventoryItemRepository.findUserItemStackEntries(
+              owner, canonical, location, true, true, unit, pageable))
+          .thenReturn(new PageImpl<>(List.of(row), pageable, 5));
+
+      Page<InventoryItemDto> result =
+          service.getMyItemStackEntries(owner, retired, location, true, true, unit, pageable);
+
+      assertEquals(1, result.getNumberOfElements());
+      assertEquals(5, result.getTotalElements());
+      verify(gameItemRepository).resolveLocalIds(List.of(retired));
+      verify(inventoryItemMapper).toDto(row);
+    }
+
+    @Test
+    void globalDrilldownUsesSurvivorAndRetainsTenancyAndFlags() {
+      UUID retired = UUID.randomUUID();
+      UUID canonical = UUID.randomUUID();
+      UUID owner = UUID.randomUUID();
+      UUID location = UUID.randomUUID();
+      UUID unit = UUID.randomUUID();
+      Pageable pageable = PageRequest.of(0, 2);
+      ScopePredicate scope = new ScopePredicate(false, unit, Set.of(unit));
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN)).thenReturn(scope);
+      when(gameItemRepository.resolveLocalIds(List.of(retired))).thenReturn(List.of(canonical));
+      when(inventoryItemRepository.findGlobalItemStackEntries(
+              canonical, owner, location, false, unit, false, unit, Set.of(unit), pageable))
+          .thenReturn(new PageImpl<>(List.of(new InventoryItem()), pageable, 7));
+
+      Page<InventoryItemDto> result =
+          service.getAllItemStackEntries(retired, owner, location, null, unit, pageable);
+
+      assertEquals(1, result.getNumberOfElements());
+      assertEquals(7, result.getTotalElements());
+      verify(gameItemRepository).resolveLocalIds(List.of(retired));
+    }
+
+    @Test
+    void currentIdKeepsItsStackWhenNoRedirectExists() {
+      UUID item = UUID.randomUUID();
+      UUID owner = UUID.randomUUID();
+      UUID location = UUID.randomUUID();
+      Pageable pageable = PageRequest.of(0, 2);
+      stubUser(owner);
+      when(inventoryItemRepository.findUserItemStackEntries(
+              owner, item, location, false, false, null, pageable))
+          .thenReturn(Page.empty(pageable));
+
+      assertTrue(
+          service
+              .getMyItemStackEntries(owner, item, location, null, null, null, pageable)
+              .isEmpty());
+    }
+  }
 
   @Nested
   class FilterRoutingTests {

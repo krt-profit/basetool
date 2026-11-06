@@ -111,6 +111,23 @@ public class InventoryStockCommands implements StockCommands {
   }
 
   /**
+   * Attempts globally ordered lot locks without waiting; a false result requires rollback.
+   *
+   * @param repository the advisory-lock repository
+   * @param keys every lot key needed by the transaction
+   * @return whether every lock was acquired
+   */
+  static boolean tryLockInOrder(
+      @NotNull InventoryItemRepository repository, @NotNull Collection<Long> keys) {
+    for (long key : new TreeSet<>(keys)) {
+      if (!repository.tryLockExchangeLot(key)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Derives a lot's 64-bit advisory lock key: the first eight bytes of the SHA-256 of the member
    * and the lot key under the fixed prefix.
    *

@@ -78,9 +78,13 @@ public class ExchangeItemReferences {
     for (GameItem item : gameItemRepository.findAllById(Set.copyOf(itemIds.values()))) {
       byId.put(item.getId(), GameItemReferenceDto.of(item));
     }
+    Set<UUID> unresolvedIds = new LinkedHashSet<>(itemIds.values());
+    unresolvedIds.removeAll(byId.keySet());
+    Map<UUID, UUID> redirects =
+        unresolvedIds.isEmpty() ? Map.of() : gameItemRepository.findLocalIdRedirects(unresolvedIds);
     Map<String, GameItemReferenceDto> references = new HashMap<>();
     itemIds.forEach((key, id) -> {
-      GameItemReferenceDto reference = byId.get(id);
+      GameItemReferenceDto reference = byId.get(redirects.getOrDefault(id, id));
       if (reference != null) {
         references.put(key, reference);
       }

@@ -8,7 +8,8 @@
 </head>
 <body>
 <th:block th:fragment="pageContent">
-<main>
+<main id="material-detail-results">
+    <th:block th:fragment="materialDetails">
     <div class="page-head" data-testid="page-head">
         <div class="page-head__main">
             <a class="page-eyebrow" th:href="@{/materials}" data-testid="page-eyebrow"
@@ -60,6 +61,43 @@
                 <div class="kpi-sub" th:text="#{materials.detail.kpi.uexSync}">Letzter UEX-Sync</div>
             </div>
         </div>
+
+        <section class="card" th:if="${material.miningData != null}" th:with="mining=${material.miningData}"
+                 data-testid="material-wiki-mining">
+            <h2 class="section-title" th:text="#{catalogue.mining.title}">Mining and cargo</h2>
+            <p class="cell-sub" th:text="#{catalogue.source.wiki}">SC Wiki source data</p>
+            <dl class="kv-list">
+                <th:block th:if="${mining.tier != null}"><dt th:text="#{catalogue.mining.tier}">Tier</dt><dd th:text="${mining.tier}"></dd></th:block>
+                <th:block th:if="${mining.instability != null}"><dt th:text="#{catalogue.mining.instability}">Instability</dt><dd th:text="${mining.instability}"></dd></th:block>
+                <th:block th:if="${mining.resistance != null}"><dt th:text="#{catalogue.mining.resistance}">Resistance</dt><dd th:text="${mining.resistance}"></dd></th:block>
+                <th:block th:if="${mining.volatility != null}"><dt th:text="#{catalogue.mining.volatility}">Volatility</dt><dd th:text="${mining.volatility}"></dd></th:block>
+                <th:block th:if="${mining.volatilityHealthDecayPerSecond != null}"><dt th:text="#{catalogue.mining.decay}">Volatility decay per second</dt><dd th:text="${mining.volatilityHealthDecayPerSecond}"></dd></th:block>
+                <th:block th:if="${mining.signature != null}"><dt th:text="#{catalogue.mining.signature}">Signature</dt><dd th:text="${mining.signature}"></dd></th:block>
+                <th:block th:if="${!#lists.isEmpty(mining.boxSizesScu)}"><dt th:text="#{catalogue.mining.boxSizes}">Container sizes (SCU)</dt><dd th:text="${#strings.listJoin(mining.boxSizesScu, ', ')}"></dd></th:block>
+                <th:block th:if="${!#lists.isEmpty(mining.commodityGroups)}"><dt th:text="#{catalogue.mining.groups}">Resource groups</dt><dd th:text="${#strings.listJoin(mining.commodityGroups, ', ')}"></dd></th:block>
+                <th:block th:if="${!#lists.isEmpty(mining.methods)}"><dt th:text="#{catalogue.mining.methods}">Acquisition methods</dt><dd th:text="${#strings.listJoin(mining.methods, ', ')}"></dd></th:block>
+                <th:block th:if="${!#lists.isEmpty(mining.systems)}"><dt th:text="#{catalogue.mining.systems}">Systems</dt><dd th:text="${#strings.listJoin(mining.systems, ', ')}"></dd></th:block>
+            </dl>
+            <div>
+                <span th:if="${mining.mineable != null}" class="chip" th:text="${mining.mineable} ? #{catalogue.mining.mineable.yes} : #{catalogue.mining.mineable.no}">Mineable</span>
+                <span th:if="${mining.shipMineable != null}" class="chip" th:text="${#messages.msg('catalogue.mining.ship') + ': ' + #messages.msg(mining.shipMineable ? 'catalogue.flag.yes' : 'catalogue.flag.no')}">Ship mining</span>
+                <span th:if="${mining.groundVehicleMineable != null}" class="chip" th:text="${#messages.msg('catalogue.mining.ground') + ': ' + #messages.msg(mining.groundVehicleMineable ? 'catalogue.flag.yes' : 'catalogue.flag.no')}">Ground mining</span>
+                <span th:if="${mining.fpsMineable != null}" class="chip" th:text="${#messages.msg('catalogue.mining.fps') + ': ' + #messages.msg(mining.fpsMineable ? 'catalogue.flag.yes' : 'catalogue.flag.no')}">Hand mining</span>
+                <span th:if="${mining.harvestable != null}" class="chip" th:text="${#messages.msg('catalogue.mining.harvestable') + ': ' + #messages.msg(mining.harvestable ? 'catalogue.flag.yes' : 'catalogue.flag.no')}">Harvestable</span>
+                <span th:if="${mining.salvage != null}" class="chip" th:text="${#messages.msg('catalogue.mining.salvage') + ': ' + #messages.msg(mining.salvage ? 'catalogue.flag.yes' : 'catalogue.flag.no')}">Salvage</span>
+            </div>
+            <div th:if="${!#lists.isEmpty(mining.locations)}" class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead><tr><th th:text="#{catalogue.mining.location}">Location</th><th th:text="#{catalogue.mining.systems}">System</th><th th:text="#{catalogue.mining.quality}">Resource evidence</th></tr></thead>
+                    <tbody><tr th:each="location : ${mining.locations}">
+                        <td><span class="cell-title" th:text="${location.displayName ?: location.name}"></span><span class="cell-sub" th:text="${location.parentName}"></span></td>
+                        <td th:attr="data-label=#{catalogue.mining.systems}" th:text="${location.system ?: '—'}"></td>
+                        <td th:attr="data-label=#{catalogue.mining.quality}"><span class="cell-sub" th:each="entry : ${location.entries}"
+                            th:text="#{catalogue.mining.occurrence(${entry.groupName ?: '—'}, ${entry.qualityMin ?: '—'}, ${entry.qualityMax ?: '—'}, ${entry.entryCount ?: '—'})}"></span></td>
+                    </tr></tbody>
+                </table>
+            </div>
+        </section>
 
         <h2 class="md-section-title" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
 
@@ -161,6 +199,7 @@
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.detail.noData', textKey='materials.detail.noData.text')}"></th:block>
         </div>
         </section>
+    </th:block>
     </th:block>
 </main>
 

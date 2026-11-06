@@ -209,7 +209,27 @@ answers the review URL, and the member saves through the ordinary path — as in
    active org unit renders greyed. Another tab shows the change on its next page load; the open
    dashboard re-reads every ten minutes (REQ-UI-032, REQ-UI-034).
 
-## 6.10 An admin imports the P4K catalogue
+## 6.10 An external catalogue run applies a source snapshot
+
+1. Persist a running source attempt before resolving the Wiki build; nested aggregate attempts
+   inherit that build. Fetch outside a database transaction through the shared paced/retry client.
+2. Validate source identities and multiplicities before matching. Preserve the fetched census
+   independently of committed writes; conflicting strong identities cannot be rebound by a name.
+3. Apply short chunks, retrying a failed chunk row by row. Reconcile proven item duplicates in
+   one owner-participating transaction, archiving source rows and preserving old local ids.
+4. Permit absence cleanup only with complete, compatible presence evidence. For known Wiki
+   items/vehicles omitted by the relevant scope, verify all-asset existence without importing
+   internal assets; restore known false tombstones in bounded batches.
+5. Persist the actual outcome and publish the catalogue change after committed writes. Readers
+   invalidate catalogue caches before rendering live fragments; no-op and failed-before-write
+   attempts publish no data-change event. Metrics and run history distinguish the latest attempt
+   from the last complete source sweep.
+
+Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
+[REQ-OBS-011](../specs/observability.md),
+[ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md).
+
+## 6.11 An admin imports the P4K catalogue
 
 1. **Upload.** `/admin/p4k-import` sends the file (`.json`, `.json.gz` or `.json.zst`) to
    `POST /api/v1/catalog/admin/import/p4k/jobs`. `P4kUploadGate` checks it synchronously: the size

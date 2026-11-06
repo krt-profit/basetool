@@ -167,7 +167,7 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
   public MaterialDto getMaterial(@NotNull UUID id) {
-    return materialMapper.toDto(requireMaterial(id));
+    return materialMapper.toDetailDto(requireMaterial(id));
   }
 
   /**

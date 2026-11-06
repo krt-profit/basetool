@@ -319,7 +319,7 @@ public class BlueprintImportService implements BlueprintImports {
     alias.setProductKey(product.productKey());
     alias.setProductName(product.productName());
     if (product.outputItemId() != null) {
-      alias.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
+      alias.setOutputItem(gameItemRepository.getCanonicalReferenceById(product.outputItemId()));
     }
     alias.setCreatedBy(ownerUserId.toString());
     aliasRepository.save(alias);
@@ -550,7 +550,7 @@ public class BlueprintImportService implements BlueprintImports {
     entity.setProductKey(product.productKey());
     entity.setProductName(product.productName());
     if (product.outputItemId() != null) {
-      entity.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
+      entity.setOutputItem(gameItemRepository.getCanonicalReferenceById(product.outputItemId()));
     }
     entity.setAcquiredAt(acquiredAt);
     entity.setNote(note);

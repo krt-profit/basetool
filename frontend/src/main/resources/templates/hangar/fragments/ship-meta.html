@@ -13,6 +13,21 @@
               th:if="${p.meltable != null}" th:text="' · ' + (${p.meltable} ? #{hangar.ship.pledge.meltable} : #{hangar.ship.pledge.notMeltable})"> · schmelzbar</span><span
               th:if="${p.giftable != null}" th:text="' · ' + (${p.giftable} ? #{hangar.ship.pledge.giftable} : #{hangar.ship.pledge.notGiftable})"> · verschenkbar</span></span>
     </span>
+    <span class="hangar-row__meta" th:if="${ship.shipType != null and ship.shipType.catalogueFacts != null}"
+          th:with="facts=${ship.shipType.catalogueFacts}" data-testid="hangar-catalogue-facts">
+        <span th:if="${facts.inventoryScu != null}" class="chip chip--data"
+              th:text="#{catalogue.ship.inventory(${facts.inventoryScu})}">Inventory</span>
+        <span th:if="${facts.oreCapacityScu != null}" class="chip chip--data"
+              th:text="#{catalogue.ship.ore(${facts.oreCapacityScu})}">Ore</span>
+        <span th:if="${facts.medicalTier != null}" class="chip chip--data"
+              th:text="#{catalogue.ship.medical(${facts.medicalTier})}">Medical tier</span>
+        <span th:if="${facts.hullHealth != null}" class="chip chip--data"
+              th:text="#{catalogue.ship.hull(${facts.hullHealth})}">Hull health</span>
+        <span th:if="${facts.shieldHealth != null}" class="chip chip--data"
+              th:text="#{catalogue.ship.shield(${facts.shieldHealth})}">Shield health</span>
+        <span th:if="${facts.gameVersion != null}" class="cell-sub"
+              th:text="#{catalogue.source.version(${facts.gameVersion})}">Source version</span>
+    </span>
 </th:block>
 </body>
 </html>

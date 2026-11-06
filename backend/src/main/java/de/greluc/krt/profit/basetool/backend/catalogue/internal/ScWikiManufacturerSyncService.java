@@ -25,15 +25,20 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiRes
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -49,130 +54,147 @@ import org.springframework.util.StringUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ScWikiManufacturerSyncService {
 
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final ManufacturerRepository manufacturerRepository;
   private final SyncReportService syncReportService;
+  private final SyncChunkWriter chunkWriter;
 
   /**
-   * Runs the manufacturer reconciliation; a no-op when the flag is off, and an empty response skips
-   * the orphan sweep.
+   * Reconciles a complete manufacturer census with isolated database writes.
    *
-   * @return the number of {@code manufacturer} rows written ({@code linked + refreshed}), {@code 0}
-   *     when disabled or empty, or {@link ManufacturerRepository#countLiveScwikiManufacturers() the
-   *     live reconciled-manufacturer count} on a {@code 304 Not Modified}
+   * @return successfully linked or refreshed manufacturers
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncManufacturers() {
     if (!Boolean.TRUE.equals(properties.manufacturerSyncEnabled())) {
-      log.info(
-          "SC Wiki manufacturer sync invoked but disabled "
-              + "(krt.scwiki.manufacturer-sync-enabled=false) — skipping.");
       return 0;
     }
+    try (var _ = scWikiClient.openSyncRun()) {
+      return reconcileCensus();
+    }
+  }
 
-    log.info("Starting SC Wiki manufacturer reconciliation...");
-    ScWikiClient.FetchResult<ScWikiManufacturerDto> result =
+  private int reconcileCensus() {
+    var result =
         scWikiClient.fetchAllPagesResult(
             properties.manufacturersEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiManufacturerDto>>() {},
             "manufacturers");
-    if (result.notModified()) {
-      long live = manufacturerRepository.countLiveScwikiManufacturers();
-      log.info(
-          "SC Wiki manufacturer catalogue unchanged since last sync (304) — reporting {} live"
-              + " reconciled manufacturer row(s) instead of 0.",
-          live);
-      return (int) live;
-    }
-    List<ScWikiManufacturerDto> fetched = result.data();
-    if (fetched.isEmpty()) {
-      log.warn("No manufacturers received from SC Wiki API. Aborting reconciliation (no sweep).");
+
+    List<ScWikiManufacturerDto> rows = result.data();
+    if (rows.isEmpty()) {
+      syncReportService.recordSweep(false);
       return 0;
     }
-
-    UUID runId = syncReportService.beginRun();
     Instant now = Instant.now();
+    UUID runId = syncReportService.beginRun();
+    Set<UUID> conflicts = new HashSet<>();
     Set<UUID> seen = new HashSet<>();
-    int linked = 0;
-    int refreshed = 0;
-    int conflicts = 0;
-    int unmatched = 0;
-
-    for (ScWikiManufacturerDto dto : fetched) {
-      if (dto.uuid() == null) {
-        continue;
-      }
-      try {
-        Manufacturer match = resolve(dto);
-        if (match == null) {
-          unmatched++;
-          continue;
-        }
-        UUID existingLink = match.getScwikiUuid();
-        if (existingLink != null && !existingLink.equals(dto.uuid())) {
-          syncReportService.logScwikiEvent(
-              runId,
-              SyncEventType.MANUFACTURER_MISMATCH,
-              "manufacturer",
-              dto.uuid(),
-              dto.name(),
-              "Wiki manufacturer matched local '"
-                  + match.getName()
-                  + "' which is already linked to a different Wiki UUID — left untouched.");
-          conflicts++;
-          continue;
-        }
-
-        final boolean firstLink = existingLink == null;
-        seen.add(dto.uuid());
-        match.setScwikiUuid(dto.uuid());
-        if (StringUtils.hasText(dto.code())) {
-          match.setScwikiCode(dto.code());
-        }
-        match.setScwikiSyncedAt(now);
-        match.setScwikiDeletedAt(null);
-        manufacturerRepository.save(match);
-
-        if (firstLink) {
-          linked++;
-          syncReportService.logScwikiEvent(
-              runId,
-              SyncEventType.MANUFACTURER_LINKED,
-              "manufacturer",
-              dto.uuid(),
-              match.getName(),
-              "Linked Wiki manufacturer (code "
-                  + dto.code()
-                  + ") to local '"
-                  + match.getName()
-                  + "'.");
-        } else {
-          refreshed++;
-        }
-      } catch (Exception e) {
-        log.error("Failed to reconcile SC Wiki manufacturer {}", dto.uuid(), e);
-      }
+    List<ScWikiManufacturerDto> valid =
+        rows.stream().filter(dto -> dto != null && dto.uuid() != null).toList();
+    valid.forEach(dto -> seen.add(dto.uuid()));
+    Map<String, Long> names =
+        valid.stream()
+            .map(ScWikiManufacturerDto::name)
+            .filter(StringUtils::hasText)
+            .map(ScWikiManufacturerSyncService::sourceKey)
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    Map<String, Long> codes =
+        valid.stream()
+            .map(ScWikiManufacturerDto::code)
+            .filter(StringUtils::hasText)
+            .map(ScWikiManufacturerSyncService::sourceKey)
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    if (valid.size() != rows.size() || seen.size() != rows.size()) {
+      syncReportService.recordIncomplete();
     }
-
-    ScWikiOrphanSweep.sweepDeletedOrphans(
-        seen,
-        result.complete(),
-        s -> manufacturerRepository.markScwikiDeletedExcept(s, now),
-        log,
-        "manufacturer");
+    var outcome =
+        chunkWriter.write(
+            valid,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk ->
+                chunk.stream()
+                    .map(dto -> reconcile(dto, runId, now, conflicts, names, codes))
+                    .filter(id -> id != null)
+                    .toList(),
+            "Wiki manufacturer",
+            dto -> dto.uuid().toString());
+    boolean complete =
+        result.complete()
+            && valid.size() == rows.size()
+            && seen.size() == rows.size()
+            && outcome.failedRows() == 0
+            && conflicts.isEmpty();
+    if (complete && !seen.isEmpty() && !outcome.results().isEmpty()) {
+      int marked =
+          chunkWriter.inNewTransaction(
+              () -> manufacturerRepository.markScwikiDeletedExcept(seen, now));
+      syncReportService.recordApplied(marked);
+      syncReportService.recordSweep(true);
+    } else {
+      syncReportService.recordSweep(false);
+    }
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
-    log.info(
-        "Finished SC Wiki manufacturer reconciliation: {} newly linked, {} refreshed, {} conflicts,"
-            + " {} unmatched.",
-        linked,
-        refreshed,
-        conflicts,
-        unmatched);
-    return linked + refreshed;
+    return outcome.results().size();
+  }
+
+  @Nullable
+  private UUID reconcile(
+      ScWikiManufacturerDto dto,
+      UUID runId,
+      Instant now,
+      Set<UUID> conflicts,
+      Map<String, Long> names,
+      Map<String, Long> codes) {
+    ManufacturerMatch resolution = resolve(dto, names, codes);
+    Manufacturer manufacturer = resolution.manufacturer();
+    if (manufacturer == null) {
+      if (resolution.ambiguous()) {
+        conflicts.add(dto.uuid());
+        syncReportService.recordIncomplete();
+        syncReportService.logScwikiEvent(
+            runId,
+            SyncEventType.MULTI_MATCH_AMBIGUOUS,
+            "manufacturer",
+            dto.uuid(),
+            dto.name(),
+            "Manufacturer source identity is ambiguous.");
+      }
+      return null;
+    }
+    UUID link = manufacturer.getScwikiUuid();
+    if (link != null && !link.equals(dto.uuid())) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.MANUFACTURER_MISMATCH,
+          "manufacturer",
+          dto.uuid(),
+          dto.name(),
+          "Matched manufacturer is linked to another Wiki UUID.");
+      syncReportService.recordIncomplete();
+      conflicts.add(dto.uuid());
+      return null;
+    }
+    manufacturer.setScwikiUuid(dto.uuid());
+    if (StringUtils.hasText(dto.code())) {
+      manufacturer.setScwikiCode(dto.code());
+    }
+    manufacturer.setScwikiSyncedAt(now);
+    manufacturer.setScwikiDeletedAt(null);
+    manufacturerRepository.save(manufacturer);
+    if (link == null) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.MANUFACTURER_LINKED,
+          "manufacturer",
+          dto.uuid(),
+          manufacturer.getName(),
+          "Linked Wiki manufacturer.");
+    }
+    return dto.uuid();
   }
 
   /**
@@ -180,25 +202,48 @@ public class ScWikiManufacturerSyncService {
    * then case-insensitive {@code abbreviation == code}.
    *
    * @param dto the Wiki manufacturer payload
+   * @param names current Wiki identities per normalized exact name
+   * @param codes current Wiki identities per normalized engine code
    * @return the matching local manufacturer, or {@code null}
    */
-  @Nullable
-  private Manufacturer resolve(@NotNull ScWikiManufacturerDto dto) {
+  private ManufacturerMatch resolve(
+      @NotNull ScWikiManufacturerDto dto, Map<String, Long> names, Map<String, Long> codes) {
     Optional<Manufacturer> byUuid = manufacturerRepository.findByScwikiUuid(dto.uuid());
     if (byUuid.isPresent()) {
-      return byUuid.get();
+      return new ManufacturerMatch(byUuid.get(), false);
     }
+    boolean ambiguous = false;
     if (StringUtils.hasText(dto.name())) {
-      Optional<Manufacturer> byName = manufacturerRepository.findByNameIgnoreCase(dto.name());
-      if (byName.isPresent()) {
-        return byName.get();
+      long count = names.getOrDefault(sourceKey(dto.name()), 0L);
+      if (count == 1) {
+        var byName = manufacturerRepository.findByNameIgnoreCase(dto.name().strip());
+        if (byName.isPresent()) {
+          return new ManufacturerMatch(byName.get(), false);
+        }
+      } else {
+        ambiguous = true;
       }
     }
     if (StringUtils.hasText(dto.code())) {
-      return manufacturerRepository
-          .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(dto.code())
-          .orElse(null);
+      long count = codes.getOrDefault(sourceKey(dto.code()), 0L);
+      if (count == 1) {
+        List<Manufacturer> byCode =
+            manufacturerRepository.findByAbbreviationIgnoreCase(dto.code().strip());
+        if (byCode.size() == 1) {
+          return new ManufacturerMatch(byCode.getFirst(), false);
+        }
+        ambiguous |= byCode.size() > 1;
+      } else {
+        ambiguous = true;
+      }
     }
-    return null;
+    return new ManufacturerMatch(null, ambiguous);
+  }
+
+  /** A local identity candidate with an explicit ambiguity outcome. */
+  private record ManufacturerMatch(@Nullable Manufacturer manufacturer, boolean ambiguous) {}
+
+  private static String sourceKey(@NotNull String value) {
+    return value.strip().toLowerCase(Locale.ROOT);
   }
 }

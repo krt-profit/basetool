@@ -55,3 +55,44 @@ tasks.register("generateTermsVersion") {
     logger.lifecycle("Terms-of-Use version: $version -> $targetForLog")
   }
 }
+
+val prometheusConfiguration = layout.projectDirectory.dir("monitoring/prometheus")
+val prometheusImage =
+  providers
+    .fileContents(layout.projectDirectory.file("docker-compose.monitoring.yml"))
+    .asText
+    .map { compose ->
+      Regex("(?m)^    image: (prom/prometheus:\\S+@sha256:[a-f0-9]{64})\\s*$")
+        .find(compose)
+        ?.groupValues
+        ?.get(1) ?: error("The Prometheus compose image must carry a SHA-256 digest")
+    }
+val prometheusRuleScratch =
+  providers
+    .gradleProperty("prometheusRuleScratch")
+    .map(::File)
+    .getOrElse(layout.buildDirectory.dir("tmp/prometheus-rule-tests").get().asFile)
+
+tasks.register<Exec>("testPrometheusRules") {
+  val scratch = prometheusRuleScratch
+  group = "verification"
+  description = "Checks and tests Prometheus alert rules with the deployed image."
+  inputs.dir(prometheusConfiguration)
+  inputs.property("prometheusImage", prometheusImage)
+  doFirst { scratch.mkdirs() }
+  commandLine(
+    "docker",
+    "run",
+    "--rm",
+    "--network=none",
+    "--read-only",
+    "--entrypoint=sh",
+    "--volume=${prometheusConfiguration.asFile.absolutePath}:/work:ro",
+    "--volume=${prometheusRuleScratch.absolutePath}:/worktmp",
+    "--env=TMPDIR=/worktmp",
+    "--workdir=/work",
+    prometheusImage.get(),
+    "-c",
+    "promtool check rules alerts/*.yml && promtool test rules tests/*_test.yml",
+  )
+}

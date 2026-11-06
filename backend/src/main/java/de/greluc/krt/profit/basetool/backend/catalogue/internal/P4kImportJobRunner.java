@@ -21,8 +21,12 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +56,7 @@ public class P4kImportJobRunner {
   private final MasterDataCacheEvictionService cacheEvictionService;
   private final ObjectMapper objectMapper;
   private final AuthHelperService authHelperService;
+  private final LiveSyncPublisher catalogueUpdates;
 
   /**
    * Executes one import job asynchronously on the {@code importExecutor}. Never throws: every
@@ -86,6 +91,7 @@ public class P4kImportJobRunner {
       @NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean createItemsAndShips) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;
+    boolean changedCatalogue = false;
     try {
       jobService.markRunning(jobId);
       byte[] bytes = jobService.loadPayload(jobId);
@@ -96,6 +102,7 @@ public class P4kImportJobRunner {
             importService.applyImport(
                 bytes, new P4kImportService.P4kApplyRequest(jobId, createdBy, createItemsAndShips));
         appliedMasterData = true;
+        changedCatalogue = hasChanges(result);
       } else {
         result = importService.previewImport(bytes);
       }
@@ -114,10 +121,30 @@ public class P4kImportJobRunner {
               cacheEvictionService::evictP4kSyncedMasterData,
               "evict P4K-synced master-data caches");
         }
+        if (changedCatalogue) {
+          safely(
+              () ->
+                  catalogueUpdates.publishAfterCommit(
+                      LiveSyncTopic.global(LiveSyncTopicClass.CATALOGUE), List.of("catalogue")),
+              "publish catalogue change");
+        }
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
       safely(jobService::pruneOldJobs, "prune old jobs");
     }
+  }
+
+  private static boolean hasChanges(P4kImportResultDto result) {
+    return result.ingredientsResolved() > 0
+        || hasChanges(result.manufacturers())
+        || hasChanges(result.items())
+        || hasChanges(result.ships())
+        || hasChanges(result.commodities())
+        || hasChanges(result.blueprints());
+  }
+
+  private static boolean hasChanges(P4kImportResultDto.Counts counts) {
+    return counts.created() > 0 || counts.enriched() > 0;
   }
 
   /**

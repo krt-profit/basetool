@@ -33,16 +33,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -58,7 +62,6 @@ import org.springframework.util.StringUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ScWikiCommoditySyncService {
 
   /**
@@ -86,118 +89,121 @@ public class ScWikiCommoditySyncService {
   private final MaterialRepository materialRepository;
   private final MaterialExternalAliasService aliasService;
   private final SyncReportService syncReportService;
+  private final SyncChunkWriter chunkWriter;
 
   /**
-   * Runs the full Wiki commodity merge; a no-op when {@code krt.scwiki.commodity-sync-enabled} is
-   * off, and an empty response skips the orphan sweep.
+   * Imports one Wiki commodity census in isolated database transactions.
    *
-   * @return the number of {@code material} rows written ({@code linked + createdWikiOnly}), {@code
-   *     0} when disabled or empty, or {@link MaterialRepository#countLiveScwikiMaterials() the live
-   *     linked-material count} on a {@code 304 Not Modified}
+   * @return successfully applied commodity rows
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncCommodities() {
     if (!Boolean.TRUE.equals(properties.commoditySyncEnabled())) {
-      log.info(
-          "SC Wiki commodity sync invoked but disabled "
-              + "(krt.scwiki.commodity-sync-enabled=false) — skipping.");
       return 0;
     }
+    try (var _ = scWikiClient.openSyncRun()) {
+      return syncCensus();
+    }
+  }
 
-    log.info("Starting SC Wiki commodity merge...");
-    ScWikiClient.FetchResult<ScWikiCommodityDto> fetchResult =
+  private int syncCensus() {
+    var fetched =
         scWikiClient.fetchAllPagesResult(
             properties.commoditiesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>() {},
             "commodities");
-    if (fetchResult.notModified()) {
-      long live = materialRepository.countLiveScwikiMaterials();
-      log.info(
-          "SC Wiki commodity catalogue unchanged since last sync (304) — reporting {} live linked"
-              + " material row(s) instead of 0.",
-          live);
-      return (int) live;
-    }
-    List<ScWikiCommodityDto> fetched = fetchResult.data();
-    if (fetched.isEmpty()) {
-      log.warn("No commodities received from SC Wiki API. Aborting merge (no orphan sweep).");
+
+    List<ScWikiCommodityDto> rows = fetched.data();
+    if (rows.isEmpty()) {
+      syncReportService.recordSweep(false);
       return 0;
     }
-
     UUID runId = syncReportService.beginRun();
     Instant now = Instant.now();
-    Map<String, List<Material>> canonicalIndex = buildCanonicalIndex();
-
-    Set<UUID> seenScwikiUuids = new HashSet<>();
-    int linked = 0;
-    int createdWikiOnly = 0;
-    int skippedJunk = 0;
-    int skippedAmbiguous = 0;
-
-    for (ScWikiCommodityDto dto : fetched) {
-      try {
-        if (isCommodityHardJunk(dto)) {
-          syncReportService.logCommodityEvent(
-              runId, SyncEventType.SKIP_JUNK, dto.uuid(), dto.name(), "Hard-junk name pattern");
-          skippedJunk++;
-          continue;
-        }
-        if (dto.uuid() == null) {
-          syncReportService.logCommodityEvent(
-              runId, SyncEventType.SKIP_JUNK, null, dto.name(), "Wiki commodity without uuid");
-          skippedJunk++;
-          continue;
-        }
-
-        ResolveResult result = resolve(dto, canonicalIndex, runId);
-        if (result.skip()) {
-          skippedAmbiguous++;
-          continue;
-        }
-
-        seenScwikiUuids.add(dto.uuid());
-        Material material = result.material();
-        if (material == null) {
-          material = createWikiOnlyMaterial(dto, runId);
-          createdWikiOnly++;
-        } else {
-          linked++;
-        }
-        applyWikiFields(material, dto, now);
-        if (material.getSourceSystems() == MaterialSourceSystem.UEX_ONLY) {
-          material.setSourceSystems(MaterialSourceSystem.BOTH);
-        }
-        materialRepository.save(material);
-      } catch (Exception e) {
-        log.error("Failed to process SC Wiki commodity dto: {}", dto.uuid(), e);
-      }
-    }
-
-    if (seenScwikiUuids.isEmpty()) {
-      log.warn("Skipping orphan sweep — no SC Wiki commodity was merged this run.");
-    } else if (!fetchResult.complete()) {
-      log.warn(
-          "Skipping the material scwiki_deleted sweep: the Wiki commodity page walk did not"
-              + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
-              + " census and every row outside them would be tombstoned for never having been"
-              + " fetched.",
-          seenScwikiUuids.size());
+    Set<UUID> census = new HashSet<>();
+    rows.stream()
+        .filter(dto -> dto != null && dto.uuid() != null)
+        .forEach(dto -> census.add(dto.uuid()));
+    Map<String, Long> sourceCounts =
+        rows.stream()
+            .filter(dto -> dto != null)
+            .map(dto -> canonicalName(dto.name()))
+            .filter(name -> name != null && !name.isBlank())
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    Map<String, Long> exactNames =
+        rows.stream()
+            .filter(dto -> dto != null)
+            .map(ScWikiCommodityDto::name)
+            .filter(StringUtils::hasText)
+            .map(name -> name.strip().toLowerCase(Locale.ROOT))
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    Map<String, List<UUID>> candidates = chunkWriter.inNewTransaction(this::buildCanonicalIndex);
+    var outcome =
+        chunkWriter.write(
+            rows,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk ->
+                chunk.stream()
+                    .map(dto -> upsert(dto, candidates, sourceCounts, exactNames, runId, now))
+                    .filter(uuid -> uuid != null)
+                    .toList(),
+            "Wiki commodity",
+            dto -> dto == null ? "missing payload" : String.valueOf(dto.uuid()));
+    long eligible =
+        rows.stream()
+            .filter(dto -> dto != null && dto.uuid() != null)
+            .filter(dto -> !isCommodityHardJunk(dto))
+            .count();
+    boolean complete =
+        fetched.complete()
+            && census.size() == rows.size()
+            && outcome.failedRows() == 0
+            && outcome.results().size() == eligible;
+    if (complete && !outcome.results().isEmpty()) {
+      int marked =
+          chunkWriter.inNewTransaction(() -> materialRepository.markScwikiDeleted(census, now));
+      syncReportService.recordApplied(marked);
+      syncReportService.recordSweep(true);
     } else {
-      int marked = materialRepository.markScwikiDeleted(seenScwikiUuids, now);
-      if (marked > 0) {
-        log.info("Marked {} material row(s) scwiki_deleted (no longer in Wiki feed)", marked);
-      }
+      syncReportService.recordIncomplete();
+      syncReportService.recordSweep(false);
     }
-
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
-    log.info(
-        "Finished SC Wiki commodity merge: {} linked, {} created WIKI_ONLY, {} junk-skipped, "
-            + "{} ambiguous-skipped.",
-        linked,
-        createdWikiOnly,
-        skippedJunk,
-        skippedAmbiguous);
-    return linked + createdWikiOnly;
+    return outcome.results().size();
+  }
+
+  @Nullable
+  private UUID upsert(
+      ScWikiCommodityDto dto,
+      Map<String, List<UUID>> candidates,
+      Map<String, Long> sourceCounts,
+      Map<String, Long> exactNames,
+      UUID runId,
+      Instant now) {
+    if (dto == null || dto.uuid() == null || isCommodityHardJunk(dto)) {
+      syncReportService.logCommodityEvent(
+          runId,
+          SyncEventType.SKIP_JUNK,
+          dto == null ? null : dto.uuid(),
+          dto == null ? null : dto.name(),
+          "Missing identity or excluded commodity name.");
+      return null;
+    }
+    ResolveResult resolution = resolve(dto, candidates, sourceCounts, exactNames, runId);
+    if (resolution.skip()) {
+      syncReportService.recordIncomplete();
+      return null;
+    }
+    Material material = resolution.material();
+    if (material == null) {
+      material = createWikiOnlyMaterial(dto, runId);
+    }
+    applyWikiFields(material, dto, now);
+    if (material.getSourceSystems() == MaterialSourceSystem.UEX_ONLY) {
+      material.setSourceSystems(MaterialSourceSystem.BOTH);
+    }
+    materialRepository.save(material);
+    return dto.uuid();
   }
 
   /**
@@ -208,40 +214,74 @@ public class ScWikiCommoditySyncService {
    *
    * @param dto the Wiki commodity row
    * @param canonicalIndex canonical-name index of unmatched materials
+   * @param exactNames Wiki rows per normalized exact source name
+   * @param sourceCounts Wiki rows per canonical commodity core
    * @param runId current run id for event logging
    * @return a matched material, a "create new" result, or a skip result
    */
   private ResolveResult resolve(
-      @NotNull ScWikiCommodityDto dto, Map<String, List<Material>> canonicalIndex, UUID runId) {
+      @NotNull ScWikiCommodityDto dto,
+      Map<String, List<UUID>> canonicalIndex,
+      Map<String, Long> sourceCounts,
+      Map<String, Long> exactNames,
+      UUID runId) {
     Optional<Material> byUuid = materialRepository.findByScwikiUuid(dto.uuid());
     if (byUuid.isPresent()) {
       return ResolveResult.matched(byUuid.orElseThrow());
     }
 
+    if (StringUtils.hasText(dto.name())
+        && exactNames.getOrDefault(dto.name().strip().toLowerCase(Locale.ROOT), 0L) > 1) {
+      syncReportService.logCommodityEvent(
+          runId,
+          SyncEventType.MULTI_MATCH_AMBIGUOUS,
+          dto.uuid(),
+          dto.name(),
+          "Several Wiki UUIDs share the exact source name.");
+      return ResolveResult.skipped();
+    }
+
     Material byAlias =
         aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, dto.name());
     if (byAlias != null) {
+      ResolveResult compatibleAlias = compatible(dto, byAlias, runId);
+      if (compatibleAlias.skip()) {
+        return compatibleAlias;
+      }
       syncReportService.logCommodityEvent(
           runId,
           SyncEventType.LINKED_VIA_ALIAS,
           dto.uuid(),
           dto.name(),
           "Linked to material '" + byAlias.getName() + "' via alias");
-      return ResolveResult.matched(byAlias);
+      return compatibleAlias;
     }
 
     if (StringUtils.hasText(dto.name())) {
       Optional<Material> byName = materialRepository.findByName(dto.name());
       if (byName.isPresent()) {
-        return ResolveResult.matched(byName.orElseThrow());
+        return compatible(dto, byName.orElseThrow(), runId);
       }
     }
 
     String canon = canonicalName(dto.name());
     if (canon != null && !canon.isBlank()) {
-      List<Material> candidates = canonicalIndex.getOrDefault(canon, List.of());
+      if (sourceCounts.getOrDefault(canon, 0L) > 1) {
+        syncReportService.logCommodityEvent(
+            runId,
+            SyncEventType.MULTI_MATCH_AMBIGUOUS,
+            dto.uuid(),
+            dto.name(),
+            "Canonical name is shared by several Wiki commodities.");
+        return ResolveResult.skipped();
+      }
+      List<Material> candidates =
+          canonicalIndex.getOrDefault(canon, List.of()).stream()
+              .map(materialRepository::findById)
+              .flatMap(Optional::stream)
+              .toList();
       if (candidates.size() == 1) {
-        return ResolveResult.matched(candidates.getFirst());
+        return compatible(dto, candidates.getFirst(), runId);
       }
       if (candidates.size() > 1) {
         String names =
@@ -259,15 +299,29 @@ public class ScWikiCommoditySyncService {
     return ResolveResult.createNew();
   }
 
+  private ResolveResult compatible(ScWikiCommodityDto dto, Material material, UUID runId) {
+    UUID existing = material.getScwikiUuid();
+    if (existing != null && !existing.equals(dto.uuid())) {
+      syncReportService.logCommodityEvent(
+          runId,
+          SyncEventType.SOURCE_IDENTITY_CONFLICT,
+          dto.uuid(),
+          dto.name(),
+          "Existing material is linked to another Wiki UUID.");
+      return ResolveResult.skipped();
+    }
+    return ResolveResult.matched(material);
+  }
+
   /**
    * Builds a {@code canonicalName → materials} index over materials without a Wiki UUID, so the
-   * canonical step never links a row to a second Wiki commodity.
+   * each write reloads the candidate and validates its current Wiki identity.
    *
    * @return canonical-name index of unmatched materials
    */
   @NotNull
-  private Map<String, List<Material>> buildCanonicalIndex() {
-    Map<String, List<Material>> index = new HashMap<>();
+  private Map<String, List<UUID>> buildCanonicalIndex() {
+    Map<String, List<UUID>> index = new HashMap<>();
     for (Material material : materialRepository.findAll()) {
       if (material.getScwikiUuid() != null) {
         continue;
@@ -276,7 +330,7 @@ public class ScWikiCommoditySyncService {
       if (canon == null || canon.isBlank()) {
         continue;
       }
-      index.computeIfAbsent(canon, _ -> new ArrayList<>()).add(material);
+      index.computeIfAbsent(canon, _ -> new ArrayList<>()).add(material.getId());
     }
     return index;
   }
@@ -318,6 +372,7 @@ public class ScWikiCommoditySyncService {
    */
   private void applyWikiFields(
       @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now) {
+    material.setMiningData(dto.miningData());
     material.setScwikiUuid(dto.uuid());
     material.setScwikiKey(dto.key());
     material.setScwikiSlug(dto.slug());

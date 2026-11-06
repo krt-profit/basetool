@@ -1,0 +1,232 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReassignmentParticipant;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Unifies verified source duplicates while archiving both source snapshots and retaining local ids.
+ */
+@Service
+@RequiredArgsConstructor
+public class ItemReconciliationService {
+  private final GameItemRepository items;
+  private final GameItemRedirectRepository redirects;
+  private final CatalogueItemReassignmentRepository recipes;
+  private final GameItemPriceRepository prices;
+  private final GameItemStatRepository stats;
+  private final List<GameItemReassignmentParticipant> participants;
+  private final SyncReportService reports;
+
+  /**
+   * Consolidates a uniquely matched uuid-less UEX row into an existing Wiki identity.
+   *
+   * @param wikiItem managed Wiki item
+   * @param uexItemId uuid-less source row's local id
+   * @param runId source report run
+   * @param incoming current Wiki facts that independently identify the candidate
+   * @return the surviving managed item, or null when the candidate no longer qualifies
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @Nullable GameItem mergeExisting(
+      @NotNull GameItem wikiItem,
+      @NotNull UUID uexItemId,
+      @NotNull UUID runId,
+      @NotNull WikiIdentity incoming) {
+    if (wikiItem.getId().equals(uexItemId)) {
+      return null;
+    }
+    List<GameItem> locked = items.lockReconciliationRows(List.of(wikiItem.getId(), uexItemId));
+    GameItem source =
+        locked.stream().filter(item -> item.getId().equals(uexItemId)).findFirst().orElse(null);
+    GameItem target =
+        locked.stream()
+            .filter(item -> item.getId().equals(wikiItem.getId()))
+            .findFirst()
+            .orElse(null);
+    if (source == null
+        || target == null
+        || source.getExternalUuid() != null
+        || source.getSourceSystems() != GameItemSourceSystem.UEX_ONLY
+        || target.getExternalUuid() == null
+        || target.getUexItemId() != null
+        || !ItemIdentityCompatibility.matches(
+            source, incoming.kind(), incoming.manufacturer(), incoming.className())
+        || !ItemIdentityCompatibility.matches(
+            source, target.getKind(), target.getManufacturer(), target.getClassName())) {
+      return null;
+    }
+    String sourceName = source.getUexName() == null ? source.getName() : source.getUexName();
+    String expectedName = UexIdentityCensus.nameKey(incoming.name());
+    if (expectedName == null || !expectedName.equals(UexIdentityCensus.nameKey(sourceName))) {
+      return null;
+    }
+    Integer uexId = source.getUexItemId();
+    if (uexId == null) {
+      return null;
+    }
+    final String archive = redirects.snapshot(uexItemId, target.getId());
+    source.setUexItemId(null);
+    items.saveAndFlush(source);
+    copyUexColumns(source, target);
+    target.setUexItemId(uexId);
+    items.saveAndFlush(target);
+    for (GameItemReassignmentParticipant participant : participants) {
+      participant.reassignGameItem(uexItemId, target.getId());
+    }
+    recipes.blueprints(uexItemId, target.getId());
+    recipes.ingredients(uexItemId, target.getId());
+    movePrices(source, target);
+    moveStats(source, target);
+    redirects.repoint(uexItemId, target.getId());
+    GameItemRedirect redirect = new GameItemRedirect();
+    redirect.setId(uexItemId);
+    redirect.setCanonicalItem(target);
+    redirect.setRetiredSnapshot(archive);
+    redirects.saveAndFlush(redirect);
+    items.delete(source);
+    items.flush();
+    reports.logScwikiEvent(
+        runId,
+        SyncEventType.SOURCE_RECORDS_MERGED,
+        "game_item",
+        target.getExternalUuid(),
+        target.getName(),
+        "retiredItem=" + uexItemId + ";survivorItem=" + target.getId());
+    return target;
+  }
+
+  /**
+   * Current source facts used to validate a prefetched name candidate under the catalogue row
+   * locks.
+   *
+   * @param name Wiki source display name
+   * @param kind most-specific kind established by the source endpoint
+   * @param manufacturer resolved Wiki source manufacturer
+   * @param className engine class supplied by the current Wiki payload
+   */
+  public record WikiIdentity(
+      @Nullable String name,
+      @NotNull GameItemKind kind,
+      @Nullable Manufacturer manufacturer,
+      @Nullable String className) {}
+
+  private static void copyUexColumns(GameItem from, GameItem to) {
+    to.setUexName(from.getUexName() == null ? from.getName() : from.getUexName());
+    if (to.getSourceSystems() != GameItemSourceSystem.P4K) {
+      to.setName(from.getName());
+      if (from.getManufacturer() != null) {
+        to.setManufacturer(from.getManufacturer());
+      }
+    }
+    to.setKind(GameItemKind.mergeMoreSpecific(to.getKind(), from.getKind()));
+    to.setUexSlug(from.getUexSlug());
+    to.setUexCategory(from.getUexCategory());
+    to.setUexCompanyId(from.getUexCompanyId());
+    to.setUexVehicleId(from.getUexVehicleId());
+    to.setLinkedShipType(from.getLinkedShipType());
+    to.setUexColor(from.getUexColor());
+    to.setUexColor2(from.getUexColor2());
+    to.setUexQuality(from.getUexQuality());
+    to.setUexUrlStore(from.getUexUrlStore());
+    to.setUexScreenshot(from.getUexScreenshot());
+    to.setIsExclusivePledge(from.getIsExclusivePledge());
+    to.setIsExclusiveSubscriber(from.getIsExclusiveSubscriber());
+    to.setIsExclusiveConcierge(from.getIsExclusiveConcierge());
+    to.setUexIsCommodity(from.getUexIsCommodity());
+    to.setUexIsHarvestable(from.getUexIsHarvestable());
+    to.setUexNotification(from.getUexNotification());
+    to.setUexGameVersionSeen(from.getUexGameVersionSeen());
+    to.setUexSyncedAt(from.getUexSyncedAt());
+    to.setUexDeletedAt(from.getUexDeletedAt());
+    if (to.getSourceSystems() == GameItemSourceSystem.WIKI_ONLY) {
+      to.setSourceSystems(GameItemSourceSystem.BOTH);
+    }
+  }
+
+  private void movePrices(GameItem from, GameItem to) {
+    Comparator<Long> modified = Comparator.nullsFirst(Long::compareTo);
+    Comparator<Instant> synced = Comparator.nullsFirst(Instant::compareTo);
+    Map<UUID, GameItemPrice> targetPrices =
+        prices.findByGameItemId(to.getId()).stream()
+            .collect(Collectors.toMap(price -> price.getTerminal().getId(), Function.identity()));
+    for (GameItemPrice source : prices.findByGameItemId(from.getId())) {
+      GameItemPrice target = targetPrices.get(source.getTerminal().getId());
+      if (target == null) {
+        source.setGameItem(to);
+        prices.save(source);
+        targetPrices.put(source.getTerminal().getId(), source);
+      } else {
+        int dateOrder = modified.compare(source.getDateModified(), target.getDateModified());
+        if (dateOrder > 0
+            || (dateOrder == 0
+                && synced.compare(source.getUexSyncedAt(), target.getUexSyncedAt()) > 0)) {
+          target.setPriceBuy(source.getPriceBuy());
+          target.setPriceSell(source.getPriceSell());
+          target.setPriceRent(source.getPriceRent());
+          target.setStatusBuy(source.getStatusBuy());
+          target.setStatusSell(source.getStatusSell());
+          target.setDateModified(source.getDateModified());
+          target.setGameVersion(source.getGameVersion());
+          target.setUexSyncedAt(source.getUexSyncedAt());
+          prices.save(target);
+        }
+        prices.delete(source);
+      }
+    }
+    prices.flush();
+  }
+
+  private void moveStats(GameItem from, GameItem to) {
+    Map<BlueprintStatProperty, GameItemStat> targetStats =
+        stats.findByGameItemId(to.getId()).stream()
+            .collect(Collectors.toMap(GameItemStat::getProperty, Function.identity()));
+    for (GameItemStat source : stats.findByGameItemId(from.getId())) {
+      if (targetStats.containsKey(source.getProperty())) {
+        stats.delete(source);
+      } else {
+        source.setGameItem(to);
+        stats.save(source);
+      }
+    }
+    stats.flush();
+  }
+}

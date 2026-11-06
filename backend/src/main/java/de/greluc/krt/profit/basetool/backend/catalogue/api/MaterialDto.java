@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying Material payload. */
 public record MaterialDto(
@@ -38,4 +39,43 @@ public record MaterialDto(
     @JsonProperty("isJobOrder") Boolean isJobOrder,
     @JsonProperty("isManualEntry") Boolean isManualEntry,
     @JsonProperty("isVisible") Boolean isVisible,
-    Long version) {}
+    Long version,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable
+        CommodityMiningData miningData) {
+
+  /** Creates the editable summary without source-owned mining enrichment. */
+  public MaterialDto(
+      UUID id,
+      String name,
+      String type,
+      String quantityType,
+      String description,
+      MaterialDto refinedMaterial,
+      MaterialCategoryDto category,
+      Boolean isIllegal,
+      Boolean isVolatileQt,
+      Boolean isVolatileTime,
+      Boolean isManualRawMaterial,
+      Boolean isJobOrder,
+      Boolean isManualEntry,
+      Boolean isVisible,
+      Long version) {
+    this(
+        id,
+        name,
+        type,
+        quantityType,
+        description,
+        refinedMaterial,
+        category,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        isManualRawMaterial,
+        isJobOrder,
+        isManualEntry,
+        isVisible,
+        version,
+        null);
+  }
+}
