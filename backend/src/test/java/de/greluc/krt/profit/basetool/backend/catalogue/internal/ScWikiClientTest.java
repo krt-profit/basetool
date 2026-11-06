@@ -26,8 +26,10 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemCatalogueMetadata;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiCommodityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
@@ -39,8 +41,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -50,10 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 
-/**
- * Unit tests for {@link ScWikiClient} against a {@link MockWebServer}: pagination, ETag conditional
- * GET, rate-limit pacing between pages, and the empty-list fallback.
- */
+/** Tests version scopes, complete pagination, replay, request pacing and bounded failures. */
 class ScWikiClientTest {
 
   private MockWebServer server;
@@ -71,7 +70,16 @@ class ScWikiClientTest {
     server.start();
     config.putAll(
         Map.of(
-            "api-url", server.url("/").toString(), "page-size", 200, "requests-per-second", 1000));
+            "api-url",
+            server.url("/").toString(),
+            "page-size",
+            200,
+            "requests-per-second",
+            1000,
+            "game-version",
+            "4.10.2-LIVE.12881860",
+            "max-attempts",
+            1));
     meterRegistry = new SimpleMeterRegistry();
     rebuild();
   }
@@ -86,7 +94,8 @@ class ScWikiClientTest {
         new ScWikiClient(
             new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
             properties,
-            meterRegistry);
+            meterRegistry,
+            new SyncRunProgress());
     client.initClient();
   }
 
@@ -195,26 +204,25 @@ class ScWikiClientTest {
   }
 
   @Test
-  void etag304ShortCircuitOnFirstPage_returnsEmptyList() throws Exception {
-    server.enqueue(jsonOk(pageBody(1, 1, "")).setHeader("ETag", "\"wiki-v1\""));
-    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"wiki-v1\""));
+  void pageEtagDoesNotSuppressChangesOnLaterPages() throws Exception {
+    server.enqueue(jsonOk(pageBody(1, 2, rows(1))).setHeader("ETag", "\"page-one\""));
+    server.enqueue(jsonOk(pageBody(2, 2, rows(1, 2))));
+    server.enqueue(jsonOk(pageBody(1, 2, rows(1))).setHeader("ETag", "\"page-one\""));
+    server.enqueue(jsonOk(pageBody(2, 2, rows(1, 3))));
 
     client.fetchAllPages("/api/commodities", commodityTypeRef(), "commodities");
     List<ScWikiCommodityDto> second =
         client.fetchAllPages("/api/commodities", commodityTypeRef(), "commodities");
 
-    assertTrue(second.isEmpty(), "304 on page 1 must short-circuit to empty list");
-    server.takeRequest(1, TimeUnit.SECONDS);
-    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
-    assertNotNull(secondReq);
-    assertEquals(
-        "\"wiki-v1\"",
-        secondReq.getHeader("If-None-Match"),
-        "second call must replay the ETag stored from the first 200 response");
+    assertEquals(2, second.size());
+    assertEquals("Row3", second.get(1).name());
+    for (int i = 0; i < 4; i++) {
+      assertNull(server.takeRequest(1, TimeUnit.SECONDS).getHeader("If-None-Match"));
+    }
   }
 
   @Test
-  void etagStorage_isPerUri_includeParamYieldsDifferentCacheKey() throws Exception {
+  void distinctRelationshipRequestsAreAlwaysFetchedUnconditionally() throws Exception {
     server.enqueue(jsonOk(pageBody(1, 1, "")).setHeader("ETag", "\"with-include\""));
     server.enqueue(jsonOk(pageBody(1, 1, "")));
 
@@ -230,35 +238,37 @@ class ScWikiClientTest {
   }
 
   @Test
-  void fetchAllPagesResult_304OnFirstPage_isFlaggedNotModified() throws Exception {
-    server.enqueue(jsonOk(pageBody(1, 1, "")).setHeader("ETag", "\"wiki-v1\""));
-    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"wiki-v1\""));
+  void replayDoesNotDependOnWhetherThePreviousApplicationSucceeded() throws Exception {
+    String body = pageBody(1, 1, rows(1));
+    server.enqueue(jsonOk(body).setHeader("ETag", "\"same-page\""));
+    server.enqueue(jsonOk(body).setHeader("ETag", "\"same-page\""));
 
-    client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
-    ScWikiClient.FetchResult<ScWikiCommodityDto> second =
+    ScWikiClient.FetchResult<ScWikiCommodityDto> first =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+    ScWikiClient.FetchResult<ScWikiCommodityDto> replay =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
 
-    assertTrue(second.notModified(), "a 304 on page 1 must be surfaced as notModified");
-    assertTrue(second.data().isEmpty(), "a 304 carries no rows");
+    assertEquals(first.data(), replay.data());
+    assertTrue(replay.complete());
   }
 
   @Test
-  void fetchAllPagesResult_emptyDataAndError_areNotFlaggedNotModified() throws Exception {
+  void fetchAllPagesResult_distinguishesACompleteEmptyPayloadFromAFailedCensus() throws Exception {
     server.enqueue(jsonOk(pageBody(1, 1, "")));
     ScWikiClient.FetchResult<ScWikiCommodityDto> empty200 =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
-    assertFalse(empty200.notModified(), "an empty-200 must not be flagged notModified");
     assertTrue(empty200.data().isEmpty());
+    assertTrue(empty200.complete());
 
     server.enqueue(new MockResponse().setResponseCode(500).setBody("boom"));
     ScWikiClient.FetchResult<ScWikiCommodityDto> err =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
-    assertFalse(err.notModified(), "an error must not be flagged notModified");
     assertTrue(err.data().isEmpty());
+    assertFalse(err.complete());
   }
 
   @Test
-  void fetchAllPagesResult_2xxWithRows_isFlaggedModifiedWithData() throws Exception {
+  void fetchAllPagesResult_completePayloadContainsItsDecodedRows() throws Exception {
     server.enqueue(
         jsonOk(
             pageBody(
@@ -270,37 +280,26 @@ class ScWikiClientTest {
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
-
-    assertFalse(result.notModified(), "a 2xx with rows is a modified response");
     assertEquals(1, result.data().size());
     assertEquals("Gold", result.data().get(0).name());
+    assertTrue(result.complete());
   }
 
   @Test
-  void paceForRateLimit_isInvokedBetweenPagesNotBeforeFirstPage() throws Exception {
-    server.enqueue(jsonOk(pageBody(1, 3, "")));
-    server.enqueue(jsonOk(pageBody(2, 3, "")));
-    server.enqueue(jsonOk(pageBody(3, 3, "")));
+  void everyFirstPageAndDetailSharesTheRequestStartLimit() {
+    config.put("requests-per-second", 10);
+    rebuild();
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
+    server.enqueue(jsonOk("{\"data\":{\"key\":\"BP_TEST\"}}"));
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
 
-    AtomicInteger paceCalls = new AtomicInteger(0);
-    ScWikiClient counter =
-        new ScWikiClient(
-            new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
-            properties,
-            meterRegistry) {
-          @Override
-          public void paceForRateLimit() {
-            paceCalls.incrementAndGet();
-          }
-        };
-    counter.initClient();
+    long started = System.nanoTime();
+    client.fetchAllPages("/api/commodities", commodityTypeRef(), "commodities");
+    client.fetchOne("/api/blueprints", "test", ScWikiBlueprintDto.class, "blueprint");
+    client.fetchAllPages("/api/commodities", commodityTypeRef(), "commodities");
 
-    counter.fetchAllPages("/api/commodities", commodityTypeRef(), "commodities");
-
-    assertEquals(
-        2,
-        paceCalls.get(),
-        "pacing hook must be invoked between each adjacent page pair, never before the first");
+    assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) >= 190);
+    assertEquals(3, server.getRequestCount());
   }
 
   @Test
@@ -481,9 +480,9 @@ class ScWikiClientTest {
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
 
-    assertTrue(result.complete(), "id-less rows each count as their own row, not as duplicates");
+    assertFalse(result.complete(), "rows without source identities cannot authorize deletion");
     assertEquals(3, result.data().size());
-    assertEquals(0.0, fetchErrorCount(), "a healthy id-less feed is not a fetch error");
+    assertEquals(1.0, fetchErrorCount(), "an identity-incomplete census leaves one error");
   }
 
   @Test
@@ -575,20 +574,20 @@ class ScWikiClientTest {
 
     assertFalse(result.complete(), "a failed page 1 enumerated nothing at all");
     assertTrue(result.data().isEmpty());
-    assertFalse(result.notModified(), "an error is not an unchanged catalogue");
   }
 
   @Test
-  void unchanged304_isNotReportedAsACompleteCensus() {
+  void unsolicited304_isNotReportedAsACompleteCensus() {
     server.enqueue(jsonOk(pageBody(1, 1, "")).setHeader("ETag", "\"v1\""));
     client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"v1\""));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
-
-    assertTrue(result.notModified());
-    assertFalse(result.complete(), "a conditional-GET hit enumerated no rows");
+    assertFalse(result.complete(), "an unsolicited 304 has no replayable catalogue payload");
+    assertTrue(result.data().isEmpty());
+    assertEquals(1.0, fetchErrorCount());
+    assertEquals(2, server.getRequestCount());
   }
 
   @Test
@@ -665,7 +664,8 @@ class ScWikiClientTest {
         new ScWikiClient(
             new RestClientConfig().restClientBuilder(observationRegistry),
             properties,
-            meterRegistry);
+            meterRegistry,
+            new SyncRunProgress());
     observedClient.initClient();
     server.enqueue(jsonOk("{\"uuid\":\"a\"}"));
     server.enqueue(jsonOk("{\"uuid\":\"b\"}"));
@@ -690,6 +690,211 @@ class ScWikiClientTest {
         client.fetchOne("/api/blueprints", "missing", ScWikiBlueprintDto.class, "blueprint");
 
     assertNull(detail, "404 must resolve to null (Wiki doesn't know this one), not throw");
+  }
+
+  @Test
+  void defaultVersionIsResolvedOnceAndPinnedAcrossNestedScopesAndDetails() throws Exception {
+    config.remove("game-version");
+    rebuild();
+    server.enqueue(jsonOk("{\"data\":{\"code\":\"4.10.2-LIVE.12881860\"}}"));
+    server.enqueue(jsonOk(pageBody(1, 2, rows(1))));
+    server.enqueue(jsonOk(pageBody(2, 2, rows(1, 2))));
+    server.enqueue(
+        jsonOk("{\"data\":{\"key\":\"BP_TEST\",\"game_version\":\"4.10.2-LIVE.12881860\"}}"));
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 1, rows(1))));
+
+    try (ScWikiClient.SyncRun run = client.openSyncRun()) {
+      assertEquals("4.10.2-LIVE.12881860", run.version());
+      try (ScWikiClient.SyncRun nested = client.openSyncRun()) {
+        assertEquals(run.version(), nested.version());
+        client.fetchAllPages("/api/commodities", commodityTypeRef(), "commodities");
+      }
+      assertNotNull(
+          client.fetchOne("/api/blueprints", "test", ScWikiBlueprintDto.class, "blueprint"));
+      assertTrue(client.fetchExistenceCensus("/api/items", "items", 200).complete());
+    }
+
+    assertEquals("/api/game-versions/default", server.takeRequest().getPath());
+    for (int i = 0; i < 4; i++) {
+      assertTrue(server.takeRequest().getPath().contains("version=4.10.2-LIVE.12881860"));
+    }
+    assertEquals(5, server.getRequestCount());
+  }
+
+  @Test
+  void closingTheRunResolvesANewDefaultForTheNextRun() {
+    config.remove("game-version");
+    rebuild();
+    server.enqueue(jsonOk("{\"data\":{\"code\":\"4.10.2-LIVE.1\"}}"));
+    server.enqueue(jsonOk("{\"data\":{\"code\":\"4.11.0-LIVE.2\"}}"));
+
+    try (ScWikiClient.SyncRun run = client.openSyncRun()) {
+      assertEquals("4.10.2-LIVE.1", run.version());
+    }
+    try (ScWikiClient.SyncRun run = client.openSyncRun()) {
+      assertEquals("4.11.0-LIVE.2", run.version());
+    }
+    assertEquals(2, server.getRequestCount());
+  }
+
+  @Test
+  void absentDefaultVersionAbortsBeforeAnyCatalogueRequest() {
+    config.remove("game-version");
+    rebuild();
+    server.enqueue(jsonOk("{\"data\":{}}"));
+
+    assertThrows(IllegalStateException.class, client::openSyncRun);
+    assertEquals(1, server.getRequestCount());
+  }
+
+  @Test
+  void unavailableDefaultVersionDuringDetailFetchCountsOneOperationFailure() {
+    config.remove("game-version");
+    rebuild();
+    server.enqueue(new MockResponse().setResponseCode(503));
+
+    var result = client.fetchOneResult("/api/items", "example", ScWikiItemDto.class, "item");
+
+    assertEquals(ScWikiClient.DetailOutcome.UNAVAILABLE, result.outcome());
+    assertNull(result.data());
+    assertEquals(1.0, fetchErrorCount());
+    assertEquals(1, server.getRequestCount());
+  }
+
+  @Test
+  void aDetailFromAnotherPatchIsRejected() {
+    server.enqueue(jsonOk("{\"data\":{\"game_version\":\"4.11.0-LIVE.1\"}}"));
+
+    assertNull(client.fetchOne("/api/blueprints", "test", ScWikiBlueprintDto.class, "blueprint"));
+    assertEquals(1.0, fetchErrorCount());
+  }
+
+  @Test
+  void aPageFromAnotherPatchCannotAuthorizeATombstoneSweep() {
+    server.enqueue(
+        jsonOk(
+            "{\"data\":[{\"uuid\":\"00000000-0000-0000-0000-000000000001\","
+                + "\"version\":\"4.11.0-LIVE.1\"}],\"meta\":{\"last_page\":1}}"));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(result.complete());
+    assertTrue(result.data().isEmpty());
+  }
+
+  @Test
+  void transientFailuresAndRateLimitsAreRetriedWithinTheConfiguredBound() {
+    config.put("max-attempts", 3);
+    config.put("retry-delay-millis", 1);
+    rebuild();
+    server.enqueue(new MockResponse().setResponseCode(429).setHeader("Retry-After", "0"));
+    server.enqueue(new MockResponse().setResponseCode(503));
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete());
+    assertEquals(1, result.data().size());
+    assertEquals(3, server.getRequestCount());
+    assertEquals(0.0, fetchErrorCount());
+  }
+
+  @Test
+  void excessiveRetryAfterDoesNotCauseAnEarlyRetryOrAnUnboundedWait() {
+    config.put("max-attempts", 3);
+    config.put("max-retry-delay-millis", 10);
+    rebuild();
+    server.enqueue(new MockResponse().setResponseCode(429).setHeader("Retry-After", "120"));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(result.complete());
+    assertEquals(1, server.getRequestCount());
+    assertEquals(1.0, fetchErrorCount());
+  }
+
+  @Test
+  void terminalTransientFailureCountsOnceAfterAllAttempts() {
+    config.put("max-attempts", 2);
+    config.put("retry-delay-millis", 1);
+    rebuild();
+    server.enqueue(new MockResponse().setResponseCode(503));
+    server.enqueue(new MockResponse().setResponseCode(503));
+
+    assertNull(client.fetchOne("/api/blueprints", "test", ScWikiBlueprintDto.class, "blueprint"));
+    assertEquals(2, server.getRequestCount());
+    assertEquals(1.0, fetchErrorCount());
+  }
+
+  @Test
+  void itemDetailsRequestAndRecordEmptyLoadedRelationships() throws Exception {
+    server.enqueue(jsonOk("{\"data\":{\"variants\":[],\"vehicles\":[],\"related_items\":{}}}"));
+
+    ScWikiItemDto item = client.fetchOne("/api/items", "test", ScWikiItemDto.class, "item");
+
+    assertNotNull(item);
+    assertEquals(
+        Set.of(
+            ItemCatalogueMetadata.Relationship.VARIANTS,
+            ItemCatalogueMetadata.Relationship.RELATED_ITEMS,
+            ItemCatalogueMetadata.Relationship.VEHICLES),
+        item.metadata().requestedIncludes());
+    assertTrue(item.metadata().variants().isEmpty());
+    assertTrue(server.takeRequest().getPath().contains("include="));
+  }
+
+  @Test
+  void itemPagesRecordTheRelationshipsActuallyRequested() {
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
+
+    ScWikiClient.FetchResult<ScWikiItemDto> result =
+        client.fetchAllPagesResult(
+            "/api/items",
+            new ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>>() {},
+            "items",
+            "related_items",
+            null);
+
+    assertEquals(
+        Set.of(ItemCatalogueMetadata.Relationship.RELATED_ITEMS),
+        result.data().getFirst().metadata().requestedIncludes());
+  }
+
+  @Test
+  void existenceCensusRequestsAllAssetsWithoutMetadataUnderTheSameVersion() throws Exception {
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 1, rows(1))));
+
+    ScWikiClient.ExistenceCensus result =
+        client.fetchExistenceCensus("/api/vehicles", "vehicles", 200);
+
+    assertTrue(result.complete());
+    assertEquals(
+        Set.of(java.util.UUID.fromString("00000000-0000-0000-0000-000000000001")), result.uuids());
+    assertThrows(UnsupportedOperationException.class, () -> result.uuids().clear());
+    var url = server.takeRequest().getRequestUrl();
+    assertNotNull(url);
+    assertEquals("true", url.queryParameter("filter[include_irrelevant]"));
+    assertEquals("50", url.queryParameter("page[size]"));
+    assertEquals("4.10.2-LIVE.12881860", url.queryParameter("version"));
+    assertNull(url.queryParameter("include"));
+  }
+
+  @Test
+  void existenceCensusCannotVouchForMissingOrDuplicatedAssetIdentities() {
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 1, idlessRows(1))));
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 2, rows(1) + "," + rows(1))));
+
+    ScWikiClient.ExistenceCensus missing = client.fetchExistenceCensus("/api/items", "items", 200);
+    ScWikiClient.ExistenceCensus duplicated =
+        client.fetchExistenceCensus("/api/items", "items", 200);
+
+    assertFalse(missing.complete());
+    assertTrue(missing.uuids().isEmpty());
+    assertFalse(duplicated.complete());
+    assertEquals(1, duplicated.uuids().size());
   }
 
   private double fetchErrorCount() {

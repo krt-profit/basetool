@@ -132,3 +132,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('#squadron-results')) return;
+    krtPageSections.create({
+        topicClass: 'CATALOGUE',
+        topic: 'catalogue',
+        sections: { catalogue: { container: '#squadron-results' } },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        receiver: { coalesceMs: 1500 },
+    });
+});

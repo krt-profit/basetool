@@ -37,6 +37,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.Nullable;
 
 /** Material JPA entity. */
@@ -242,6 +244,12 @@ public class Material extends AbstractEntity<UUID> {
   @Column(name = "name_key", length = 200)
   @Nullable
   private String nameKey;
+
+  /** Wiki-owned mining and cargo enrichment, independent of UEX market data. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "wiki_mining_data", columnDefinition = "jsonb")
+  @Nullable
+  private CommodityMiningData miningData;
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
   @Column(name = "p4k_synced_at")

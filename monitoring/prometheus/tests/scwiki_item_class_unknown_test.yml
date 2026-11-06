@@ -32,7 +32,7 @@ tests:
   - name: silent - the series is absent (sync disabled)
     interval: 1m
     input_series:
-      - series: 'basetool_catalogue_orphan_sweep_skipped_total{reason="not_modified"}'
+      - series: 'basetool_catalogue_orphan_sweep_skipped_total{reason="no_rows"}'
         values: "0+1x180"
     alert_rule_test:
       - eval_time: 150m

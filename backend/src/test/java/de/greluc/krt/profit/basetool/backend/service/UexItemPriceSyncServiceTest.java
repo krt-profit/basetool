@@ -40,17 +40,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPrice;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexItemPriceSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemPriceDto;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,7 +98,7 @@ class UexItemPriceSyncServiceTest {
             gameItemRepository,
             gameItemPriceRepository,
             terminalRepository,
-            new SyncChunkWriter(tx));
+            new SyncChunkWriter(tx, new SyncRunProgress()));
   }
 
   @Test
@@ -133,7 +132,7 @@ class UexItemPriceSyncServiceTest {
     knownItems(ref(1, item.getId()));
     knownTerminals(ref(107, terminal.getId()));
     when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
-    when(gameItemRepository.getReferenceById(item.getId())).thenReturn(item);
+    when(gameItemRepository.getCanonicalReferenceById(item.getId())).thenReturn(item);
     when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
     stubSaveAssigningId();
 
@@ -219,7 +218,7 @@ class UexItemPriceSyncServiceTest {
     knownItems(ref(1, item.getId()));
     knownTerminals(ref(107, terminal.getId()));
     when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
-    when(gameItemRepository.getReferenceById(item.getId())).thenReturn(item);
+    when(gameItemRepository.getCanonicalReferenceById(item.getId())).thenReturn(item);
     when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
     stubSaveAssigningId();
 
@@ -231,14 +230,13 @@ class UexItemPriceSyncServiceTest {
   }
 
   @Test
-  void syncItemPrices_isolatesAFailingRow_andSweepsOnlySavedIds() {
+  void syncItemPrices_isolatesAFailingRow_andRefusesAbsenceCleanup() {
     GameItem item1 = gameItem();
     GameItem item2 = gameItem();
     GameItem item3 = gameItem();
     Terminal terminal = terminal();
     UUID id1 = UUID.randomUUID();
     UUID id3 = UUID.randomUUID();
-    UUID staleId = UUID.randomUUID();
     when(uexClient.getItemPrices())
         .thenReturn(
             fetched(
@@ -249,9 +247,9 @@ class UexItemPriceSyncServiceTest {
     knownItems(ref(1, item1.getId()), ref(2, item2.getId()), ref(3, item3.getId()));
     knownTerminals(ref(107, terminal.getId()));
     when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
-    when(gameItemRepository.getReferenceById(item1.getId())).thenReturn(item1);
-    when(gameItemRepository.getReferenceById(item2.getId())).thenReturn(item2);
-    when(gameItemRepository.getReferenceById(item3.getId())).thenReturn(item3);
+    when(gameItemRepository.getCanonicalReferenceById(item1.getId())).thenReturn(item1);
+    when(gameItemRepository.getCanonicalReferenceById(item2.getId())).thenReturn(item2);
+    when(gameItemRepository.getCanonicalReferenceById(item3.getId())).thenReturn(item3);
     when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
     when(gameItemPriceRepository.save(any(GameItemPrice.class)))
         .thenAnswer(inv -> {
@@ -262,15 +260,69 @@ class UexItemPriceSyncServiceTest {
           p.setId(p.getGameItem() == item1 ? id1 : id3);
           return p;
         });
-    when(gameItemPriceRepository.findIdsWithLivePrices()).thenReturn(List.of(id1, id3, staleId));
 
     service.syncItemPrices();
 
     verify(gameItemPriceRepository, times(5)).save(any(GameItemPrice.class));
     assertEquals(2, tx.rolledBack, "the chunk and the failing row roll back");
-    ArgumentCaptor<Collection<UUID>> sweep = ArgumentCaptor.captor();
-    verify(gameItemPriceRepository).clearPricesByIds(sweep.capture());
-    assertEquals(Set.of(staleId), Set.copyOf(sweep.getValue()));
+    verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
+    verify(gameItemPriceRepository, never()).clearPricesByIds(any());
+  }
+
+  @Test
+  void nonemptyPartialFeed_updatesKnownPrices_withoutClearingUnseenPrices() {
+    GameItem item = gameItem();
+    Terminal terminal = terminal();
+    when(uexClient.getItemPrices())
+        .thenReturn(UexClient.FetchResult.partial(List.of(dto(1, 107, 10.0, 20.0, 1L))));
+    knownItems(ref(1, item.getId()));
+    knownTerminals(ref(107, terminal.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    when(gameItemRepository.getCanonicalReferenceById(item.getId())).thenReturn(item);
+    when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    stubSaveAssigningId();
+
+    service.syncItemPrices();
+
+    verify(gameItemPriceRepository).save(any());
+    verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
+    verify(gameItemPriceRepository, never()).clearPricesByIds(any());
+  }
+
+  @Test
+  void failingExistingPriceUpdate_keepsAllPreviouslyStoredPrices() {
+    GameItem failedItem = gameItem();
+    GameItem goodItem = gameItem();
+    Terminal terminal = terminal();
+    GameItemPrice oldPrice = new GameItemPrice();
+    oldPrice.setId(UUID.randomUUID());
+    oldPrice.setGameItem(failedItem);
+    oldPrice.setTerminal(terminal);
+    oldPrice.setPriceBuy(99.0);
+    when(uexClient.getItemPrices())
+        .thenReturn(fetched(List.of(dto(1, 107, 10.0, 20.0, 1L), dto(2, 107, 30.0, 40.0, 1L))));
+    knownItems(ref(1, failedItem.getId()), ref(2, goodItem.getId()));
+    knownTerminals(ref(107, terminal.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs())
+        .thenReturn(List.of(pair(failedItem.getId(), terminal.getId(), oldPrice.getId())));
+    when(gameItemPriceRepository.findAllById(List.of(oldPrice.getId())))
+        .thenReturn(List.of(oldPrice));
+    when(gameItemRepository.getCanonicalReferenceById(goodItem.getId())).thenReturn(goodItem);
+    when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    when(gameItemPriceRepository.save(any()))
+        .thenAnswer(invocation -> {
+          GameItemPrice price = invocation.getArgument(0);
+          if (price.getGameItem() == failedItem) {
+            throw new IllegalStateException("The known row update failed");
+          }
+          price.setId(UUID.randomUUID());
+          return price;
+        });
+
+    service.syncItemPrices();
+
+    verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
+    verify(gameItemPriceRepository, never()).clearPricesByIds(any());
   }
 
   private void knownItems(de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef... refs) {

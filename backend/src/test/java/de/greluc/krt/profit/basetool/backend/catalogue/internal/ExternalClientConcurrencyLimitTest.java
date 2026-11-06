@@ -155,7 +155,7 @@ class ExternalClientConcurrencyLimitTest {
         @Qualifier(RestClientConfig.EXTERNAL_REST_CLIENT_BUILDER) RestClient.Builder builder,
         UexProperties properties,
         MeterRegistry meterRegistry) {
-      return new UexClient(builder, properties, meterRegistry);
+      return new UexClient(builder, properties, meterRegistry, new SyncRunProgress());
     }
   }
 }

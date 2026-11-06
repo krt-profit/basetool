@@ -73,7 +73,25 @@ groups:
           severity: warning
         annotations:
           summary: "External fetch errors ({{ $labels.source }})"
-          description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours (incomplete page-walk censuses, reason=census, are excluded: they carry a standing per-run floor and are watched by ScWikiCensusIncompleteStreak) — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
+          description: "The {{ $labels.source }} client handled more than 3 fetch/parse errors in 6 hours (incomplete page-walk censuses, reason=census, are excluded and watched by ScWikiCensusIncompleteStreak). The affected attempts record PARTIAL or FAILED while independent healthy slices may still apply. Check the upstream API, durable run history and sync logs."
+
+      - alert: CatalogueAttemptIncomplete
+        expr: max by (source, aggregate, status) (basetool_catalogue_attempt_status{status=~"PARTIAL|FAILED"}) == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Catalogue apply incomplete ({{ $labels.source }} / {{ $labels.aggregate }})"
+          description: "The latest {{ $labels.source }} {{ $labels.aggregate }} attempt is {{ $labels.status }}. The sync-report page records actual start/end, source build, row counters and cleanup refusal even when no anomaly event was emitted. Absence-based cleanup is refused when its source census or required writes are incomplete. Check that attempt before retrying; a later complete attempt clears this state."
+
+      - alert: CatalogueAttemptRunningTooLong
+        expr: (basetool_catalogue_attempt_active{aggregate="CATALOGUE"} == 1) and on (source, aggregate) (time() - basetool_catalogue_attempt_started_timestamp_seconds{aggregate="CATALOGUE"} > 7200)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Catalogue sync still running after two hours ({{ $labels.source }})"
+          description: "The {{ $labels.source }} source sweep has remained active for more than two hours. Inspect its durable run history and outbound request timing; avoid starting another apply while it holds the catalogue coordinator."
 
       - alert: KeycloakSyncFetchFailing
         expr: sum(increase(basetool_keycloak_sync_fetch_failures_total[6h])) > 0
@@ -103,7 +121,7 @@ groups:
           severity: warning
         annotations:
           summary: "SC-Wiki sync step failing ({{ $labels.step }})"
-          description: "The {{ $labels.step }} step of the daily SC-Wiki sync has failed on at least two runs in 48h while the umbrella job keeps recording success — that catalogue slice is silently importing nothing. Check the SC-Wiki upstream and the backend sync logs."
+          description: "The {{ $labels.step }} step of the daily SC-Wiki sync has failed on at least two runs in 48h and its source sweep records failure while other slices may still apply. Check the SC-Wiki upstream and the backend sync logs."
 
       - alert: ScWikiCensusIncompleteStreak
         expr: |
@@ -126,7 +144,7 @@ groups:
           severity: warning
         annotations:
           summary: "SC-Wiki orphan sweep has stood down on three incomplete runs in 72h"
-          description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because the census could not be vouched for. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Since ADR-0195 an incomplete KIND pass alone no longer causes this: it fires only when the residual /api/items pass could not vouch for its own census, or when a kind pass was served a row that residual census does not contain (logged as 'the kind endpoints are not a subset of the item pool after all'). Both are new upstream shapes rather than the long-standing /api/vehicle-items tie — so unlike ScWikiCensusIncompleteStreak, this one firing is always worth reading. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and the census WARNs above it. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
+          description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because the census could not be vouched for. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while healthy catalogue rows may still apply. Since ADR-0195 an incomplete KIND pass alone no longer causes this: it fires only when the residual /api/items pass could not vouch for its own census, or when a kind pass was served a row that residual census does not contain (logged as 'the kind endpoints are not a subset of the item pool after all'). Both are new upstream shapes rather than the long-standing /api/vehicle-items tie — so unlike ScWikiCensusIncompleteStreak, this one firing is always worth reading. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and the census WARNs above it."
 
       - alert: ScWikiItemClassUnknown
         expr: sum(increase(basetool_catalogue_item_class_unknown_total[24h])) > 0

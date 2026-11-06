@@ -481,6 +481,20 @@ public class MaterialsPageController {
   }
 
   /**
+   * Refreshes the material facts and prices in place after a committed catalogue update.
+   *
+   * @param id material identity
+   * @param model detail-page data
+   * @return the material's existing detail content
+   */
+  @NotNull
+  @GetMapping(value = "/{id}", params = "fragment=catalogue")
+  public String getMaterialCatalogue(@PathVariable @NotNull UUID id, Model model) {
+    getMaterialDetail(id, model);
+    return "catalogue/material-detail :: materialDetails";
+  }
+
+  /**
    * Adds the material, its complete price list, the terminal rows and the price summary.
    *
    * @param id the material

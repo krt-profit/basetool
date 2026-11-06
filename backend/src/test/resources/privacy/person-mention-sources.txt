@@ -148,6 +148,11 @@ exempt-column|external_sync_report.detail
 exempt-column|external_sync_report.event_type
 exempt-column|external_sync_report.external_name
 exempt-column|external_sync_report.source_system
+exempt-column|external_sync_run.aggregate
+exempt-column|external_sync_run.game_version
+exempt-column|external_sync_run.source_system
+exempt-column|external_sync_run.status
+exempt-column|external_sync_run.sweep_outcome
 exempt-column|frequency_type.created_by
 exempt-column|frequency_type.description
 exempt-column|frequency_type.name
@@ -272,6 +277,7 @@ exempt-table|faction
 exempt-table|flyway_schema_history
 exempt-table|game_item
 exempt-table|game_item_price
+exempt-table|game_item_redirect
 exempt-table|game_item_stat
 exempt-table|jurisdiction
 exempt-table|manufacturer

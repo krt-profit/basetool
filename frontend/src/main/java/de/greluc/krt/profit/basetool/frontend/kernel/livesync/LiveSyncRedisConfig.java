@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -57,6 +58,7 @@ public class LiveSyncRedisConfig {
    * @param handlerProvider lazy provider of the relay handler
    * @param meterRegistry registry the fan-out counters bind to
    * @param liveSyncProperties the live-sync settings supplying the channel name
+   * @param catalogueCacheEviction clears source snapshots before browser refreshes
    * @return the Redis fan-out bean
    */
   @NotNull
@@ -65,7 +67,8 @@ public class LiveSyncRedisConfig {
       StringRedisTemplate redisTemplate,
       ObjectProvider<LiveSyncWebSocketHandler> handlerProvider,
       MeterRegistry meterRegistry,
-      LiveSyncProperties liveSyncProperties) {
+      LiveSyncProperties liveSyncProperties,
+      CatalogueCacheEviction catalogueCacheEviction) {
     String instanceId = UUID.randomUUID().toString();
     log.info(
         "Live-sync Redis fan-out enabled (channel={}, presenceChannel={}, instanceId={})",
@@ -76,6 +79,7 @@ public class LiveSyncRedisConfig {
         redisTemplate,
         handlerProvider,
         meterRegistry,
+        catalogueCacheEviction,
         liveSyncProperties.redis().channel(),
         liveSyncProperties.redis().presenceChannel(),
         instanceId);

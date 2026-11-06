@@ -47,18 +47,20 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class UexScheduler {
 
+  private final UexProperties properties;
+
   private final UexCommodityService uexCommodityService;
   private final UexStarSystemService uexStarSystemService;
   private final UexManufacturerService uexManufacturerService;
   private final UexVehicleService uexVehicleService;
   private final UexUniverseSyncService uexUniverseSyncService;
   private final UexRefinerySyncService uexRefinerySyncService;
-  private final UexCategoryRefService uexCategoryRefService;
   private final UexItemSyncService uexItemSyncService;
   private final UexItemPriceSyncService uexItemPriceSyncService;
   private final SyncCoordinator syncCoordinator;
   private final TaskMetrics taskMetrics;
   private final MasterDataCacheEvictionService masterDataCacheEvictionService;
+  private final SyncRunService syncRuns;
 
   /**
    * Periodic UEX sync entry point, started at boot and serialised against the SC Wiki sync through
@@ -71,7 +73,18 @@ public class UexScheduler {
       initialDelayString = "${krt.uex.scheduler-initial-delay:0}")
   public void scheduleCommodityPriceUpdate() {
     syncCoordinator.runExclusively(
-        "UEX", () -> taskMetrics.recordCounting(ScheduledJob.UEX_SYNC, this::runAllSyncSteps));
+        "UEX",
+        () ->
+            taskMetrics.recordCounting(
+                ScheduledJob.UEX_SYNC,
+                () ->
+                    syncRuns
+                        .run(
+                            SyncSourceSystem.UEX,
+                            SyncAggregate.CATALOGUE,
+                            null,
+                            this::runAllSyncSteps)
+                        .count()));
   }
 
   /**
@@ -88,30 +101,30 @@ public class UexScheduler {
     log.info("Running scheduled task to update UEX data...");
     int itemsProcessed = 0;
     try {
-      uexUniverseSyncService.syncTerminals();
-
-      uexUniverseSyncService.syncFactions();
-      uexUniverseSyncService.syncJurisdictions();
-      uexUniverseSyncService.syncPlanets();
-      uexUniverseSyncService.syncMoons();
-      uexUniverseSyncService.syncOrbits();
-      uexUniverseSyncService.syncCities();
-      uexUniverseSyncService.syncOutposts();
-      uexUniverseSyncService.syncPois();
-      uexUniverseSyncService.syncSpaceStations();
-
-      uexStarSystemService.fetchAndProcessStarSystems();
-      uexCommodityService.fetchAndProcessCommoditiesPrices();
-      uexManufacturerService.syncManufacturers();
-      uexVehicleService.syncVehicles();
-
-      uexCategoryRefService.syncCategories();
-      itemsProcessed = uexItemSyncService.syncItems();
-
-      uexItemPriceSyncService.syncItemPrices();
-
-      uexRefinerySyncService.syncRefiningMethods();
-      uexRefinerySyncService.syncRefineryYields();
+      runStep(SyncAggregate.TERMINAL, uexUniverseSyncService::syncTerminals);
+      runStep(SyncAggregate.FACTION, uexUniverseSyncService::syncFactions);
+      runStep(SyncAggregate.JURISDICTION, uexUniverseSyncService::syncJurisdictions);
+      runStep(SyncAggregate.PLANET, uexUniverseSyncService::syncPlanets);
+      runStep(SyncAggregate.MOON, uexUniverseSyncService::syncMoons);
+      runStep(SyncAggregate.ORBIT, uexUniverseSyncService::syncOrbits);
+      runStep(SyncAggregate.CITY, uexUniverseSyncService::syncCities);
+      runStep(SyncAggregate.OUTPOST, uexUniverseSyncService::syncOutposts);
+      runStep(SyncAggregate.POI, uexUniverseSyncService::syncPois);
+      runStep(SyncAggregate.SPACE_STATION, uexUniverseSyncService::syncSpaceStations);
+      runStep(SyncAggregate.STAR_SYSTEM, uexStarSystemService::fetchAndProcessStarSystems);
+      runStep(SyncAggregate.COMMODITY, uexCommodityService::fetchAndProcessCommoditiesPrices);
+      runStep(SyncAggregate.MANUFACTURER, uexManufacturerService::syncManufacturers);
+      runStep(SyncAggregate.SHIP_TYPE, uexVehicleService::syncVehicles);
+      SyncRunService.Result items =
+          syncRuns.run(
+              SyncSourceSystem.UEX, SyncAggregate.GAME_ITEM, null, uexItemSyncService::syncItems);
+      requireComplete(items);
+      itemsProcessed = items.count();
+      if (Boolean.TRUE.equals(properties.itemPriceSyncEnabled())) {
+        runStep(SyncAggregate.ITEM_PRICE, uexItemPriceSyncService::syncItemPrices);
+      }
+      runStep(SyncAggregate.REFINING_METHOD, uexRefinerySyncService::syncRefiningMethods);
+      runStep(SyncAggregate.REFINERY_YIELD, uexRefinerySyncService::syncRefineryYields);
     } finally {
       try {
         uexUniverseSyncService.reconcileRefineryTerminalFlags();
@@ -122,6 +135,24 @@ public class UexScheduler {
       masterDataCacheEvictionService.evictUexSyncedMasterData();
     }
     return itemsProcessed;
+  }
+
+  private void runStep(SyncAggregate aggregate, Runnable task) {
+    requireComplete(
+        syncRuns.run(
+            SyncSourceSystem.UEX,
+            aggregate,
+            null,
+            () -> {
+              task.run();
+              return 0;
+            }));
+  }
+
+  private static void requireComplete(SyncRunService.Result result) {
+    if (!result.complete()) {
+      throw new IllegalStateException("UEX sync did not completely apply a catalogue slice");
+    }
   }
 
   /**

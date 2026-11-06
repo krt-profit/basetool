@@ -858,7 +858,7 @@ reload.
 > `basetool:livesync:changed`: an exchange or ingest write (REQ-XCH-013) and an org-unit ship change
 > (ADR-0260, ADR-0261) arrive at the backend and no browser made them, so without that publish the
 > member's open pages would stay stale — exactly the defect class this requirement exists to
-> prevent. The backend's `LiveSyncTopicClass` therefore keeps only the six rooms it publishes into,
+> prevent. The backend's `LiveSyncTopicClass` therefore keeps only rooms it actually publishes into,
 > and `LiveSyncTopicRegistryParityTest` keeps holding it to a subset of the frontend's registry: a
 > prefix or section key only the backend knows is a frame the browser clips away on arrival, with
 > nothing broken and nothing logged.
@@ -1284,6 +1284,15 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `hangar-unit:{orgUnitId}` | ships (the unit tab with a pinned unit, ADR-0260)                                                                            | no            | `GET /api/v1/hangar/units/{id}/overview-access` (the unit-overview scope, REQ-HANGAR-003)             |
 | `hangar-units` (global)  | ships (the unit tab across every unit the viewer sees, ADR-0260)                                                              | no            | authenticated (each viewer re-pulls its own scoped overview)                                          |
 | `blueprints:{userId}`    | list                                                                                                                          | no            | the member whose id it is, and nobody else (local check against the socket's subject, fails closed)   |
+| `catalogue` (global) | catalogue | no | `ROLE_ADMIN`, `ROLE_LOGISTICIAN` or `ROLE_KRT_MEMBER` (local check, matching the member catalogue reads) |
+
+Catalogue reconciliation is a backend writer into the existing `order:{id}` room. After committed
+item-reference replacements, `JobOrderItemReassignment` publishes `items`, `item-stock`,
+`item-handovers`, `item-handover-lines` and `blueprint-owners` for each affected order. Existing
+receivers fetch current rows and their optimistic-lock versions; ordinary browser mutations use
+the same room. This shared publication ownership does not widen subscribe authorization. The
+`catalogue` room refreshes source facts and recipes after committed source writes; its consumers
+evict synced frontend reference caches before notifying browser receivers (ADR-0349).
 
 The two personal rooms carry a member's own pages, `/hangar` and „Meine Blueprints": the page
 names its room from the model (`hangarLiveSyncTopic`, `blueprintsLiveSyncTopic`), sends `changed` on

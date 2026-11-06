@@ -831,3 +831,15 @@ current principal and no request is bound.
 
 **Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `platform/api/ObserverSpi`,
 `audit/api/AuditService`, `bank/internal/BankAuditService`
+
+### Catalogue duplicate reconciliation in existing audit areas
+
+REQ-AUDIT-001 also covers automatic reference reassignment during the archived reconciliation of
+REQ-DATA-034. Each changed row is audited in its owning transaction and existing domain:
+`INVENTORY_ITEM_CATALOGUE_REASSIGNED`, `MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED`,
+`JOB_ORDER_ITEM_CATALOGUE_REASSIGNED`, `BLUEPRINT_CATALOGUE_REASSIGNED`,
+`SUPPLY_CATALOGUE_REASSIGNED` and `PURCHASING_CATALOGUE_REASSIGNED`.
+Details contain canonical/retired ids and fixed tokens; duplicate stock-floor reconciliation
+also records numeric before/after minimum and target settings. No note or member free text is
+copied into details. Unchanged rows and rolled-back attempts emit no mutation event. These
+owner-domain events do not implement or replace the planned catalogue-admin audit domain.

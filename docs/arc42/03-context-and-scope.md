@@ -33,7 +33,7 @@
 | **Discord** | both | OAuth2 social login, guild membership, in-guild role and nickname — all asked by the Keycloak SPI, fail-closed; the applications never call Discord | An identity the organisation already uses; the tool does not own it |
 | **Keycloak** | — | *Inside* the boundary as a deployed component, but *outside* the applications: they never see a credential | See §5 |
 | **UEX** | out | Commodity and item prices, the universe's locations, vehicles, refinery methods and yields (`catalogue/internal/UexClient`) | Third-party game-economy data |
-| **Star Citizen wiki** | out | Reference data synchronised by the backend (`integration/scwiki`) | Third-party game data |
+| **Star Citizen wiki** | out | Versioned game reference data synchronised by the backend (`catalogue.internal.ScWikiClient`) | Third-party game data |
 | **SMTP relay** | out | Transactional account mails — approval and rejection notices (`REQ-NOTIF-013/-014`); a no-op unless `SPRING_MAIL_HOST` is set | Mail delivery is not something to host |
 | **Let's Encrypt** | out | ACME HTTP-01 for the three public names | Certificate authority |
 | **GHCR / GitHub / Sigstore** | out | Signed images, the promotable config and provider-JAR bundles, provenance and attestations; the host verifies every digest against Sigstore before applying it (`REQ-OPS-015`) | Build and distribution |
@@ -93,3 +93,12 @@ must refuse a connection on the public address, and no edge hostname may answer 
   gets out of the way; where and when members meet stays off-tool and private, on purpose.
 - **Payment of any kind.** The Kartellbank is a ledger of in-game currency. No real money, no
   payment provider, nothing in scope for PCI.
+
+### External catalogue snapshot boundary
+
+UEX supplies trade/category data; SC Wiki supplies versioned game evidence. A Wiki run pins one
+build across lists, details and statistics. Its player-relevant import scope differs from the
+all-asset identity census used to protect known filtered records. Derived UEX information inside
+Wiki payloads is identified as such and never becomes a second independent price authority.
+Canonical rules: [REQ-DATA-032…038](../specs/data-persistence.md#req-data-032--one-wiki-snapshot-context-governs-every-request-of-a-sync-run),
+[ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md).

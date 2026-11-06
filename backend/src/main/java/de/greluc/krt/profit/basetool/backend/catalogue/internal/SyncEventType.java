@@ -95,5 +95,14 @@ public enum SyncEventType {
    * matches the upstream name, so the override is obsolete and should be removed. Emitted once per
    * obsolete override per run; {@code detail} carries the key, the current and the expected name.
    */
-  BLUEPRINT_NAME_OVERRIDE_OBSOLETE
+  BLUEPRINT_NAME_OVERRIDE_OBSOLETE,
+
+  /** Source identity claims disagree and the affected records remain separate. */
+  SOURCE_IDENTITY_CONFLICT,
+
+  /** Equivalent source records were reconciled with every dependent reference preserved. */
+  SOURCE_RECORDS_MERGED,
+
+  /** A complete all-asset census restored known records excluded from the player-relevant list. */
+  SOURCE_RECORDS_RESTORED
 }

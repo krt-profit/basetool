@@ -30,6 +30,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
@@ -65,6 +66,86 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class MaterialsPageControllerMvcTest {
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void materialMiningData_rendersSourceCharacteristicsAndResourceLocationsInTheLiveFragment()
+      throws Exception {
+    UUID id = UUID.randomUUID();
+    var mining =
+        de.greluc.krt.profit.basetool.frontend.catalogue.model.CommodityMiningData.builder()
+            .tier(2)
+            .instability(0.4)
+            .resistance(0.7)
+            .volatility(0.2)
+            .mineable(true)
+            .shipMineable(true)
+            .boxSizesScu(List.of(1.0, 8.0))
+            .commodityGroups(List.of("Metal"))
+            .methods(List.of("Mining"))
+            .systems(List.of("Stanton"))
+            .locations(
+                List.of(
+                    new de.greluc.krt.profit.basetool.frontend.catalogue.model.CommodityMiningData
+                        .Location(
+                        UUID.randomUUID(),
+                        "Resource Field",
+                        "Resource Field Alpha",
+                        "Stanton",
+                        "Asteroid Belt",
+                        "Crusader",
+                        "Planet",
+                        List.of(
+                            new de.greluc.krt.profit.basetool.frontend.catalogue.model
+                                .CommodityMiningData.Occurrence("Metallic", "Ore", 100, 800, 3)))))
+            .build();
+    MaterialDto material =
+        new MaterialDto(
+            id,
+            "Agricium",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            0L,
+            mining);
+    stubDetail(material, List.of());
+
+    String html =
+        mockMvc
+            .perform(get("/materials/" + id).param("fragment", "catalogue").param("lang", "en"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("catalogue/material-detail :: materialDetails"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(
+            "material-wiki-mining",
+            "Mining and cargo",
+            "Source: SC Wiki",
+            "Instability",
+            "0.4",
+            "Resistance",
+            "0.7",
+            "Metal",
+            "1.0, 8.0",
+            "Resource Field Alpha",
+            "Metallic",
+            "100",
+            "800",
+            "Stanton")
+        .doesNotContain("<!DOCTYPE html>");
+  }
 
   private MockMvc mockMvc;
 

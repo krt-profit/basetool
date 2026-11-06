@@ -88,15 +88,6 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
-   * Counts the live (non-soft-deleted) blueprints; reported as the sync's item count when the Wiki
-   * answers {@code 304 Not Modified}.
-   *
-   * @return the number of non-tombstoned blueprints
-   */
-  @Query("SELECT COUNT(b) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL")
-  long countLiveScwikiBlueprints();
-
-  /**
    * Pages active blueprints without a search term.
    *
    * <p>Separate from {@link #searchActive(String, Pageable)} so no {@code null} is bound into
@@ -126,11 +117,13 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * Returns the active blueprints that produce the given game item, i.e. the recipes an item-order
    * line may pick.
    *
-   * @param gameItemId the produced item's id
+   * @param gameItemId the produced item's current or retained local id
    * @return active blueprints whose {@code outputItem} is that game item
    */
   @Query(
-      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputItem.id = :gameItemId")
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND (b.outputItem.id = :gameItemId"
+          + " OR b.outputItem.id = (SELECT r.canonicalItem.id FROM GameItemRedirect r"
+          + " WHERE r.id = :gameItemId))")
   List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
 
   /**

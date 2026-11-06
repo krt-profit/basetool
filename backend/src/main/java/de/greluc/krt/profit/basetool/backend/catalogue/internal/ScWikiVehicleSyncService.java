@@ -25,58 +25,56 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiVehicleDto;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-/**
- * Fills the Wiki-owned columns of the {@code ship_type} rows from the SC Wiki vehicle feed ({@code
- * /api/vehicles}), matched by {@code external_uuid}, by the UEX vehicle id the {@code
- * ship_type_uex_alias} table ties the class name to (REQ-DATA-026), or by case-insensitive name.
- *
- * <p>Never overwrites UEX-canonical columns; an unmatched vehicle becomes a {@code WIKI_ONLY} ship
- * type. Gated behind {@code krt.scwiki.vehicle-sync-enabled} (default {@code false}).
- */
+/** Applies identity-checked Wiki vehicle facts in isolated transactions. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ScWikiVehicleSyncService {
 
+  private static final int PRESENCE_BATCH_SIZE = 500;
+  private static final double MICRO_SCU_PER_SCU = 1_000_000.0;
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final ShipTypeRepository shipTypeRepository;
   private final SyncReportService syncReportService;
+  private final SyncChunkWriter chunkWriter;
 
   /**
-   * Runs the full Wiki vehicle fill; a no-op when the flag is off, and an empty response skips the
-   * orphan sweep.
+   * Imports the configured vehicle census without holding a transaction during HTTP requests.
    *
-   * @return the number of {@code ship_type} rows written ({@code linked} plus {@code
-   *     createdWikiOnly}), {@code 0} when disabled or empty, or {@link
-   *     ShipTypeRepository#countLiveScwikiShipTypes() the live Wiki-linked ship-type count} on a
-   *     {@code 304 Not Modified}
+   * @return successfully applied vehicle rows
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncVehicles() {
     if (!Boolean.TRUE.equals(properties.vehicleSyncEnabled())) {
-      log.info(
-          "SC Wiki vehicle sync invoked but disabled "
-              + "(krt.scwiki.vehicle-sync-enabled=false) — skipping.");
       return 0;
     }
+    try (var _ = scWikiClient.openSyncRun()) {
+      return syncVehicleCensus();
+    }
+  }
 
-    log.info("Starting SC Wiki vehicle sync...");
-    ScWikiClient.FetchResult<ScWikiVehicleDto> result =
+  private int syncVehicleCensus() {
+    var result =
         scWikiClient.fetchAllPagesResult(
             properties.vehiclesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiVehicleDto>>() {},
@@ -84,98 +82,173 @@ public class ScWikiVehicleSyncService {
             null,
             null,
             properties.vehiclesPageSize());
-    if (result.notModified()) {
-      long live = shipTypeRepository.countLiveScwikiShipTypes();
-      log.info(
-          "SC Wiki vehicle catalogue unchanged since last sync (304) — reporting {} live"
-              + " Wiki-linked ship_type row(s) instead of 0.",
-          live);
-      return (int) live;
-    }
-    List<ScWikiVehicleDto> fetched = result.data();
-    if (fetched.isEmpty()) {
-      log.warn("No vehicles received from SC Wiki API. Aborting sync (no orphan sweep).");
-      return 0;
-    }
 
-    Instant now = Instant.now();
+    List<ScWikiVehicleDto> rows = result.data();
     Set<UUID> seen = new HashSet<>();
-    int linked = 0;
-    int createdWikiOnly = 0;
-
-    for (ScWikiVehicleDto dto : fetched) {
-      if (dto.uuid() == null) {
-        continue;
-      }
-      try {
-        Optional<ShipType> match = shipTypeRepository.findByExternalUuid(dto.uuid());
-        if (match.isEmpty() && StringUtils.hasText(dto.className())) {
-          match = shipTypeRepository.findByUexAliasOfClassName(dto.className());
-        }
-        if (match.isEmpty() && StringUtils.hasText(dto.name())) {
-          match = shipTypeRepository.findByNameIgnoreCase(dto.name());
-        }
-        ShipType st = match.orElse(null);
-        if (st == null) {
-          st = new ShipType();
-          st.setName(dto.name());
-          st.setExternalUuid(dto.uuid());
-          st.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
-          createdWikiOnly++;
-        } else {
-          if (st.getExternalUuid() == null) {
-            st.setExternalUuid(dto.uuid());
+    List<ScWikiVehicleDto> valid =
+        rows.stream()
+            .filter(dto -> dto != null && dto.uuid() != null && StringUtils.hasText(dto.name()))
+            .toList();
+    valid.forEach(dto -> seen.add(dto.uuid()));
+    if (valid.size() != rows.size() || seen.size() != rows.size()) {
+      syncReportService.recordIncomplete();
+    }
+    Map<String, Long> nameCounts =
+        valid.stream()
+            .map(dto -> dto.name().toLowerCase(Locale.ROOT))
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    UUID runId = syncReportService.beginRun();
+    Instant now = Instant.now();
+    var outcome =
+        chunkWriter.write(
+            valid,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk ->
+                chunk.stream()
+                    .map(dto -> upsert(dto, nameCounts, runId, now))
+                    .filter(id -> id != null)
+                    .toList(),
+            "Wiki vehicle",
+            dto -> dto.uuid().toString());
+    boolean complete =
+        result.complete()
+            && valid.size() == rows.size()
+            && seen.size() == rows.size()
+            && outcome.results().size() == valid.size()
+            && outcome.failedRows() == 0;
+    int restored = 0;
+    if (complete && !seen.isEmpty()) {
+      List<UUID> known =
+          chunkWriter.inNewTransaction(shipTypeRepository::findWikiLinkedVehicleUuids);
+      if (!seen.containsAll(known)) {
+        var existence =
+            scWikiClient.fetchExistenceCensus(
+                properties.vehiclesEndpoint(), "vehicle existence", properties.vehiclesPageSize());
+        complete = existence.complete() && existence.uuids().containsAll(seen);
+        if (complete) {
+          List<UUID> present = new ArrayList<>();
+          for (UUID uuid : known) {
+            if (!seen.contains(uuid) && existence.uuids().contains(uuid)) {
+              present.add(uuid);
+            }
           }
-          linked++;
+          restored = restorePresent(present, runId, now);
+          seen.addAll(present);
+        } else {
+          syncReportService.recordIncomplete();
         }
-        seen.add(dto.uuid());
-        applyWikiFields(st, dto, now);
-        if (st.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
-          st.setSourceSystems(GameItemSourceSystem.BOTH);
-        }
-        shipTypeRepository.save(st);
-      } catch (Exception e) {
-        log.error("Failed to process SC Wiki vehicle dto: {}", dto.uuid(), e);
       }
     }
-
-    ScWikiOrphanSweep.sweepDeletedOrphans(
-        seen,
-        result.complete(),
-        s -> shipTypeRepository.markScwikiDeletedExcept(s, now),
-        log,
-        "ship_type");
+    if (complete && !seen.isEmpty()) {
+      int marked =
+          chunkWriter.inNewTransaction(() -> shipTypeRepository.markScwikiDeletedExcept(seen, now));
+      syncReportService.recordApplied(marked);
+      syncReportService.recordSweep(true);
+    } else {
+      syncReportService.recordSweep(false);
+    }
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
-    log.info(
-        "Finished SC Wiki vehicle sync: {} linked, {} created WIKI_ONLY.", linked, createdWikiOnly);
-    return linked + createdWikiOnly;
+    return outcome.results().size() + restored;
   }
 
-  /**
-   * Writes the Wiki-owned columns onto a ship type; {@code description_en}, {@code class_name} and
-   * {@code vehicle_inventory_scu} are filled only when UEX left them blank.
-   *
-   * @param st the ship type to update
-   * @param dto the Wiki vehicle payload
-   * @param now timestamp for {@code scwiki_synced_at}
-   */
-  private void applyWikiFields(@NotNull ShipType st, @NotNull ScWikiVehicleDto dto, Instant now) {
-    st.setScwikiSlug(dto.slug());
-    st.setGameName(dto.gameName());
-    if (!StringUtils.hasText(st.getClassName())) {
-      st.setClassName(dto.className());
+  private int restorePresent(List<UUID> present, UUID runId, Instant now) {
+    int restored = 0;
+    for (int from = 0; from < present.size(); from += PRESENCE_BATCH_SIZE) {
+      List<UUID> batch =
+          present.subList(from, Math.min(present.size(), from + PRESENCE_BATCH_SIZE));
+      int changed =
+          chunkWriter.inNewTransaction(
+              () -> shipTypeRepository.restoreWikiPresentVehicles(batch, now));
+      restored += changed;
+      syncReportService.recordApplied(changed);
     }
-    if (st.getVehicleInventoryScu() == null) {
-      st.setVehicleInventoryScu(dto.vehicleInventory());
+    if (restored > 0) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.SOURCE_RECORDS_RESTORED,
+          "ship_type",
+          null,
+          null,
+          "restored=" + restored + ";scope=all_assets");
+    }
+    return restored;
+  }
+
+  @Nullable
+  private UUID upsert(ScWikiVehicleDto dto, Map<String, Long> nameCounts, UUID runId, Instant now) {
+    Optional<ShipType> match = shipTypeRepository.findByExternalUuid(dto.uuid());
+    if (match.isEmpty() && StringUtils.hasText(dto.className())) {
+      match = shipTypeRepository.findByUexAliasOfClassName(dto.className());
+    }
+    if (match.isEmpty() && nameCounts.getOrDefault(dto.name().toLowerCase(Locale.ROOT), 0L) == 1) {
+      match = shipTypeRepository.findByNameIgnoreCase(dto.name());
+    }
+    ShipType ship = match.orElseGet(ShipType::new);
+    if (ship.getExternalUuid() != null && !ship.getExternalUuid().equals(dto.uuid())) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.SOURCE_IDENTITY_CONFLICT,
+          "ship_type",
+          dto.uuid(),
+          dto.name(),
+          "Existing vehicle has another game UUID.");
+      syncReportService.recordIncomplete();
+      return null;
+    }
+    if (match.isEmpty()) {
+      ship.setName(dto.name());
+      ship.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    }
+    ship.setExternalUuid(dto.uuid());
+    applyWikiFields(ship, dto, now);
+    if (ship.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
+      ship.setSourceSystems(GameItemSourceSystem.BOTH);
+    }
+    ShipType saved = shipTypeRepository.save(ship);
+    return saved.getExternalUuid();
+  }
+
+  private void applyWikiFields(ShipType ship, ScWikiVehicleDto dto, Instant now) {
+    ship.setScwikiSlug(dto.slug());
+    ship.setGameName(dto.gameName());
+    ship.setScwikiGameVersionSeen(dto.version());
+    if (!StringUtils.hasText(ship.getClassName())) {
+      ship.setClassName(dto.className());
+    }
+    if (dto.vehicleInventory() != null) {
+      ship.setVehicleInventoryScu(nonNegative(dto.vehicleInventory()) / MICRO_SCU_PER_SCU);
+    }
+    if (dto.oreCapacity() != null) {
+      ship.setOreCapacity(nonNegative(dto.oreCapacity()));
+    }
+    if (dto.health() != null) {
+      ship.setHealth(nonNegative(dto.health()));
+    }
+    if (dto.shieldHp() != null) {
+      ship.setShieldHp(nonNegative(dto.shieldHp()));
+    }
+    if (dto.maxMedicalTier() != null) {
+      String tier = dto.maxMedicalTier();
+      if (!tier.matches("T[0-3]")) {
+        throw new IllegalArgumentException("Unknown medical service tier");
+      }
+      ship.setMaxMedicalTier(Integer.parseInt(tier.substring(1)));
     }
     if (dto.description() != null) {
-      String en = dto.description().get("en_EN");
-      if (!StringUtils.hasText(st.getDescriptionEn()) && StringUtils.hasText(en)) {
-        st.setDescriptionEn(en);
+      String english = dto.description().get("en_EN");
+      if (!StringUtils.hasText(ship.getDescriptionEn()) && StringUtils.hasText(english)) {
+        ship.setDescriptionEn(english);
       }
-      st.setDescriptionDe(dto.description().get("de_DE"));
+      ship.setDescriptionDe(dto.description().get("de_DE"));
     }
-    st.setScwikiSyncedAt(now);
-    st.setScwikiDeletedAt(null);
+    ship.setScwikiSyncedAt(now);
+    ship.setScwikiDeletedAt(null);
+  }
+
+  private static double nonNegative(double value) {
+    if (!Double.isFinite(value) || value < 0) {
+      throw new IllegalArgumentException("Vehicle quantity must be finite and nonnegative");
+    }
+    return value;
   }
 }

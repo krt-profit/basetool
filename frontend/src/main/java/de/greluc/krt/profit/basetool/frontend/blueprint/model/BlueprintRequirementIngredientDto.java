@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend blueprint ingredient-line DTO. {@code quantityType} ({@code "SCU"}
@@ -33,4 +35,7 @@ public record BlueprintRequirementIngredientDto(
     Double quantityScu,
     Integer quantityUnits,
     Integer minQuality,
-    String quantityType) {}
+    String quantityType,
+    @Nullable UUID wikiResourceUuid,
+    @Nullable UUID wikiOreUuid,
+    @Nullable UUID wikiItemUuid) {}

@@ -137,6 +137,8 @@ public class AdminAuditLogPageController {
               "INVENTORY",
               List.of(
                   "INVENTORY_ITEM_CREATED",
+                  "INVENTORY_ITEM_CATALOGUE_REASSIGNED",
+                  "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED",
                   "INVENTORY_ITEM_UPDATED",
                   "INVENTORY_ITEM_MERGED",
                   "INVENTORY_ITEM_NOTE_UPDATED",
@@ -176,6 +178,7 @@ public class AdminAuditLogPageController {
               "JOB_ORDER",
               List.of(
                   "JOB_ORDER_CREATED",
+                  "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED",
                   "JOB_ORDER_ITEM_CREATED",
                   "JOB_ORDER_UPDATED",
                   "JOB_ORDER_ITEM_UPDATED",
@@ -336,6 +339,7 @@ public class AdminAuditLogPageController {
               "BLUEPRINT",
               List.of(
                   "BLUEPRINT_ADDED",
+                  "BLUEPRINT_CATALOGUE_REASSIGNED",
                   "BLUEPRINT_BATCH_ADDED",
                   "BLUEPRINT_UPDATED",
                   "BLUEPRINT_REMOVED",
@@ -371,6 +375,7 @@ public class AdminAuditLogPageController {
               "SUPPLY",
               List.of(
                   "NEED_RAISED",
+                  "SUPPLY_CATALOGUE_REASSIGNED",
                   "NEED_UPDATED",
                   "NEED_PAUSED",
                   "NEED_RESUMED",
@@ -389,6 +394,7 @@ public class AdminAuditLogPageController {
               "PURCHASING",
               List.of(
                   "DEAL_CREATED",
+                  "PURCHASING_CATALOGUE_REASSIGNED",
                   "DEAL_UPDATED",
                   "DEAL_CANCELLED",
                   "DEAL_TRANCHE_REQUESTED",

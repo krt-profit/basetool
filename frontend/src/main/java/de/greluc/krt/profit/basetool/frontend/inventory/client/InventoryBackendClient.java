@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.client;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueDetailsDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.BulkCheckoutRequest;
@@ -171,6 +172,18 @@ public class InventoryBackendClient {
             ? "/api/v1/inventory/game-item/{id}?page={page}&size={size}"
             : "/api/v1/inventory/material/{id}?page={page}&size={size}";
     return backendApiClient.get(uri, INVENTORY_ITEM_PAGE, id, page, size);
+  }
+
+  /**
+   * Reads source-attributed catalogue details independently of warehouse stock.
+   *
+   * @param id local canonical game-item identity
+   * @return catalogue details, absent when no body was returned
+   */
+  @Nullable
+  public ItemCatalogueDetailsDto itemCatalogue(@NotNull UUID id) {
+    return backendApiClient.get(
+        "/api/v1/game-items/{id}/catalogue", ItemCatalogueDetailsDto.class, id);
   }
 
   /**

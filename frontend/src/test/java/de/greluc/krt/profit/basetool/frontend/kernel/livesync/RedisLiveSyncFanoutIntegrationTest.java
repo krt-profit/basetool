@@ -27,6 +27,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -186,7 +187,13 @@ class RedisLiveSyncFanoutIntegrationTest {
     ObjectProvider<LiveSyncWebSocketHandler> provider = mock(ObjectProvider.class);
     when(provider.getObject()).thenReturn(handler);
     return new RedisLiveSyncFanout(
-        template, provider, new SimpleMeterRegistry(), CHANNEL, PRESENCE_CHANNEL, instanceId);
+        template,
+        provider,
+        new SimpleMeterRegistry(),
+        mock(CatalogueCacheEviction.class),
+        CHANNEL,
+        PRESENCE_CHANNEL,
+        instanceId);
   }
 
   /**
@@ -223,6 +230,12 @@ class RedisLiveSyncFanoutIntegrationTest {
     ObjectProvider<LiveSyncWebSocketHandler> provider = mock(ObjectProvider.class);
     when(provider.getObject()).thenReturn(handler);
     return new RedisLiveSyncFanout(
-        template, provider, new SimpleMeterRegistry(), CHANNEL, PRESENCE_CHANNEL, instanceId);
+        template,
+        provider,
+        new SimpleMeterRegistry(),
+        mock(CatalogueCacheEviction.class),
+        CHANNEL,
+        PRESENCE_CHANNEL,
+        instanceId);
   }
 }

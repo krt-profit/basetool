@@ -132,6 +132,23 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
+  void catalogueRoom_requiresTheCatalogueReadRoles() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("catalogue");
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_KRT_MEMBER"), null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_LOGISTICIAN"), null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_ADMIN"), null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_PENDING_APPROVAL"), null))
+        .isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of(), null)).isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, null, null))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
   void aUnitHangarRoomAsksTheUnitOverviewGate() throws Exception {
     UUID unit = UUID.randomUUID();
     LiveSyncTopic topic = LiveSyncTopic.parse("hangar-unit:" + unit);

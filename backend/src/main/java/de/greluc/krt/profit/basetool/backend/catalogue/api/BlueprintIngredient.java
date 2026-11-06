@@ -99,6 +99,11 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
   @Column(name = "wiki_resource_uuid")
   private UUID wikiResourceUuid;
 
+  /** Distinct source ore identity retained alongside the required resource identity. */
+  @Column(name = "wiki_ore_uuid")
+  @Nullable
+  private UUID wikiOreUuid;
+
   /** Raw Wiki item UUID for an ITEM line — kept for forensic re-resolution. */
   @Column(name = "wiki_item_uuid")
   private UUID wikiItemUuid;

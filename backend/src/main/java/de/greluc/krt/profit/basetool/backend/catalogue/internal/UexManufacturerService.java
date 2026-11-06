@@ -58,6 +58,7 @@ public class UexManufacturerService {
   private final UexClient uexClient;
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository aliasRepository;
+  private final SyncRunProgress progress;
 
   /**
    * Self-reference, resolved lazily so each per-company upsert runs through the Spring transaction
@@ -105,16 +106,19 @@ public class UexManufacturerService {
     int aliased = 0;
     int skipped = 0;
     for (UexCompanyDto dto : ordered) {
-      if (!StringUtils.hasText(dto.name())) {
+      if (dto.id() == null || !StringUtils.hasText(dto.name())) {
         log.debug(
             "Skipping company with missing name (id={}, nickname='{}')",
             dto.id(),
             LogSafe.text(dto.nickname(), MAX_NAME_LOG_LENGTH));
         skipped++;
+        progress.skipped(1);
+        progress.invalidateCensus();
         continue;
       }
       try {
         UpsertOutcome outcome = self.getObject().upsertCompanyWithinTransaction(dto, now);
+        progress.applied(1);
         if (outcome == UpsertOutcome.CREATED) {
           added++;
         } else if (outcome == UpsertOutcome.UPDATED) {
@@ -129,6 +133,7 @@ public class UexManufacturerService {
             LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
             e);
         skipped++;
+        progress.failed(1);
       }
     }
     log.info(

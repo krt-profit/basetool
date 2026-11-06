@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueDetailsDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueMetadata.Relationship;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
@@ -246,6 +248,24 @@ public class InventoryPageController {
     model.addAttribute("items", items);
     model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
     model.addAttribute("selectedGameItemId", gameItemId);
+    var catalogue = catalogs.catalogueItem(gameItemId);
+    model.addAttribute("itemCatalogue", catalogue.orElse(null));
+    var metadata = catalogue.map(ItemCatalogueDetailsDto::wikiMetadata);
+    model.addAttribute(
+        "itemVariantsLoaded",
+        metadata
+            .map(value -> value.requestedIncludes().contains(Relationship.VARIANTS))
+            .orElse(false));
+    model.addAttribute(
+        "itemRelatedLoaded",
+        metadata
+            .map(value -> value.requestedIncludes().contains(Relationship.RELATED_ITEMS))
+            .orElse(false));
+    model.addAttribute(
+        "itemVehiclesLoaded",
+        metadata
+            .map(value -> value.requestedIncludes().contains(Relationship.VEHICLES))
+            .orElse(false));
     model.addAttribute(
         "gameItemName",
         items.stream()
@@ -253,7 +273,7 @@ public class InventoryPageController {
             .filter(Objects::nonNull)
             .map(InventoryGameItemReferenceDto::name)
             .findFirst()
-            .orElse(null));
+            .orElseGet(() -> catalogue.map(ItemCatalogueDetailsDto::name).orElse(null)));
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory/inventory-game-item :: inventoryGameItemResults";
     }

@@ -41,6 +41,7 @@ class FrontendCacheSplitTest {
 
   @Autowired private CacheManager cacheManager;
   @Autowired private BackendApiClient backendApiClient;
+  @Autowired private CatalogueCacheEviction catalogueCacheEviction;
 
   @org.springframework.test.context.bean.override.mockito.MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
@@ -135,6 +136,34 @@ class FrontendCacheSplitTest {
         terminal.get("k"),
         "a sibling domain must be retained — the whole point of the split is that a squadron "
             + "mutation no longer cold-starts the terminal list");
+  }
+
+  @Test
+  void sourceChange_dropsSyncedFactsBeforeFragmentReads_andRetainsUnrelatedCatalogues() {
+    java.util.Set<CacheDomain> synced =
+        java.util.EnumSet.of(
+            CacheDomain.MATERIAL,
+            CacheDomain.LOCATION,
+            CacheDomain.SHIP_TYPE,
+            CacheDomain.REFINING_METHOD,
+            CacheDomain.TERMINAL,
+            CacheDomain.MANUFACTURER,
+            CacheDomain.ITEM_CATALOG);
+    for (CacheDomain domain : CacheDomain.values()) {
+      cacheManager.getCache(domain.getCacheName()).put("source-snapshot", "old facts");
+    }
+
+    catalogueCacheEviction.evictSourceCatalogues();
+
+    for (CacheDomain domain : CacheDomain.values()) {
+      Cache.ValueWrapper cached =
+          cacheManager.getCache(domain.getCacheName()).get("source-snapshot");
+      if (synced.contains(domain)) {
+        assertNull(cached, () -> "source refresh must fetch fresh " + domain.name());
+      } else {
+        assertNotNull(cached, () -> "source refresh retains unrelated " + domain.name());
+      }
+    }
   }
 
   @Test

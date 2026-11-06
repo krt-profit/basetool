@@ -117,7 +117,7 @@ public class DefaultBlueprintBootstrap implements CommandLineRunner {
       entity.setProductKey(product.productKey());
       entity.setProductName(product.productName());
       if (product.outputItemId() != null) {
-        entity.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
+        entity.setOutputItem(gameItemRepository.getCanonicalReferenceById(product.outputItemId()));
       }
     } else {
       log.warn(

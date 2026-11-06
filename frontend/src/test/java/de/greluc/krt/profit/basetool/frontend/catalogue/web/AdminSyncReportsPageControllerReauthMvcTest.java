@@ -44,7 +44,9 @@ class AdminSyncReportsPageControllerReauthMvcTest {
 
   @BeforeEach
   void setUp() {
-    mockMvc = ReauthPageMvc.standalone(new AdminSyncReportsPageController(client));
+    mockMvc =
+        ReauthPageMvc.standalone(
+            new AdminSyncReportsPageController(client, new SyncReportPageReader(client)));
     ReauthPageMvc.signInMember("ADMIN");
   }
 

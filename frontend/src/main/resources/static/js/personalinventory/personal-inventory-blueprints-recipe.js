@@ -1,3 +1,5 @@
+import { renderBlueprintMetadata } from '/js/personalinventory/personal-inventory-blueprint-metadata.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -69,6 +71,10 @@ let activeRow = null;
  */
 
 const recipeCache = new Map();
+
+/** @type {KrtPageSections | null} */
+let catalogueUpdates = null;
+let catalogueGeneration = 0;
 
 const craftabilityById = new Map();
 /** @type {HTMLElement | null} */
@@ -368,9 +374,13 @@ function loadRecipe(id) {
             krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
         ),
     );
+    const generation = catalogueGeneration;
     krtFetch
         .getJson(resolveUrl(endpoints().recipe, id))
         .then((recipe) => {
+            if (generation !== catalogueGeneration) {
+                return;
+            }
             if (!recipe) {
                 showError();
                 return;
@@ -381,7 +391,9 @@ function loadRecipe(id) {
             }
         })
         .catch(() => {
-            showError();
+            if (generation === catalogueGeneration) {
+                showError();
+            }
         });
 }
 
@@ -410,6 +422,10 @@ function renderRecipe(recipe) {
         return;
     }
     clear(recipeEl);
+    const metadata = renderBlueprintMetadata(recipe.wikiMetadata, i18n());
+    if (metadata) {
+        recipeEl.appendChild(metadata);
+    }
     const groups = recipe.requirementGroups || [];
     const flat = recipe.ingredients || [];
     if (groups.length === 0 && flat.length === 0) {
@@ -759,10 +775,14 @@ function loadCraftability() {
     }
     const sep = url.indexOf('?') === -1 ? '?' : '&';
     const target = safeSameOriginUrl(`${url + sep}includeRefinery=true`, url);
+    const generation = catalogueGeneration;
     krtFetch
         .getJson(target)
         .catch(() => null)
         .then((list) => {
+            if (generation !== catalogueGeneration) {
+                return;
+            }
             craftabilityById.clear();
             if (Array.isArray(list)) {
                 list.forEach((c) => {
@@ -1293,6 +1313,25 @@ function init() {
     acquiredEl = document.getElementById('krt-bp-detail-acquired');
     sourceEl = document.getElementById('krt-bp-detail-source');
     recipeEl = document.getElementById('krt-bp-detail-recipe');
+    if (!catalogueUpdates) {
+        catalogueUpdates = krtPageSections.create({
+            topicClass: 'CATALOGUE',
+            topic: 'catalogue',
+            sections: { catalogue: { container: '#krt-bp-detail-recipe' } },
+            receiver: {
+                coalesceMs: 1500,
+                refresh() {
+                    catalogueGeneration++;
+                    recipeCache.clear();
+                    craftabilityById.clear();
+                    if (activeRow) {
+                        loadRecipe(attr(activeRow, 'data-id'));
+                    }
+                    loadCraftability();
+                },
+            },
+        });
+    }
     noteSection = document.getElementById('krt-bp-detail-note-section');
     noteEl = document.getElementById('krt-bp-detail-note');
     editBtn = document.getElementById('krt-bp-detail-edit');

@@ -151,3 +151,15 @@ These terms come with ADR-0335…0347 (map #2884); the rules are in
 | **Lagerort / storage place** | A `location` where stock can lie: a city or station from UEX, or any visible starmap object an admin picks. The import never creates one (REQ-P4K-036). |
 | **Mass guard** | The 5 % threshold above which the orphan sweep of a kind stamps nothing unless the admin ticks "apply marking anyway" for that run (REQ-P4K-012, ADR-0336). |
 | **P4K stamp** | `p4k_deleted_at`, set by the orphan sweep on a row a complete kind no longer lists: the row leaves every picker and search, its references stay with a "no longer in the game" notice, and it wins over UEX and the Wiki (REQ-P4K-011, REQ-P4K-013). |
+
+
+## 12.8 External catalogue reconciliation
+
+| Term | Means |
+| --- | --- |
+| **Source record** | One record identified by its supplier, such as one UEX item or vehicle id. Two source records claiming one game UUID are not automatically the same game asset. |
+| **Source census** | A complete enumeration of usable identities in one source, game build and requested scope. It describes what was supplied, not what the application successfully stored. |
+| **Player-relevant scope** | The Wiki's selection of assets intended for player-facing use. An asset omitted from this selection may still exist in the source. |
+| **Sync attempt** | One attempt to fetch and apply a source catalogue or one of its slices. It has an outcome even when it changes nothing or produces no anomaly. |
+| **Catalogue redirect** | A lasting equivalence from a retired duplicate's local id to its surviving game asset, with both original source states retained. It does not merge genuine variants. |
+| **Source enrichment** | Attributed supplemental facts, including their units and loading state, that do not replace another source's authoritative facts. |

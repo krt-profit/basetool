@@ -267,6 +267,24 @@ class ExchangeResolveServiceTest {
   }
 
   @Test
+  void retainedLocalItemIdsResolveToTheCurrentCanonicalBt() {
+    UUID retired = UUID.randomUUID();
+    UUID canonical = UUID.randomUUID();
+    when(gameItemRepository.findLocalIdRedirects(List.of(retired)))
+        .thenReturn(Map.of(retired, canonical));
+    when(gameItemRepository.findExchangeKeyRows(any(), any(), any(), any(), any(), any()))
+        .thenReturn(
+            List.of(
+                new ExchangeItemKeyRow(canonical, "Canonical Item", null, null, null, null, null)));
+
+    Result result = only(resolve(ExchangeCatalogKind.ITEM, ref(retired.toString(), null, null)));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref()).isNotNull();
+    assertThat(result.ref().bt()).isEqualTo(canonical.toString());
+  }
+
+  @Test
   void materialNamesGoExactThenCanonicalThenAliasThenFuzzy() {
     Material silicon = material("Silicon", true);
     Material rawSilicon = material("Silicon (Raw)", true);

@@ -156,6 +156,23 @@ class ScWikiItemStatExtractorTest {
   }
 
   @Test
+  void canonicalTractorValuesTakePriorityOverDeprecatedAliases() {
+    Map<BlueprintStatProperty, Double> values =
+        extract(
+            """
+            {"tractor_beam":{"force":{"max":500000,"max_volume":300000},
+                             "range":{"max":75,"full_strength_distance":45},
+                             "max_force":1,"max_volume":2,"max_distance":3,
+                             "full_strength_distance":4}}
+            """);
+
+    assertEquals(500000.0, values.get(BlueprintStatProperty.TRACTOR_FORCE));
+    assertEquals(300000.0, values.get(BlueprintStatProperty.TRACTOR_MAX_VOLUME));
+    assertEquals(75.0, values.get(BlueprintStatProperty.TRACTOR_MAX_DISTANCE));
+    assertEquals(45.0, values.get(BlueprintStatProperty.TRACTOR_FULL_STRENGTH_DISTANCE));
+  }
+
+  @Test
   void listRowWithoutStatBlocks_yieldsNothing() {
     assertTrue(extract("{\"name\":\"Hadanite\",\"is_craftable\":false}").isEmpty());
   }

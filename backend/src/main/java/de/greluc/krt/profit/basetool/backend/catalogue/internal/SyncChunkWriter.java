@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.ToLongFunction;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -52,12 +53,17 @@ public class SyncChunkWriter {
   /** Runs a callback in its own new transaction, suspending any the caller holds. */
   private final TransactionTemplate requiresNew;
 
+  private final SyncRunProgress progress;
+
   /**
-   * Creates the writer over the application's transaction manager.
+   * Creates a writer whose committed rows contribute to the active catalogue attempt.
    *
-   * @param transactionManager the transaction manager every chunk and row transaction runs on
+   * @param transactionManager transaction manager used for isolated writes
+   * @param progress active attempt counters
    */
-  public SyncChunkWriter(@NotNull PlatformTransactionManager transactionManager) {
+  public SyncChunkWriter(
+      @NotNull PlatformTransactionManager transactionManager, SyncRunProgress progress) {
+    this.progress = progress;
     this.requiresNew = new TransactionTemplate(transactionManager);
     this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -83,6 +89,30 @@ public class SyncChunkWriter {
       @NotNull Function<List<T>, List<R>> writer,
       @NotNull String label,
       @NotNull Function<T, String> describe) {
+    return write(rows, chunkSize, writer, label, describe, _ -> 1);
+  }
+
+  /**
+   * Writes chunks whose result describes a variable number of committed child-row changes.
+   *
+   * @param rows source rows to apply
+   * @param chunkSize maximum source rows per transaction
+   * @param writer transactional callback returning results for resolved rows
+   * @param label bounded row description for failure logs
+   * @param describe safe source-row identifier for failure logs
+   * @param appliedCount committed database changes represented by one result
+   * @param <T> source row type
+   * @param <R> transaction result type
+   * @return committed results and isolated failure count
+   */
+  @NotNull
+  public <T, R> Outcome<R> write(
+      @NotNull List<T> rows,
+      int chunkSize,
+      @NotNull Function<List<T>, List<R>> writer,
+      @NotNull String label,
+      @NotNull Function<T, String> describe,
+      @NotNull ToLongFunction<R> appliedCount) {
     if (chunkSize < 1) {
       throw new IllegalArgumentException("chunkSize must be at least 1");
     }
@@ -109,7 +139,37 @@ public class SyncChunkWriter {
         }
       }
     }
+    progress.applied(results.stream().mapToLong(appliedCount).sum());
+    progress.failed(failedRows);
+    progress.skipped(Math.max(0, rows.size() - results.size() - failedRows));
     return new Outcome<>(Collections.unmodifiableList(results), failedRows);
+  }
+
+  /**
+   * Records whether the writer's verified census permitted absence-based cleanup.
+   *
+   * @param performed whether cleanup ran
+   */
+  public void recordSweep(boolean performed) {
+    progress.sweep(performed);
+  }
+
+  /**
+   * Counts changes committed by a separately executed cleanup transaction.
+   *
+   * @param count changed database rows
+   */
+  public void recordApplied(long count) {
+    progress.applied(count);
+  }
+
+  /**
+   * Counts source rows rejected before chunk application.
+   *
+   * @param count rejected source rows
+   */
+  public void recordSkipped(long count) {
+    progress.skipped(count);
   }
 
   /**

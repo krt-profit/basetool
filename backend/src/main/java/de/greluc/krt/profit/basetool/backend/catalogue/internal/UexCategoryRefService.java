@@ -23,10 +23,13 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.UexCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,12 +67,36 @@ public class UexCategoryRefService {
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public List<UexCategory> syncCategories() {
+    return syncCategoriesResult().categories();
+  }
+
+  /**
+   * Refreshes the category reference table and preserves the upstream census verdict.
+   *
+   * @return current supported categories with a complete-source verdict
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public @NotNull CategorySyncResult syncCategoriesResult() {
     log.info("Starting synchronization of UEX categories...");
     UexClient.FetchResult<UexCategoryDto> fetched = uexClient.getCategories();
     List<UexCategoryDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No categories received from UEX API. Aborting synchronization.");
-      return chunkWriter.inNewTransaction(repository::findAll);
+      return new CategorySyncResult(chunkWriter.inNewTransaction(repository::findAll), false);
+    }
+
+    Set<Integer> sourceIds = new HashSet<>();
+    Set<Integer> supportedIds = new HashSet<>();
+    boolean valid = true;
+    for (UexCategoryDto dto : dtos) {
+      if (dto.id() == null || dto.id() <= 0 || !sourceIds.add(dto.id())) {
+        valid = false;
+      } else if (dto.type() == null || "item".equals(dto.type()) || "vehicle".equals(dto.type())) {
+        supportedIds.add(dto.id());
+      }
+      if (dto.section() == null || dto.name() == null) {
+        valid = false;
+      }
     }
 
     Instant now = Instant.now();
@@ -77,20 +104,37 @@ public class UexCategoryRefService {
         chunkWriter.write(
             dtos,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
-            chunk -> chunk.stream().map(dto -> upsertCategory(dto, now)).toList(),
+            chunk ->
+                chunk.stream()
+                    .map(dto -> upsertCategory(dto, now))
+                    .filter(result -> "added".equals(result) || "updated".equals(result))
+                    .toList(),
             "category",
             dto -> "(id=" + dto.id() + ")");
     long added = outcome.results().stream().filter("added"::equals).count();
     long updated = outcome.results().stream().filter("updated"::equals).count();
-    long skipped = outcome.results().stream().filter("skipped"::equals).count();
+    long skipped = (long) dtos.size() - outcome.results().size() - outcome.failedRows();
 
     log.info(
         "Finished UEX category sync: {} added, {} updated, {} skipped (unsupported type)",
         added,
         updated,
         skipped);
-    return chunkWriter.inNewTransaction(repository::findAll);
+    boolean complete = fetched.complete() && valid && outcome.failedRows() == 0;
+    List<UexCategory> categories =
+        complete
+            ? chunkWriter.inNewTransaction(() -> repository.findAllById(supportedIds))
+            : chunkWriter.inNewTransaction(repository::findAll);
+    return new CategorySyncResult(categories, complete);
   }
+
+  /**
+   * Categories usable for ingestion and whether their upstream membership was fully enumerated.
+   *
+   * @param categories supported category rows
+   * @param complete whether the category feed was fetched and applied without an identity gap
+   */
+  public record CategorySyncResult(@NotNull List<UexCategory> categories, boolean complete) {}
 
   /**
    * Upserts one category inside the caller's chunk transaction.
@@ -101,7 +145,7 @@ public class UexCategoryRefService {
    *     {@code "invalid"} for a row missing its id, section or name
    */
   private String upsertCategory(UexCategoryDto dto, Instant now) {
-    if (dto.id() == null || dto.section() == null || dto.name() == null) {
+    if (dto.id() == null || dto.id() <= 0 || dto.section() == null || dto.name() == null) {
       log.debug(
           "Skipping category with missing id/section/name (id={}, section='{}', name='{}')",
           dto.id(),

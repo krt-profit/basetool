@@ -42,6 +42,21 @@ public enum LiveSyncTopicClass {
    */
   INVENTORY_ALL("inventory", false, "inventory_all"),
 
+  /** Shared member-readable catalogue enrichment and reference-data room. */
+  CATALOGUE("catalogue", false, "catalogue"),
+
+  /** A job-order detail page, keyed by the order identity. */
+  ORDER("order", true, "order_detail"),
+
+  /** Shared supply needs, personal donations and aggregate statistics. */
+  SUPPLY_NEEDS("supply-needs", false, "supply_needs"),
+
+  /** Incoming donations of one receiving org unit. */
+  SUPPLY_DONATIONS("supply-donations", true, "supply_donations"),
+
+  /** Shared purchasing-deal views. */
+  PURCHASING_DEALS("purchasing-deals", false, "purchasing_deals"),
+
   /** A member's own hangar, keyed by the member's id. */
   HANGAR_OWN("hangar", true, "hangar_own"),
 
@@ -110,6 +125,23 @@ public enum LiveSyncTopicClass {
   public Set<String> allowedSections() {
     return switch (this) {
       case INVENTORY_ALL -> INVENTORY_ALL_SECTIONS;
+      case CATALOGUE -> Set.of("catalogue");
+      case ORDER ->
+          Set.of(
+              "header",
+              "kpi",
+              "materials",
+              "aggregated",
+              "items",
+              "item-stock",
+              "handovers",
+              "item-handovers",
+              "item-handover-lines",
+              "blueprint-owners",
+              "assignees");
+      case SUPPLY_NEEDS -> Set.of("needs", "mine", "stats");
+      case SUPPLY_DONATIONS -> Set.of("donations");
+      case PURCHASING_DEALS -> Set.of("deals");
       case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;

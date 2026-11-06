@@ -1,6 +1,10 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .item-catalogue-details .cell-sub,
+    .item-catalogue-details dd {
+        overflow-wrap: anywhere;
+    }
     .drill-alert {
         margin: var(--space-3) var(--space-4);
     }

@@ -300,7 +300,7 @@ public class PersonalBlueprintService {
         .resolveRecipe(entity.getProductKey())
         .orElseGet(() ->
             new PersonalBlueprintRecipeResponse(
-                entity.getProductName(), 0, List.of(), List.of(), List.of()));
+                entity.getProductName(), 0, List.of(), List.of(), List.of(), null));
   }
 
   /**
@@ -581,7 +581,7 @@ public class PersonalBlueprintService {
     entity.setProductKey(product.productKey());
     entity.setProductName(product.productName());
     if (product.outputItemId() != null) {
-      entity.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
+      entity.setOutputItem(gameItemRepository.getCanonicalReferenceById(product.outputItemId()));
     }
     entity.setAcquiredAt(acquiredAt);
     entity.setNote(note);

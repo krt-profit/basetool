@@ -30,6 +30,24 @@ import org.jetbrains.annotations.NotNull;
 @RequiredArgsConstructor
 public enum AuditEventType {
 
+  /** A warehouse row was linked to the surviving catalogue item. */
+  INVENTORY_ITEM_CATALOGUE_REASSIGNED(AuditDomain.INVENTORY),
+
+  /** A stock floor was linked or combined during catalogue reconciliation. */
+  MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED(AuditDomain.INVENTORY),
+
+  /** A job-order item was linked to the surviving catalogue item. */
+  JOB_ORDER_ITEM_CATALOGUE_REASSIGNED(AuditDomain.JOB_ORDER),
+
+  /** An owned, default or aliased blueprint was linked to the surviving catalogue item. */
+  BLUEPRINT_CATALOGUE_REASSIGNED(AuditDomain.BLUEPRINT),
+
+  /** A supply need or donation was linked to the surviving catalogue item. */
+  SUPPLY_CATALOGUE_REASSIGNED(AuditDomain.SUPPLY),
+
+  /** A purchasing deal was linked to the surviving catalogue item. */
+  PURCHASING_CATALOGUE_REASSIGNED(AuditDomain.PURCHASING),
+
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
 

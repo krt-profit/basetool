@@ -21,20 +21,64 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Bounding-box dimensions nested inside a {@link ScWikiItemDto} (REQ-DATA-015); any axis may be
- * {@code null}.
+ * Separates physical dimensions, cargo occupancy and inventory display dimensions.
  *
- * <p>Only the top-level axes are bound; the {@code true_dimension}, {@code cargo_dimension} and
- * {@code ui_dimension} blocks are ignored.
- *
- * @param width the box's width in metres, written to {@code game_item.dimension_x}
- * @param height the box's height in metres, written to {@code game_item.dimension_y}
- * @param length the box's depth / length in metres, written to {@code game_item.dimension_z}
+ * @param width physical width in metres
+ * @param height physical height in metres
+ * @param length physical length in metres
+ * @param physical explicit physical bounding box
+ * @param cargo cargo-grid occupancy in metres
+ * @param ui inventory display dimensions in metres
+ * @param volumeScu stored occupancy volume in SCU
+ * @param legacyPhysical deprecated explicit physical bounding box
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiDimensionDto(
-    @JsonProperty("width") Double width,
-    @JsonProperty("height") Double height,
-    @JsonProperty("length") Double length) {}
+    @Nullable @JsonProperty("width") Double width,
+    @Nullable @JsonProperty("height") Double height,
+    @Nullable @JsonProperty("length") Double length,
+    @Nullable @JsonProperty("dimensions") Axes physical,
+    @Nullable @JsonProperty("cargo_dimension") Axes cargo,
+    @Nullable @JsonProperty("ui_dimension") Axes ui,
+    @Nullable @JsonProperty("volume") Double volumeScu,
+    @Nullable @JsonProperty("true_dimension") Axes legacyPhysical) {
+
+  /** Selects physical axes without substituting modern UI or cargo occupancy dimensions. */
+  public ScWikiDimensionDto {
+    physical = physical == null ? legacyPhysical : physical;
+    if (physical != null) {
+      width = physical.width();
+      height = physical.height();
+      length = physical.length();
+    } else if (cargo != null || ui != null) {
+      width = null;
+      height = null;
+      length = null;
+    }
+  }
+
+  /**
+   * Represents an older payload containing only its physical axes.
+   *
+   * @param width width in metres
+   * @param height height in metres
+   * @param length length in metres
+   */
+  public ScWikiDimensionDto(
+      @Nullable Double width, @Nullable Double height, @Nullable Double length) {
+    this(width, height, length, null, null, null, null, null);
+  }
+
+  /**
+   * Contains one explicitly named set of dimensions in metres.
+   *
+   * @param width width in metres
+   * @param height height in metres
+   * @param length length in metres
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Axes(@Nullable Double width, @Nullable Double height, @Nullable Double length) {}
+}

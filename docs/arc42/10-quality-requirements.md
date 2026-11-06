@@ -64,3 +64,13 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 are all required to move with the change — and nothing in CI can enforce the wiki half, because it
 is a separate repository. That is a known, accepted gap, mitigated only by writing the rule into
 every place a contributor or an agent starts.
+
+### Catalogue failure isolation and convergence
+
+The catalogue acceptance scenarios include copied UUIDs, both source arrival orders, partial
+nonempty payloads, an invalid row between valid rows, wrong-identity detail responses, filtered
+known assets, old-id reads, bounded bulk lookup queries, and complete rollback of reference
+reassignment. Real PostgreSQL tests verify archive contents, every current FK owner, optimistic
+versions, quantities and per-owner audit events. Deterministic HTTP fixtures verify pinned
+versions, retries and exact durable counters; Prometheus rule tests cover incomplete, failed,
+recovered and hung attempts. See [REQ-DATA-032…038](../specs/data-persistence.md).

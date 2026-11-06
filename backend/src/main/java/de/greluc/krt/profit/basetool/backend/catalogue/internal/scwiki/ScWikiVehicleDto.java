@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.UUID;
+import lombok.Builder;
 
 /**
  * SC Wiki vehicle row from {@code /api/vehicles}, used by {@code ScWikiVehicleSyncService} to fill
@@ -35,9 +36,16 @@ import java.util.UUID;
  * @param name display name
  * @param gameName Wiki game-name field
  * @param className RSI engine class name
- * @param vehicleInventory vehicle internal inventory in SCU (Wiki's {@code vehicle_inventory})
- * @param description locale → description text map ({@code en_EN}, {@code de_DE}, …)
+ * @param vehicleInventory vehicle internal inventory in micro-SCU (Wiki's {@code
+ *     vehicle_inventory})
+ * @param description locale to description text map
+ * @param oreCapacity ore storage in SCU
+ * @param maxMedicalTier medical service tier, such as {@code T2}
+ * @param health hull health points
+ * @param shieldHp shield health points
+ * @param version upstream game build
  */
+@Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiVehicleDto(
     @JsonProperty("uuid") UUID uuid,
@@ -46,5 +54,10 @@ public record ScWikiVehicleDto(
     @JsonProperty("game_name") String gameName,
     @JsonProperty("class_name") String className,
     @JsonProperty("vehicle_inventory") Double vehicleInventory,
-    @JsonProperty("description") Map<String, String> description)
+    @JsonProperty("description") Map<String, String> description,
+    @JsonProperty("ore_capacity") Double oreCapacity,
+    @JsonProperty("max_medical_tier") String maxMedicalTier,
+    @JsonProperty("health") Double health,
+    @JsonProperty("shield_hp") Double shieldHp,
+    String version)
     implements ScWikiRow {}
