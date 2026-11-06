@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.jetbrains.annotations.NotNull;
 import org.mapstruct.BeanMapping;
+import org.mapstruct.InheritConfiguration;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 /** MapStruct mapper between Material entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class, uses = MaterialCategoryMapper.class)
@@ -47,7 +49,19 @@ public interface MaterialMapper {
           "java(entity.getSourceSystems() =="
               + " de.greluc.krt.profit.basetool.backend.catalogue.api."
               + "MaterialSourceSystem.MANUAL)")
+  @Mapping(target = "miningData", ignore = true)
   MaterialDto toDto(Material entity);
+
+  /**
+   * Maps one material detail with its source-owned mining and cargo evidence.
+   *
+   * @param entity material with nullable Wiki enrichment
+   * @return material details
+   */
+  @Named("materialDetails")
+  @InheritConfiguration(name = "toDto")
+  @Mapping(target = "miningData", source = "miningData")
+  MaterialDto toDetailDto(Material entity);
 
   /**
    * Builds a {@link Material} entity from the admin-editable subset in the DTO, converting boolean

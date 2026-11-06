@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintCatalogueMetadata;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.io.IOException;
@@ -34,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,6 +56,8 @@ import org.junit.jupiter.api.Test;
  * <p>Frontend-only records are skipped, and their count is asserted to stay a small minority.
  */
 class FrontendDtoContractTest {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /** Candidate locations of the committed OpenAPI document, relative to the test working dir. */
   private static final List<Path> OPENAPI_CANDIDATES =
@@ -151,7 +157,7 @@ class FrontendDtoContractTest {
     } else if (type.isEnum()) {
       Set<String> frontendValues = new LinkedHashSet<>();
       for (Object constant : type.getEnumConstants()) {
-        frontendValues.add(((Enum<?>) constant).name());
+        frontendValues.add(MAPPER.valueToTree(constant).asText());
       }
       Set<String> missing = new TreeSet<>(enumValueSet(property));
       missing.removeAll(frontendValues);
@@ -197,8 +203,7 @@ class FrontendDtoContractTest {
             .orElseThrow(() ->
                 new IllegalStateException(
                     "openapi.json not found; looked at " + OPENAPI_CANDIDATES));
-    JsonNode schemas =
-        new ObjectMapper().readTree(path.toFile()).path("components").path("schemas");
+    JsonNode schemas = MAPPER.readTree(path.toFile()).path("components").path("schemas");
     assertThat(schemas.isObject())
         .as("components.schemas in %s should be an object", path)
         .isTrue();
@@ -206,7 +211,7 @@ class FrontendDtoContractTest {
   }
 
   /**
-   * Collects the enum constant names from an openapi property's {@code enum} array.
+   * Collects serialized enum values from an OpenAPI property's {@code enum} array.
    *
    * @param property the schema property node
    * @return the enum values as an insertion-ordered set
@@ -225,5 +230,98 @@ class FrontendDtoContractTest {
    */
   private String enumValues(JsonNode property) {
     return enumValueSet(property).toString();
+  }
+
+  @Test
+  void annotatedEnumWireValuesMatchTheirSchemaInsteadOfTheirJavaNames() throws IOException {
+    JsonNode properties =
+        MAPPER.readTree(
+            """
+            {"kind":{"type":"string","enum":["group","item"]}}
+            """);
+    List<String> problems = new ArrayList<>();
+
+    checkComponent(
+        PropertyEnumMirror.class,
+        PropertyEnumMirror.class.getRecordComponents()[0],
+        properties,
+        problems);
+    checkComponent(
+        ValueEnumMirror.class,
+        ValueEnumMirror.class.getRecordComponents()[0],
+        properties,
+        problems);
+
+    assertThat(problems).isEmpty();
+    assertThat(MAPPER.writeValueAsString(PropertyKind.GROUP)).isEqualTo("\"group\"");
+    assertThat(MAPPER.writeValueAsString(ValueKind.GROUP)).isEqualTo("\"group\"");
+  }
+
+  @Test
+  void anAnnotatedEnumStillRejectsAnUnrepresentedBackendWireValue() throws IOException {
+    JsonNode properties =
+        MAPPER.readTree(
+            """
+            {"kind":{"type":"string","enum":["group","item","resource"]}}
+            """);
+    List<String> problems = new ArrayList<>();
+
+    checkComponent(
+        PropertyEnumMirror.class,
+        PropertyEnumMirror.class.getRecordComponents()[0],
+        properties,
+        problems);
+
+    assertThat(problems).hasSize(1);
+    assertThat(problems.getFirst()).contains("[resource]").doesNotContain("[group", "[item");
+  }
+
+  @Test
+  void blueprintRequirementKindsRoundTripTheirLowercaseWireValues() throws IOException {
+    Set<String> wireValues = new LinkedHashSet<>();
+    for (BlueprintCatalogueMetadata.RequirementKind kind :
+        BlueprintCatalogueMetadata.RequirementKind.values()) {
+      String wire = MAPPER.writeValueAsString(kind);
+      assertThat(MAPPER.readValue(wire, BlueprintCatalogueMetadata.RequirementKind.class))
+          .isEqualTo(kind);
+      wireValues.add(MAPPER.readTree(wire).asText());
+    }
+    assertThat(wireValues).containsExactlyInAnyOrder("root", "group", "resource", "item");
+  }
+
+  /**
+   * Models an enum whose field annotations define its JSON representation.
+   *
+   * @param kind annotated enum value
+   */
+  private record PropertyEnumMirror(PropertyKind kind) {}
+
+  /**
+   * Models an enum whose annotated value defines its JSON representation.
+   *
+   * @param kind value-backed enum
+   */
+  private record ValueEnumMirror(ValueKind kind) {}
+
+  /** Source node kinds whose Java names differ from their annotated JSON names. */
+  private enum PropertyKind {
+    /** Group requirement represented by its lowercase source token. */
+    @JsonProperty("group")
+    GROUP,
+    /** Item requirement represented by its lowercase source token. */
+    @JsonProperty("item")
+    ITEM
+  }
+
+  /** Source node kinds serialized through an explicit JSON value. */
+  @RequiredArgsConstructor
+  private enum ValueKind {
+    /** Group requirement represented by its source token. */
+    GROUP("group"),
+    /** Item requirement represented by its source token. */
+    ITEM("item");
+
+    /** JSON token accepted by the backend contract. */
+    @JsonValue private final String wireValue;
   }
 }

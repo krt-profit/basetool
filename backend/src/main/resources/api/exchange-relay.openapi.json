@@ -2437,6 +2437,84 @@
           }
         }
       },
+      "CommodityMiningData" : {
+        "type" : "object",
+        "properties" : {
+          "boxSizesScu" : {
+            "type" : "array",
+            "items" : {
+              "type" : "number",
+              "format" : "double"
+            }
+          },
+          "commodityGroups" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "fpsMineable" : {
+            "type" : "boolean"
+          },
+          "groundVehicleMineable" : {
+            "type" : "boolean"
+          },
+          "harvestable" : {
+            "type" : "boolean"
+          },
+          "instability" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "locations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Location"
+            }
+          },
+          "methods" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "mineable" : {
+            "type" : "boolean"
+          },
+          "resistance" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "salvage" : {
+            "type" : "boolean"
+          },
+          "shipMineable" : {
+            "type" : "boolean"
+          },
+          "signature" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "systems" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "tier" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "volatility" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "volatilityHealthDecayPerSecond" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
       "Entry" : {
         "type" : "object",
         "properties" : {
@@ -3813,6 +3891,39 @@
           }
         }
       },
+      "Location" : {
+        "type" : "object",
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Occurrence"
+            }
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentName" : {
+            "type" : "string"
+          },
+          "parentType" : {
+            "type" : "string"
+          },
+          "system" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "uuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
       "LocationDto" : {
         "type" : "object",
         "properties" : {
@@ -3888,6 +3999,10 @@
           "isVolatileTime" : {
             "type" : "boolean"
           },
+          "miningData" : {
+            "$ref" : "#/components/schemas/CommodityMiningData",
+            "readOnly" : true
+          },
           "name" : {
             "type" : "string"
           },
@@ -3935,6 +4050,29 @@
             "format" : "date-time"
           },
           "status" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Occurrence" : {
+        "type" : "object",
+        "properties" : {
+          "entryCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "groupName" : {
+            "type" : "string"
+          },
+          "qualityMax" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "qualityMin" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "resourceKind" : {
             "type" : "string"
           }
         }

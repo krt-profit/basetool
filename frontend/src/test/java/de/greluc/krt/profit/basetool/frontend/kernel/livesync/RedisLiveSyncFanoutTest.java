@@ -25,11 +25,13 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
@@ -57,6 +59,7 @@ class RedisLiveSyncFanoutTest {
   private LiveSyncWebSocketHandler handler;
   private SimpleMeterRegistry registry;
   private RedisLiveSyncFanout fanout;
+  private CatalogueCacheEviction cacheEviction;
 
   @BeforeEach
   @SuppressWarnings("unchecked")
@@ -64,11 +67,18 @@ class RedisLiveSyncFanoutTest {
     redisTemplate = mock(StringRedisTemplate.class);
     handler = mock(LiveSyncWebSocketHandler.class);
     registry = new SimpleMeterRegistry();
+    cacheEviction = mock(CatalogueCacheEviction.class);
     ObjectProvider<LiveSyncWebSocketHandler> handlerProvider = mock(ObjectProvider.class);
     when(handlerProvider.getObject()).thenReturn(handler);
     fanout =
         new RedisLiveSyncFanout(
-            redisTemplate, handlerProvider, registry, CHANNEL, PRESENCE_CHANNEL, SELF);
+            redisTemplate,
+            handlerProvider,
+            registry,
+            cacheEviction,
+            CHANNEL,
+            PRESENCE_CHANNEL,
+            SELF);
   }
 
   @Test
@@ -127,6 +137,22 @@ class RedisLiveSyncFanoutTest {
 
     verify(handler).deliverFromFanout(topic, List.of("crew", "mgmt"));
     assertThat(consumedCount("mission")).isEqualTo(1.0);
+    verify(cacheEviction, never()).evictSourceCatalogues();
+  }
+
+  @Test
+  void onMessage_sourceCatalogueChange_evictsSnapshotsBeforeBrowserDelivery() {
+    String body =
+        "{\"v\":1,\"topic\":\"catalogue\",\"origin\":\"backend\","
+            + "\"sections\":[\"catalogue\"]}";
+
+    fanout.onMessage(
+        new DefaultMessage(CHANNEL.getBytes(StandardCharsets.UTF_8), bytes(body)), null);
+
+    var order = inOrder(cacheEviction, handler);
+    order.verify(cacheEviction).evictSourceCatalogues();
+    order.verify(handler).deliverFromFanout("catalogue", List.of("catalogue"));
+    assertThat(consumedCount("catalogue")).isEqualTo(1.0);
   }
 
   @Test

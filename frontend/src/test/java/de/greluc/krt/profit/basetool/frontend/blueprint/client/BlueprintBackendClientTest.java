@@ -92,6 +92,29 @@ class BlueprintBackendClientTest {
   }
 
   @Test
+  void memberRecipeIncludesTypedWikiUnlockConditions() {
+    backend.answerJson(
+        """
+        {"productName":"Omnisky III Cannon","variantCount":1,
+         "requirementGroups":[],"ingredients":[],"baseStats":[],
+         "wikiMetadata":{"source":"SC_WIKI","gameVersion":"4.10.2-LIVE.12881860",
+           "loadedSections":["MISSIONS"],"unlockingMissions":[
+             {"title":"Tactical Strike Group Needed","chance":1,
+              "webUrl":"https://api.star-citizen.wiki/missions/example"}],
+           "unlockingMissionGroups":[],"tiers":[]}}
+        """);
+
+    var recipe = client.recipe(ID);
+
+    assertThat(recipe).isNotNull();
+    assertThat(recipe.wikiMetadata()).isNotNull();
+    assertThat(recipe.wikiMetadata().gameVersion()).isEqualTo("4.10.2-LIVE.12881860");
+    assertThat(recipe.wikiMetadata().unlockingMissions().getFirst().title())
+        .isEqualTo("Tactical Strike Group Needed");
+    backend.expect("GET", "/api/v1/personal-blueprints/" + ID + "/recipe");
+  }
+
+  @Test
   void ownedBlueprintWrites() {
     backend.answerEmpty();
     backend.answerEmpty();

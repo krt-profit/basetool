@@ -99,7 +99,8 @@ class AdminBlueprintsPageControllerMvcTest {
             List.of(),
             List.of(),
             List.of(),
-            0L);
+            0L,
+            null);
     int totalPages = total == 0 ? 0 : (int) Math.ceil(total / 25.0);
     return new PageResponse<>(List.of(dto), 0, 25, total, totalPages, List.of());
   }

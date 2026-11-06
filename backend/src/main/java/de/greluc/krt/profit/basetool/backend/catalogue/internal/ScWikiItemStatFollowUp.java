@@ -30,11 +30,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
-/**
- * Fetches the full SC Wiki payload of every item an active blueprint crafts that still has no
- * stored stat base value, since the residual {@code /api/items} list rows carry no stat blocks
- * (REQ-DATA-027).
- */
+/** Fetches missing blueprint-output stat bases from version-pinned Wiki item details. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -43,28 +39,40 @@ public class ScWikiItemStatFollowUp {
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final GameItemStatRepository gameItemStatRepository;
+  private final SyncReportService syncReportService;
 
   /**
    * Fetches each missing item's detail and hands it to {@code fill}; a failing item is logged and
    * skipped.
    *
-   * @param fill persists one fetched payload, given the item's UUID and the payload or {@code null}
-   *     when the Wiki does not know the item
+   * @param fill persists one successfully fetched payload with its item UUID
    * @return the number of items fetched and filled
    */
   public int fetchMissing(@NotNull BiConsumer<UUID, ScWikiItemDto> fill) {
+    try (ScWikiClient.SyncRun _ = scWikiClient.openSyncRun()) {
+      return fetchWithinRun(fill);
+    }
+  }
+
+  /** Fetches missing stat payloads under the selected run version. */
+  private int fetchWithinRun(BiConsumer<UUID, ScWikiItemDto> fill) {
     List<UUID> missing = gameItemStatRepository.findBlueprintOutputUuidsWithoutStats();
     int fetched = 0;
     for (UUID uuid : missing) {
-      scWikiClient.paceForRateLimit();
       try {
-        fill.accept(
-            uuid,
-            scWikiClient.fetchOne(properties.itemsEndpoint(), uuid, ScWikiItemDto.class, "item"));
+        ScWikiItemDto dto =
+            scWikiClient.fetchOne(properties.itemsEndpoint(), uuid, ScWikiItemDto.class, "item");
+        if (dto == null) {
+          continue;
+        }
+        fill.accept(uuid, dto);
         fetched++;
+        syncReportService.recordApplied(1);
       } catch (OptimisticLockingFailureException _) {
+        syncReportService.recordFailed(1);
         log.warn("Optimistic lock collision filling stats of SC Wiki item {}; deferring", uuid);
       } catch (Exception e) {
+        syncReportService.recordFailed(1);
         log.error("Failed to fetch stats of SC Wiki item {}", uuid, e);
       }
     }

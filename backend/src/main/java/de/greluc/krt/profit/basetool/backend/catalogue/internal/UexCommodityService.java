@@ -102,8 +102,17 @@ public class UexCommodityService {
           "Finished commodities synchronization. Processed {} items ({} failed).",
           outcome.results().size(),
           outcome.failedRows());
-      occurrenceSync.replaceAll(commodities);
+      if (commodityFetch.complete()
+          && outcome.failedRows() == 0
+          && outcome.results().size() == commodities.size()) {
+        occurrenceSync.replaceAll(commodities);
+        chunkWriter.recordSweep(true);
+      } else {
+        chunkWriter.recordSweep(false);
+        log.warn("Skipping commodity location replacement after an incomplete fetch or write");
+      }
     } else {
+      chunkWriter.recordSweep(false);
       log.warn("No commodities received from UEX API.");
     }
 
@@ -112,6 +121,7 @@ public class UexCommodityService {
     List<UexCommodityPriceDto> dtos = priceFetch.data();
 
     if (dtos.isEmpty()) {
+      chunkWriter.recordSweep(false);
       log.warn("No data received from UEX API. Aborting synchronization.");
       return;
     }
@@ -129,6 +139,7 @@ public class UexCommodityService {
         usable.add(dto);
       }
     }
+    chunkWriter.recordSkipped(dtos.size() - usable.size());
 
     UexMatrixLookups lookups = chunkWriter.inNewTransaction(this::loadPriceLookups);
     createMissingMaterials(usable, lookups);
@@ -149,10 +160,16 @@ public class UexCommodityService {
                     + "')");
     Set<UUID> seenPriceIds = new HashSet<>(outcome.results());
 
-    if (seenPriceIds.isEmpty()) {
+    boolean cleanupAllowed =
+        priceFetch.complete()
+            && outcome.failedRows() == 0
+            && usable.size() == dtos.size()
+            && everyPriceReferenceResolves(usable, lookups);
+    if (seenPriceIds.isEmpty() || !cleanupAllowed) {
+      chunkWriter.recordSweep(false);
       log.warn(
-          "Skipping stale-row cleanup because no commodity-price row could be processed "
-              + "({} dto(s) received, all failed). Refusing to wipe the entire price matrix.",
+          "Skipping stale-row cleanup because the commodity-price census or its application"
+              + " is incomplete ({} dto(s) received).",
           dtos.size());
     } else {
       int cleared =
@@ -161,6 +178,8 @@ public class UexCommodityService {
                   materialPriceRepository.findIdsWithLivePrices(),
                   seenPriceIds,
                   materialPriceRepository::clearPricesByIds));
+      chunkWriter.recordApplied(cleared);
+      chunkWriter.recordSweep(true);
       if (cleared > 0) {
         log.info("Cleared prices on {} material_price row(s) no longer returned by UEX.", cleared);
       }
@@ -170,6 +189,14 @@ public class UexCommodityService {
         "Finished synchronization. Processed {} items ({} failed).",
         outcome.results().size(),
         outcome.failedRows());
+  }
+
+  private static boolean everyPriceReferenceResolves(
+      List<UexCommodityPriceDto> rows, UexMatrixLookups lookups) {
+    return rows.stream()
+        .allMatch(row ->
+            lookups.parentId(row.idCommodity()) != null
+                && lookups.terminalId(row.idTerminal()) != null);
   }
 
   /**

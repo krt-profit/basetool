@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexRefinerySyncService;
@@ -76,7 +77,9 @@ class UexRefinerySyncServiceTest {
   @Mock private AuditService auditService;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexRefinerySyncService service;
 

@@ -606,22 +606,44 @@ final class E2eSupport {
    * @param label short prefix for the artifact filenames
    */
   static void dump(Page page, String label) {
+    writeSnapshot(page, label, SnapshotOutcome.FAILURE);
+  }
+
+  /**
+   * Captures successful page HTML and a screenshot under {@code build/e2e/<label>-success.*}.
+   *
+   * @param page the successfully verified page
+   * @param label short prefix for the artifact filenames
+   */
+  static void capture(Page page, String label) {
+    writeSnapshot(page, label, SnapshotOutcome.SUCCESS);
+  }
+
+  /**
+   * Writes page diagnostics with filenames and log severity matching their outcome.
+   *
+   * @param page the observed page
+   * @param label artifact filename prefix
+   * @param outcome whether the page passed its assertions
+   */
+  private static void writeSnapshot(Page page, String label, SnapshotOutcome outcome) {
     Path dir = Path.of("build", "e2e");
+    final String stem = label + "-" + outcome.fileSuffix;
     try {
       Files.createDirectories(dir);
-      System.out.printf("[E2E][FAIL] %s url=%s%n", label, page.url());
-      Files.writeString(dir.resolve(label + "-failure.html"), page.content());
+      System.out.printf("%s %s url=%s%n", outcome.logPrefix, label, page.url());
+      Files.writeString(dir.resolve(stem + ".html"), page.content());
     } catch (RuntimeException | IOException e) {
-      System.out.println("[E2E][FAIL] HTML dump failed: " + e);
+      System.out.println(outcome.logPrefix + " HTML dump failed: " + e);
     }
-    Path screenshot = dir.resolve(label + "-failure.png");
+    Path screenshot = dir.resolve(stem + ".png");
     try {
       page.screenshot(new Page.ScreenshotOptions().setPath(screenshot).setFullPage(true));
     } catch (RuntimeException tooTall) {
       try {
         page.screenshot(new Page.ScreenshotOptions().setPath(screenshot));
       } catch (RuntimeException e) {
-        System.out.println("[E2E][FAIL] screenshot failed: " + e);
+        System.out.println(outcome.logPrefix + " screenshot failed: " + e);
       }
     }
   }
@@ -646,5 +668,19 @@ final class E2eSupport {
     page.locator(".filter-panel")
         .first()
         .waitFor(new Locator.WaitForOptions().setTimeout(FILTER_PANEL_TIMEOUT_MS));
+  }
+
+  /** Names page diagnostic outcomes and their artifact and log representations. */
+  private enum SnapshotOutcome {
+    SUCCESS("success", "[E2E][CAPTURE]"),
+    FAILURE("failure", "[E2E][FAIL]");
+
+    private final String fileSuffix;
+    private final String logPrefix;
+
+    SnapshotOutcome(String fileSuffix, String logPrefix) {
+      this.fileSuffix = fileSuffix;
+      this.logPrefix = logPrefix;
+    }
   }
 }

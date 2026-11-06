@@ -76,7 +76,8 @@ class UexClientTest {
         new UexClient(
             new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
             properties,
-            meterRegistry);
+            meterRegistry,
+            new SyncRunProgress());
     client.initClient();
   }
 
@@ -102,7 +103,8 @@ class UexClientTest {
         new UexClient(
             new RestClientConfig().restClientBuilder(observationRegistry),
             properties,
-            meterRegistry);
+            meterRegistry,
+            new SyncRunProgress());
     observedClient.initClient();
     server.enqueue(
         new MockResponse()

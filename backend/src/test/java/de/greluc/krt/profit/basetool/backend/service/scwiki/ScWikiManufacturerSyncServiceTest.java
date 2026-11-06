@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -35,9 +36,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepo
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiManufacturerSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.service.RecordingTransactionManager;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;
@@ -87,7 +91,11 @@ class ScWikiManufacturerSyncServiceTest {
     properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiManufacturerSyncService(
-            scWikiClient, properties, manufacturerRepository, syncReportService);
+            scWikiClient,
+            properties,
+            manufacturerRepository,
+            syncReportService,
+            new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress()));
   }
 
   @Test
@@ -111,20 +119,25 @@ class ScWikiManufacturerSyncServiceTest {
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(manufacturerRepository, never()).save(any());
     assertEquals(0, written, "an empty Wiki response must report zero reconciled rows");
+    verify(syncReportService).recordSweep(false);
+    verify(syncReportService, never()).recordIncomplete();
   }
 
   @Test
-  void syncManufacturers_notModified_reportsLiveCount_andSkipsReconciliationAndSweep() {
+  void repeatedManufacturerPayloadsRefreshTheirSourceColumnsAgain() {
+    UUID uuid = UUID.randomUUID();
+    Manufacturer local = manufacturer("Aegis Dynamics", "AEGS");
+    local.setScwikiUuid(uuid);
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
-        .thenReturn(ScWikiClient.FetchResult.unchanged());
-    when(manufacturerRepository.countLiveScwikiManufacturers()).thenReturn(7L);
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Aegis Dynamics", "AEGS"))));
+    when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.of(local));
 
-    int written = service.syncManufacturers();
+    assertEquals(1, service.syncManufacturers());
+    local.setScwikiCode("stale");
+    assertEquals(1, service.syncManufacturers());
 
-    assertEquals(7, written, "a 304 (unchanged) catalogue must report the live manufacturer count");
-    verify(syncReportService, never()).beginRun();
-    verify(manufacturerRepository, never()).save(any());
-    verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
+    assertEquals("AEGS", local.getScwikiCode());
+    verify(manufacturerRepository, times(2)).save(local);
   }
 
   @Test
@@ -184,8 +197,7 @@ class ScWikiManufacturerSyncServiceTest {
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Aegis", "AEGS"))));
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis")).thenReturn(Optional.empty());
-    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("AEGS"))
-        .thenReturn(Optional.of(local));
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("AEGS")).thenReturn(List.of(local));
 
     service.syncManufacturers();
 
@@ -230,14 +242,90 @@ class ScWikiManufacturerSyncServiceTest {
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Some Indie Studio"))
         .thenReturn(Optional.empty());
-    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("INDIE"))
-        .thenReturn(Optional.empty());
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("INDIE")).thenReturn(List.of());
 
     service.syncManufacturers();
 
     verify(manufacturerRepository, never()).save(any());
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(syncReportService, never()).logScwikiEvent(any(), any(), any(), any(), any(), any());
+    verify(syncReportService).recordSweep(false);
+  }
+
+  @Test
+  void duplicateSourceNamesCannotLinkTheFirstManufacturerByName() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    dto(first, "Aegis Dynamics", "AEGS1"),
+                    dto(second, " aegis dynamics ", "AEGS2"))));
+
+    assertEquals(0, service.syncManufacturers());
+
+    verify(manufacturerRepository, never()).findByNameIgnoreCase(any());
+    verify(manufacturerRepository, never()).save(any());
+    verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService, times(2))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MULTI_MATCH_AMBIGUOUS),
+            eq("manufacturer"),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void duplicateSourceCodesCannotLinkTheFirstManufacturerByAbbreviation() {
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    dto(UUID.randomUUID(), "Unknown One", "AEGS"),
+                    dto(UUID.randomUUID(), "Unknown Two", " aegs "))));
+
+    assertEquals(0, service.syncManufacturers());
+
+    verify(manufacturerRepository, never()).findByAbbreviationIgnoreCase(any());
+    verify(manufacturerRepository, never()).save(any());
+    verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService, times(2))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MULTI_MATCH_AMBIGUOUS),
+            eq("manufacturer"),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void duplicatedLocalAbbreviationsDoNotChooseAFirstManufacturer() {
+    UUID uuid = UUID.randomUUID();
+    Manufacturer first = manufacturer("Aegis Dynamics", "AEGS");
+    Manufacturer second = manufacturer("Aegis Defense", "AEGS");
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Aegis", "AEGS"))));
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("AEGS"))
+        .thenReturn(List.of(first, second));
+
+    assertEquals(0, service.syncManufacturers());
+
+    assertNull(first.getScwikiUuid());
+    assertNull(second.getScwikiUuid());
+    verify(manufacturerRepository, never()).save(any());
+    verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MULTI_MATCH_AMBIGUOUS),
+            eq("manufacturer"),
+            eq(uuid),
+            any(),
+            any());
   }
 
   /**

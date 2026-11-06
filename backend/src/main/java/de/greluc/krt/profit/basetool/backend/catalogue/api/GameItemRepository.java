@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -36,7 +38,38 @@ import org.springframework.stereotype.Repository;
  * Spring Data repository for {@link GameItem}, including the sync lookups and soft-delete sweeps.
  */
 @Repository
-public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
+public interface GameItemRepository
+    extends JpaRepository<GameItem, UUID>, GameItemIdentityReferences {
+
+  /**
+   * Loads the surviving item for a live or retained local id.
+   *
+   * @param id caller-supplied local item id
+   * @return the surviving item when the id is known
+   */
+  @Override
+  @NotNull
+  Optional<GameItem> findById(@NotNull UUID id);
+
+  /**
+   * Loads distinct surviving items for a batch of live or retained local ids.
+   *
+   * @param ids caller-supplied local item ids
+   * @return the distinct surviving items
+   */
+  @Override
+  @NotNull
+  List<GameItem> findAllById(@NotNull Iterable<UUID> ids);
+
+  /**
+   * Returns the surviving item reference for a live or retained local id.
+   *
+   * @param id caller-supplied local item id
+   * @return the alias-resolved JPA reference
+   */
+  @Override
+  @NotNull
+  GameItem getReferenceById(@NotNull UUID id);
 
   /**
    * Finds a game item by its unique in-game asset UUID, the sync's primary match key.
@@ -53,6 +86,23 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    * @return matching {@link GameItem} if present
    */
   Optional<GameItem> findByUexItemId(Integer uexItemId);
+
+  /**
+   * Locks actual catalogue rows in id order before references or source identities move.
+   *
+   * @param ids non-empty set of actual row ids
+   * @return rows protected against concurrent foreign-key inserts and catalogue edits
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT g FROM GameItem g WHERE g.id IN :ids ORDER BY g.id")
+  List<GameItem> lockReconciliationRows(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Lists all UEX-owned identities for both-side name and slug ambiguity checks.
+   *
+   * @return every item carrying a UEX source id
+   */
+  List<GameItem> findByUexItemIdIsNotNull();
 
   /**
    * Lists every stored {@code external_uuid} with the row's UEX item id, for the item sync's
@@ -105,6 +155,18 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   List<GameItem> findByNameIgnoreCase(String name);
 
   /**
+   * Finds every live Wiki identity carrying an exact source name, including UEX-claimed variants.
+   *
+   * @param name the UEX display name to compare ignoring case and surrounding whitespace
+   * @return all Wiki-side candidates, so callers can reject ambiguity before adoption
+   */
+  @Query(
+      "SELECT g FROM GameItem g WHERE g.scwikiSyncedAt IS NOT NULL"
+          + " AND g.scwikiDeletedAt IS NULL"
+          + " AND LOWER(TRIM(COALESCE(g.scwikiName, g.name))) = LOWER(TRIM(:name))")
+  List<GameItem> findWikiNameCandidates(@Param("name") String name);
+
+  /**
    * Returns every distinct non-null {@code external_uuid}, the item set the Wiki item sync fetches
    * details for.
    *
@@ -112,6 +174,31 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    */
   @Query("SELECT DISTINCT g.externalUuid FROM GameItem g WHERE g.externalUuid IS NOT NULL")
   List<UUID> findAllExternalUuids();
+
+  /**
+   * Lists known Wiki identities whose omission from the player-relevant pool needs full-scope
+   * proof.
+   *
+   * @return external UUIDs of every Wiki-written item, including tombstones
+   */
+  @Query(
+      "SELECT g.externalUuid FROM GameItem g WHERE g.scwikiSyncedAt IS NOT NULL"
+          + " AND g.externalUuid IS NOT NULL")
+  List<UUID> findKnownWikiExternalUuids();
+
+  /**
+   * Restores known Wiki rows whose existence was verified without rewriting their metadata.
+   *
+   * @param uuids bounded non-empty set of positively verified game UUIDs
+   * @param now time of the presence correction
+   * @return the number of tombstones cleared
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      "UPDATE GameItem g SET g.scwikiDeletedAt = NULL, g.version = COALESCE(g.version, 0) + 1,"
+          + " g.updatedAt = :now WHERE g.scwikiSyncedAt IS NOT NULL AND g.scwikiDeletedAt IS NOT"
+          + " NULL AND g.externalUuid IN :uuids")
+  int restoreKnownWikiItems(@Param("uuids") Collection<UUID> uuids, @Param("now") Instant now);
 
   /**
    * Loads every row without an {@code external_uuid} owned by the given source system, for the Wiki
@@ -133,7 +220,8 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   @Modifying
   @Query(
       """
-      UPDATE GameItem g SET g.uexDeletedAt = :now
+      UPDATE GameItem g SET g.uexDeletedAt = :now,
+        g.version = COALESCE(g.version, 0) + 1, g.updatedAt = :now
       WHERE g.uexItemId IS NOT NULL
       AND g.uexItemId NOT IN :seenIds
       AND g.uexDeletedAt IS NULL
@@ -155,27 +243,14 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   @Modifying
   @Query(
       """
-      UPDATE GameItem g SET g.scwikiDeletedAt = :now
+      UPDATE GameItem g SET g.scwikiDeletedAt = :now,
+        g.version = COALESCE(g.version, 0) + 1, g.updatedAt = :now
       WHERE g.scwikiSyncedAt IS NOT NULL
       AND g.externalUuid NOT IN :seenExternalUuids
       AND g.scwikiDeletedAt IS NULL
       """)
   int markScwikiDeletedExcept(
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
-
-  /**
-   * Counts the live Wiki-written game items; reported as the backfill's item count when every kind
-   * endpoint answers {@code 304 Not Modified}.
-   *
-   * @return the number of non-tombstoned game items the SC Wiki sync has written
-   */
-  @Query(
-      """
-      SELECT COUNT(g) FROM GameItem g
-      WHERE g.scwikiSyncedAt IS NOT NULL
-      AND g.scwikiDeletedAt IS NULL
-      """)
-  long countLiveScwikiItems();
 
   /**
    * The UEX item id and local id of every game item. One query for the whole table; the UEX syncs

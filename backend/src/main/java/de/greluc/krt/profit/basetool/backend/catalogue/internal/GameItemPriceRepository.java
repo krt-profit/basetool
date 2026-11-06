@@ -47,6 +47,14 @@ public interface GameItemPriceRepository extends JpaRepository<GameItemPrice, UU
   Optional<GameItemPrice> findByGameItemIdAndTerminalId(UUID gameItemId, UUID terminalId);
 
   /**
+   * Loads the price rows moved with a verified item reconciliation.
+   *
+   * @param gameItemId the source catalogue row
+   * @return the item's source-owned terminal prices
+   */
+  List<GameItemPrice> findByGameItemId(UUID gameItemId);
+
+  /**
    * Nulls the price columns of the given stale rows, keeping the rows themselves; rows already
    * cleared are skipped.
    *

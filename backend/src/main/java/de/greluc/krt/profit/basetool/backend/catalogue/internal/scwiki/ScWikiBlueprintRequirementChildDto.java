@@ -42,6 +42,7 @@ import java.util.UUID;
  * @param quantity discrete unit count required for an ITEM child, or {@code null}
  * @param quantityScu SCU amount required for a RESOURCE child, or {@code null}
  * @param minQuality minimum quality tier required, or {@code null}
+ * @param oreUuid distinct source ore identity; never replaces the required resource UUID
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiBlueprintRequirementChildDto(
@@ -51,4 +52,5 @@ public record ScWikiBlueprintRequirementChildDto(
     @JsonProperty("name") String name,
     @JsonProperty("quantity") Integer quantity,
     @JsonProperty("quantity_scu") Double quantityScu,
-    @JsonProperty("min_quality") Integer minQuality) {}
+    @JsonProperty("min_quality") Integer minQuality,
+    @JsonProperty("ore_uuid") UUID oreUuid) {}

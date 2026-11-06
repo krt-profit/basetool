@@ -18,6 +18,25 @@
  */
 
 import { krtTableSort } from '/js/kernel/krt-table-sort.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
+
+/** @type {{ key: string, dir: 'asc' | 'desc' }} */
+let materialSort = { key: 'sell', dir: 'desc' };
+
+/** The local terminal filter retained across source-driven fragment refreshes. */
+let terminalFilter = '';
+
+krtPageSections.create({
+    topicClass: 'CATALOGUE',
+    topic: 'catalogue',
+    sections: {
+        catalogue: { container: '#material-detail-results', fragmentValue: 'catalogue' },
+    },
+    pageUrl() {
+        return window.location.pathname + window.location.search;
+    },
+    receiver: { coalesceMs: 1500 },
+});
 
 /**
  * Wires the price table: column-header sorting and the terminal search.
@@ -73,13 +92,17 @@ function initMaterialDetail() {
     }
 
     krtTableSort.attach(priceTable, {
-        initial: { key: 'sell', dir: 'desc' },
+        initial: materialSort,
         valueOf,
         tiebreak: byTerminal,
+        onChange(state) {
+            materialSort = state;
+        },
     });
 
     /** Shows the rows whose terminal name contains the search text. */
     function filterTerminals() {
+        terminalFilter = input ? input.value : '';
         const needle = input ? input.value.trim().toLocaleLowerCase() : '';
         let visible = 0;
         Array.prototype.forEach.call(rowsBody.rows, (/** @type {HTMLTableRowElement} */ row) => {
@@ -95,8 +118,25 @@ function initMaterialDetail() {
     }
 
     if (input) {
+        input.value = terminalFilter;
         input.addEventListener('input', filterTerminals);
     }
+    filterTerminals();
 }
 
 initMaterialDetail();
+
+/**
+ * Rebinds controls to newly rendered material facts and terminal rows.
+ *
+ * @param {Event} event the completed server-fragment swap
+ */
+function afterMaterialRefresh(event) {
+    if (!(event instanceof CustomEvent)) return;
+    const container = event.detail?.container;
+    if (container instanceof Element && container.id === 'material-detail-results') {
+        initMaterialDetail();
+    }
+}
+
+document.addEventListener('krt:swapped', afterMaterialRefresh);

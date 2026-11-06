@@ -72,6 +72,10 @@
             <span th:if="${row.status() != null}" class="status-pill"
                   th:classappend="${row.status() == 'FAILED'} ? 'status-failed'"
                   th:text="#{${'dashboard.widget.sync-status.status.' + #strings.toLowerCase(row.status())}}">Erfolgreich</span>
+            <span th:if="${row.lastCompleteAt() != null}" class="cell-sub">
+                <span th:text="#{dashboard.widget.sync-status.last-complete}">Completely applied</span>
+                <span th:text="${#temporals.format(@relativeDays.local(row.lastCompleteAt()), 'dd.MM.yyyy HH:mm')}"></span>
+            </span>
         </li>
     </ul>
     <div class="home-card-foot dash-widget__foot">

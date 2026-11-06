@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
@@ -55,6 +56,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   private final StringRedisTemplate redisTemplate;
   private final ObjectProvider<LiveSyncWebSocketHandler> handlerProvider;
   private final MeterRegistry meterRegistry;
+  private final CatalogueCacheEviction catalogueCacheEviction;
   private final JsonMapper jsonMapper;
   private final String channel;
   private final String presenceChannel;
@@ -66,6 +68,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
    * @param redisTemplate the string Redis template used to publish
    * @param handlerProvider lazy provider of the relay handler (breaks the construction cycle)
    * @param meterRegistry registry the publish/consume/error counters bind to
+   * @param catalogueCacheEviction clears source-synced frontend snapshots before room delivery
    * @param channel the Redis channel {@code changed} signals cross
    * @param presenceChannel the Redis channel editor-presence snapshots cross (ADR-0126); must
    *     differ from {@code channel}
@@ -76,12 +79,14 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       @NotNull StringRedisTemplate redisTemplate,
       @NotNull ObjectProvider<LiveSyncWebSocketHandler> handlerProvider,
       @NotNull MeterRegistry meterRegistry,
+      @NotNull CatalogueCacheEviction catalogueCacheEviction,
       @NotNull String channel,
       @NotNull String presenceChannel,
       @NotNull String instanceId) {
     this.redisTemplate = redisTemplate;
     this.handlerProvider = handlerProvider;
     this.meterRegistry = meterRegistry;
+    this.catalogueCacheEviction = catalogueCacheEviction;
     this.jsonMapper = JsonMapper.builder().build();
     this.channel = channel;
     this.presenceChannel = presenceChannel;
@@ -211,6 +216,9 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       }
       if (sections.isEmpty()) {
         return;
+      }
+      if (LiveSyncTopicClass.CATALOGUE.prefix().equals(topic) && sections.contains("catalogue")) {
+        catalogueCacheEviction.evictSourceCatalogues();
       }
       handlerProvider.getObject().deliverFromFanout(topic, sections);
       meterRegistry

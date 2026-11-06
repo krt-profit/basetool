@@ -31,13 +31,17 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiVehicleSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiVehicleDto;
+import de.greluc.krt.profit.basetool.backend.service.RecordingTransactionManager;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,7 +80,11 @@ class ScWikiVehicleSyncServiceTest {
     properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiVehicleSyncService(
-            scWikiClient, properties, shipTypeRepository, syncReportService);
+            scWikiClient,
+            properties,
+            shipTypeRepository,
+            syncReportService,
+            new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress()));
   }
 
   @Test
@@ -120,8 +128,13 @@ class ScWikiVehicleSyncServiceTest {
             "100i",
             "Origin 100i game",
             "ORIG_100i",
-            2.0,
-            Map.of("en_EN", "Wiki English desc", "de_DE", "Wiki Deutsch"));
+            2_000_000.0,
+            Map.of("en_EN", "Wiki English desc", "de_DE", "Wiki Deutsch"),
+            null,
+            null,
+            null,
+            null,
+            null);
 
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
@@ -154,7 +167,18 @@ class ScWikiVehicleSyncServiceTest {
     uexShip.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(
-            uuid, "xnaa-santokyai", "San'tok.yai", null, "XNAA_SanTokYai", null, null);
+            uuid,
+            "xnaa-santokyai",
+            "San'tok.yai",
+            null,
+            "XNAA_SanTokYai",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
@@ -181,7 +205,18 @@ class ScWikiVehicleSyncServiceTest {
     UUID uuid = UUID.randomUUID();
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(
-            uuid, "wiki-only-ship", "Wiki Only Ship", null, null, null, Map.of("en_EN", "x"));
+            uuid,
+            "wiki-only-ship",
+            "Wiki Only Ship",
+            null,
+            null,
+            null,
+            Map.of("en_EN", "x"),
+            null,
+            null,
+            null,
+            null,
+            null);
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
@@ -205,7 +240,19 @@ class ScWikiVehicleSyncServiceTest {
     legacy.setName("Cutlass Black");
     legacy.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     ScWikiVehicleDto dto =
-        new ScWikiVehicleDto(uuid, "drake-cutlass", "Cutlass Black", null, null, null, null);
+        new ScWikiVehicleDto(
+            uuid,
+            "drake-cutlass",
+            "Cutlass Black",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
@@ -235,23 +282,48 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
-  void syncVehicles_notModified_reportsLiveCount_andSkipsSyncAndSweep() {
+  void repeatedVehiclePayloadsApplyCurrentUnitsAgain() {
+    UUID uuid = UUID.randomUUID();
+    ShipType existing = new ShipType();
+    existing.setExternalUuid(uuid);
+    existing.setName("Avenger Stalker");
+    var dto =
+        ScWikiVehicleDto.builder()
+            .uuid(uuid)
+            .name("Avenger Stalker")
+            .vehicleInventory(710000.0)
+            .build();
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
-        .thenReturn(ScWikiClient.FetchResult.unchanged());
-    when(shipTypeRepository.countLiveScwikiShipTypes()).thenReturn(42L);
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
+    when(shipTypeRepository.save(any(ShipType.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
-    int written = service.syncVehicles();
+    assertEquals(1, service.syncVehicles());
+    existing.setVehicleInventoryScu(710000.0);
+    assertEquals(1, service.syncVehicles());
 
-    assertEquals(42, written, "a 304 (unchanged) catalogue must report the live ship_type count");
-    verify(shipTypeRepository, never()).save(any());
-    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+    assertEquals(0.71, existing.getVehicleInventoryScu());
+    verify(shipTypeRepository, times(2)).save(existing);
   }
 
   @Test
   void syncVehicles_incompletePageWalk_upsertsTheRows_butSkipsOrphanSweep() {
     UUID uuid = UUID.randomUUID();
     ScWikiVehicleDto dto =
-        new ScWikiVehicleDto(uuid, "drake-caterpillar", "Caterpillar", null, null, null, null);
+        new ScWikiVehicleDto(
+            uuid,
+            "drake-caterpillar",
+            "Caterpillar",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.partial(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
@@ -263,5 +335,175 @@ class ScWikiVehicleSyncServiceTest {
     verify(shipTypeRepository).save(any(ShipType.class));
     verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
     assertEquals(1, written, "the rows that arrived are still written");
+  }
+
+  @Test
+  void syncVehicles_refreshesPreviouslyMisinterpretedInventoryFromCurrentPayload() {
+    UUID uuid = UUID.fromString("3e4de942-5611-4f88-a151-89fb6bf6cd26");
+    ShipType existing = new ShipType();
+    existing.setId(UUID.randomUUID());
+    existing.setName("Avenger Stalker");
+    existing.setExternalUuid(uuid);
+    existing.setVehicleInventoryScu(710000.0);
+    var dto =
+        ScWikiVehicleDto.builder()
+            .uuid(uuid)
+            .name("Avenger Stalker")
+            .vehicleInventory(710000.0)
+            .oreCapacity(12.5)
+            .maxMedicalTier("T2")
+            .health(11900.5)
+            .shieldHp(4488.25)
+            .build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
+    when(shipTypeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncVehicles());
+
+    assertEquals(0.71, existing.getVehicleInventoryScu(), 0.000000001);
+    assertEquals(12.5, existing.getOreCapacity());
+    assertEquals(2, existing.getMaxMedicalTier());
+    assertEquals(11900.5, existing.getHealth());
+    assertEquals(4488.25, existing.getShieldHp());
+  }
+
+  @Test
+  void syncVehicles_rejectsNameMatchWithDifferentUuidAndDoesNotSweep() {
+    UUID incomingUuid = UUID.randomUUID();
+    UUID storedUuid = UUID.randomUUID();
+    ShipType existing = new ShipType();
+    existing.setExternalUuid(storedUuid);
+    existing.setName("Distinct variant");
+    var dto = ScWikiVehicleDto.builder().uuid(incomingUuid).name("Distinct variant").build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByNameIgnoreCase("Distinct variant"))
+        .thenReturn(Optional.of(existing));
+
+    assertEquals(0, service.syncVehicles());
+
+    assertEquals(storedUuid, existing.getExternalUuid());
+    verify(shipTypeRepository, never()).save(any());
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  @Test
+  void syncVehicles_rejectsAliasedRowWithDifferentUuid() {
+    ShipType existing = new ShipType();
+    UUID original = UUID.randomUUID();
+    existing.setExternalUuid(original);
+    var dto =
+        ScWikiVehicleDto.builder()
+            .uuid(UUID.randomUUID())
+            .name("Utility")
+            .className("ESPR_Prowler_Utility")
+            .build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByUexAliasOfClassName(dto.className()))
+        .thenReturn(Optional.of(existing));
+
+    assertEquals(0, service.syncVehicles());
+
+    assertEquals(original, existing.getExternalUuid());
+    verify(shipTypeRepository, never()).save(any());
+    verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
+  }
+
+  @Test
+  void allAssetCensusRestoresExcludedExistingVehiclesWithoutImportingTheirMetadata() {
+    UUID relevant = UUID.randomUUID();
+    UUID excluded = UUID.randomUUID();
+    UUID absent = UUID.randomUUID();
+    singleVehicleCensus(relevant);
+    when(shipTypeRepository.findWikiLinkedVehicleUuids())
+        .thenReturn(List.of(relevant, excluded, absent));
+    when(scWikiClient.fetchExistenceCensus("/api/vehicles", "vehicle existence", 50))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(relevant, excluded), true));
+    when(shipTypeRepository.restoreWikiPresentVehicles(eq(List.of(excluded)), any())).thenReturn(1);
+
+    assertEquals(2, service.syncVehicles());
+
+    verify(shipTypeRepository).restoreWikiPresentVehicles(eq(List.of(excluded)), any());
+    verify(shipTypeRepository)
+        .markScwikiDeletedExcept(
+            argThat(ids ->
+                ids.size() == 2
+                    && ids.contains(relevant)
+                    && ids.contains(excluded)
+                    && !ids.contains(absent)),
+            any());
+    verify(shipTypeRepository, times(1)).save(any());
+    verify(shipTypeRepository, never()).findByExternalUuid(excluded);
+    verify(shipTypeRepository, never()).findByExternalUuid(absent);
+  }
+
+  @Test
+  void incompleteAllAssetCensusCannotRestoreOrTombstoneExcludedVehicles() {
+    UUID relevant = UUID.randomUUID();
+    UUID excluded = UUID.randomUUID();
+    singleVehicleCensus(relevant);
+    when(shipTypeRepository.findWikiLinkedVehicleUuids()).thenReturn(List.of(relevant, excluded));
+    when(scWikiClient.fetchExistenceCensus("/api/vehicles", "vehicle existence", 50))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(relevant), false));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, never()).restoreWikiPresentVehicles(any(), any());
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService).recordIncomplete();
+    verify(syncReportService).recordSweep(false);
+  }
+
+  @Test
+  void allAssetCensusMustContainEveryRelevantVehicleBeforeItCanProveAnAbsence() {
+    UUID relevant = UUID.randomUUID();
+    UUID excluded = UUID.randomUUID();
+    singleVehicleCensus(relevant);
+    when(shipTypeRepository.findWikiLinkedVehicleUuids()).thenReturn(List.of(relevant, excluded));
+    when(scWikiClient.fetchExistenceCensus("/api/vehicles", "vehicle existence", 50))
+        .thenReturn(new ScWikiClient.ExistenceCensus(Set.of(excluded), true));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, never()).restoreWikiPresentVehicles(any(), any());
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService).recordIncomplete();
+  }
+
+  @Test
+  void relevantCensusNeedsNoBroaderFetchWhenItContainsEveryPreviouslyLinkedVehicle() {
+    UUID relevant = UUID.randomUUID();
+    singleVehicleCensus(relevant);
+    when(shipTypeRepository.findWikiLinkedVehicleUuids()).thenReturn(List.of(relevant));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(scWikiClient, never()).fetchExistenceCensus(any(), any(), anyInt());
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(relevant)), any());
+  }
+
+  @Test
+  void failedVehicleFetchStillClosesItsVersionScope() {
+    ScWikiClient.SyncRun scope = mock(ScWikiClient.SyncRun.class);
+    when(scWikiClient.openSyncRun()).thenReturn(scope);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenThrow(new IllegalStateException("source unavailable"));
+
+    assertThrows(IllegalStateException.class, service::syncVehicles);
+
+    verify(scope).close();
+    verifyNoInteractions(shipTypeRepository);
+  }
+
+  /** Supplies one relevant vehicle row that can be written without any prior local match. */
+  private void singleVehicleCensus(UUID uuid) {
+    ScWikiVehicleDto dto = ScWikiVehicleDto.builder().uuid(uuid).name("Relevant " + uuid).build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.save(any(ShipType.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
   }
 }

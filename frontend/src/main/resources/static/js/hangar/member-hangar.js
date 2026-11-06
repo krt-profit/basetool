@@ -476,3 +476,16 @@ function initMemberHangar() {
 }
 
 document.addEventListener('DOMContentLoaded', initMemberHangar);
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('#member-hangar-results')) return;
+    krtPageSections.create({
+        topicClass: 'CATALOGUE',
+        topic: 'catalogue',
+        sections: { catalogue: { container: '#member-hangar-results' } },
+        pageUrl() {
+            return window.location.pathname + window.location.search;
+        },
+        receiver: { coalesceMs: 1500 },
+    });
+});

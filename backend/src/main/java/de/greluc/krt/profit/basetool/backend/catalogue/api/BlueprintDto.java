@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Admin view of a synced crafting blueprint: recipe header, requirement groups with ingredients and
@@ -45,6 +46,7 @@ import java.util.UUID;
  * @param summaryProperties roll-up of the stats this blueprint affects
  * @param dismantleReturns commodities recovered on dismantle
  * @param version optimistic-lock version
+ * @param wikiMetadata typed Wiki unlock conditions and complete source tier evidence
  */
 public record BlueprintDto(
     UUID id,
@@ -63,4 +65,5 @@ public record BlueprintDto(
     List<BlueprintRequirementIngredientDto> ingredients,
     List<BlueprintSummaryPropertyDto> summaryProperties,
     List<BlueprintDismantleReturnDto> dismantleReturns,
-    Long version) {}
+    Long version,
+    @Nullable BlueprintCatalogueMetadata wikiMetadata) {}

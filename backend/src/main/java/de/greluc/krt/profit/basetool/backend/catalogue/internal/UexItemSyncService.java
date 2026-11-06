@@ -54,10 +54,10 @@ import org.springframework.util.StringUtils;
  * Syncs UEX items into {@code game_item}, walking {@code /items?id_category=<n>} for every
  * game-related {@code uex_category}.
  *
- * <p>An item resolves by UEX item id, then by external UUID, else is created as {@link
- * GameItemSourceSystem#UEX_ONLY}. An id that UEX has moved to another item is released and the item
- * rebound by its UUID at the end of the run, when that UUID occurs once in the run. Items missing
- * from every response are marked UEX-deleted via {@link
+ * <p>An item resolves by UEX item id, then an unambiguous external UUID or exact source name,
+ * otherwise it is created as {@link GameItemSourceSystem#UEX_ONLY}. Verified source-id
+ * reassignments release their old bindings before writes, after the complete feed validates their
+ * UUIDs. Items missing from every response are marked UEX-deleted via {@link
  * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}, but only when every
  * category fetch was complete (REQ-DATA-014). Each item is upserted in its own transaction, so a
  * colliding row rolls back alone (REQ-DATA-004).
@@ -78,6 +78,7 @@ public class UexItemSyncService {
   private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final SyncReportService syncReportService;
+  private final ScWikiProperties scWikiProperties;
 
   /**
    * Self-reference, resolved lazily so each per-item upsert runs through the Spring transaction
@@ -100,15 +101,16 @@ public class UexItemSyncService {
   public int syncItems() {
     log.info("Starting synchronization of UEX items...");
     final UUID runId = syncReportService.beginRun();
-    List<UexCategory> categories = categoryRefService.syncCategories();
+    UexCategoryRefService.CategorySyncResult categoryResult =
+        categoryRefService.syncCategoriesResult();
+    List<UexCategory> categories = categoryResult.categories();
 
-    RunTally tally = new RunTally();
+    final RunTally tally = new RunTally();
     int categoriesProcessed = 0;
     int incompleteCategories = 0;
-    Instant now = Instant.now();
+    final Instant now = Instant.now();
     ItemLookups lookups = chunkWriter.inNewTransaction(this::loadItemLookups);
-    Map<UUID, Integer> uuidCountsThisRun = new HashMap<>();
-    List<DeferredItem> reassignedIds = new ArrayList<>();
+    List<DeferredItem> inputs = new ArrayList<>();
 
     for (UexCategory category : categories) {
       if (!Boolean.TRUE.equals(category.getIsGameRelated())) {
@@ -132,25 +134,35 @@ public class UexItemSyncService {
       }
       categoriesProcessed++;
       for (UexItemDto dto : dtos) {
-        UUID uuid = UexValues.parseUuid(dto.uuid());
-        if (uuid != null) {
-          uuidCountsThisRun.merge(uuid, 1, Integer::sum);
-        }
-        if (lookups.isReassignedId(dto.id(), uuid)) {
-          reassignedIds.add(new DeferredItem(dto, category));
+        inputs.add(new DeferredItem(dto, category));
+      }
+    }
+    UexIdentityCensus census =
+        UexIdentityCensus.of(
+            inputs,
+            input -> input.dto().id(),
+            input -> input.dto().uuid(),
+            input -> input.dto().name(),
+            categoryResult.complete() && incompleteCategories == 0);
+    lookups = lookups.withCensus(census);
+    if (!census.complete()) {
+      syncReportService.recordIncomplete();
+    }
+    for (DeferredItem input : inputs) {
+      UUID uuid = UexValues.parseUuid(input.dto().uuid());
+      if (census.uniqueUuid(uuid) && lookups.isReassignedId(input.dto().id(), uuid)) {
+        if (releaseReassignedId(input.dto())) {
+          tally.idsReassigned++;
         } else {
-          upsertAndTally(dto, category, now, lookups, tally);
+          tally.failed++;
+          syncReportService.recordFailed(1);
         }
       }
     }
-    for (DeferredItem deferred : reassignedIds) {
-      UUID uuid = UexValues.parseUuid(deferred.dto().uuid());
-      if (uuidCountsThisRun.getOrDefault(uuid, 0) == 1 && releaseReassignedId(deferred.dto())) {
-        tally.idsReassigned++;
-      }
-      upsertAndTally(deferred.dto(), deferred.category(), now, lookups, tally);
+    for (DeferredItem input : inputs) {
+      upsertAndTally(input.dto(), input.category(), now, lookups, tally);
     }
-    Set<Integer> seenUexItemIds = tally.seenUexItemIds;
+    Set<Integer> seenUexItemIds = census.ids();
     int itemsProcessed = tally.itemsProcessed;
     int itemsCreated = tally.itemsCreated;
     int sharedUuidDeclined = tally.sharedUuidDeclined;
@@ -160,13 +172,14 @@ public class UexItemSyncService {
       log.warn(
           "Skipping orphan sweep — no UEX item was processed across {} category response(s).",
           categoriesProcessed);
-    } else if (incompleteCategories > 0) {
+    } else if (!census.complete() || tally.failed > 0 || tally.rejected > 0) {
       log.warn(
-          "Skipping orphan sweep — {} item(s) seen but {} category fetch(es) came back incomplete"
-              + " (failed or non-ok envelope), so the seen-set is not a census of the"
-              + " catalogue and a sweep would soft-delete rows that were merely never fetched.",
+          "Skipping orphan sweep — {} upstream ids seen; complete census={}, failed writes={},"
+              + " rejected rows={}",
           seenUexItemIds.size(),
-          incompleteCategories);
+          census.complete(),
+          tally.failed,
+          tally.rejected);
     } else {
       marked =
           chunkWriter.inNewTransaction(
@@ -175,6 +188,8 @@ public class UexItemSyncService {
         log.info("Marked {} game_item row(s) uex_deleted (no longer in UEX feed)", marked);
       }
     }
+    syncReportService.recordSweep(
+        !seenUexItemIds.isEmpty() && census.complete() && tally.failed == 0 && tally.rejected == 0);
 
     log.info(
         "Finished UEX item sync: {} categories visited, {} items upserted ({} new, {} updated), {}"
@@ -238,21 +253,26 @@ public class UexItemSyncService {
   private void upsertAndTally(
       UexItemDto dto, UexCategory category, Instant now, ItemLookups lookups, RunTally tally) {
     try {
-      GameItem item = self.getObject().upsertItemWithinTransaction(dto, category, now, lookups);
+      ItemWriteOutcome result =
+          self.getObject().writeItemWithinTransaction(dto, category, now, lookups);
+      GameItem item = result.item();
       if (item == null) {
+        tally.rejected++;
+        syncReportService.recordIncomplete();
+        syncReportService.recordSkipped(1);
         return;
       }
       tally.itemsProcessed++;
-      if (item.getCreatedAt() == null || item.getCreatedAt().equals(item.getUpdatedAt())) {
+      syncReportService.recordApplied(1);
+      if (result.created()) {
         tally.itemsCreated++;
-      }
-      if (item.getUexItemId() != null) {
-        tally.seenUexItemIds.add(item.getUexItemId());
       }
       if (item.getExternalUuid() == null && UexValues.parseUuid(dto.uuid()) != null) {
         tally.sharedUuidDeclined++;
       }
     } catch (Exception e) {
+      tally.failed++;
+      syncReportService.recordFailed(1);
       log.error(
           "Failed to process UEX item dto (id={}, uuid={}, name='{}')",
           dto.id(),
@@ -295,26 +315,42 @@ public class UexItemSyncService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public GameItem upsertItemWithinTransaction(
       UexItemDto dto, UexCategory category, Instant now, @Nullable ItemLookups lookups) {
-    if (dto.id() == null || !StringUtils.hasText(dto.name())) {
+    return writeItemWithinTransaction(dto, category, now, lookups).item();
+  }
+
+  /**
+   * Writes one UEX item and reports whether this write inserted a new catalogue row.
+   *
+   * @param dto inbound UEX row
+   * @param category resolved UEX category
+   * @param now this run's source timestamp
+   * @param lookups preloaded references and upstream identity census
+   * @return the persisted item and its creation verdict, or an empty item for rejected input
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public @NotNull ItemWriteOutcome writeItemWithinTransaction(
+      UexItemDto dto, UexCategory category, Instant now, @Nullable ItemLookups lookups) {
+    if (dto.id() == null || dto.id() <= 0 || !StringUtils.hasText(dto.name())) {
       log.debug(
           "Skipping UEX item with missing id/name (id={}, uuid={}, name='{}')",
           dto.id(),
           dto.uuid(),
           LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH));
-      return null;
+      return new ItemWriteOutcome(null, false);
     }
 
-    GameItem item = resolveExistingItem(dto);
-    boolean newRow = (item == null);
+    GameItem item = resolveExistingItem(dto, category, lookups);
+    final boolean created = item == null;
     if (item == null) {
       item = new GameItem();
       item.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     }
 
     UUID externalUuid = UexValues.parseUuid(dto.uuid());
-    if (item.getExternalUuid() == null && externalUuid != null) {
-      Optional<GameItem> uuidOwner =
-          newRow ? Optional.empty() : gameItemRepository.findByExternalUuid(externalUuid);
+    if (item.getExternalUuid() == null
+        && externalUuid != null
+        && (lookups == null || lookups.census().uniqueUuid(externalUuid))) {
+      Optional<GameItem> uuidOwner = gameItemRepository.findByExternalUuid(externalUuid);
       if (uuidOwner.isPresent()) {
         GameItem owner = uuidOwner.orElseThrow();
         log.debug(
@@ -337,9 +373,18 @@ public class UexItemSyncService {
           item.getExternalUuid());
     }
 
-    item.setName(dto.name());
+    item.setUexName(dto.name());
+    if (item.getSourceSystems() != GameItemSourceSystem.P4K
+        || !StringUtils.hasText(item.getName())) {
+      item.setName(dto.name());
+    }
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), deriveKind(category)));
-    item.setManufacturer(resolveManufacturer(dto, lookups));
+    Manufacturer manufacturer = resolveManufacturer(dto, lookups);
+    if (manufacturer != null
+        && (item.getSourceSystems() != GameItemSourceSystem.P4K
+            || item.getManufacturer() == null)) {
+      item.setManufacturer(manufacturer);
+    }
     item.setUexItemId(dto.id());
     item.setUexSlug(dto.slug());
     item.setUexCategory(category);
@@ -365,8 +410,16 @@ public class UexItemSyncService {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }
 
-    return gameItemRepository.save(item);
+    return new ItemWriteOutcome(gameItemRepository.save(item), created);
   }
+
+  /**
+   * One isolated UEX write, including whether it inserted the catalogue row.
+   *
+   * @param item the persisted item, or {@code null} when input was rejected
+   * @param created whether the item was newly inserted
+   */
+  public record ItemWriteOutcome(@Nullable GameItem item, boolean created) {}
 
   /**
    * Clears {@code uex_item_id} on the row that holds the DTO's UEX id, in its own transaction, so a
@@ -394,14 +447,17 @@ public class UexItemSyncService {
   }
 
   /**
-   * Resolves the existing {@link GameItem} for the inbound DTO by UEX item id, then by external
-   * UUID.
+   * Resolves the source id first, then a unique unclaimed UUID or compatible exact Wiki source
+   * name.
    *
    * @param dto inbound UEX row
+   * @param category source category used to reject incompatible name matches
+   * @param lookups this run's source-id and UUID census
    * @return existing row if matched; {@code null} otherwise
    */
   @Nullable
-  private GameItem resolveExistingItem(UexItemDto dto) {
+  private GameItem resolveExistingItem(
+      UexItemDto dto, UexCategory category, @Nullable ItemLookups lookups) {
     if (dto.id() != null) {
       Optional<GameItem> byUex = gameItemRepository.findByUexItemId(dto.id());
       if (byUex.isPresent()) {
@@ -409,10 +465,34 @@ public class UexItemSyncService {
       }
     }
     UUID externalUuid = UexValues.parseUuid(dto.uuid());
-    if (externalUuid != null) {
+    if (externalUuid != null && (lookups == null || lookups.census().uniqueUuid(externalUuid))) {
       Optional<GameItem> byUuid = gameItemRepository.findByExternalUuid(externalUuid);
       if (byUuid.isPresent()) {
-        return byUuid.orElseThrow();
+        GameItem candidate = byUuid.orElseThrow();
+        if (candidate.getUexItemId() == null || candidate.getUexItemId().equals(dto.id())) {
+          return candidate;
+        }
+        if (lookups != null
+            && lookups.census().complete()
+            && !lookups.census().containsId(candidate.getUexItemId())) {
+          return candidate;
+        }
+      }
+    }
+    if (externalUuid == null
+        && !StringUtils.hasText(dto.uuid())
+        && lookups != null
+        && lookups.census().uniqueName(dto.name())
+        && Boolean.TRUE.equals(scWikiProperties.reconcileUuidlessByName())) {
+      List<GameItem> candidates = gameItemRepository.findWikiNameCandidates(dto.name());
+      if (candidates.size() == 1) {
+        GameItem candidate = candidates.getFirst();
+        Manufacturer manufacturer = resolveManufacturer(dto, lookups);
+        if (candidate.getUexItemId() == null
+            && ItemIdentityCompatibility.matches(
+                candidate, deriveKind(category), manufacturer, null)) {
+          return candidate;
+        }
       }
     }
     return null;
@@ -503,7 +583,14 @@ public class UexItemSyncService {
         uuidByUexItemId.put(ref.getUexItemId(), ref.getExternalUuid());
       }
     }
-    return new ItemLookups(byCompany, byName, byVehicle, uuidByUexItemId, knownUuids);
+    return new ItemLookups(
+        byCompany,
+        byName,
+        byVehicle,
+        uuidByUexItemId,
+        knownUuids,
+        UexIdentityCensus.of(
+            List.<UexItemDto>of(), UexItemDto::id, UexItemDto::uuid, UexItemDto::name, false));
   }
 
   /**
@@ -515,13 +602,31 @@ public class UexItemSyncService {
    * @param shipTypeByVehicleId ship-type id by UEX vehicle id
    * @param externalUuidByUexItemId stored {@code external_uuid} by UEX item id, for rows with both
    * @param knownExternalUuids every {@code external_uuid} already stored on a {@code game_item}
+   * @param census the validated source-id and UUID census of this run
    */
   public record ItemLookups(
       @NotNull Map<Integer, UUID> manufacturerByCompanyId,
       @NotNull Map<String, UUID> manufacturerByLowerName,
       @NotNull Map<Integer, UUID> shipTypeByVehicleId,
       @NotNull Map<Integer, UUID> externalUuidByUexItemId,
-      @NotNull Set<UUID> knownExternalUuids) {
+      @NotNull Set<UUID> knownExternalUuids,
+      @NotNull UexIdentityCensus census) {
+
+    /**
+     * Binds the preloaded references to the completed upstream identity census.
+     *
+     * @param census the run's source-id and UUID census
+     * @return the references with the run's identity evidence
+     */
+    private ItemLookups withCensus(@NotNull UexIdentityCensus census) {
+      return new ItemLookups(
+          manufacturerByCompanyId,
+          manufacturerByLowerName,
+          shipTypeByVehicleId,
+          externalUuidByUexItemId,
+          knownExternalUuids,
+          census);
+    }
 
     /**
      * Whether UEX has moved {@code uexItemId} to a different item: the row holding the id stores
@@ -552,9 +657,6 @@ public class UexItemSyncService {
   /** Mutable counters of one item-sync run. */
   private static final class RunTally {
 
-    /** UEX item ids of every row upserted this run; the census for the orphan sweep. */
-    private final Set<Integer> seenUexItemIds = new HashSet<>();
-
     /** Rows upserted this run. */
     private int itemsProcessed;
 
@@ -566,6 +668,12 @@ public class UexItemSyncService {
 
     /** UEX ids released from their old row because UEX moved them to another item. */
     private int idsReassigned;
+
+    /** Rows whose isolated write failed. */
+    private int failed;
+
+    /** Source rows rejected before a database write. */
+    private int rejected;
   }
 
   /**

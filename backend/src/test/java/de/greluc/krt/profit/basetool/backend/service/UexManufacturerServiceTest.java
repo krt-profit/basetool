@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompanyRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexManufacturerService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCompanyDto;
@@ -62,6 +63,7 @@ class UexManufacturerServiceTest {
   @Mock private ManufacturerUexCompanyRepository aliasRepository;
 
   @Mock private ObjectProvider<UexManufacturerService> self;
+  @Mock private SyncRunProgress progress;
 
   @InjectMocks private UexManufacturerService uexManufacturerService;
 
@@ -98,6 +100,7 @@ class UexManufacturerServiceTest {
 
     ArgumentCaptor<Manufacturer> captor = ArgumentCaptor.forClass(Manufacturer.class);
     verify(manufacturerRepository, times(2)).save(captor.capture());
+    verify(progress, times(2)).applied(1);
 
     Manufacturer aegis = captor.getAllValues().get(0);
     assertEquals("Aegis Dynamics", aegis.getName());
@@ -275,6 +278,8 @@ class UexManufacturerServiceTest {
         .thenReturn(null);
 
     assertDoesNotThrow(() -> uexManufacturerService.syncManufacturers());
+    verify(progress).failed(1);
+    verify(progress).applied(1);
 
     ArgumentCaptor<Manufacturer> captor = ArgumentCaptor.forClass(Manufacturer.class);
     verify(manufacturerRepository, times(2)).save(captor.capture());
@@ -292,5 +297,18 @@ class UexManufacturerServiceTest {
 
     verify(manufacturerRepository, never()).save(any());
     verify(aliasRepository, never()).save(any());
+  }
+
+  @Test
+  void missingSourceIdentity_rejectsCensusWithoutWriting() {
+    when(uexClient.getCompanies())
+        .thenReturn(fetched(List.of(UexCompanyDto.builder().name("Unidentified Company").build())));
+
+    uexManufacturerService.syncManufacturers();
+
+    verify(manufacturerRepository, never()).save(any());
+    verify(progress).skipped(1);
+    verify(progress).invalidateCensus();
+    verify(progress, never()).applied(anyLong());
   }
 }

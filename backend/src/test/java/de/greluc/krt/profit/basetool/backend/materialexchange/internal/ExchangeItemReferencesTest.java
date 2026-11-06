@@ -114,4 +114,16 @@ class ExchangeItemReferencesTest {
     assertThat(references.ofProductKey("ghost")).isNull();
     verify(gameItemRepository, never()).findAllById(any());
   }
+
+  @Test
+  void aProductReadThatRacesWithReconciliationKeepsItsResolvedItemReference() {
+    UUID retiredId = UUID.randomUUID();
+    when(blueprintProducts.outputItemIdsByProductKey(anyCollection()))
+        .thenReturn(Map.of("fr-66", retiredId));
+    when(gameItemRepository.findAllById(any())).thenReturn(List.of(shield));
+    when(gameItemRepository.findLocalIdRedirects(anyCollection()))
+        .thenReturn(Map.of(retiredId, shield.getId()));
+
+    assertThat(references.ofProductKey("fr-66")).isEqualTo(GameItemReferenceDto.of(shield));
+  }
 }

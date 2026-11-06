@@ -37,10 +37,13 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiScheduler;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiVehicleSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.function.IntSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,6 +63,7 @@ class ScWikiSchedulerTest {
   @Mock private ScWikiVehicleSyncService vehicleSyncService;
   @Mock private ScWikiManufacturerSyncService manufacturerSyncService;
   @Mock private MasterDataCacheEvictionService masterDataCacheEvictionService;
+  @Mock private SyncRunService syncRuns;
 
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
@@ -71,6 +75,11 @@ class ScWikiSchedulerTest {
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient().when(properties.commoditySyncEnabled()).thenReturn(true);
+    org.mockito.Mockito.lenient().when(properties.vehicleSyncEnabled()).thenReturn(true);
+    org.mockito.Mockito.lenient().when(properties.itemSyncEnabled()).thenReturn(true);
+    org.mockito.Mockito.lenient().when(properties.blueprintSyncEnabled()).thenReturn(true);
+    org.mockito.Mockito.lenient().when(properties.manufacturerSyncEnabled()).thenReturn(true);
     scheduler =
         new ScWikiScheduler(
             scWikiClient,
@@ -83,7 +92,16 @@ class ScWikiSchedulerTest {
             syncCoordinator,
             taskMetrics,
             masterDataCacheEvictionService,
-            meterRegistry);
+            meterRegistry,
+            syncRuns);
+    ScWikiClient.SyncRun scope = org.mockito.Mockito.mock(ScWikiClient.SyncRun.class);
+    org.mockito.Mockito.lenient().when(scWikiClient.openSyncRun()).thenReturn(scope);
+    org.mockito.Mockito.lenient().when(scope.version()).thenReturn("4.10.2-LIVE");
+    org.mockito.Mockito.lenient()
+        .when(syncRuns.run(any(), any(), any(), any()))
+        .thenAnswer(invocation ->
+            new SyncRunService.Result(
+                ((IntSupplier) invocation.getArgument(3)).getAsInt(), SyncRunStatus.SUCCESS));
   }
 
   @Test
@@ -93,6 +111,27 @@ class ScWikiSchedulerTest {
     scheduler.scheduleScWikiSync();
 
     verifyNoInteractions(
+        commoditySyncService,
+        vehicleSyncService,
+        itemSyncService,
+        blueprintSyncService,
+        manufacturerSyncService);
+  }
+
+  @Test
+  void schedule_withAllSlicesDisabled_neverResolvesTheUpstreamVersion() {
+    when(properties.schedulerEnabled()).thenReturn(true);
+    when(properties.commoditySyncEnabled()).thenReturn(false);
+    when(properties.vehicleSyncEnabled()).thenReturn(false);
+    when(properties.itemSyncEnabled()).thenReturn(false);
+    when(properties.blueprintSyncEnabled()).thenReturn(false);
+    when(properties.manufacturerSyncEnabled()).thenReturn(false);
+
+    scheduler.scheduleScWikiSync();
+
+    verifyNoInteractions(
+        scWikiClient,
+        syncRuns,
         commoditySyncService,
         vehicleSyncService,
         itemSyncService,
@@ -136,20 +175,21 @@ class ScWikiSchedulerTest {
   }
 
   @Test
-  void schedule_recordsZeroItems_whenAStepFailsAndTheRestWriteNothing() {
+  void schedule_recordsFailure_whenAStepFailsAndTheRestWriteNothing() {
     when(properties.schedulerEnabled()).thenReturn(true);
     when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
 
     scheduler.scheduleScWikiSync();
 
     assertEquals(
-        0.0,
+        1.0,
         meterRegistry
-            .get(MetricNames.SCHEDULED_JOB_ITEMS)
+            .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
             .tag(MetricNames.TAG_JOB, ScheduledJob.SCWIKI_SYNC.label())
+            .tag(MetricNames.TAG_OUTCOME, MetricNames.OUTCOME_FAILURE)
             .counter()
             .count(),
-        "a zero-write sweep must still register the item counter at 0");
+        "a failing catalogue slice must fail the umbrella sync outcome");
   }
 
   @Test

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityOccurrenceSync;
@@ -69,9 +70,24 @@ class UexCommodityServiceTest {
   @Mock private UexCommodityOccurrenceSync occurrenceSync;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexCommodityService uexCommodityService;
+
+  @Test
+  void rejectedCommodityRow_preservesExistingOccurrenceSets() {
+    when(uexClient.getCommodities())
+        .thenReturn(fetched(List.of(UexCommodityDto.builder().id(1).build())));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    verify(occurrenceSync, never()).replaceAll(any());
+    verify(chunkWriter, atLeastOnce()).recordSweep(false);
+    verify(materialRepository, never()).save(any());
+  }
 
   @Test
   void shouldProcessCommodityDtoAndCreateNewMaterialAndLocation() {
@@ -655,7 +671,45 @@ class UexCommodityServiceTest {
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
     verify(materialPriceRepository, times(3)).save(any());
-    verify(materialPriceRepository).findIdsWithLivePrices();
+    verify(materialPriceRepository, never()).findIdsWithLivePrices();
+  }
+
+  @Test
+  void nonemptyPartialCommodityFeed_doesNotReplaceStoredOccurrences() {
+    UexCommodityDto resource = commodity(1, "Titanium", 1, 0);
+    when(uexClient.getCommodities()).thenReturn(UexClient.FetchResult.partial(List.of(resource)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Titanium")).thenReturn(Optional.empty());
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    verify(materialRepository).save(any());
+    verify(occurrenceSync, never()).replaceAll(any());
+  }
+
+  @Test
+  void nonemptyPartialPriceFeed_doesNotClearUnseenPrices() {
+    UexCommodityPriceDto dto =
+        UexCommodityPriceDto.builder()
+            .idCommodity(1)
+            .idTerminal(1)
+            .commodityName("Gold")
+            .priceBuy(BigDecimal.ONE)
+            .build();
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll())
+        .thenReturn(UexClient.FetchResult.partial(List.of(dto)));
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, UUID.randomUUID())));
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(1, UUID.randomUUID())));
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    stubPriceSaveAssignsId();
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    verify(materialPriceRepository).save(any());
+    verify(materialPriceRepository, never()).findIdsWithLivePrices();
+    verify(materialPriceRepository, never()).clearPricesByIds(any());
   }
 
   @Test

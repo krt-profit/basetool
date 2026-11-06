@@ -1287,3 +1287,11 @@ redirects only to a page the entry registry opens to the caller; the owner is al
 token's subject, no endpoint takes a member id, and a favourite, hidden page, ordered key or
 tab-bar slot is a key of a page the user already sees — the entry's own gate stays
 authoritative.
+
+
+### Catalogue evidence reads
+
+`GET /api/v1/game-items/{id}/catalogue` serves the source-attributed catalogue detail to
+`ADMIN`, `LOGISTICIAN` and `KRT_MEMBER`, matching the full game-item catalogue audience.
+Material details and ship summaries retain their existing access gates and add read-only
+source facts. These reads grant no editing permission and expose no third-party exchange surface.

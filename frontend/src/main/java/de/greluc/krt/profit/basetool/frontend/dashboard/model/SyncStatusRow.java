@@ -29,14 +29,34 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param source the synchronisation or import
  * @param lastRunAt when the latest run happened, {@code null} when there never was one
- * @param status the latest run's status for an import ({@code SUCCEEDED}, {@code FAILED}, ...),
- *     {@code null} for a synchronisation
+ * @param status latest source or import outcome, absent for legacy event history
  * @param inRange whether the latest run lies inside the widget's range
  * @param runs how many runs finished inside the widget's range
+ * @param lastCompleteAt newest completely applied source sweep
  */
 public record SyncStatusRow(
     @NotNull SyncSource source,
     @Nullable Instant lastRunAt,
     @Nullable String status,
     boolean inRange,
-    long runs) {}
+    long runs,
+    @Nullable Instant lastCompleteAt) {
+
+  /**
+   * Represents an import or legacy source without a separate complete-apply timestamp.
+   *
+   * @param source external source
+   * @param lastRunAt latest attempt or import time
+   * @param status latest outcome
+   * @param inRange whether it lies in the requested range
+   * @param runs run count in the requested range
+   */
+  public SyncStatusRow(
+      SyncSource source,
+      @Nullable Instant lastRunAt,
+      @Nullable String status,
+      boolean inRange,
+      long runs) {
+    this(source, lastRunAt, status, inRange, runs, null);
+  }
+}

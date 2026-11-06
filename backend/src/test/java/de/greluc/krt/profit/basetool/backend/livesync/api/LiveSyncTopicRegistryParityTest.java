@@ -115,7 +115,8 @@ class LiveSyncTopicRegistryParityTest {
     assertThat(backendKeys)
         .as(
             "a room the backend never publishes into is a room this registry should not name; the"
-                + " frontend owns every surface a browser edits (ADR-0274)")
+                + " backend also publishes committed catalogue reference changes (ADR-0274)")
+        .contains(key("order", true))
         .doesNotContain(
             key("bank", false),
             key("bank", true),
@@ -123,7 +124,6 @@ class LiveSyncTopicRegistryParityTest {
             key("mission", true),
             key("missions", false),
             key("operation", true),
-            key("order", true),
             key("orders", false),
             key("refinery", false),
             key("refinery-order", true),

@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobServ
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +59,7 @@ class P4kImportJobRunnerTest {
   @Mock private P4kImportJobService jobService;
   @Mock private P4kImportService importService;
   @Mock private MasterDataCacheEvictionService cacheEvictionService;
+  @Mock private LiveSyncPublisher catalogueUpdates;
 
   private P4kImportJobRunner runner;
 
@@ -65,7 +67,11 @@ class P4kImportJobRunnerTest {
   void setUp() {
     runner =
         new P4kImportJobRunner(
-            jobService, importService, cacheEvictionService, JsonMapper.builder().build());
+            jobService,
+            importService,
+            cacheEvictionService,
+            JsonMapper.builder().build(),
+            catalogueUpdates);
   }
 
   private static P4kImportResultDto someResult() {
@@ -149,5 +155,34 @@ class P4kImportJobRunnerTest {
 
     assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, false));
     verify(jobService).markSucceeded(eq(id), anyString());
+  }
+
+  @Test
+  void applyPublishesCatalogueChangeOnlyAfterCommittedDataChanges() {
+    UUID job = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    var zero = new P4kImportResultDto.Counts(0, 0, 0, 0, 0, 0);
+    var enriched = new P4kImportResultDto.Counts(1, 0, 0, 1, 0, 0);
+    var result = new P4kImportResultDto(false, false, zero, enriched, zero, zero, zero, 0, job);
+    when(jobService.loadPayload(job)).thenReturn(bytes);
+    when(importService.applyImport(bytes, false)).thenReturn(result);
+
+    runner.run(job, P4kImportJobKind.APPLY, false);
+
+    InOrder order = inOrder(importService, catalogueUpdates);
+    order.verify(importService).applyImport(bytes, false);
+    order.verify(catalogueUpdates).publishAfterCommit(any(), eq(java.util.List.of("catalogue")));
+  }
+
+  @Test
+  void unchangedApplyDoesNotPublishCatalogueChange() {
+    UUID job = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    when(jobService.loadPayload(job)).thenReturn(bytes);
+    when(importService.applyImport(bytes, false)).thenReturn(someResult());
+
+    runner.run(job, P4kImportJobKind.APPLY, false);
+
+    org.mockito.Mockito.verifyNoInteractions(catalogueUpdates);
   }
 }

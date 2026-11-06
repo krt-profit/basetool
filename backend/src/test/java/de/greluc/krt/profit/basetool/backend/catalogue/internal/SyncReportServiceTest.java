@@ -53,6 +53,9 @@ class SyncReportServiceTest {
 
   @Mock private AdminDashboardLiveSync adminDashboardLiveSync;
 
+  @Mock private ExternalSyncRunRepository runRepository;
+  @Spy private SyncRunProgress progress = new SyncRunProgress();
+
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private SyncReportService service;

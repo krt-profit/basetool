@@ -101,6 +101,7 @@ class BlueprintServiceTest {
         List.of(),
         List.of(),
         List.of(),
-        0L);
+        0L,
+        null);
   }
 }

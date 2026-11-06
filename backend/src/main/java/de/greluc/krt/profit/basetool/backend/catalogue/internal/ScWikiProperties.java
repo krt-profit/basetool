@@ -60,6 +60,9 @@ import org.springframework.validation.annotation.Validated;
  *     pageSize} because vehicle rows are very large
  * @param requestsPerSecond the pacing target between page fetches; the sleep is {@code 1000 /
  *     requestsPerSecond} milliseconds
+ * @param maxAttempts maximum HTTP attempts after transient read failures
+ * @param retryDelayMillis initial exponential retry delay in milliseconds
+ * @param maxRetryDelayMillis largest upstream cooldown the client will wait in milliseconds
  * @param gameVersion an optional {@code ?version=…} pin; {@code null} follows the current game
  *     version
  * @param syncAllItems {@code true} pages in every Wiki item; {@code false} runs the item sync in
@@ -105,9 +108,12 @@ public record ScWikiProperties(
     @DefaultValue("false") @NotNull Boolean manufacturerSyncEnabled,
     @DefaultValue("86400000") @NotBlank String schedulerDelay,
     @DefaultValue("200") @Min(50) @Max(200) Integer pageSize,
-    @DefaultValue("50") @Min(50) @Max(200) Integer vehiclesPageSize,
+    @DefaultValue("50") @Min(1) @Max(50) Integer vehiclesPageSize,
     @DefaultValue("5") @Min(1) @Max(20) Integer requestsPerSecond,
     String gameVersion,
+    @DefaultValue("3") @Min(1) @Max(5) Integer maxAttempts,
+    @DefaultValue("1000") @Min(1) @Max(30000) Integer retryDelayMillis,
+    @DefaultValue("30000") @Min(1) @Max(60000) Integer maxRetryDelayMillis,
     @DefaultValue("false") @NotNull Boolean syncAllItems,
     @DefaultValue("true") @NotNull Boolean reconcileUuidlessByName,
     @DefaultValue("FPS.Armor") String armorFilter,

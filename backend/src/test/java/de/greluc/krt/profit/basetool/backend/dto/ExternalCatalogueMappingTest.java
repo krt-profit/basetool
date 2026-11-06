@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.dto;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
@@ -55,6 +56,7 @@ class ExternalCatalogueMappingTest {
   private static final Set<String> SCWIKI_ITEM_KEYS =
       Set.of(
           "ammunition",
+          "base_variant",
           "armor",
           "blueprint",
           "class",
@@ -101,6 +103,7 @@ class ExternalCatalogueMappingTest {
           "radar",
           "radiation_resistance",
           "rarity",
+          "related_items",
           "required_tags",
           "resource_network",
           "shield",
@@ -123,6 +126,7 @@ class ExternalCatalogueMappingTest {
           "uuid",
           "variants",
           "vehicle_weapon",
+          "vehicles",
           "version",
           "weapon_modifier",
           "web_url");
@@ -688,6 +692,9 @@ class ExternalCatalogueMappingTest {
   private static void assertMapsOnlyServedNames(Class<?> record, Set<String> servedKeys) {
     List<String> phantom = new ArrayList<>();
     for (RecordComponent component : record.getRecordComponents()) {
+      if (component.getAccessor().isAnnotationPresent(JsonIgnore.class)) {
+        continue;
+      }
       String jsonName = jsonNameOf(record, component);
       if (!servedKeys.contains(jsonName)) {
         phantom.add(jsonName + " (-> " + component.getName() + ")");

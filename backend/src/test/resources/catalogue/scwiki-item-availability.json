@@ -1,0 +1,47 @@
+{
+  "source_url": "https://api.star-citizen.wiki/api/items/9a26bc89-a35b-4317-adfd-ec4a285d7e72?version=4.10.2-LIVE.12881860&include=related_items,variants,vehicles",
+  "captured_at_utc": "2026-11-06T16:30:40.4915161+00:00",
+  "data": {
+    "uuid": "9a26bc89-a35b-4317-adfd-ec4a285d7e72",
+    "name": "A23 Flight Helmet Woodland",
+    "version": "4.10.2-LIVE.12881860",
+    "updated_at": "2026-11-06T00:10:08Z",
+    "is_lootable": true,
+    "images": [
+      {
+        "source": "cstone.space",
+        "original_url": "https://cstone.space/uifimages/9a26bc89-a35b-4317-adfd-ec4a285d7e72.png",
+        "thumbnail_url": "https://cstone.space/uifimages/9a26bc89-a35b-4317-adfd-ec4a285d7e72.png",
+        "original_width": 571,
+        "original_height": 890,
+        "thumbnail_width": 571,
+        "thumbnail_height": 890
+      }
+    ],
+    "uex_prices": {
+      "purchase": [
+        {
+          "price_buy": 1290,
+          "price_sell": 0,
+          "price_rent": null,
+          "terminal_id": 766,
+          "terminal_code": "ARMNPG",
+          "terminal_name": "Armor - Pyro Gateway (Nyx)",
+          "starmap_location": {
+            "uuid": "a66119fa-6d93-4e56-bcd1-c9bd2c50beb7",
+            "name": "Pyro Gateway",
+            "slug": "pyro-gateway-2",
+            "type_name": "Manmade",
+            "parent_name": "Nyx",
+            "star_system_name": "Nyx",
+            "link": "https://api.star-citizen.wiki/api/locations/a66119fa-6d93-4e56-bcd1-c9bd2c50beb7",
+            "web_url": "https://api.star-citizen.wiki/locations/a66119fa-6d93-4e56-bcd1-c9bd2c50beb7?version=4.10.2-LIVE.12881860"
+          },
+          "date_updated": "2026-09-11T04:54:47+02:00",
+          "game_version": "4.10.2-LIVE.12881860",
+          "uex_link": "https://uexcorp.space/items/info?name=a23-flight-helmet-woodland&tab=about"
+        }
+      ]
+    }
+  }
+}

@@ -58,6 +58,44 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class HangarPageControllerMvcTest {
 
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void shipCatalogueFacts_showNormalizedCapacitiesAndSourceBuild() throws Exception {
+    ShipTypeDto type =
+        new ShipTypeDto(
+            UUID.randomUUID(),
+            "Avenger Stalker",
+            null,
+            null,
+            BigDecimal.ZERO,
+            false,
+            new de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipCatalogueFacts(
+                0.71, 12.0, 2, 1000.0, 500.0, "4.10.2-LIVE"));
+    ShipDto ship =
+        new ShipDto(
+            UUID.randomUUID(), "Stalker", type, "LTI", null, true, null, null, 0L, 0L, null, null);
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/hangar").param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(
+            "hangar-catalogue-facts",
+            "Inventory: 0.71 SCU",
+            "Ore capacity: 12 SCU",
+            "Medical: T2",
+            "Hull: 1,000",
+            "Shields: 500",
+            "4.10.2-LIVE");
+  }
+
   private MockMvc mockMvc;
 
   @Autowired private WebApplicationContext context;

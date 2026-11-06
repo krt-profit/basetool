@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexStarSystemService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexStarSystemDto;
@@ -49,7 +50,9 @@ class UexStarSystemServiceTest {
   @Mock private StarSystemRepository starSystemRepository;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
-  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+  @Spy
+  private SyncChunkWriter chunkWriter =
+      new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress());
 
   @InjectMocks private UexStarSystemService uexStarSystemService;
 
