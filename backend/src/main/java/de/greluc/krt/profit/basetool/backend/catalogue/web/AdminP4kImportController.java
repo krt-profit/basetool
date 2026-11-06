@@ -44,6 +44,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -91,6 +92,7 @@ public class AdminP4kImportController {
    *
    * @param file the uploaded catalogue: {@code .json}, {@code .json.gz} or {@code .json.zst}
    * @param adminUserId the authenticated administrator (for the audit {@code created_by})
+   * @param authentication the administrator's authentication, which the background run acts under
    * @return {@code 202 Accepted} with the enqueued job
    */
   @PostMapping(value = "/jobs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -106,11 +108,13 @@ public class AdminP4kImportController {
   })
   @NotNull
   public ResponseEntity<P4kImportJobDto> enqueuePreview(
-      @RequestParam("file") @NotNull MultipartFile file, @CurrentUserId @NotNull UUID adminUserId) {
+      @RequestParam("file") @NotNull MultipartFile file,
+      @CurrentUserId @NotNull UUID adminUserId,
+      @NotNull Authentication authentication) {
     P4kImportJob job =
         jobService.createPreviewJob(
             uploadGate.check(readBytes(file)), file.getOriginalFilename(), adminUserId);
-    jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, false);
+    jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, false, authentication);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
 
@@ -157,6 +161,7 @@ public class AdminP4kImportController {
    * @param createItemsAndShips {@code true} to create unmatched playable items and ships
    *     (REQ-P4K-009); {@code false} (default) creates nothing
    * @param adminUserId the authenticated administrator (for the audit {@code created_by})
+   * @param authentication the administrator's authentication, which the background run acts under
    * @return {@code 202 Accepted} with the enqueued apply job
    */
   @PostMapping("/jobs/{id}/apply")
@@ -174,9 +179,10 @@ public class AdminP4kImportController {
       @PathVariable("id") @NotNull UUID id,
       @RequestParam(value = "createItemsAndShips", defaultValue = "false")
           boolean createItemsAndShips,
-      @CurrentUserId @NotNull UUID adminUserId) {
+      @CurrentUserId @NotNull UUID adminUserId,
+      @NotNull Authentication authentication) {
     P4kImportJob job = jobService.createApplyJob(id, createItemsAndShips, adminUserId);
-    jobRunner.run(job.getId(), P4kImportJobKind.APPLY, createItemsAndShips);
+    jobRunner.run(job.getId(), P4kImportJobKind.APPLY, createItemsAndShips, authentication);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
 

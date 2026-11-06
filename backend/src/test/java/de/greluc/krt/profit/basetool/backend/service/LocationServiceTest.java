@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
@@ -55,12 +56,15 @@ class LocationServiceTest {
 
   @Mock private LocationUsage orderUsage;
 
+  @Mock private AuditRecorder auditRecorder;
+
   private LocationService locationService;
 
   @BeforeEach
   void setUp() {
     locationService =
-        new LocationService(locationRepository, locationMapper, List.of(orderUsage, shipUsage));
+        new LocationService(
+            locationRepository, locationMapper, List.of(orderUsage, shipUsage), auditRecorder);
   }
 
   @Test

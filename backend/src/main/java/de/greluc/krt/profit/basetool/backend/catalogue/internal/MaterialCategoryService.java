@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
@@ -47,6 +50,7 @@ public class MaterialCategoryService {
 
   private final MaterialCategoryRepository repository;
   private final MaterialCategoryMapper mapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns all categories sorted by name ascending. Cached as a single entry keyed by the empty
@@ -90,7 +94,14 @@ public class MaterialCategoryService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
   public MaterialCategory create(MaterialCategory category) {
-    return repository.save(category);
+    MaterialCategory saved = repository.save(category);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_CATEGORY_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        null);
+    return saved;
   }
 
   /**
@@ -105,7 +116,17 @@ public class MaterialCategoryService {
   @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
   public MaterialCategory update(UUID id, MaterialCategory category) {
     MaterialCategory existing = requireById(id);
+    AuditChangedFields changed =
+        AuditChangedFields.create().compare("name", existing.getName(), category.getName());
     existing.setName(category.getName());
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_MATERIAL_CATEGORY_UPDATED,
+          id,
+          existing.getName(),
+          null,
+          changed.toDetails());
+    }
     return repository.save(existing);
   }
 
@@ -121,5 +142,7 @@ public class MaterialCategoryService {
   public void delete(UUID id) {
     MaterialCategory existing = requireById(id);
     repository.delete(existing);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_CATEGORY_DELETED, id, existing.getName(), null, null);
   }
 }

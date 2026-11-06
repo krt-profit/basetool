@@ -52,7 +52,7 @@ worth reading even if you know the domain.
 
 | Term | Means |
 | --- | --- |
-| **Audited area** | One of the thirteen areas (the bank and twelve `AuditDomain` values) whose every state-mutating activity is written to the append-only trail (`REQ-AUDIT-001`). |
+| **Audited area** | One of the fifteen areas (the bank and fourteen `AuditDomain` values) whose every state-mutating activity is written to the append-only trail (`REQ-AUDIT-001`). |
 | **Live update** | A single client's own mutation updating the DOM **in place**, with no full-page reload (`REQ-FE-*`). |
 | **Live sync** | A *peer's* change propagating to other viewers over `/ws/sync`, fanned across replicas by Redis pub/sub. Not the same thing as live update, and both are required. The backend's parallel SSE bridge for the app is discontinued (ADR-0274) — see §12.5. |
 | **Discord-Registrierung / approval queue** | A self-service sign-up through Discord waits here as `PENDING` and sees nothing until an admin approves, rejects or links it to an existing account. |

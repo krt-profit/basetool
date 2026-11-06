@@ -754,7 +754,7 @@ groups:
           description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
       - alert: AuditDomainSilenceAnomaly
-        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PERSONAL_INVENTORY|MARKET|HANGAR|BLUEPRINT|CONNECTED_APPS|SUPPLY|PURCHASING"}[30d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PERSONAL_INVENTORY|MARKET|HANGAR|BLUEPRINT|CONNECTED_APPS|SUPPLY|PURCHASING|CATALOGUE"}[30d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
         keep_firing_for: 15m
         labels:

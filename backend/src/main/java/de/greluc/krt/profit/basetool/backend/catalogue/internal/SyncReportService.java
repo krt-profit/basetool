@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -59,6 +62,7 @@ public class SyncReportService {
   private final ExternalSyncReportRepository repository;
   private final MeterRegistry meterRegistry;
   private final AdminDashboardLiveSync adminDashboardLiveSync;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Starts a new sync cycle and returns its {@code run_id}. Every event logged for this cycle
@@ -255,6 +259,14 @@ public class SyncReportService {
           days,
           source == null ? "ALL" : source);
     }
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_SYNC_REPORTS_DELETED,
+        null,
+        null,
+        null,
+        AuditDetails.of("source", source == null ? "ALL" : source.name())
+            .with("olderThanDays", days)
+            .with("deleted", deleted));
     return deleted;
   }
 

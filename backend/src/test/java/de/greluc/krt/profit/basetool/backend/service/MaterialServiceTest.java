@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDeletionObserver;
@@ -78,6 +79,8 @@ class MaterialServiceTest {
   @Mock private MaterialMapper materialMapper;
 
   @Mock private MaterialDeletionObserver materialDeletionObserver;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private MaterialService materialService;
 

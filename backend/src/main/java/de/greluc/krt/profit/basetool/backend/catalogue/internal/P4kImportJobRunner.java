@@ -22,11 +22,13 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -49,6 +51,7 @@ public class P4kImportJobRunner {
   private final P4kImportService importService;
   private final MasterDataCacheEvictionService cacheEvictionService;
   private final ObjectMapper objectMapper;
+  private final AuthHelperService authHelperService;
 
   /**
    * Executes one import job asynchronously on the {@code importExecutor}. Never throws: every
@@ -59,9 +62,27 @@ public class P4kImportJobRunner {
    * @param kind whether to preview or apply
    * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
    *     created
+   * @param admin the authentication of the administrator who enqueued the job; the run acts under
+   *     it, so its audit events name that administrator
    */
   @Async(AsyncConfig.IMPORT_EXECUTOR)
   public void run(
+      @NotNull UUID jobId,
+      @NotNull P4kImportJobKind kind,
+      boolean createItemsAndShips,
+      @NotNull Authentication admin) {
+    authHelperService.runAs(admin, () -> execute(jobId, kind, createItemsAndShips));
+  }
+
+  /**
+   * Runs one import job on the current thread; never throws.
+   *
+   * @param jobId the (already-committed) job to run
+   * @param kind whether to preview or apply
+   * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
+   *     created
+   */
+  private void execute(
       @NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean createItemsAndShips) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;

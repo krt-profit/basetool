@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -37,14 +38,20 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobServ
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -59,13 +66,32 @@ class P4kImportJobRunnerTest {
   @Mock private P4kImportService importService;
   @Mock private MasterDataCacheEvictionService cacheEvictionService;
 
+  private final AuthHelperService authHelperService = new AuthHelperService(roleHierarchy());
+
   private P4kImportJobRunner runner;
+
+  /** The administrator who enqueued every job of these tests. */
+  private static final Authentication ADMIN =
+      new TestingAuthenticationToken("p4k-admin", null, "ROLE_ADMIN");
+
+  /**
+   * A role hierarchy without implications; these tests check no role.
+   *
+   * @return the hierarchy
+   */
+  private static RoleHierarchy roleHierarchy() {
+    return RoleHierarchyImpl.fromHierarchy("");
+  }
 
   @BeforeEach
   void setUp() {
     runner =
         new P4kImportJobRunner(
-            jobService, importService, cacheEvictionService, JsonMapper.builder().build());
+            jobService,
+            importService,
+            cacheEvictionService,
+            JsonMapper.builder().build(),
+            authHelperService);
   }
 
   private static P4kImportResultDto someResult() {
@@ -89,7 +115,7 @@ class P4kImportJobRunnerTest {
     when(jobService.loadPayload(id)).thenReturn(bytes);
     when(importService.previewImport(bytes)).thenReturn(someResult());
 
-    runner.run(id, P4kImportJobKind.PREVIEW, false);
+    runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN);
 
     InOrder order = inOrder(jobService, importService);
     order.verify(jobService).markRunning(id);
@@ -112,7 +138,7 @@ class P4kImportJobRunnerTest {
         new P4kImportService.P4kApplyRequest(id, admin, true);
     when(importService.applyImport(bytes, request)).thenReturn(someResult());
 
-    runner.run(id, P4kImportJobKind.APPLY, true);
+    runner.run(id, P4kImportJobKind.APPLY, true, ADMIN);
 
     verify(importService).applyImport(bytes, request);
     verify(importService, never()).previewImport(any());
@@ -120,6 +146,25 @@ class P4kImportJobRunnerTest {
     verify(jobService).deletePayload(id);
     verify(jobService).pruneOldJobs();
     verify(cacheEvictionService).evictP4kSyncedMasterData();
+  }
+
+  @Test
+  void run_apply_actsUnderTheEnqueuingAdmin_andRestoresTheThreadAfterwards() {
+    UUID id = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    when(jobService.loadPayload(id)).thenReturn(bytes);
+    UUID admin = stubAdmin(id);
+    AtomicReference<Authentication> actingAs = new AtomicReference<>();
+    when(importService.applyImport(bytes, new P4kImportService.P4kApplyRequest(id, admin, false)))
+        .thenAnswer(_ -> {
+          actingAs.set(authHelperService.currentAuthentication().orElse(null));
+          return someResult();
+        });
+
+    runner.run(id, P4kImportJobKind.APPLY, false, ADMIN);
+
+    assertThat(actingAs.get()).isSameAs(ADMIN);
+    assertThat(authHelperService.currentAuthentication()).isEmpty();
   }
 
   @Test
@@ -131,7 +176,7 @@ class P4kImportJobRunnerTest {
     when(importService.applyImport(bytes, new P4kImportService.P4kApplyRequest(id, admin, false)))
         .thenThrow(new BadRequestException("empty catalog"));
 
-    runner.run(id, P4kImportJobKind.APPLY, false);
+    runner.run(id, P4kImportJobKind.APPLY, false, ADMIN);
 
     verify(jobService).markFailed(id, "empty catalog");
     verify(jobService).deletePayload(id);
@@ -145,7 +190,7 @@ class P4kImportJobRunnerTest {
     when(jobService.loadPayload(id)).thenReturn(bytes);
     when(importService.previewImport(bytes)).thenThrow(new BadRequestException("not valid JSON"));
 
-    runner.run(id, P4kImportJobKind.PREVIEW, false);
+    runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN);
 
     verify(jobService).markFailed(id, "not valid JSON");
     verify(jobService, never()).markSucceeded(any(), anyString());
@@ -160,7 +205,7 @@ class P4kImportJobRunnerTest {
     when(importService.previewImport(bytes)).thenReturn(someResult());
     doThrow(new RuntimeException("db down")).when(jobService).pruneOldJobs();
 
-    assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, false));
+    assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, false, ADMIN));
     verify(jobService).markSucceeded(eq(id), anyString());
   }
 }

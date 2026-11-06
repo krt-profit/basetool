@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -54,6 +55,8 @@ class SyncReportServiceTest {
   @Mock private AdminDashboardLiveSync adminDashboardLiveSync;
 
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private SyncReportService service;
 

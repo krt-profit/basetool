@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -67,12 +71,14 @@ public class P4kImportJobService {
   private final P4kImportJobPayloadRepository payloadRepository;
   private final MeterRegistry meterRegistry;
   private final AdminDashboardLiveSync adminDashboardLiveSync;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Enqueues a new {@link P4kImportJobKind#PREVIEW PREVIEW} job in state {@link
    * P4kImportJobStatus#PENDING PENDING}, persisting the gate-checked upload, compressed, into the
-   * payload side table. The returned job is committed when this method returns, so the async worker
-   * (triggered afterwards) is guaranteed to see the row.
+   * payload side table, and records the enqueue as a {@code CATALOGUE} audit event with the job as
+   * subject and the Build (REQ-P4K-046). The returned job is committed when this method returns, so
+   * the async worker (triggered afterwards) is guaranteed to see the row.
    *
    * @param upload the upload the gate accepted
    * @param filename the original upload filename for display, or {@code null}
@@ -95,6 +101,13 @@ public class P4kImportJobService {
     payload.setJobId(job.getId());
     payload.setContent(upload.storedPayload());
     payloadRepository.save(payload);
+    P4kBuild build = upload.build();
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_P4K_PREVIEW_ENQUEUED,
+        job.getId(),
+        build.version(),
+        null,
+        AuditDetails.of("branch", build.branch()).with("change", build.changeNumber()));
     return job;
   }
 

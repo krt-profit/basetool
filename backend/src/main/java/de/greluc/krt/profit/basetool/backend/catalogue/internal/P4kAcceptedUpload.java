@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -26,5 +27,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param storedPayload the bytes the job stores, always compressed (REQ-P4K-002)
  * @param uploadedBytes the size of the file as uploaded
+ * @param build the Build the catalogue names, which the gate requires
  */
-public record P4kAcceptedUpload(byte @NotNull [] storedPayload, long uploadedBytes) {}
+public record P4kAcceptedUpload(
+    byte @NotNull [] storedPayload, long uploadedBytes, @NotNull P4kBuild build) {}

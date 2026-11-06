@@ -26,11 +26,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
@@ -40,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kAcceptedUploa
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
@@ -69,9 +74,13 @@ class P4kImportJobServiceTest {
   @Mock private P4kImportJobRepository jobRepository;
   @Mock private P4kImportJobPayloadRepository payloadRepository;
   @Mock private AdminDashboardLiveSync adminDashboardLiveSync;
+  @Mock private AuditRecorder auditRecorder;
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private P4kImportJobService service;
+
+  private static final P4kBuild BUILD =
+      new P4kBuild("sc-alpha-4.3.2", "4.3.2-LIVE.9876543", "9876543", "b-1", null);
 
   /**
    * Reads the current value of the terminal-outcome counter for a bounded {@code outcome} / {@code
@@ -119,7 +128,7 @@ class P4kImportJobServiceTest {
     UUID user = UUID.randomUUID();
 
     P4kImportJob job =
-        service.createPreviewJob(new P4kAcceptedUpload(bytes, 9000L), "p4k.json", user);
+        service.createPreviewJob(new P4kAcceptedUpload(bytes, 9000L, BUILD), "p4k.json", user);
 
     assertEquals(P4kImportJobKind.PREVIEW, job.getKind());
     assertEquals(P4kImportJobStatus.PENDING, job.getStatus());
@@ -133,6 +142,26 @@ class P4kImportJobServiceTest {
     verify(payloadRepository).save(payload.capture());
     assertEquals(job.getId(), payload.getValue().getJobId());
     assertArrayEquals(bytes, payload.getValue().getContent());
+  }
+
+  @Test
+  void createPreviewJob_recordsOneCatalogueEventWithTheJobAndItsBuild() {
+    stubSaveAssignsId();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+
+    P4kImportJob job =
+        service.createPreviewJob(
+            new P4kAcceptedUpload(bytes, 2L, BUILD), "p4k.json", UUID.randomUUID());
+
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.CATALOGUE_P4K_PREVIEW_ENQUEUED),
+            eq(job.getId()),
+            eq("4.3.2-LIVE.9876543"),
+            isNull(),
+            argThat(details ->
+                details != null
+                    && "branch=sc-alpha-4.3.2 change=9876543".equals(details.toString())));
   }
 
   @Test
