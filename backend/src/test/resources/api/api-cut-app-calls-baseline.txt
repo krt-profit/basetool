@@ -209,10 +209,10 @@ GET /api/v1/personal-blueprints/overview/owners q=productKey f=orgUnitMember,own
 DELETE /api/v1/personal-blueprints/{id} q=- f=- s=PersonalBlueprintRepository.remove.726ad476
 PUT /api/v1/personal-blueprints/{id} q=- f=acquiredAt,createdAt,id,note,productKey,productName,removable,source,sourceClientId,sourceClientName,updatedAt,version s=PersonalBlueprintRepository.updateNote.f9642a67
 GET /api/v1/personal-blueprints/{id}/recipe q=- f=ingredients,kind,label,minQuality,name,productName,quantityScu,quantityType,quantityUnits,requiredCount,requirementGroups,variantCount s=PersonalBlueprintRepository.recipe.3496e823
-GET /api/v1/personal-inventory q=page,q,size f=content,createdAt,id,locationName,locationType,locationUexId,name,note,page,quantity,size,sort,totalElements,totalPages,updatedAt,version s=PersonalInventoryRepository.page.0b7a8171
-POST /api/v1/personal-inventory q=- f=createdAt,id,locationName,locationType,locationUexId,name,note,quantity,updatedAt,version s=PersonalInventoryRepository.create.b5ed83c2
+GET /api/v1/personal-inventory q=page,q,size f=content,createdAt,id,locationId,locationName,locationType,name,note,page,quantity,size,sort,totalElements,totalPages,updatedAt,version s=PersonalInventoryRepository.page.0b7a8171
+POST /api/v1/personal-inventory q=- f=createdAt,id,locationId,locationName,locationType,name,note,quantity,updatedAt,version s=PersonalInventoryRepository.create.b5ed83c2
 DELETE /api/v1/personal-inventory/{id} q=- f=- s=PersonalInventoryRepository.delete.aaef9c67
-PUT /api/v1/personal-inventory/{id} q=- f=createdAt,id,locationName,locationType,locationUexId,name,note,quantity,updatedAt,version s=PersonalInventoryRepository.update.df78bb28
+PUT /api/v1/personal-inventory/{id} q=- f=createdAt,id,locationId,locationName,locationType,name,note,quantity,updatedAt,version s=PersonalInventoryRepository.update.df78bb28
 POST /api/v1/refinery-orders q=- f=category,code,description,displayName,durationMinutes,effectiveName,expenses,goods,id,inputMaterial,inputQuantity,isIllegal,location,mission,name,oreSales,otherExpenses,outputMaterial,outputQuantity,owner,owningOrgUnitId,owningSquadron,plannedStartTime,profit,quality,quantityType,ratingCost,ratingSpeed,ratingYield,refinedMaterial,refiningMethod,shorthand,startedAt,status,type,username,version,yieldBonusPercent s=RefineryRepository.createOrder.4be1b312
 GET /api/v1/refinery-orders/all q=page,size,sort,status f=code,content,description,displayName,durationMinutes,effectiveName,endsAt,expenses,goods,id,inputMaterial,inputQuantity,location,mission,name,oreSales,otherExpenses,outputMaterial,outputQuantity,owner,owningSquadron,page,plannedStartTime,profit,quality,ratingCost,ratingSpeed,ratingYield,refiningMethod,shorthand,size,sort,startedAt,status,totalElements,totalPages,username,version,yieldBonusPercent s=RefineryRepository.myOrders.b4a5ce32
 DELETE /api/v1/refinery-orders/{id} q=- f=- s=RefineryRepository.deleteOrder.b6a27a33
@@ -226,7 +226,7 @@ GET /api/v1/terminals q=page,size,sort f=content,id,name,page,size,sort,starSyst
 POST /api/v1/terms/acceptance q=- f=accepted,currentVersion s=TermsRepository.accept.36882543
 GET /api/v1/terms/document q=- f=bullets,clauses,heading,intro,lastUpdated,sections,text,title,version s=TermsRepository.document.bf821e5f
 GET /api/v1/terms/status q=- f=accepted,currentVersion s=TermsRepository.status.7e74e2fb
-GET /api/v1/uex/locations/search q=limit,q f=name,parentName,starSystemName,type,uexId s=PersonalInventoryRepository.locations.cd53c714
+GET /api/v1/personal-inventory/locations q=limit,q f=id,name,parentName,starSystemName,type s=PersonalInventoryRepository.locations.cd53c714
 GET /api/v1/users/me q=- f=description,displayName,effectiveName,id,lastReadAnnouncementId,name,permissions,roles,shorthand,squadron,username,version s=AnnouncementRepository.lastRead.9445449b,IdentityRepository.me.5dba6c4f
 GET /api/v1/users/me/blueprint-sharing q=- f=shareBlueprintsGlobally,version s=MemberPreferencesRepository.blueprintSharing.2699b0b9
 PUT /api/v1/users/me/blueprint-sharing q=- f=shareBlueprintsGlobally,version s=MemberPreferencesRepository.setBlueprintSharing.5736e95c

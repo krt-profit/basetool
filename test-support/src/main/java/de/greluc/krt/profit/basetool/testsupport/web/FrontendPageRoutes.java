@@ -189,7 +189,7 @@ public final class FrontendPageRoutes {
           "/pending-approval/status",
           "/personal-inventory/blueprints/craftability",
           "/personal-inventory/blueprints/search",
-          "/personal-inventory/uex-search",
+          "/personal-inventory/location-search",
           "/users/search",
           "/users/search-bank",
           "/notifications/stream");

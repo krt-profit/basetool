@@ -105,8 +105,6 @@ public final class SessionTypeAllowList {
               + "$JobOrderItemMaterialForm",
           "de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm",
           "de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryForm",
-          "de.greluc.krt.profit.basetool.frontend.personalinventory.model"
-              + ".PersonalInventoryLocationType",
           "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueCode",
           "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto",
           "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueSeverity",

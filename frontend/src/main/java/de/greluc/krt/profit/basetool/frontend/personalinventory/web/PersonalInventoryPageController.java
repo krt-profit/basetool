@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.personalinventory.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -34,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalIn
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -44,13 +44,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.event.Level;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -135,7 +135,9 @@ public class PersonalInventoryPageController {
   @NotNull
   @PostMapping("/add")
   public String add(
-      @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
+      @Validated({Default.class, PersonalInventoryForm.Create.class})
+          @ModelAttribute("personalInventoryForm")
+          PersonalInventoryForm form,
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes) {
@@ -149,11 +151,7 @@ public class PersonalInventoryPageController {
     try {
       PersonalInventoryItemCreateRequest request =
           new PersonalInventoryItemCreateRequest(
-              form.getName(),
-              form.getNote(),
-              form.getLocationUexId(),
-              form.getLocationType(),
-              form.getQuantity());
+              form.getName(), form.getNote(), form.getLocationId(), form.getQuantity());
       personalInventoryClient.create(request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
     } catch (Exception e) {
@@ -195,8 +193,7 @@ public class PersonalInventoryPageController {
           new PersonalInventoryItemUpdateRequest(
               form.getName(),
               form.getNote(),
-              form.getLocationUexId(),
-              form.getLocationType(),
+              form.getLocationId(),
               form.getQuantity(),
               form.getVersion());
       personalInventoryClient.update(id, request);
@@ -269,8 +266,6 @@ public class PersonalInventoryPageController {
     if (request == null
         || request.name() == null
         || request.name().isBlank()
-        || request.locationUexId() == null
-        || request.locationType() == null
         || request.quantity() == null
         || request.quantity() < 1) {
       return validationProblem();
@@ -304,8 +299,8 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Validates the JSON create payload like the {@code PersonalInventoryForm} constraints: name,
-   * location id and type present, quantity at least one.
+   * Validates the JSON create payload like the {@code PersonalInventoryForm} constraints: name and
+   * location id present, quantity at least one.
    *
    * @param request the create payload to validate
    * @return {@code true} when a required field is missing or out of range
@@ -314,8 +309,7 @@ public class PersonalInventoryPageController {
     return request == null
         || request.name() == null
         || request.name().isBlank()
-        || request.locationUexId() == null
-        || request.locationType() == null
+        || request.locationId() == null
         || request.quantity() == null
         || request.quantity() < 1;
   }
@@ -332,27 +326,6 @@ public class PersonalInventoryPageController {
     body.put("status", 422);
     body.put("code", "VALIDATION");
     return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
-  }
-
-  /**
-   * AJAX endpoint backing the KRT-styled UEX location typeahead. The frontend module deliberately
-   * proxies through itself rather than letting the browser hit the backend directly so that the
-   * same Spring Security session and CSRF policy apply.
-   */
-  @GetMapping("/uex-search")
-  @ResponseBody
-  public List<UexLocationDto> uexSearch(
-      @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
-    String query = q == null ? "" : q;
-    int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 2000);
-    List<UexLocationDto> result =
-        SectionFallback.load(
-            log,
-            Level.DEBUG,
-            "uex-location-search",
-            () -> personalInventoryClient.searchLocations(query, effectiveLimit),
-            Collections.emptyList());
-    return result == null ? Collections.emptyList() : result;
   }
 
   /**

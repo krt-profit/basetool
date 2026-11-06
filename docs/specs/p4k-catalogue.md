@@ -23,7 +23,7 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 
 > [!note] Partly implemented
 > REQ-P4K-001…005, REQ-P4K-007…010 and REQ-P4K-045 are implemented (#3031), REQ-P4K-033 is
-> implemented (#3041); every other
+> implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -879,16 +879,43 @@ rule, survives re-imports and is an audit event (REQ-P4K-046).
 
 ### REQ-P4K-039 — no feature references a location by an external id
 
-`personal_inventory_item.location_uex_id` and `location_type` move to a UUID foreign key; the name
+`personal_inventory_item.location_uex_id` and `location_type` move to a UUID foreign key on the
+storage place, `personal_inventory_item.location_id` → `location.id` (`ON DELETE SET NULL`); the name
 snapshot stays. This step is independent of the P4K import and may ship at any time.
+
+The owner's decision (@greluc, 2026-11-05) fixes the edges:
+
+- **Every resolvable row gets a key.** A city or space station a row references that has no
+  `location` row yet gets one, linked to it and marked `location.reference_only`. A name already
+  taken falls back to `<name> (UEX city|space station <id>)`.
+- **A reference-only row is offered nowhere else.** The storage-place lists and pickers, the hangar
+  and stock pickers, the home locations, the refinery locations and the exchange catalogue and
+  resolver skip it; only a lookup by id or by city / station reaches it. The UEX universe sync keeps
+  its name in step with the place and clears the marker once the place is live; a live place adopts
+  the reference-only row of its city or station instead of creating a second one.
+- **The member picker** (`GET /api/v1/personal-inventory/locations`, the admin twin
+  `…/admin/{userId}/locations`) offers every non-hidden, non-reference-only location plus every
+  location one of the owner's own items already references. A write accepts exactly those, so every
+  existing row stays editable, including one on a reference-only or hidden place.
+- **An unresolvable row stays.** A row whose UEX id resolves to no city or station keeps its
+  snapshot with a `null` key; an update may keep it so, while dropping the key of a row that has one
+  is a `400`. The API shows such a row with `locationId` and `locationType` `null`.
+- `locationType` (`CITY`, `SPACE_STATION`, `OTHER`) is derived from the location's link for the
+  marker only and is no longer stored.
 
 **Acceptance**
 
-- [ ] The migration maps every personal-inventory row with a resolvable UEX id onto the location's
-  UUID and keeps the name snapshot.
+- [x] The migration maps every personal-inventory row with a resolvable UEX id onto the location's
+  UUID and keeps the name snapshot; the test covers an existing location, a created reference-only
+  one shared by two rows, a taken name, and two unresolvable rows (a city and a station id).
+- [x] No storage-place list, picker or exchange read returns a reference-only row; the sync clears
+  the marker of a place that becomes live.
+- [x] The member picker and the write accept an offered location or one the owner already uses, and
+  nothing else.
 
-**Enforced by (planned):** the migration test of the personal-inventory location key · **ADR:**
-[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+**Enforced by:** `V340MigrationTest`, `LocationRepositoryTest`, `UexUniverseSyncServiceTest`,
+`PersonalInventoryItemRepositoryTest`, `PersonalInventoryItemServiceTest` · **ADR:**
+[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3043
 
 ## Loadouts and paints
 

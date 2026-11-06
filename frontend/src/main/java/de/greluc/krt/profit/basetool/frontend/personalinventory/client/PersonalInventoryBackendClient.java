@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.personalinventory.client;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,15 +39,21 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Typed backend client of the personal-inventory domain: the caller's own items, the admin
- * management of a member's items and the UEX location type-ahead behind the item form, over {@link
+ * management of a member's items and the location type-ahead behind the item form, over {@link
  * BackendApiClient} (plan §5.9, ADR-0032).
  */
 @Service
 @RequiredArgsConstructor
 public class PersonalInventoryBackendClient {
 
-  private static final ParameterizedTypeReference<List<UexLocationDto>> UEX_LOCATION_LIST =
-      new ParameterizedTypeReference<>() {};
+  /** The type-ahead's result cap when the page names none. */
+  private static final int DEFAULT_LOCATION_LIMIT = 25;
+
+  /** The largest type-ahead result the backend serves. */
+  private static final int MAX_LOCATION_LIMIT = 2000;
+
+  private static final ParameterizedTypeReference<List<PersonalInventoryLocationOption>>
+      LOCATION_LIST = new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
       ITEM_PAGE = new ParameterizedTypeReference<>() {};
@@ -144,16 +150,49 @@ public class PersonalInventoryBackendClient {
   }
 
   /**
-   * Searches the UEX locations by name for the item form's type-ahead.
+   * Searches the locations the caller may pick, by name, for the item form's type-ahead.
    *
    * @param q the name fragment, empty for the first locations
-   * @param limit the result cap
+   * @param limit the result cap, {@code null} for 25, clamped to {@code [1, 2000]}
    * @return the locations, or {@code null} when the backend sent no body
    */
   @Nullable
-  public List<UexLocationDto> searchLocations(@NotNull String q, int limit) {
+  public List<PersonalInventoryLocationOption> searchLocations(
+      @NotNull String q, @Nullable Integer limit) {
     return backendApiClient.get(
-        "/api/v1/uex/locations/search?q={q}&limit={limit}", UEX_LOCATION_LIST, q, limit);
+        "/api/v1/personal-inventory/locations?q={q}&limit={limit}",
+        LOCATION_LIST,
+        q,
+        locationLimit(limit));
+  }
+
+  /**
+   * Searches the locations a member's items may take, by name, for the admin item form.
+   *
+   * @param userSub the member's Keycloak {@code sub}
+   * @param q the name fragment, empty for the first locations
+   * @param limit the result cap, {@code null} for 25, clamped to {@code [1, 2000]}
+   * @return the locations, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<PersonalInventoryLocationOption> searchMemberLocations(
+      @NotNull UUID userSub, @NotNull String q, @Nullable Integer limit) {
+    return backendApiClient.get(
+        "/api/v1/personal-inventory/admin/{userSub}/locations?q={q}&limit={limit}",
+        LOCATION_LIST,
+        userSub,
+        q,
+        locationLimit(limit));
+  }
+
+  /**
+   * Applies the type-ahead's default and bounds to a requested result cap.
+   *
+   * @param limit the requested cap, or {@code null}
+   * @return the cap sent to the backend
+   */
+  private static int locationLimit(@Nullable Integer limit) {
+    return limit == null ? DEFAULT_LOCATION_LIMIT : Math.clamp(limit, 1, MAX_LOCATION_LIMIT);
   }
 
   /**

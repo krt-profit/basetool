@@ -462,6 +462,8 @@ DELETE /api/v1/personal-inventory/admin/items/{id} | AdminPersonalInventoryContr
 PUT /api/v1/personal-inventory/admin/items/{id} | AdminPersonalInventoryController#updateForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/personal-inventory/admin/{userId} | AdminPersonalInventoryController#listForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/personal-inventory/admin/{userId} | AdminPersonalInventoryController#createForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/personal-inventory/admin/{userId}/locations | AdminPersonalInventoryController#searchSelectableLocationsForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/personal-inventory/locations | PersonalInventoryController#searchSelectableLocations | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
 DELETE /api/v1/personal-inventory/{id} | PersonalInventoryController#delete | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
 GET /api/v1/personal-inventory/{id} | PersonalInventoryController#get | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
 PUT /api/v1/personal-inventory/{id} | PersonalInventoryController#update | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
@@ -603,7 +605,6 @@ GET /api/v1/terms/admin | AdminTermsController#listAcceptanceStatus | pre=hasRol
 GET /api/v1/terms/admin/pending-count | AdminTermsController#getPendingCount | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/terms/document | TermsDocumentController#document | pre=permitAll() | url=GET /api/v1/terms/document -> permitAll
 GET /api/v1/terms/status | TermsController#getStatus | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/uex/locations/search | UexLocationController#search | pre=isAuthenticated() | url=/api/v1/uex/locations/** -> authenticated
 GET /api/v1/users | UserProfileController#getAllUsers | pre=hasAnyRole('ADMIN', 'KRT_MEMBER') | url=GET /api/v1/users -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER)
 GET /api/v1/users/admin/deletion-requests | AdminDeletionRequestController#pending | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/users/admin/deletion-requests/{id}/decline | AdminDeletionRequestController#decline | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)

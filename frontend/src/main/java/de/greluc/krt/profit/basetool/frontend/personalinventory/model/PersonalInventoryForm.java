@@ -33,6 +33,9 @@ import lombok.Data;
 @Data
 public class PersonalInventoryForm {
 
+  /** Validation group of the create form, which alone requires a location. */
+  public interface Create {}
+
   /** Optional: only present when editing an existing item. */
   private UUID id;
 
@@ -43,11 +46,12 @@ public class PersonalInventoryForm {
   @Size(max = 2000, message = "{personalInventory.validation.note.tooLong}")
   private String note;
 
-  @NotNull(message = "{personalInventory.validation.location.required}")
-  private Integer locationUexId;
-
-  @NotNull(message = "{personalInventory.validation.location.required}")
-  private PersonalInventoryLocationType locationType;
+  /**
+   * The {@code location.id} picked in the type-ahead; required on create, and empty on update only
+   * for an item whose place no longer resolves (REQ-P4K-039).
+   */
+  @NotNull(message = "{personalInventory.validation.location.required}", groups = Create.class)
+  private UUID locationId;
 
   /** Display snapshot used to repopulate the typeahead input on validation re-render. */
   private String locationName;

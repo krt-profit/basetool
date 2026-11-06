@@ -26,11 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationOption;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationType;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,35 +39,41 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-unit test for the {@code /personal-inventory/uex-search} typeahead endpoint exposed by
- * {@link PersonalInventoryPageController}. Verifies the URL composition, default and clamped
- * limits, and the silent fallback to an empty list on backend failures (so the typeahead never
- * shows a stack trace to the user).
+ * Pure-unit test for the {@code /personal-inventory/location-search} typeahead endpoint exposed by
+ * {@link PersonalInventoryLocationSearchController}. Verifies the URL composition, default and
+ * clamped limits, and the silent fallback to an empty list on backend failures (so the typeahead
+ * never shows a stack trace to the user).
  */
 @ExtendWith(MockitoExtension.class)
-class PersonalInventoryUexSearchTest {
+class PersonalInventoryLocationSearchTest {
 
-  private static final String SEARCH_URI = "/api/v1/uex/locations/search?q={q}&limit={limit}";
+  private static final String SEARCH_URI =
+      "/api/v1/personal-inventory/locations?q={q}&limit={limit}";
 
   @Mock private BackendApiClient backendApiClient;
 
-  private PersonalInventoryPageController controller;
+  private PersonalInventoryLocationSearchController controller;
 
   @BeforeEach
   void setUp() {
     controller =
-        new PersonalInventoryPageController(new PersonalInventoryBackendClient(backendApiClient));
+        new PersonalInventoryLocationSearchController(
+            new PersonalInventoryBackendClient(backendApiClient));
   }
 
   @Test
-  void uexSearch_delegatesToBackend_andDefaultsLimitTo25() {
-    UexLocationDto dto =
-        new UexLocationDto(
-            42, PersonalInventoryLocationType.CITY, "Lorville", "Stanton", "Hurston");
+  void locationSearch_delegatesToBackend_andDefaultsLimitTo25() {
+    PersonalInventoryLocationOption dto =
+        new PersonalInventoryLocationOption(
+            UUID.randomUUID(),
+            PersonalInventoryLocationType.CITY,
+            "Lorville",
+            "Stanton",
+            "Hurston");
     when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("lor"), eq(25)))
         .thenReturn(List.of(dto));
 
-    List<UexLocationDto> result = controller.uexSearch("lor", null);
+    List<PersonalInventoryLocationOption> result = controller.locationSearch("lor", null);
 
     assertNotNull(result);
     assertEquals(1, result.size());
@@ -74,21 +81,21 @@ class PersonalInventoryUexSearchTest {
   }
 
   @Test
-  void uexSearch_clampsLimit_to2000() {
+  void locationSearch_clampsLimit_to2000() {
     when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("x"), eq(2000)))
         .thenReturn(List.of());
 
-    List<UexLocationDto> result = controller.uexSearch("x", 9999);
+    List<PersonalInventoryLocationOption> result = controller.locationSearch("x", 9999);
 
     assertTrue(result.isEmpty());
   }
 
   @Test
-  void uexSearch_returnsEmptyList_whenBackendThrows() {
+  void locationSearch_returnsEmptyList_whenBackendThrows() {
     when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("anything"), eq(25)))
         .thenThrow(new RuntimeException("boom"));
 
-    List<UexLocationDto> result = controller.uexSearch("anything", 25);
+    List<PersonalInventoryLocationOption> result = controller.locationSearch("anything", 25);
 
     assertNotNull(result);
     assertTrue(result.isEmpty());

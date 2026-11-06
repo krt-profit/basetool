@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
@@ -128,8 +127,6 @@ class DataExportIntegrationTest {
       item.setName("Probe");
       item.setQuantity(1);
       item.setNote(note);
-      item.setLocationUexId(1);
-      item.setLocationType(PersonalInventoryLocationType.values()[0]);
       item.setLocationNameSnapshot("Testort");
       seededItems.add(personalInventoryItemRepository.save(item).getId());
     });

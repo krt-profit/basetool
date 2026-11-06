@@ -37,7 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.web.PersonalInventoryBlu
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
-import de.greluc.krt.profit.basetool.frontend.personalinventory.web.PersonalInventoryPageController;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.web.PersonalInventoryLocationSearchController;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -102,15 +102,16 @@ class TypeaheadQueryLoggingTest {
   }
 
   @Test
-  void uexTypeahead_logsWithoutTheQueryAtDebugNotWarn() {
+  void locationTypeahead_logsWithoutTheQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
-    ListAppender<ILoggingEvent> appender = capture(PersonalInventoryPageController.class);
+    ListAppender<ILoggingEvent> appender = capture(PersonalInventoryLocationSearchController.class);
 
     assertThat(
-            new PersonalInventoryPageController(new PersonalInventoryBackendClient(client))
-                .uexSearch(FORGED_QUERY, 25))
+            new PersonalInventoryLocationSearchController(
+                    new PersonalInventoryBackendClient(client))
+                .locationSearch(FORGED_QUERY, 25))
         .isEmpty();
 
     assertSanitisedAt(appender, Level.DEBUG);

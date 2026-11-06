@@ -20,16 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.UUID;
 
 /**
  * Outbound write DTO for updating an existing personal inventory entry. The {@code version} field
- * is mandatory on the backend (optimistic locking).
+ * is mandatory on the backend (optimistic locking); {@code locationId} is empty only for an item
+ * whose place no longer resolves.
  */
 @DtoMirror
 public record PersonalInventoryItemUpdateRequest(
-    String name,
-    String note,
-    Integer locationUexId,
-    PersonalInventoryLocationType locationType,
-    Integer quantity,
-    Long version) {}
+    String name, String note, UUID locationId, Integer quantity, Long version) {}

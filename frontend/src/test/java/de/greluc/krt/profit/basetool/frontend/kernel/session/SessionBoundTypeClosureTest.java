@@ -63,7 +63,7 @@ class SessionBoundTypeClosureTest {
   private static final int MIN_WRITES = 317;
 
   /** Selection floor: session-bound application types when the test was added. */
-  private static final int MIN_APPLICATION_TYPES = 21;
+  private static final int MIN_APPLICATION_TYPES = 20;
 
   /**
    * Session writes whose static type the scan cannot determine, resolved by review: {@code site ->

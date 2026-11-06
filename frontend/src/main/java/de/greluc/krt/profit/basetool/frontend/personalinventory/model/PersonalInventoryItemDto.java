@@ -29,7 +29,7 @@ public record PersonalInventoryItemDto(
     UUID id,
     String name,
     String note,
-    Integer locationUexId,
+    UUID locationId,
     PersonalInventoryLocationType locationType,
     String locationName,
     Integer quantity,

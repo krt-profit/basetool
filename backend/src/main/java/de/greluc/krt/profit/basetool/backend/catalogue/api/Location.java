@@ -78,4 +78,12 @@ public class Location extends AbstractEntity<UUID> {
    */
   @Column(name = "is_home_location", nullable = false)
   private Boolean homeLocation = false;
+
+  /**
+   * Marks a place kept only so personal-inventory rows resolve (REQ-P4K-039): a city or space
+   * station that is not live. No storage-place picker, list or exchange read offers such a row; the
+   * UEX universe sync keeps its name and clears the marker once the place is live.
+   */
+  @Column(name = "reference_only", nullable = false)
+  private Boolean referenceOnly = false;
 }

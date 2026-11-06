@@ -118,6 +118,7 @@
 /admin/personal-blueprints/{userSub}/items/{id}/update-note POST -> AdminPersonalBlueprintsPageController#updateNote gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory GET -> AdminPersonalInventoryPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/add POST -> AdminPersonalInventoryPageController#add gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-inventory/{userSub}/location-search GET -> PersonalInventoryLocationSearchController#memberLocationSearch gate=method:hasRole('ADMIN') layout=no
 /admin/personal-inventory/{userSub}/{id}/delete POST -> AdminPersonalInventoryPageController#delete gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/{id}/update POST -> AdminPersonalInventoryPageController#update gate=class:hasRole('ADMIN') layout=yes
 /admin/purchasing GET -> PurchasingPageController#adminSettings gate=method:hasRole('ADMIN') layout=yes
@@ -560,7 +561,7 @@
 /personal-inventory/blueprints/{id}/recipe GET -> PersonalInventoryBlueprintsPageController#recipe gate=class:isAuthenticated() layout=yes
 /personal-inventory/blueprints/{id}/update-note POST -> PersonalInventoryBlueprintsPageController#updateNote gate=class:isAuthenticated() layout=yes
 /personal-inventory/blueprints/{id}/update-note POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryBlueprintsPageController#updateNoteAjax gate=class:isAuthenticated() layout=yes
-/personal-inventory/uex-search GET -> PersonalInventoryPageController#uexSearch gate=class:isAuthenticated() layout=yes
+/personal-inventory/location-search GET -> PersonalInventoryLocationSearchController#locationSearch gate=class:isAuthenticated() layout=no
 /personal-inventory/{id}/delete POST -> PersonalInventoryPageController#delete gate=class:isAuthenticated() layout=yes
 /personal-inventory/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryPageController#deleteAjax gate=class:isAuthenticated() layout=yes
 /personal-inventory/{id}/update POST -> PersonalInventoryPageController#update gate=class:isAuthenticated() layout=yes

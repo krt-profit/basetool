@@ -28,3 +28,8 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO city (id, name, id_city, has_refinery)
 VALUES ('66666666-6666-6666-6666-666666666666', 'E2E Personal Inventory City', 900001, false)
 ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO location (id, name, city_id, hidden)
+VALUES ('88888888-8888-8888-8888-888888888888', 'E2E Personal Inventory City',
+        '66666666-6666-6666-6666-666666666666', false)
+ON CONFLICT (id) DO NOTHING;

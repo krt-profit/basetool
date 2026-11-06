@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationOption;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,6 +33,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -98,6 +100,28 @@ public class AdminPersonalInventoryController {
   }
 
   /**
+   * Searches the locations an item of the target user may take (REQ-P4K-039): every offered storage
+   * place plus every location one of that user's items references.
+   *
+   * @param userId target user's {@code app_user.id}
+   * @param q optional case-insensitive name fragment
+   * @param limit optional result cap, clamped to {@code [1, 2000]}, default 25
+   * @return the matching locations, by name
+   */
+  @GetMapping("/{userId}/locations")
+  @Operation(summary = "Search the locations a specific user's entries may take.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Up to 2000 matches, sorted by name."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+  })
+  public List<PersonalInventoryLocationOption> searchSelectableLocationsForUser(
+      @PathVariable UUID userId,
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) Integer limit) {
+    return service.searchLocations(userId, q, limit);
+  }
+
+  /**
    * Creates an item on behalf of the target user.
    *
    * @param userId target user's {@code app_user.id}
@@ -111,7 +135,7 @@ public class AdminPersonalInventoryController {
     @ApiResponse(responseCode = "201", description = "Item created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
-    @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
+    @ApiResponse(responseCode = "404", description = "Location unknown or not selectable.")
   })
   public PersonalInventoryItemResponse createForUser(
       @PathVariable UUID userId, @Valid @RequestBody PersonalInventoryItemCreateRequest request) {

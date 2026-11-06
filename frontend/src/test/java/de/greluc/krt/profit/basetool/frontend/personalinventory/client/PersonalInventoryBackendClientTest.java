@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarnes
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient.ItemQuery;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationType;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,12 +40,11 @@ class PersonalInventoryBackendClientTest {
   private static final UUID SUB = UUID.fromString("11111111-2222-3333-4444-555555555555");
   private static final String EMPTY_PAGE =
       "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}";
+  private static final UUID LOCATION = UUID.fromString("0c000001-0000-4000-8000-000000000001");
   private static final String CREATE_BODY =
-      "{\"name\":\"Medpen\",\"note\":null,\"locationUexId\":42,\"locationType\":\"CITY\","
-          + "\"quantity\":3}";
+      "{\"name\":\"Medpen\",\"note\":null,\"locationId\":\"" + LOCATION + "\",\"quantity\":3}";
   private static final String UPDATE_BODY =
-      "{\"name\":\"Medpen\",\"note\":\"Kiste 2\",\"locationUexId\":7,"
-          + "\"locationType\":\"SPACE_STATION\",\"quantity\":1,\"version\":4}";
+      "{\"name\":\"Medpen\",\"note\":\"Kiste 2\",\"locationId\":null,\"quantity\":1,\"version\":4}";
 
   private BackendClientHarness backend;
   private PersonalInventoryBackendClient client;
@@ -78,7 +76,7 @@ class PersonalInventoryBackendClientTest {
     client.create(create());
     client.update(ID, update());
     client.delete(ID);
-    assertThat(client.searchLocations("Lor ville", 25)).isEmpty();
+    assertThat(client.searchLocations("Lor ville", null)).isEmpty();
 
     backend.expect("GET", "/api/v1/personal-blueprints?size=1");
     backend.expect("GET", "/api/v1/personal-inventory?page=2&size=50&sort=name%2Casc&q=Med%20Pen");
@@ -86,7 +84,7 @@ class PersonalInventoryBackendClientTest {
     backend.expect("POST", "/api/v1/personal-inventory", CREATE_BODY);
     backend.expect("PUT", "/api/v1/personal-inventory/" + ID, UPDATE_BODY);
     backend.expect("DELETE", "/api/v1/personal-inventory/" + ID, null);
-    backend.expect("GET", "/api/v1/uex/locations/search?q=Lor%20ville&limit=25");
+    backend.expect("GET", "/api/v1/personal-inventory/locations?q=Lor%20ville&limit=25");
   }
 
   @Test
@@ -97,6 +95,7 @@ class PersonalInventoryBackendClientTest {
     backend.answerEmpty();
     backend.answerEmpty();
     backend.answerEmpty();
+    backend.answerJson("[]");
 
     client.user(SUB);
     assertThat(client.memberItemPage(SUB, new ItemQuery(1, 50, "name,asc", "Med Pen"))).isNotNull();
@@ -104,6 +103,7 @@ class PersonalInventoryBackendClientTest {
     client.createForMember(SUB, create());
     client.updateForMember(ID, update());
     client.deleteForMember(ID);
+    assertThat(client.searchMemberLocations(SUB, "Port", 9999)).isEmpty();
 
     backend.expect("GET", "/api/v1/users/" + SUB);
     backend.expect(
@@ -113,25 +113,25 @@ class PersonalInventoryBackendClientTest {
     backend.expect("POST", "/api/v1/personal-inventory/admin/" + SUB, CREATE_BODY);
     backend.expect("PUT", "/api/v1/personal-inventory/admin/items/" + ID, UPDATE_BODY);
     backend.expect("DELETE", "/api/v1/personal-inventory/admin/items/" + ID, null);
+    backend.expect(
+        "GET", "/api/v1/personal-inventory/admin/" + SUB + "/locations?q=Port&limit=2000");
   }
 
   /**
    * Builds the create body both create calls send.
    *
-   * @return a three-piece item at a city
+   * @return a three-piece item at a location
    */
   private static PersonalInventoryItemCreateRequest create() {
-    return new PersonalInventoryItemCreateRequest(
-        "Medpen", null, 42, PersonalInventoryLocationType.CITY, 3);
+    return new PersonalInventoryItemCreateRequest("Medpen", null, LOCATION, 3);
   }
 
   /**
    * Builds the update body both update calls send.
    *
-   * @return a one-piece item at a station, at version 4
+   * @return a one-piece item whose place no longer resolves, at version 4
    */
   private static PersonalInventoryItemUpdateRequest update() {
-    return new PersonalInventoryItemUpdateRequest(
-        "Medpen", "Kiste 2", 7, PersonalInventoryLocationType.SPACE_STATION, 1, 4L);
+    return new PersonalInventoryItemUpdateRequest("Medpen", "Kiste 2", null, 1, 4L);
   }
 }

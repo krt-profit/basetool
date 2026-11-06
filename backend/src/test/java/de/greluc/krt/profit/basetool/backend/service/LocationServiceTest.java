@@ -185,13 +185,15 @@ class LocationServiceTest {
     lorville.setName("Lorville");
     LocationDto orisonDto = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 0L);
     LocationDto lorvilleDto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 0L);
-    when(locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc())
+    when(locationRepository
+            .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc())
         .thenReturn(List.of(orison, lorville));
     when(locationMapper.toDto(orison)).thenReturn(orisonDto);
     when(locationMapper.toDto(lorville)).thenReturn(lorvilleDto);
 
     assertEquals(List.of(orisonDto, lorvilleDto), locationService.getHomeLocations());
-    verify(locationRepository, times(1)).findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+    verify(locationRepository, times(1))
+        .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc();
   }
 
   @Test
